@@ -10,6 +10,7 @@ import type { App } from 'obsidian';
 import { TFile } from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type { InstalledPack } from '#types/content-packs/contentPack.types';
+import type { TileEntry, TileLayerRole } from '#types/tiles/tile.types';
 import type { PckArchive } from './pckParser';
 import { extractFileData } from './pckParser';
 import type { DungeondraftPackMeta } from './pckMetadata';
@@ -19,6 +20,7 @@ import {
 	loadTileMetadata,
 	bulkSetImportTags,
 	bulkSetDdSourceType,
+	bulkSetDepthAffinity,
 	bulkSetWallStripInfo,
 	bulkMarkWallEndCaps,
 	saveTileMetadata,
@@ -90,6 +92,117 @@ function stemOf(filename: string): string {
 	return filename.replace(/\.(webp|png)$/i, '');
 }
 
+/**
+ * Vault folder (= drawer category) a texture lands in on extraction: strips
+ * stay in their source-type folder so `_end` caps sit beside their strips;
+ * tagged cell tiles go under their first pack tag; untagged ones under their
+ * source-relative subpath. The wizard's tier rows key on this same rule so
+ * step-② decisions land on the folders the user will actually see.
+ */
+function destFolderOf(
+	relativePath: string,
+	sourceType: string | null,
+	firstTag: string | undefined,
+): string {
+	if (sourceType != null && STRIP_SOURCE_TYPES.has(sourceType)) return sourceType;
+	if (firstTag != null) return firstTag.replace(/[\\:*?"<>|]/g, '_');
+	const parts = relativePath.split('/');
+	return parts.length > 2 ? parts.slice(1, -1).join('/') : parts[0] ?? 'misc';
+}
+
+/** Texture entries eligible for import (webp/png under the known source dirs). */
+function listTextureEntries(archive: PckArchive): PckArchive['files'] {
+	return archive.files.filter(f => {
+		if (!f.path.endsWith('.webp') && !f.path.endsWith('.png')) return false;
+		if (f.path.includes('/thumbnails/')) return false;
+		return TEXTURE_DIRS.some(dir => f.path.includes('/textures/' + dir + '/'));
+	});
+}
+
+/** Pack tag lookup tables keyed by relative texture path. */
+function buildPackTagIndex(
+	buffer: ArrayBuffer,
+	archive: PckArchive,
+): { pathToFirstTag: Map<string, string>; pathToAllTags: Map<string, string[]> } {
+	const pathToFirstTag = new Map<string, string>();
+	const pathToAllTags = new Map<string, string[]>();
+	const tags = parseDungeondraftTags(buffer, archive);
+	if (tags != null) {
+		for (const [tag, paths] of Object.entries(tags.tags)) {
+			for (const p of paths) {
+				if (!pathToFirstTag.has(p)) {
+					pathToFirstTag.set(p, tag);
+				}
+				const existing = pathToAllTags.get(p);
+				if (existing != null) {
+					existing.push(tag);
+				} else {
+					pathToAllTags.set(p, [tag]);
+				}
+			}
+		}
+	}
+	return { pathToFirstTag, pathToAllTags };
+}
+
+interface PckWizardAnalysis {
+	/**
+	 * Pseudo tile entries for the pack's CELL textures (strips excluded):
+	 * vaultPath = relative texture path, category = destination folder,
+	 * tags = pack tags. Feed these to aggregateFolderTiers/mineFilenameTags.
+	 */
+	cellTiles: TileEntry[];
+	/** Wall/path strip textures — line assets, not shown in tier/tag steps. */
+	stripCount: number;
+	/** Pack-shipped tags with cell-texture counts, descending. */
+	packTags: Array<{ tag: string; count: number }>;
+}
+
+/**
+ * In-memory analysis of a pack for the Add-tiles wizard steps ②③ —
+ * no extraction, no vault writes.
+ */
+function analyzePckForWizard(buffer: ArrayBuffer, archive: PckArchive): PckWizardAnalysis {
+	const { pathToFirstTag, pathToAllTags } = buildPackTagIndex(buffer, archive);
+	const cellTiles: TileEntry[] = [];
+	let stripCount = 0;
+	const tagCounts = new Map<string, number>();
+
+	for (const entry of listTextureEntries(archive)) {
+		const rel = toRelativeTexturePath(entry.path);
+		const sourceType = sourceTypeOf(rel);
+		if (sourceType != null && STRIP_SOURCE_TYPES.has(sourceType)) {
+			stripCount++;
+			continue;
+		}
+		const filename = rel.split('/').pop() ?? 'unknown';
+		const tags = pathToAllTags.get(rel);
+		cellTiles.push({
+			id: stemOf(filename),
+			filename,
+			vaultPath: rel,
+			category: destFolderOf(rel, sourceType, pathToFirstTag.get(rel)),
+			tags,
+		});
+		for (const t of tags ?? []) {
+			tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
+		}
+	}
+
+	const packTags = Array.from(tagCounts.entries())
+		.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+		.map(([tag, count]) => ({ tag, count }));
+	return { cellTiles, stripCount, packTags };
+}
+
+/** Wizard-confirmed decisions applied on top of the automatic import pipeline. */
+interface DdWizardDecisions {
+	/** Confirmed tier per destination folder (keys = destFolderOf values). */
+	tierByFolder?: ReadonlyMap<string, TileLayerRole>;
+	/** Extra (mined/manual) tags -> relative texture paths. */
+	extraTags?: ReadonlyArray<{ tag: string; rels: readonly string[] }>;
+}
+
 /** True for `_end` cap textures paired with a wall strip. */
 function isEndCapFilename(filename: string): boolean {
 	return /_end\.(webp|png)$/i.test(filename);
@@ -153,32 +266,21 @@ async function runDdImport(
 	archive: PckArchive,
 	meta: DungeondraftPackMeta,
 	onProgress?: DdProgressFn,
+	wizard?: DdWizardDecisions,
 ): Promise<DdImportResult> {
 	const basePath = CONTENT_PACKS_FOLDER + '/dungeondraft-packs/' + meta.id;
 	await ensureFolder(app, basePath);
 
-	const textures = archive.files.filter(f => {
-		if (!f.path.endsWith('.webp') && !f.path.endsWith('.png')) return false;
-		if (f.path.includes('/thumbnails/')) return false;
-		return TEXTURE_DIRS.some(dir => f.path.includes('/textures/' + dir + '/'));
-	});
+	const textures = listTextureEntries(archive);
 
-	const tags = parseDungeondraftTags(buffer, archive);
-	const pathToFirstTag = new Map<string, string>();
-	const pathToAllTags = new Map<string, string[]>();
-	if (tags != null) {
-		for (const [tag, paths] of Object.entries(tags.tags)) {
-			for (const p of paths) {
-				if (!pathToFirstTag.has(p)) {
-					pathToFirstTag.set(p, tag);
-				}
-				const existing = pathToAllTags.get(p);
-				if (existing != null) {
-					existing.push(tag);
-				} else {
-					pathToAllTags.set(p, [tag]);
-				}
-			}
+	const { pathToFirstTag, pathToAllTags } = buildPackTagIndex(buffer, archive);
+	// Wizard-applied (mined/manual) tags ride along with the pack tags so the
+	// extraction loop below writes them into importTags in one pass.
+	for (const { tag, rels } of wizard?.extraTags ?? []) {
+		for (const rel of rels) {
+			const existing = pathToAllTags.get(rel);
+			if (existing == null) pathToAllTags.set(rel, [tag]);
+			else if (!existing.includes(tag)) existing.push(tag);
 		}
 	}
 
@@ -196,6 +298,8 @@ async function runDdImport(
 	const ddSourceEntries: Array<{ vaultPath: string; sourceType: string }> = [];
 	// relativePath -> vault destPath, for resolving end-cap pairs after extraction
 	const relToDest = new Map<string, string>();
+	// destination folder -> extracted cell-tile vault paths (wizard tier application)
+	const cellDestsByFolder = new Map<string, string[]>();
 	let failedCount = 0;
 
 	for (let i = 0; i < textures.length; i++) {
@@ -205,20 +309,8 @@ async function runDdImport(
 		const sourceType = sourceTypeOf(relativePath);
 		const isStrip = sourceType != null && STRIP_SOURCE_TYPES.has(sourceType);
 
-		const tag = pathToFirstTag.get(relativePath);
-		let destPath: string;
-		if (isStrip) {
-			// Walls/paths always land in their source-type folder so `_end` caps
-			// stay beside their strips; DD tags would scatter the pairing.
-			destPath = basePath + '/' + sourceType + '/' + filename;
-		} else if (tag != null) {
-			const safeTag = tag.replace(/[\\:*?"<>|]/g, '_');
-			destPath = basePath + '/' + safeTag + '/' + filename;
-		} else {
-			const parts = relativePath.split('/');
-			const category = parts.length > 2 ? parts.slice(1, -1).join('/') : parts[0] ?? 'misc';
-			destPath = basePath + '/' + category + '/' + filename;
-		}
+		const folder = destFolderOf(relativePath, sourceType, pathToFirstTag.get(relativePath));
+		const destPath = basePath + '/' + folder + '/' + filename;
 
 		try {
 			const parentDir = destPath.substring(0, destPath.lastIndexOf('/'));
@@ -244,6 +336,11 @@ async function runDdImport(
 
 		// Record metadata only for files that actually landed in the vault.
 		relToDest.set(relativePath, destPath);
+		if (!isStrip) {
+			const folderDests = cellDestsByFolder.get(folder);
+			if (folderDests != null) folderDests.push(destPath);
+			else cellDestsByFolder.set(folder, [destPath]);
+		}
 		const allTags = pathToAllTags.get(relativePath);
 		if (allTags != null && allTags.length > 0) {
 			importTagEntries.push({ vaultPath: destPath, tags: allTags });
@@ -316,6 +413,20 @@ async function runDdImport(
 			metadata = passResult.metadata;
 		}
 
+		// Wizard step-② confirmations outrank the automatic predictions above —
+		// the user explicitly reviewed each folder's tier.
+		if (wizard?.tierByFolder != null && wizard.tierByFolder.size > 0) {
+			const tierEntries: Array<{ vaultPath: string; depth: TileLayerRole }> = [];
+			for (const [folder, dests] of cellDestsByFolder) {
+				const tier = wizard.tierByFolder.get(folder);
+				if (tier == null) continue;
+				for (const vaultPath of dests) tierEntries.push({ vaultPath, depth: tier });
+			}
+			if (tierEntries.length > 0) {
+				metadata = bulkSetDepthAffinity(metadata, tierEntries);
+			}
+		}
+
 		await saveTileMetadata(app, metadata);
 		// Push the freshly-written store into the renderer's accessor so any
 		// open map resolves the new per-tile render modes without a full reload.
@@ -366,6 +477,8 @@ export {
 	sourceTypeOf,
 	stemOf,
 	isEndCapFilename,
+	destFolderOf,
+	analyzePckForWizard,
 	STRIP_SOURCE_TYPES,
 };
-export type { AssetCounts, DdImportResult, DdProgressFn, PluginLike };
+export type { AssetCounts, DdImportResult, DdProgressFn, PluginLike, PckWizardAnalysis, DdWizardDecisions };

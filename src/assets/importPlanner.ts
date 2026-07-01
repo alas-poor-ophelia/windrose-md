@@ -99,16 +99,20 @@ export function mineFilenameTags(tiles: TileEntry[]): TagSuggestion[] {
   const byTag = new Map<string, { paths: string[]; sample: TagSuggestion['sample'] }>();
 
   for (const tile of tiles) {
-    // Tokens the subfolder already supplies via folderTags — redundant as
-    // mined suggestions for THIS tile (but still countable from other folders).
-    const folderTokens = new Set<string>();
+    // Tokens the tile already owns — via its subfolder (folderTags) or its
+    // existing tags (pack tags for DD imports) — are redundant as mined
+    // suggestions for THIS tile, but still countable from other tiles.
+    const ownedTokens = new Set<string>();
     for (const segment of (tile.category ?? '').split('/')) {
-      for (const tok of extractTokens(segment)) folderTokens.add(tok);
+      for (const tok of extractTokens(segment)) ownedTokens.add(tok);
+    }
+    for (const tag of tile.tags ?? []) {
+      for (const tok of extractTokens(tag)) ownedTokens.add(tok);
     }
 
     const seen = new Set<string>();
     for (const tok of extractTokens(tile.filename)) {
-      if (tok.length < TAG_MIN_LENGTH || NOISE.has(tok) || folderTokens.has(tok)) continue;
+      if (tok.length < TAG_MIN_LENGTH || NOISE.has(tok) || ownedTokens.has(tok)) continue;
       if (seen.has(tok)) continue;
       seen.add(tok);
 

@@ -8,6 +8,8 @@ import {
 	sourceTypeOf,
 	stemOf,
 	isEndCapFilename,
+	destFolderOf,
+	analyzePckForWizard,
 } from '../../../src/content-packs/ddImportCore';
 
 function buildPckBuffer(files: Array<{ path: string; data: Uint8Array }>): ArrayBuffer {
@@ -197,5 +199,77 @@ describe('parseWallSidecars', () => {
 		const sidecars = parseWallSidecars(buffer, archive);
 		expect(sidecars.has('Bad')).toBe(false);
 		expect(sidecars.get('Good')?.color).toBe('112233');
+	});
+});
+
+describe('destFolderOf', () => {
+	it('keeps strips in their source-type folder even when tagged', () => {
+		expect(destFolderOf('textures/walls/Wall_Stone_01.webp', 'walls', 'Fancy Tag')).toBe('walls');
+		expect(destFolderOf('textures/paths/Path_Dirt_01.webp', 'paths', undefined)).toBe('paths');
+	});
+
+	it('routes tagged cell tiles under their sanitized first tag', () => {
+		expect(destFolderOf('textures/objects/Furniture/Chair_01.webp', 'objects', 'Furniture Wood'))
+			.toBe('Furniture Wood');
+		expect(destFolderOf('textures/objects/X.webp', 'objects', 'Bad:Tag?')).toBe('Bad_Tag_');
+	});
+
+	it('routes untagged cell tiles under their source-relative subpath', () => {
+		expect(destFolderOf('textures/objects/Furniture/Beds/Bed_01.webp', 'objects', undefined))
+			.toBe('objects/Furniture/Beds');
+		expect(destFolderOf('textures/terrain/Grass_01.webp', 'terrain', undefined)).toBe('terrain');
+	});
+});
+
+describe('analyzePckForWizard', () => {
+	function buildWizardPack(): ArrayBuffer {
+		const tagsJson = JSON.stringify({
+			tags: {
+				'Furniture Wood': [
+					'textures/objects/Furniture/Chair_01.webp',
+					'textures/objects/Furniture/Table_01.webp',
+				],
+			},
+		});
+		return buildPckBuffer([
+			{ path: 'res://packs/t1/pack.json', data: enc('{}') },
+			{ path: 'res://packs/t1/data/default.dungeondraft_tags', data: enc(tagsJson) },
+			{ path: 'res://packs/t1/textures/objects/Furniture/Chair_01.webp', data: px },
+			{ path: 'res://packs/t1/textures/objects/Furniture/Table_01.webp', data: px },
+			{ path: 'res://packs/t1/textures/terrain/Grass_01.webp', data: px },
+			{ path: 'res://packs/t1/textures/walls/Wall_Stone_01.webp', data: px },
+		]);
+	}
+
+	it('builds cell pseudo-tiles keyed by destination folder, excluding strips', () => {
+		const buffer = buildWizardPack();
+		const analysis = analyzePckForWizard(buffer, parsePck(buffer));
+		expect(analysis.cellTiles).toHaveLength(3);
+		expect(analysis.stripCount).toBe(1);
+
+		const chair = analysis.cellTiles.find(t => t.filename === 'Chair_01.webp');
+		expect(chair?.vaultPath).toBe('textures/objects/Furniture/Chair_01.webp');
+		expect(chair?.category).toBe('Furniture Wood');
+		expect(chair?.tags).toEqual(['Furniture Wood']);
+
+		const grass = analysis.cellTiles.find(t => t.filename === 'Grass_01.webp');
+		expect(grass?.category).toBe('terrain');
+		expect(grass?.tags).toBeUndefined();
+	});
+
+	it('counts pack tags over cell textures', () => {
+		const buffer = buildWizardPack();
+		const analysis = analyzePckForWizard(buffer, parsePck(buffer));
+		expect(analysis.packTags).toEqual([{ tag: 'Furniture Wood', count: 2 }]);
+	});
+
+	it('handles packs without a tags file', () => {
+		const buffer = buildPckBuffer([
+			{ path: 'res://packs/t2/textures/objects/Rock_01.webp', data: px },
+		]);
+		const analysis = analyzePckForWizard(buffer, parsePck(buffer));
+		expect(analysis.cellTiles).toHaveLength(1);
+		expect(analysis.cellTiles[0].category).toBe('objects');
+		expect(analysis.packTags).toEqual([]);
 	});
 });

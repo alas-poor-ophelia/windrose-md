@@ -163,6 +163,25 @@
     }
   }
 
+  .windrose-wz-packprev {
+    margin-top: 8px;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    line-height: 1.5;
+
+    strong {
+      color: var(--text-normal);
+    }
+
+    p {
+      margin: 4px 0 0;
+    }
+  }
+
+  .windrose-wz-warning {
+    color: var(--color-orange);
+  }
+
   // ---------- ② tier table ----------
   .windrose-wz-table {
     border-top: 1px solid var(--background-modifier-border);

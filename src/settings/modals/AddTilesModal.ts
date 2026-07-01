@@ -17,8 +17,13 @@
 import { Modal, Notice } from 'obsidian';
 import type { App } from 'obsidian';
 import type { TileEntry, TileLayerRole } from '#types/tiles/tile.types';
-import type { PluginLike } from '../../content-packs/ddImportCore';
-import { DungeondraftImportModal } from '../../content-packs/DungeondraftImportModal';
+import type { InstalledPack } from '#types/content-packs/contentPack.types';
+import type { PluginLike, PckWizardAnalysis, DdWizardDecisions } from '../../content-packs/ddImportCore';
+import { runDdImport, analyzePckForWizard } from '../../content-packs/ddImportCore';
+import type { PckArchive } from '../../content-packs/pckParser';
+import { parsePck } from '../../content-packs/pckParser';
+import type { DungeondraftPackMeta } from '../../content-packs/pckMetadata';
+import { parsePackMetadata } from '../../content-packs/pckMetadata';
 import { FolderSuggest } from '../helpers/FolderSuggest';
 import { scanTilesetFolder } from '../../assets/tilesetOperations';
 import {
@@ -56,6 +61,12 @@ class AddTilesModal extends Modal {
   private folderPath = '';
   private tiles: TileEntry[] = [];
   private scanTimer: number | undefined;
+
+  // Pack source state (parsed in memory; nothing extracts until Finish).
+  private packBuffer: ArrayBuffer | null = null;
+  private packArchive: PckArchive | null = null;
+  private packMeta: DungeondraftPackMeta | null = null;
+  private packAnalysis: PckWizardAnalysis | null = null;
 
   private tierRows: FolderTierRow[] = [];
   private tierChoice = new Map<string, TileLayerRole>();
@@ -135,6 +146,18 @@ class AddTilesModal extends Modal {
       desc: 'A vault folder of PNGs/WebPs. Subfolders map to tiers and tags are mined from filenames.',
     });
 
+    // Pack file input + parse preview, visible when the pack card is selected.
+    const packInputRow = packCard.createDiv({ cls: 'windrose-wz-folderin' });
+    const fileInput = packInputRow.createEl('input', {
+      type: 'file',
+      attr: { accept: '.dungeondraft_pack' },
+    });
+    const packPreview = packCard.createDiv({ cls: 'windrose-wz-packprev' });
+    if (this.packMeta != null && this.packAnalysis != null) {
+      this.renderPackPreview(packPreview);
+    }
+    if (this.source !== 'pack') { packInputRow.hide(); packPreview.hide(); }
+
     // Folder path input, visible when the folder card is selected.
     const folderInputRow = folderCard.createDiv({ cls: 'windrose-wz-folderin' });
     const input = folderInputRow.createEl('input', {
@@ -153,8 +176,13 @@ class AddTilesModal extends Modal {
 
     const updateReadiness = (): void => {
       if (this.source === 'pack') {
-        caption.textContent = '';
-        continueBtn.disabled = false;
+        const a = this.packAnalysis;
+        caption.textContent = a != null
+          ? `${a.cellTiles.length} tile(s) ready` +
+            (a.stripCount > 0 ? ` · ${a.stripCount} wall/path strip(s)` : '')
+          : 'Pick a .dungeondraft_pack file';
+        // Strips-only packs are valid — walls/paths import automatically.
+        continueBtn.disabled = a == null || (a.cellTiles.length === 0 && a.stripCount === 0);
       } else {
         caption.textContent = this.tiles.length > 0
           ? `${this.tiles.length} tile(s) ready`
@@ -168,13 +196,23 @@ class AddTilesModal extends Modal {
       packCard.toggleClass('on', kind === 'pack');
       folderCard.toggleClass('on', kind === 'folder');
       if (kind === 'folder') folderInputRow.show(); else folderInputRow.hide();
+      if (kind === 'pack') { packInputRow.show(); packPreview.show(); }
+      else { packInputRow.hide(); packPreview.hide(); }
       updateReadiness();
     };
-    packCard.onclick = (): void => select('pack');
+    packCard.onclick = (e: MouseEvent): void => {
+      if (e.target !== fileInput) select('pack');
+    };
     folderCard.onclick = (e: MouseEvent): void => {
       // Clicking the input shouldn't re-run selection (and steal focus behavior).
       if (e.target !== input) select('folder');
     };
+
+    fileInput.addEventListener('change', (e: Event) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file == null) return;
+      void this.handlePackFile(file, packPreview).then(updateReadiness);
+    });
 
     input.addEventListener('input', () => {
       this.folderPath = input.value.trim();
@@ -188,11 +226,13 @@ class AddTilesModal extends Modal {
 
     continueBtn.onclick = (): void => {
       if (this.source === 'pack') {
-        this.close();
-        new DungeondraftImportModal(this.app, this.plugin, this.onImported).open();
+        if (this.packAnalysis == null) return;
+        // The pack's pseudo-tiles drive the same steps ②③ as a folder —
+        // "a pack just arrives further along."
+        this.tiles = this.packAnalysis.cellTiles;
+      } else if (this.tiles.length === 0) {
         return;
       }
-      if (this.tiles.length === 0) return;
       this.tierRows = aggregateFolderTiers(this.tiles);
       this.tierChoice = new Map(this.tierRows.map(r => [r.category, r.tier]));
       this.suggestions = mineFilenameTags(this.tiles);
@@ -201,6 +241,59 @@ class AddTilesModal extends Modal {
     };
 
     select(this.source);
+  }
+
+  private async handlePackFile(file: File, preview: HTMLElement): Promise<void> {
+    preview.empty();
+    this.packBuffer = null;
+    this.packArchive = null;
+    this.packMeta = null;
+    this.packAnalysis = null;
+    preview.createEl('p', { text: 'Reading pack…' });
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const archive = parsePck(buffer);
+      const result = parsePackMetadata(buffer, archive);
+      preview.empty();
+      if (!result.ok) {
+        preview.createEl('p', { text: result.error, cls: 'windrose-wz-error' });
+        return;
+      }
+      this.packBuffer = buffer;
+      this.packArchive = archive;
+      this.packMeta = result.meta;
+      this.packAnalysis = analyzePckForWizard(buffer, archive);
+      this.renderPackPreview(preview);
+    } catch (err: unknown) {
+      preview.empty();
+      preview.createEl('p', {
+        text: 'Failed to read pack: ' + (err as Error).message,
+        cls: 'windrose-wz-error',
+      });
+    }
+  }
+
+  private renderPackPreview(preview: HTMLElement): void {
+    const meta = this.packMeta;
+    const analysis = this.packAnalysis;
+    if (meta == null || analysis == null) return;
+    preview.empty();
+    const head = preview.createDiv();
+    head.createEl('strong', { text: meta.name });
+    head.createSpan({ text: ` by ${meta.author} · v${meta.version}` });
+    preview.createEl('p', {
+      text: `${analysis.cellTiles.length} tile(s) · ${analysis.stripCount} wall/path strip(s) · ` +
+        `${analysis.packTags.length} tag(s)`,
+    });
+    const existing = (this.plugin.settings.installedContentPacks ?? [])
+      .find((p: InstalledPack) => p.id === meta.id);
+    if (existing != null) {
+      preview.createEl('p', {
+        cls: 'windrose-wz-warning',
+        text: `Already imported (v${existing.version}) — finishing will overwrite existing files.`,
+      });
+    }
   }
 
   private renderSourceCard(
@@ -238,8 +331,15 @@ class AddTilesModal extends Modal {
     const checkCount = this.tierRows.length - autoCount;
 
     const lead = body.createDiv({ cls: 'windrose-wz-lead' });
-    lead.createEl('b', { text: `${this.tierRows.length} folder(s) · ${this.tiles.length} tiles` });
-    lead.appendText(' found. We guessed a tier for each — fix any that look wrong, then continue.');
+    if (this.tierRows.length === 0 && this.source === 'pack') {
+      lead.appendText('This pack contains no cell tiles to tier — nothing to review here.');
+    } else {
+      lead.createEl('b', { text: `${this.tierRows.length} folder(s) · ${this.tiles.length} tiles` });
+      lead.appendText(' found. We guessed a tier for each — fix any that look wrong, then continue.');
+    }
+    if (this.source === 'pack' && (this.packAnalysis?.stripCount ?? 0) > 0) {
+      lead.appendText(` ${this.packAnalysis?.stripCount} wall/path strip(s) import automatically as line assets.`);
+    }
 
     const table = body.createDiv({ cls: 'windrose-wz-table' });
     for (const row of this.tierRows) {
@@ -283,20 +383,35 @@ class AddTilesModal extends Modal {
   // ========================= 3: Tags =========================
 
   private renderTags(body: HTMLElement, foot: HTMLElement): void {
-    // Folder-name tags arrive automatically (folderTags in getAllTags).
-    const folderTagNames = Array.from(new Set(
-      this.tiles.flatMap(t => (t.category ?? '').split('/'))
-        .filter(s => s !== '')
-        .map(s => s.toLowerCase()),
-    ));
-    if (folderTagNames.length > 0) {
-      body.createDiv({ cls: 'windrose-wz-group', text: 'From folder names · applied' });
-      const chips = body.createDiv({ cls: 'windrose-wz-chips' });
-      for (const name of folderTagNames.slice(0, 12)) {
-        chips.createSpan({ cls: 'windrose-wz-chip', text: '✓ ' + name });
+    if (this.source === 'pack') {
+      // Tags shipped inside the pack — applied automatically at import.
+      const packTags = this.packAnalysis?.packTags ?? [];
+      if (packTags.length > 0) {
+        body.createDiv({ cls: 'windrose-wz-group', text: 'Imported with the pack · applied' });
+        const chips = body.createDiv({ cls: 'windrose-wz-chips' });
+        for (const { tag, count } of packTags.slice(0, 12)) {
+          chips.createSpan({ cls: 'windrose-wz-chip', text: `✓ ${tag} ${count}` });
+        }
+        if (packTags.length > 12) {
+          chips.createSpan({ cls: 'windrose-wz-chip', text: `+${packTags.length - 12} more` });
+        }
       }
-      if (folderTagNames.length > 12) {
-        chips.createSpan({ cls: 'windrose-wz-chip', text: `+${folderTagNames.length - 12} more` });
+    } else {
+      // Folder-name tags arrive automatically (folderTags in getAllTags).
+      const folderTagNames = Array.from(new Set(
+        this.tiles.flatMap(t => (t.category ?? '').split('/'))
+          .filter(s => s !== '')
+          .map(s => s.toLowerCase()),
+      ));
+      if (folderTagNames.length > 0) {
+        body.createDiv({ cls: 'windrose-wz-group', text: 'From folder names · applied' });
+        const chips = body.createDiv({ cls: 'windrose-wz-chips' });
+        for (const name of folderTagNames.slice(0, 12)) {
+          chips.createSpan({ cls: 'windrose-wz-chip', text: '✓ ' + name });
+        }
+        if (folderTagNames.length > 12) {
+          chips.createSpan({ cls: 'windrose-wz-chip', text: `+${folderTagNames.length - 12} more` });
+        }
       }
     }
 
@@ -430,11 +545,94 @@ class AddTilesModal extends Modal {
 
   // ========================= Finish =========================
 
+  /** Step ②③ outcomes in the shape the DD pipeline consumes. */
+  private buildWizardDecisions(): DdWizardDecisions {
+    const tierByFolder = new Map<string, TileLayerRole>();
+    for (const row of this.tierRows) {
+      tierByFolder.set(row.category, this.tierChoice.get(row.category) ?? row.tier);
+    }
+    const extraTags: Array<{ tag: string; rels: string[] }> = [];
+    for (const suggestion of this.suggestions) {
+      const applied = this.appliedTags.get(suggestion.tag);
+      if (applied == null || applied === '') continue;
+      extraTags.push({ tag: applied, rels: suggestion.paths });
+    }
+    for (const manual of this.manualTags) {
+      extraTags.push({ tag: manual, rels: this.tiles.map(t => t.vaultPath) });
+    }
+    return { tierByFolder, extraTags };
+  }
+
+  private async finishPackImport(
+    body: HTMLElement,
+    foot: HTMLElement,
+    finishBtn: HTMLButtonElement,
+  ): Promise<void> {
+    if (this.packBuffer == null || this.packArchive == null || this.packMeta == null) return;
+    finishBtn.disabled = true;
+    finishBtn.setText('Importing…');
+    body.empty();
+    foot.querySelectorAll('button').forEach(b => { b.disabled = true; });
+
+    const progress = body.createDiv({ cls: 'windrose-wz-progress' });
+    const progressBar = progress.createEl('progress', { attr: { max: '100', value: '0' } });
+    progressBar.setCssStyles({ width: '100%' });
+    const status = progress.createEl('p', { text: 'Preparing…' });
+
+    try {
+      const result = await runDdImport(
+        this.app,
+        this.plugin,
+        this.packBuffer,
+        this.packArchive,
+        this.packMeta,
+        (done, total, stage) => {
+          if (stage === 'extract') {
+            progressBar.value = Math.round((done / total) * 90);
+            status.setText(`Extracting: ${done}/${total}`);
+          } else if (stage === 'metadata') {
+            status.setText('Saving tag metadata…');
+          } else if (stage === 'scan') {
+            status.setText('Analyzing tile footprints…');
+          }
+        },
+        this.buildWizardDecisions(),
+      );
+
+      progressBar.value = 100;
+      progress.empty();
+      progress.createEl('p', {
+        cls: result.failed > 0 ? 'windrose-wz-warning' : 'windrose-wz-done',
+        text: `Imported ${result.imported} of ${result.total} textures from ${result.packName}.` +
+          (result.failed > 0 ? ` ${result.failed} file(s) failed (see developer console).` : ''),
+      });
+      new Notice(`${result.packName} imported (${result.imported}/${result.total} textures).`);
+
+      this.finished = true;
+      finishBtn.setText('Done');
+      finishBtn.disabled = false;
+      finishBtn.onclick = (): void => this.close();
+    } catch (err: unknown) {
+      console.error('[Windrose] Pack import failed:', err);
+      progress.empty();
+      progress.createEl('p', {
+        cls: 'windrose-wz-error',
+        text: 'Import failed: ' + (err as Error).message,
+      });
+      finishBtn.setText('Finish import');
+      finishBtn.disabled = false;
+    }
+  }
+
   private async finishImport(
     body: HTMLElement,
     foot: HTMLElement,
     finishBtn: HTMLButtonElement,
   ): Promise<void> {
+    if (this.source === 'pack') {
+      await this.finishPackImport(body, foot, finishBtn);
+      return;
+    }
     finishBtn.disabled = true;
     finishBtn.setText('Importing…');
     body.empty();
