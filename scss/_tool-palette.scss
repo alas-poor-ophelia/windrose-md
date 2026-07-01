@@ -77,14 +77,23 @@
 }
 
 .windrose-subtool {
+  /* Red corner triangle, BOTTOM-right (block/horizontal palette). The vertical
+     full-pane palette flips this to the top-right corner to suit its orientation.
+     font-size:0 hides the "▼" glyph the component renders as the indicator's text. */
   &-indicator {
     position: absolute;
-    bottom: 1px;
-    right: 1px;
-    font-size: 7px;
-    opacity: 0.6;
+    bottom: 2px;
+    right: 2px;
+    top: auto;
+    width: 0;
+    height: 0;
+    font-size: 0;
+    opacity: 1;
     pointer-events: none;
     line-height: 1;
+    border-style: solid;
+    border-width: 8px 8px 0 0;
+    border-color: transparent var(--windrose-accent-red) transparent transparent;
   }
 
   &-menu {
@@ -147,8 +156,7 @@
 }
 
 .windrose-tool-btn-active .windrose-subtool-indicator {
-  opacity: 0.9;
-  color: var(--windrose-bg-primary);
+  opacity: 1;
 }
 
 .windrose-history {
@@ -277,20 +285,9 @@
     height: 38px;
   }
 
-  /* Active = gold border + glow framing a bright, high-contrast icon (the gold
-     icon-on-gold-frame read as nearly invisible). */
-  .windrose-tool-btn-active {
-    background-color: var(--windrose-bg-primary);
-    border-color: var(--windrose-gold-bright);
-    box-shadow:
-      0 0 8px oklch(from var(--windrose-gold-bright) l c h / 0.5),
-      inset 0 0 0 1px oklch(from var(--windrose-gold-bright) l c h / 0.35);
-
-    svg {
-      color: var(--windrose-accent-red);
-      filter: none;
-    }
-  }
+  /* Active state intentionally NOT overridden here — the block-mode (horizontal)
+     palette is the source of truth: gold fill + red icon with a gold drop-shadow
+     outline. Inheriting it keeps the two palettes 100% matched. */
 
   /* Subtool flag → red corner triangle, top-right */
   .windrose-subtool-indicator {

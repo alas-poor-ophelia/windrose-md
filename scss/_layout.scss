@@ -37,8 +37,11 @@
     inset 0 0 0 5px oklch(from var(--windrose-border-primary) l c h / 0.5),
     0 0 20px oklch(from var(--windrose-border-primary) l c h / 0.2);
 
+  /* Tuck the tool palette to 2px inside the container's inner hairline. That
+     line is the inset box-shadow gold ring, ~5px in from the content edge, so
+     the palette's outer border sits at 7px — a 2px gap on both sides. */
   .windrose-toolbar-anchor {
-    padding-inline: clamp(0.75rem, 2vw, 1rem);
+    padding-inline: 7px;
   }
 
   /* Slim the re-added name/status header in block mode: tighter vertical padding

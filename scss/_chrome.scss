@@ -26,10 +26,12 @@
   flex-shrink: 0;
 }
 
-/* `select.` (0,1,1) beats Obsidian's `select { height: var(--input-height) }`,
-   which otherwise pins the picker taller than the now-condensed header and clips
-   it. Height matches the sibling +new-map action button (28px). */
-select.windrose-map-picker {
+/* `.windrose-header select.` (0,2,1) beats Obsidian's bare `select` height rule
+   (--input-height, 30px) AND any theme's `select:not(...)` at 0,1,1 that would
+   otherwise pin the picker to 30px — taller than the 37px header (0 bottom
+   padding), so it pokes past the boundary on desktop. Height matches the sibling
+   +new-map action button (28px). Mirrors the tablet twin's strength. */
+.windrose-header select.windrose-map-picker {
   height: 28px;
   box-sizing: border-box;
   background: var(--windrose-bg-secondary);
@@ -54,8 +56,11 @@ select.windrose-map-picker {
 }
 
 @at-root {
+  /* `.windrose-header button.` (0,2,1) — the bare `.windrose-header-action-btn`
+     (0,1,0) lost on desktop to any theme's `button:not(.clickable-icon)` (0,1,1),
+     which pins the button to --input-height (30px) and overflows the header. */
   .is-tablet button.windrose-header-action-btn,
-  .windrose-header-action-btn {
+  .windrose-header button.windrose-header-action-btn {
     background: transparent;
     border: 1px solid var(--windrose-border-secondary);
     border-radius: 4px;
