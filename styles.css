@@ -3615,7 +3615,19 @@ button:is(.windrose-tb-iconbtn,
   border-color: oklch(from var(--windrose-gold-bright) l c h/0.5);
   background: oklch(from var(--windrose-gold-bright) l c h/0.12);
 }
-.windrose-fd-subtool.dim, .windrose-fd-subtool:disabled {
+.windrose-fd-subtool {
+  /* 'available' grade: unusual pairing — dimmed but still clickable (manual override). */
+}
+.windrose-fd-subtool.dim {
+  opacity: 0.45;
+}
+.windrose-fd-subtool.dim:hover {
+  opacity: 0.85;
+}
+.windrose-fd-subtool {
+  /* 'disabled' grade: truly impossible combination. */
+}
+.windrose-fd-subtool:disabled {
   opacity: 0.3;
   cursor: default;
 }
@@ -8714,6 +8726,329 @@ button.windrose-breadcrumb-link {
   color: var(--text-muted);
   font-size: 0.9em;
   padding: 6px 0;
+}
+
+.windrose-add-tiles-modal .windrose-wz-steps {
+  display: flex;
+  align-items: center;
+  padding: 8px 0 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.windrose-add-tiles-modal .windrose-wz-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.windrose-add-tiles-modal .windrose-wz-step .windrose-wz-num {
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  flex-shrink: 0;
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+.windrose-add-tiles-modal .windrose-wz-step .windrose-wz-lbl {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.windrose-add-tiles-modal .windrose-wz-step.on .windrose-wz-num {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+.windrose-add-tiles-modal .windrose-wz-step.on .windrose-wz-lbl {
+  color: var(--text-normal);
+  font-weight: 600;
+}
+.windrose-add-tiles-modal .windrose-wz-step.done .windrose-wz-num {
+  color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  background: transparent;
+}
+.windrose-add-tiles-modal .windrose-wz-sep {
+  flex: 1;
+  height: 1px;
+  background: var(--background-modifier-border);
+  margin: 0 8px;
+  min-width: 8px;
+}
+.windrose-add-tiles-modal .windrose-wz-body {
+  max-height: 55vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+.windrose-add-tiles-modal .windrose-wz-lead {
+  padding: 12px 0 8px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.windrose-add-tiles-modal .windrose-wz-lead b {
+  color: var(--text-normal);
+}
+.windrose-add-tiles-modal .windrose-wz-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 8px 0;
+}
+.windrose-add-tiles-modal .windrose-wz-src {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 13px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--background-modifier-border);
+  transition: border-color 0.12s ease;
+}
+.windrose-add-tiles-modal .windrose-wz-src:hover {
+  border-color: var(--interactive-accent-hover);
+}
+.windrose-add-tiles-modal .windrose-wz-src.on {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+.windrose-add-tiles-modal .windrose-wz-src .windrose-wz-src-main {
+  flex: 1;
+}
+.windrose-add-tiles-modal .windrose-wz-src .windrose-wz-src-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+.windrose-add-tiles-modal .windrose-wz-src .windrose-wz-src-desc {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin-top: 2px;
+}
+.windrose-add-tiles-modal .windrose-wz-src .windrose-wz-radio {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 2px;
+  border: 1.5px solid var(--background-modifier-border);
+}
+.windrose-add-tiles-modal .windrose-wz-src.on .windrose-wz-radio {
+  border-color: var(--interactive-accent);
+  background: radial-gradient(circle at center, var(--interactive-accent) 0 45%, transparent 50%);
+}
+.windrose-add-tiles-modal .windrose-wz-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  margin-top: 7px;
+  color: var(--color-green);
+  border: 1px solid var(--color-green);
+}
+.windrose-add-tiles-modal .windrose-wz-folderin {
+  margin-top: 9px;
+}
+.windrose-add-tiles-modal .windrose-wz-folderin input {
+  width: 100%;
+}
+.windrose-add-tiles-modal .windrose-wz-packprev {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.windrose-add-tiles-modal .windrose-wz-packprev strong {
+  color: var(--text-normal);
+}
+.windrose-add-tiles-modal .windrose-wz-packprev p {
+  margin: 4px 0 0;
+}
+.windrose-add-tiles-modal .windrose-wz-warning {
+  color: var(--color-orange);
+}
+.windrose-add-tiles-modal .windrose-wz-table {
+  border-top: 1px solid var(--background-modifier-border);
+}
+.windrose-add-tiles-modal .windrose-wz-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.windrose-add-tiles-modal .windrose-wz-row .windrose-wz-row-path {
+  font-size: 12.5px;
+  color: var(--text-normal);
+  font-weight: 500;
+}
+.windrose-add-tiles-modal .windrose-wz-row .windrose-wz-row-count {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.windrose-add-tiles-modal .windrose-wz-auto,
+.windrose-add-tiles-modal .windrose-wz-fix {
+  font-size: 8.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+.windrose-add-tiles-modal .windrose-wz-auto {
+  color: var(--interactive-accent);
+  border: 1px solid var(--interactive-accent);
+}
+.windrose-add-tiles-modal .windrose-wz-fix {
+  color: var(--text-error);
+  border: 1px solid var(--text-error);
+}
+.windrose-add-tiles-modal .windrose-wz-group {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 12px 0 7px;
+}
+.windrose-add-tiles-modal .windrose-wz-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 6px;
+}
+.windrose-add-tiles-modal .windrose-wz-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-green);
+  border: 1px solid var(--color-green);
+}
+.windrose-add-tiles-modal .windrose-wz-chip .windrose-wz-chip-x {
+  cursor: pointer;
+  color: var(--text-muted);
+}
+.windrose-add-tiles-modal .windrose-wz-chip .windrose-wz-chip-x:hover {
+  color: var(--text-error);
+}
+.windrose-add-tiles-modal .windrose-wz-tag {
+  padding: 9px 2px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.windrose-add-tiles-modal .windrose-wz-tag.on {
+  box-shadow: inset 2px 0 0 var(--interactive-accent);
+  padding-left: 8px;
+}
+.windrose-add-tiles-modal .windrose-wz-tag .windrose-wz-tag-top {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.windrose-add-tiles-modal .windrose-wz-tag .windrose-wz-tag-name {
+  font-family: var(--font-monospace);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+.windrose-add-tiles-modal .windrose-wz-tag .windrose-wz-tag-count {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  min-width: 24px;
+}
+.windrose-add-tiles-modal .windrose-wz-tag .windrose-wz-tag-bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--background-modifier-border);
+  overflow: hidden;
+  min-width: 18px;
+}
+.windrose-add-tiles-modal .windrose-wz-tag .windrose-wz-tag-fill {
+  height: 100%;
+  background: var(--interactive-accent);
+}
+.windrose-add-tiles-modal .windrose-wz-tag .windrose-wz-tag-sample {
+  margin-top: 6px;
+  font-family: var(--font-monospace);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.windrose-add-tiles-modal .windrose-wz-tag .windrose-wz-mark {
+  color: var(--text-normal);
+  background: var(--text-highlight-bg);
+  border-radius: 3px;
+  padding: 0 2px;
+}
+.windrose-add-tiles-modal .windrose-wz-toggle {
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.windrose-add-tiles-modal .windrose-wz-toggle.on {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.windrose-add-tiles-modal .windrose-wz-rename {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 8px;
+}
+.windrose-add-tiles-modal .windrose-wz-rename input {
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  width: 140px;
+}
+.windrose-add-tiles-modal .windrose-wz-addrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 0 7px;
+}
+.windrose-add-tiles-modal .windrose-wz-addrow input {
+  flex: 1;
+}
+.windrose-add-tiles-modal .windrose-wz-foot {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-top: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+  margin-top: 8px;
+}
+.windrose-add-tiles-modal .windrose-wz-foot .windrose-wz-cap {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.windrose-add-tiles-modal .windrose-wz-cap {
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.windrose-add-tiles-modal .windrose-wz-progress {
+  padding: 16px 0;
+}
+.windrose-add-tiles-modal .windrose-wz-done {
+  color: var(--color-green);
+}
+.windrose-add-tiles-modal .windrose-wz-error {
+  color: var(--text-error);
 }
 
 /* ===========================================

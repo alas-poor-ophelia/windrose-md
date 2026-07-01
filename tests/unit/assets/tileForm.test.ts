@@ -3,9 +3,12 @@ import {
   deriveTileForm,
   formDef,
   subtoolMeta,
-  formSupportsSubtool,
+  subtoolGate,
+  ribbonSubtoolsForForm,
   FORM_DEFS,
+  RIBBON_SUBTOOL_ORDER,
 } from '../../../src/assets/tileForm';
+import type { TileSubtoolId } from '../../../src/assets/tileForm';
 import type { TileForm, TileMetadataEntry, TilesetDef } from '../../../types/tiles/tile.types';
 
 function makeTileset(opts?: Partial<TilesetDef>): TilesetDef {
@@ -94,36 +97,74 @@ describe('deriveTileForm', () => {
   });
 });
 
-describe('form×subtool matrix', () => {
-  const allForms: TileForm[] = ['cell', 'region', 'line', 'autotile', 'scatter'];
+describe('form×subtool matrix (lenient tri-state)', () => {
+  const allForms: TileForm[] = ['cell', 'region', 'line', 'autotile'];
+  const allSubtools: TileSubtoolId[] = ['paint', 'stamp', 'scatter', 'fill', 'brush', 'line', 'autotile'];
 
-  it('every form has a def whose defaultSubtool is its first subtool', () => {
-    for (const form of allForms) {
-      const def = formDef(form);
-      expect(def.subtools.length).toBeGreaterThan(0);
-      expect(def.subtools[0]).toBe(def.defaultSubtool);
-      expect(def.subtools).toContain(def.defaultSubtool);
-    }
+  it('FORM_DEFS covers exactly the four derivable forms', () => {
+    expect(Object.keys(FORM_DEFS).sort()).toEqual([...allForms].sort());
   });
 
-  it('every subtool referenced by a form has metadata', () => {
+  it('every form grades every subtool', () => {
     for (const form of allForms) {
-      for (const st of formDef(form).subtools) {
-        expect(subtoolMeta(st).id).toBe(st);
-        expect(subtoolMeta(st).icon).toMatch(/^lucide-/);
+      for (const st of allSubtools) {
+        expect(['recommended', 'available', 'disabled']).toContain(subtoolGate(form, st));
       }
     }
   });
 
-  it('formSupportsSubtool matches the matrix', () => {
-    expect(formSupportsSubtool('region', 'fill')).toBe(true);
-    expect(formSupportsSubtool('region', 'line')).toBe(false);
-    expect(formSupportsSubtool('line', 'line')).toBe(true);
-    expect(formSupportsSubtool('cell', 'stamp')).toBe(true);
-    expect(formSupportsSubtool('cell', 'fill')).toBe(false);
+  it("every form's default subtool is recommended", () => {
+    for (const form of allForms) {
+      expect(subtoolGate(form, formDef(form).defaultSubtool)).toBe('recommended');
+    }
   });
 
-  it('FORM_DEFS covers exactly the five forms', () => {
-    expect(Object.keys(FORM_DEFS).sort()).toEqual([...allForms].sort());
+  it('lenient invariant: at most 2 disabled subtools per form (line + autotile only)', () => {
+    for (const form of allForms) {
+      const disabled = allSubtools.filter(st => subtoolGate(form, st) === 'disabled');
+      expect(disabled.length).toBeLessThanOrEqual(2);
+      for (const st of disabled) {
+        expect(['line', 'autotile']).toContain(st);
+      }
+    }
+  });
+
+  it('line-draw is disabled everywhere except the line form', () => {
+    expect(subtoolGate('line', 'line')).toBe('recommended');
+    expect(subtoolGate('cell', 'line')).toBe('disabled');
+    expect(subtoolGate('region', 'line')).toBe('disabled');
+    expect(subtoolGate('autotile', 'line')).toBe('disabled');
+  });
+
+  it('region defaults to fill; cell defaults to paint', () => {
+    expect(formDef('region').defaultSubtool).toBe('fill');
+    expect(formDef('cell').defaultSubtool).toBe('paint');
+    expect(subtoolGate('region', 'brush')).toBe('recommended');
+  });
+
+  it('every subtool has metadata with a lucide icon', () => {
+    for (const st of allSubtools) {
+      expect(subtoolMeta(st).id).toBe(st);
+      expect(subtoolMeta(st).icon).toMatch(/^lucide-/);
+    }
+  });
+
+  describe('ribbon visibility', () => {
+    it('autotile is hidden from the ribbon for non-autotile forms', () => {
+      for (const form of ['cell', 'region', 'line'] as TileForm[]) {
+        expect(ribbonSubtoolsForForm(form)).not.toContain('autotile');
+        expect(ribbonSubtoolsForForm(form)).toEqual(RIBBON_SUBTOOL_ORDER);
+      }
+    });
+
+    it('autotile form prepends the autotile subtool', () => {
+      expect(ribbonSubtoolsForForm('autotile')).toEqual(['autotile', ...RIBBON_SUBTOOL_ORDER]);
+    });
+
+    it('ribbon order lists every non-autotile subtool exactly once', () => {
+      expect([...RIBBON_SUBTOOL_ORDER].sort()).toEqual(
+        allSubtools.filter(st => st !== 'autotile').sort(),
+      );
+    });
   });
 });

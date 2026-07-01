@@ -1,23 +1,19 @@
 /**
  * TileSubtoolRibbon.tsx
  *
- * The drawer's tile-placement subtool ribbon. Shows the selected tile's derived
- * render-form as a badge and lights only the placement subtools that form
- * supports (★ = default armed); unsupported subtools are dimmed/disabled.
- *
- * Subtool selection is currently display/arming state — the line/autotile/scatter
- * placement renderers are deferred, so a chosen subtool does not yet change
- * placement behavior (the gating + badge are the shipped surface).
+ * The drawer's tile-placement subtool ribbon. Grades each placement subtool
+ * for the selected tile's derived form via the lenient form×subtool matrix:
+ * recommended subtools are bright (★ = default armed), 'available' ones are
+ * dimmed but still clickable (manual override), and only truly impossible
+ * combinations are disabled. 'autotile' is shown only for autotile forms.
  */
 
 import type { VNode } from 'preact';
 import type { TileForm } from '#types/tiles/tile.types';
 import type { TileSubtoolId } from '../../assets/tileForm';
 
-import { SUBTOOL_META, formDef, formSupportsSubtool } from '../../assets/tileForm';
+import { SUBTOOL_META, formDef, ribbonSubtoolsForForm, subtoolGate } from '../../assets/tileForm';
 import { Icon } from '../shared/Icon';
-
-const ALL_SUBTOOLS: TileSubtoolId[] = ['stamp', 'fill', 'line', 'autotile', 'scatter'];
 
 interface TileSubtoolRibbonProps {
   /** Selected tile's derived form, or null when nothing is selected. */
@@ -33,17 +29,22 @@ const TileSubtoolRibbon = ({ form, activeSubtool, onSubtoolChange }: TileSubtool
 
   return (
     <div className="windrose-fd-subrib-tools">
-      {ALL_SUBTOOLS.map(id => {
-        const supported = formSupportsSubtool(form, id);
+      {ribbonSubtoolsForForm(form).map(id => {
+        const gate = subtoolGate(form, id);
         const meta = SUBTOOL_META[id];
         const isDefault = def.defaultSubtool === id;
+        const title = isDefault
+          ? `${meta.title} (default)`
+          : gate === 'available'
+            ? `${meta.title} — not typical for this tile`
+            : meta.title;
         return (
           <button
             key={id}
-            className={`windrose-fd-subtool interactive-child ${activeSubtool === id ? 'on' : ''} ${supported ? '' : 'dim'}`}
-            disabled={!supported}
-            title={isDefault ? `${meta.title} (default)` : meta.title}
-            onClick={() => { if (supported) onSubtoolChange(id); }}
+            className={`windrose-fd-subtool interactive-child ${activeSubtool === id ? 'on' : ''} ${gate === 'available' ? 'dim' : ''}`}
+            disabled={gate === 'disabled'}
+            title={title}
+            onClick={() => { if (gate !== 'disabled') onSubtoolChange(id); }}
           >
             <Icon icon={meta.icon} size={15} />
             {isDefault && <span className="windrose-fd-subtool-star">★</span>}

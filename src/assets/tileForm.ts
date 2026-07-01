@@ -1,10 +1,15 @@
 /**
  * tileForm.ts
  *
- * Derives a tile's composite "render form" (cell/region/line/autotile/scatter)
- * from signals already in the data model, and exposes the form×subtool matrix as
- * DATA (not hardcoded branching) so the drawer ribbon can light only the
- * placement subtools a selected tile's form supports.
+ * Derives a tile's composite "render form" (cell/region/line/autotile) from
+ * signals already in the data model, and exposes the form×subtool matrix as
+ * DATA (not hardcoded branching) so the drawer ribbon can grade the placement
+ * subtools for a selected tile's form.
+ *
+ * Gating is deliberately LENIENT: detection can be rough, so a subtool is
+ * 'disabled' only when the combination is truly impossible (e.g. wall/path
+ * line-draw needs strip metadata). Everything else is at worst 'available' —
+ * dimmed in the ribbon but still clickable as a manual override.
  *
  * Pure functions — no Obsidian, no rendering. `renderMode` ('cell'|'region')
  * remains the only persisted render mode; `TileForm` is a read-time projection.
@@ -21,9 +26,6 @@ const LINE_DD_SOURCES = new Set(['walls', 'paths', 'portals']);
  *   line      — DD source is walls/paths/portals
  *   region    — effective renderMode is 'region'
  *   cell      — residual default
- *
- * Note: 'scatter' is NOT derived here — it is a brush mode (stampMode), with no
- * per-tile signal in the data model. It exists in the matrix for the ribbon only.
  */
 function deriveTileForm(
   metadata: TileMetadataEntry | undefined,
@@ -42,7 +44,15 @@ function deriveTileForm(
 }
 
 /** A placement subtool the ribbon can offer. */
-export type TileSubtoolId = 'stamp' | 'fill' | 'line' | 'autotile' | 'scatter';
+export type TileSubtoolId = 'paint' | 'stamp' | 'scatter' | 'fill' | 'brush' | 'line' | 'autotile';
+
+/**
+ * How a form grades a subtool:
+ *   recommended — bright; a natural fit for the form
+ *   available   — dimmed but clickable; unusual pairing, manual override
+ *   disabled    — truly impossible (missing required metadata/machinery)
+ */
+export type SubtoolGate = 'recommended' | 'available' | 'disabled';
 
 export interface TileSubtoolDef {
   id: TileSubtoolId;
@@ -53,32 +63,92 @@ export interface TileSubtoolDef {
 
 /** Subtool metadata (icon/label/title) — single source for the ribbon. */
 const SUBTOOL_META: Record<TileSubtoolId, TileSubtoolDef> = {
-  stamp: { id: 'stamp', label: 'Stamp', icon: 'lucide-stamp', title: 'Stamp one tile per cell' },
-  fill: { id: 'fill', label: 'Fill', icon: 'lucide-paint-bucket', title: 'Seamless region fill' },
-  line: { id: 'line', label: 'Draw', icon: 'lucide-spline', title: 'Draw along edges / a curve' },
+  paint: { id: 'paint', label: 'Paint', icon: 'lucide-paintbrush', title: 'Paint the tile per grid cell' },
+  stamp: { id: 'stamp', label: 'Stamp', icon: 'lucide-stamp', title: 'Place one freeform stamp' },
+  scatter: { id: 'scatter', label: 'Scatter', icon: 'lucide-diamond', title: 'Scatter freeform stamps with jitter' },
+  fill: { id: 'fill', label: 'Fill', icon: 'lucide-paint-bucket', title: 'Flood fill a connected area' },
+  brush: { id: 'brush', label: 'Brush', icon: 'lucide-brush', title: 'Soft round terrain brush' },
+  line: { id: 'line', label: 'Draw', icon: 'lucide-spline', title: 'Draw along a wall / path curve' },
   autotile: { id: 'autotile', label: 'Auto', icon: 'lucide-grid-3x3', title: 'Auto-tile by neighbours' },
-  scatter: { id: 'scatter', label: 'Scatter', icon: 'lucide-diamond', title: 'Freeform scatter brush' },
 };
+
+/**
+ * Ribbon display order. 'autotile' is NOT listed — it is prepended only when
+ * the selected tile's form is 'autotile' (hidden otherwise, per design).
+ */
+const RIBBON_SUBTOOL_ORDER: TileSubtoolId[] = ['paint', 'stamp', 'scatter', 'fill', 'brush', 'line'];
 
 interface FormDef {
   form: TileForm;
   label: string;
   /** Subtool armed by default (★) when this form is selected. */
   defaultSubtool: TileSubtoolId;
-  /** Subtools this form supports, in display order. First is the default. */
-  subtools: TileSubtoolId[];
+  /** Lenient grade for every subtool. */
+  gates: Record<TileSubtoolId, SubtoolGate>;
 }
 
 /**
- * The form×subtool matrix, as data. The ribbon renders `subtools` for the
- * selected tile's form and arms `defaultSubtool`; everything else is dimmed.
+ * The form×subtool matrix, as data. 'line' is disabled off the line form (it
+ * needs wall/path strip metadata); 'autotile' is hidden from the ribbon for
+ * non-autotile forms so its gate there is moot (kept 'disabled' for honesty).
  */
 const FORM_DEFS: Record<TileForm, FormDef> = {
-  cell: { form: 'cell', label: 'Cell', defaultSubtool: 'stamp', subtools: ['stamp', 'scatter'] },
-  region: { form: 'region', label: 'Region', defaultSubtool: 'fill', subtools: ['fill', 'stamp'] },
-  line: { form: 'line', label: 'Line', defaultSubtool: 'line', subtools: ['line'] },
-  autotile: { form: 'autotile', label: 'Auto-tile', defaultSubtool: 'autotile', subtools: ['autotile', 'stamp'] },
-  scatter: { form: 'scatter', label: 'Scatter', defaultSubtool: 'scatter', subtools: ['scatter', 'stamp'] },
+  cell: {
+    form: 'cell',
+    label: 'Cell',
+    defaultSubtool: 'paint',
+    gates: {
+      paint: 'recommended',
+      stamp: 'recommended',
+      scatter: 'recommended',
+      fill: 'available',
+      brush: 'available',
+      line: 'disabled',
+      autotile: 'disabled',
+    },
+  },
+  region: {
+    form: 'region',
+    label: 'Region',
+    defaultSubtool: 'fill',
+    gates: {
+      paint: 'recommended',
+      stamp: 'available',
+      scatter: 'available',
+      fill: 'recommended',
+      brush: 'recommended',
+      line: 'disabled',
+      autotile: 'disabled',
+    },
+  },
+  line: {
+    form: 'line',
+    label: 'Line',
+    defaultSubtool: 'line',
+    gates: {
+      paint: 'available',
+      stamp: 'available',
+      scatter: 'available',
+      fill: 'available',
+      brush: 'available',
+      line: 'recommended',
+      autotile: 'disabled',
+    },
+  },
+  autotile: {
+    form: 'autotile',
+    label: 'Auto-tile',
+    defaultSubtool: 'autotile',
+    gates: {
+      paint: 'available',
+      stamp: 'available',
+      scatter: 'available',
+      fill: 'available',
+      brush: 'available',
+      line: 'disabled',
+      autotile: 'recommended',
+    },
+  },
 };
 
 function formDef(form: TileForm): FormDef {
@@ -89,17 +159,24 @@ function subtoolMeta(id: TileSubtoolId): TileSubtoolDef {
   return SUBTOOL_META[id];
 }
 
-/** Does the given form support the given subtool? (matrix membership test) */
-function formSupportsSubtool(form: TileForm, subtool: TileSubtoolId): boolean {
-  return FORM_DEFS[form].subtools.includes(subtool);
+/** Grade of the given subtool for the given form (matrix lookup). */
+function subtoolGate(form: TileForm, subtool: TileSubtoolId): SubtoolGate {
+  return FORM_DEFS[form].gates[subtool];
+}
+
+/** Subtools the ribbon shows for a form, in display order. */
+function ribbonSubtoolsForForm(form: TileForm): TileSubtoolId[] {
+  return form === 'autotile' ? ['autotile', ...RIBBON_SUBTOOL_ORDER] : RIBBON_SUBTOOL_ORDER;
 }
 
 export {
   deriveTileForm,
   formDef,
   subtoolMeta,
-  formSupportsSubtool,
+  subtoolGate,
+  ribbonSubtoolsForForm,
   FORM_DEFS,
   SUBTOOL_META,
+  RIBBON_SUBTOOL_ORDER,
   LINE_DD_SOURCES,
 };

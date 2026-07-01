@@ -258,7 +258,16 @@ button:is(
     background: oklch(from var(--windrose-gold-bright) l c h / 0.12);
   }
 
-  &.dim,
+  /* 'available' grade: unusual pairing — dimmed but still clickable (manual override). */
+  &.dim {
+    opacity: 0.45;
+
+    &:hover {
+      opacity: 0.85;
+    }
+  }
+
+  /* 'disabled' grade: truly impossible combination. */
   &:disabled {
     opacity: 0.3;
     cursor: default;

@@ -143,9 +143,9 @@ export type TileLayerRole = 'ground' | 'structure' | 'props' | 'decoration';
  *   region   — seamless world-anchored terrain fill (renderMode === 'region')
  *   line     — wall/path/portal art meant to be drawn along edges/curves
  *   autotile — bitmask-driven auto-tiling (tileset has autoTileConfig)
- *   scatter  — freeform brush scatter (a brush mode; not derived per-tile)
+ * (Scatter is a placement SUBTOOL, not a form — every form can scatter.)
  */
-export type TileForm = 'cell' | 'region' | 'line' | 'autotile' | 'scatter';
+export type TileForm = 'cell' | 'region' | 'line' | 'autotile';
 
 /** Default layer stack for grid tile maps */
 export const DEFAULT_TILE_LAYERS: ReadonlyArray<{
