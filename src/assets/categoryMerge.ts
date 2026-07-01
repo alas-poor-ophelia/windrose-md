@@ -90,6 +90,40 @@ function normalizeTokens(raw: string): Set<string> {
   return out;
 }
 
+const HEX_WORDS: ReadonlySet<string> = new Set(['hex', 'hexes', 'hexagonal', 'hexagon']);
+const GRID_WORDS: ReadonlySet<string> = new Set(['square', 'squares', 'grid', 'gridded', 'gridmap']);
+
+/**
+ * Detect the geometry a folder/tag set EXPLICITLY declares, for the tile drawer's
+ * silent hex-vs-grid scope. Conservative by design: returns a geometry only on a
+ * positive, unambiguous signal; absent (undefined) means geometry-agnostic and the
+ * tile shows on every map type ("a crate is a crate"). A folder/tag set that names
+ * BOTH geometries is treated as agnostic rather than guessed. Returned values match
+ * the map's own `mapType` vocabulary ('hex' | 'grid') so the caller can compare directly.
+ */
+function detectTileGeometry(raw: string, tags?: readonly string[]): 'hex' | 'grid' | undefined {
+  let hex = false;
+  let grid = false;
+  const spaced = (raw + ' ' + (tags?.join(' ') ?? ''))
+    .replace(/[()]/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2');
+  for (const piece of spaced.split(/[/_\-\s&,#]+/)) {
+    const tok = piece.toLowerCase().replace(/[^a-z]/g, '');
+    if (tok === '') {
+      continue;
+    }
+    if (HEX_WORDS.has(tok)) {
+      hex = true;
+    } else if (GRID_WORDS.has(tok)) {
+      grid = true;
+    }
+  }
+  if (hex === grid) {
+    return undefined; // neither signalled, or both did → agnostic
+  }
+  return hex ? 'hex' : 'grid';
+}
+
 /**
  * Human-readable label for a raw folder: strip parens and NOISE words but keep
  * original casing/order. Falls back to the trimmed raw if every word was noise.
@@ -193,6 +227,7 @@ export {
   ALIAS,
   normalizeTokens,
   cleanLabel,
+  detectTileGeometry,
   humanizePackName,
   diceCoefficient,
   clusterCategories,

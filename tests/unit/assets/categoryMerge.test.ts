@@ -5,6 +5,7 @@ import {
   MERGE_THRESHOLD,
   normalizeTokens,
   cleanLabel,
+  detectTileGeometry,
   humanizePackName,
   diceCoefficient,
   clusterCategories,
@@ -25,6 +26,40 @@ describe('categoryMerge — humanizePackName', () => {
   it('falls back to the raw name when humanizing would empty it', () => {
     expect(humanizePackName('v2')).toBe('v2');
     expect(humanizePackName('')).toBe('');
+  });
+});
+
+describe('categoryMerge — detectTileGeometry', () => {
+  it('detects an explicit hex signal from the folder name', () => {
+    expect(detectTileGeometry('Hex Forest')).toBe('hex');
+    expect(detectTileGeometry('Hexagonal Terrain')).toBe('hex');
+    expect(detectTileGeometry('Foliage/Forest (Hex)')).toBe('hex');
+  });
+
+  it('detects an explicit grid/square signal from the folder name', () => {
+    expect(detectTileGeometry('Square Dungeon Floors')).toBe('grid');
+    expect(detectTileGeometry('Gridded Stone')).toBe('grid');
+    expect(detectTileGeometry('grid_walls')).toBe('grid');
+  });
+
+  it('treats an unsignalled folder as agnostic (undefined)', () => {
+    expect(detectTileGeometry('Crates & Barrels')).toBeUndefined();
+    expect(detectTileGeometry('Forest')).toBeUndefined();
+    expect(detectTileGeometry('')).toBeUndefined();
+  });
+
+  it('treats a folder naming BOTH geometries as agnostic (no guessing)', () => {
+    expect(detectTileGeometry('Hex and Square Terrain')).toBeUndefined();
+  });
+
+  it('reads the signal from tags when the folder is silent', () => {
+    expect(detectTileGeometry('Forest', ['hex', 'nature'])).toBe('hex');
+    expect(detectTileGeometry('Floors', ['square'])).toBe('grid');
+  });
+
+  it('matches whole tokens only, not substrings ("gridiron" is not "grid")', () => {
+    expect(detectTileGeometry('Gridiron Field')).toBeUndefined();
+    expect(detectTileGeometry('Hexbolt Crate')).toBeUndefined();
   });
 });
 

@@ -38,7 +38,7 @@ import {
 } from '../../persistence/tileMetadata';
 import { predictDepthTier } from '../../assets/depthPredictor';
 import { deriveTileForm } from '../../assets/tileForm';
-import { clusterCategories, NOISE, humanizePackName } from '../../assets/categoryMerge';
+import { clusterCategories, NOISE, humanizePackName, detectTileGeometry } from '../../assets/categoryMerge';
 import type { FolderInput } from '../../assets/categoryMerge';
 import { predictSpan, DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
 import { runDetectionScan } from '../../assets/tileImageScan';
@@ -860,6 +860,16 @@ const TileAssetBrowser = memo(({
         return affinity === tileDepth;
       });
     }
+
+    // Silent geometry scope: hide a tile only when its own folder/tags EXPLICITLY
+    // declare the other geometry (a "Hex Forest" terrain on a grid map). Tiles with
+    // no geometry signal are agnostic and show everywhere. Read-only derivation — no
+    // metadata write, so it never touches placed-tile rendering. Backs the Filter
+    // panel's "auto · {mapType} map" note row.
+    tiles = tiles.filter((t: TileEntry) => {
+      const geom = detectTileGeometry(t.category ?? '', getAllTags(t, tileMetadata));
+      return geom == null || geom === mapType;
+    });
 
     return tiles;
   }, [allTiles, searchFilter, activeTags, packFilter, tileToTilesetId, tileMetadata, tileDepth, mapType]);
