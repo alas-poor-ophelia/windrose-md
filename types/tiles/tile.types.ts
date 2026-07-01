@@ -141,7 +141,7 @@ export type TileLayerRole = 'ground' | 'structure' | 'props' | 'decoration';
  * which placement subtools the drawer ribbon lights for a selected tile.
  *   cell     — discrete per-cell stamp (the default)
  *   region   — seamless world-anchored terrain fill (renderMode === 'region')
- *   line     — wall/path/portal art meant to be drawn along edges/curves
+ *   line     — wall/path art meant to be drawn along edges/curves
  *   autotile — bitmask-driven auto-tiling (tileset has autoTileConfig)
  * (Scatter is a placement SUBTOOL, not a form — every form can scatter.)
  */

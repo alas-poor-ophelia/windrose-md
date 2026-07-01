@@ -38,9 +38,13 @@ describe('deriveTileForm', () => {
     });
   });
 
-  describe('line (walls/paths/portals)', () => {
-    it.each(['walls', 'paths', 'portals'])('classifies ddSourceType %s as line', (src) => {
+  describe('line (walls/paths)', () => {
+    it.each(['walls', 'paths'])('classifies ddSourceType %s as line', (src) => {
       expect(deriveTileForm({ ddSourceType: src }, makeTileset())).toBe('line');
+    });
+
+    it('does NOT treat portals as line (DD ships them beside walls, but they stamp like props)', () => {
+      expect(deriveTileForm({ ddSourceType: 'portals' }, makeTileset())).toBe('cell');
     });
 
     it('is case-insensitive on ddSourceType', () => {

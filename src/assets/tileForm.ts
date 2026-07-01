@@ -17,13 +17,17 @@
 
 import type { TileForm, TileMetadataEntry, TilesetDef } from '#types/tiles/tile.types';
 
-/** DD source directories whose art is drawn ALONG edges/curves, not stamped per cell. */
-const LINE_DD_SOURCES = new Set(['walls', 'paths', 'portals']);
+/**
+ * DD source directories whose art is drawn ALONG edges/curves, not stamped per
+ * cell. Portals are deliberately NOT here: DD ships them beside walls, but they
+ * are stamped like props — and the wall tool has no strip metadata for them.
+ */
+const LINE_DD_SOURCES = new Set(['walls', 'paths']);
 
 /**
  * Classify a tile into its render form. Priority (most specific first):
  *   autotile  — the tileset declares an autoTileConfig
- *   line      — DD source is walls/paths/portals
+ *   line      — DD source is walls/paths
  *   region    — effective renderMode is 'region'
  *   cell      — residual default
  */

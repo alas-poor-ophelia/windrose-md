@@ -466,7 +466,13 @@ const TileAssetBrowser = memo(({
       onTileDeselect();
     } else {
       onTileSelect(tilesetId, tileId);
-      onToolChange('tilePaint');
+      // Wall/path strips arm the wall tool (WallLayer reads the same tile
+      // selection); everything else arms tile placement. Portals derive as
+      // stamps, not strips, so they route to tilePaint like other tiles.
+      const src = tileMetadata[
+        tilesets.find(t => t.id === tilesetId)?.tiles.find(t => t.id === tileId)?.vaultPath ?? ''
+      ]?.ddSourceType?.toLowerCase();
+      onToolChange(src === 'walls' || src === 'paths' ? 'wall' : 'tilePaint');
     }
   };
 
@@ -712,14 +718,15 @@ const TileAssetBrowser = memo(({
     };
   }, [tilesets, tileMetadata, app]);
 
-  // Merge all tileset tiles into a single pool. Wall/path strips and their
-  // `_end` caps are line assets, not cell tiles — they live in the Walls mode.
+  // Merge all tileset tiles into a single pool. Wall/path strips are browsable
+  // (selecting one arms the wall tool); their `_end` caps stay hidden — caps
+  // are referenced indirectly via the strip's wallEndCapPath metadata.
   const allTiles = useMemo(() => {
     const tiles: TileEntry[] = [];
     for (const ts of tilesets) {
       for (const t of ts.tiles) {
         const e = tileMetadata[t.vaultPath];
-        if (e?.ddSourceType === 'walls' || e?.ddSourceType === 'paths' || e?.isWallEndCap === true) continue;
+        if (e?.isWallEndCap === true) continue;
         tiles.push(t);
       }
     }

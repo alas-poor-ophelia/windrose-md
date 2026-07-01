@@ -803,7 +803,7 @@ const WallLayer = ({
         return (
           <span className="windrose-wall-bar-hint">
             <Icon icon="lucide-brick-wall" size={14} />
-            Pick a wall or path in the tile browser's Walls tab — or click an existing wall to edit it
+            Pick a wall or path strip in the tile drawer — or click an existing wall to edit it
           </span>
         );
       }

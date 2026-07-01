@@ -364,6 +364,24 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     recentTiles,
     handleTileSelect, handleTileDeselect,
   } = useTileBrush();
+
+  // Coupling: the 'line' subtool and the wall tool travel together. Arming
+  // line (a wall/path strip got selected) switches to the wall tool; leaving
+  // line while the wall tool is still active returns to tile placement.
+  // Transition-driven via refs so a manual tool pick is never fought.
+  const currentToolRef = useRef(currentTool);
+  currentToolRef.current = currentTool;
+  const prevSubtoolRef = useRef<typeof tileSubtool>(null);
+  useEffect(() => {
+    const prev = prevSubtoolRef.current;
+    prevSubtoolRef.current = tileSubtool;
+    if (tileSubtool === 'line' && prev !== 'line') {
+      setCurrentTool('wall');
+    } else if (prev === 'line' && tileSubtool !== 'line' && currentToolRef.current === 'wall') {
+      setCurrentTool('tilePaint');
+    }
+  }, [tileSubtool, setCurrentTool]);
+
   // Use rootMapData for tileset check — tilesets are built from global settings and stored on root,
   // but sub-maps should also have access to tiles
   const availableTilesets = useMemo(
