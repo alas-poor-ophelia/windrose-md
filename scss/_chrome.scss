@@ -76,6 +76,9 @@
     transition: var(--windrose-transition);
 
     svg {
+      /* display:block kills the inline-svg baseline gap that pushed the icon
+         ~1.5px above the button's centre (the Icon wrapper span is block). */
+      display: block;
       width: 16px;
       height: 16px;
     }
@@ -143,6 +146,7 @@
     outline: none;
 
     svg {
+      display: block;
       width: 16px;
       height: 16px;
       color: currentColor;

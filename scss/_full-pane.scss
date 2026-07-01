@@ -30,12 +30,14 @@
   position: relative;
 }
 
-/* Map-name header: keep it tight but leave symmetric vertical padding so the
-   controls have breathing room above the gold divider (a 0 bottom pad pinned
-   them to the line and read as overflowing it). Divide it from the stage/canvas
-   with the same gold stroke the sidebars use. */
+/* Map-name header. Asymmetric vertical padding, deliberately: the container's
+   inset box-shadow stroke sits ~4-5px in from the top edge (container padding is
+   0 in full-pane), so the controls need ~7px top clearance to stay below that
+   thin line; the bottom only needs ~4px to float above the gold divider. Divide
+   it from the stage/canvas with the same gold stroke the sidebars use. */
 .windrose-full-pane .windrose-header {
-  padding-block: 4px;
+  padding-top: 7px;
+  padding-bottom: 4px;
   margin-bottom: 0;
   border-bottom: 1.5px solid oklch(from var(--windrose-border-primary) l c h / 0.5);
 }
