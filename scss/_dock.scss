@@ -754,7 +754,17 @@
 }
 
 .is-tablet button.windrose-dock-layer-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
   padding: 4px 8px;
+  background: transparent;
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.3);
+  border-radius: 4px;
+  color: var(--windrose-text-muted);
+  font-size: 11px;
 }
 
 /* Phase 7 Board->Strata->Layer buttons — neutralize Obsidian's injected padding/background */
@@ -803,7 +813,7 @@
   gap: 4px;
   width: 100%;
   padding: 4px 8px;
-  border: 1px dashed oklch(from var(--windrose-border-primary) l c h / 0.3);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.3);
   border-radius: 4px;
   background: transparent;
   color: var(--windrose-text-muted);

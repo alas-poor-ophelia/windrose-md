@@ -287,12 +287,12 @@
       inset 0 0 0 1px oklch(from var(--windrose-gold-bright) l c h / 0.35);
 
     svg {
-      color: var(--windrose-text-primary);
+      color: var(--windrose-accent-red);
       filter: none;
     }
   }
 
-  /* Subtool flag → blue corner triangle, top-right */
+  /* Subtool flag → red corner triangle, top-right */
   .windrose-subtool-indicator {
     top: 2px;
     right: 2px;
@@ -303,7 +303,7 @@
     opacity: 1;
     border-style: solid;
     border-width: 0 8px 8px 0;
-    border-color: transparent var(--windrose-accent-blue) transparent transparent;
+    border-color: transparent var(--windrose-accent-red) transparent transparent;
   }
 
   /* Undo/redo stacked at the bottom under a top divider */
@@ -364,6 +364,18 @@
   max-width: 38px;
   height: 38px;
   padding: 6px;
+}
+
+/* Popout/dock button lives in the full-pane vertical bar. Give it its own tablet
+   twin so Obsidian's injected padding can't squeeze the 20px icon — the general
+   .windrose-tool-btn reset covers it by inheritance, but this control is pinned
+   explicitly (keep it half-lit until hover). */
+.is-tablet .windrose-tool-palette-vertical button.windrose-tool-palette-dock-btn {
+  min-width: 38px;
+  max-width: 38px;
+  height: 38px;
+  padding: 6px;
+  opacity: 0.5;
 }
 
 .is-tablet button.windrose-history-btn {

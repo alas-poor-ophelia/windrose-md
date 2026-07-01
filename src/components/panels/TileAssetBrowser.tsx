@@ -481,7 +481,7 @@ const TileAssetBrowser = memo(({
   useEffect(() => {
     if (!hoveredTile) {
       if (portalRef.current) {
-        portalRef.current.hide();
+        portalRef.current.classList.remove('windrose-tile-preview-portal-visible');
       }
       return undefined;
     }
@@ -509,7 +509,7 @@ const TileAssetBrowser = memo(({
 
     if (browserRef.current) {
       const rect = browserRef.current.getBoundingClientRect();
-      portal.show();
+      portal.classList.add('windrose-tile-preview-portal-visible');
       const topVal = (rect.top + rect.height / 2 - (PREVIEW_SIZE + 24) / 2) + 'px';
       const leftVal = (rect.left - PREVIEW_SIZE - 16) + 'px';
       portal.style.setProperty('top', topVal);
@@ -1066,6 +1066,21 @@ const TileAssetBrowser = memo(({
     enabled: !compact && !organize && containerWidth > 0,
     overscan: 5,
   });
+
+  // virtual-core memoizes row measurements on count/enabled but NOT on
+  // estimateSize. On initial load the ResizeObserver reports the container width
+  // more than once (mid drawer-open animation, then again once settled); each
+  // fire updates fullCellWidth but the cached measurements keep the first,
+  // wrong height — so category rows render stacked/overlapping until some
+  // unrelated re-render busts the cache (the "scroll fixes it" symptom). Force a
+  // re-measure whenever a size input changes so positions track the current estimate.
+  useEffect(() => {
+    fullVirtualizer.measure();
+  }, [fullVirtualizer, fullCellWidth, listMode, gridGap]);
+
+  useEffect(() => {
+    orgVirtualizer.measure();
+  }, [orgVirtualizer, orgCellWidth]);
 
   // Request thumbnails only for visible tiles (virtualizer-driven)
   const orgRange = orgVirtualizer.range;

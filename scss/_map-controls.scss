@@ -13,6 +13,16 @@
   width: 80px;
   align-items: center;
 
+  /* Block/embedded mode: hug the map's right edge. The 80px column is centered,
+     so the smaller block-mode compass floated ~20px in from the canvas edge
+     (16px dead space + 4px offset). Narrow the column to the compass width and
+     tighten the offset so it sits snug against the map. */
+  .windrose-canvas-wrapper:not(.windrose-full-pane-canvas) & {
+    width: 58px;
+    min-width: 58px;
+    right: 6px;
+  }
+
   &-overlay {
     position: fixed;
     inset: 0;
@@ -46,12 +56,12 @@
   /* Block/embedded mode is a compact 600x400-ish widget — the full 70px compass
      reads oversized there. Scope a smaller compass to the non-full-pane canvas. */
   .windrose-canvas-wrapper:not(.windrose-full-pane-canvas) & {
-    width: 48px;
-    height: 48px;
-    min-width: 48px;
-    min-height: 48px;
-    max-width: 48px;
-    max-height: 48px;
+    width: 58px;
+    height: 58px;
+    min-width: 58px;
+    min-height: 58px;
+    max-width: 58px;
+    max-height: 58px;
   }
   border-radius: 50%;
   display: flex;
