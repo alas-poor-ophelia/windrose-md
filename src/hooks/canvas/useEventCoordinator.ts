@@ -341,9 +341,16 @@ const useEventCoordinator = ({
       } else if (currentTool === 'tilePaint') {
         if (hasMultiSelection) clearSelection();
 
+        // Both tile layers listen on tilePaint; they self-gate on the armed
+        // subtool (TerrainBrushLayer acts only for 'brush', TilePlacementLayer
+        // yields it), so exactly one handles the event.
+        const eventToUse = isTouchEvent ? syntheticEvent : e;
+        const brushHandlers = getHandlers('terrainBrush');
+        if (brushHandlers?.handlePointerDown) {
+          brushHandlers.handlePointerDown(eventToUse);
+        }
         const tileHandlers = getHandlers('tilePlacement');
         if (tileHandlers?.handlePointerDown) {
-          const eventToUse = isTouchEvent ? syntheticEvent : e;
           tileHandlers.handlePointerDown(eventToUse);
         }
       } else if (currentTool === 'wall') {
@@ -585,6 +592,10 @@ const useEventCoordinator = ({
     }
 
     if (currentTool === 'tilePaint') {
+      const brushHandlers = getHandlers('terrainBrush');
+      if (brushHandlers?.handlePointerMove) {
+        brushHandlers.handlePointerMove(e);
+      }
       const tileHandlers = getHandlers('tilePlacement');
       if (tileHandlers?.handlePointerMove) {
         tileHandlers.handlePointerMove(e);
@@ -712,6 +723,10 @@ const useEventCoordinator = ({
     }
 
     if (currentTool === 'tilePaint') {
+      const brushHandlers = getHandlers('terrainBrush');
+      if (brushHandlers?.handlePointerUp) {
+        brushHandlers.handlePointerUp(e);
+      }
       const tileHandlers = getHandlers('tilePlacement');
       if (tileHandlers?.handlePointerUp) {
         tileHandlers.handlePointerUp(e);

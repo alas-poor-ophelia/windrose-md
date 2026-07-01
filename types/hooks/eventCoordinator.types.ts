@@ -242,6 +242,7 @@ export interface HandlerTypeMap {
   alignment: AlignmentHandlers;
   freehand: FreehandHandlers;
   tilePlacement: LayerHandlers;
+  terrainBrush: LayerHandlers;
   outline: LayerHandlers;
   region: RegionHandlers;
   shapeOverlay: ShapeOverlayHandlers;

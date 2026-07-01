@@ -46,6 +46,7 @@ import { RegionLayer } from './RegionLayer';
 import { OutlineLayer } from './OutlineLayer';
 import { ShapeOverlayLayer } from './ShapeOverlayLayer';
 import { TilePlacementLayer } from './TilePlacementLayer';
+import { TerrainBrushLayer } from './TerrainBrushLayer';
 import { WallLayer } from './WallLayer';
 import { RerollDungeonButton } from './RerollDungeonButton';
 import { getSetting } from '../../core/settingsAccessor';
@@ -555,6 +556,7 @@ MapCanvas.RegionLayer = RegionLayer;
 MapCanvas.OutlineLayer = OutlineLayer;
 MapCanvas.ShapeOverlayLayer = ShapeOverlayLayer;
 MapCanvas.TilePlacementLayer = TilePlacementLayer;
+MapCanvas.TerrainBrushLayer = TerrainBrushLayer;
 MapCanvas.WallLayer = WallLayer;
 MapCanvas.RerollDungeonButton = RerollDungeonButton;
 

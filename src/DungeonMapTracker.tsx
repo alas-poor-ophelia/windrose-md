@@ -590,6 +590,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleEdgesChange,
     handleTilesChange,
     handleWallPathsChange,
+    handleTerrainStrokesChange,
     handleAddCustomColor,
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
@@ -1109,6 +1110,17 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 brushSize={brushSize}
                 tileDepth={tileDepth}
                 onTilesChange={handleTilesChange}
+              />
+
+              {/* TerrainBrushLayer - world-space soft terrain brush ('brush' subtool) */}
+              <MapCanvas.TerrainBrushLayer
+                currentTool={currentTool}
+                activeSubtool={tileSubtool}
+                selectedTilesetId={selectedTilesetId}
+                selectedTileId={selectedTileId}
+                brushSize={brushSize}
+                tileDepth={tileDepth}
+                onTerrainStrokesChange={handleTerrainStrokesChange}
               />
 
               {/* WallLayer - wall/path strip drawing along polylines */}
