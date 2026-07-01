@@ -31,6 +31,22 @@ const DD_SOURCE_TO_RENDERMODE: Record<string, TileRenderMode> = {
   lights: 'cell',
 };
 
+/**
+ * Category/tag words signalling seamless surfaces — the loose-folder analog
+ * of DD's terrain/patterns source dirs (folder-added tilesets derive
+ * category + tags from their subfolder path, but have no ddSourceType).
+ */
+const REGION_CATEGORY_WORDS = new Set([
+  'terrain', 'terrains', 'pattern', 'patterns', 'texture', 'textures',
+  'material', 'materials', 'floor', 'floors', 'ground', 'tileset', 'tilesets',
+]);
+/** Category/tag words signalling discrete stamps. */
+const CELL_CATEGORY_WORDS = new Set([
+  'object', 'objects', 'prop', 'props', 'furniture', 'creature', 'creatures',
+  'decoration', 'decorations', 'item', 'items', 'portal', 'portals',
+  'light', 'lights',
+]);
+
 export interface RenderModePrediction {
   mode: TileRenderMode;
   confidence: number;
@@ -49,6 +65,22 @@ function predictRenderMode(
     const mapped = DD_SOURCE_TO_RENDERMODE[src];
     if (mapped === 'region') region += 0.50;
     else if (mapped === 'cell') cell += 0.50;
+  } else {
+    // Signal 1b: subfolder-derived category/tags (weight 0.45) — the same
+    // folder-structure evidence, slightly weaker since folder names are
+    // user-authored. Only when both directions don't cancel out.
+    const catTokens = new Set<string>();
+    for (const source of [...(tile.tags ?? []), tile.category ?? '']) {
+      for (const tok of extractTokens(source)) catTokens.add(tok);
+    }
+    let regionHit = false;
+    let cellHit = false;
+    for (const tok of catTokens) {
+      if (REGION_CATEGORY_WORDS.has(tok)) regionHit = true;
+      if (CELL_CATEGORY_WORDS.has(tok)) cellHit = true;
+    }
+    if (regionHit && !cellHit) region += 0.45;
+    else if (cellHit && !regionHit) cell += 0.45;
   }
 
   // Signal 2: alpha coverage (weight up to 0.35) — seamless fills are near-opaque,

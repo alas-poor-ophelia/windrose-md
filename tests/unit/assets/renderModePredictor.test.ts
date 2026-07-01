@@ -31,6 +31,46 @@ describe('predictRenderMode', () => {
     });
   });
 
+  describe('category/tags signal (folder-added sets)', () => {
+    it('classifies a Terrain-subfolder texture as region', () => {
+      // The live regression: "Terrain/Acid_01_a.webp" — no ddSourceType, no
+      // head noun; category signal + opaque coverage must cross 0.5.
+      const tile = makeTile('Acid_01_a.webp', { category: 'Terrain', tags: ['Terrain'] });
+      const r = predictRenderMode(tile, { alphaCoverage: 1 });
+      expect(r.mode).toBe('region');
+      expect(r.confidence).toBeGreaterThanOrEqual(0.5);
+    });
+
+    it('keeps a near-opaque Furniture prop on cell', () => {
+      // Tightly-cropped props scan near-opaque; the folder word must outweigh.
+      const tile = makeTile('Bench_01_a.webp', { category: 'Furniture', tags: ['Furniture'] });
+      const r = predictRenderMode(tile, { alphaCoverage: 0.99 });
+      expect(r.mode).toBe('cell');
+    });
+
+    it('stays silent when region and cell words cancel out', () => {
+      const tile = makeTile(NEUTRAL, { category: 'Terrain/Props', tags: ['Terrain', 'Props'] });
+      const r = predictRenderMode(tile, undefined);
+      expect(r.confidence).toBe(0);
+    });
+
+    it('alone stays under the persistence threshold', () => {
+      // Folder word without pixel/name support is suggestive, not decisive.
+      const tile = makeTile(NEUTRAL, { category: 'Textures', tags: ['Textures'] });
+      const r = predictRenderMode(tile, undefined);
+      expect(r.mode).toBe('region');
+      expect(r.confidence).toBeLessThan(0.5);
+    });
+
+    it('is ignored when ddSourceType is present', () => {
+      // DD source already encodes the folder evidence at full weight.
+      const tile = makeTile(NEUTRAL, { category: 'Terrain', tags: ['Terrain'] });
+      const r = predictRenderMode(tile, { ddSourceType: 'objects' });
+      expect(r.mode).toBe('cell');
+      expect(r.confidence).toBeCloseTo(0.5, 6);
+    });
+  });
+
   describe('alpha coverage signal', () => {
     it('treats near-opaque images as region', () => {
       const r = predictRenderMode(makeTile(NEUTRAL), { alphaCoverage: 0.98 });

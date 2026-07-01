@@ -10,7 +10,6 @@ import type { App } from 'obsidian';
 import { TFile } from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type { InstalledPack } from '#types/content-packs/contentPack.types';
-import type { TileLayerRole } from '#types/tiles/tile.types';
 import type { PckArchive } from './pckParser';
 import { extractFileData } from './pckParser';
 import type { DungeondraftPackMeta } from './pckMetadata';
@@ -20,19 +19,12 @@ import {
 	loadTileMetadata,
 	bulkSetImportTags,
 	bulkSetDdSourceType,
-	bulkSetDepthAffinity,
-	bulkSetRenderMode,
-	bulkSetDetectionSignals,
-	bulkSetDefaultSpan,
 	bulkSetWallStripInfo,
 	bulkMarkWallEndCaps,
 	saveTileMetadata,
 	setTileMetadataForRender,
 } from '../persistence/tileMetadata';
-import { predictDepthTier } from '../assets/depthPredictor';
-import { predictRenderMode } from '../assets/renderModePredictor';
-import { runDetectionScan } from '../assets/tileImageScan';
-import { predictSpan, DEFAULT_PIXELS_PER_CELL } from '../assets/spanPredictor';
+import { runImportDetectionPass } from '../assets/importDetectionPass';
 
 interface PluginLike {
 	app: App;
@@ -277,36 +269,6 @@ async function runDdImport(
 			metadata = bulkSetDdSourceType(metadata, ddSourceEntries);
 		}
 
-		// Cell-tile predictions (depth, render mode, span) never apply to
-		// wall/path strips — they are line assets, not cell tiles.
-		const cellEntries = ddSourceEntries.filter(e => !STRIP_SOURCE_TYPES.has(e.sourceType));
-
-		const depthEntries: Array<{ vaultPath: string; depth: TileLayerRole }> = [];
-		for (const { vaultPath } of cellEntries) {
-			const tile = { id: '', filename: vaultPath.split('/').pop() ?? '', vaultPath, tags: [] };
-			const entry = metadata[vaultPath];
-			const { tier, confidence } = predictDepthTier(tile, entry);
-			if (confidence >= 0.4) {
-				depthEntries.push({ vaultPath, depth: tier });
-			}
-		}
-		if (depthEntries.length > 0) {
-			metadata = bulkSetDepthAffinity(metadata, depthEntries);
-		}
-		// Predict render mode from ddSourceType (terrain/patterns -> region).
-		// Pixel-based refinement happens later via the browser's eager scan.
-		const renderModeEntries: Array<{ vaultPath: string; mode: 'region' }> = [];
-		for (const { vaultPath } of cellEntries) {
-			const tile = { id: '', filename: vaultPath.split('/').pop() ?? '', vaultPath, tags: [] };
-			const { mode, confidence } = predictRenderMode(tile, metadata[vaultPath]);
-			if (mode === 'region' && confidence >= 0.5) {
-				renderModeEntries.push({ vaultPath, mode: 'region' });
-			}
-		}
-		if (renderModeEntries.length > 0) {
-			metadata = bulkSetRenderMode(metadata, renderModeEntries);
-		}
-
 		// Wall strip pairing: end caps + sidecar default colors.
 		const wallStripEntries: Array<{ vaultPath: string; endCapPath?: string; defaultColor?: string }> = [];
 		const endCapVaultPaths: string[] = [];
@@ -332,32 +294,26 @@ async function runDdImport(
 			metadata = bulkMarkWallEndCaps(metadata, endCapVaultPaths);
 		}
 
-		// Bake detection signals + footprint at import — the guaranteed trigger.
-		// Decoupled from the browser's lazy scan so signals exist even if the
-		// tile browser is never opened. Footprint uses the source size ÷ DD's
-		// 256px authoring spec; region tiles tile seamlessly and are skipped.
+		// Detection scan + predictions at import — the guaranteed trigger,
+		// shared with the settings folder-add path (importDetectionPass).
 		// Strips are scanned too (srcH = native strip height feeds the wall
-		// renderer) but never get span predictions.
-		const writtenPaths = ddSourceEntries.map(e => e.vaultPath);
+		// renderer) but never get depth/render-mode/span predictions.
 		const stripPaths = new Set(
 			ddSourceEntries.filter(e => STRIP_SOURCE_TYPES.has(e.sourceType)).map(e => e.vaultPath),
 		);
-		if (writtenPaths.length > 0) {
+		const writtenTiles = ddSourceEntries.map(({ vaultPath }) => ({
+			id: '',
+			filename: vaultPath.split('/').pop() ?? '',
+			vaultPath,
+			tags: [],
+		}));
+		if (writtenTiles.length > 0) {
 			onProgress?.(textures.length, textures.length, 'scan');
-			const scanned = await runDetectionScan(app, writtenPaths, { concurrency: 4 });
-			if (scanned.length > 0) {
-				metadata = bulkSetDetectionSignals(metadata, scanned);
-				const spanEntries: Array<{ vaultPath: string; spanW: number; spanH: number }> = [];
-				for (const { vaultPath, signals } of scanned) {
-					if (metadata[vaultPath]?.renderMode === 'region') continue;
-					if (stripPaths.has(vaultPath)) continue;
-					const { spanW, spanH } = predictSpan(signals.naturalW, signals.naturalH, DEFAULT_PIXELS_PER_CELL);
-					if (spanW > 1 || spanH > 1) spanEntries.push({ vaultPath, spanW, spanH });
-				}
-				if (spanEntries.length > 0) {
-					metadata = bulkSetDefaultSpan(metadata, spanEntries);
-				}
-			}
+			const passResult = await runImportDetectionPass(app, writtenTiles, metadata, {
+				applyRenderMode: true,
+				skipPredictions: stripPaths,
+			});
+			metadata = passResult.metadata;
 		}
 
 		await saveTileMetadata(app, metadata);
