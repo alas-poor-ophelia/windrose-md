@@ -78,6 +78,17 @@ The one real gap. Conservative policy chosen by the Guildmaster ("a crate is a c
 WIRED and functional: Select-All, **Tag…** (`bulkAddTag`), **Tier…** (`bulkSetDepthAffinity`),
 **Star** (`bulkToggleStar`), search filter, per-tile select, Done/exit.
 
+### "Add tiles" 3-step import wizard — DONE 2026-07-01 (`49e5a1f6`)
+The design's never-built wizard (`organize.jsx`: Source → Tiers → Tags) now exists:
+`src/settings/modals/AddTilesModal.ts` (native Modal) + pure engines in
+`src/assets/importPlanner.ts` (`aggregateFolderTiers` confidence-vote,
+`mineFilenameTags` frequency miner) + `scss/_import-wizard.scss`. Settings tab's two
+entry buttons replaced by one "Add tiles" CTA. DD packs delegate to
+`DungeondraftImportModal` from step ① (packs arrive pre-grouped/tagged — design-blessed).
+Finish = register folder + tier/tag writes + `runImportDetectionPass`. Live-verified
+end-to-end. **Deferred:** absorbing DD into steps ②③, suggestion "merge into" links,
+drag-onto-drawer source.
+
 ---
 
 ## MAYBE / PARTIAL (built but not where it should be)
