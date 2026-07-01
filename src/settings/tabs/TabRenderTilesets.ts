@@ -2,7 +2,7 @@ import type { SettingsTabThis } from './settingsTabContext';
 import type { App } from 'obsidian';
 import { Notice, Setting } from 'obsidian';
 import { FolderSuggest } from '../helpers/FolderSuggest';
-import { DungeondraftImportModal } from '../../content-packs/DungeondraftImportModal';
+import { AddTilesModal } from '../modals/AddTilesModal';
 import { scanTilesetFolder } from '../../assets/tilesetOperations';
 import { runImportDetectionPass } from '../../assets/importDetectionPass';
 import {
@@ -118,29 +118,18 @@ export const TabRenderTilesetsMethods = {
           }));
     }
 
-    // Add folder button
+    // One entry point for every source (design: "Add tiles" wizard) —
+    // a Dungeondraft pack or a folder of images, with tier mapping and
+    // filename tag mining for folders.
     new Setting(containerEl)
-      .setName('Add tile folder')
-      .setDesc('Add a vault folder to scan for tile images')
+      .setName('Add tiles')
+      .setDesc('Import a Dungeondraft pack or a folder of images — with tier mapping and tag suggestions')
       .addButton(btn => btn
-        .setButtonText('Add folder')
-        .onClick(async () => {
-          const updated = [...(s.tilesetFolders ?? []), ''];
-          s.tilesetFolders = updated;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
-
-    // Import Dungeondraft pack
-    new Setting(containerEl)
-      .setName('Import Dungeondraft pack')
-      .setDesc('Import a .dungeondraft_pack file as a tileset')
-      .addButton(btn => btn
-        .setButtonText('Import pack')
+        .setButtonText('Add tiles')
+        .setCta()
         .onClick(() => {
           const pluginLike = { app: this.app, settings: this.plugin.settings, saveSettings: () => this.plugin.saveSettings() };
-          new DungeondraftImportModal(this.app, pluginLike, () => {
+          new AddTilesModal(this.app, pluginLike, () => {
             this.settingsChanged = true;
             this.display();
           }).open();
