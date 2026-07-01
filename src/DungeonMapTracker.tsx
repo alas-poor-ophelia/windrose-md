@@ -174,6 +174,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Selected tile's derived render-form + armed placement subtool (drawer ribbon).
   const [selectedTileForm, setSelectedTileForm] = useState<TileForm | null>(null);
   const [tileSubtool, setTileSubtool] = useState<TileSubtoolId | null>(null);
+  // Id of the wall being edit-dragged: threaded to the renderer so the static
+  // raster drops it (the WallLayer overlay draws it live during the drag).
+  const [draggingWallId, setDraggingWallId] = useState<string | null>(null);
   // Arm the form's default subtool whenever the selected form changes.
   useEffect(() => {
     setTileSubtool(selectedTileForm != null ? formDef(selectedTileForm).defaultSubtool : null);
@@ -1027,6 +1030,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               theme={theme}
               layerVisibility={layerVisibility}
               adjacentSubHexes={showAdjacentSubMaps && isInSubHex ? adjacentSubHexes : null}
+              draggingWallId={draggingWallId}
             >
               {/* DrawingLayer - handles all drawing tools */}
               <MapCanvas.DrawingLayer
@@ -1103,6 +1107,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 selectedTilesetId={selectedTilesetId}
                 selectedTileId={selectedTileId}
                 onWallPathsChange={handleWallPathsChange}
+                onDragStateChange={setDraggingWallId}
               />
 
               {/* RegionLayer - hex region creation and editing */}

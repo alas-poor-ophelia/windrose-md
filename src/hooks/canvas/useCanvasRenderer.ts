@@ -414,7 +414,7 @@ function renderLayerCellsAndEdges(
 }
 
 const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, selectedItems = [], options = {}) => {
-  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null, hiddenTileLayers = undefined } = options;
+  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null, hiddenTileLayers = undefined, draggingWallId = null } = options;
   if (canvas == null) return;
 
   // Normalize selectedItems to array (backward compatibility)
@@ -688,12 +688,18 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       });
     }
 
-    // Wall paths (between curves and tiles)
+    // Wall paths (between curves and tiles). A wall under active edit-drag is
+    // excluded here and drawn live on the overlay instead.
     if (drawLayer.wallPaths != null && drawLayer.wallPaths.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
-      const wallCellSize = geometry.type === 'grid' ? geometry.cellSize : geometry.hexSize;
-      renderWallPaths(ctx, drawLayer.wallPaths, mapData.tilesets, rendererViewState, wallCellSize, {
-        getCachedImage
-      });
+      const wallsToRender = draggingWallId != null
+        ? drawLayer.wallPaths.filter(w => w.id !== draggingWallId)
+        : drawLayer.wallPaths;
+      if (wallsToRender.length > 0) {
+        const wallCellSize = geometry.type === 'grid' ? geometry.cellSize : geometry.hexSize;
+        renderWallPaths(ctx, wallsToRender, mapData.tilesets, rendererViewState, wallCellSize, {
+          getCachedImage
+        });
+      }
     }
 
     // Tiles (between curves and regions, z-sorted for overflow occlusion)
@@ -836,7 +842,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     mapData.objectSetId, mapData.settings, mapData.activeLayerId, activeLayer,
     mapData.activeBoardId, mapData.layerMode,
     geometry, hiddenTileLayers, adjacentSubHexes, showCoordinates,
-    width, height,
+    width, height, draggingWallId,
     JSON.stringify(THEME), JSON.stringify(visibility),
   ];
 
@@ -913,7 +919,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 };
 
 const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], options = {}) => {
-  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false, adjacentSubHexes = null, hiddenTileLayers = undefined } = options;
+  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false, adjacentSubHexes = null, hiddenTileLayers = undefined, draggingWallId = null } = options;
   // Coalesce renders to at most one per animation frame. Pan/zoom writes viewState
   // (stored on mapData) on EVERY pointermove/touchmove; on a 120Hz touch device that
   // fires far faster than the display refreshes, so rendering synchronously per update
@@ -932,10 +938,11 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
     adjacentSubHexes: typeof adjacentSubHexes;
     hiddenTileLayers: typeof hiddenTileLayers;
     tileImagesReady: boolean;
+    draggingWallId: typeof draggingWallId;
   } | null>(null);
 
   useEffect(() => {
-    renderInputsRef.current = { mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, hiddenTileLayers, tileImagesReady };
+    renderInputsRef.current = { mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, hiddenTileLayers, tileImagesReady, draggingWallId };
     const scheduleRender = (): void => {
       // A frame is already queued — it will pick up the latest inputs from the ref.
       if (rafIdRef.current != null) return;
@@ -944,7 +951,7 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
         const a = renderInputsRef.current;
         if (a && a.mapData && a.geometry && canvasRef.current) {
           const fogCanvas = fogCanvasRef?.current ?? null;
-          renderCanvas(canvasRef.current, fogCanvas, a.mapData, a.geometry, a.selectedItems, { isResizeMode: a.isResizeMode, theme: a.theme, showCoordinates: a.showCoordinates, layerVisibility: a.layerVisibility, adjacentSubHexes: a.adjacentSubHexes, hiddenTileLayers: a.hiddenTileLayers, tileImagesReady: a.tileImagesReady });
+          renderCanvas(canvasRef.current, fogCanvas, a.mapData, a.geometry, a.selectedItems, { isResizeMode: a.isResizeMode, theme: a.theme, showCoordinates: a.showCoordinates, layerVisibility: a.layerVisibility, adjacentSubHexes: a.adjacentSubHexes, hiddenTileLayers: a.hiddenTileLayers, tileImagesReady: a.tileImagesReady, draggingWallId: a.draggingWallId });
         }
       });
     };
@@ -952,7 +959,7 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
     // a zoom gesture settles.
     if (canvasRef.current) setStaticSettleCallback(canvasRef.current, scheduleRender);
     scheduleRender();
-  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, hiddenTileLayers]);
+  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, hiddenTileLayers, draggingWallId]);
 
   // Cancel any frame still pending when the component unmounts.
   useEffect(() => () => {

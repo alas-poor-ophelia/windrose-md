@@ -71,6 +71,12 @@ export interface RenderCanvasOptions {
   hiddenTileLayers?: Set<string>;
   /** Flips when async tile images finish loading; part of the static-layer cache key. */
   tileImagesReady?: boolean;
+  /**
+   * Wall currently being edit-dragged. Excluded from the static raster so the
+   * live overlay preview owns it — the gesture pays one re-raster on drag start
+   * (to drop it) and one on commit (to re-include it), not one per frame.
+   */
+  draggingWallId?: string | null;
 }
 
 /** Main render function */

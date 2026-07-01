@@ -91,11 +91,27 @@ function arcSubdivisions(
 }
 
 /**
+ * Per-object flatten cache, keyed by WallPath reference. Mutations replace the
+ * WallPath object (immutable updates), so a changed wall misses and re-flattens
+ * while unchanged walls reuse across frames; entries are GC'd with their walls.
+ * Mirrors curveRenderer's `path2DCache`.
+ */
+const flattenCache = new WeakMap<WallPath, FlattenedPath>();
+
+/**
  * Flatten a wall path to a polyline. Straight segments contribute their two
  * endpoints; arc segments subdivide. Closed paths append the closing segment
  * (which may itself arc via the last vertex's `arc`).
  */
 function flattenWallPath(wallPath: WallPath): FlattenedPath {
+  const cached = flattenCache.get(wallPath);
+  if (cached != null) return cached;
+  const result = computeFlattenWallPath(wallPath);
+  flattenCache.set(wallPath, result);
+  return result;
+}
+
+function computeFlattenWallPath(wallPath: WallPath): FlattenedPath {
   const verts = wallPath.vertices;
   const points: Array<[number, number]> = [];
   if (verts.length < 2) return { points, totalLength: 0 };

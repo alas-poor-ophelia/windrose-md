@@ -36,6 +36,13 @@ export interface WallLayerProps {
   selectedTilesetId: string | null;
   selectedTileId: string | null;
   onWallPathsChange: (wallPaths: WallPath[], suppressHistory?: boolean) => void;
+  /**
+   * Reports the wall currently being edit-dragged (null when idle). The parent
+   * threads this to the renderer so the static raster drops the dragged wall —
+   * the live overlay owns it during the gesture, and mapData is untouched until
+   * the single commit on pointerup.
+   */
+  onDragStateChange?: (wallId: string | null) => void;
 }
 
 /** Hide edit handles below this zoom — too small to grab, pure clutter. */
@@ -58,6 +65,43 @@ function segmentMidpoint(wall: WallPath, i: number): { x: number; y: number } {
 
 function segmentCount(wall: WallPath): number {
   return wall.closed ? wall.vertices.length : wall.vertices.length - 1;
+}
+
+/** True if two walls differ geometrically (vertex count, position, or arc). */
+function wallGeometryChanged(a: WallPath, b: WallPath): boolean {
+  if (a.vertices.length !== b.vertices.length) return true;
+  for (let i = 0; i < a.vertices.length; i++) {
+    const va = a.vertices[i];
+    const vb = b.vertices[i];
+    if (Math.abs(va.x - vb.x) > 1e-3 || Math.abs(va.y - vb.y) > 1e-3) return true;
+    const aa = va.arc;
+    const ab = vb.arc;
+    if ((aa == null) !== (ab == null)) return true;
+    if (aa != null && ab != null && (Math.abs(aa[0] - ab[0]) > 1e-3 || Math.abs(aa[1] - ab[1]) > 1e-3)) return true;
+  }
+  return false;
+}
+
+/**
+ * Axis-aligned bounds over a wall's vertices and arc control points. Control
+ * points are included because an arc can bow beyond the vertex hull; the
+ * flattened polyline stays inside {vertices ∪ control points}.
+ */
+function wallBounds(wall: WallPath): { minX: number; minY: number; maxX: number; maxY: number } {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const v of wall.vertices) {
+    if (v.x < minX) minX = v.x;
+    if (v.y < minY) minY = v.y;
+    if (v.x > maxX) maxX = v.x;
+    if (v.y > maxY) maxY = v.y;
+    if (v.arc != null) {
+      if (v.arc[0] < minX) minX = v.arc[0];
+      if (v.arc[1] < minY) minY = v.arc[1];
+      if (v.arc[0] > maxX) maxX = v.arc[0];
+      if (v.arc[1] > maxY) maxY = v.arc[1];
+    }
+  }
+  return { minX, minY, maxX, maxY };
 }
 
 /** Min distance from a point to a wall's flattened centerline. */
@@ -84,6 +128,7 @@ const WallLayer = ({
   selectedTilesetId,
   selectedTileId,
   onWallPathsChange,
+  onDragStateChange,
 }: WallLayerProps): VNode | null => {
   const app = useApp();
   const { mapData, geometry, screenToWorld, getClientCoords, canvasRef } = useMapState();
@@ -112,6 +157,9 @@ const WallLayer = ({
   selectedVertexRef.current = selectedVertexIndex;
   const dragRef = useRef<DragState | null>(null);
   const dragMovedRef = useRef(false);
+  // Working copy of the wall under drag. Mutated per-frame in place of mapData,
+  // rendered live on the overlay, and committed to mapData once on pointerup.
+  const dragWorkingRef = useRef<WallPath | null>(null);
 
   const isWallTool = currentTool === 'wall';
   const isDrawing = vertices.length > 0;
@@ -284,13 +332,24 @@ const WallLayer = ({
     if (ctx == null) return;
     ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-    const wall = selectedWallIdRef.current != null
+    // During a drag the working copy is the source of truth (mapData is untouched
+    // and the wall is excluded from the static raster); otherwise read from mapData.
+    const dragging = dragWorkingRef.current;
+    const wall = dragging ?? (selectedWallIdRef.current != null
       ? (mapData != null ? (getActiveLayer(mapData).wallPaths ?? []).find(w => w.id === selectedWallIdRef.current) : null)
-      : null;
+      : null);
     if (wall == null) return;
     const view = getViewTransform(overlay);
     if (view == null) return;
     const { offsetX, offsetY, zoom } = view;
+
+    // While dragging, the wall is dropped from the static raster, so paint its
+    // textured strip live here. renderWallPaths manages its own transform.
+    if (dragging != null && mapData?.tilesets != null && mapData.tilesets.length > 0) {
+      renderWallPaths(ctx, [dragging], mapData.tilesets, { x: offsetX, y: offsetY, zoom }, cellSize, {
+        getCachedImage,
+      });
+    }
 
     ctx.save();
     ctx.translate(offsetX, offsetY);
@@ -338,7 +397,7 @@ const WallLayer = ({
     }
 
     ctx.restore();
-  }, [mapData, getViewTransform]);
+  }, [mapData, getViewTransform, cellSize]);
 
   // Keep handles in sync with selection, data, and view changes.
   useEffect(() => {
@@ -360,6 +419,16 @@ const WallLayer = ({
     next[idx] = mutate(walls[idx]);
     onWallPathsChange(next, suppress);
   }, [getWalls, onWallPathsChange]);
+
+  // Enter an ephemeral edit-drag: seed the working copy, tell the parent to drop
+  // this wall from the static raster, and paint it live on the overlay. No
+  // mapData writes happen until the single commit on pointerup.
+  const beginDrag = useCallback((wall: WallPath) => {
+    dragWorkingRef.current = wall;
+    dragMovedRef.current = false;
+    onDragStateChange?.(wall.id);
+    drawEditHandles();
+  }, [onDragStateChange, drawEditHandles]);
 
   // ---- Draw-mode actions ----
   const cancelDrawing = useCallback(() => {
@@ -414,7 +483,7 @@ const WallLayer = ({
           const v = selWall.vertices[i];
           if (Math.hypot(coords.worldX - v.x, coords.worldY - v.y) < hitR) {
             dragRef.current = { type: 'vertex', wallId: selWall.id, index: i };
-            dragMovedRef.current = false;
+            beginDrag(selWall);
             return;
           }
         }
@@ -422,20 +491,27 @@ const WallLayer = ({
           const m = segmentMidpoint(selWall, i);
           if (Math.hypot(coords.worldX - m.x, coords.worldY - m.y) < hitR) {
             dragRef.current = { type: 'bow', wallId: selWall.id, index: i };
-            dragMovedRef.current = false;
+            beginDrag(selWall);
             return;
           }
         }
       }
 
-      // Centerline hit-test across all walls (nearest within corridor wins)
+      // Centerline hit-test across all walls (nearest within corridor wins).
+      // A cheap bbox pre-filter skips the expensive polyline flatten for any
+      // wall whose bounds (+ corridor margin) can't contain the pointer.
+      const corridor = Math.max(cellSize * 0.4, 22 / zoom);
       let bestWall: WallPath | null = null;
       let bestDist = Infinity;
       for (const w of walls) {
+        const bb = wallBounds(w);
+        if (coords.worldX < bb.minX - corridor || coords.worldX > bb.maxX + corridor ||
+            coords.worldY < bb.minY - corridor || coords.worldY > bb.maxY + corridor) {
+          continue;
+        }
         const d = distanceToWall(w, coords.worldX, coords.worldY);
         if (d < bestDist) { bestDist = d; bestWall = w; }
       }
-      const corridor = Math.max(cellSize * 0.4, 22 / zoom);
       if (bestWall != null && bestDist < corridor) {
         setSelectedWallId(bestWall.id);
         setSelectedVertexIndex(null);
@@ -473,7 +549,7 @@ const WallLayer = ({
     verticesRef.current = next;
     pressActiveRef.current = next.length >= 2;
     drawPreview();
-  }, [currentTool, mapData, getWalls, selectedEntry, isStripAsset, getClientCoords, screenToWorld, cellSize, snapDistance, snapWorld, angleSnap, createOverlay, commitWall, drawPreview]);
+  }, [currentTool, mapData, getWalls, selectedEntry, isStripAsset, getClientCoords, screenToWorld, cellSize, snapDistance, snapWorld, angleSnap, createOverlay, commitWall, drawPreview, beginDrag]);
 
   const handlePointerMove = useCallback((e: MouseEvent | TouchEvent | PointerEvent) => {
     if (currentTool !== 'wall') return;
@@ -483,39 +559,39 @@ const WallLayer = ({
     const zoom = mapData?.viewState?.zoom ?? 1;
 
     // ---- EDIT DRAG ----
+    // Mutate the working copy only — mapData stays untouched for the whole gesture
+    // (no per-frame state write, no static-cache bust, no context cascade).
     const drag = dragRef.current;
     if (drag != null) {
+      const base = dragWorkingRef.current;
+      if (base == null) return;
       dragMovedRef.current = true;
       if (drag.type === 'vertex') {
         const snapped = snapWorld(coords.worldX, coords.worldY);
-        updateWall(drag.wallId, w => {
-          const nextVerts = w.vertices.slice();
-          nextVerts[drag.index] = { ...nextVerts[drag.index], x: snapped.x, y: snapped.y };
-          return { ...w, vertices: nextVerts };
-        }, true);
+        const nextVerts = base.vertices.slice();
+        nextVerts[drag.index] = { ...nextVerts[drag.index], x: snapped.x, y: snapped.y };
+        dragWorkingRef.current = { ...base, vertices: nextVerts };
       } else {
         // Bow: arc passes through the cursor; near the chord straightens.
-        updateWall(drag.wallId, w => {
-          const a = w.vertices[drag.index];
-          const b = w.vertices[(drag.index + 1) % w.vertices.length];
-          const mx = coords.worldX;
-          const my = coords.worldY;
-          const len2 = (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
-          let chordDist = Infinity;
-          if (len2 > 0) {
-            const t = Math.max(0, Math.min(1, ((mx - a.x) * (b.x - a.x) + (my - a.y) * (b.y - a.y)) / len2));
-            chordDist = Math.hypot(mx - (a.x + t * (b.x - a.x)), my - (a.y + t * (b.y - a.y)));
-          }
-          const nextVerts = w.vertices.slice();
-          const va = { ...a };
-          if (chordDist > 4 / zoom) {
-            va.arc = [2 * mx - (a.x + b.x) / 2, 2 * my - (a.y + b.y) / 2];
-          } else {
-            delete va.arc;
-          }
-          nextVerts[drag.index] = va;
-          return { ...w, vertices: nextVerts };
-        }, true);
+        const a = base.vertices[drag.index];
+        const b = base.vertices[(drag.index + 1) % base.vertices.length];
+        const mx = coords.worldX;
+        const my = coords.worldY;
+        const len2 = (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
+        let chordDist = Infinity;
+        if (len2 > 0) {
+          const t = Math.max(0, Math.min(1, ((mx - a.x) * (b.x - a.x) + (my - a.y) * (b.y - a.y)) / len2));
+          chordDist = Math.hypot(mx - (a.x + t * (b.x - a.x)), my - (a.y + t * (b.y - a.y)));
+        }
+        const nextVerts = base.vertices.slice();
+        const va = { ...a };
+        if (chordDist > 4 / zoom) {
+          va.arc = [2 * mx - (a.x + b.x) / 2, 2 * my - (a.y + b.y) / 2];
+        } else {
+          delete va.arc;
+        }
+        nextVerts[drag.index] = va;
+        dragWorkingRef.current = { ...base, vertices: nextVerts };
       }
       drawEditHandles();
       return;
@@ -555,24 +631,31 @@ const WallLayer = ({
     const constrained = angleSnap(coords.worldX, coords.worldY, (e as MouseEvent).altKey === true);
     cursorRef.current = snapWorld(constrained.x, constrained.y);
     drawPreview();
-  }, [currentTool, mapData, getClientCoords, screenToWorld, snapWorld, angleSnap, updateWall, drawEditHandles, drawPreview]);
+  }, [currentTool, mapData, getClientCoords, screenToWorld, snapWorld, angleSnap, drawEditHandles, drawPreview]);
 
   const handlePointerUp = useCallback((_e: MouseEvent | TouchEvent | PointerEvent) => {
     pressActiveRef.current = false;
     const drag = dragRef.current;
     if (drag != null) {
       dragRef.current = null;
-      if (dragMovedRef.current) {
-        // Commit the gesture as ONE history entry.
-        onWallPathsChange(getWalls(), false);
+      const working = dragWorkingRef.current;
+      dragWorkingRef.current = null;
+      if (dragMovedRef.current && working != null) {
+        // Commit the working copy as ONE history entry — but skip a sub-epsilon
+        // twitch (no geometry change ⇒ no history write, no re-render).
+        const orig = getWalls().find(w => w.id === working.id);
+        if (orig == null || wallGeometryChanged(orig, working)) {
+          onWallPathsChange(getWalls().map(w => (w.id === working.id ? working : w)), false);
+        }
       } else if (drag.type === 'vertex') {
         // Click without movement selects the vertex (Delete then removes it).
         setSelectedVertexIndex(drag.index);
       }
       dragMovedRef.current = false;
+      onDragStateChange?.(null);
       drawEditHandles();
     }
-  }, [getWalls, onWallPathsChange, drawEditHandles]);
+  }, [getWalls, onWallPathsChange, onDragStateChange, drawEditHandles]);
 
   const handleDoubleClick = useCallback((e: MouseEvent) => {
     if (currentTool !== 'wall') return;

@@ -139,6 +139,8 @@ interface MapCanvasContentProps {
   isAnimating: boolean;
   theme: ResolvedTheme;
   isAlignmentMode: boolean;
+  /** Wall under active edit-drag; excluded from the static raster (live overlay owns it). */
+  draggingWallId?: string | null;
   children: ComponentChildren;
 }
 
@@ -181,7 +183,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, children }: MapCanvasContentProps): VNode => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, draggingWallId, children }: MapCanvasContentProps): VNode => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -296,7 +298,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
   }, [isAnimating]);
 
   // Render canvas whenever relevant state changes
-  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, hiddenTileLayers });
+  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, hiddenTileLayers, draggingWallId });
 
   // Trigger redraw when canvas dimensions change (from expand/collapse)
   useEffect(() => {
