@@ -118,9 +118,14 @@ drag-onto-drawer source.
    `displayCategory()` still lops unmerged deep paths to 2 segments in section headers
    (harmless post-merge), and merge provenance is Option B rather than the design-narrative's
    Option C (accepted).
-2. **Organize → Move…** — hard `disabled={true}` stub (`TileAssetBrowser.tsx` ~L1347). Needs a
-   folder/category reassignment or pack-remap UX. Organize is otherwise the "reconcile leftovers"
-   surface the IA doc envisions (merge "Foliage" into "Forest", re-tier a mis-sorted tile).
+2. ~~**Organize → Move…**~~ — **DONE 2026-07-01 (`a591fa2b`)**: per-tile `categoryOverride`
+   in the metadata store (raw `TileEntry.category` never rewritten — lossless);
+   `bulkSetCategoryOverride` (+ `pruneEmptyEntries` allowlist extended);
+   `mergedCategories`/`groupedTiles` read `override ?? category` so moves flow through the
+   merge projection; popover = merged-label chips + free-text + "Reset to folder". Geometry
+   scope deliberately still reads the RAW category (art property, not shelf). Live-verified
+   round-trip on the hex map. NOTE for live-verifying virtualized UI: a backgrounded Obsidian
+   window suspends rAF + ResizeObserver → grids render 0 rows; foreground the window first.
 3. ~~**`predictSpan` divisor bug**~~ — **STALE ITEM; was already fixed** in `d2c9d36f`
    ("two-ruler model"): the divisor is the per-tileset `pixelsPerCell` (default 256, DD spec),
    with a settings "Px / cell" input that recomputes baked spans. Verified 2026-07-01.
