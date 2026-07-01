@@ -295,6 +295,33 @@ function bulkSetDefaultSpan(
   return result;
 }
 
+/** Remove the per-tile renderMode override — "Auto": detection resolves at read time. */
+function bulkClearRenderMode(metadata: TileMetadataStore, paths: string[]): TileMetadataStore {
+  const result = { ...metadata };
+  for (const vaultPath of paths) {
+    const existing = result[vaultPath];
+    if (existing?.renderMode == null) continue;
+    const rest = { ...existing };
+    delete rest.renderMode;
+    result[vaultPath] = rest;
+  }
+  return pruneEmptyEntries(result);
+}
+
+/** Remove the per-tile footprint override — "Auto": next placement re-detects. */
+function bulkClearDefaultSpan(metadata: TileMetadataStore, paths: string[]): TileMetadataStore {
+  const result = { ...metadata };
+  for (const vaultPath of paths) {
+    const existing = result[vaultPath];
+    if (existing == null || (existing.defaultSpanW == null && existing.defaultSpanH == null)) continue;
+    const rest = { ...existing };
+    delete rest.defaultSpanW;
+    delete rest.defaultSpanH;
+    result[vaultPath] = rest;
+  }
+  return pruneEmptyEntries(result);
+}
+
 function bulkSetDetectionSignals(
   metadata: TileMetadataStore,
   entries: Array<{ vaultPath: string; signals: { alphaCoverage: number; opaqueW: number; opaqueH: number; naturalW: number; naturalH: number } }>
@@ -397,6 +424,8 @@ export {
   bulkSetDetectionSignals,
   bulkSetRenderMode,
   bulkSetDefaultSpan,
+  bulkClearRenderMode,
+  bulkClearDefaultSpan,
   bulkSetWallStripInfo,
   bulkMarkWallEndCaps,
 };

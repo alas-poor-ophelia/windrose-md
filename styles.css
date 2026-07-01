@@ -2747,6 +2747,20 @@ button.windrose-object-grid-item:hover,
   z-index: 20;
 }
 
+/* Footprint W/H steppers in the Mode… popover. */
+input.windrose-tb-spanin {
+  padding: 6px 7px;
+  border-radius: 7px;
+  border: 1px solid var(--windrose-border-primary-dark);
+  background: var(--windrose-bg-secondary);
+  color: var(--windrose-text-primary);
+  font-size: 12px;
+}
+input.windrose-tb-spanin:focus {
+  border-color: var(--windrose-gold-bright);
+  outline: none;
+}
+
 .windrose-tb-act {
   display: flex;
   align-items: center;

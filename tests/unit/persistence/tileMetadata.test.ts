@@ -20,6 +20,9 @@ import {
   bulkSetCategoryOverride,
   bulkSetDdSourceType,
   bulkSetDefaultSpan,
+  bulkSetRenderMode,
+  bulkClearRenderMode,
+  bulkClearDefaultSpan,
   pruneEmptyEntries,
   getTileMetadataForRender,
   setTileMetadataForRender,
@@ -484,6 +487,44 @@ describe('tileMetadata', () => {
       const current = getTileMetadataForRender();
       expect(current).toBe(next);
       expect(current['a.png']).toBeUndefined();
+    });
+  });
+
+  describe('bulkClearRenderMode / bulkClearDefaultSpan (Mode… overrides)', () => {
+    it('bulkClearRenderMode removes only the renderMode key', () => {
+      const store: TileMetadataStore = {
+        'a.png': { renderMode: 'region', starred: true },
+        'b.png': { renderMode: 'cell' },
+        'c.png': { starred: true },
+      };
+      const result = bulkClearRenderMode(store, ['a.png', 'b.png', 'c.png']);
+      expect(result['a.png']).toEqual({ starred: true });
+      expect(result['b.png']).toBeUndefined(); // pruned: nothing left
+      expect(result['c.png']).toEqual({ starred: true });
+    });
+
+    it('bulkClearDefaultSpan removes both span keys and prunes empties', () => {
+      const store: TileMetadataStore = {
+        'a.png': { defaultSpanW: 2, defaultSpanH: 3, userTags: ['keep'] },
+        'b.png': { defaultSpanW: 4, defaultSpanH: 4 },
+      };
+      const result = bulkClearDefaultSpan(store, ['a.png', 'b.png']);
+      expect(result['a.png']).toEqual({ userTags: ['keep'] });
+      expect(result['b.png']).toBeUndefined();
+    });
+
+    it('clear functions no-op on paths without the override', () => {
+      const store: TileMetadataStore = { 'a.png': { starred: true } };
+      expect(bulkClearRenderMode(store, ['a.png', 'missing.png'])['a.png']).toEqual({ starred: true });
+      expect(bulkClearDefaultSpan(store, ['a.png', 'missing.png'])['a.png']).toEqual({ starred: true });
+    });
+
+    it('set + clear round-trips to the original store shape', () => {
+      const store: TileMetadataStore = { 'a.png': { starred: true } };
+      const set = bulkSetRenderMode(store, [{ vaultPath: 'a.png', mode: 'region' }]);
+      expect(set['a.png'].renderMode).toBe('region');
+      const cleared = bulkClearRenderMode(set, ['a.png']);
+      expect(cleared['a.png']).toEqual({ starred: true });
     });
   });
 });

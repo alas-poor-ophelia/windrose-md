@@ -32,6 +32,9 @@ import {
   bulkSetCategoryOverride,
   bulkSetDetectionSignals,
   bulkSetDefaultSpan,
+  bulkSetRenderMode,
+  bulkClearRenderMode,
+  bulkClearDefaultSpan,
   isStarred,
   collectUniqueTags,
   collectDepthAwareTags,
@@ -43,6 +46,8 @@ import type { TileSubtoolId } from '../../assets/tileForm';
 import { clusterCategories, NOISE, humanizePackName, detectTileGeometry } from '../../assets/categoryMerge';
 import type { FolderInput } from '../../assets/categoryMerge';
 import { predictSpan, DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
+import { predictRenderMode } from '../../assets/renderModePredictor';
+import { MAX_TILE_SPAN } from '../../assets/tileRenderResolution';
 import { runDetectionScan } from '../../assets/tileImageScan';
 
 // ===========================================
@@ -441,6 +446,9 @@ const TileAssetBrowser = memo(({
   const [orgSelection, setOrgSelection] = useState<Set<string>>(new Set());
   const [orgSearch, setOrgSearch] = useState('');
   const [orgShowTag, setOrgShowTag] = useState(false);
+  const [orgShowMode, setOrgShowMode] = useState(false);
+  const [orgSpanW, setOrgSpanW] = useState('');
+  const [orgSpanH, setOrgSpanH] = useState('');
   const [orgTagInput, setOrgTagInput] = useState('');
   const [orgShowTier, setOrgShowTier] = useState(false);
   const [orgShowMove, setOrgShowMove] = useState(false);
@@ -802,6 +810,38 @@ const TileAssetBrowser = memo(({
     setOrgShowTier(false);
   };
 
+  // Mode…: per-tile render-mode / footprint overrides (autodetect Phase 7,
+  // minimal). Predictions are shown live but NEVER bulk-persisted — writes
+  // happen only on an explicit user click (2026-06-10 RCA rule).
+  const handleBulkRenderMode = (mode: 'cell' | 'region' | undefined): void => {
+    if (orgSelection.size === 0) return;
+    const paths = Array.from(orgSelection);
+    const updated = mode == null
+      ? bulkClearRenderMode(tileMetadata, paths)
+      : bulkSetRenderMode(tileMetadata, paths.map(vaultPath => ({ vaultPath, mode })));
+    setTileMetadata(updated);
+    saveTileMetadataDebounced(app, updated);
+  };
+
+  const handleBulkSpanApply = (): void => {
+    if (orgSelection.size === 0) return;
+    const w = Math.min(Math.max(parseInt(orgSpanW, 10) || 1, 1), MAX_TILE_SPAN);
+    const h = Math.min(Math.max(parseInt(orgSpanH, 10) || 1, 1), MAX_TILE_SPAN);
+    const entries = Array.from(orgSelection).map(vaultPath => ({ vaultPath, spanW: w, spanH: h }));
+    const updated = bulkSetDefaultSpan(tileMetadata, entries);
+    setTileMetadata(updated);
+    saveTileMetadataDebounced(app, updated);
+  };
+
+  const handleBulkSpanAuto = (): void => {
+    if (orgSelection.size === 0) return;
+    const updated = bulkClearDefaultSpan(tileMetadata, Array.from(orgSelection));
+    setTileMetadata(updated);
+    saveTileMetadataDebounced(app, updated);
+    setOrgSpanW('');
+    setOrgSpanH('');
+  };
+
   // Move… reassigns the category home via a read-time metadata override;
   // undefined clears it, restoring the folder-derived category (lossless).
   const handleBulkMove = (category: string | undefined): void => {
@@ -813,11 +853,39 @@ const TileAssetBrowser = memo(({
     setOrgShowMove(false);
   };
 
+  // Detection preview for the Mode… popover: current override state across the
+  // selection, plus live predictions when exactly one tile is selected.
+  const orgModeInfo = useMemo(() => {
+    if (!orgShowMode || orgSelection.size === 0) return null;
+    const paths = Array.from(orgSelection);
+    const modes = new Set(paths.map(p => tileMetadata[p]?.renderMode ?? 'auto'));
+    const currentMode: string = modes.size === 1 ? Array.from(modes)[0] : 'mixed';
+    let detectedModeLabel: string | null = null;
+    let detectedSpanLabel: string | null = null;
+    if (paths.length === 1) {
+      const vaultPath = paths[0];
+      const tile = allTiles.find(t => t.vaultPath === vaultPath);
+      const meta = tileMetadata[vaultPath];
+      if (tile != null) {
+        const pred = predictRenderMode(tile, meta);
+        detectedModeLabel = `Auto (detected ${pred.mode === 'region' ? 'Region' : 'Cell'} ${Math.round(pred.confidence * 100)}%)`;
+      }
+      if (meta?.srcW != null && meta.srcH != null) {
+        const tsId = tileToTilesetId.get(vaultPath);
+        const ts = tilesets.find(t => t.id === tsId);
+        const span = predictSpan(meta.srcW, meta.srcH, ts?.pixelsPerCell ?? DEFAULT_PIXELS_PER_CELL);
+        detectedSpanLabel = `Auto (detected ${span.spanW}×${span.spanH})`;
+      }
+    }
+    return { currentMode, detectedModeLabel, detectedSpanLabel };
+  }, [orgShowMode, orgSelection, tileMetadata, allTiles, tileToTilesetId, tilesets]);
+
   const exitOrganize = (): void => {
     setOrganize(false);
     setOrgSelection(new Set());
     setOrgSearch('');
     setOrgShowTag(false);
+    setOrgShowMode(false);
     setOrgShowTier(false);
     setOrgShowMove(false);
     setOrgTagInput('');
@@ -1432,9 +1500,96 @@ const TileAssetBrowser = memo(({
             </div>
           )}
 
+          {orgShowMode && (
+            <div className="windrose-tb-tag-pop">
+              <div style={{ fontSize: 11, color: 'var(--windrose-text-secondary)', marginBottom: 8 }}>
+                Render mode for <b style={{ color: 'var(--windrose-gold-bright)' }}>{orgSelection.size}</b> tiles
+              </div>
+              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                <button
+                  className={`windrose-tb-act ${orgModeInfo?.currentMode === 'auto' ? 'windrose-tb-act-apply' : ''}`}
+                  onClick={() => handleBulkRenderMode(undefined)}
+                  title="Clear the override — detection decides at import/read time"
+                >
+                  {orgModeInfo?.detectedModeLabel ?? 'Auto'}
+                </button>
+                <button
+                  className={`windrose-tb-act ${orgModeInfo?.currentMode === 'cell' ? 'windrose-tb-act-apply' : ''}`}
+                  onClick={() => handleBulkRenderMode('cell')}
+                >
+                  Cell
+                </button>
+                <button
+                  className={`windrose-tb-act ${orgModeInfo?.currentMode === 'region' ? 'windrose-tb-act-apply' : ''}`}
+                  onClick={() => handleBulkRenderMode('region')}
+                >
+                  Region
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--windrose-text-secondary)', margin: '11px 0 6px' }}>
+                Footprint (cells)
+              </div>
+              <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  className="windrose-tb-spanin"
+                  type="number"
+                  min={1}
+                  max={MAX_TILE_SPAN}
+                  placeholder="W"
+                  value={orgSpanW}
+                  onInput={(e: Event) => setOrgSpanW((e.target as HTMLInputElement).value)}
+                  style={{ width: 46 }}
+                />
+                <span style={{ color: 'var(--windrose-text-muted)' }}>×</span>
+                <input
+                  className="windrose-tb-spanin"
+                  type="number"
+                  min={1}
+                  max={MAX_TILE_SPAN}
+                  placeholder="H"
+                  value={orgSpanH}
+                  onInput={(e: Event) => setOrgSpanH((e.target as HTMLInputElement).value)}
+                  style={{ width: 46 }}
+                />
+                <button
+                  className="windrose-tb-act windrose-tb-act-apply"
+                  disabled={orgSpanW.trim() === '' && orgSpanH.trim() === ''}
+                  onClick={handleBulkSpanApply}
+                >
+                  Apply
+                </button>
+                <button
+                  className="windrose-tb-act"
+                  onClick={handleBulkSpanAuto}
+                  title="Clear the override — new placements re-detect from image size"
+                >
+                  {orgModeInfo?.detectedSpanLabel ?? 'Auto'}
+                </button>
+              </div>
+              <div style={{ fontSize: 10.5, color: 'var(--windrose-text-muted)', marginTop: 9 }}>
+                Render mode affects existing placements of these tiles; footprint applies to new placements.
+              </div>
+              <div style={{ display: 'flex', gap: 7, marginTop: 11 }}>
+                <button
+                  className="windrose-tb-act windrose-tb-act-cancel"
+                  onClick={() => setOrgShowMode(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="windrose-tb-org-actions">
             <button className="windrose-tb-act" disabled={orgSelection.size === 0} onClick={() => setOrgShowTag(true)}>
               <Icon icon="lucide-tag" size={14} /> Tag…
+            </button>
+            <button
+              className="windrose-tb-act"
+              disabled={orgSelection.size === 0}
+              onClick={() => setOrgShowMode(!orgShowMode)}
+            >
+              <Icon icon="lucide-wand-2" size={14} /> Mode…
             </button>
             <button
               className="windrose-tb-act"
