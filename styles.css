@@ -1084,19 +1084,6 @@ button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windro
   border-right: none;
   overflow: visible;
 }
-.windrose-object-sidebar-header {
-  text-wrap: balance;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 8px;
-  font-size: 10pt;
-  font-weight: bold;
-  color: var(--windrose-text-primary);
-  background: var(--windrose-bg-secondary);
-  border-bottom: 1px solid var(--windrose-border-secondary);
-  flex-shrink: 0;
-}
 .windrose-object-sidebar-set-selector {
   padding: 4px 6px;
   border-bottom: 1px solid var(--windrose-border-secondary);
@@ -1111,30 +1098,14 @@ button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windro
   padding: 3px 4px;
   font-size: 11px;
 }
-.windrose-object-sidebar-search {
-  padding: 4px 6px;
-  border-bottom: 1px solid var(--windrose-border-secondary);
-  flex-shrink: 0;
-}
-.windrose-object-sidebar-search-input {
-  width: 100%;
-  background: var(--windrose-bg-secondary);
-  color: var(--windrose-text-primary);
-  border: 1px solid var(--windrose-border-secondary);
-  border-radius: 3px;
-  padding: 4px 6px;
-  font-size: 11px;
-  box-sizing: border-box;
-}
-.windrose-object-sidebar-search-input::placeholder {
-  color: var(--windrose-text-muted);
-}
-.windrose-object-sidebar-search-input:focus {
-  outline: none;
-  border-color: var(--windrose-border-primary);
+.windrose-object-sidebar-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
 }
 .windrose-object-sidebar-content {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 4px 6px;
@@ -1145,15 +1116,10 @@ button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windro
 .windrose-object-sidebar-category {
   margin-bottom: 4px;
 }
-.windrose-object-sidebar-category-count {
-  margin-left: auto;
-  font-size: 8px;
-  color: var(--windrose-text-disabled);
-}
 .windrose-object-sidebar-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 3px;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 4px;
   padding: 3px 0;
 }
 .windrose-object-sidebar-footer {
@@ -1172,28 +1138,6 @@ button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windro
   color: var(--windrose-text-muted);
   font-size: 11px;
 }
-.windrose-object-sidebar-category-label,
-.is-tablet .windrose-object-sidebar-category-label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  width: 100%;
-  padding: 3px 4px;
-  min-height: unset;
-  max-height: unset;
-  background: none;
-  border: none;
-  color: var(--windrose-text-muted);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-}
-.windrose-object-sidebar-category-label:hover,
-.is-tablet .windrose-object-sidebar-category-label:hover {
-  color: var(--windrose-text-secondary);
-}
-
 .windrose-object-sidebar-action-btn,
 .is-tablet .windrose-object-sidebar-action-btn {
   width: 28px;
@@ -1324,8 +1268,9 @@ button.windrose-object-grid-item,
   border: 1.5px solid var(--windrose-border-secondary);
   border-radius: 3px;
   cursor: pointer;
-  padding: 6px 2px;
-  min-height: 52px;
+  padding: 4px 2px;
+  aspect-ratio: 1;
+  min-height: 0;
   min-width: unset;
   max-width: unset;
   max-height: unset;
@@ -1346,6 +1291,31 @@ button.windrose-object-grid-item:hover,
   border-color: var(--windrose-border-primary);
   box-shadow: 0 0 6px oklch(from var(--windrose-border-primary) l c h/0.4);
   background: oklch(from var(--windrose-border-primary) l c h/0.1);
+}
+
+/* Object list rows — reuse the tile pane's dense-row pattern (.windrose-tb-listrow),
+   but taller with a larger thumb so the object preview reads clearly. */
+.windrose-tb-listrow.is-object {
+  height: 54px;
+}
+.windrose-tb-listrow.is-object .lthumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--windrose-text-primary);
+  font-family: "Noto Emoji", "Noto Sans Symbols 2", monospace;
+}
+.windrose-tb-listrow.is-object .windrose-object-grid-image {
+  width: 32px;
+  height: 32px;
+}
+.windrose-tb-listrow.is-object .ra {
+  font-size: 24px;
+  color: var(--windrose-text-primary);
 }
 
 .windrose-object-grid-symbol {
@@ -1422,24 +1392,27 @@ button.windrose-object-grid-item:hover,
   transform: scale(-1, -1);
 }
 
-/* ---- Header ---- */
+/* ---- Header ----
+   Flat, quiet header — no gradient, sits on the drawer background. The title
+   matches the right dock's panel headers (uppercase, muted) rather than the old
+   Cinzel gold, so the Tiles and Objects panes read as one drawer. */
 .windrose-tb-head {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 7px 12px;
-  background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h/0.14), oklch(from var(--windrose-border-primary) l c h/0.05));
-  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.26);
+  background: transparent;
+  border-bottom: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
 }
 
 .windrose-tb-title {
-  font-family: "Cinzel", serif;
+  margin-right: auto;
+  font-size: 11px;
   font-weight: 600;
-  font-size: 12px;
-  letter-spacing: 0.05em;
-  color: var(--windrose-gold-bright);
-  text-shadow: 0 1px 1px oklch(0% 0 0deg / 0.45);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--windrose-text-secondary);
 }
 
 .windrose-tb-cap {
@@ -3395,23 +3368,6 @@ button:is(.windrose-tb-iconbtn,
 }
 
 /* Drawer pane wrapper — vertical ribbon on the left, active pane fills the rest */
-.windrose-drawer-pane {
-  display: flex;
-  flex-direction: row;
-  height: 100%;
-  min-height: 0;
-}
-
-/* Main content column to the right of the vertical ribbon */
-.windrose-drawer-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-
 /* ---- Block-mode compact drawer: shared header above both panes ---- */
 .windrose-cd {
   display: flex;

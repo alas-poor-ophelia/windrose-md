@@ -163,6 +163,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const setTileViewMode = useCallback((mode: 'grid' | 'list'): void => {
     updateMapData((prev: MapData) => ({ ...prev, tileViewMode: mode }));
   }, [updateMapData]);
+  // Objects pane grid/list view — its own per-map field, independent of tiles.
+  const objectViewMode = mapData?.objectViewMode ?? 'grid';
+  const setObjectViewMode = useCallback((mode: 'grid' | 'list'): void => {
+    updateMapData((prev: MapData) => ({ ...prev, objectViewMode: mode }));
+  }, [updateMapData]);
   // Selected tile's derived render-form + armed placement subtool (drawer ribbon).
   const [selectedTileForm, setSelectedTileForm] = useState<TileForm | null>(null);
   const [tileSubtool, setTileSubtool] = useState<TileSubtoolId | null>(null);
@@ -191,7 +196,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       )}
     </div>
   );
-  const renderObjectsPane = (): VNode => (
+  // `hideHeader` in block mode (the compact head above both panes serves); the
+  // full-pane pane renders its own DrawerPaneHead to match the tile pane, and
+  // takes the vertical ribbon so it seats below the header like the tile ribbon.
+  const renderObjectsPane = (hideHeader: boolean, ribbon?: VNode): VNode => (
     <ObjectSidebar
       selectedObjectType={selectedObjectType}
       onObjectTypeSelect={setSelectedObjectType}
@@ -203,46 +211,54 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       onObjectSetChange={handleObjectSetChange}
       isFreeformMode={freeformPlacementMode}
       onFreeformToggle={() => setFreeformPlacementMode(prev => !prev)}
+      hideHeader={hideHeader}
+      viewMode={objectViewMode}
+      onViewModeChange={setObjectViewMode}
+      onCollapse={collapseTileBrowser}
+      ribbon={ribbon}
     />
   );
   // Block-mode shared drawer header: a segmented Tiles|Objects control (the
   // block spec's pane switch, replacing the .fd-subrib), the grid/list view
   // toggle (tiles only) and a collapse button — sits above both panes.
-  const renderCompactDrawerHead = (): VNode => (
-    <div className="windrose-cd-head">
-      <div className="windrose-cd-paneseg interactive-child" role="group" aria-label="Tiles or Objects">
-        <button
-          className={`windrose-cd-segbtn ${tilePane === 'tiles' ? 'active' : ''}`}
-          onClick={() => selectPane('tiles')}
-        >Tiles</button>
-        <button
-          className={`windrose-cd-segbtn ${tilePane === 'objects' ? 'active' : ''}`}
-          onClick={() => selectPane('objects')}
-        >Objects</button>
-      </div>
-      {tilePane === 'tiles' && (
+  const renderCompactDrawerHead = (): VNode => {
+    // The grid/list toggle serves whichever pane is active.
+    const paneViewMode = tilePane === 'tiles' ? tileViewMode : objectViewMode;
+    const setPaneViewMode = tilePane === 'tiles' ? setTileViewMode : setObjectViewMode;
+    return (
+      <div className="windrose-cd-head">
+        <div className="windrose-cd-paneseg interactive-child" role="group" aria-label="Tiles or Objects">
+          <button
+            className={`windrose-cd-segbtn ${tilePane === 'tiles' ? 'active' : ''}`}
+            onClick={() => selectPane('tiles')}
+          >Tiles</button>
+          <button
+            className={`windrose-cd-segbtn ${tilePane === 'objects' ? 'active' : ''}`}
+            onClick={() => selectPane('objects')}
+          >Objects</button>
+        </div>
         <div className="windrose-cd-vtog interactive-child" role="group" aria-label="View mode">
           <button
-            className={`windrose-tb-iconbtn ${tileViewMode === 'grid' ? 'active' : 'ghost'}`}
+            className={`windrose-tb-iconbtn ${paneViewMode === 'grid' ? 'active' : 'ghost'}`}
             title="Grid view"
-            aria-pressed={tileViewMode === 'grid'}
-            onClick={() => setTileViewMode('grid')}
+            aria-pressed={paneViewMode === 'grid'}
+            onClick={() => setPaneViewMode('grid')}
           ><Icon icon="lucide-layout-grid" size={14} /></button>
           <button
-            className={`windrose-tb-iconbtn ${tileViewMode === 'list' ? 'active' : 'ghost'}`}
+            className={`windrose-tb-iconbtn ${paneViewMode === 'list' ? 'active' : 'ghost'}`}
             title="List view"
-            aria-pressed={tileViewMode === 'list'}
-            onClick={() => setTileViewMode('list')}
+            aria-pressed={paneViewMode === 'list'}
+            onClick={() => setPaneViewMode('list')}
           ><Icon icon="lucide-list" size={14} /></button>
         </div>
-      )}
-      <button
-        className="windrose-tb-iconbtn ghost interactive-child windrose-cd-collapse"
-        title="Collapse to edge"
-        onClick={collapseTileBrowser}
-      ><Icon icon="lucide-panel-left-open" size={15} /></button>
-    </div>
-  );
+        <button
+          className="windrose-tb-iconbtn ghost interactive-child windrose-cd-collapse"
+          title="Collapse to edge"
+          onClick={collapseTileBrowser}
+        ><Icon icon="lucide-panel-left-open" size={15} /></button>
+      </div>
+    );
+  };
 
   // Panel/modal state (plugin installer, settings modal, layer edit)
   const {
@@ -1162,7 +1178,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               {renderCompactDrawerHead()}
               <div className="windrose-cd-main">
               {tilePane === 'objects' ? (
-              renderObjectsPane()
+              renderObjectsPane(true)
               ) : (
               <TileAssetBrowser
                 tilesets={availableTilesets}
@@ -1411,12 +1427,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                   onPane={selectPane}
                 >
                   {tilePane === 'objects' ? (
-                  <div className="windrose-drawer-pane">
-                  {renderDrawerRibbon()}
-                  <div className="windrose-drawer-main">
-                  {renderObjectsPane()}
-                  </div>
-                  </div>
+                  renderObjectsPane(false, renderDrawerRibbon())
                   ) : (
                   <TileAssetBrowser
                     tilesets={availableTilesets}

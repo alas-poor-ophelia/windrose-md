@@ -110,23 +110,6 @@ button:is(
 }
 
 /* Drawer pane wrapper — vertical ribbon on the left, active pane fills the rest */
-.windrose-drawer-pane {
-  display: flex;
-  flex-direction: row;
-  height: 100%;
-  min-height: 0;
-}
-
-/* Main content column to the right of the vertical ribbon */
-.windrose-drawer-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-
 /* ---- Block-mode compact drawer: shared header above both panes ---- */
 .windrose-cd {
   display: flex;

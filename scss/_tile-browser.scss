@@ -38,24 +38,27 @@
   &-br { bottom: 5px; right: 5px; transform: scale(-1, -1); }
 }
 
-/* ---- Header ---- */
+/* ---- Header ----
+   Flat, quiet header — no gradient, sits on the drawer background. The title
+   matches the right dock's panel headers (uppercase, muted) rather than the old
+   Cinzel gold, so the Tiles and Objects panes read as one drawer. */
 .windrose-tb-head {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 7px 12px;
-  background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h / 0.14), oklch(from var(--windrose-border-primary) l c h / 0.05));
-  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.26);
+  background: transparent;
+  border-bottom: 1px solid var(--windrose-border-secondary);
   flex-shrink: 0;
 }
 
 .windrose-tb-title {
-  font-family: "Cinzel", serif;
+  margin-right: auto;
+  font-size: 11px;
   font-weight: 600;
-  font-size: 12px;
-  letter-spacing: 0.05em;
-  color: var(--windrose-gold-bright);
-  text-shadow: 0 1px 1px oklch(0 0 0 / 0.45);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--windrose-text-secondary);
 }
 
 .windrose-tb-cap {

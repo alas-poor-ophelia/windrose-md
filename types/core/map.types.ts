@@ -313,6 +313,10 @@ export interface MapData {
   // Tile drawer view: grid (thumbnail wall) vs list (dense rows). Persisted per map.
   tileViewMode?: 'grid' | 'list';
 
+  // Objects drawer view: grid (square wall) vs list (dense rows). Persisted per map,
+  // independent of tileViewMode.
+  objectViewMode?: 'grid' | 'list';
+
   // Map dimensions - optional, defaults from DEFAULTS
   dimensions?: MapDimensions;
 

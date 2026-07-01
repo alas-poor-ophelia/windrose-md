@@ -26,20 +26,6 @@
     overflow: visible;
   }
 
-  &-header {
-    text-wrap: balance;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 8px;
-    font-size: 10pt;
-    font-weight: bold;
-    color: var(--windrose-text-primary);
-    background: var(--windrose-bg-secondary);
-    border-bottom: 1px solid var(--windrose-border-secondary);
-    flex-shrink: 0;
-  }
-
   &-set-selector {
     padding: 4px 6px;
     border-bottom: 1px solid var(--windrose-border-secondary);
@@ -56,34 +42,18 @@
     font-size: 11px;
   }
 
-  &-search {
-    padding: 4px 6px;
-    border-bottom: 1px solid var(--windrose-border-secondary);
-    flex-shrink: 0;
-  }
-
-  &-search-input {
-    width: 100%;
-    background: var(--windrose-bg-secondary);
-    color: var(--windrose-text-primary);
-    border: 1px solid var(--windrose-border-secondary);
-    border-radius: 3px;
-    padding: 4px 6px;
-    font-size: 11px;
-    box-sizing: border-box;
-
-    &::placeholder {
-      color: var(--windrose-text-muted);
-    }
-
-    &:focus {
-      outline: none;
-      border-color: var(--windrose-border-primary);
-    }
+  // Body row — ribbon (left column) + scrollable content, mirroring the tile
+  // pane's .windrose-tb-body so the ribbon starts level with the content, below
+  // the full-width header/search.
+  &-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
   }
 
   &-content {
     flex: 1;
+    min-width: 0;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 4px 6px;
@@ -96,16 +66,12 @@
     margin-bottom: 4px;
   }
 
-  &-category-count {
-    margin-left: auto;
-    font-size: 8px;
-    color: var(--windrose-text-disabled);
-  }
-
   &-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 3px;
+    // Square cells, auto-filled — many more per row than the old 2-wide layout,
+    // matching the tile grid's dense wall.
+    grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+    gap: 4px;
     padding: 3px 0;
   }
 
@@ -125,31 +91,6 @@
     text-align: center;
     color: var(--windrose-text-muted);
     font-size: 11px;
-  }
-
-  // Category label — with .is-tablet specificity override
-  @at-root {
-    #{$sidebar}-category-label,
-    .is-tablet #{$sidebar}-category-label {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      width: 100%;
-      padding: 3px 4px;
-      min-height: unset;
-      max-height: unset;
-      background: none;
-      border: none;
-      color: var(--windrose-text-muted);
-      font-size: 9px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      cursor: pointer;
-
-      &:hover {
-        color: var(--windrose-text-secondary);
-      }
-    }
   }
 
   // Action button — with .is-tablet specificity override
@@ -299,8 +240,11 @@ button.windrose-object-grid-item,
   border: 1.5px solid var(--windrose-border-secondary);
   border-radius: 3px;
   cursor: pointer;
-  padding: 6px 2px;
-  min-height: 52px;
+  padding: 4px 2px;
+  // Square cell — width comes from the grid track, height follows via aspect-ratio,
+  // so the button stays roughly its old ~52px height while packing more per row.
+  aspect-ratio: 1;
+  min-height: 0;
   min-width: unset;
   max-width: unset;
   max-height: unset;
@@ -322,6 +266,34 @@ button.windrose-object-grid-item,
   border-color: var(--windrose-border-primary);
   box-shadow: 0 0 6px oklch(from var(--windrose-border-primary) l c h/0.4);
   background: oklch(from var(--windrose-border-primary) l c h/0.1);
+}
+
+/* Object list rows — reuse the tile pane's dense-row pattern (.windrose-tb-listrow),
+   but taller with a larger thumb so the object preview reads clearly. */
+.windrose-tb-listrow.is-object {
+  height: 54px;
+
+  .lthumb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--windrose-text-primary);
+    font-family: "Noto Emoji", "Noto Sans Symbols 2", monospace;
+  }
+
+  .windrose-object-grid-image {
+    width: 32px;
+    height: 32px;
+  }
+
+  .ra {
+    font-size: 24px;
+    color: var(--windrose-text-primary);
+  }
 }
 
 .windrose-object-grid {

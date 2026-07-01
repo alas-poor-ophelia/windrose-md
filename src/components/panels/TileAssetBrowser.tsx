@@ -20,6 +20,7 @@ import { useThumbnailPipeline } from '../../hooks/state/useThumbnailPipeline';
 import { THUMB_SIZE } from '../../assets/thumbnailCache';
 import { usePreactVirtualizer } from '../../hooks/state/useVirtualizer';
 import { Icon } from '../shared/Icon';
+import { DrawerPaneHead, DrawerSearch } from './drawerChrome';
 import { DepthBar, depthMeta } from './DepthBar';
 import {
   loadTileMetadata,
@@ -1336,60 +1337,40 @@ const TileAssetBrowser = memo(({
         </>
       ) : (<>
 
-      {/* Header */}
+      {/* Header — shared with the objects pane via DrawerPaneHead */}
       {!hideHeader && (
-      <div className="windrose-tb-head">
-        <div className="windrose-tb-title">Tiles</div>
-        <span className="windrose-tb-cap" style={{ marginRight: 'auto', marginLeft: 2 }}>
-          {tilesets.length === 1 ? tilesets[0].name : `${tilesets.length} packs`}
-        </span>
-        {!compact && (
-          <div className="windrose-tb-viewtoggle" role="group" aria-label="View mode">
-            <button
-              className={`windrose-tb-iconbtn ${viewMode === 'grid' ? 'active' : 'ghost'}`}
-              title="Grid view"
-              aria-pressed={viewMode === 'grid'}
-              onClick={() => setViewMode('grid')}
-            >
-              <Icon icon="lucide-layout-grid" size={15} />
-            </button>
-            <button
-              className={`windrose-tb-iconbtn ${viewMode === 'list' ? 'active' : 'ghost'}`}
-              title="List view"
-              aria-pressed={viewMode === 'list'}
-              onClick={() => setViewMode('list')}
-            >
-              <Icon icon="lucide-list" size={15} />
-            </button>
-          </div>
-        )}
-        {/* Action cluster — separated from the view toggle by a distinct gap */}
-        <div className="windrose-tb-head-actions">
-          {onTilesetOverrideChange != null && tilesets.length > 0 && (
-            <button
-              className="windrose-tb-iconbtn ghost"
-              title="Tileset settings"
-              onClick={() => setShowTilesetConfig(!showTilesetConfig)}
-            >
-              <Icon icon="lucide-sliders-horizontal" size={15} />
-            </button>
-          )}
-          {!compact && (
-            <button
-              className="windrose-tb-iconbtn ghost"
-              title="Organize tiles"
-              onClick={() => setOrganize(true)}
-            >
-              <Icon icon="lucide-check-square" size={15} />
-            </button>
-          )}
-          {onCollapse && (
-            <button className="windrose-tb-iconbtn ghost" title="Collapse to edge" onClick={onCollapse}>
-              <Icon icon="lucide-panel-left-open" size={15} />
-            </button>
-          )}
-        </div>
-      </div>
+        <DrawerPaneHead
+          title="Tiles"
+          viewMode={compact ? undefined : viewMode}
+          onViewModeChange={compact ? undefined : setViewMode}
+          actions={
+            <>
+              {onTilesetOverrideChange != null && tilesets.length > 0 && (
+                <button
+                  className="windrose-tb-iconbtn ghost"
+                  title="Tileset settings"
+                  onClick={() => setShowTilesetConfig(!showTilesetConfig)}
+                >
+                  <Icon icon="lucide-sliders-horizontal" size={15} />
+                </button>
+              )}
+              {!compact && (
+                <button
+                  className="windrose-tb-iconbtn ghost"
+                  title="Organize tiles"
+                  onClick={() => setOrganize(true)}
+                >
+                  <Icon icon="lucide-check-square" size={15} />
+                </button>
+              )}
+              {onCollapse && (
+                <button className="windrose-tb-iconbtn ghost" title="Collapse to edge" onClick={onCollapse}>
+                  <Icon icon="lucide-panel-left-open" size={15} />
+                </button>
+              )}
+            </>
+          }
+        />
       )}
 
       {/* Depth band */}
@@ -1589,14 +1570,11 @@ const TileAssetBrowser = memo(({
         </div>
       ) : (
         <div className="windrose-tb-filter">
-          <div className="windrose-tb-search">
-            <Icon icon="lucide-search" size={14} />
-            <input
-              placeholder={compact ? `Search ${depthLabel}…` : `Filter ${depthLabel}…`}
-              value={searchFilter}
-              onInput={(e: Event) => setSearchFilter((e.target as HTMLInputElement).value)}
-            />
-          </div>
+          <DrawerSearch
+            value={searchFilter}
+            placeholder={compact ? `Search ${depthLabel}…` : `Filter ${depthLabel}…`}
+            onInput={setSearchFilter}
+          />
           {!compact && (
             <button
               className={`windrose-tb-filtbtn ${activeFilterCount > 0 ? 'on' : ''}`}
