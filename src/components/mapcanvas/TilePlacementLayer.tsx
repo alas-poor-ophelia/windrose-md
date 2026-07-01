@@ -22,6 +22,7 @@ import { preloadImage } from '../../assets/imageOperations';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import { cellsCoveredByAssignment, assignmentsOverlap } from '../../assets/tileFootprint';
 import { getBrushCells, bresenhamLine, floodFillCells } from '../../drawing/tilePlacementOps';
+import { scatterSpacing, makeScatterDrop } from '../../drawing/scatterBrush';
 
 
 // ===========================================
@@ -69,6 +70,7 @@ const TilePlacementLayer = ({
   const isDraggingRef = useRef(false);
   const strokeInitialTilesRef = useRef<TileAssignment[] | null>(null);
   const lastGridPosRef = useRef<{ col: number; row: number } | null>(null);
+  const scatterLastDropRef = useRef<{ x: number; y: number } | null>(null);
 
   const placeTilesInBrush = useCallback((col: number, row: number) => {
     if (!mapData || selectedTilesetId == null || selectedTilesetId === '' || selectedTileId == null || selectedTileId === '') return;
@@ -203,7 +205,13 @@ const TilePlacementLayer = ({
     onTilesChange(newTiles);
   }, [app, mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileDepth, onTilesChange]);
 
-  const placeStampAtWorld = useCallback((worldX: number, worldY: number, col: number, row: number) => {
+  const placeStampAtWorld = useCallback((
+    worldX: number,
+    worldY: number,
+    col: number,
+    row: number,
+    overrides?: { rotation?: TileRotation; flipH?: boolean; scale?: number }
+  ) => {
     if (!mapData || selectedTilesetId == null || selectedTilesetId === '' || selectedTileId == null || selectedTileId === '') return;
 
     const ts = mapData.tilesets?.find(t => t.id === selectedTilesetId);
@@ -213,22 +221,49 @@ const TilePlacementLayer = ({
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles ?? [];
 
+    const rotation = overrides?.rotation ?? tileRotation;
+    const flipH = overrides?.flipH ?? tileFlipH;
+    const scale = overrides?.scale ?? tileScale;
+
     const newTile: TileAssignment = {
       col, row,
       tilesetId: selectedTilesetId,
       tileId: selectedTileId,
-      rotation: (tileRotation || undefined) as TileRotation | undefined,
-      flipH: tileFlipH || undefined,
+      rotation: (rotation || undefined) as TileRotation | undefined,
+      flipH: flipH || undefined,
       placement: 'overlay',
       fitMode: tileFitMode === 'auto' ? undefined : tileFitMode,
-      scale: tileScale !== 1 ? tileScale : undefined,
+      scale: scale !== 1 ? scale : undefined,
       freeform: true,
       worldX,
       worldY,
     };
 
-    onTilesChange([...currentTiles, newTile]);
+    // Scatter strokes batch into one history entry (same pattern as the grid brush).
+    const isBatchedStroke = strokeInitialTilesRef.current !== null;
+    onTilesChange([...currentTiles, newTile], isBatchedStroke);
   }, [app, mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileFitMode, tileScale, onTilesChange]);
+
+  // Scatter: drop a jittered stamp when the pointer has traveled far enough
+  // in world space since the previous drop.
+  const scatterAdvance = useCallback((worldX: number, worldY: number, col: number, row: number) => {
+    if (!geometry) return;
+    const last = scatterLastDropRef.current;
+    const spacing = scatterSpacing(geometry.cellSize, tileScale);
+    if (last != null && Math.hypot(worldX - last.x, worldY - last.y) < spacing) return;
+    scatterLastDropRef.current = { x: worldX, y: worldY };
+    const drop = makeScatterDrop(worldX, worldY, {
+      cellSize: geometry.cellSize,
+      tileScale,
+      isHex: geometry.type === 'hex',
+      rng: Math.random,
+    });
+    placeStampAtWorld(drop.worldX, drop.worldY, col, row, {
+      rotation: drop.rotation,
+      flipH: drop.flipH,
+      scale: drop.scale,
+    });
+  }, [geometry, tileScale, placeStampAtWorld]);
 
   const handlePointerDown = useCallback((e: PointerEvent) => {
     if (!isTileTool || !geometry) return;
@@ -247,14 +282,23 @@ const TilePlacementLayer = ({
         case 'fill':
           floodFillAtCell(coords.x, coords.y);
           return;
-        case 'stamp':
-        case 'scatter': {
-          // Scatter places like stamp on click; the jittered drag stroke
-          // lands with the scatter module (Track A4).
+        case 'stamp': {
           const worldCoords = screenToWorld(e.clientX, e.clientY);
           if (worldCoords) {
             placeStampAtWorld(worldCoords.worldX, worldCoords.worldY, coords.x, coords.y);
           }
+          return;
+        }
+        case 'scatter': {
+          // Scatter is a drag stroke of jittered stamps: batch the whole
+          // gesture into one history entry via strokeInitialTilesRef.
+          const worldCoords = screenToWorld(e.clientX, e.clientY);
+          if (!worldCoords) return;
+          isDraggingRef.current = true;
+          scatterLastDropRef.current = null;
+          const layer = getActiveLayer(mapData);
+          strokeInitialTilesRef.current = [...(layer.tiles ?? [])];
+          scatterAdvance(worldCoords.worldX, worldCoords.worldY, coords.x, coords.y);
           return;
         }
         case 'brush':
@@ -280,7 +324,7 @@ const TilePlacementLayer = ({
     } else {
       eraseTilesInBrush(coords.x, coords.y);
     }
-  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, activeSubtool, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, floodFillAtCell, mapData]);
+  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, activeSubtool, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, scatterAdvance, floodFillAtCell, mapData]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     // Only the paint/erase grid stroke sets isDraggingRef; the click-only
@@ -289,6 +333,13 @@ const TilePlacementLayer = ({
 
     const coords = screenToGrid(e.clientX, e.clientY);
     if (!coords) return;
+
+    // Scatter stroke: world-distance spaced jittered stamps, no cell logic.
+    if (activeSubtool === 'scatter' && hasTileSelected) {
+      const worldCoords = screenToWorld(e.clientX, e.clientY);
+      if (worldCoords) scatterAdvance(worldCoords.worldX, worldCoords.worldY, coords.x, coords.y);
+      return;
+    }
 
     const current = { col: coords.x, row: coords.y };
     const last = lastGridPosRef.current;
@@ -307,7 +358,7 @@ const TilePlacementLayer = ({
     }
 
     lastGridPosRef.current = current;
-  }, [isTileTool, geometry, screenToGrid, hasTileSelected, placeTilesInBrush, eraseTilesInBrush]);
+  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, activeSubtool, placeTilesInBrush, eraseTilesInBrush, scatterAdvance]);
 
   const handlePointerUp = useCallback(() => {
     if (strokeInitialTilesRef.current !== null && mapData) {
@@ -318,6 +369,7 @@ const TilePlacementLayer = ({
     isDraggingRef.current = false;
     paintedInStrokeRef.current = new Set();
     lastGridPosRef.current = null;
+    scatterLastDropRef.current = null;
   }, [mapData, onTilesChange]);
 
   const tileHandlersRef = useRef<Record<string, unknown> | null>(null);
