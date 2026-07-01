@@ -17,8 +17,10 @@ import {
   bulkSetImportTags,
   setDepthAffinity,
   bulkSetDepthAffinity,
+  bulkSetCategoryOverride,
   bulkSetDdSourceType,
   bulkSetDefaultSpan,
+  pruneEmptyEntries,
   getTileMetadataForRender,
   setTileMetadataForRender,
 } from '../../../src/persistence/tileMetadata';
@@ -238,6 +240,46 @@ describe('tileMetadata', () => {
       ]);
       expect(result['a.png']?.depthAffinity).toBe('ground');
       expect(result['b.png']?.depthAffinity).toBe('structure');
+    });
+  });
+
+  // ---- bulkSetCategoryOverride ----
+  describe('bulkSetCategoryOverride', () => {
+    it('sets the override on multiple entries, preserving existing fields', () => {
+      const store: TileMetadataStore = { 'a.png': { starred: true } };
+      const result = bulkSetCategoryOverride(store, ['a.png', 'b.png'], 'Forest');
+      expect(result['a.png']?.categoryOverride).toBe('Forest');
+      expect(result['a.png']?.starred).toBe(true);
+      expect(result['b.png']?.categoryOverride).toBe('Forest');
+    });
+
+    it('clears the override with undefined, keeping the rest of the entry', () => {
+      const store: TileMetadataStore = {
+        'a.png': { categoryOverride: 'Forest', depthAffinity: 'props' },
+      };
+      const result = bulkSetCategoryOverride(store, ['a.png'], undefined);
+      expect(result['a.png']?.categoryOverride).toBeUndefined();
+      expect('categoryOverride' in (result['a.png'] ?? {})).toBe(false);
+      expect(result['a.png']?.depthAffinity).toBe('props');
+    });
+
+    it('does not mutate the input store', () => {
+      const store: TileMetadataStore = { 'a.png': { categoryOverride: 'Old' } };
+      bulkSetCategoryOverride(store, ['a.png'], 'New');
+      expect(store['a.png']?.categoryOverride).toBe('Old');
+    });
+
+    it('survives pruneEmptyEntries when it is the only field', () => {
+      const result = bulkSetCategoryOverride({}, ['a.png'], 'Forest');
+      const pruned = pruneEmptyEntries(result);
+      expect(pruned['a.png']?.categoryOverride).toBe('Forest');
+    });
+
+    it('entry with only a cleared override is pruned on save', () => {
+      const store = bulkSetCategoryOverride({}, ['a.png'], 'Forest');
+      const cleared = bulkSetCategoryOverride(store, ['a.png'], undefined);
+      const pruned = pruneEmptyEntries(cleared);
+      expect(pruned['a.png']).toBeUndefined();
     });
   });
 

@@ -81,6 +81,7 @@ function pruneEmptyEntries(metadata: TileMetadataStore): TileMetadataStore {
       (entry.userTags != null && entry.userTags.length > 0) ||
       (entry.importTags != null && entry.importTags.length > 0) ||
       entry.depthAffinity != null ||
+      entry.categoryOverride != null ||
       entry.ddSourceType != null ||
       entry.renderMode != null ||
       entry.defaultSpanW != null ||
@@ -235,6 +236,29 @@ function bulkSetDepthAffinity(
   return result;
 }
 
+/**
+ * Reassign the category home for a set of tiles (Organize → Move…).
+ * `category` undefined clears the override, restoring the folder-derived home.
+ */
+function bulkSetCategoryOverride(
+  metadata: TileMetadataStore,
+  paths: string[],
+  category: string | undefined
+): TileMetadataStore {
+  const result = { ...metadata };
+  for (const vaultPath of paths) {
+    const existing = result[vaultPath] ?? {};
+    if (category == null) {
+      const rest = { ...existing };
+      delete rest.categoryOverride;
+      result[vaultPath] = rest;
+    } else {
+      result[vaultPath] = { ...existing, categoryOverride: category };
+    }
+  }
+  return result;
+}
+
 function bulkSetDdSourceType(
   metadata: TileMetadataStore,
   entries: Array<{ vaultPath: string; sourceType: string }>
@@ -368,6 +392,7 @@ export {
   bulkSetImportTags,
   setDepthAffinity,
   bulkSetDepthAffinity,
+  bulkSetCategoryOverride,
   bulkSetDdSourceType,
   bulkSetDetectionSignals,
   bulkSetRenderMode,

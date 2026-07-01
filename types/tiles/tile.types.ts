@@ -225,6 +225,11 @@ export interface TileMetadataEntry {
   importTags?: string[];
   /** Predicted or user-assigned depth tier affinity */
   depthAffinity?: TileLayerRole;
+  /** User reassignment of the tile's category home (Organize → Move…). Read-time
+   *  overlay: raw TileEntry.category is never rewritten, so clearing this restores
+   *  the folder-derived category losslessly. Flows through the normalize/merge
+   *  projection like any folder name. */
+  categoryOverride?: string;
   /** Original DD source directory type (objects, patterns, terrain, walls, etc.) */
   ddSourceType?: string;
   /** Auto-detected or user-set render mode for this tile. Per-tile classification

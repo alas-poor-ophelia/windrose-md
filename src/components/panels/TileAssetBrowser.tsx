@@ -29,6 +29,7 @@ import {
   bulkAddTag,
   bulkToggleStar,
   bulkSetDepthAffinity,
+  bulkSetCategoryOverride,
   bulkSetDetectionSignals,
   bulkSetDefaultSpan,
   isStarred,
@@ -440,6 +441,8 @@ const TileAssetBrowser = memo(({
   const [orgShowTag, setOrgShowTag] = useState(false);
   const [orgTagInput, setOrgTagInput] = useState('');
   const [orgShowTier, setOrgShowTier] = useState(false);
+  const [orgShowMove, setOrgShowMove] = useState(false);
+  const [orgMoveInput, setOrgMoveInput] = useState('');
   const [tileMetadata, setTileMetadata] = useState<TileMetadataStore>({});
   const { getThumbUrl, requestThumbs } = useThumbnailPipeline();
   const orgScrollRef = useRef<HTMLDivElement>(null);
@@ -790,13 +793,26 @@ const TileAssetBrowser = memo(({
     setOrgShowTier(false);
   };
 
+  // Move… reassigns the category home via a read-time metadata override;
+  // undefined clears it, restoring the folder-derived category (lossless).
+  const handleBulkMove = (category: string | undefined): void => {
+    if (orgSelection.size === 0) return;
+    const updated = bulkSetCategoryOverride(tileMetadata, Array.from(orgSelection), category);
+    setTileMetadata(updated);
+    saveTileMetadataDebounced(app, updated);
+    setOrgMoveInput('');
+    setOrgShowMove(false);
+  };
+
   const exitOrganize = (): void => {
     setOrganize(false);
     setOrgSelection(new Set());
     setOrgSearch('');
     setOrgShowTag(false);
     setOrgShowTier(false);
+    setOrgShowMove(false);
     setOrgTagInput('');
+    setOrgMoveInput('');
   };
 
   // Collect available tags for the filter chips, then drop folder/pack noise.
@@ -909,7 +925,9 @@ const TileAssetBrowser = memo(({
     const seen = new Set<string>();
     const folders: FolderInput[] = [];
     for (const tile of allTiles) {
-      const raw = tile.category ?? 'Uncategorized';
+      // Organize's Move… reassigns the category home read-time; the raw
+      // folder-derived category is never rewritten (lossless).
+      const raw = tileMetadata[tile.vaultPath]?.categoryOverride ?? tile.category ?? 'Uncategorized';
       const pack = tileToTilesetId.get(tile.vaultPath) ?? 'unknown';
       const key = `${pack}|${raw}`;
       if (!seen.has(key)) {
@@ -928,12 +946,12 @@ const TileAssetBrowser = memo(({
       }
     }
     return { lookup, meta };
-  }, [allTiles, tileToTilesetId]);
+  }, [allTiles, tileToTilesetId, tileMetadata]);
 
   const groupedTiles = useMemo(() => {
     const groups = new Map<string, TileEntry[]>();
     for (const tile of filteredTiles) {
-      const raw = tile.category ?? 'Uncategorized';
+      const raw = tileMetadata[tile.vaultPath]?.categoryOverride ?? tile.category ?? 'Uncategorized';
       const pack = tileToTilesetId.get(tile.vaultPath) ?? 'unknown';
       const cat = mergedCategories.lookup.get(`${pack}|${raw}`) ?? raw;
       const bucket = groups.get(cat);
@@ -944,7 +962,13 @@ const TileAssetBrowser = memo(({
       }
     }
     return groups;
-  }, [filteredTiles, mergedCategories, tileToTilesetId]);
+  }, [filteredTiles, mergedCategories, tileToTilesetId, tileMetadata]);
+
+  // Destination chips for Move… — the canonical (merged) category labels.
+  const orgMoveSuggestions = useMemo((): string[] => {
+    if (!organize) return [];
+    return Array.from(new Set(mergedCategories.lookup.values())).sort((a, b) => a.localeCompare(b)).slice(0, 12);
+  }, [organize, mergedCategories]);
 
   // Merge banner (Option B): provenance for the currently-open single category.
   const openCategoryMerge = useMemo(() => {
@@ -1343,6 +1367,51 @@ const TileAssetBrowser = memo(({
             </div>
           )}
 
+          {orgShowMove && (
+            <div className="windrose-tb-tag-pop">
+              <div style={{ fontSize: 11, color: 'var(--windrose-text-secondary)', marginBottom: 8 }}>
+                Move <b style={{ color: 'var(--windrose-gold-bright)' }}>{orgSelection.size}</b> tiles to
+              </div>
+              <div className="windrose-tb-search" style={{ marginBottom: 9 }}>
+                <Icon icon="lucide-folder-input" size={13} />
+                <input
+                  placeholder="Category…"
+                  value={orgMoveInput}
+                  onInput={(e: Event) => setOrgMoveInput((e.target as HTMLInputElement).value)}
+                />
+              </div>
+              <div className="windrose-tb-chips-scroll" style={{ flexWrap: 'wrap' }}>
+                {orgMoveSuggestions.map(c => (
+                  <button key={c} className="windrose-tb-chip" onClick={() => setOrgMoveInput(c)}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 7, marginTop: 11 }}>
+                <button
+                  className="windrose-tb-act windrose-tb-act-cancel"
+                  onClick={() => { setOrgShowMove(false); setOrgMoveInput(''); }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="windrose-tb-act"
+                  onClick={() => handleBulkMove(undefined)}
+                  title="Clear the override — restore each tile's folder-derived category"
+                >
+                  Reset to folder
+                </button>
+                <button
+                  className="windrose-tb-act windrose-tb-act-apply"
+                  disabled={orgMoveInput.trim() === ''}
+                  onClick={() => handleBulkMove(orgMoveInput.trim())}
+                >
+                  Move
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="windrose-tb-org-actions">
             <button className="windrose-tb-act" disabled={orgSelection.size === 0} onClick={() => setOrgShowTag(true)}>
               <Icon icon="lucide-tag" size={14} /> Tag…
@@ -1354,7 +1423,11 @@ const TileAssetBrowser = memo(({
             >
               <Icon icon="lucide-layers" size={14} /> Tier…
             </button>
-            <button className="windrose-tb-act" disabled={true}>
+            <button
+              className="windrose-tb-act"
+              disabled={orgSelection.size === 0}
+              onClick={() => setOrgShowMove(!orgShowMove)}
+            >
               <Icon icon="lucide-folder-input" size={14} /> Move…
             </button>
             <button
