@@ -1810,6 +1810,20 @@ button.windrose-object-grid-item:hover,
   color: var(--windrose-gold-bright);
   background: oklch(from var(--windrose-border-primary) l c h/0.18);
 }
+.windrose-tb-filtbtn {
+  /* Compact (block-mode) drawer: icon-only, square, sits beside the search box. */
+}
+.windrose-tb-filtbtn.icon {
+  gap: 0;
+  padding: 7px;
+  position: relative;
+}
+.windrose-tb-filtbtn.icon .fc {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  box-shadow: 0 0 0 2px var(--windrose-bg-primary);
+}
 .windrose-tb-filtbtn .fc {
   background: var(--windrose-border-primary);
   color: var(--windrose-bg-primary);
@@ -3006,6 +3020,10 @@ button.windrose-object-grid-item:hover,
   border-color: var(--windrose-border-primary);
   color: var(--windrose-gold-bright);
   background: oklch(from var(--windrose-border-primary) l c h/0.18);
+}
+.is-tablet button.windrose-tb-filtbtn.icon {
+  gap: 0;
+  padding: 7px;
 }
 
 .is-tablet button.windrose-tb-frow {

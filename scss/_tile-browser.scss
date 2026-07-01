@@ -402,6 +402,20 @@
     background: oklch(from var(--windrose-border-primary) l c h / 0.18);
   }
 
+  /* Compact (block-mode) drawer: icon-only, square, sits beside the search box. */
+  &.icon {
+    gap: 0;
+    padding: 7px;
+    position: relative;
+
+    .fc {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      box-shadow: 0 0 0 2px var(--windrose-bg-primary);
+    }
+  }
+
   .fc {
     background: var(--windrose-border-primary);
     color: var(--windrose-bg-primary);
@@ -1664,6 +1678,11 @@
     border-color: var(--windrose-border-primary);
     color: var(--windrose-gold-bright);
     background: oklch(from var(--windrose-border-primary) l c h / 0.18);
+  }
+
+  &.icon {
+    gap: 0;
+    padding: 7px;
   }
 }
 

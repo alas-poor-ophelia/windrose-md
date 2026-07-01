@@ -1597,17 +1597,15 @@ const TileAssetBrowser = memo(({
             placeholder={compact ? `Search ${depthLabel}…` : `Filter ${depthLabel}…`}
             onInput={setSearchFilter}
           />
-          {!compact && (
-            <button
-              className={`windrose-tb-filtbtn ${activeFilterCount > 0 ? 'on' : ''}`}
-              title="All filters"
-              onClick={() => { setFilterSearch(''); setFilterView('types'); }}
-            >
-              <Icon icon="lucide-filter" size={13} />
-              Filter
-              {activeFilterCount > 0 && <span className="fc">{activeFilterCount}</span>}
-            </button>
-          )}
+          <button
+            className={`windrose-tb-filtbtn ${compact ? 'icon' : ''} ${activeFilterCount > 0 ? 'on' : ''}`}
+            title="All filters"
+            onClick={() => { setFilterSearch(''); setFilterView('types'); }}
+          >
+            <Icon icon="lucide-filter" size={13} />
+            {!compact && 'Filter'}
+            {activeFilterCount > 0 && <span className="fc">{activeFilterCount}</span>}
+          </button>
         </div>
       )}
 
@@ -1661,7 +1659,7 @@ const TileAssetBrowser = memo(({
       )}
 
       {/* Dedicated Filter screen (power-user) — drills Tags / Packs, searchable; shares state with the quick chips */}
-      {!compact && filterView != null && (
+      {filterView != null && (
         <div className="windrose-tb-fscreen">
           <div className="windrose-tb-fhead">
             <button
