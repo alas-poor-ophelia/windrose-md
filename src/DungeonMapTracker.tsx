@@ -9,7 +9,7 @@ import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { ResolvedTheme } from '#types/settings/settings.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { Cell } from '#types/core/cell.types';
-import type { TilesetOverrides, TileForm } from '#types/tiles/tile.types';
+import type { TilesetOverrides } from '#types/tiles/tile.types';
 import type { CustomColor } from '#types/core/common.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -48,8 +48,6 @@ import { ColorPicker } from './components/shared/ColorPicker';
 import { RegionPanel } from './components/panels/RegionPanel';
 import { EdgeRail } from './components/panels/EdgeRail';
 import { TileSubtoolRibbon } from './components/panels/TileSubtoolRibbon';
-import { formDef } from './assets/tileForm';
-import type { TileSubtoolId } from './assets/tileForm';
 import { LayerEditModal } from './components/modals/LayerEditModal';
 import { openNativeCloneLayerModal, CloneLayerModal } from './components/modals/CloneLayerModal';
 import { useSubHexNavigation } from './hooks/interactions/useSubHexNavigation';
@@ -171,16 +169,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const setObjectViewMode = useCallback((mode: 'grid' | 'list'): void => {
     updateMapData((prev: MapData) => ({ ...prev, objectViewMode: mode }));
   }, [updateMapData]);
-  // Selected tile's derived render-form + armed placement subtool (drawer ribbon).
-  const [selectedTileForm, setSelectedTileForm] = useState<TileForm | null>(null);
-  const [tileSubtool, setTileSubtool] = useState<TileSubtoolId | null>(null);
   // Id of the wall being edit-dragged: threaded to the renderer so the static
   // raster drops it (the WallLayer overlay draws it live during the drag).
   const [draggingWallId, setDraggingWallId] = useState<string | null>(null);
-  // Arm the form's default subtool whenever the selected form changes.
-  useEffect(() => {
-    setTileSubtool(selectedTileForm != null ? formDef(selectedTileForm).defaultSubtool : null);
-  }, [selectedTileForm]);
   // Vertical left ribbon: Tiles/Objects tabs + (on Tiles with a tile selected) placement subtools.
   const renderDrawerRibbon = (): VNode => (
     <div className="windrose-fd-subrib">
@@ -364,7 +355,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     tileFlipH, setTileFlipH,
     tileLayer, setTileLayer,
     tileFitMode, setTileFitMode,
-    stampMode, setStampMode,
+    selectedTileForm, setSelectedTileForm,
+    tileSubtool, setTileSubtool,
     tileScale, setTileScale,
     brushSize,
     tileDepth, setTileDepth,
@@ -1094,7 +1086,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 tileFlipH={tileFlipH}
                 tileLayer={tileLayer}
                 tileFitMode={tileFitMode}
-                stampMode={stampMode}
+                activeSubtool={tileSubtool}
                 tileScale={tileScale}
                 brushSize={brushSize}
                 tileDepth={tileDepth}
@@ -1237,8 +1229,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 mapType={mapData?.mapType}
                 tileFitMode={tileFitMode}
                 onTileFitModeChange={setTileFitMode}
-                stampMode={stampMode}
-                onStampModeChange={setStampMode}
+                activeSubtool={tileSubtool}
+                onSubtoolChange={setTileSubtool}
                 tileScale={tileScale}
                 onTileScaleChange={setTileScale}
                 getCachedImage={getCachedImage}
@@ -1425,14 +1417,15 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 mapType={mapData?.mapType}
                 tileFitMode={tileFitMode}
                 onTileFitModeChange={setTileFitMode}
-                stampMode={stampMode}
-                onStampModeChange={setStampMode}
+                activeSubtool={tileSubtool}
+                onSubtoolChange={setTileSubtool}
                 tileScale={tileScale}
                 onTileScaleChange={setTileScale}
                 getCachedImage={getCachedImage}
                 tilesetOverrides={mapData?.tilesetOverrides}
                 onTilesetOverrideChange={handleTilesetOverrideChange}
                 recentTiles={recentTiles}
+                onSelectedFormChange={setSelectedTileForm}
               />
             </FloatingPanel>
           )}
@@ -1486,8 +1479,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     mapType={mapData?.mapType}
                     tileFitMode={tileFitMode}
                     onTileFitModeChange={setTileFitMode}
-                    stampMode={stampMode}
-                    onStampModeChange={setStampMode}
+                    activeSubtool={tileSubtool}
+                    onSubtoolChange={setTileSubtool}
                     tileScale={tileScale}
                     onTileScaleChange={setTileScale}
                     getCachedImage={getCachedImage}

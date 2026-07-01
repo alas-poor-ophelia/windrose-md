@@ -13,7 +13,7 @@ import type { VNode, ComponentChildren } from 'preact';
 import { TFile } from 'obsidian';
 import type { App } from 'obsidian';
 
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { memo } from 'preact/compat';
 import { useApp } from '../../context/AppContext';
 import { useThumbnailPipeline } from '../../hooks/state/useThumbnailPipeline';
@@ -38,7 +38,8 @@ import {
   getAllTags,
 } from '../../persistence/tileMetadata';
 import { predictDepthTier } from '../../assets/depthPredictor';
-import { deriveTileForm } from '../../assets/tileForm';
+import { deriveTileForm, formDef } from '../../assets/tileForm';
+import type { TileSubtoolId } from '../../assets/tileForm';
 import { clusterCategories, NOISE, humanizePackName, detectTileGeometry } from '../../assets/categoryMerge';
 import type { FolderInput } from '../../assets/categoryMerge';
 import { predictSpan, DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
@@ -303,8 +304,9 @@ interface TileAssetBrowserProps {
   mapType?: string;
   tileFitMode: 'fill' | 'contain' | 'auto';
   onTileFitModeChange: (mode: 'fill' | 'contain' | 'auto') => void;
-  stampMode: boolean;
-  onStampModeChange: (stamp: boolean) => void;
+  /** Armed placement subtool (ribbon state; the footer stamp button mirrors it). */
+  activeSubtool: TileSubtoolId | null;
+  onSubtoolChange: (id: TileSubtoolId) => void;
   tileScale: number;
   onTileScaleChange: (scale: number) => void;
   getCachedImage?: (path: string) => HTMLImageElement | null;
@@ -388,8 +390,8 @@ const TileAssetBrowser = memo(({
   mapType,
   tileFitMode,
   onTileFitModeChange,
-  stampMode,
-  onStampModeChange,
+  activeSubtool,
+  onSubtoolChange,
   tileScale,
   onTileScaleChange,
   getCachedImage,
@@ -990,16 +992,27 @@ const TileAssetBrowser = memo(({
     return ts?.tiles.find(t => t.id === selectedTileId) ?? null;
   }, [selectedTileId, selectedTilesetId, tilesets]);
 
-  // Report the selected tile's derived render-form upward (drives the drawer subtool ribbon).
-  useEffect(() => {
-    if (onSelectedFormChange == null) return;
-    if (selectedTile == null || selectedTilesetId == null) {
-      onSelectedFormChange(null);
-      return;
-    }
+  // The selected tile's derived render-form: reported upward for the drawer
+  // subtool ribbon, and used locally by the footer stamp-mirror button.
+  const selectedForm = useMemo((): TileForm | null => {
+    if (selectedTile == null || selectedTilesetId == null) return null;
     const ts = tilesets.find(t => t.id === selectedTilesetId);
-    onSelectedFormChange(deriveTileForm(tileMetadata[selectedTile.vaultPath], ts));
-  }, [selectedTile, selectedTilesetId, tilesets, tileMetadata, onSelectedFormChange]);
+    return deriveTileForm(tileMetadata[selectedTile.vaultPath], ts);
+  }, [selectedTile, selectedTilesetId, tilesets, tileMetadata]);
+
+  useEffect(() => {
+    onSelectedFormChange?.(selectedForm);
+  }, [selectedForm, onSelectedFormChange]);
+
+  // Footer stamp button: mirrors the subtool state for modes with no ribbon
+  // (floating/compact) — toggles between 'stamp' and the form's default.
+  const toggleStampSubtool = useCallback(() => {
+    onSubtoolChange(
+      activeSubtool === 'stamp'
+        ? (selectedForm != null ? formDef(selectedForm).defaultSubtool : 'paint')
+        : 'stamp'
+    );
+  }, [activeSubtool, selectedForm, onSubtoolChange]);
 
   // Resolve recent tiles across all tilesets
   const recentTileEntries = useMemo((): TileEntry[] => {
@@ -2126,9 +2139,9 @@ const TileAssetBrowser = memo(({
               <Icon icon="lucide-rotate-cw" size={12} />
             </button>
             <button
-              className={`windrose-tb-iconbtn ${stampMode ? 'active' : ''}`}
-              onClick={() => onStampModeChange(!stampMode)}
-              title={stampMode ? 'Stamp: ON' : 'Stamp: OFF'}
+              className={`windrose-tb-iconbtn ${activeSubtool === 'stamp' ? 'active' : ''}`}
+              onClick={toggleStampSubtool}
+              title={activeSubtool === 'stamp' ? 'Stamp: ON' : 'Stamp: OFF'}
             >
               <Icon icon="lucide-stamp" size={12} />
             </button>
@@ -2191,9 +2204,9 @@ const TileAssetBrowser = memo(({
             </button>
             <span className="sep" />
             <button
-              className={`windrose-tb-iconbtn ${stampMode ? 'active' : ''}`}
-              onClick={() => onStampModeChange(!stampMode)}
-              title={stampMode ? 'Stamp mode: ON' : 'Stamp mode: OFF'}
+              className={`windrose-tb-iconbtn ${activeSubtool === 'stamp' ? 'active' : ''}`}
+              onClick={toggleStampSubtool}
+              title={activeSubtool === 'stamp' ? 'Stamp mode: ON' : 'Stamp mode: OFF'}
             >
               <Icon icon="lucide-stamp" size={14} />
             </button>

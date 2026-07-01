@@ -1,12 +1,21 @@
 /**
  * tilePlacement Unit Tests
  *
- * Tests the pure data transformation logic extracted from TilePlacementLayer.
- * These operations transform TileAssignment[] arrays for tile paint/erase.
+ * Two parts:
+ * 1. The REAL cell-space ops from src/drawing/tilePlacementOps (brush cells,
+ *    Bresenham interpolation, footprint-aware flood fill).
+ * 2. Reference semantics for the TileAssignment[] transformations the layer
+ *    performs (place/erase/stamp) — kept as documentation of the data shape.
  */
 
 import { describe, it, expect } from "vitest";
 import type { TileAssignment } from "../../../types/tiles/tile.types";
+import {
+  getBrushCells,
+  bresenhamLine,
+  floodFillCells,
+  FLOOD_FILL_MAX,
+} from "../../../src/drawing/tilePlacementOps";
 
 // =============================================================================
 // Pure helper functions extracted from TilePlacementLayer logic
@@ -133,6 +142,102 @@ function overlayTile(
 ): TileAssignment {
   return { col, row, tilesetId, tileId, placement: "overlay" };
 }
+
+// =============================================================================
+// Real ops (src/drawing/tilePlacementOps)
+// =============================================================================
+
+describe("tilePlacementOps", () => {
+  describe("getBrushCells", () => {
+    it("size 1 returns just the anchor cell", () => {
+      expect(getBrushCells(3, -2, 1)).toEqual([{ col: 3, row: -2 }]);
+    });
+
+    it("size 3 returns a 3x3 block centered on the anchor", () => {
+      const cells = getBrushCells(0, 0, 3);
+      expect(cells).toHaveLength(9);
+      for (let dr = -1; dr <= 1; dr++)
+        for (let dc = -1; dc <= 1; dc++)
+          expect(cells).toContainEqual({ col: dc, row: dr });
+    });
+
+    it("even sizes round down to the enclosing odd block (size 2 -> 3x3)", () => {
+      expect(getBrushCells(5, 5, 2)).toHaveLength(9);
+    });
+  });
+
+  describe("bresenhamLine", () => {
+    it("includes both endpoints", () => {
+      const pts = bresenhamLine(0, 0, 3, 0);
+      expect(pts[0]).toEqual({ col: 0, row: 0 });
+      expect(pts[pts.length - 1]).toEqual({ col: 3, row: 0 });
+      expect(pts).toHaveLength(4);
+    });
+
+    it("walks a diagonal without gaps", () => {
+      const pts = bresenhamLine(0, 0, 3, 3);
+      expect(pts).toEqual([
+        { col: 0, row: 0 },
+        { col: 1, row: 1 },
+        { col: 2, row: 2 },
+        { col: 3, row: 3 },
+      ]);
+    });
+
+    it("degenerate line returns the single cell", () => {
+      expect(bresenhamLine(2, 2, 2, 2)).toEqual([{ col: 2, row: 2 }]);
+    });
+  });
+
+  describe("floodFillCells", () => {
+    it("clicking empty fills the connected empty area within 3x map bounds", () => {
+      // mapWidth/Height 2 -> cols/rows range -2..4 = 7x7 = 49 cells
+      const cells = floodFillCells([], 0, 0, 2, 2);
+      expect(cells).toHaveLength(49);
+    });
+
+    it("clicking a tile fills only the contiguous same-tile region", () => {
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: "ts", tileId: "grass" },
+        { col: 1, row: 0, tilesetId: "ts", tileId: "grass" },
+        { col: 2, row: 0, tilesetId: "ts", tileId: "water" },
+        { col: 4, row: 0, tilesetId: "ts", tileId: "grass" }, // disconnected
+      ];
+      const cells = floodFillCells(tiles, 0, 0, 10, 10);
+      expect(cells).toHaveLength(2);
+      expect(cells).toContainEqual({ col: 0, row: 0 });
+      expect(cells).toContainEqual({ col: 1, row: 0 });
+    });
+
+    it("multi-cell footprints block empty fill across their whole area", () => {
+      // A vertical wall of 1x3 props at col 1 splits rows -1..1 locally;
+      // fill starting left of the wall must not leak through the span cells.
+      const wall: TileAssignment[] = [
+        { col: 1, row: -2, tilesetId: "ts", tileId: "wall", spanW: 1, spanH: 5 },
+      ];
+      const cells = floodFillCells(wall, 0, 0, 1, 1);
+      // Bounds: cols -1..2, rows -1..2 (4x4=16). The span covers (1,-2)..(1,2),
+      // blocking column 1 for all in-bounds rows -1..2 => right column (2,*)
+      // is unreachable. Left region = cols -1..0 x rows -1..2 = 8 cells.
+      expect(cells).toHaveLength(8);
+      expect(cells.every(c => c.col <= 0)).toBe(true);
+    });
+
+    it("freeform stamps do not block the fill", () => {
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: "ts", tileId: "tree", freeform: true, worldX: 10, worldY: 10 },
+      ];
+      const cells = floodFillCells(tiles, 0, 0, 2, 2);
+      expect(cells).toHaveLength(49);
+    });
+
+    it("respects the FLOOD_FILL_MAX cap on huge empty areas", () => {
+      const cells = floodFillCells([], 0, 0, 100, 100);
+      expect(cells.length).toBeLessThanOrEqual(FLOOD_FILL_MAX);
+      expect(cells.length).toBe(FLOOD_FILL_MAX);
+    });
+  });
+});
 
 // =============================================================================
 // Tests

@@ -11,7 +11,8 @@
  * - tileFlipH: Horizontal flip for tile placement
  * - tileLayer: Target layer for tile placement ('base' | 'overlay')
  * - tileFitMode: How tiles fit within cells ('fill' | 'contain' | 'auto')
- * - stampMode: Whether stamp mode is active
+ * - selectedTileForm: Selected tile's derived render-form (reported by the browser)
+ * - tileSubtool: Armed placement subtool (drives TilePlacementLayer behavior)
  *
  * Operations provided:
  * - handleTileSelect: Select a tile from a tileset
@@ -19,8 +20,10 @@
  */
 
 
-import type { TileLayerRole } from '#types/tiles/tile.types';
-import { useCallback, useState } from 'preact/hooks';
+import type { TileForm, TileLayerRole } from '#types/tiles/tile.types';
+import type { TileSubtoolId } from '../../assets/tileForm';
+import { useCallback, useEffect, useState } from 'preact/hooks';
+import { formDef } from '../../assets/tileForm';
 const MAX_RECENT_TILES = 20;
 
 interface RecentTile {
@@ -45,8 +48,10 @@ interface UseTileBrushResult {
   setTileLayer: (v: 'base' | 'overlay') => void;
   tileFitMode: 'fill' | 'contain' | 'auto';
   setTileFitMode: (v: 'fill' | 'contain' | 'auto') => void;
-  stampMode: boolean;
-  setStampMode: (v: boolean) => void;
+  selectedTileForm: TileForm | null;
+  setSelectedTileForm: (v: TileForm | null) => void;
+  tileSubtool: TileSubtoolId | null;
+  setTileSubtool: (v: TileSubtoolId | null) => void;
   tileScale: number;
   setTileScale: (v: number) => void;
   brushSize: number;
@@ -69,12 +74,20 @@ function useTileBrush(): UseTileBrushResult {
   const [tileFlipH, setTileFlipH] = useState<boolean>(false);
   const [tileLayer, setTileLayer] = useState<'base' | 'overlay'>('base');
   const [tileFitMode, setTileFitMode] = useState<'fill' | 'contain' | 'auto'>('auto');
-  const [stampMode, setStampMode] = useState<boolean>(false);
+  const [selectedTileForm, setSelectedTileForm] = useState<TileForm | null>(null);
+  const [tileSubtool, setTileSubtool] = useState<TileSubtoolId | null>(null);
   const [tileScale, setTileScale] = useState<number>(1);
   const [brushSize, setBrushSize] = useState<number>(1);
   const [tileDepth, setTileDepth] = useState<TileLayerRole>('ground');
   const [hiddenLayers, setHiddenLayers] = useState<Set<TileLayerRole>>(new Set());
   const [recentTiles, setRecentTiles] = useState<RecentTile[]>([]);
+
+  // Re-arm the form's default subtool only when the FORM changes: a manual
+  // subtool override survives switching between same-form tiles, but resets
+  // across forms (and clears on deselect).
+  useEffect(() => {
+    setTileSubtool(selectedTileForm != null ? formDef(selectedTileForm).defaultSubtool : null);
+  }, [selectedTileForm]);
 
   const toggleHiddenLayer = useCallback((layer: TileLayerRole) => {
     setHiddenLayers(prev => {
@@ -103,6 +116,7 @@ function useTileBrush(): UseTileBrushResult {
     setSelectedTileId(null);
     setTileRotation(0);
     setTileFlipH(false);
+    setSelectedTileForm(null);
   }, []);
 
   return {
@@ -114,7 +128,8 @@ function useTileBrush(): UseTileBrushResult {
     tileFlipH, setTileFlipH,
     tileLayer, setTileLayer,
     tileFitMode, setTileFitMode,
-    stampMode, setStampMode,
+    selectedTileForm, setSelectedTileForm,
+    tileSubtool, setTileSubtool,
     tileScale, setTileScale,
     brushSize, setBrushSize,
     tileDepth, setTileDepth,

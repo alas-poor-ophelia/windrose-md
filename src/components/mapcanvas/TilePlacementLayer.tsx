@@ -1,15 +1,17 @@
 /**
  * TilePlacementLayer.tsx
  *
- * Interaction layer for placing tile images on hex or grid maps.
- * Supports: pencil (grid-snap with brush size), stamp (freeform),
- * flood fill (Shift+click), and eyedropper (Alt+click).
- * Bresenham interpolation fills gaps during fast drag strokes.
+ * Interaction layer for placing tile images on hex or grid maps. Behavior is
+ * driven by the armed placement subtool from the drawer ribbon: paint
+ * (grid-snap with brush size), stamp/scatter (freeform), fill (flood fill,
+ * also Shift+click), while brush/line are owned by other layers. Bresenham
+ * interpolation fills gaps during fast drag strokes.
  */
 
 import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
 import type { TileAssignment, TileRotation, TileLayerRole } from '#types/tiles/tile.types';
+import type { TileSubtoolId } from '../../assets/tileForm';
 
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
@@ -18,81 +20,8 @@ import { useApp } from '../../context/AppContext';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { preloadImage } from '../../assets/imageOperations';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
-import { cellsCoveredByAssignment, assignmentsOverlap, assignmentCoversCell } from '../../assets/tileFootprint';
-
-
-// ===========================================
-// Pure helpers
-// ===========================================
-
-function getBrushCells(col: number, row: number, brushSize: number): Array<{ col: number; row: number }> {
-  if (brushSize <= 1) return [{ col, row }];
-  const half = Math.floor(brushSize / 2);
-  const cells: Array<{ col: number; row: number }> = [];
-  for (let dr = -half; dr <= half; dr++)
-    for (let dc = -half; dc <= half; dc++)
-      cells.push({ col: col + dc, row: row + dr });
-  return cells;
-}
-
-function bresenhamLine(x0: number, y0: number, x1: number, y1: number): Array<{ col: number; row: number }> {
-  const points: Array<{ col: number; row: number }> = [];
-  const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
-  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
-  let err = dx - dy;
-  let cx = x0, cy = y0;
-  while (true) {
-    points.push({ col: cx, row: cy });
-    if (cx === x1 && cy === y1) break;
-    const e2 = 2 * err;
-    if (e2 > -dy) { err -= dy; cx += sx; }
-    if (e2 < dx) { err += dx; cy += sy; }
-  }
-  return points;
-}
-
-const FLOOD_FILL_MAX = 10000;
-
-function floodFillCells(
-  tiles: TileAssignment[],
-  startCol: number,
-  startRow: number,
-  mapWidth: number,
-  mapHeight: number
-): Array<{ col: number; row: number }> {
-  const targetKey = tiles.find(t => t.freeform !== true && assignmentCoversCell(t, startCol, startRow));
-  const targetId = targetKey ? `${targetKey.tilesetId}:${targetKey.tileId}` : '';
-
-  // Register every cell of each prop's footprint so multi-cell occupants block
-  // the fill across their whole area, not just the anchor.
-  const tileMap = new Map<string, string>();
-  for (const t of tiles) {
-    if (t.freeform === true) continue;
-    const id = `${t.tilesetId}:${t.tileId}`;
-    for (const c of cellsCoveredByAssignment(t)) tileMap.set(`${c.col},${c.row}`, id);
-  }
-
-  const visited = new Set<string>();
-  const result: Array<{ col: number; row: number }> = [];
-  const stack = [{ col: startCol, row: startRow }];
-
-  while (stack.length > 0 && result.length < FLOOD_FILL_MAX) {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- stack is non-empty: the while-loop condition guarantees stack.length > 0
-    const { col, row } = stack.pop()!;
-    const key = `${col},${row}`;
-    if (visited.has(key)) continue;
-    visited.add(key);
-
-    if (col < -mapWidth || col > mapWidth * 2 || row < -mapHeight || row > mapHeight * 2) continue;
-
-    const cellId = tileMap.get(key) ?? '';
-    if (cellId !== targetId) continue;
-
-    result.push({ col, row });
-    stack.push({ col: col + 1, row }, { col: col - 1, row }, { col, row: row + 1 }, { col, row: row - 1 });
-  }
-  return result;
-}
+import { cellsCoveredByAssignment, assignmentsOverlap } from '../../assets/tileFootprint';
+import { getBrushCells, bresenhamLine, floodFillCells } from '../../drawing/tilePlacementOps';
 
 
 // ===========================================
@@ -107,7 +36,8 @@ export interface TilePlacementLayerProps {
   tileFlipH: boolean;
   tileLayer: 'base' | 'overlay';
   tileFitMode: 'fill' | 'contain' | 'auto';
-  stampMode: boolean;
+  /** Armed placement subtool from the drawer ribbon (null = no tile selected). */
+  activeSubtool: TileSubtoolId | null;
   tileScale: number;
   brushSize: number;
   tileDepth: TileLayerRole;
@@ -122,7 +52,7 @@ const TilePlacementLayer = ({
   tileFlipH,
   tileLayer,
   tileFitMode,
-  stampMode,
+  activeSubtool,
   tileScale,
   brushSize,
   tileDepth,
@@ -306,19 +236,36 @@ const TilePlacementLayer = ({
     const coords = screenToGrid(e.clientX, e.clientY);
     if (!coords) return;
 
-    // Shift+click = flood fill
+    // Shift+click stays as a flood-fill shortcut regardless of armed subtool.
     if (e.shiftKey && hasTileSelected) {
       floodFillAtCell(coords.x, coords.y);
       return;
     }
 
-    // Stamp mode: place at exact world position
-    if (stampMode && hasTileSelected) {
-      const worldCoords = screenToWorld(e.clientX, e.clientY);
-      if (worldCoords) {
-        placeStampAtWorld(worldCoords.worldX, worldCoords.worldY, coords.x, coords.y);
+    if (hasTileSelected) {
+      switch (activeSubtool) {
+        case 'fill':
+          floodFillAtCell(coords.x, coords.y);
+          return;
+        case 'stamp':
+        case 'scatter': {
+          // Scatter places like stamp on click; the jittered drag stroke
+          // lands with the scatter module (Track A4).
+          const worldCoords = screenToWorld(e.clientX, e.clientY);
+          if (worldCoords) {
+            placeStampAtWorld(worldCoords.worldX, worldCoords.worldY, coords.x, coords.y);
+          }
+          return;
+        }
+        case 'brush':
+          // World-space terrain brush: TerrainBrushLayer owns this subtool.
+          return;
+        case 'line':
+          // 'line' arms the wall tool, so tilePaint never sees these events.
+          return;
+        default:
+          break; // 'paint' (and autotile until built) → grid brush stroke below
       }
-      return;
     }
 
     isDraggingRef.current = true;
@@ -333,11 +280,12 @@ const TilePlacementLayer = ({
     } else {
       eraseTilesInBrush(coords.x, coords.y);
     }
-  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, stampMode, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, floodFillAtCell, mapData]);
+  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, activeSubtool, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, floodFillAtCell, mapData]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
+    // Only the paint/erase grid stroke sets isDraggingRef; the click-only
+    // subtools (stamp/fill/scatter-for-now) return from pointerdown early.
     if (!isDraggingRef.current || !isTileTool || !geometry) return;
-    if (stampMode) return;
 
     const coords = screenToGrid(e.clientX, e.clientY);
     if (!coords) return;
@@ -359,7 +307,7 @@ const TilePlacementLayer = ({
     }
 
     lastGridPosRef.current = current;
-  }, [isTileTool, geometry, screenToGrid, hasTileSelected, stampMode, placeTilesInBrush, eraseTilesInBrush]);
+  }, [isTileTool, geometry, screenToGrid, hasTileSelected, placeTilesInBrush, eraseTilesInBrush]);
 
   const handlePointerUp = useCallback(() => {
     if (strokeInitialTilesRef.current !== null && mapData) {
