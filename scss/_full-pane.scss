@@ -30,10 +30,12 @@
   position: relative;
 }
 
-/* Map-name header: drop the bottom padding + margin to tighten the section, and
-   divide it from the stage/canvas with the same gold stroke the sidebars use. */
+/* Map-name header: keep it tight but leave symmetric vertical padding so the
+   controls have breathing room above the gold divider (a 0 bottom pad pinned
+   them to the line and read as overflowing it). Divide it from the stage/canvas
+   with the same gold stroke the sidebars use. */
 .windrose-full-pane .windrose-header {
-  padding-bottom: 0;
+  padding-block: 4px;
   margin-bottom: 0;
   border-bottom: 1.5px solid oklch(from var(--windrose-border-primary) l c h / 0.5);
 }

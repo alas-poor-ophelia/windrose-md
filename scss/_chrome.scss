@@ -92,9 +92,18 @@
   }
 }
 
-.windrose-map-name {
+/* `.windrose-header input.` (0,2,1) — the bare `.windrose-map-name` (0,1,0) lost
+   to app.css `input[type="text"]` (0,1,1), which forced a border, the input
+   padding, and height:--input-height (30px) onto this title field. That made it
+   a 30px bordered box — the tallest header child — so it drove the header height
+   and read as "controls overflowing" against the gold divider. Re-state the flat
+   transparent title and null out the injected height/padding/border. */
+.windrose-header input.windrose-map-name {
   background: transparent;
   border: none;
+  box-shadow: none;
+  height: auto;
+  padding: 0;
   color: var(--windrose-text-primary);
   font-size: 16px;
   font-weight: bold;
