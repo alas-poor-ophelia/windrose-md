@@ -38,6 +38,7 @@ import { DEFAULTS } from './core/dmtConstants';
 import { getColorByHex, isDefaultColor, DEFAULT_COLOR } from './drawing/colorOperations';
 import { ImageAlignmentMode } from './components/overlays/ImageAlignmentMode';
 import { OnboardingSurvey } from './components/overlays/OnboardingSurvey';
+import { WhatsNewNotice } from './components/overlays/WhatsNewNotice';
 import { useAlignmentMode } from './hooks/interactions/useAlignmentMode';
 import { ModalPortal } from './components/modals/ModalPortal';
 import { getActiveLayer, getLayerById, getActiveBoardLayers, addBoard, setActiveBoard, removeBoard, setLayerMode, addLayer, updateActiveLayer } from './persistence/layerAccessor';
@@ -879,6 +880,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           onMapSelect={handleMapSelect}
           onNewMap={fullPane ? handleNewMap : undefined}
         />
+
+        {/* One-time upgrader notice pointing at the Features settings section. */}
+        {onboarding === 'whatsnew' && <WhatsNewNotice />}
 
         {isInSubHex && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

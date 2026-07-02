@@ -5,7 +5,7 @@
  * Resets fixture files to clean state.
  */
 
-import { existsSync, mkdirSync, cpSync } from "fs";
+import { existsSync, mkdirSync, cpSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 
 const PROJECT_ROOT = path.resolve(__dirname, "../..");
@@ -82,6 +82,26 @@ export async function setup() {
       }
       console.warn(`  Plugin file not found: ${source}`);
     }
+  }
+
+  // Pin onboardingState to 'done' in the plugin settings so neither the
+  // first-run survey nor the What's-New banner appears during tests. The
+  // settings data.json is plugin-owned and gitignored — on a fresh clone it
+  // is absent, and the map fixture existing would otherwise resolve the
+  // state to 'whatsnew' (banner in every test).
+  const settingsFile = path.join(PLUGIN_TARGET, "data.json");
+  let settings: Record<string, unknown> = {};
+  if (existsSync(settingsFile)) {
+    try {
+      settings = JSON.parse(readFileSync(settingsFile, "utf-8")) as Record<string, unknown>;
+    } catch {
+      settings = {};
+    }
+  }
+  if (settings.onboardingState !== "done") {
+    settings.onboardingState = "done";
+    writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
+    console.log("  Pinned: plugin settings onboardingState = 'done'");
   }
 
   console.log("Test vault setup complete.");
