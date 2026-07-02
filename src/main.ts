@@ -10,7 +10,7 @@ import * as dungeonGenerator from './generation/dungeonGenerator';
 import * as objectPlacer from './generation/objectPlacer';
 import { registerDeepLinks } from './core/deepLinkRegistration';
 import { setPlugin, clearPlugin, FALLBACK_SETTINGS } from './core/settingsAccessor';
-import { decideOnboardingState } from './core/featureFlags';
+import { decideOnboardingState, isFeatureEnabled } from './core/featureFlags';
 import { WindroseMDSettingsTab } from './settings/WindroseSettingsTab';
 import { VIEW_TYPE_WINDROSE_MAP, WindroseMapView } from './views/WindroseMapView';
 import { recordPerfTelemetry } from './utils/perfTelemetry';
@@ -138,7 +138,11 @@ export default class WindrosePlugin extends Plugin {
     this.addCommand({
       id: 'insert-random-dungeon',
       name: 'Generate random dungeon',
-      editorCallback: async (editor) => {
+      // checkCallback form: re-evaluated every palette open, so toggling the
+      // dungeonGenerator feature takes effect without a plugin reload.
+      editorCheckCallback: (checking, editor) => {
+        if (!isFeatureEnabled('dungeonGenerator')) return false;
+        if (checking) return true;
         new InsertDungeonModal(this.app, this, async (mapName, cells, objects, edges, options) => {
           const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
           await this.saveDungeonToJson(mapId, mapName, cells as DungeonCell[], objects, edges, options as DungeonGenOptions);
@@ -153,6 +157,7 @@ export default class WindrosePlugin extends Plugin {
 
           editor.replaceSelection(codeBlock);
         }).open();
+        return true;
       }
     });
   }

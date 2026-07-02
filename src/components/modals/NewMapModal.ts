@@ -1,6 +1,7 @@
 import type { App } from 'obsidian';
 import { Modal, Setting } from 'obsidian';
 import type { MapType } from '#types/index';
+import { isFeatureEnabled } from '../../core/featureFlags';
 
 class NewMapModal extends Modal {
   private mapName = '';
@@ -44,23 +45,31 @@ class NewMapModal extends Modal {
       attr: { type: 'button' }
     });
 
-    const hexBtn = buttonRow.createEl('button', {
+    // Feature gate: hex map CREATION hides when disabled. With only grid
+    // left, preselect it.
+    const hexEnabled = isFeatureEnabled('hexMaps');
+    const hexBtn = hexEnabled ? buttonRow.createEl('button', {
       text: 'Hex',
       cls: 'windrose-map-type-btn',
       attr: { type: 'button' }
-    });
+    }) : null;
 
     gridBtn.onclick = () => {
       this.mapType = 'grid';
       gridBtn.addClass('selected');
-      hexBtn.removeClass('selected');
+      hexBtn?.removeClass('selected');
     };
 
-    hexBtn.onclick = () => {
-      this.mapType = 'hex';
-      hexBtn.addClass('selected');
-      gridBtn.removeClass('selected');
-    };
+    if (hexBtn != null) {
+      hexBtn.onclick = () => {
+        this.mapType = 'hex';
+        hexBtn.addClass('selected');
+        gridBtn.removeClass('selected');
+      };
+    } else {
+      this.mapType = 'grid';
+      gridBtn.addClass('selected');
+    }
 
     const buttonContainer = contentEl.createDiv({ cls: 'windrose-modal-buttons' });
 
