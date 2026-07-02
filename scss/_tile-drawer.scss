@@ -162,8 +162,8 @@ button:is(
   }
 
   &.active {
-    background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-gold));
-    color: #241c12;
+    background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-border-primary));
+    color: var(--windrose-gold-contrast);
   }
 }
 
@@ -340,8 +340,8 @@ button:is(
   font-weight: 600;
 
   &.active {
-    background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-gold));
-    color: #241c12;
+    background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-border-primary));
+    color: var(--windrose-gold-contrast);
   }
 }
 

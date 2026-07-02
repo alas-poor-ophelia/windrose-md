@@ -1850,26 +1850,41 @@ button.windrose-object-grid-item:hover,
   overflow: hidden;
 }
 
+/* Subview header — match the main Tiles/Objects header bar (.windrose-tb-head):
+   same 7px 12px inset, transparent surface, and secondary border. */
 .windrose-tb-fhead {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 7px 12px;
   border-bottom: 1px solid var(--windrose-border-secondary);
-  background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h/0.08), transparent);
+  background: transparent;
+  flex-shrink: 0;
 }
 
+/* Breadcrumb styled like the main header title (.windrose-tb-title): understated
+   uppercase secondary, not the old oversized gold. */
 .windrose-tb-fcrumb {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--windrose-gold-bright);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--windrose-text-secondary);
 }
 .windrose-tb-fcrumb .dim {
   color: var(--windrose-text-muted);
-  font-weight: 600;
+}
+.windrose-tb-fcrumb {
+  /* Chevron sits between text nodes; the icon span is inline by default so its
+     SVG rides the text baseline. Flex-center it (and mute it) so it lines up. */
+}
+.windrose-tb-fcrumb .windrose-tb-crumb-chev {
+  display: inline-flex;
+  align-items: center;
+  color: var(--windrose-text-muted);
 }
 
 .windrose-tb-fsearchwrap {
@@ -2674,10 +2689,6 @@ button.windrose-object-grid-item:hover,
 }
 
 /* ---- Organize mode ---- */
-.windrose-tb-head-organize {
-  background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h/0.28), oklch(from var(--windrose-border-primary) l c h/0.1));
-}
-
 .windrose-tb-org-search {
   padding: 9px 10px 7px;
 }
@@ -2826,11 +2837,22 @@ input.windrose-tb-spanin:focus {
   border-top: 1px solid color-mix(in oklch, var(--windrose-border-primary) 25%, oklch(0% 0 0deg));
   background: linear-gradient(180deg, oklch(17% 0.03 75deg), oklch(12% 0.02 75deg));
   display: flex;
-  gap: 7px;
+  /* Five buttons (four labeled + the icon-only star). At full width they share
+     one line; in a narrow drawer the row wraps instead of pushing the star off
+     the edge. The tighter gap/padding keeps all five on one line at the common
+     drawer width. */
+  flex-wrap: wrap;
+  gap: 6px;
   flex-shrink: 0;
 }
 .windrose-tb-org-actions .windrose-tb-act {
   flex: 1;
+  /* Default min-width:auto floors each button at its content width, so the
+     row can't shrink to one line and the star spills. A small explicit floor
+     lets them compress to share one line at normal widths, and only forces a
+     wrap once the drawer is genuinely too narrow (never clipping the label). */
+  min-width: 56px;
+  padding-inline: 7px;
 }
 .windrose-tb-org-actions .windrose-tb-act-star {
   flex: none;
@@ -3538,8 +3560,8 @@ button:is(.windrose-tb-iconbtn,
   color: var(--windrose-text-primary);
 }
 .windrose-cd-segbtn.active {
-  background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-gold));
-  color: #241c12;
+  background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-border-primary));
+  color: var(--windrose-gold-contrast);
 }
 
 .windrose-cd-vtog {
@@ -3709,8 +3731,8 @@ button:is(.windrose-tb-iconbtn,
   font-weight: 600;
 }
 .is-tablet button.windrose-cd-segbtn.active {
-  background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-gold));
-  color: #241c12;
+  background: linear-gradient(180deg, var(--windrose-gold-bright), var(--windrose-border-primary));
+  color: var(--windrose-gold-contrast);
 }
 
 /* Collapsed-spine buttons — keep their fixed icon-button boxes on tablet */
@@ -9349,11 +9371,12 @@ button.windrose-breadcrumb-link {
 
 /* Tame Obsidian's default view-content padding (12px sides / 32px bottom via
    `.workspace-leaf-content .view-content`, specificity 0,2,0): keep a comfortable
-   12px margin around the whole editor so it clears the host's title chrome on all
-   sides, but drop the bloated 32px bottom to match. Specificity + later source
-   order wins the cascade. */
+   12px margin around the whole editor so it clears the host's title chrome on the
+   top and sides. Keep a deeper bottom inset so the canvas clears the host's
+   fixed status-bar ribbon (word count / sync) that floats over the bottom-right
+   corner of the leaf. Specificity + later source order wins the cascade. */
 .workspace-leaf-content .windrose-full-pane.view-content {
-  padding: 12px;
+  padding: 12px 12px 32px;
 }
 
 .windrose-full-pane .windrose-container {

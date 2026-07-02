@@ -8,6 +8,7 @@
 
 import type { TilesetDef, TileEntry, TileForm, TilesetOverrides, TileLayerRole, TileMetadataStore, TilesetOrigin } from '#types/tiles/tile.types';
 import type { ToolId } from '#types/tools/tool.types';
+import type { WallToolSurface } from '#types/core/wallpath.types';
 import type { FlyoutTile } from './DrawerDock';
 import type { VNode, ComponentChildren } from 'preact';
 import { TFile } from 'obsidian';
@@ -325,6 +326,9 @@ interface TileAssetBrowserProps {
    *  time (never rewrites tile metadata or already-painted cells). */
   paintEdgeBlend?: boolean;
   onPaintEdgeBlendChange?: (on: boolean) => void;
+  /** Wall-tool control surface (published by WallLayer). When present the footer
+   *  renders the wall tool's draw/edit controls in place of the brush controls. */
+  wallSurface?: WallToolSurface | null;
   getCachedImage?: (path: string) => HTMLImageElement | null;
   tilesetOverrides?: Record<string, TilesetOverrides>;
   onTilesetOverrideChange?: (tilesetId: string, overrides: TilesetOverrides) => void;
@@ -416,6 +420,7 @@ const TileAssetBrowser = memo(({
   onBrushSoftnessChange,
   paintEdgeBlend,
   onPaintEdgeBlendChange,
+  wallSurface,
   getCachedImage,
   tilesetOverrides,
   onTilesetOverrideChange,
@@ -1324,11 +1329,97 @@ const TileAssetBrowser = memo(({
   ];
   const clearAllFilters = (): void => { setActiveTags(new Set()); setPackFilter(new Set()); };
 
+  // Wall-tool footer controls (relocated from the old floating bar). Rendered in
+  // the loaded-brush footer whenever the wall tool publishes a control surface.
+  const renderWallBar = (surface: WallToolSurface): VNode => {
+    if (!surface.hasAsset) {
+      return <span className="windrose-tb-cap">Pick a wall or path strip</span>;
+    }
+    if (surface.mode === 'edit' && surface.edit != null) {
+      const edit = surface.edit;
+      return (
+        <>
+          <span className="windrose-tb-cap" style={{ minWidth: 34 }}>{edit.vertexCount} pts</span>
+          <span className="label">Width</span>
+          <input
+            className="windrose-tb-range"
+            type="range"
+            min="0.25"
+            max="3"
+            step="0.25"
+            value={edit.widthScale}
+            onInput={(e: Event) => edit.setWidth(parseFloat((e.target as HTMLInputElement).value))}
+            style={{ flex: 1, minWidth: 40 }}
+          />
+          <span className="windrose-tb-cap" style={{ minWidth: 24, textAlign: 'right' }}>{edit.widthScale}×</span>
+          <button
+            className={`windrose-tb-iconbtn ${edit.flip ? 'active' : ''}`}
+            title="Flip texture direction"
+            onClick={edit.toggleFlip}
+          >
+            <Icon icon="lucide-flip-vertical" size={14} />
+          </button>
+          <button className="windrose-tb-iconbtn" title="Delete wall (Delete)" onClick={edit.deleteWall}>
+            <Icon icon="lucide-trash-2" size={14} />
+          </button>
+          <button className="windrose-tb-iconbtn" title="Deselect (Escape)" onClick={edit.deselect}>
+            <Icon icon="lucide-x" size={14} />
+          </button>
+        </>
+      );
+    }
+    // Draw mode (also covers idle-with-asset: the action buttons disable until drawing).
+    return (
+      <>
+        <span className="windrose-tb-cap" style={{ minWidth: 34 }}>{surface.vertexCount} pts</span>
+        <button
+          className={`windrose-tb-iconbtn ${surface.snapEnabled ? 'active' : ''}`}
+          title={surface.snapEnabled ? 'Grid snap: ON' : 'Grid snap: OFF'}
+          onClick={surface.toggleSnap}
+        >
+          <Icon icon="lucide-magnet" size={14} />
+        </button>
+        <button
+          className={`windrose-tb-iconbtn ${surface.angleSnapEnabled ? 'active' : ''}`}
+          title={surface.angleSnapEnabled ? '45° angle snap: ON (or hold Alt)' : '45° angle snap: OFF (or hold Alt)'}
+          onClick={surface.toggleAngleSnap}
+        >
+          <Icon icon="lucide-triangle-right" size={14} />
+        </button>
+        <span className="sep" />
+        <button
+          className="windrose-tb-iconbtn"
+          title="Undo last point (Backspace)"
+          disabled={!surface.isDrawing}
+          onClick={surface.undoLastPoint}
+        >
+          <Icon icon="lucide-undo-2" size={14} />
+        </button>
+        <button
+          className="windrose-tb-iconbtn"
+          title="Cancel (Escape)"
+          disabled={!surface.isDrawing}
+          onClick={surface.cancelDrawing}
+        >
+          <Icon icon="lucide-x" size={14} />
+        </button>
+        <button
+          className="windrose-tb-iconbtn active"
+          title="Finish wall (Enter or double-click)"
+          disabled={!surface.canFinish}
+          onClick={surface.finishWall}
+        >
+          <Icon icon="lucide-check" size={14} />
+        </button>
+      </>
+    );
+  };
+
   return (
     <div ref={browserRef} className="windrose-tile-browser">
       {organize ? (
         <>
-          <div className="windrose-tb-head windrose-tb-head-organize">
+          <div className="windrose-tb-head">
             <Icon icon="lucide-check-square" size={16} />
             <div className="windrose-tb-title">Organize</div>
             <span className="windrose-tb-cap" style={{ marginRight: 'auto', marginLeft: 4 }}>
@@ -1952,7 +2043,7 @@ const TileAssetBrowser = memo(({
               ) : (
                 <>
                   <span className="dim">Filter</span>
-                  <Icon icon="lucide-chevron-right" size={11} />
+                  <Icon icon="lucide-chevron-right" size={11} className="windrose-tb-crumb-chev" />
                   {filterTypes.find(f => f.id === filterView)?.label ?? ''}
                 </>
               )}
@@ -2316,44 +2407,48 @@ const TileAssetBrowser = memo(({
             <div className="chip-tile compact">
               <LoadedChipThumb url={getThumbUrl(selectedTile.vaultPath)} />
             </div>
-            <button className="windrose-tb-iconbtn" title="Rotate" onClick={handleRotateCW}>
-              <Icon icon="lucide-rotate-cw" size={12} />
-            </button>
-            <button
-              className={`windrose-tb-iconbtn ${activeSubtool === 'stamp' ? 'active' : ''}`}
-              onClick={toggleStampSubtool}
-              title={activeSubtool === 'stamp' ? 'Stamp: ON' : 'Stamp: OFF'}
-            >
-              <Icon icon="lucide-stamp" size={12} />
-            </button>
-            <span className="sep" />
-            {activeSubtool === 'brush' && onBrushSizeChange != null ? (
+            {wallSurface != null ? renderWallBar(wallSurface) : (
               <>
-                <span className="label">Size</span>
-                <input
-                  className="windrose-tb-range"
-                  type="range"
-                  min="0.5"
-                  max="8"
-                  step="0.5"
-                  value={brushSize ?? 1}
-                  onInput={(e: Event) => onBrushSizeChange(parseFloat((e.target as HTMLInputElement).value))}
-                  style={{ flex: 1, minWidth: 0 }}
-                />
-              </>
-            ) : (
-              <>
-                <span className="label">Scale</span>
-                <input
-                  className="windrose-tb-range"
-                  type="range"
-                  min="0.25"
-                  max="3"
-                  step="0.25"
-                  value={tileScale}
-                  onInput={(e: Event) => onTileScaleChange(parseFloat((e.target as HTMLInputElement).value))}
-                  style={{ flex: 1, minWidth: 0 }}
-                />
+                <button className="windrose-tb-iconbtn" title="Rotate" onClick={handleRotateCW}>
+                  <Icon icon="lucide-rotate-cw" size={12} />
+                </button>
+                <button
+                  className={`windrose-tb-iconbtn ${activeSubtool === 'stamp' ? 'active' : ''}`}
+                  onClick={toggleStampSubtool}
+                  title={activeSubtool === 'stamp' ? 'Stamp: ON' : 'Stamp: OFF'}
+                >
+                  <Icon icon="lucide-stamp" size={12} />
+                </button>
+                <span className="sep" />
+                {activeSubtool === 'brush' && onBrushSizeChange != null ? (
+                  <>
+                    <span className="label">Size</span>
+                    <input
+                      className="windrose-tb-range"
+                      type="range"
+                      min="0.5"
+                      max="8"
+                      step="0.5"
+                      value={brushSize ?? 1}
+                      onInput={(e: Event) => onBrushSizeChange(parseFloat((e.target as HTMLInputElement).value))}
+                      style={{ flex: 1, minWidth: 0 }}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <span className="label">Scale</span>
+                    <input
+                      className="windrose-tb-range"
+                      type="range"
+                      min="0.25"
+                      max="3"
+                      step="0.25"
+                      value={tileScale}
+                      onInput={(e: Event) => onTileScaleChange(parseFloat((e.target as HTMLInputElement).value))}
+                      style={{ flex: 1, minWidth: 0 }}
+                    />
+                  </>
+                )}
               </>
             )}
             <button
@@ -2390,7 +2485,7 @@ const TileAssetBrowser = memo(({
               transform controls for size/softness; the ribbon owns subtool
               selection in full mode, so no stamp mirror here. */}
           <div className="windrose-tb-brushbar">
-            {activeSubtool === 'brush' && onBrushSizeChange != null ? (
+            {wallSurface != null ? renderWallBar(wallSurface) : activeSubtool === 'brush' && onBrushSizeChange != null ? (
               <>
                 <span className="label">Size</span>
                 <input

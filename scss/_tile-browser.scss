@@ -443,26 +443,40 @@
   overflow: hidden;
 }
 
+/* Subview header — match the main Tiles/Objects header bar (.windrose-tb-head):
+   same 7px 12px inset, transparent surface, and secondary border. */
 .windrose-tb-fhead {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 7px 12px;
   border-bottom: 1px solid var(--windrose-border-secondary);
-  background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h / 0.08), transparent);
+  background: transparent;
+  flex-shrink: 0;
 }
 
+/* Breadcrumb styled like the main header title (.windrose-tb-title): understated
+   uppercase secondary, not the old oversized gold. */
 .windrose-tb-fcrumb {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--windrose-gold-bright);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--windrose-text-secondary);
 
   .dim {
     color: var(--windrose-text-muted);
-    font-weight: 600;
+  }
+
+  /* Chevron sits between text nodes; the icon span is inline by default so its
+     SVG rides the text baseline. Flex-center it (and mute it) so it lines up. */
+  .windrose-tb-crumb-chev {
+    display: inline-flex;
+    align-items: center;
+    color: var(--windrose-text-muted);
   }
 }
 
@@ -1309,10 +1323,6 @@
 }
 
 /* ---- Organize mode ---- */
-.windrose-tb-head-organize {
-  background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h / 0.28), oklch(from var(--windrose-border-primary) l c h / 0.1));
-}
-
 .windrose-tb-org-search {
   padding: 9px 10px 7px;
 
@@ -1471,11 +1481,22 @@ input.windrose-tb-spanin {
   border-top: 1px solid color-mix(in oklch, var(--windrose-border-primary) 25%, oklch(0 0 0));
   background: linear-gradient(180deg, oklch(0.17 0.03 75), oklch(0.12 0.02 75));
   display: flex;
-  gap: 7px;
+  /* Five buttons (four labeled + the icon-only star). At full width they share
+     one line; in a narrow drawer the row wraps instead of pushing the star off
+     the edge. The tighter gap/padding keeps all five on one line at the common
+     drawer width. */
+  flex-wrap: wrap;
+  gap: 6px;
   flex-shrink: 0;
 
   .windrose-tb-act {
     flex: 1;
+    /* Default min-width:auto floors each button at its content width, so the
+       row can't shrink to one line and the star spills. A small explicit floor
+       lets them compress to share one line at normal widths, and only forces a
+       wrap once the drawer is genuinely too narrow (never clipping the label). */
+    min-width: 56px;
+    padding-inline: 7px;
   }
 
   .windrose-tb-act-star {

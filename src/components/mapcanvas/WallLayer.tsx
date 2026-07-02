@@ -15,7 +15,7 @@
  * suppress-then-commit history (one undo entry per gesture).
  */
 
-import type { WallPath, WallVertex } from '#types/core/wallpath.types';
+import type { WallPath, WallVertex, WallToolSurface } from '#types/core/wallpath.types';
 import type { VNode } from 'preact';
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
@@ -28,8 +28,6 @@ import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import { getCachedImage, preloadImage } from '../../assets/imageOperations';
 import { createWallPath } from '../../drawing/wallPathOperations';
 import { useApp } from '../../context/AppContext';
-import { Icon } from '../shared/Icon';
-import { CornerBrackets } from '../shared/CornerBrackets';
 
 export interface WallLayerProps {
   currentTool: string;
@@ -43,6 +41,12 @@ export interface WallLayerProps {
    * the single commit on pointerup.
    */
   onDragStateChange?: (wallId: string | null) => void;
+  /**
+   * Publishes the wall-tool control surface (draw/edit state + actions) so the
+   * tile-drawer footer can render the tool's controls. WallLayer renders no DOM
+   * of its own — its controls live in the drawer. Null when the tool is idle.
+   */
+  onSurfaceChange?: (surface: WallToolSurface | null) => void;
 }
 
 /** Hide edit handles below this zoom — too small to grab, pure clutter. */
@@ -129,6 +133,7 @@ const WallLayer = ({
   selectedTileId,
   onWallPathsChange,
   onDragStateChange,
+  onSurfaceChange,
 }: WallLayerProps): VNode | null => {
   const app = useApp();
   const { mapData, geometry, screenToWorld, getClientCoords, canvasRef } = useMapState();
@@ -462,6 +467,60 @@ const WallLayer = ({
     cancelDrawing();
   }, [mapData, selectedTilesetId, selectedTileId, selectedMeta?.ddSourceType, onWallPathsChange, cancelDrawing]);
 
+  // ---- Control-surface actions (rendered by the drawer footer) ----
+  const toggleSnap = useCallback(() => setSnapEnabled(v => !v), []);
+  const toggleAngleSnap = useCallback(() => setAngleSnapEnabled(v => !v), []);
+  const finishWall = useCallback(() => commitWall(false), [commitWall]);
+  const undoLastPoint = useCallback(() => {
+    const verts = verticesRef.current;
+    if (verts.length <= 1) { cancelDrawing(); return; }
+    const next = verts.slice(0, -1);
+    setVertices(next);
+    verticesRef.current = next;
+    drawPreview();
+  }, [cancelDrawing, drawPreview]);
+  const deselect = useCallback(() => { setSelectedWallId(null); setSelectedVertexIndex(null); }, []);
+  const deleteSelectedWall = useCallback((wallId: string) => {
+    onWallPathsChange(getWalls().filter(w => w.id !== wallId), false);
+    setSelectedWallId(null);
+    setSelectedVertexIndex(null);
+  }, [getWalls, onWallPathsChange]);
+
+  // Stable action wrappers for the published control surface. The wrappers keep
+  // a fixed identity (created once) and dispatch through a ref that always holds
+  // the latest closures + selected wall. This keeps them OUT of the publish
+  // effect's dependency list — depending on the raw callbacks made the effect
+  // re-fire after each setWallSurface (which re-renders this layer), an infinite
+  // render loop while drawing (Preact doesn't guard against it).
+  const liveRef = useRef({
+    toggleSnap, toggleAngleSnap, undoLastPoint, cancelDrawing, finishWall,
+    updateWall, deleteSelectedWall, deselect, selectedWallId: null as string | null,
+  });
+  liveRef.current = {
+    toggleSnap, toggleAngleSnap, undoLastPoint, cancelDrawing, finishWall,
+    updateWall, deleteSelectedWall, deselect, selectedWallId: selectedWallId,
+  };
+  const surfaceActions = useRef({
+    toggleSnap: () => liveRef.current.toggleSnap(),
+    toggleAngleSnap: () => liveRef.current.toggleAngleSnap(),
+    undoLastPoint: () => liveRef.current.undoLastPoint(),
+    cancelDrawing: () => liveRef.current.cancelDrawing(),
+    finishWall: () => liveRef.current.finishWall(),
+    setWidth: (v: number) => {
+      const id = liveRef.current.selectedWallId;
+      if (id != null) liveRef.current.updateWall(id, w => ({ ...w, widthScale: v }), false);
+    },
+    toggleFlip: () => {
+      const id = liveRef.current.selectedWallId;
+      if (id != null) liveRef.current.updateWall(id, w => ({ ...w, flip: w.flip !== true }), false);
+    },
+    deleteWall: () => {
+      const id = liveRef.current.selectedWallId;
+      if (id != null) liveRef.current.deleteSelectedWall(id);
+    },
+    deselect: () => liveRef.current.deselect(),
+  }).current;
+
   // ---- Pointer handlers ----
   const handlePointerDown = useCallback((e: MouseEvent | TouchEvent | PointerEvent) => {
     if (currentTool !== 'wall') return;
@@ -793,134 +852,58 @@ const WallLayer = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!isWallTool) return null;
+  // ---- Publish the control surface to the drawer footer ----
+  // WallLayer owns the wall-tool state but renders no chrome; the footer draws
+  // the controls from this snapshot. Deps are PRIMITIVES ONLY (+ the stable
+  // surfaceActions) so publishing — which sets state in the parent and re-renders
+  // this layer — can't re-trigger itself into an infinite loop.
+  const hasAsset = selectedEntry != null && isStripAsset;
+  const assetKind: 'wall' | 'path' = selectedMeta?.ddSourceType === 'paths' ? 'path' : 'wall';
+  const hasSelectedWall = selectedWall != null;
+  const editVertexCount = selectedWall?.vertices.length ?? 0;
+  const editWidthScale = selectedWall?.widthScale ?? 1;
+  const editFlip = selectedWall?.flip === true;
+  useEffect(() => {
+    if (onSurfaceChange == null) return;
+    if (!isWallTool) { onSurfaceChange(null); return; }
+    const inEdit = !isDrawing && hasSelectedWall;
+    onSurfaceChange({
+      mode: inEdit ? 'edit' : 'draw',
+      hasAsset,
+      assetKind,
+      isDrawing,
+      vertexCount: vertices.length,
+      snapEnabled,
+      angleSnapEnabled,
+      canFinish: vertices.length >= 2,
+      toggleSnap: surfaceActions.toggleSnap,
+      toggleAngleSnap: surfaceActions.toggleAngleSnap,
+      undoLastPoint: surfaceActions.undoLastPoint,
+      cancelDrawing: surfaceActions.cancelDrawing,
+      finishWall: surfaceActions.finishWall,
+      edit: inEdit
+        ? {
+            vertexCount: editVertexCount,
+            widthScale: editWidthScale,
+            flip: editFlip,
+            setWidth: surfaceActions.setWidth,
+            toggleFlip: surfaceActions.toggleFlip,
+            deleteWall: surfaceActions.deleteWall,
+            deselect: surfaceActions.deselect,
+          }
+        : null,
+    });
+  }, [
+    onSurfaceChange, isWallTool, isDrawing, vertices.length, snapEnabled, angleSnapEnabled,
+    hasAsset, assetKind, hasSelectedWall, editVertexCount, editWidthScale, editFlip,
+    surfaceActions,
+  ]);
+  // Clear the surface on unmount so a stale footer can't linger.
+  useEffect(() => () => onSurfaceChange?.(null), [onSurfaceChange]);
 
-  // ---- Floating bar ----
-  const barContent = (() => {
-    if (isDrawing || selectedWall == null) {
-      // Draw mode (or idle with nothing selected)
-      if (selectedEntry == null || !isStripAsset) {
-        return (
-          <span className="windrose-wall-bar-hint">
-            <Icon icon="lucide-brick-wall" size={14} />
-            Pick a wall or path strip in the tile drawer — or click an existing wall to edit it
-          </span>
-        );
-      }
-      return (
-        <>
-          <span className="windrose-wall-bar-name" title={selectedEntry.filename}>
-            <Icon icon={selectedMeta?.ddSourceType === 'paths' ? 'lucide-route' : 'lucide-brick-wall'} size={14} />
-            {selectedEntry.filename.replace(/\.(webp|png)$/i, '')}
-          </span>
-          <span className="windrose-wall-bar-count">{vertices.length} pts</span>
-          <button
-            className={`windrose-tb-iconbtn ${snapEnabled ? 'active' : ''}`}
-            title={snapEnabled ? 'Grid snap: ON' : 'Grid snap: OFF'}
-            onClick={() => setSnapEnabled(!snapEnabled)}
-          >
-            <Icon icon="lucide-magnet" size={14} />
-          </button>
-          <button
-            className={`windrose-tb-iconbtn ${angleSnapEnabled ? 'active' : ''}`}
-            title={angleSnapEnabled ? '45° angle snap: ON (or hold Alt)' : '45° angle snap: OFF (or hold Alt)'}
-            onClick={() => setAngleSnapEnabled(!angleSnapEnabled)}
-          >
-            <Icon icon="lucide-triangle-right" size={14} />
-          </button>
-          <button
-            className="windrose-tb-iconbtn"
-            title="Undo last point (Backspace)"
-            disabled={!isDrawing}
-            onClick={() => {
-              const verts = verticesRef.current;
-              if (verts.length <= 1) { cancelDrawing(); return; }
-              const next = verts.slice(0, -1);
-              setVertices(next);
-              verticesRef.current = next;
-              drawPreview();
-            }}
-          >
-            <Icon icon="lucide-undo-2" size={14} />
-          </button>
-          <button
-            className="windrose-tb-iconbtn"
-            title="Cancel (Escape)"
-            disabled={!isDrawing}
-            onClick={cancelDrawing}
-          >
-            <Icon icon="lucide-x" size={14} />
-          </button>
-          <button
-            className="windrose-tb-iconbtn active"
-            title="Finish wall (Enter or double-click)"
-            disabled={vertices.length < 2}
-            onClick={() => commitWall(false)}
-          >
-            <Icon icon="lucide-check" size={14} />
-          </button>
-        </>
-      );
-    }
-
-    // Edit mode — a wall is selected
-    return (
-      <>
-        <span className="windrose-wall-bar-name" title={selectedWall.tileId}>
-          <Icon icon={selectedWall.kind === 'path' ? 'lucide-route' : 'lucide-brick-wall'} size={14} />
-          {selectedWall.tileId}
-        </span>
-        <span className="windrose-wall-bar-count">{selectedWall.vertices.length} pts</span>
-        <span className="label" style={{ fontSize: 11 }}>Width</span>
-        <input
-          className="windrose-tb-range"
-          type="range"
-          min="0.25"
-          max="3"
-          step="0.25"
-          value={selectedWall.widthScale}
-          onInput={(e: Event) => {
-            const v = parseFloat((e.target as HTMLInputElement).value);
-            updateWall(selectedWall.id, w => ({ ...w, widthScale: v }), false);
-          }}
-          style={{ width: 80 }}
-        />
-        <span className="windrose-wall-bar-count">{selectedWall.widthScale}×</span>
-        <button
-          className={`windrose-tb-iconbtn ${selectedWall.flip === true ? 'active' : ''}`}
-          title="Flip texture direction"
-          onClick={() => updateWall(selectedWall.id, w => ({ ...w, flip: w.flip !== true }), false)}
-        >
-          <Icon icon="lucide-flip-vertical" size={14} />
-        </button>
-        <button
-          className="windrose-tb-iconbtn"
-          title="Delete wall (Delete)"
-          onClick={() => {
-            onWallPathsChange(getWalls().filter(w => w.id !== selectedWall.id), false);
-            setSelectedWallId(null);
-            setSelectedVertexIndex(null);
-          }}
-        >
-          <Icon icon="lucide-trash-2" size={14} />
-        </button>
-        <button
-          className="windrose-tb-iconbtn"
-          title="Deselect (Escape)"
-          onClick={() => { setSelectedWallId(null); setSelectedVertexIndex(null); }}
-        >
-          <Icon icon="lucide-x" size={14} />
-        </button>
-      </>
-    );
-  })();
-
-  return (
-    <div className="windrose-floating-bar windrose-wall-bar">
-      <CornerBrackets classPrefix="windrose-wallbar-bracket" variant="compact" filterId="wallbar-bracket" />
-      {barContent}
-    </div>
-  );
+  // No chrome: the tool's controls live in the drawer footer, its handles on
+  // the canvas overlay. Nothing to render here.
+  return null;
 };
 
 export { WallLayer };

@@ -6,11 +6,12 @@
 
 /* Tame Obsidian's default view-content padding (12px sides / 32px bottom via
    `.workspace-leaf-content .view-content`, specificity 0,2,0): keep a comfortable
-   12px margin around the whole editor so it clears the host's title chrome on all
-   sides, but drop the bloated 32px bottom to match. Specificity + later source
-   order wins the cascade. */
+   12px margin around the whole editor so it clears the host's title chrome on the
+   top and sides. Keep a deeper bottom inset so the canvas clears the host's
+   fixed status-bar ribbon (word count / sync) that floats over the bottom-right
+   corner of the leaf. Specificity + later source order wins the cascade. */
 .workspace-leaf-content .windrose-full-pane.view-content {
-  padding: 12px;
+  padding: 12px 12px 32px;
 }
 
 .windrose-full-pane .windrose-container {

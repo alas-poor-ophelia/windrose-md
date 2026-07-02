@@ -9,6 +9,7 @@ import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { ResolvedTheme } from '#types/settings/settings.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { Cell } from '#types/core/cell.types';
+import type { WallToolSurface } from '#types/core/wallpath.types';
 import type { TilesetOverrides } from '#types/tiles/tile.types';
 import type { CustomColor } from '#types/core/common.types';
 
@@ -172,6 +173,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Id of the wall being edit-dragged: threaded to the renderer so the static
   // raster drops it (the WallLayer overlay draws it live during the drag).
   const [draggingWallId, setDraggingWallId] = useState<string | null>(null);
+  // Wall-tool control surface published by WallLayer and consumed by the tile
+  // drawer footer, which renders the tool's draw/edit controls.
+  const [wallSurface, setWallSurface] = useState<WallToolSurface | null>(null);
   // Vertical left ribbon: Tiles/Objects tabs + (on Tiles with a tile selected) placement subtools.
   const renderDrawerRibbon = (): VNode => (
     <div className="windrose-fd-subrib">
@@ -1155,6 +1159,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 selectedTileId={selectedTileId}
                 onWallPathsChange={handleWallPathsChange}
                 onDragStateChange={setDraggingWallId}
+                onSurfaceChange={setWallSurface}
               />
 
               {/* RegionLayer - hex region creation and editing */}
@@ -1286,6 +1291,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onTileFitModeChange={setTileFitMode}
                 activeSubtool={tileSubtool}
                 onSubtoolChange={setTileSubtool}
+                wallSurface={wallSurface}
                 tileScale={tileScale}
                 onTileScaleChange={setTileScale}
                 brushSize={brushSize}
@@ -1480,6 +1486,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onTileFitModeChange={setTileFitMode}
                 activeSubtool={tileSubtool}
                 onSubtoolChange={setTileSubtool}
+                wallSurface={wallSurface}
                 tileScale={tileScale}
                 onTileScaleChange={setTileScale}
                 brushSize={brushSize}
@@ -1548,6 +1555,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     onTileFitModeChange={setTileFitMode}
                     activeSubtool={tileSubtool}
                     onSubtoolChange={setTileSubtool}
+                    wallSurface={wallSurface}
                     tileScale={tileScale}
                     onTileScaleChange={setTileScale}
                     brushSize={brushSize}
