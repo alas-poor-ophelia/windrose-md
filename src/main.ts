@@ -13,6 +13,7 @@ import { setPlugin, clearPlugin, FALLBACK_SETTINGS } from './core/settingsAccess
 import { WindroseMDSettingsTab } from './settings/WindroseSettingsTab';
 import { VIEW_TYPE_WINDROSE_MAP, WindroseMapView } from './views/WindroseMapView';
 import { recordPerfTelemetry } from './utils/perfTelemetry';
+import { writeCanvasCapabilityReport } from './utils/canvasCapabilityReport';
 
 /** Cell produced by the dungeon generator with grid coordinates. */
 interface DungeonCell {
@@ -67,6 +68,11 @@ export default class WindrosePlugin extends Plugin {
       id: 'record-perf-telemetry',
       name: 'Record performance telemetry (60s)',
       callback: () => { void recordPerfTelemetry(this.app); },
+    });
+    this.addCommand({
+      id: 'canvas-capability-report',
+      name: 'Write canvas capability report',
+      callback: () => { void writeCanvasCapabilityReport(this.app); },
     });
 
     this.registerMarkdownCodeBlockProcessor('windrose-map', (source, el, ctx) => {

@@ -13,6 +13,9 @@ import {
   renderTiles,
   computeRegionPatternTransform,
   regionFeatherPx,
+  shadowBlurImage,
+  pyramidLevels,
+  pyramidBlurImage,
 } from "../../../../src/geometry/renderers/tileRenderer";
 
 import type { TileAssignment, TilesetDef } from '#types/tiles/tile.types';
@@ -989,6 +992,74 @@ describe('tileRenderer', () => {
     it('does not divide by zero for a zero-width image', () => {
       const { scale } = computeRegionPatternTransform(0, 4, 100, 1, 0, 0);
       expect(Number.isFinite(scale)).toBe(true);
+    });
+  });
+
+  describe('shadowBlurImage', () => {
+    function makeShadowCtx() {
+      return {
+        save: vi.fn(),
+        restore: vi.fn(),
+        drawImage: vi.fn(),
+        shadowColor: '',
+        shadowBlur: 0,
+        shadowOffsetX: 0,
+      };
+    }
+
+    it('draws the source fully off-canvas with the shadow offset back into view', () => {
+      const ctx = makeShadowCtx();
+      const src = { width: 200, height: 100 } as HTMLCanvasElement;
+      let atDraw: { blur: number; offX: number; x: number } | null = null;
+      ctx.drawImage.mockImplementation((_s: HTMLCanvasElement, x: number) => {
+        atDraw = { blur: ctx.shadowBlur, offX: ctx.shadowOffsetX, x };
+      });
+
+      shadowBlurImage(ctx as unknown as CanvasRenderingContext2D, src, 10);
+
+      expect(ctx.drawImage).toHaveBeenCalledTimes(1);
+      // Source must sit entirely left of the canvas (x + width <= 0)…
+      expect(atDraw!.x + src.width).toBeLessThanOrEqual(0);
+      // …with the shadow offset landing it exactly back at the origin.
+      expect(atDraw!.offX).toBe(-atDraw!.x);
+      // Shadow sigma is shadowBlur/2; filter blur(N) uses sigma N → 2× factor.
+      expect(atDraw!.blur).toBe(20);
+    });
+
+    it('wraps shadow state changes in save/restore', () => {
+      const ctx = makeShadowCtx();
+      const src = { width: 50, height: 50 } as HTMLCanvasElement;
+      shadowBlurImage(ctx as unknown as CanvasRenderingContext2D, src, 4);
+      expect(ctx.save).toHaveBeenCalledTimes(1);
+      expect(ctx.restore).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('pyramidLevels', () => {
+    it('scales with the blur radius (log2)', () => {
+      expect(pyramidLevels(2)).toBe(1);
+      expect(pyramidLevels(8)).toBe(3);
+      expect(pyramidLevels(16)).toBe(4);
+    });
+
+    it('clamps to [1, 5]', () => {
+      expect(pyramidLevels(0)).toBe(1);
+      expect(pyramidLevels(1)).toBe(1);
+      expect(pyramidLevels(10000)).toBe(5);
+    });
+  });
+
+  describe('pyramidBlurImage', () => {
+    it('degrades to a plain blit when no scratch canvases exist (non-DOM env)', () => {
+      const ctx = {
+        save: vi.fn(), restore: vi.fn(), drawImage: vi.fn(),
+        clearRect: vi.fn(), imageSmoothingEnabled: true,
+      };
+      const src = { width: 100, height: 80 } as HTMLCanvasElement;
+      pyramidBlurImage(ctx as unknown as CanvasRenderingContext2D, src, 100, 80, 8);
+      // typeof document === 'undefined' in the unit env → hard blit fallback
+      expect(ctx.drawImage).toHaveBeenCalledTimes(1);
+      expect(ctx.drawImage).toHaveBeenCalledWith(src, 0, 0);
     });
   });
 
