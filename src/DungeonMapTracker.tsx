@@ -36,7 +36,7 @@ import { getColorByHex, isDefaultColor, DEFAULT_COLOR } from './drawing/colorOpe
 import { ImageAlignmentMode } from './components/overlays/ImageAlignmentMode';
 import { useAlignmentMode } from './hooks/interactions/useAlignmentMode';
 import { ModalPortal } from './components/modals/ModalPortal';
-import { getActiveLayer, getLayerById, addBoard, setActiveBoard, removeBoard, setLayerMode, addLayer, updateActiveLayer } from './persistence/layerAccessor';
+import { getActiveLayer, getLayerById, getActiveBoardLayers, addBoard, setActiveBoard, removeBoard, setLayerMode, addLayer, updateActiveLayer } from './persistence/layerAccessor';
 import type { TileLayerRole } from '#types/tiles/tile.types';
 import { setCell as accessorSetCell, removeCell as accessorRemoveCell, cellToPoint } from './geometry/core/cellAccessor';
 import { FloatingPanel } from './components/panels/FloatingPanel';
@@ -629,6 +629,27 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     toggleFloat('colorPicker');
     setIsColorPickerOpen(false);
   }, [toggleFloat, setIsColorPickerOpen, handleAddCustomColor, setSelectedColor]);
+
+  // Strata coupling: the depth band doubles as the stratum selector. Tile
+  // placements and terrain strokes write to the ACTIVE layer, so the band must
+  // activate its matching stratum — otherwise terrain paints onto whatever
+  // layer happens to be selected and renders in that stratum's slot.
+  const handleTileDepthChange = useCallback((depth: TileLayerRole): void => {
+    setTileDepth(depth);
+    if (mapData?.layerMode === 'strata') {
+      const target = getActiveBoardLayers(mapData).find(l => l.tileRole === depth);
+      if (target != null && target.id !== mapData.activeLayerId) {
+        handleLayerSelect(target.id);
+      }
+    }
+  }, [mapData, setTileDepth, handleLayerSelect]);
+
+  // Reverse sync: selecting a stratum layer (layers panel) follows with the band.
+  useEffect(() => {
+    if (mapData?.layerMode !== 'strata') return;
+    const role = getActiveLayer(mapData).tileRole;
+    if (role != null && role !== tileDepth) setTileDepth(role);
+  }, [mapData, tileDepth, setTileDepth]);
 
   // Custom event listeners (sub-hex, deep links, regions, object links, hex context menu)
   useCustomEventHandlers({
@@ -1227,7 +1248,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               fold
               compact
               depth={tileDepth}
-              onDepthChange={setTileDepth}
+              onDepthChange={handleTileDepthChange}
               hidden={hiddenLayers}
               onToggleHide={toggleHiddenLayer}
               flyoutRecent={flyoutRecent}
@@ -1257,7 +1278,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 tileLayer={tileLayer}
                 onTileLayerChange={setTileLayer}
                 tileDepth={tileDepth}
-                onTileDepthChange={setTileDepth}
+                onTileDepthChange={handleTileDepthChange}
                 hidden={hiddenLayers}
                 onToggleHide={toggleHiddenLayer}
                 mapType={mapData?.mapType}
@@ -1451,7 +1472,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 tileLayer={tileLayer}
                 onTileLayerChange={setTileLayer}
                 tileDepth={tileDepth}
-                onTileDepthChange={setTileDepth}
+                onTileDepthChange={handleTileDepthChange}
                 hidden={hiddenLayers}
                 onToggleHide={toggleHiddenLayer}
                 mapType={mapData?.mapType}
@@ -1492,7 +1513,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                   fold
                   compact={false}
                   depth={tileDepth}
-                  onDepthChange={setTileDepth}
+                  onDepthChange={handleTileDepthChange}
                   hidden={hiddenLayers}
                   onToggleHide={toggleHiddenLayer}
                   flyoutRecent={flyoutRecent}
@@ -1519,7 +1540,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     tileLayer={tileLayer}
                     onTileLayerChange={setTileLayer}
                     tileDepth={tileDepth}
-                    onTileDepthChange={setTileDepth}
+                    onTileDepthChange={handleTileDepthChange}
                     hidden={hiddenLayers}
                     onToggleHide={toggleHiddenLayer}
                     mapType={mapData?.mapType}

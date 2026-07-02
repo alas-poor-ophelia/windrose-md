@@ -29,7 +29,7 @@ import type {
 import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 
 import { useCallback, useMemo } from 'preact/hooks';
-import { getActiveLayer, updateActiveLayer, promoteToStrata } from '../../persistence/layerAccessor';
+import { getActiveLayer, updateActiveLayer, promoteToStrata, getActiveBoardLayers, setActiveLayer } from '../../persistence/layerAccessor';
 
 
 /**
@@ -146,6 +146,15 @@ function useDataHandlers({
         const mapHadTiles = currentMapData.layers.some(l => (l.tiles?.length ?? 0) > 0);
         if (currentMapData.layerMode !== 'strata' && !mapHadTiles && newValue.length > 0) {
           nextMapData = promoteToStrata(nextMapData);
+          // Land on the stratum the user was painting into: promotion keeps the
+          // ground layer active, but the just-placed tile's depth says which
+          // band was armed — without this the NEXT stroke writes to the wrong
+          // stratum (depth band and active layer are coupled selectors).
+          const placedDepth = newValue[newValue.length - 1]?.depth ?? 'ground';
+          const target = getActiveBoardLayers(nextMapData).find(l => l.tileRole === placedDepth);
+          if (target != null && target.id !== nextMapData.activeLayerId) {
+            nextMapData = setActiveLayer(nextMapData, target.id);
+          }
         }
 
         return nextMapData;
