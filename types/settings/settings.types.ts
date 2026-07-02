@@ -69,6 +69,34 @@ export interface GridDensityPreset {
 }
 
 // ===========================================
+// Feature Gating & Onboarding
+// ===========================================
+
+/** Individually toggleable feature groups (absence = enabled) */
+export type WindroseFeature =
+  | 'hexMaps'
+  | 'regions'
+  | 'outlines'
+  | 'subMaps'
+  | 'fogOfWar'
+  | 'dungeonGenerator'
+  | 'tiles'
+  | 'walls'
+  | 'notePins'
+  | 'shapeOverlays'
+  | 'measurement'
+  | 'freehand';
+
+/**
+ * First-run onboarding state.
+ * Absent = not yet resolved (detection runs at plugin load).
+ * 'pending'  = fresh install; show survey on first map view.
+ * 'whatsnew' = upgrader; show one-time What's-New notice.
+ * 'done'     = nothing left to show.
+ */
+export type OnboardingState = 'pending' | 'whatsnew' | 'done';
+
+// ===========================================
 // Plugin Settings (Global)
 // ===========================================
 
@@ -156,6 +184,12 @@ export interface PluginSettings {
 
   // Content packs (downloaded supplementary content)
   installedContentPacks?: InstalledPack[];
+
+  // Feature gating (absent key or absent record = feature enabled)
+  features?: Partial<Record<WindroseFeature, boolean>>;
+
+  // First-run onboarding state (absent = not yet resolved)
+  onboardingState?: OnboardingState;
 }
 
 // ===========================================

@@ -190,6 +190,8 @@ export type {
   GridCalculation,
   GridDensityPreset,
   PaletteColor,
+  WindroseFeature,
+  OnboardingState,
   // Object customization (re-exported from objects for convenience)
   ObjectOverride,
   CustomObject,

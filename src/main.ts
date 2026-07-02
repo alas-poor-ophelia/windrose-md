@@ -10,6 +10,7 @@ import * as dungeonGenerator from './generation/dungeonGenerator';
 import * as objectPlacer from './generation/objectPlacer';
 import { registerDeepLinks } from './core/deepLinkRegistration';
 import { setPlugin, clearPlugin, FALLBACK_SETTINGS } from './core/settingsAccessor';
+import { decideOnboardingState } from './core/featureFlags';
 import { WindroseMDSettingsTab } from './settings/WindroseSettingsTab';
 import { VIEW_TYPE_WINDROSE_MAP, WindroseMapView } from './views/WindroseMapView';
 import { recordPerfTelemetry } from './utils/perfTelemetry';
@@ -39,6 +40,8 @@ export default class WindrosePlugin extends Plugin {
   settings: PluginSettings = {} as PluginSettings;
   dataFilePath: string = 'windrose-md-data.json';
   private mountedElements: Set<HTMLElement> = new Set();
+  /** Raw loadData() result, kept for fresh-vs-upgrade onboarding detection. */
+  private rawLoadedSettings: Partial<PluginSettings> | null = null;
 
   async onload(): Promise<void> {
     await this.migrateFromOldPlugin();
@@ -46,6 +49,7 @@ export default class WindrosePlugin extends Plugin {
     this.initMcpNamespace();
     await this.resolveDebugConfig();
     await this.resolveDataFilePath();
+    await this.resolveOnboardingState();
     this.checkForConflicts();
 
     setPlugin(this);
@@ -474,7 +478,22 @@ export default class WindrosePlugin extends Plugin {
 
   async loadSettings(): Promise<void> {
     const loaded = (await this.loadData()) as Partial<PluginSettings> | null;
+    this.rawLoadedSettings = loaded;
     this.settings = { ...FALLBACK_SETTINGS, ...loaded };
+  }
+
+  /**
+   * One-time fresh-vs-upgrade detection for the onboarding survey.
+   * Fresh installs (no settings, no map data) get 'pending' (survey);
+   * everyone else gets 'whatsnew' (one-time notice). Persists via saveData
+   * directly — saveSettings would dispatch the settings-changed event into
+   * a half-initialized workspace.
+   */
+  private async resolveOnboardingState(): Promise<void> {
+    if (this.settings.onboardingState != null) return;
+    const mapDataExists = await this.app.vault.adapter.exists(this.dataFilePath);
+    this.settings.onboardingState = decideOnboardingState(this.rawLoadedSettings, mapDataExists);
+    await this.saveData(this.settings);
   }
 
   async saveSettings(): Promise<void> {
