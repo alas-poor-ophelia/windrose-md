@@ -187,6 +187,10 @@ interface TileAssignmentBase {
   spanH?: number;
   /** Per-tile size multiplier. @default 1.0 */
   scale?: number;
+  /** Region edge softness captured at paint time (fraction of a cell, 0 =
+   *  hard). Wins over tile-level edgeFeather so a placement keeps the blend
+   *  it was painted with, whatever the tile's setting becomes later. */
+  feather?: number;
   /** Opacity 0-1 for scatter brush placements. @default 1.0 */
   opacity?: number;
   /** World-space X coordinate (present when freeform is true) */

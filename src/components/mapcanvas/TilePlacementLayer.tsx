@@ -20,7 +20,7 @@ import { useApp } from '../../context/AppContext';
 import { getActiveLayer, getActiveBoardLayers } from '../../persistence/layerAccessor';
 import { preloadImage } from '../../assets/imageOperations';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
-import { resolveTileRender } from '../../assets/tileRenderResolution';
+import { resolveTileRender, EDGE_BLEND_FEATHER } from '../../assets/tileRenderResolution';
 import { cellsCoveredByAssignment, assignmentsOverlap } from '../../assets/tileFootprint';
 import { getBrushCells, bresenhamLine, floodFillCells } from '../../drawing/tilePlacementOps';
 import { scatterSpacing, makeScatterDrop } from '../../drawing/scatterBrush';
@@ -42,6 +42,8 @@ export interface TilePlacementLayerProps {
   activeSubtool: TileSubtoolId | null;
   tileScale: number;
   brushSize: number;
+  /** Edge blend for region tiles, captured onto each placement at paint time. */
+  paintEdgeBlend: boolean;
   tileDepth: TileLayerRole;
   onTilesChange: (tiles: TileAssignment[], suppressHistory?: boolean) => void;
 }
@@ -57,6 +59,7 @@ const TilePlacementLayer = ({
   activeSubtool,
   tileScale,
   brushSize,
+  paintEdgeBlend,
   tileDepth,
   onTilesChange
 }: TilePlacementLayerProps): VNode | null => {
@@ -102,6 +105,13 @@ const TilePlacementLayer = ({
     const spanH = resolved != null && resolved.spanH > 1 ? resolved.spanH : undefined;
     const hasFootprint = spanW != null || spanH != null;
 
+    // Capture the blend choice onto region placements at paint time — an
+    // explicit 0 pins hard edges even if the tile later gains a metadata
+    // feather, so toggling blend never restyles already-painted cells.
+    const feather = resolved?.renderMode === 'region'
+      ? (paintEdgeBlend ? EDGE_BLEND_FEATHER : (resolved.edgeFeather > 0 ? 0 : undefined))
+      : undefined;
+
     const cells = hasFootprint ? [{ col, row }] : getBrushCells(col, row, brushSize);
 
     for (const cell of cells) {
@@ -120,6 +130,7 @@ const TilePlacementLayer = ({
         scale: tileScale !== 1 ? tileScale : undefined,
         spanW,
         spanH,
+        feather,
       };
 
       // Mark every covered cell painted (stops a drag re-placing the same prop)
@@ -139,7 +150,7 @@ const TilePlacementLayer = ({
       if (isBatchedStroke) strokeTilesRef.current = currentTiles;
       onTilesChange(currentTiles, isBatchedStroke);
     }
-  }, [mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, brushSize, tileDepth, onTilesChange, app]);
+  }, [mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, brushSize, paintEdgeBlend, tileDepth, onTilesChange, app]);
 
   const eraseTilesInBrush = useCallback((col: number, row: number) => {
     if (!mapData) return;
@@ -178,6 +189,14 @@ const TilePlacementLayer = ({
     const ts = mapData.tilesets?.find(t => t.id === selectedTilesetId);
     const entry = ts?.tiles.find(t => t.id === selectedTileId);
     if (entry?.vaultPath != null && entry.vaultPath !== '') void preloadImage(app, entry.vaultPath);
+
+    // Same paint-time blend capture as the grid brush (see placeTilesInBrush).
+    const isGrid = geometry?.type === 'grid';
+    const meta = isGrid && entry?.vaultPath != null && entry.vaultPath !== '' ? getTileMetadataForRender()[entry.vaultPath] : undefined;
+    const resolved = isGrid ? resolveTileRender(undefined, meta, ts) : undefined;
+    const feather = resolved?.renderMode === 'region'
+      ? (paintEdgeBlend ? EDGE_BLEND_FEATHER : (resolved.edgeFeather > 0 ? 0 : undefined))
+      : undefined;
 
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles ?? [];
@@ -226,11 +245,12 @@ const TilePlacementLayer = ({
         placement: targetPlacement === 'fill' ? undefined : targetPlacement,
         depth: tileDepth === 'ground' ? undefined : tileDepth,
         fitMode: tileFitMode === 'auto' ? undefined : tileFitMode,
+        feather,
       });
     }
 
     onTilesChange(newTiles);
-  }, [app, mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileDepth, onTilesChange]);
+  }, [app, mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, paintEdgeBlend, tileDepth, onTilesChange]);
 
   const placeStampAtWorld = useCallback((
     worldX: number,

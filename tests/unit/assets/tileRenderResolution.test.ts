@@ -79,6 +79,15 @@ describe('resolveTileRender', () => {
     expect(r.worldRepeat).toBe(0);
   });
 
+  it('lets a placement-captured feather beat tile and tileset edgeFeather', () => {
+    // Edge blend is captured at paint time: an explicit 0 pins hard edges
+    // even when the tile metadata later gains a feather, and vice versa.
+    const meta: TileMetadataEntry = { edgeFeather: 0.25 };
+    expect(resolveTileRender({ feather: 0 }, meta, undefined).edgeFeather).toBe(0);
+    expect(resolveTileRender({ feather: 0.25 }, undefined, undefined).edgeFeather).toBe(0.25);
+    expect(resolveTileRender(undefined, meta, undefined).edgeFeather).toBe(0.25);
+  });
+
   it('forces a 1x1 span when the resolved render mode is region', () => {
     // Stale import data can carry both a big footprint prediction and a later
     // region classification; the span must never win (each placement would

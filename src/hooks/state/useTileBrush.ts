@@ -58,6 +58,8 @@ interface UseTileBrushResult {
   setBrushSize: (v: number) => void;
   brushSoftness: number;
   setBrushSoftness: (v: number) => void;
+  paintEdgeBlend: boolean;
+  setPaintEdgeBlend: (v: boolean) => void;
   tileDepth: TileLayerRole;
   setTileDepth: (v: TileLayerRole) => void;
   hiddenLayers: Set<TileLayerRole>;
@@ -82,6 +84,9 @@ function useTileBrush(): UseTileBrushResult {
   const [brushSize, setBrushSize] = useState<number>(1);
   // Soft-brush edge softness as a fraction of one cell (0 = hard edge).
   const [brushSoftness, setBrushSoftness] = useState<number>(0.5);
+  // Edge blend for region paint/fill: captured onto each placement at paint
+  // time (TileAssignment.feather), so toggling it never restyles old cells.
+  const [paintEdgeBlend, setPaintEdgeBlend] = useState<boolean>(false);
   const [tileDepth, setTileDepth] = useState<TileLayerRole>('ground');
   const [hiddenLayers, setHiddenLayers] = useState<Set<TileLayerRole>>(new Set());
   const [recentTiles, setRecentTiles] = useState<RecentTile[]>([]);
@@ -137,6 +142,7 @@ function useTileBrush(): UseTileBrushResult {
     tileScale, setTileScale,
     brushSize, setBrushSize,
     brushSoftness, setBrushSoftness,
+    paintEdgeBlend, setPaintEdgeBlend,
     tileDepth, setTileDepth,
     hiddenLayers, toggleHiddenLayer,
     recentTiles,

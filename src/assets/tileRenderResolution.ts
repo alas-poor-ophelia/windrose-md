@@ -23,6 +23,8 @@ export const DEFAULT_WORLD_REPEAT = 4;
  *  Hard by default — the soft terrain brush covers organic edges, so painted
  *  region cells keep crisp corners unless the tile opts into edge blend. */
 export const DEFAULT_EDGE_FEATHER = 0;
+/** Feather stamped onto region placements painted with edge blend enabled. */
+export const EDGE_BLEND_FEATHER = 0.25;
 /** Ratio below which a tile auto-detects as a stamp (natW/tileWidth or natH/cellH). */
 export const DEFAULT_STAMP_THRESHOLD = 0.5;
 /** Minimum stamp scale as a fraction of the cell's smaller screen dimension.
@@ -59,7 +61,7 @@ function clampSpan(n: number | undefined): number {
  * @param tileset    temporary per-tileset fallback (may be undefined)
  */
 export function resolveTileRender(
-  assignment: Pick<TileAssignment, 'spanW' | 'spanH' | 'fitMode'> | undefined,
+  assignment: Pick<TileAssignment, 'spanW' | 'spanH' | 'fitMode' | 'feather'> | undefined,
   meta: TileMetadataEntry | undefined,
   tileset: TilesetDef | undefined,
 ): ResolvedTileRender {
@@ -73,7 +75,7 @@ export function resolveTileRender(
     spanH: renderMode === 'region' ? 1 : clampSpan(assignment?.spanH ?? meta?.defaultSpanH),
     fitMode: assignment?.fitMode ?? tileset?.fitMode,
     worldRepeat: meta?.worldRepeat ?? tileset?.worldRepeat ?? DEFAULT_WORLD_REPEAT,
-    edgeFeather: meta?.edgeFeather ?? tileset?.edgeFeather ?? DEFAULT_EDGE_FEATHER,
+    edgeFeather: assignment?.feather ?? meta?.edgeFeather ?? tileset?.edgeFeather ?? DEFAULT_EDGE_FEATHER,
     stampThreshold: tileset?.stampThreshold ?? DEFAULT_STAMP_THRESHOLD,
     minStampScale: tileset?.minStampScale ?? DEFAULT_MIN_STAMP_SCALE,
   };

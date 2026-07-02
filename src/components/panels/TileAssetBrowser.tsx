@@ -26,7 +26,6 @@ import {
   loadTileMetadata,
   saveTileMetadataDebounced,
   setTileMetadataForRender,
-  setEntryMetadata,
   bulkAddTag,
   bulkToggleStar,
   bulkSetDepthAffinity,
@@ -48,7 +47,7 @@ import { clusterCategories, NOISE, humanizePackName, detectTileGeometry } from '
 import type { FolderInput } from '../../assets/categoryMerge';
 import { predictSpan, DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
 import { predictRenderMode } from '../../assets/renderModePredictor';
-import { MAX_TILE_SPAN, resolveTileRender } from '../../assets/tileRenderResolution';
+import { MAX_TILE_SPAN } from '../../assets/tileRenderResolution';
 import { runDetectionScan } from '../../assets/tileImageScan';
 
 // ===========================================
@@ -322,6 +321,10 @@ interface TileAssetBrowserProps {
   /** Soft-brush edge softness as a fraction of one cell (0 = hard). */
   brushSoftness?: number;
   onBrushSoftnessChange?: (softness: number) => void;
+  /** Edge blend for region paint/fill — captured onto each placement at paint
+   *  time (never rewrites tile metadata or already-painted cells). */
+  paintEdgeBlend?: boolean;
+  onPaintEdgeBlendChange?: (on: boolean) => void;
   getCachedImage?: (path: string) => HTMLImageElement | null;
   tilesetOverrides?: Record<string, TilesetOverrides>;
   onTilesetOverrideChange?: (tilesetId: string, overrides: TilesetOverrides) => void;
@@ -411,6 +414,8 @@ const TileAssetBrowser = memo(({
   onBrushSizeChange,
   brushSoftness,
   onBrushSoftnessChange,
+  paintEdgeBlend,
+  onPaintEdgeBlendChange,
   getCachedImage,
   tilesetOverrides,
   onTilesetOverrideChange,
@@ -1102,23 +1107,6 @@ const TileAssetBrowser = memo(({
     );
   }, [activeSubtool, selectedForm, onSubtoolChange]);
 
-  // Edge blend for region tiles: painted region cells are hard-edged by
-  // default; this toggles the tile's edgeFeather metadata (0.25 = blend,
-  // 0 = explicit hard so a tileset-level feather cannot resurrect it).
-  const selectedEdgeBlendOn = useMemo((): boolean => {
-    if (selectedTile == null) return false;
-    const ts = tilesets.find(t => t.id === selectedTilesetId);
-    return resolveTileRender(undefined, tileMetadata[selectedTile.vaultPath], ts).edgeFeather > 0;
-  }, [selectedTile, selectedTilesetId, tilesets, tileMetadata]);
-
-  const toggleEdgeBlend = useCallback(() => {
-    if (selectedTile == null) return;
-    const updated = setEntryMetadata(tileMetadata, selectedTile.vaultPath, {
-      edgeFeather: selectedEdgeBlendOn ? 0 : 0.25,
-    });
-    setTileMetadata(updated);
-    saveTileMetadataDebounced(app, updated);
-  }, [selectedTile, selectedEdgeBlendOn, tileMetadata, app]);
 
   // Resolve recent tiles across all tilesets
   const recentTileEntries = useMemo((): TileEntry[] => {
@@ -2449,11 +2437,11 @@ const TileAssetBrowser = memo(({
                   <Icon icon="lucide-flip-horizontal" size={14} />
                 </button>
                 <span className="sep" />
-                {selectedForm === 'region' && (
+                {selectedForm === 'region' && onPaintEdgeBlendChange != null && (
                   <button
-                    className={`windrose-tb-iconbtn ${selectedEdgeBlendOn ? 'active' : ''}`}
-                    onClick={toggleEdgeBlend}
-                    title={selectedEdgeBlendOn ? 'Edge blend: ON (soft region edges)' : 'Edge blend: OFF (hard region edges)'}
+                    className={`windrose-tb-iconbtn ${paintEdgeBlend === true ? 'active' : ''}`}
+                    onClick={() => onPaintEdgeBlendChange(paintEdgeBlend !== true)}
+                    title={paintEdgeBlend === true ? 'Edge blend: ON — new cells paint with soft edges' : 'Edge blend: OFF — new cells paint with hard edges'}
                   >
                     <Icon icon="lucide-droplet" size={14} />
                   </button>

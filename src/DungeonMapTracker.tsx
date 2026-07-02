@@ -360,6 +360,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     tileScale, setTileScale,
     brushSize, setBrushSize,
     brushSoftness, setBrushSoftness,
+    paintEdgeBlend, setPaintEdgeBlend,
     tileDepth, setTileDepth,
     hiddenLayers, toggleHiddenLayer,
     recentTiles,
@@ -1109,6 +1110,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 activeSubtool={tileSubtool}
                 tileScale={tileScale}
                 brushSize={brushSize}
+                paintEdgeBlend={paintEdgeBlend}
                 tileDepth={tileDepth}
                 onTilesChange={handleTilesChange}
               />
@@ -1269,6 +1271,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onBrushSizeChange={setBrushSize}
                 brushSoftness={brushSoftness}
                 onBrushSoftnessChange={setBrushSoftness}
+                paintEdgeBlend={paintEdgeBlend}
+                onPaintEdgeBlendChange={setPaintEdgeBlend}
                 getCachedImage={getCachedImage}
                 tilesetOverrides={mapData?.tilesetOverrides}
                 onTilesetOverrideChange={handleTilesetOverrideChange}
@@ -1461,6 +1465,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onBrushSizeChange={setBrushSize}
                 brushSoftness={brushSoftness}
                 onBrushSoftnessChange={setBrushSoftness}
+                paintEdgeBlend={paintEdgeBlend}
+                onPaintEdgeBlendChange={setPaintEdgeBlend}
                 getCachedImage={getCachedImage}
                 tilesetOverrides={mapData?.tilesetOverrides}
                 onTilesetOverrideChange={handleTilesetOverrideChange}
@@ -1527,6 +1533,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     onBrushSizeChange={setBrushSize}
                     brushSoftness={brushSoftness}
                     onBrushSoftnessChange={setBrushSoftness}
+                    paintEdgeBlend={paintEdgeBlend}
+                    onPaintEdgeBlendChange={setPaintEdgeBlend}
                     getCachedImage={getCachedImage}
                     tilesetOverrides={mapData?.tilesetOverrides}
                     onTilesetOverrideChange={handleTilesetOverrideChange}
