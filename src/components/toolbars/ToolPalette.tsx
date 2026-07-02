@@ -9,6 +9,7 @@ import type { HexColor } from '#types/core/common.types';
 import type { MapType } from '#types/core/map.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { CustomColor } from '#types/core/common.types';
+import type { WindroseFeature } from '#types/settings/settings.types';
 import type { ColorOpacityOverrides } from '../shared/ColorPicker.tsx';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
@@ -16,6 +17,7 @@ import { DEFAULT_COLOR } from '../../drawing/colorOperations';
 import { ColorPicker } from '../shared/ColorPicker';
 import { CornerBrackets } from '../shared/CornerBrackets';
 import { getSettings } from '../../core/settingsAccessor';
+import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
 import { Icon } from '../shared/Icon';
 
 
@@ -35,6 +37,7 @@ interface SubToolDef {
   actionId?: string;
   gridOnly?: boolean;
   hexOnly?: boolean;
+  feature?: WindroseFeature;
 }
 
 /** Tool group with sub-tools */
@@ -45,6 +48,7 @@ interface ToolGroup {
   subTools: SubToolDef[];
   gridOnly?: boolean;
   hexOnly?: boolean;
+  feature?: WindroseFeature;
 }
 
 /** Simple tool (no sub-menu) */
@@ -56,6 +60,7 @@ interface SimpleTool {
   actionId?: string;
   gridOnly?: boolean;
   hexOnly?: boolean;
+  feature?: WindroseFeature;
 }
 
 /** Sub-tool selections state */
@@ -193,6 +198,7 @@ const ToolButtonWithSubMenu = ({
 }: ToolButtonWithSubMenuProps): VNode | null => {
   const longPressTimer = useRef<number | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const featureFlags = useFeatureFlags();
   const LONG_PRESS_DURATION = 300;
 
   // In the vertical rail the flyout opens `position: fixed` to escape the rail's
@@ -206,12 +212,14 @@ const ToolButtonWithSubMenu = ({
     setFixedAnchor({ left: r.right - off.left, top: r.top + r.height / 2 - off.top });
   }, [vertical, isSubMenuOpen]);
 
-  // Hide entire group if it's map-type-restricted
+  // Hide entire group if it's map-type-restricted or feature-disabled
   if (toolGroup.hexOnly === true && mapType !== 'hex') return null;
+  if (toolGroup.feature != null && !featureFlags[toolGroup.feature]) return null;
 
   const visibleSubTools = toolGroup.subTools.filter(st =>
     (mapType !== 'hex' || st.gridOnly !== true) &&
-    (mapType !== 'grid' || st.hexOnly !== true)
+    (mapType !== 'grid' || st.hexOnly !== true) &&
+    (st.feature == null || featureFlags[st.feature])
   );
 
   if (visibleSubTools.length === 0) return null;
@@ -315,7 +323,7 @@ const toolGroups: ToolGroup[] = [
       { id: 'draw', label: 'Paint Cells', title: 'Draw (fill cells)', icon: 'lucide-paintbrush' },
       { id: 'segmentDraw', label: 'Paint Segments', title: 'Paint Segments (partial cells)', icon: 'lucide-triangle', gridOnly: true },
       { id: 'edgeDraw', label: 'Paint Edges', title: 'Paint Edges (grid lines)', icon: 'lucide-pencil-ruler', gridOnly: true },
-      { id: 'freehand', label: 'Freehand Draw', title: 'Freehand Draw', icon: 'lucide-pen-tool', shortcut: 'f', actionId: 'freehandTool' }
+      { id: 'freehand', label: 'Freehand Draw', title: 'Freehand Draw', icon: 'lucide-pen-tool', shortcut: 'f', actionId: 'freehandTool', feature: 'freehand' }
     ]
   },
   {
@@ -339,6 +347,7 @@ const toolGroups: ToolGroup[] = [
   {
     id: 'region',
     hexOnly: true,
+    feature: 'regions',
     subTools: [
       { id: 'regionPaint', label: 'Paint Region', title: 'Paint hexes into a region', icon: 'lucide-map' },
       { id: 'regionBoundary', label: 'Draw Boundary', title: 'Draw region boundary polygon', icon: 'lucide-pentagon' }
@@ -349,14 +358,32 @@ const toolGroups: ToolGroup[] = [
 const simpleTools: SimpleTool[] = [
   { id: 'edgeLine', title: 'Paint Line (click two points)', icon: 'lucide-git-commit-horizontal', gridOnly: true },
   { id: 'addObject', title: 'Add Object (select from sidebar)', icon: 'lucide-map-pin-plus' },
-  { id: 'addNote', title: 'Place Note Pin', icon: 'lucide-pin', shortcut: 'n', actionId: 'notePinTool' },
+  { id: 'addNote', title: 'Place Note Pin', icon: 'lucide-pin', shortcut: 'n', actionId: 'notePinTool', feature: 'notePins' },
   { id: 'addText', title: 'Add Text Label', icon: 'lucide-type' },
-  { id: 'outline', title: 'Draw Outline', icon: 'lucide-spline', hexOnly: true },
-  { id: 'shape', title: 'Place Shape Overlay', icon: 'lucide-shapes' },
-  { id: 'measure', title: 'Measure Distance', icon: 'lucide-ruler', shortcut: 'm', actionId: 'measureTool' },
-  { id: 'tilePaint', title: 'Place Tile (select from tile browser)', icon: 'lucide-image-plus' },
-  { id: 'wall', title: 'Draw Wall/Path (select from Walls tab)', icon: 'lucide-brick-wall' }
+  { id: 'outline', title: 'Draw Outline', icon: 'lucide-spline', hexOnly: true, feature: 'outlines' },
+  { id: 'shape', title: 'Place Shape Overlay', icon: 'lucide-shapes', feature: 'shapeOverlays' },
+  { id: 'measure', title: 'Measure Distance', icon: 'lucide-ruler', shortcut: 'm', actionId: 'measureTool', feature: 'measurement' },
+  { id: 'tilePaint', title: 'Place Tile (select from tile browser)', icon: 'lucide-image-plus', feature: 'tiles' },
+  { id: 'wall', title: 'Draw Wall/Path (select from Walls tab)', icon: 'lucide-brick-wall', feature: 'walls' }
 ];
+
+// ToolId → gating feature, derived from the tool config (used to guard
+// keyboard-shortcut activation of hidden tools).
+const TOOL_FEATURE_MAP: Partial<Record<ToolId, WindroseFeature>> = {};
+for (const group of toolGroups) {
+  for (const sub of group.subTools) {
+    const feature = sub.feature ?? group.feature;
+    if (feature != null) TOOL_FEATURE_MAP[sub.id] = feature;
+  }
+}
+for (const tool of simpleTools) {
+  if (tool.feature != null) TOOL_FEATURE_MAP[tool.id] = tool.feature;
+}
+
+function isToolIdEnabled(toolId: ToolId, flags: Record<WindroseFeature, boolean>): boolean {
+  const feature = TOOL_FEATURE_MAP[toolId];
+  return feature == null || flags[feature];
+}
 
 // Derive DEFAULT shortcut map from tool config: key -> { group } or { tool }
 const DEFAULT_SHORTCUT_MAP: Record<string, { group?: keyof SubToolSelections; tool?: ToolId }> = {};
@@ -430,6 +457,7 @@ const ToolPalette = ({
 
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const [subToolSelections, setSubToolSelections] = useState<SubToolSelections>(INITIAL_SUB_TOOL_SELECTIONS);
+  const featureFlags = useFeatureFlags();
 
   useEffect((): (() => void) | undefined => {
     if (!isFocused) return undefined;
@@ -444,12 +472,14 @@ const ToolPalette = ({
       if (shortcuts != null) {
         for (const group of toolGroups) {
           if (group.actionId != null && group.actionId !== '' && shortcuts[group.actionId]?.toLowerCase() === key) {
+            if (!isToolIdEnabled(subToolSelections[group.id], featureFlags)) return;
             onToolChange(subToolSelections[group.id]);
             e.preventDefault();
             return;
           }
           for (const sub of group.subTools) {
             if (sub.actionId != null && sub.actionId !== '' && shortcuts[sub.actionId]?.toLowerCase() === key) {
+              if (!isToolIdEnabled(sub.id, featureFlags)) return;
               onToolChange(sub.id);
               e.preventDefault();
               return;
@@ -458,6 +488,7 @@ const ToolPalette = ({
         }
         for (const tool of simpleTools) {
           if (tool.actionId != null && tool.actionId !== '' && shortcuts[tool.actionId]?.toLowerCase() === key) {
+            if (!isToolIdEnabled(tool.id, featureFlags)) return;
             onToolChange(tool.id);
             e.preventDefault();
             return;
@@ -470,17 +501,19 @@ const ToolPalette = ({
       const toolId = shortcut.group != null
         ? subToolSelections[shortcut.group]
         : shortcut.tool ?? currentTool;
+      if (!isToolIdEnabled(toolId, featureFlags)) return;
       onToolChange(toolId);
       e.preventDefault();
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onToolChange, isFocused, subToolSelections, currentTool]);
+  }, [onToolChange, isFocused, subToolSelections, currentTool, featureFlags]);
 
   const visibleSimpleTools = simpleTools.filter(tool =>
     (mapType !== 'hex' || tool.gridOnly !== true) &&
-    (mapType !== 'grid' || tool.hexOnly !== true)
+    (mapType !== 'grid' || tool.hexOnly !== true) &&
+    (tool.feature == null || featureFlags[tool.feature])
   );
 
   const handleSubMenuOpen = (groupId: string): void => {
