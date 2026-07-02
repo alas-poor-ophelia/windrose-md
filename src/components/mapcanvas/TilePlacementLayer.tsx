@@ -17,9 +17,10 @@ import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
 import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
 import { useApp } from '../../context/AppContext';
-import { getActiveLayer } from '../../persistence/layerAccessor';
+import { getActiveLayer, getActiveBoardLayers } from '../../persistence/layerAccessor';
 import { preloadImage } from '../../assets/imageOperations';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
+import { resolveTileRender } from '../../assets/tileRenderResolution';
 import { cellsCoveredByAssignment, assignmentsOverlap } from '../../assets/tileFootprint';
 import { getBrushCells, bresenhamLine, floodFillCells } from '../../drawing/tilePlacementOps';
 import { scatterSpacing, makeScatterDrop } from '../../drawing/scatterBrush';
@@ -68,7 +69,11 @@ const TilePlacementLayer = ({
 
   const paintedInStrokeRef = useRef<Set<string>>(new Set());
   const isDraggingRef = useRef(false);
-  const strokeInitialTilesRef = useRef<TileAssignment[] | null>(null);
+  // Live tile array for the current stroke; null when no stroke is active.
+  // Handlers read/write this instead of the mapData closure so a stroke stays
+  // self-consistent even when pointer events outrun Preact's re-render (the
+  // stale closure would otherwise commit pre-stroke tiles, erasing the stroke).
+  const strokeTilesRef = useRef<TileAssignment[] | null>(null);
   const lastGridPosRef = useRef<{ col: number; row: number } | null>(null);
   const scatterLastDropRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -80,19 +85,21 @@ const TilePlacementLayer = ({
     const entry = ts?.tiles.find(t => t.id === selectedTileId);
     if (entry?.vaultPath != null && entry.vaultPath !== '') void preloadImage(app, entry.vaultPath);
 
-    const activeLayer = getActiveLayer(mapData);
-    let currentTiles = activeLayer.tiles ?? [];
+    let currentTiles = strokeTilesRef.current ?? getActiveLayer(mapData).tiles ?? [];
     let changed = false;
 
     const targetPlacement = tileLayer === 'base' ? 'fill' : 'overlay';
 
     // Snapshot the tile's detected footprint (grid only) onto the placement so it
     // stays stable if the metadata later changes. A prop with span > 1 ignores
-    // brush size and places a single footprint at the anchor.
+    // brush size and places a single footprint at the anchor. Resolution goes
+    // through resolveTileRender so region tiles never carry a span (a seamless
+    // texture's footprint would make each placement swallow its neighbours).
     const isGrid = geometry?.type === 'grid';
     const meta = isGrid && entry?.vaultPath != null && entry.vaultPath !== '' ? getTileMetadataForRender()[entry.vaultPath] : undefined;
-    const spanW = meta?.defaultSpanW != null && meta.defaultSpanW > 1 ? meta.defaultSpanW : undefined;
-    const spanH = meta?.defaultSpanH != null && meta.defaultSpanH > 1 ? meta.defaultSpanH : undefined;
+    const resolved = isGrid ? resolveTileRender(undefined, meta, ts) : undefined;
+    const spanW = resolved != null && resolved.spanW > 1 ? resolved.spanW : undefined;
+    const spanH = resolved != null && resolved.spanH > 1 ? resolved.spanH : undefined;
     const hasFootprint = spanW != null || spanH != null;
 
     const cells = hasFootprint ? [{ col, row }] : getBrushCells(col, row, brushSize);
@@ -128,7 +135,8 @@ const TilePlacementLayer = ({
     }
 
     if (changed) {
-      const isBatchedStroke = strokeInitialTilesRef.current !== null;
+      const isBatchedStroke = strokeTilesRef.current !== null;
+      if (isBatchedStroke) strokeTilesRef.current = currentTiles;
       onTilesChange(currentTiles, isBatchedStroke);
     }
   }, [mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, brushSize, tileDepth, onTilesChange, app]);
@@ -136,8 +144,7 @@ const TilePlacementLayer = ({
   const eraseTilesInBrush = useCallback((col: number, row: number) => {
     if (!mapData) return;
 
-    const activeLayer = getActiveLayer(mapData);
-    const currentTiles = activeLayer.tiles ?? [];
+    const currentTiles = strokeTilesRef.current ?? getActiveLayer(mapData).tiles ?? [];
     const cells = getBrushCells(col, row, brushSize);
     const keysToErase = new Set<string>();
 
@@ -159,7 +166,8 @@ const TilePlacementLayer = ({
     );
 
     if (newTiles.length !== currentTiles.length) {
-      const isBatchedStroke = strokeInitialTilesRef.current !== null;
+      const isBatchedStroke = strokeTilesRef.current !== null;
+      if (isBatchedStroke) strokeTilesRef.current = newTiles;
       onTilesChange(newTiles, isBatchedStroke);
     }
   }, [mapData, brushSize, onTilesChange]);
@@ -174,9 +182,28 @@ const TilePlacementLayer = ({
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles ?? [];
 
+    // Structure-stratum tiles on the active board bound the fill even from
+    // other strata (a wall footprint stops a ground-layer flood). The active
+    // layer is excluded — its own tiles already act as region boundaries.
+    const blockedCells = new Set<string>();
+    for (const layer of getActiveBoardLayers(mapData)) {
+      if (layer.id === activeLayer.id || layer.tileRole !== 'structure') continue;
+      for (const t of layer.tiles ?? []) {
+        if (t.freeform === true) continue;
+        for (const c of cellsCoveredByAssignment(t)) blockedCells.add(`${c.col},${c.row}`);
+      }
+    }
+
     const mapWidth = mapData.dimensions?.width ?? 50;
     const mapHeight = mapData.dimensions?.height ?? 50;
-    const fillCells = floodFillCells(currentTiles, col, row, mapWidth, mapHeight);
+    const fillCells = floodFillCells(currentTiles, col, row, mapWidth, mapHeight, {
+      blockedCells,
+      // Bounded geometries (hex) clamp the fill to their real bounds, which
+      // the rectangular width/height margin cannot express.
+      inBounds: geometry != null && geometry.isBounded()
+        ? (c, r) => geometry.isWithinBounds(c, r)
+        : undefined,
+    });
     if (fillCells.length === 0) return;
 
     const targetPlacement = tileLayer === 'base' ? 'fill' : 'overlay';
@@ -203,7 +230,7 @@ const TilePlacementLayer = ({
     }
 
     onTilesChange(newTiles);
-  }, [app, mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileDepth, onTilesChange]);
+  }, [app, mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileDepth, onTilesChange]);
 
   const placeStampAtWorld = useCallback((
     worldX: number,
@@ -218,8 +245,7 @@ const TilePlacementLayer = ({
     const entry = ts?.tiles.find(t => t.id === selectedTileId);
     if (entry?.vaultPath != null && entry.vaultPath !== '') void preloadImage(app, entry.vaultPath);
 
-    const activeLayer = getActiveLayer(mapData);
-    const currentTiles = activeLayer.tiles ?? [];
+    const currentTiles = strokeTilesRef.current ?? getActiveLayer(mapData).tiles ?? [];
 
     const rotation = overrides?.rotation ?? tileRotation;
     const flipH = overrides?.flipH ?? tileFlipH;
@@ -240,8 +266,10 @@ const TilePlacementLayer = ({
     };
 
     // Scatter strokes batch into one history entry (same pattern as the grid brush).
-    const isBatchedStroke = strokeInitialTilesRef.current !== null;
-    onTilesChange([...currentTiles, newTile], isBatchedStroke);
+    const isBatchedStroke = strokeTilesRef.current !== null;
+    const nextTiles = [...currentTiles, newTile];
+    if (isBatchedStroke) strokeTilesRef.current = nextTiles;
+    onTilesChange(nextTiles, isBatchedStroke);
   }, [app, mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileFitMode, tileScale, onTilesChange]);
 
   // Scatter: drop a jittered stamp when the pointer has traveled far enough
@@ -297,7 +325,7 @@ const TilePlacementLayer = ({
           isDraggingRef.current = true;
           scatterLastDropRef.current = null;
           const layer = getActiveLayer(mapData);
-          strokeInitialTilesRef.current = [...(layer.tiles ?? [])];
+          strokeTilesRef.current = [...(layer.tiles ?? [])];
           scatterAdvance(worldCoords.worldX, worldCoords.worldY, coords.x, coords.y);
           return;
         }
@@ -317,7 +345,7 @@ const TilePlacementLayer = ({
     lastGridPosRef.current = { col: coords.x, row: coords.y };
 
     const activeLayer = getActiveLayer(mapData);
-    strokeInitialTilesRef.current = [...(activeLayer.tiles ?? [])];
+    strokeTilesRef.current = [...(activeLayer.tiles ?? [])];
 
     if (hasTileSelected) {
       placeTilesInBrush(coords.x, coords.y);
@@ -361,16 +389,18 @@ const TilePlacementLayer = ({
   }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, activeSubtool, placeTilesInBrush, eraseTilesInBrush, scatterAdvance]);
 
   const handlePointerUp = useCallback(() => {
-    if (strokeInitialTilesRef.current !== null && mapData) {
-      const activeLayer = getActiveLayer(mapData);
-      onTilesChange(activeLayer.tiles ?? [], false);
-      strokeInitialTilesRef.current = null;
+    if (strokeTilesRef.current !== null) {
+      // Commit the history entry from the stroke ref, NOT the mapData closure:
+      // pointerup can fire before Preact re-renders from the stroke's state
+      // updates, and the stale closure would commit pre-stroke tiles.
+      onTilesChange(strokeTilesRef.current, false);
+      strokeTilesRef.current = null;
     }
     isDraggingRef.current = false;
     paintedInStrokeRef.current = new Set();
     lastGridPosRef.current = null;
     scatterLastDropRef.current = null;
-  }, [mapData, onTilesChange]);
+  }, [onTilesChange]);
 
   const tileHandlersRef = useRef<Record<string, unknown> | null>(null);
   tileHandlersRef.current = isTileTool

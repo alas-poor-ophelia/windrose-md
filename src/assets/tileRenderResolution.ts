@@ -19,8 +19,10 @@ import type { TileAssignment, TileMetadataEntry, TilesetDef } from '#types/tiles
 
 /** Cells per full texture span for region (seamless terrain) fills. */
 export const DEFAULT_WORLD_REPEAT = 4;
-/** Region-fill edge feather as a fraction of one cell (0 = hard edges). */
-export const DEFAULT_EDGE_FEATHER = 0.25;
+/** Region-fill edge feather as a fraction of one cell (0 = hard edges).
+ *  Hard by default — the soft terrain brush covers organic edges, so painted
+ *  region cells keep crisp corners unless the tile opts into edge blend. */
+export const DEFAULT_EDGE_FEATHER = 0;
 /** Ratio below which a tile auto-detects as a stamp (natW/tileWidth or natH/cellH). */
 export const DEFAULT_STAMP_THRESHOLD = 0.5;
 /** Minimum stamp scale as a fraction of the cell's smaller screen dimension.
@@ -61,10 +63,14 @@ export function resolveTileRender(
   meta: TileMetadataEntry | undefined,
   tileset: TilesetDef | undefined,
 ): ResolvedTileRender {
+  const renderMode = meta?.renderMode ?? tileset?.renderMode ?? 'cell';
   return {
-    renderMode: meta?.renderMode ?? tileset?.renderMode ?? 'cell',
-    spanW: clampSpan(assignment?.spanW ?? meta?.defaultSpanW),
-    spanH: clampSpan(assignment?.spanH ?? meta?.defaultSpanH),
+    renderMode,
+    // Region tiles pattern-fill per anchor cell; a footprint span on them never
+    // affects rendering but poisons overlap-removal and erase hit-tests (each
+    // placement would swallow its neighbours), so region forces a 1x1 span.
+    spanW: renderMode === 'region' ? 1 : clampSpan(assignment?.spanW ?? meta?.defaultSpanW),
+    spanH: renderMode === 'region' ? 1 : clampSpan(assignment?.spanH ?? meta?.defaultSpanH),
     fitMode: assignment?.fitMode ?? tileset?.fitMode,
     worldRepeat: meta?.worldRepeat ?? tileset?.worldRepeat ?? DEFAULT_WORLD_REPEAT,
     edgeFeather: meta?.edgeFeather ?? tileset?.edgeFeather ?? DEFAULT_EDGE_FEATHER,

@@ -79,6 +79,26 @@ describe('resolveTileRender', () => {
     expect(r.worldRepeat).toBe(0);
   });
 
+  it('forces a 1x1 span when the resolved render mode is region', () => {
+    // Stale import data can carry both a big footprint prediction and a later
+    // region classification; the span must never win (each placement would
+    // swallow its neighbours via overlap-removal).
+    const meta: TileMetadataEntry = { renderMode: 'region', defaultSpanW: 12, defaultSpanH: 12 };
+    const r = resolveTileRender(undefined, meta, undefined);
+    expect(r.spanW).toBe(1);
+    expect(r.spanH).toBe(1);
+
+    // Same when region comes from the tileset fallback tier and the span from metadata.
+    const ts = makeTileset({ renderMode: 'region' });
+    const r2 = resolveTileRender(undefined, { defaultSpanW: 8 }, ts);
+    expect(r2.spanW).toBe(1);
+
+    // Even a per-placement span override loses to region mode.
+    const r3 = resolveTileRender({ spanW: 4, spanH: 4 }, { renderMode: 'region' }, undefined);
+    expect(r3.spanW).toBe(1);
+    expect(r3.spanH).toBe(1);
+  });
+
   it('clamps spans to >= 1 and <= MAX_TILE_SPAN, rounding fractions', () => {
     expect(resolveTileRender({ spanW: 0, spanH: -5 }, undefined, undefined).spanW).toBe(1);
     expect(resolveTileRender({ spanW: 0, spanH: -5 }, undefined, undefined).spanH).toBe(1);

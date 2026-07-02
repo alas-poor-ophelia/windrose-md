@@ -236,6 +236,30 @@ describe("tilePlacementOps", () => {
       expect(cells.length).toBeLessThanOrEqual(FLOOD_FILL_MAX);
       expect(cells.length).toBe(FLOOD_FILL_MAX);
     });
+
+    it("blockedCells stop expansion like walls, even on empty ground", () => {
+      // Vertical blocked line at col 1, full height of the -2..4 bounds range,
+      // splits the empty area; fill from the left never reaches col > 1.
+      const blocked = new Set<string>();
+      for (let r = -2; r <= 4; r++) blocked.add(`1,${r}`);
+      const cells = floodFillCells([], 0, 0, 2, 2, { blockedCells: blocked });
+      expect(cells.length).toBeGreaterThan(0);
+      expect(cells.every(c => c.col < 1)).toBe(true);
+    });
+
+    it("a blocked start cell fills nothing", () => {
+      const cells = floodFillCells([], 0, 0, 2, 2, { blockedCells: new Set(["0,0"]) });
+      expect(cells).toHaveLength(0);
+    });
+
+    it("inBounds predicate clamps the fill tighter than the rect bounds", () => {
+      // Diamond |col|+|row| <= 2 inside generous rect bounds.
+      const cells = floodFillCells([], 0, 0, 50, 50, {
+        inBounds: (c, r) => Math.abs(c) + Math.abs(r) <= 2,
+      });
+      expect(cells).toHaveLength(13); // 1 + 4 + 8 cells of the diamond
+      expect(cells.every(c => Math.abs(c.col) + Math.abs(c.row) <= 2)).toBe(true);
+    });
   });
 });
 

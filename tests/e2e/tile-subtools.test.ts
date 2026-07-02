@@ -81,9 +81,10 @@ interface SavedTile {
 /** Dispatch a mousedown, wait a beat, then mouseup on the visible map canvas
  *  at a fraction of its size (same pattern as wall-drawing.test.ts —
  *  overlapping panels can occlude the canvas, so viewport clicks are
- *  unreliable). The pause between down and up matters: real input always has
- *  a frame between them, and the paint stroke's mouseup commit reads state
- *  that a same-tick synthetic pair would still see un-rendered. */
+ *  unreliable). A short pause between down and up mimics real input; the
+ *  paint stroke no longer depends on a re-render between the two (the stroke
+ *  commits from a synchronous ref), so this is pacing, not a correctness
+ *  workaround. */
 async function canvasClick(page: any, fx: number, fy: number, shift = false): Promise<void> {
   const dispatch = async (type: string): Promise<void> => {
     await page.evaluate(({ type, fx, fy, shift }: { type: string; fx: number; fy: number; shift: boolean }) => {
@@ -101,7 +102,7 @@ async function canvasClick(page: any, fx: number, fy: number, shift = false): Pr
     }, { type, fx, fy, shift });
   };
   await dispatch("mousedown");
-  await page.waitForTimeout(120);
+  await page.waitForTimeout(30);
   await dispatch("mouseup");
   await page.waitForTimeout(250);
 }

@@ -38,18 +38,29 @@ function bresenhamLine(x0: number, y0: number, x1: number, y1: number): Array<{ 
 
 const FLOOD_FILL_MAX = 10000;
 
+interface FloodFillOptions {
+  /** Cell keys ("col,row") that block expansion regardless of tile match —
+   *  e.g. structure-stratum tiles bounding a ground-layer terrain fill. */
+  blockedCells?: ReadonlySet<string>;
+  /** Extra bounds predicate; cells failing it stop expansion (e.g. hex map
+   *  bounds, which the rectangular width/height clamp cannot express). */
+  inBounds?: (col: number, row: number) => boolean;
+}
+
 /**
  * Contiguous-region fill: clicking a cell occupied by tile T collects the
  * connected T-region; clicking empty collects the connected empty area bounded
  * by any snapped tile footprint (freeform stamps do not block). 4-neighbour
- * expansion, clamped to 3x map bounds and FLOOD_FILL_MAX cells.
+ * expansion, clamped to 3x map bounds and FLOOD_FILL_MAX cells, plus any
+ * caller-supplied blocked cells / bounds predicate.
  */
 function floodFillCells(
   tiles: TileAssignment[],
   startCol: number,
   startRow: number,
   mapWidth: number,
-  mapHeight: number
+  mapHeight: number,
+  options?: FloodFillOptions
 ): Array<{ col: number; row: number }> {
   const targetKey = tiles.find(t => t.freeform !== true && assignmentCoversCell(t, startCol, startRow));
   const targetId = targetKey ? `${targetKey.tilesetId}:${targetKey.tileId}` : '';
@@ -63,6 +74,8 @@ function floodFillCells(
     for (const c of cellsCoveredByAssignment(t)) tileMap.set(`${c.col},${c.row}`, id);
   }
 
+  const blocked = options?.blockedCells;
+  const inBounds = options?.inBounds;
   const visited = new Set<string>();
   const result: Array<{ col: number; row: number }> = [];
   const stack = [{ col: startCol, row: startRow }];
@@ -75,6 +88,8 @@ function floodFillCells(
     visited.add(key);
 
     if (col < -mapWidth || col > mapWidth * 2 || row < -mapHeight || row > mapHeight * 2) continue;
+    if (blocked?.has(key) === true) continue;
+    if (inBounds != null && !inBounds(col, row)) continue;
 
     const cellId = tileMap.get(key) ?? '';
     if (cellId !== targetId) continue;
@@ -86,3 +101,4 @@ function floodFillCells(
 }
 
 export { getBrushCells, bresenhamLine, floodFillCells, FLOOD_FILL_MAX };
+export type { FloodFillOptions };
