@@ -84,8 +84,7 @@ export type WindroseFeature =
   | 'walls'
   | 'notePins'
   | 'shapeOverlays'
-  | 'measurement'
-  | 'freehand';
+  | 'measurement';
 
 /**
  * First-run onboarding state.

@@ -61,10 +61,8 @@ describe('mapAnswersToFeatures', () => {
     expectOff(mapAnswersToFeatures({ mapKinds: ['grid', 'hex'] }), []);
   });
 
-  it('clean & simple style turns off tiles, walls, and shape overlays — but never freehand', () => {
-    const flags = mapAnswersToFeatures({ visualStyle: ['simple'] });
-    expectOff(flags, ['tiles', 'walls', 'shapeOverlays']);
-    expect(flags.freehand).toBe(true);
+  it('clean & simple style turns off tiles, walls, and shape overlays', () => {
+    expectOff(mapAnswersToFeatures({ visualStyle: ['simple'] }), ['tiles', 'walls', 'shapeOverlays']);
   });
 
   it('rich & illustrated style disables nothing', () => {
@@ -123,16 +121,14 @@ describe('mapAnswersToFeatures', () => {
     );
   });
 
-  it('never presets freehand or notePins off under any answer combination', () => {
+  it('never presets notePins off under any answer combination', () => {
     const combos = [
       { mapKinds: ['grid'], visualStyle: ['simple'], runGames: ['no'], dungeonGen: ['no'] },
       { mapKinds: ['hex'], visualStyle: ['simple'], runGames: ['no'], dungeonGen: ['no'] },
       { mapKinds: [], visualStyle: ['simple'], runGames: ['no'], dungeonGen: ['no'] },
     ];
     for (const answers of combos) {
-      const flags = mapAnswersToFeatures(answers);
-      expect(flags.freehand).toBe(true);
-      expect(flags.notePins).toBe(true);
+      expect(mapAnswersToFeatures(answers).notePins).toBe(true);
     }
   });
 });

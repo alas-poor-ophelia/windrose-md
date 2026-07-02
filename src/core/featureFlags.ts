@@ -38,7 +38,6 @@ const FEATURE_DEFINITIONS: FeatureDefinition[] = [
   { id: 'notePins', label: 'Note pins', desc: 'Pin notes to map locations and deep-link back to them.' },
   { id: 'shapeOverlays', label: 'Shape overlays', desc: 'Place resizable shape overlays (circles, cones, areas) on the map.' },
   { id: 'measurement', label: 'Distance measurement', desc: 'Measure distances in cells or map units.' },
-  { id: 'freehand', label: 'Freehand drawing', desc: 'Sketch freehand curves on top of the grid.' },
 ];
 
 // ===========================================

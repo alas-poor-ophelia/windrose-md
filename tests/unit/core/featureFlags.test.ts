@@ -28,14 +28,18 @@ afterEach(() => {
 });
 
 describe('FEATURE_DEFINITIONS', () => {
-  it('defines 12 unique features with labels and descriptions', () => {
-    expect(FEATURE_DEFINITIONS).toHaveLength(12);
+  it('defines 11 unique features with labels and descriptions', () => {
+    expect(FEATURE_DEFINITIONS).toHaveLength(11);
     const ids = FEATURE_DEFINITIONS.map(d => d.id);
-    expect(new Set(ids).size).toBe(12);
+    expect(new Set(ids).size).toBe(11);
     for (const def of FEATURE_DEFINITIONS) {
       expect(def.label.length).toBeGreaterThan(0);
       expect(def.desc.length).toBeGreaterThan(0);
     }
+  });
+
+  it('does not gate core drawing tools (freehand is not a feature)', () => {
+    expect(FEATURE_DEFINITIONS.map(d => d.id as string)).not.toContain('freehand');
   });
 });
 
@@ -71,7 +75,7 @@ describe('getFeatureFlags', () => {
     expect(Object.keys(flags)).toHaveLength(FEATURE_DEFINITIONS.length);
     expect(flags.walls).toBe(false);
     expect(flags.tiles).toBe(true);
-    expect(flags.freehand).toBe(true);
+    expect(flags.notePins).toBe(true);
   });
 });
 

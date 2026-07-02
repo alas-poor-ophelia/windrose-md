@@ -86,8 +86,8 @@ function allFeaturesEnabled(): Record<WindroseFeature, boolean> {
  * Starts all-true; answers only disable. Unanswered questions (or an empty
  * multi-select) disable nothing — skipping mid-survey stays safe.
  *
- * `freehand` and `notePins` are part of the base kit: never preset off,
- * only toggleable in the review step.
+ * `notePins` is part of the base kit: never preset off, only toggleable in
+ * the review step. (Freehand is core and not a feature toggle at all.)
  */
 function mapAnswersToFeatures(answers: OnboardingAnswers): Record<WindroseFeature, boolean> {
   const flags = allFeaturesEnabled();
