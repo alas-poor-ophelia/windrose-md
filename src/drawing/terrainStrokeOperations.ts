@@ -21,6 +21,8 @@ interface CreateTerrainStrokeOptions {
 	tilesetId: string;
 	tileId: string;
 	depth?: TileLayerRole;
+	/** Edge softness (fraction of a cell, 0 = hard); captured from brush softness. */
+	feather?: number;
 	opacity?: number;
 }
 
@@ -33,6 +35,7 @@ function createTerrainStroke(opts: CreateTerrainStrokeOptions): TerrainStroke {
 		tilesetId: opts.tilesetId,
 		tileId: opts.tileId,
 		...(opts.depth != null && opts.depth !== 'ground' ? { depth: opts.depth } : {}),
+		...(opts.feather != null ? { feather: opts.feather } : {}),
 		...(opts.opacity != null && opts.opacity !== 1 ? { opacity: opts.opacity } : {}),
 	};
 }

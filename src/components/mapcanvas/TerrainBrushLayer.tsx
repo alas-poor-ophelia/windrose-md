@@ -44,6 +44,8 @@ export interface TerrainBrushLayerProps {
   selectedTileId: string | null;
   /** Shared brush size (cells of diameter): radiusWorld = brushSize × cellSize / 2. */
   brushSize: number;
+  /** Edge softness captured onto each stroke (fraction of a cell, 0 = hard). */
+  brushSoftness: number;
   tileDepth: TileLayerRole;
   onTerrainStrokesChange: (strokes: TerrainStroke[], suppressHistory?: boolean) => void;
 }
@@ -54,6 +56,7 @@ const TerrainBrushLayer = ({
   selectedTilesetId,
   selectedTileId,
   brushSize,
+  brushSoftness,
   tileDepth,
   onTerrainStrokesChange,
 }: TerrainBrushLayerProps): VNode | null => {
@@ -251,9 +254,10 @@ const TerrainBrushLayer = ({
       tilesetId: selectedTilesetId,
       tileId: selectedTileId,
       depth: tileDepth,
+      feather: brushSoftness,
     });
     onTerrainStrokesChange([...getStrokes(), stroke], false);
-  }, [mapData, selectedTilesetId, selectedTileId, radiusWorld, tileDepth, getStrokes, onTerrainStrokesChange]);
+  }, [mapData, selectedTilesetId, selectedTileId, radiusWorld, tileDepth, brushSoftness, getStrokes, onTerrainStrokesChange]);
 
   // Drop transient state when the brush disarms.
   useEffect(() => {

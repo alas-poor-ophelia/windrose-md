@@ -6,10 +6,12 @@
  * as a round-cap swept mask filled with the same world-anchored pattern as
  * region cell fills, so strokes and cells of one texture merge seamlessly.
  *
- * worldRepeat/edgeFeather are deliberately NOT persisted per stroke — they
- * resolve at render time from the tile's metadata (tileRenderResolution), so a
- * stroke always shares pattern phase and feather with cell fills of the same
- * texture.
+ * worldRepeat is deliberately NOT persisted per stroke — it resolves at render
+ * time from the tile's metadata (tileRenderResolution), so a stroke always
+ * shares pattern phase with cell fills of the same texture. Edge softness IS
+ * per stroke (`feather`, captured from the brush softness at paint time);
+ * strokes whose effective feather matches a cell fill's still merge into the
+ * same render group and blend seamlessly.
  */
 
 import type { TileLayerRole } from '../tiles/tile.types';
@@ -37,6 +39,10 @@ export interface TerrainStroke {
   tileId: string;
   /** Tile depth tier the stroke renders in. @default 'ground' */
   depth?: TileLayerRole;
+  /** Edge softness as a fraction of one cell (same semantics as edgeFeather;
+   *  0 = hard). Captured from the brush softness at paint time; absent =
+   *  resolve from the tile like cell fills. */
+  feather?: number;
   /** Stroke opacity 0-1. Reserved; no UI yet. @default 1 */
   opacity?: number;
 }

@@ -358,7 +358,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     selectedTileForm, setSelectedTileForm,
     tileSubtool, setTileSubtool,
     tileScale, setTileScale,
-    brushSize,
+    brushSize, setBrushSize,
+    brushSoftness, setBrushSoftness,
     tileDepth, setTileDepth,
     hiddenLayers, toggleHiddenLayer,
     recentTiles,
@@ -1119,6 +1120,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 selectedTilesetId={selectedTilesetId}
                 selectedTileId={selectedTileId}
                 brushSize={brushSize}
+                brushSoftness={brushSoftness}
                 tileDepth={tileDepth}
                 onTerrainStrokesChange={handleTerrainStrokesChange}
               />
@@ -1263,6 +1265,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onSubtoolChange={setTileSubtool}
                 tileScale={tileScale}
                 onTileScaleChange={setTileScale}
+                brushSize={brushSize}
+                onBrushSizeChange={setBrushSize}
+                brushSoftness={brushSoftness}
+                onBrushSoftnessChange={setBrushSoftness}
                 getCachedImage={getCachedImage}
                 tilesetOverrides={mapData?.tilesetOverrides}
                 onTilesetOverrideChange={handleTilesetOverrideChange}
@@ -1451,6 +1457,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onSubtoolChange={setTileSubtool}
                 tileScale={tileScale}
                 onTileScaleChange={setTileScale}
+                brushSize={brushSize}
+                onBrushSizeChange={setBrushSize}
+                brushSoftness={brushSoftness}
+                onBrushSoftnessChange={setBrushSoftness}
                 getCachedImage={getCachedImage}
                 tilesetOverrides={mapData?.tilesetOverrides}
                 onTilesetOverrideChange={handleTilesetOverrideChange}
@@ -1513,6 +1523,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     onSubtoolChange={setTileSubtool}
                     tileScale={tileScale}
                     onTileScaleChange={setTileScale}
+                    brushSize={brushSize}
+                    onBrushSizeChange={setBrushSize}
+                    brushSoftness={brushSoftness}
+                    onBrushSoftnessChange={setBrushSoftness}
                     getCachedImage={getCachedImage}
                     tilesetOverrides={mapData?.tilesetOverrides}
                     onTilesetOverrideChange={handleTilesetOverrideChange}

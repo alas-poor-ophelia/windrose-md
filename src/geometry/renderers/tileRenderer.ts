@@ -561,7 +561,10 @@ function renderTiles(
         // (the tileset tier is temporary, removed once the legacy override UI dies).
         const resolved = resolveTileRender(t, metaStore[lookup.entry.vaultPath], lookup.tileset);
         if (resolved.renderMode === 'region') {
-          const key = t.tilesetId + ':' + t.tileId;
+          // Feather participates in the group key: the mask blur is one pass
+          // per group, so entries can only share a group when they share a
+          // softness. Same feather → cells and strokes still merge seamlessly.
+          const key = t.tilesetId + ':' + t.tileId + ':f' + resolved.edgeFeather;
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- regionByDepth is pre-seeded for every DEPTH_ORDER key including 'ground'
           const groups = regionByDepth.get(depth) ?? regionByDepth.get('ground')!;
           let grp = groups.get(key);
@@ -600,7 +603,11 @@ function renderTiles(
       const lookup = entryMap.get(s.tilesetId + ':' + s.tileId);
       if (lookup == null) continue;
       const resolved = resolveTileRender(undefined, metaStore[lookup.entry.vaultPath], lookup.tileset);
-      const key = s.tilesetId + ':' + s.tileId;
+      // Per-stroke softness wins over the tile default; feather is part of
+      // the group key (one mask blur per group), so a stroke matching a cell
+      // fill's feather still merges into that group and blends seamlessly.
+      const feather = s.feather ?? resolved.edgeFeather;
+      const key = s.tilesetId + ':' + s.tileId + ':f' + feather;
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- regionByDepth is pre-seeded for every DEPTH_ORDER key including 'ground'
       const groups = regionByDepth.get(depth) ?? regionByDepth.get('ground')!;
       let grp = groups.get(key);
@@ -611,7 +618,7 @@ function renderTiles(
           cells: [],
           strokes: [],
           worldRepeat: resolved.worldRepeat,
-          edgeFeather: resolved.edgeFeather,
+          edgeFeather: feather,
         };
         groups.set(key, grp);
       }

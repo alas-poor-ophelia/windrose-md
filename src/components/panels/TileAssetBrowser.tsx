@@ -26,6 +26,7 @@ import {
   loadTileMetadata,
   saveTileMetadataDebounced,
   setTileMetadataForRender,
+  setEntryMetadata,
   bulkAddTag,
   bulkToggleStar,
   bulkSetDepthAffinity,
@@ -47,7 +48,7 @@ import { clusterCategories, NOISE, humanizePackName, detectTileGeometry } from '
 import type { FolderInput } from '../../assets/categoryMerge';
 import { predictSpan, DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
 import { predictRenderMode } from '../../assets/renderModePredictor';
-import { MAX_TILE_SPAN } from '../../assets/tileRenderResolution';
+import { MAX_TILE_SPAN, resolveTileRender } from '../../assets/tileRenderResolution';
 import { runDetectionScan } from '../../assets/tileImageScan';
 
 // ===========================================
@@ -314,6 +315,13 @@ interface TileAssetBrowserProps {
   onSubtoolChange: (id: TileSubtoolId) => void;
   tileScale: number;
   onTileScaleChange: (scale: number) => void;
+  /** Soft-brush size in cells of diameter; footer shows size/softness sliders
+   *  when the 'brush' subtool is armed (controls hidden when unwired). */
+  brushSize?: number;
+  onBrushSizeChange?: (size: number) => void;
+  /** Soft-brush edge softness as a fraction of one cell (0 = hard). */
+  brushSoftness?: number;
+  onBrushSoftnessChange?: (softness: number) => void;
   getCachedImage?: (path: string) => HTMLImageElement | null;
   tilesetOverrides?: Record<string, TilesetOverrides>;
   onTilesetOverrideChange?: (tilesetId: string, overrides: TilesetOverrides) => void;
@@ -399,6 +407,10 @@ const TileAssetBrowser = memo(({
   onSubtoolChange,
   tileScale,
   onTileScaleChange,
+  brushSize,
+  onBrushSizeChange,
+  brushSoftness,
+  onBrushSoftnessChange,
   getCachedImage,
   tilesetOverrides,
   onTilesetOverrideChange,
@@ -1081,6 +1093,7 @@ const TileAssetBrowser = memo(({
 
   // Footer stamp button: mirrors the subtool state for modes with no ribbon
   // (floating/compact) — toggles between 'stamp' and the form's default.
+  // Full mode has the ribbon, so its footer no longer shows this mirror.
   const toggleStampSubtool = useCallback(() => {
     onSubtoolChange(
       activeSubtool === 'stamp'
@@ -1088,6 +1101,24 @@ const TileAssetBrowser = memo(({
         : 'stamp'
     );
   }, [activeSubtool, selectedForm, onSubtoolChange]);
+
+  // Edge blend for region tiles: painted region cells are hard-edged by
+  // default; this toggles the tile's edgeFeather metadata (0.25 = blend,
+  // 0 = explicit hard so a tileset-level feather cannot resurrect it).
+  const selectedEdgeBlendOn = useMemo((): boolean => {
+    if (selectedTile == null) return false;
+    const ts = tilesets.find(t => t.id === selectedTilesetId);
+    return resolveTileRender(undefined, tileMetadata[selectedTile.vaultPath], ts).edgeFeather > 0;
+  }, [selectedTile, selectedTilesetId, tilesets, tileMetadata]);
+
+  const toggleEdgeBlend = useCallback(() => {
+    if (selectedTile == null) return;
+    const updated = setEntryMetadata(tileMetadata, selectedTile.vaultPath, {
+      edgeFeather: selectedEdgeBlendOn ? 0 : 0.25,
+    });
+    setTileMetadata(updated);
+    saveTileMetadataDebounced(app, updated);
+  }, [selectedTile, selectedEdgeBlendOn, tileMetadata, app]);
 
   // Resolve recent tiles across all tilesets
   const recentTileEntries = useMemo((): TileEntry[] => {
@@ -2308,17 +2339,35 @@ const TileAssetBrowser = memo(({
               <Icon icon="lucide-stamp" size={12} />
             </button>
             <span className="sep" />
-            <span className="label">Scale</span>
-            <input
-              className="windrose-tb-range"
-              type="range"
-              min="0.25"
-              max="3"
-              step="0.25"
-              value={tileScale}
-              onInput={(e: Event) => onTileScaleChange(parseFloat((e.target as HTMLInputElement).value))}
-              style={{ flex: 1, minWidth: 0 }}
-            />
+            {activeSubtool === 'brush' && onBrushSizeChange != null ? (
+              <>
+                <span className="label">Size</span>
+                <input
+                  className="windrose-tb-range"
+                  type="range"
+                  min="0.5"
+                  max="8"
+                  step="0.5"
+                  value={brushSize ?? 1}
+                  onInput={(e: Event) => onBrushSizeChange(parseFloat((e.target as HTMLInputElement).value))}
+                  style={{ flex: 1, minWidth: 0 }}
+                />
+              </>
+            ) : (
+              <>
+                <span className="label">Scale</span>
+                <input
+                  className="windrose-tb-range"
+                  type="range"
+                  min="0.25"
+                  max="3"
+                  step="0.25"
+                  value={tileScale}
+                  onInput={(e: Event) => onTileScaleChange(parseFloat((e.target as HTMLInputElement).value))}
+                  style={{ flex: 1, minWidth: 0 }}
+                />
+              </>
+            )}
             <button
               className="windrose-tb-iconbtn ghost"
               title="Clear brush"
@@ -2349,53 +2398,92 @@ const TileAssetBrowser = memo(({
               <Icon icon="lucide-x" size={14} />
             </button>
           </div>
+          {/* Brushbar: context-sensitive per armed subtool. Brush swaps the
+              transform controls for size/softness; the ribbon owns subtool
+              selection in full mode, so no stamp mirror here. */}
           <div className="windrose-tb-brushbar">
-            <button className="windrose-tb-iconbtn" title="Rotate counter-clockwise" onClick={handleRotateCCW}>
-              <Icon icon="lucide-rotate-ccw" size={14} />
-            </button>
-            <span className="windrose-tb-cap" style={{ minWidth: 28, textAlign: 'center' }}>{rotation}°</span>
-            <button className="windrose-tb-iconbtn" title="Rotate clockwise" onClick={handleRotateCW}>
-              <Icon icon="lucide-rotate-cw" size={14} />
-            </button>
-            <button
-              className={`windrose-tb-iconbtn ${flipH ? 'active' : ''}`}
-              onClick={() => onFlipChange(!flipH)}
-              title="Flip horizontal"
-            >
-              <Icon icon="lucide-flip-horizontal" size={14} />
-            </button>
-            <span className="sep" />
-            <button
-              className={`windrose-tb-iconbtn ${activeSubtool === 'stamp' ? 'active' : ''}`}
-              onClick={toggleStampSubtool}
-              title={activeSubtool === 'stamp' ? 'Stamp mode: ON' : 'Stamp mode: OFF'}
-            >
-              <Icon icon="lucide-stamp" size={14} />
-            </button>
-            <button
-              className="windrose-tb-iconbtn"
-              onClick={() => {
-                const modes: Array<'auto' | 'fill' | 'contain'> = ['auto', 'fill', 'contain'];
-                const idx = modes.indexOf(tileFitMode);
-                onTileFitModeChange(modes[(idx + 1) % modes.length]);
-              }}
-              title={`Fit: ${tileFitMode}`}
-            >
-              <Icon icon={tileFitMode === 'contain' ? 'lucide-minimize-2' : tileFitMode === 'fill' ? 'lucide-maximize-2' : 'lucide-scan'} size={14} />
-            </button>
-            <span className="sep" />
-            <span className="label">Scale</span>
-            <input
-              className="windrose-tb-range"
-              type="range"
-              min="0.25"
-              max="3"
-              step="0.25"
-              value={tileScale}
-              onInput={(e: Event) => onTileScaleChange(parseFloat((e.target as HTMLInputElement).value))}
-              style={{ flex: 1, minWidth: 60 }}
-            />
-            <span className="windrose-tb-cap" style={{ minWidth: 24, textAlign: 'right' }}>{tileScale}×</span>
+            {activeSubtool === 'brush' && onBrushSizeChange != null ? (
+              <>
+                <span className="label">Size</span>
+                <input
+                  className="windrose-tb-range"
+                  type="range"
+                  min="0.5"
+                  max="8"
+                  step="0.5"
+                  value={brushSize ?? 1}
+                  onInput={(e: Event) => onBrushSizeChange(parseFloat((e.target as HTMLInputElement).value))}
+                  style={{ flex: 1, minWidth: 40 }}
+                />
+                <span className="windrose-tb-cap" style={{ minWidth: 30, textAlign: 'right' }}>{brushSize ?? 1}c</span>
+                <span className="sep" />
+                <span className="label">Soft</span>
+                <input
+                  className="windrose-tb-range"
+                  type="range"
+                  min="0"
+                  max="1.5"
+                  step="0.05"
+                  value={brushSoftness ?? 0.5}
+                  onInput={(e: Event) => onBrushSoftnessChange?.(parseFloat((e.target as HTMLInputElement).value))}
+                  style={{ flex: 1, minWidth: 40 }}
+                />
+                <span className="windrose-tb-cap" style={{ minWidth: 26, textAlign: 'right' }}>
+                  {Math.round((brushSoftness ?? 0.5) * 100)}
+                </span>
+              </>
+            ) : (
+              <>
+                <button className="windrose-tb-iconbtn" title="Rotate counter-clockwise" onClick={handleRotateCCW}>
+                  <Icon icon="lucide-rotate-ccw" size={14} />
+                </button>
+                <span className="windrose-tb-cap" style={{ minWidth: 28, textAlign: 'center' }}>{rotation}°</span>
+                <button className="windrose-tb-iconbtn" title="Rotate clockwise" onClick={handleRotateCW}>
+                  <Icon icon="lucide-rotate-cw" size={14} />
+                </button>
+                <button
+                  className={`windrose-tb-iconbtn ${flipH ? 'active' : ''}`}
+                  onClick={() => onFlipChange(!flipH)}
+                  title="Flip horizontal"
+                >
+                  <Icon icon="lucide-flip-horizontal" size={14} />
+                </button>
+                <span className="sep" />
+                {selectedForm === 'region' && (
+                  <button
+                    className={`windrose-tb-iconbtn ${selectedEdgeBlendOn ? 'active' : ''}`}
+                    onClick={toggleEdgeBlend}
+                    title={selectedEdgeBlendOn ? 'Edge blend: ON (soft region edges)' : 'Edge blend: OFF (hard region edges)'}
+                  >
+                    <Icon icon="lucide-droplet" size={14} />
+                  </button>
+                )}
+                <button
+                  className="windrose-tb-iconbtn"
+                  onClick={() => {
+                    const modes: Array<'auto' | 'fill' | 'contain'> = ['auto', 'fill', 'contain'];
+                    const idx = modes.indexOf(tileFitMode);
+                    onTileFitModeChange(modes[(idx + 1) % modes.length]);
+                  }}
+                  title={`Fit: ${tileFitMode}`}
+                >
+                  <Icon icon={tileFitMode === 'contain' ? 'lucide-minimize-2' : tileFitMode === 'fill' ? 'lucide-maximize-2' : 'lucide-scan'} size={14} />
+                </button>
+                <span className="sep" />
+                <span className="label">Scale</span>
+                <input
+                  className="windrose-tb-range"
+                  type="range"
+                  min="0.25"
+                  max="3"
+                  step="0.25"
+                  value={tileScale}
+                  onInput={(e: Event) => onTileScaleChange(parseFloat((e.target as HTMLInputElement).value))}
+                  style={{ flex: 1, minWidth: 60 }}
+                />
+                <span className="windrose-tb-cap" style={{ minWidth: 24, textAlign: 'right' }}>{tileScale}×</span>
+              </>
+            )}
           </div>
         </div>
       ))}
