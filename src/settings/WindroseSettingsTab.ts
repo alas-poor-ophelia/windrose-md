@@ -8,6 +8,8 @@ import { TabRenderColorsMethods } from './tabs/TabRenderColors';
 import { TabRenderObjectsMethods } from './tabs/TabRenderObjects';
 import { TabRenderTilesetsMethods } from './tabs/TabRenderTilesets';
 import { TabRenderKeyboardShortcutsMethods } from './tabs/TabRenderKeyboardShortcuts';
+import { TabRenderFeaturesMethods } from './tabs/TabRenderFeatures';
+import { isFeatureEnabled } from '../core/featureFlags';
 
 interface WindrosePlugin extends Plugin {
   settings: PluginSettings;
@@ -39,6 +41,7 @@ interface WindroseMDSettingsTab {
   setupDragDropForList(listEl: HTMLElement, items: unknown[], onReorder: () => void): void;
   renderTilesetFoldersContent(el: HTMLElement): void;
   renderKeyboardShortcutsContent(el: HTMLElement): void;
+  renderFeaturesContent(el: HTMLElement): void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see interface note above (deferred to Settings API migration)
@@ -161,27 +164,38 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     this.renderSearchBar(containerEl);
     this.renderImportBanner(containerEl);
 
-    this.createCollapsibleSection(containerEl, 'Hex Map Settings',
-      (el) => this.renderHexSettingsContent(el),
-      { open: openSections.has('Hex Map Settings') });
+    this.createCollapsibleSection(containerEl, 'Features',
+      (el) => this.renderFeaturesContent(el),
+      { open: openSections.has('Features') });
+    if (isFeatureEnabled('hexMaps')) {
+      this.createCollapsibleSection(containerEl, 'Hex Map Settings',
+        (el) => this.renderHexSettingsContent(el),
+        { open: openSections.has('Hex Map Settings') });
+    }
     this.createCollapsibleSection(containerEl, 'Color Settings',
       (el) => this.renderColorSettingsContent(el),
       { open: openSections.has('Color Settings') });
     this.createCollapsibleSection(containerEl, 'Color Palette',
       (el) => this.renderColorPaletteContent(el),
       { open: openSections.has('Color Palette') });
-    this.createCollapsibleSection(containerEl, 'Fog of War',
-      (el) => this.renderFogOfWarSettingsContent(el),
-      { open: openSections.has('Fog of War') });
+    if (isFeatureEnabled('fogOfWar')) {
+      this.createCollapsibleSection(containerEl, 'Fog of War',
+        (el) => this.renderFogOfWarSettingsContent(el),
+        { open: openSections.has('Fog of War') });
+    }
     this.createCollapsibleSection(containerEl, 'Map Behavior',
       (el) => this.renderMapBehaviorSettingsContent(el),
       { open: openSections.has('Map Behavior') });
-    this.createCollapsibleSection(containerEl, 'Distance Measurement',
-      (el) => this.renderDistanceMeasurementSettingsContent(el),
-      { open: openSections.has('Distance Measurement') });
-    this.createCollapsibleSection(containerEl, 'Tile Sets',
-      (el) => this.renderTilesetFoldersContent(el),
-      { open: openSections.has('Tile Sets') });
+    if (isFeatureEnabled('measurement')) {
+      this.createCollapsibleSection(containerEl, 'Distance Measurement',
+        (el) => this.renderDistanceMeasurementSettingsContent(el),
+        { open: openSections.has('Distance Measurement') });
+    }
+    if (isFeatureEnabled('tiles')) {
+      this.createCollapsibleSection(containerEl, 'Tile Sets',
+        (el) => this.renderTilesetFoldersContent(el),
+        { open: openSections.has('Tile Sets') });
+    }
     this.createCollapsibleSection(containerEl, 'Object Types',
       (el) => this.renderObjectTypesContent(el),
       { open: openSections.has('Object Types') });
@@ -206,5 +220,6 @@ Object.assign(WindroseMDSettingsTab.prototype, TabRenderColorsMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderObjectsMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderTilesetsMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderKeyboardShortcutsMethods);
+Object.assign(WindroseMDSettingsTab.prototype, TabRenderFeaturesMethods);
 
 export { WindroseMDSettingsTab };

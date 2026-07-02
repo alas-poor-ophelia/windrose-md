@@ -67,6 +67,9 @@ interface SettingsTabThis {
   renderObjectSetsBlock(containerEl: HTMLElement): void;
   setupDragDropForList(listEl: HTMLElement, items: unknown[], onReorder: () => void): void;
 
+  // Features mixin
+  renderFeaturesContent(el: HTMLElement): void;
+
   // Tilesets mixin
   renderTilesetFoldersContent(el: HTMLElement): void;
 
