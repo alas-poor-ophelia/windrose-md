@@ -6,7 +6,7 @@ import type {
   MapType,
 } from '#types/index';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
-import type { ResolvedTheme } from '#types/settings/settings.types';
+import type { ResolvedTheme, OnboardingState } from '#types/settings/settings.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { Cell } from '#types/core/cell.types';
 import type { WallToolSurface } from '#types/core/wallpath.types';
@@ -37,6 +37,7 @@ import { isFeatureEnabled } from './core/featureFlags';
 import { DEFAULTS } from './core/dmtConstants';
 import { getColorByHex, isDefaultColor, DEFAULT_COLOR } from './drawing/colorOperations';
 import { ImageAlignmentMode } from './components/overlays/ImageAlignmentMode';
+import { OnboardingSurvey } from './components/overlays/OnboardingSurvey';
 import { useAlignmentMode } from './hooks/interactions/useAlignmentMode';
 import { ModalPortal } from './components/modals/ModalPortal';
 import { getActiveLayer, getLayerById, getActiveBoardLayers, addBoard, setActiveBoard, removeBoard, setLayerMode, addLayer, updateActiveLayer } from './persistence/layerAccessor';
@@ -148,6 +149,18 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
   // Global feature gating (identity-stable; only flips when a flag changes).
   const featureFlags = useFeatureFlags();
+
+  // First-run onboarding: 'pending' shows the survey overlay, 'whatsnew' the
+  // upgrader notice. Completion saves settings → the settings-changed event
+  // re-reads state here and dismisses every mounted instance.
+  const [onboarding, setOnboarding] = useState<OnboardingState>(
+    () => getSettings().onboardingState ?? 'done'
+  );
+  useEffect(() => {
+    const handler = (): void => { setOnboarding(getSettings().onboardingState ?? 'done'); };
+    window.addEventListener('windrose-settings-changed', handler);
+    return () => window.removeEventListener('windrose-settings-changed', handler);
+  }, []);
 
   // Tile drawer pane: Tiles vs Objects (Objects sidebar folded into the drawer).
   const [tilePane, setTilePane] = useState<'tiles' | 'objects'>(
@@ -1783,6 +1796,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             </ModalPortal>
           );
         })()}
+
+        {/* First-run onboarding survey — overlays the whole block; covers
+            both code-block and full-pane paths (same component). */}
+        {onboarding === 'pending' && <OnboardingSurvey />}
       </div>
     </>
   );

@@ -1,0 +1,272 @@
+// First-run onboarding survey overlay + What's-New notice.
+// Mirrors the import-wizard stepper idiom (that one is scoped under
+// .windrose-add-tiles-modal, so these get their own onb-prefixed classes).
+
+.windrose-onb-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60; // above toolbars/panels within the block, below native modals
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--background-primary) 94%, transparent);
+  backdrop-filter: blur(2px);
+  opacity: 1;
+  transition: opacity 0.24s ease;
+
+  &.closing {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+.windrose-onb-card {
+  width: min(440px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  display: flex;
+  flex-direction: column;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-l);
+  padding: 16px 18px;
+  overflow: hidden;
+}
+
+.windrose-onb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  .windrose-onb-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-normal);
+  }
+
+  .windrose-onb-skip {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 4px 8px;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text-normal);
+    }
+  }
+}
+
+.windrose-onb-steps {
+  display: flex;
+  align-items: center;
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.windrose-onb-step {
+  .windrose-onb-num {
+    width: 19px;
+    height: 19px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10.5px;
+    font-weight: 700;
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-muted);
+  }
+
+  &.on .windrose-onb-num {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+  }
+
+  &.done .windrose-onb-num {
+    color: var(--interactive-accent);
+    border-color: var(--interactive-accent);
+    background: transparent;
+  }
+}
+
+.windrose-onb-sep {
+  flex: 1;
+  height: 1px;
+  background: var(--background-modifier-border);
+  margin: 0 8px;
+  min-width: 8px;
+}
+
+.windrose-onb-body {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+  padding: 12px 0 4px;
+}
+
+.windrose-onb-prompt {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-normal);
+  margin-bottom: 4px;
+}
+
+.windrose-onb-hint {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.windrose-onb-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.windrose-onb-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  cursor: pointer;
+  box-shadow: none;
+  height: auto;
+
+  &:hover {
+    border-color: var(--interactive-accent);
+  }
+
+  &.selected {
+    border-color: var(--interactive-accent);
+    background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-secondary));
+  }
+
+  .windrose-onb-option-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-normal);
+  }
+
+  .windrose-onb-option-desc {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+}
+
+.windrose-onb-features {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.windrose-onb-feature-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--background-secondary);
+  }
+
+  input[type='checkbox'] {
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+
+  .windrose-onb-feature-text {
+    display: flex;
+    flex-direction: column;
+
+    .windrose-onb-feature-label {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-normal);
+    }
+
+    .windrose-onb-feature-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
+  }
+}
+
+.windrose-onb-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+  margin-top: 10px;
+
+  .windrose-onb-foot-spacer {
+    flex: 1;
+  }
+
+  .windrose-onb-btn {
+    padding: 6px 16px;
+    font-size: 12.5px;
+  }
+}
+
+// ---- What's-New notice (upgraders) ----
+
+.windrose-whatsnew {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  margin: 4px 0;
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--interactive-accent);
+  border-radius: 6px;
+  background: var(--background-secondary);
+  font-size: 12px;
+  color: var(--text-normal);
+
+  .windrose-whatsnew-text {
+    flex: 1;
+    line-height: 1.4;
+
+    b {
+      color: var(--text-normal);
+    }
+  }
+
+  .windrose-whatsnew-btn {
+    padding: 4px 10px;
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+
+  .windrose-whatsnew-dismiss {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 2px;
+    color: var(--text-muted);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text-normal);
+    }
+  }
+}
