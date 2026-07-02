@@ -265,12 +265,16 @@ test("Selecting a wall strip switches the active tool to wall", async ({ page })
   await structureSeg.click();
   await page.waitForTimeout(300);
 
-  // Selecting a walls/paths strip arms the WALL tool (not tilePaint); the
-  // wall floating bar appearing is how wall-drawing.test.ts asserts tool state
+  // Selecting a walls/paths strip arms the WALL tool (not tilePaint). The tool's
+  // controls live in the drawer footer (the old floating bar was removed), so the
+  // grid-snap toggle appearing there is how we assert the wall tool is active.
   await selectTileByFilename(page, "Test_Wall_01.png");
 
-  const bar = page.locator(".windrose-wall-bar");
-  await bar.waitFor({ state: "visible", timeout: 5000 });
+  const footer = page.locator(".windrose-tb-footer");
+  await footer.waitFor({ state: "visible", timeout: 5000 });
+  const snap = footer.locator('button[title*="Grid snap"]');
+  await snap.waitFor({ state: "visible", timeout: 5000 });
+  expect(await snap.isVisible()).toBe(true);
 
   expect(errors).toHaveLength(0);
 });
