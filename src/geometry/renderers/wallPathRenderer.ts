@@ -151,6 +151,60 @@ function endAngle(points: Array<[number, number]>): number {
   return Math.atan2(points[n - 1][1] - points[n - 2][1], points[n - 1][0] - points[n - 2][0]);
 }
 
+/** Wrap an angle difference into (-PI, PI]. */
+function wrapAngle(a: number): number {
+  while (a <= -Math.PI) a += 2 * Math.PI;
+  while (a > Math.PI) a -= 2 * Math.PI;
+  return a;
+}
+
+/** Turn angle (radians) below which joint overlap is invisible and the miter
+ *  clip is skipped — protects arc subdivisions (many tiny turns) from paying
+ *  a clip per sub-segment. */
+const MITER_MIN_TURN = 0.12;
+/** Max seam offset in half-widths before the miter clamps (~bevel), so
+ *  near-U-turns don't spike the seam to infinity. */
+const MITER_LIMIT = 3;
+
+/**
+ * Clip polygon (in a segment's local frame: x along the segment from 0 to
+ * segLen, y across it) that trims the segment's texture rectangle at the
+ * angle bisector of each shared joint. Two segments clipped at their common
+ * bisector tile a turn exactly — no overlap wedge on the inside, no gap on
+ * the outside — which is what makes 45° walls render contiguously.
+ *
+ * turnIn/turnOut are the signed turns at the segment's start/end joints
+ * (0 or below MITER_MIN_TURN = no joint / straight enough to skip). Returns
+ * null when neither joint needs clipping. Exported for tests.
+ */
+function miterClipPoly(
+  turnIn: number,
+  turnOut: number,
+  segLen: number,
+  halfW: number,
+  overlap: number,
+): Array<[number, number]> | null {
+  const clipIn = Math.abs(turnIn) > MITER_MIN_TURN;
+  const clipOut = Math.abs(turnOut) > MITER_MIN_TURN;
+  if (!clipIn && !clipOut) return null;
+
+  const maxOff = MITER_LIMIT * halfW;
+  const clampOff = (o: number): number => Math.max(-maxOff, Math.min(maxOff, o));
+  // Seam through the joint along the bisector of the two segment directions:
+  // its x-offset at height y is y·tan(turn/2) (start) / -y·tan(turn/2) (end).
+  const kIn = clipIn ? Math.tan(turnIn / 2) : 0;
+  const kOut = clipOut ? Math.tan(turnOut / 2) : 0;
+  const pad = overlap + 1; // unclipped edges sit past the drawn rect
+  const xStart = (y: number): number => (clipIn ? clampOff(y * kIn) : -pad);
+  const xEnd = (y: number): number => segLen + (clipOut ? clampOff(-y * kOut) : pad);
+  return [
+    [xStart(-halfW), -halfW],
+    [xEnd(-halfW), -halfW],
+    [xEnd(halfW), halfW],
+    [xStart(halfW), halfW],
+  ];
+}
+
 // ===========================================
 // Asset resolution
 // ===========================================
@@ -202,19 +256,50 @@ function drawStripAlong(
   const widthWorld = srcH * worldScale;
   const halfW = widthWorld / 2;
 
-  // Texture u-coordinate in source px, advancing with arc length.
-  let u = 0;
-
+  // Non-degenerate sub-segments with tangent angles, so joint turns compare
+  // true neighbours even when the polyline repeats a point.
+  const segs: Array<{ x0: number; y0: number; angle: number; len: number }> = [];
   for (let i = 1; i < points.length; i++) {
     const [x0, y0] = points[i - 1];
     const [x1, y1] = points[i];
-    const segLen = Math.hypot(x1 - x0, y1 - y0);
-    if (segLen <= 0) continue;
+    const len = Math.hypot(x1 - x0, y1 - y0);
+    if (len <= 0) continue;
+    segs.push({ x0, y0, angle: Math.atan2(y1 - y0, x1 - x0), len });
+  }
+  if (segs.length === 0) return;
 
-    const angle = Math.atan2(y1 - y0, x1 - x0);
+  // Closed polylines share one more joint between the last and first segment.
+  const [fx, fy] = points[0];
+  const [lx, ly] = points[points.length - 1];
+  const isClosed = segs.length > 1 && Math.hypot(lx - fx, ly - fy) < 1e-6;
+
+  // Texture u-coordinate in source px, advancing with arc length.
+  let u = 0;
+
+  for (let j = 0; j < segs.length; j++) {
+    const seg = segs[j];
+    const segLen = seg.len;
+    const prev = j > 0 ? segs[j - 1] : isClosed ? segs[segs.length - 1] : null;
+    const next = j < segs.length - 1 ? segs[j + 1] : isClosed ? segs[0] : null;
+
     ctx.save();
-    ctx.translate(x0, y0);
-    ctx.rotate(angle);
+    ctx.translate(seg.x0, seg.y0);
+    ctx.rotate(seg.angle);
+
+    const poly = miterClipPoly(
+      prev != null ? wrapAngle(seg.angle - prev.angle) : 0,
+      next != null ? wrapAngle(next.angle - seg.angle) : 0,
+      segLen,
+      halfW,
+      CHUNK_OVERLAP,
+    );
+    if (poly != null) {
+      const clip = new Path2D();
+      clip.moveTo(poly[0][0], poly[0][1]);
+      for (let p = 1; p < poly.length; p++) clip.lineTo(poly[p][0], poly[p][1]);
+      clip.closePath();
+      ctx.clip(clip);
+    }
 
     // Walk the sub-segment, wrapping the texture at its seam.
     let drawn = 0;
@@ -337,5 +422,9 @@ export {
   collectWallPathImagePaths,
   quadPoint,
   arcSubdivisions,
+  wrapAngle,
+  miterClipPoly,
+  MITER_MIN_TURN,
+  MITER_LIMIT,
 };
 export type { WallPathRenderOptions, FlattenedPath, ResolvedWallStrip, WallViewState };
