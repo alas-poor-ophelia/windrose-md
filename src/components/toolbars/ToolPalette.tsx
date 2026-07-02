@@ -713,4 +713,4 @@ const ToolPalette = ({
   );
 };
 
-export { ToolPalette };
+export { ToolPalette, isToolIdEnabled };

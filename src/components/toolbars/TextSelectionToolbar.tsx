@@ -24,6 +24,7 @@ import { getActiveLayer } from '../../persistence/layerAccessor';
 import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition';
 import { Icon } from '../shared/Icon';
 import { Z_INDEX } from '../../core/dmtConstants';
+import { isFeatureEnabled } from '../../core/featureFlags';
 
 type MouseClickEvent = TargetedMouseEvent<HTMLButtonElement>;
 
@@ -129,7 +130,7 @@ const TextSelectionToolbar = ({
     { id: 'rotate', icon: 'lucide-rotate-cw', title: 'Rotate 45° (or press R)', onClick: onRotate },
     { id: 'copyLink', icon: 'lucide-link', title: 'Copy link to clipboard', onClick: onCopyLink },
     { id: 'delete', icon: 'lucide-trash-2', title: 'Delete (or press Delete/Backspace)', onClick: onDelete, isDelete: true }
-  ];
+  ].filter(btn => btn.id !== 'copyLink' || isFeatureEnabled('notePins'));
 
   const toolbarWidth = buttons.length * buttonSize + (buttons.length - 1) * buttonGap;
   const toolbarHeight = buttonSize;

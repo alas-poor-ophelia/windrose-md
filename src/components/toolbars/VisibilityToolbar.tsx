@@ -9,6 +9,7 @@
 import type { MapType } from '#types/core/map.types';
 import type { VNode } from 'preact';
 import { Icon } from '../shared/Icon';
+import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
 
 /** Fog of War tool identifiers */
 export type FogTool = 'paint' | 'erase' | 'rectangle' | null;
@@ -56,6 +57,7 @@ const VisibilityToolbar = ({
   showFogTools = false,
   onFogToolsToggle
 }: VisibilityToolbarProps): VNode => {
+  const featureFlags = useFeatureFlags();
   const layers: LayerDef[] = [
     {
       id: 'grid',
@@ -126,18 +128,22 @@ const VisibilityToolbar = ({
         );
       })}
 
-      <div className="windrose-visibility-separator" />
+      {featureFlags.fogOfWar && (
+        <>
+          <div className="windrose-visibility-separator" />
 
-      <div className="windrose-fow-section">
-        <button
-          className={`windrose-fow-toggle-btn ${showFogTools ? 'expanded' : ''}`}
-          onClick={onFogToolsToggle}
-          title="Fog of War tools"
-        >
-          <Icon icon="lucide-cloud-fog" />
-          <span className="windrose-fow-label">Fog</span>
-        </button>
-      </div>
+          <div className="windrose-fow-section">
+            <button
+              className={`windrose-fow-toggle-btn ${showFogTools ? 'expanded' : ''}`}
+              onClick={onFogToolsToggle}
+              title="Fog of War tools"
+            >
+              <Icon icon="lucide-cloud-fog" />
+              <span className="windrose-fow-label">Fog</span>
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 };

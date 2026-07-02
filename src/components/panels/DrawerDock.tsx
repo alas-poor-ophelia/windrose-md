@@ -38,6 +38,9 @@ interface DrawerDockProps {
       collapsed spine (clicking switches pane AND expands the drawer). */
   pane?: 'tiles' | 'objects';
   onPane?: (pane: 'tiles' | 'objects') => void;
+  /** Feature gate: when false the spine hides all tile chrome (tiles pane
+      button, starred/recent flyouts, depth ribbon, loaded-tile chip). */
+  tilesEnabled?: boolean;
   children: ComponentChildren;
 }
 
@@ -117,7 +120,7 @@ function FlyoutPanel({ tiles, onSelect, onClose, label }: {
   );
 }
 
-function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, onExpand, selectedTileName, selectedTileThumb, ribbonWidth, spineFlyout, onSpineFlyout, pane, onPane }: {
+function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, onExpand, selectedTileName, selectedTileThumb, ribbonWidth, spineFlyout, onSpineFlyout, pane, onPane, tilesEnabled = true }: {
   depth: TileLayerRole;
   onDepthChange: (d: TileLayerRole) => void;
   hidden: Set<TileLayerRole>;
@@ -131,6 +134,7 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
   onSpineFlyout: (v: 'recent' | 'starred' | null) => void;
   pane?: 'tiles' | 'objects';
   onPane?: (pane: 'tiles' | 'objects') => void;
+  tilesEnabled?: boolean;
 }): VNode {
   const chipRef = useRef<HTMLDivElement>(null);
   const chipSize = ribbonWidth - 18;
@@ -155,13 +159,15 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
       {pane != null && onPane != null && (
         <>
           <div className="windrose-tile-spine-pane">
-            <button
-              className={`windrose-tile-spine-panebtn ${pane === 'tiles' ? 'active' : ''}`}
-              title="Tiles — open"
-              onClick={() => { onPane('tiles'); onExpand(); }}
-            >
-              <Icon icon="lucide-layout-dashboard" size={15} />
-            </button>
+            {tilesEnabled && (
+              <button
+                className={`windrose-tile-spine-panebtn ${pane === 'tiles' ? 'active' : ''}`}
+                title="Tiles — open"
+                onClick={() => { onPane('tiles'); onExpand(); }}
+              >
+                <Icon icon="lucide-layout-dashboard" size={15} />
+              </button>
+            )}
             <button
               className={`windrose-tile-spine-panebtn ${pane === 'objects' ? 'active' : ''}`}
               title="Objects — open"
@@ -173,31 +179,35 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
           <div className="windrose-tile-spine-div" />
         </>
       )}
-      <div className="windrose-tile-spine-flyout-btns">
-        <button
-          className={`windrose-tile-spine-fbtn ${spineFlyout === 'starred' ? 'active' : ''}`}
-          title="Starred tiles"
-          onClick={() => toggleFlyout('starred')}
-        >
-          <Icon icon="lucide-star" size={14} />
-        </button>
-        <button
-          className={`windrose-tile-spine-fbtn ${spineFlyout === 'recent' ? 'active' : ''}`}
-          title="Recent tiles"
-          onClick={() => toggleFlyout('recent')}
-        >
-          <Icon icon="lucide-clock" size={14} />
-        </button>
-      </div>
-      <div className="windrose-tile-spine-div" />
-      <DepthRibbon
-        active={depth}
-        onPick={onDepthChange}
-        hidden={hidden}
-        onToggleHide={onToggleHide}
-        tileCounts={tileCounts}
-      />
-      {selectedTileName != null && selectedTileName !== '' && (
+      {tilesEnabled && (
+        <>
+          <div className="windrose-tile-spine-flyout-btns">
+            <button
+              className={`windrose-tile-spine-fbtn ${spineFlyout === 'starred' ? 'active' : ''}`}
+              title="Starred tiles"
+              onClick={() => toggleFlyout('starred')}
+            >
+              <Icon icon="lucide-star" size={14} />
+            </button>
+            <button
+              className={`windrose-tile-spine-fbtn ${spineFlyout === 'recent' ? 'active' : ''}`}
+              title="Recent tiles"
+              onClick={() => toggleFlyout('recent')}
+            >
+              <Icon icon="lucide-clock" size={14} />
+            </button>
+          </div>
+          <div className="windrose-tile-spine-div" />
+          <DepthRibbon
+            active={depth}
+            onPick={onDepthChange}
+            hidden={hidden}
+            onToggleHide={onToggleHide}
+            tileCounts={tileCounts}
+          />
+        </>
+      )}
+      {tilesEnabled && selectedTileName != null && selectedTileName !== '' && (
         <div
           className="windrose-tile-spine-loaded"
           title={`Loaded: ${selectedTileName}`}
@@ -235,6 +245,7 @@ function DrawerDock({
   onFlyoutSelect,
   pane,
   onPane,
+  tilesEnabled = true,
   children,
 }: DrawerDockProps): VNode {
   const [resizing, setResizing] = useState(false);
@@ -329,6 +340,7 @@ function DrawerDock({
           onSpineFlyout={setSpineFlyout}
           pane={pane}
           onPane={onPane}
+          tilesEnabled={tilesEnabled}
         />
       </div>
 

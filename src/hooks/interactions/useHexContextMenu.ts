@@ -5,6 +5,7 @@ import { useEffect } from 'preact/hooks';
 import { Menu } from 'obsidian';
 import type { MenuItem } from 'obsidian';
 import { openNativeNoteLinkModal } from '../../components/modals/NoteLinkModal';
+import { isFeatureEnabled } from '../../core/featureFlags';
 import type { HexContextMenuDetail } from '../../core/windroseEvents';
 
 interface UseHexContextMenuOptions {
@@ -30,11 +31,15 @@ function useHexContextMenu({
 
       const menu = new Menu();
 
-      menu.addItem((item: MenuItem) => {
-        item.setTitle(hasSubHex ? `Enter Sub-Hex (${q}, ${r})` : `Create Sub-Hex (${q}, ${r})`);
-        item.setIcon(hasSubHex ? 'lucide-arrow-down-right' : 'lucide-plus-circle');
-        item.onClick(() => enterSubHex(q, r));
-      });
+      // Entering existing sub-hexes always works; creating new ones is
+      // gated behind the subMaps feature.
+      if (hasSubHex || isFeatureEnabled('subMaps')) {
+        menu.addItem((item: MenuItem) => {
+          item.setTitle(hasSubHex ? `Enter Sub-Hex (${q}, ${r})` : `Create Sub-Hex (${q}, ${r})`);
+          item.setIcon(hasSubHex ? 'lucide-arrow-down-right' : 'lucide-plus-circle');
+          item.onClick(() => enterSubHex(q, r));
+        });
+      }
 
       const region = (mapData.regions ?? []).find((reg: Region) =>
         reg.hexes.some((h: { x: number; y: number }) => h.x === q && h.y === r)

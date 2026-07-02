@@ -7,6 +7,7 @@ import { getLayersOrdered, getActiveBoardId, getActiveBoardLayers, getBoardsOrde
 import { ROLE_META } from '../../assets/tileRoles';
 import { getIconInfo } from '../../assets/rpgAwesomeIcons';
 import { Icon } from '../shared/Icon';
+import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
 
 interface DragState {
   layerId: string;
@@ -52,6 +53,7 @@ const DockLayerList = ({
   const [expandedLayerId, setExpandedLayerId] = useState<string | null>(null);
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const featureFlags = useFeatureFlags();
 
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -340,7 +342,7 @@ const DockLayerList = ({
                 <Icon icon="lucide-trash-2" size={14} />
               </button>
             )}
-            {onToggleStrataMode != null && (
+            {onToggleStrataMode != null && featureFlags.tiles && (
               <button className="windrose-dock-board-btn mode active" onClick={onToggleStrataMode} title="Switch to Simple layers">
                 <Icon icon="lucide-list" size={14} />
               </button>
@@ -390,7 +392,7 @@ const DockLayerList = ({
       <div ref={listRef} className="windrose-dock-layers simple-floors">
         <div className="windrose-dock-board-bar simple">
           <span className="windrose-dock-mode-label">Floors</span>
-          {onToggleStrataMode != null && (
+          {onToggleStrataMode != null && featureFlags.tiles && (
             <button className="windrose-dock-board-btn mode" onClick={onToggleStrataMode} title="Switch to Strata (layers)">
               <Icon icon="lucide-layers-3" size={14} />
             </button>

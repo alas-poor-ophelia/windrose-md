@@ -11,6 +11,7 @@ import type { MapDataUpdater } from '#types/hooks/mapData.types';
 
 import { useCallback, useMemo, useState } from 'preact/hooks';
 import { DEFAULTS, SCHEMA_VERSION } from '../../core/dmtConstants';
+import { isFeatureEnabled } from '../../core/featureFlags';
 import { generateLayerId } from '../../persistence/layerAccessor';
 import { calculateFitZoom } from '../../geometry/core/hexMeasurements';
 
@@ -193,6 +194,9 @@ function useSubHexNavigation({
     // Look up or create sub-hex data
     let subHex = currentMapData.subHexMaps?.[hexKey];
     if (!subHex) {
+      // Feature gate: entering EXISTING sub-maps always works; creating new
+      // ones requires the subMaps feature.
+      if (!isFeatureEnabled('subMaps')) return;
       subHex = createSubHexMapData(currentMapData, q, r);
       // Write the new sub-hex into the current map's subHexMaps
       const updatedCurrent = {

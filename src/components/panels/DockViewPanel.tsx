@@ -7,6 +7,7 @@ import { useCallback } from 'preact/hooks';
 import { Modal } from 'obsidian';
 import { useApp } from '../../context/AppContext';
 import { Icon } from '../shared/Icon';
+import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
 
 interface LayerDef {
   id: keyof LayerVisibility;
@@ -66,6 +67,7 @@ const DockViewPanel = ({
   onFogClearAll,
 }: DockViewPanelProps): VNode => {
   const app = useApp();
+  const featureFlags = useFeatureFlags();
   const visibleLayers = LAYERS.filter(l => l.hexOnly !== true || mapType === 'hex');
 
   const handleClearAll = useCallback(() => {
@@ -124,6 +126,7 @@ const DockViewPanel = ({
         </div>
       </div>
 
+      {featureFlags.fogOfWar && (
       <div className="windrose-dock-view-section">
         <span className="windrose-dock-view-section-label">Fog of War</span>
         <div className="windrose-dock-view-toggles">
@@ -167,6 +170,7 @@ const DockViewPanel = ({
           </button>
         </div>
       </div>
+      )}
 
       <div className="windrose-dock-view-footer">
         <button

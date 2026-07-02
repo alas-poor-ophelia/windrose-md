@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { useMapData } from './hooks/state/useMapData';
 import { useLayerHistory } from './hooks/state/useLayerHistory';
 import { useToolState } from './hooks/state/useToolState';
+import { useFeatureFlags } from './hooks/state/useFeatureFlags';
 import { useFogOfWar } from './hooks/interactions/useFogOfWar';
 import { useDataHandlers } from './hooks/state/useDataHandlers';
 import { GridGeometry } from './geometry/core/GridGeometry';
@@ -24,7 +25,7 @@ import { HexGeometry } from './geometry/core/HexGeometry';
 import { MapHeader } from './components/controls/MapHeader';
 import { MapCanvas } from './components/mapcanvas/MapCanvas';
 import { MapControls } from './components/controls/MapControls';
-import { ToolPalette } from './components/toolbars/ToolPalette';
+import { ToolPalette, isToolIdEnabled } from './components/toolbars/ToolPalette';
 import { ObjectSidebar } from './components/panels/ObjectSidebar';
 import { VisibilityToolbar } from './components/toolbars/VisibilityToolbar';
 import { FogOfWarToolbar } from './components/toolbars/FogOfWarToolbar';
@@ -32,6 +33,7 @@ import { WindroseCompass } from './components/shared/WindroseCompass';
 
 import { MapSettingsModal } from './components/settings/MapSettingsModal';
 import { getTheme, getEffectiveSettings, getSettings } from './core/settingsAccessor';
+import { isFeatureEnabled } from './core/featureFlags';
 import { DEFAULTS } from './core/dmtConstants';
 import { getColorByHex, isDefaultColor, DEFAULT_COLOR } from './drawing/colorOperations';
 import { ImageAlignmentMode } from './components/overlays/ImageAlignmentMode';
@@ -144,8 +146,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleOpacityChange
   } = useToolState({ mapData, updateMapData });
 
+  // Global feature gating (identity-stable; only flips when a flag changes).
+  const featureFlags = useFeatureFlags();
+
   // Tile drawer pane: Tiles vs Objects (Objects sidebar folded into the drawer).
-  const [tilePane, setTilePane] = useState<'tiles' | 'objects'>('tiles');
+  const [tilePane, setTilePane] = useState<'tiles' | 'objects'>(
+    () => (isFeatureEnabled('tiles') ? 'tiles' : 'objects')
+  );
   // Selecting a pane couples to the active tool: Objects → addObject, Tiles → tilePaint.
   // Forcing tilePaint on the Tiles tab avoids ping-pong with the coupling effect below.
   const selectPane = useCallback((p: 'tiles' | 'objects'): void => {
@@ -156,6 +163,16 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   useEffect(() => {
     if (currentTool === 'addObject') setTilePane('objects');
   }, [currentTool]);
+  // Feature gating: disabling tiles forces the drawer onto the Objects pane.
+  useEffect(() => {
+    if (!featureFlags.tiles) setTilePane('objects');
+  }, [featureFlags.tiles]);
+  // Feature gating: if the active tool's feature gets disabled, fall back to
+  // select so a hidden tool can't stay armed (depends on stable flags record;
+  // setCurrentTool('select') settles in one pass).
+  useEffect(() => {
+    if (!isToolIdEnabled(currentTool, featureFlags)) setCurrentTool('select');
+  }, [currentTool, featureFlags, setCurrentTool]);
   // Category-rail / view selection, owned here so the Recent/Starred view-filters
   // can live on the drawer ribbon while the rail (categories) lives in the browser.
   const [tileRailSel, setTileRailSel] = useState<RailSelection>('all');
@@ -179,7 +196,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Vertical left ribbon: Tiles/Objects tabs + (on Tiles with a tile selected) placement subtools.
   const renderDrawerRibbon = (): VNode => (
     <div className="windrose-fd-subrib">
-      <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'tiles' ? 'on' : ''}`} title="Tiles" onClick={() => selectPane('tiles')}><Icon icon="lucide-layout-dashboard" size={16} /></button>
+      {featureFlags.tiles && <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'tiles' ? 'on' : ''}`} title="Tiles" onClick={() => selectPane('tiles')}><Icon icon="lucide-layout-dashboard" size={16} /></button>}
       <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'objects' ? 'on' : ''}`} title="Objects" onClick={() => selectPane('objects')}><Icon icon="lucide-sofa" size={16} /></button>
       {tilePane === 'tiles' && (
         <>
@@ -229,10 +246,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     return (
       <div className="windrose-cd-head">
         <div className="windrose-cd-paneseg interactive-child" role="group" aria-label="Tiles or Objects">
-          <button
-            className={`windrose-cd-segbtn ${tilePane === 'tiles' ? 'active' : ''}`}
-            onClick={() => selectPane('tiles')}
-          >Tiles</button>
+          {featureFlags.tiles && (
+            <button
+              className={`windrose-cd-segbtn ${tilePane === 'tiles' ? 'active' : ''}`}
+              onClick={() => selectPane('tiles')}
+            >Tiles</button>
+          )}
           <button
             className={`windrose-cd-segbtn ${tilePane === 'objects' ? 'active' : ''}`}
             onClick={() => selectPane('objects')}
@@ -928,7 +947,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           )}
         </div>
 
-        {!fullPane && (
+        {!fullPane && featureFlags.fogOfWar && (
           <FogOfWarToolbar
             isOpen={showFogTools && showVisibilityToolbar}
             fogOfWarState={currentFogState}
@@ -1019,7 +1038,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     />
                   )
                 },
-                ...(mapData.mapType === 'hex' ? [{
+                ...(mapData.mapType === 'hex' && featureFlags.regions ? [{
                   id: 'regions',
                   icon: 'lucide-map',
                   title: 'Regions',
@@ -1202,7 +1221,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               />
 
               {/* Re-roll button for generated dungeons */}
-              <MapCanvas.RerollDungeonButton />
+              {featureFlags.dungeonGenerator && <MapCanvas.RerollDungeonButton />}
             </MapCanvas>
 
             {!fullPane && (
@@ -1221,7 +1240,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 showLayerPanel={railOpenId === 'layers'}
                 onToggleLayerPanel={() => setRailOpenId(prev => prev === 'layers' ? null : 'layers')}
                 showRegionPanel={railOpenId === 'regions'}
-                onToggleRegionPanel={mapData.mapType === 'hex' ? () => setRailOpenId(prev => prev === 'regions' ? null : 'regions') : undefined}
+                onToggleRegionPanel={mapData.mapType === 'hex' && featureFlags.regions ? () => setRailOpenId(prev => prev === 'regions' ? null : 'regions') : undefined}
                 showVisibilityToolbar={showVisibilityToolbar}
                 onToggleVisibilityToolbar={() => {
                   const closing = showVisibilityToolbar;
@@ -1261,6 +1280,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onFlyoutSelect={handleFlyoutSelect}
               pane={tilePane}
               onPane={selectPane}
+              tilesEnabled={featureFlags.tiles}
             >
               <div className="windrose-cd">
               {renderCompactDrawerHead()}
@@ -1452,7 +1472,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               />
             </FloatingPanel>
           )}
-          {isFloating('tiles') && showTilePanel && (
+          {isFloating('tiles') && showTilePanel && featureFlags.tiles && (
             <FloatingPanel
               title="Tiles"
               isFloating
@@ -1528,6 +1548,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                   onFlyoutSelect={handleFlyoutSelect}
                   pane={tilePane}
                   onPane={selectPane}
+                  tilesEnabled={featureFlags.tiles}
                 >
                   {tilePane === 'objects' ? (
                   renderObjectsPane(false, renderDrawerRibbon())

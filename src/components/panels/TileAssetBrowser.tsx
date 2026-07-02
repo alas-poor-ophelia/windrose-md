@@ -45,6 +45,7 @@ import { predictDepthTier } from '../../assets/depthPredictor';
 import { deriveTileForm, formDef } from '../../assets/tileForm';
 import type { TileSubtoolId } from '../../assets/tileForm';
 import { clusterCategories, NOISE, humanizePackName, detectTileGeometry } from '../../assets/categoryMerge';
+import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
 import type { FolderInput } from '../../assets/categoryMerge';
 import { predictSpan, DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
 import { predictRenderMode } from '../../assets/renderModePredictor';
@@ -438,6 +439,7 @@ const TileAssetBrowser = memo(({
   ribbon,
 }: TileAssetBrowserProps): VNode | null => {
   const app = useApp();
+  const featureFlags = useFeatureFlags();
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [showTilesetConfig, setShowTilesetConfig] = useState<boolean>(false);
@@ -986,8 +988,17 @@ const TileAssetBrowser = memo(({
       return geom == null || geom === mapType;
     });
 
+    // Feature gate: wall/path strips arm the wall tool on select, so hide them
+    // entirely when the walls feature is disabled (placed walls still render).
+    if (!featureFlags.walls) {
+      tiles = tiles.filter((t: TileEntry) => {
+        const src = tileMetadata[t.vaultPath]?.ddSourceType?.toLowerCase();
+        return src !== 'walls' && src !== 'paths';
+      });
+    }
+
     return tiles;
-  }, [allTiles, searchFilter, activeTags, packFilter, tileToTilesetId, tileMetadata, tileDepth, mapType]);
+  }, [allTiles, searchFilter, activeTags, packFilter, tileToTilesetId, tileMetadata, tileDepth, mapType, featureFlags.walls]);
 
   // Packs present in the current role, for the Pack filter facet — with a
   // humanized short label and a per-pack count, scoped to the active depth on
