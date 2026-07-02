@@ -65,12 +65,14 @@ interface MergeCluster {
 }
 
 /**
- * Normalize a raw folder name into a token set: split parens/camelCase/delimiters,
- * lowercase, strip non-alpha, drop NOISE, then apply ALIAS (and drop NOISE again).
+ * Normalize a raw folder name into a token set: drop [bracketed] runs, split
+ * parens/camelCase/delimiters, lowercase, strip non-alpha, drop NOISE, then
+ * apply ALIAS (and drop NOISE again).
  */
 function normalizeTokens(raw: string): Set<string> {
   const out = new Set<string>();
   const spaced = raw
+    .replace(/\[[^\]]*\]/g, ' ')
     .replace(/[()]/g, ' ')
     .replace(/([a-z])([A-Z])/g, '$1 $2');
   for (const piece of spaced.split(/[/_\-\s&,]+/)) {
@@ -125,11 +127,14 @@ function detectTileGeometry(raw: string, tags?: readonly string[]): 'hex' | 'gri
 }
 
 /**
- * Human-readable label for a raw folder: strip parens and NOISE words but keep
- * original casing/order. Falls back to the trimmed raw if every word was noise.
+ * Human-readable label for a raw folder: strip [bracketed] runs (pack/artist
+ * prefixes like "[EA]"), parens, and NOISE words but keep original casing and
+ * order. Falls back through the bracket-stripped raw, then the trimmed raw, if
+ * every word was noise.
  */
 function cleanLabel(raw: string): string {
-  const words = raw
+  const debracketed = raw.replace(/\[[^\]]*\]/g, ' ');
+  const words = debracketed
     .trim()
     .replace(/[()]/g, ' ')
     .split(/\s+/)
@@ -138,7 +143,10 @@ function cleanLabel(raw: string): string {
       return !NOISE.has(t);
     });
   const label = words.join(' ').replace(/\s+&\s+/g, ' & ').replace(/\s+,/g, ',').trim();
-  return label === '' ? raw.trim() : label;
+  if (label !== '') return label;
+  // Bracket-only names ("[EA]") keep their inner text rather than the brackets.
+  const inner = raw.replace(/[[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+  return inner === '' ? raw.trim() : inner;
 }
 
 /** Sorensen-Dice coefficient on two token sets. 0 if either is empty. */

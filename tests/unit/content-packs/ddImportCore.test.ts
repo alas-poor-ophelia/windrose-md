@@ -219,6 +219,15 @@ describe('destFolderOf', () => {
 			.toBe('objects/Furniture/Beds');
 		expect(destFolderOf('textures/terrain/Grass_01.webp', 'terrain', undefined)).toBe('terrain');
 	});
+
+	it('trims [bracketed] pack prefixes from tags used as folders', () => {
+		expect(destFolderOf('textures/objects/Chair_01.webp', 'objects', '[EA] Chairs')).toBe('Chairs');
+	});
+
+	it('ignores a bracket-only tag and falls through to the subpath', () => {
+		expect(destFolderOf('textures/objects/Furniture/Chair_01.webp', 'objects', '[EA]'))
+			.toBe('objects/Furniture');
+	});
 });
 
 describe('analyzePckForWizard', () => {

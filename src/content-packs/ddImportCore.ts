@@ -98,6 +98,10 @@ function stemOf(filename: string): string {
  * tagged cell tiles go under their first pack tag; untagged ones under their
  * source-relative subpath. The wizard's tier rows key on this same rule so
  * step-② decisions land on the folders the user will actually see.
+ *
+ * [Bracketed] runs in tags are pack/artist prefixes ("[EA] Chairs"), not
+ * category names — they are trimmed from the folder, and a tag that is ONLY
+ * a bracket token ("[EA]") is ignored in favour of the path-derived folder.
  */
 function destFolderOf(
 	relativePath: string,
@@ -105,7 +109,10 @@ function destFolderOf(
 	firstTag: string | undefined,
 ): string {
 	if (sourceType != null && STRIP_SOURCE_TYPES.has(sourceType)) return sourceType;
-	if (firstTag != null) return firstTag.replace(/[\\:*?"<>|]/g, '_');
+	if (firstTag != null) {
+		const debracketed = firstTag.replace(/\[[^\]]*\]/g, ' ').replace(/\s+/g, ' ').trim();
+		if (debracketed !== '') return debracketed.replace(/[\\:*?"<>|]/g, '_');
+	}
 	const parts = relativePath.split('/');
 	return parts.length > 2 ? parts.slice(1, -1).join('/') : parts[0] ?? 'misc';
 }
@@ -127,10 +134,14 @@ function buildPackTagIndex(
 	const pathToFirstTag = new Map<string, string>();
 	const pathToAllTags = new Map<string, string[]>();
 	const tags = parseDungeondraftTags(buffer, archive);
+	const isBracketOnly = (t: string): boolean => /^\s*\[[^\]]*\]\s*$/.test(t);
 	if (tags != null) {
 		for (const [tag, paths] of Object.entries(tags.tags)) {
 			for (const p of paths) {
-				if (!pathToFirstTag.has(p)) {
+				// First tag wins, except a bracket-only pack prefix ("[EA]")
+				// yields to the first real tag that comes along.
+				const first = pathToFirstTag.get(p);
+				if (first == null || (isBracketOnly(first) && !isBracketOnly(tag))) {
 					pathToFirstTag.set(p, tag);
 				}
 				const existing = pathToAllTags.get(p);

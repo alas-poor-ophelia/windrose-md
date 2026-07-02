@@ -84,6 +84,11 @@ describe('categoryMerge — normalizeTokens', () => {
   it('returns an empty set when every token is noise', () => {
     expect(normalizeTokens('Hex Tiles Set').size).toBe(0);
   });
+
+  it('drops [bracketed] pack/artist prefixes before tokenizing', () => {
+    expect(normalizeTokens('[EA] Chairs')).toEqual(new Set(['chairs']));
+    expect(normalizeTokens('[EA]').size).toBe(0);
+  });
 });
 
 describe('categoryMerge — cleanLabel', () => {
@@ -94,6 +99,15 @@ describe('categoryMerge — cleanLabel', () => {
 
   it('falls back to the trimmed raw when all words are noise', () => {
     expect(cleanLabel('  Hex Tiles  ')).toBe('Hex Tiles');
+  });
+
+  it('strips [bracketed] pack/artist prefixes from labels', () => {
+    expect(cleanLabel('[EA] Chairs')).toBe('Chairs');
+    expect(cleanLabel('[ea] Hex Props')).toBe('Props');
+  });
+
+  it('keeps the inner text (not brackets) for bracket-only names', () => {
+    expect(cleanLabel('[EA]')).toBe('EA');
   });
 });
 
