@@ -721,15 +721,9 @@ class HexGeometry extends BaseGeometry {
     
     for (let i = 0; i <= distance; i++) {
       const t = i / distance;
-      
-      const cx1 = x1;
-      const cz1 = y1;
 
-      const cx2 = x2;
-      const cz2 = y2;
-
-      const x = cx1 + (cx2 - cx1) * t;
-      const z = cz1 + (cz2 - cz1) * t;
+      const x = x1 + (x2 - x1) * t;
+      const z = y1 + (y2 - y1) * t;
       
       const rounded = this.roundHex(x, z);
       

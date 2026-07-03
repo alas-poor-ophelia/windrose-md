@@ -53,37 +53,6 @@ import { getSetting } from '../../core/settingsAccessor';
 import { usePanZoomCoordinator } from '../../hooks/canvas/usePanZoomCoordinator';
 import { useEventCoordinator } from '../../hooks/canvas/useEventCoordinator';
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // ===========================================
 // Local Type Definitions
 // ===========================================

@@ -166,15 +166,6 @@ function blitStaticContent(
 ): void {
   let entry = staticLayerCaches.get(canvas);
 
-  // TEMP DEBUG: track cache hit/miss and which key index breaks (remove after perf verification)
-  const w = window as unknown as { __windroseStaticDbg?: { hit: number; rerender: number; missIdx: Record<number, number> } };
-  const dbg = w.__windroseStaticDbg ?? (w.__windroseStaticDbg = { hit: 0, rerender: 0, missIdx: {} });
-  if (entry && !staticKeysEqual(entry.key, key)) {
-    for (let i = 0; i < Math.max(entry.key.length, key.length); i++) {
-      if (!Object.is(entry.key[i], key[i])) { dbg.missIdx[i] = (dbg.missIdx[i] ?? 0) + 1; break; }
-    }
-  }
-
   let scale = 1;
   let tx = 0;
   let ty = 0;
@@ -231,7 +222,6 @@ function blitStaticContent(
   }
 
   if (!entry) return;
-  if (usable) dbg.hit++; else dbg.rerender++;
   ctx.save();
   // Pixel-exact at scale 1; smooth when scale-blitting mid-zoom.
   ctx.imageSmoothingEnabled = scale !== 1;

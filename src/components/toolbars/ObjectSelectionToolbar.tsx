@@ -6,16 +6,6 @@
  * Consumer: ObjectLayer only.
  */
 
-
-
-
-
-
-
-
-
-
-
 import type { TargetedMouseEvent, VNode } from 'preact';
 import type { Ref } from 'preact';
 import type { MapData } from '#types/core/map.types';

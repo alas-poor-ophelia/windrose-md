@@ -5,16 +5,6 @@
  * Consumer: TextLayer only.
  */
 
-
-
-
-
-
-
-/**
- * Calculate bounding box for a text label in screen coordinates
- */
-
 import type { TargetedMouseEvent, VNode } from 'preact';
 import type { MapData } from '#types/core/map.types';
 import type { TextLabel } from '#types/objects/note.types';
