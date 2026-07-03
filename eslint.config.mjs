@@ -182,6 +182,7 @@ export default [
       "types/generated/**",
       "tests/fixtures/**",
       ".claude/**",
+      ".wt/**",
       "internal/**",
       // Data / output / config dirs (not plugin source)
       "objects/**",
