@@ -14,11 +14,11 @@ import type { VNode } from 'preact';
 import type { Point } from '#types/core/geometry.types';
 import type { MapData } from '#types/core/map.types';
 
-import { useEffect, useRef } from 'preact/hooks';
 import type { ExtendedGridGeometry } from '#types/contexts/context.types';
 import { useDiagonalFill } from '../../hooks/drawing/useDiagonalFill';
 import { useMapState } from '../../context/MapContext';
-import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
+import { createViewportTransform, getCanvasDisplayMetrics } from './viewportTransform';
 import { Z_INDEX } from '../../core/dmtConstants';
 
 
@@ -68,7 +68,6 @@ function cornerToScreen(
 ): Point {
   if (!mapData.viewState) return { x: 0, y: 0 };
   const { zoom, center } = mapData.viewState;
-  const northDirection = mapData.northDirection ?? 0;
   const cellSize = geometry.cellSize;
 
   const cornerWorldOffsets: Record<CornerName, Point> = {
@@ -79,32 +78,19 @@ function cornerToScreen(
   };
 
   const cornerOffset = cornerWorldOffsets[corner];
-  const worldX = (cellX + cornerOffset.x) * cellSize;
-  const worldY = (cellY + cornerOffset.y) * cellSize;
+  const { worldToBuffer } = createViewportTransform({
+    geometry,
+    width: canvasWidth,
+    height: canvasHeight,
+    zoom,
+    center,
+    northDirection: mapData.northDirection
+  });
 
-  const scaledCellSize = geometry.getScaledCellSize(zoom);
-  const offsetX = canvasWidth / 2 - center.x * scaledCellSize;
-  const offsetY = canvasHeight / 2 - center.y * scaledCellSize;
-
-  let screenX = offsetX + worldX * zoom;
-  let screenY = offsetY + worldY * zoom;
-
-  if (northDirection !== 0) {
-    const centerX = canvasWidth / 2;
-    const centerY = canvasHeight / 2;
-
-    screenX -= centerX;
-    screenY -= centerY;
-
-    const angleRad = (northDirection * Math.PI) / 180;
-    const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
-    const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
-
-    screenX = rotatedX + centerX;
-    screenY = rotatedY + centerY;
-  }
-
-  return { x: screenX, y: screenY };
+  return worldToBuffer(
+    (cellX + cornerOffset.x) * cellSize,
+    (cellY + cornerOffset.y) * cellSize
+  );
 }
 
 /**
@@ -150,20 +136,7 @@ const DiagonalFillOverlay = ({ currentTool }: DiagonalFillOverlayProps): VNode |
     cancelFill
   } = useDiagonalFill(currentTool);
 
-  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
-
-  const diagonalFillHandlersRef = useRef<Record<string, unknown> | null>(null);
-  diagonalFillHandlersRef.current = { handleDiagonalFillClick, handleDiagonalFillMove, cancelFill, fillStart };
-
-  useEffect(() => {
-    const proxy = new Proxy({} as Record<string, unknown>, {
-      get(_target, prop: string) {
-        return diagonalFillHandlersRef.current?.[prop];
-      }
-    });
-    registerHandlers('diagonalFill', proxy);
-    return () => unregisterHandlers('diagonalFill');
-  }, [registerHandlers, unregisterHandlers]);
+  useLayerHandlers('diagonalFill', { handleDiagonalFillClick, handleDiagonalFillMove, cancelFill, fillStart });
 
   if (currentTool !== 'diagonalFill' || !fillStart || !geometry || !mapData || !mapData.viewState || !canvasRef?.current) {
     return null;
@@ -177,16 +150,12 @@ const DiagonalFillOverlay = ({ currentTool }: DiagonalFillOverlayProps): VNode |
 
   const canvas = canvasRef.current;
   const { width: canvasWidth, height: canvasHeight } = canvas;
-  const canvasRect = canvas.getBoundingClientRect();
-  const displayScale = canvasRect.width / canvasWidth;
 
   let flexContainer: HTMLElement | null = canvas.parentElement;
   while (flexContainer && !flexContainer.classList.contains('windrose-canvas-container')) {
     flexContainer = flexContainer.parentElement;
   }
-  const containerRect = flexContainer?.getBoundingClientRect();
-  const canvasOffsetX = containerRect ? canvasRect.left - containerRect.left : 0;
-  const canvasOffsetY = containerRect ? canvasRect.top - containerRect.top : 0;
+  const { canvasOffsetX, canvasOffsetY, scaleX: displayScale } = getCanvasDisplayMetrics(canvas, flexContainer);
 
   const startScreen = cornerToScreen(
     fillStart.x,

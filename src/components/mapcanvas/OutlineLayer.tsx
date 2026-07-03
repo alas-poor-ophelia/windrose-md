@@ -14,7 +14,8 @@ import type { Outline } from '#types/core/map.types';
 
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
-import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
+import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
 import { useOutlineTools } from '../../hooks/interactions/useOutlineTools';
 import type { MenuItem } from 'obsidian';
 import { Modal, Menu } from 'obsidian';
@@ -41,7 +42,6 @@ const OutlineLayer = ({
 }: OutlineLayerProps): VNode | null => {
   const app = useApp();
   const { canvasRef, mapData, geometry, screenToWorld } = useMapState();
-  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
   const isOutlineTool = currentTool === 'outline';
 
@@ -93,21 +93,9 @@ const OutlineLayer = ({
     modal.open();
   }, [app, onOutlinesChange]);
 
-  // Register handlers via Proxy pattern
-  const outlineHandlersRef = useRef<Record<string, unknown> | null>(null);
-  outlineHandlersRef.current = isOutlineTool
+  useLayerHandlers('outline', isOutlineTool
     ? { handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick }
-    : {};
-
-  useEffect(() => {
-    const proxy = new Proxy({} as Record<string, unknown>, {
-      get(_target, prop: string) {
-        return outlineHandlersRef.current?.[prop];
-      }
-    });
-    registerHandlers('outline', proxy);
-    return () => unregisterHandlers('outline');
-  }, [registerHandlers, unregisterHandlers]);
+    : {});
 
   // ESC to cancel drawing, Delete/Backspace to delete selected
   useEffect(() => {
@@ -240,8 +228,9 @@ const OutlineLayer = ({
     const viewState = mapData.viewState;
     if (!viewState) return;
 
-    const offsetX = overlay.width / 2 - viewState.center.x * viewState.zoom;
-    const offsetY = overlay.height / 2 - viewState.center.y * viewState.zoom;
+    const { offsetX, offsetY } = calculateViewportOffset(
+      geometry, viewState.center, { width: overlay.width, height: overlay.height }, viewState.zoom
+    );
     const hexGeom = geometry;
 
     const northDirection = mapData.northDirection ?? 0;

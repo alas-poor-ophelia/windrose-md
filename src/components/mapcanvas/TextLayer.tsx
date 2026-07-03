@@ -15,13 +15,13 @@ import type { VNode } from 'preact';
 import type { HexColor } from '#types/core/common.types';
 import type { CustomColor } from '#types/core/common.types';
 
-import { useCallback, useEffect, useRef } from 'preact/hooks';
+import { useCallback, useEffect } from 'preact/hooks';
 import { useTextLabelInteraction } from '../../hooks/interactions/useTextLabelInteraction';
 import { useMapState } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { useApp } from '../../context/AppContext';
 import { openNativeTextLabelEditor } from '../modals/TextLabelEditor';
-import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { SelectionActionsOverlay } from '../toolbars/SelectionActionsOverlay';
 import { buildTextActions } from '../../hooks/interactions/useSelectionActions';
 import { getActiveLayer } from '../../persistence/layerAccessor';
@@ -80,8 +80,6 @@ const TextLayer = ({
     handleTextDeletion
   } = useTextLabelInteraction(currentTool, onAddCustomColor, customColors?.map(c => c.color) ?? []);
 
-  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
-
   useEffect(() => {
     if (!showTextModal || !mapData) return;
 
@@ -131,22 +129,11 @@ const TextLayer = ({
     copyDeepLinkToClipboard(displayText, notePath, mapId, x, y, zoom, layerId);
   }, [selectedItem, mapData, mapId, notePath]);
 
-  const textHandlersRef = useRef<Record<string, unknown> | null>(null);
-  textHandlersRef.current = {
+  useLayerHandlers('text', {
     handleTextPlacement, handleTextSelection,
     handleTextDragging, stopTextDragging,
     handleCanvasDoubleClick, handleEditClick, handleTextKeyDown
-  };
-
-  useEffect(() => {
-    const proxy = new Proxy({} as Record<string, unknown>, {
-      get(_target, prop: string) {
-        return textHandlersRef.current?.[prop];
-      }
-    });
-    registerHandlers('text', proxy);
-    return () => unregisterHandlers('text');
-  }, [registerHandlers, unregisterHandlers]);
+  });
 
   if (showCoordinates || !layerVisibility.textLabels) {
     return null;

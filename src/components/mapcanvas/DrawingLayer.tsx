@@ -11,10 +11,11 @@ import type { HexColor } from '#types/core/common.types';
 import type { EffectiveDistanceSettings } from '#types/hooks/distanceMeasurement.types';
 import type { ShapeStart, DragStartContext } from '#types/hooks/drawingTools.types';
 
-import { useCallback, useEffect, useMemo, useRef } from 'preact/hooks';
+import { useCallback, useEffect, useMemo } from 'preact/hooks';
 import { useDrawingTools } from '../../hooks/drawing/useDrawingTools';
 import { useMapState } from '../../context/MapContext';
-import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
+import { createViewportTransform, getCanvasDisplayMetrics } from './viewportTransform';
 import { ShapePreviewOverlay } from './ShapePreviewOverlay';
 import { SegmentPickerOverlay } from './SegmentPickerOverlay';
 import { SegmentHoverOverlay } from './SegmentHoverOverlay';
@@ -154,10 +155,7 @@ const DrawingLayer = ({
     return () => activeDocument.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
-
-  const drawingHandlersRef = useRef<Record<string, unknown> | null>(null);
-  drawingHandlersRef.current = {
+  useLayerHandlers('drawing', {
     handleDrawingPointerDown, handleDrawingPointerMove,
     stopDrawing: handleStopDrawing, cancelDrawing,
     isDrawing, rectangleStart, circleStart, edgeLineStart,
@@ -165,17 +163,7 @@ const DrawingLayer = ({
     touchConfirmPending, cancelShapePreview,
     previewEnabled: previewSettings.kbmEnabled,
     updateSegmentHover, clearSegmentHover
-  };
-
-  useEffect(() => {
-    const proxy = new Proxy({} as Record<string, unknown>, {
-      get(_target, prop: string) {
-        return drawingHandlersRef.current?.[prop];
-      }
-    });
-    registerHandlers('drawing', proxy);
-    return () => unregisterHandlers('drawing');
-  }, [registerHandlers, unregisterHandlers]);
+  });
 
   useEffect(() => {
     if (onDrawingStateChange) {
@@ -209,81 +197,25 @@ const DrawingLayer = ({
     const { zoom, center } = viewState;
     const { width, height } = canvas;
 
-    let scaledSize: number;
-    let offsetX: number;
-    let offsetY: number;
-
-    const isGrid = geometry.type === 'grid';
-    if (isGrid) {
-      scaledSize = geometry.getScaledCellSize(zoom);
-      offsetX = width / 2 - center.x * scaledSize;
-      offsetY = height / 2 - center.y * scaledSize;
-    } else {
-      scaledSize = (geometry.cellSize ?? 1) * zoom;
-      offsetX = width / 2 - center.x * zoom;
-      offsetY = height / 2 - center.y * zoom;
-    }
-
-    const containerRect = containerRef.current.getBoundingClientRect();
-    const canvasRect = canvas.getBoundingClientRect();
-    const canvasOffsetX = canvasRect.left - containerRect.left;
-    const canvasOffsetY = canvasRect.top - containerRect.top;
-    const displayScale = canvasRect.width / width;
+    const { scaledSize, worldToBuffer } = createViewportTransform({
+      geometry, width, height, zoom, center, northDirection
+    });
+    const { canvasOffsetX, canvasOffsetY, scaleX: displayScale } = getCanvasDisplayMetrics(canvas, containerRef.current);
 
     const gridToCanvasPosition = (gridX: number, gridY: number): { x: number; y: number } => {
-      const worldX = (gridX + 0.5) * geometry.cellSize;
-      const worldY = (gridY + 0.5) * geometry.cellSize;
-
-      let screenX = offsetX + worldX * zoom;
-      let screenY = offsetY + worldY * zoom;
-
-      if ((northDirection ?? 0) !== 0) {
-        const centerX = width / 2;
-        const centerY = height / 2;
-        screenX -= centerX;
-        screenY -= centerY;
-        const angleRad = ((northDirection ?? 0) * Math.PI) / 180;
-        const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
-        const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
-        screenX = rotatedX + centerX;
-        screenY = rotatedY + centerY;
-      }
-
-      screenX *= displayScale;
-      screenY *= displayScale;
-
+      const buffer = worldToBuffer((gridX + 0.5) * geometry.cellSize, (gridY + 0.5) * geometry.cellSize);
       const cellHalfSize = (scaledSize * displayScale) / 2;
       return {
-        x: canvasOffsetX + screenX - cellHalfSize,
-        y: canvasOffsetY + screenY - cellHalfSize
+        x: canvasOffsetX + buffer.x * displayScale - cellHalfSize,
+        y: canvasOffsetY + buffer.y * displayScale - cellHalfSize
       };
     };
 
     const intersectionToCanvasPosition = (intX: number, intY: number): { x: number; y: number } => {
-      const worldX = intX * geometry.cellSize;
-      const worldY = intY * geometry.cellSize;
-
-      let screenX = offsetX + worldX * zoom;
-      let screenY = offsetY + worldY * zoom;
-
-      if ((northDirection ?? 0) !== 0) {
-        const centerX = width / 2;
-        const centerY = height / 2;
-        screenX -= centerX;
-        screenY -= centerY;
-        const angleRad = ((northDirection ?? 0) * Math.PI) / 180;
-        const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
-        const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
-        screenX = rotatedX + centerX;
-        screenY = rotatedY + centerY;
-      }
-
-      screenX *= displayScale;
-      screenY *= displayScale;
-
+      const buffer = worldToBuffer(intX * geometry.cellSize, intY * geometry.cellSize);
       return {
-        x: canvasOffsetX + screenX,
-        y: canvasOffsetY + screenY
+        x: canvasOffsetX + buffer.x * displayScale,
+        y: canvasOffsetY + buffer.y * displayScale
       };
     };
 

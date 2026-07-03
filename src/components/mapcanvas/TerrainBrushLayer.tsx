@@ -21,7 +21,7 @@ import type { TileSubtoolId } from '../../assets/tileForm';
 
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
-import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useApp } from '../../context/AppContext';
 import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
 import { getActiveLayer } from '../../persistence/layerAccessor';
@@ -62,14 +62,11 @@ const TerrainBrushLayer = ({
 }: TerrainBrushLayerProps): VNode | null => {
   const app = useApp();
   const { mapData, geometry, screenToWorld, getClientCoords, canvasRef } = useMapState();
-  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
   const hasTileSelected = selectedTilesetId != null && selectedTilesetId !== '' && selectedTileId != null && selectedTileId !== '';
   const isBrushActive = currentTool === 'tilePaint' && activeSubtool === 'brush' && hasTileSelected;
 
-  const cellSize = geometry != null
-    ? (geometry.type === 'grid' ? (geometry as unknown as { cellSize: number }).cellSize : (geometry as unknown as { hexSize: number }).hexSize)
-    : 32;
+  const cellSize = geometry != null ? geometry.cellSize : 32;
   const radiusWorld = Math.max(1, brushSize) * cellSize / 2;
 
   // ---- Gesture state (refs: no re-render during a stroke) ----
@@ -273,20 +270,9 @@ const TerrainBrushLayer = ({
 
   // Register under 'terrainBrush' — the coordinator dispatches tilePaint
   // events to both tile layers; the subtool gate decides which one acts.
-  const handlersRef = useRef<Record<string, unknown> | null>(null);
-  handlersRef.current = isBrushActive
+  useLayerHandlers('terrainBrush', isBrushActive
     ? { handlePointerDown, handlePointerMove, handlePointerUp }
-    : {};
-
-  useEffect(() => {
-    const proxy = new Proxy({} as Record<string, unknown>, {
-      get(_target, prop: string) {
-        return handlersRef.current?.[prop];
-      },
-    });
-    registerHandlers('terrainBrush', proxy);
-    return () => unregisterHandlers('terrainBrush');
-  }, [registerHandlers, unregisterHandlers]);
+    : {});
 
   return null;
 };

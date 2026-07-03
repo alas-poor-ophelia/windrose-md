@@ -13,7 +13,8 @@ import type { Region } from '#types/core/map.types';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
 import { useMapState } from '../../context/MapContext';
-import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
+import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
 import { useRegionTools } from '../../hooks/interactions/useRegionTools';
 import type { MenuItem } from 'obsidian';
 import { Menu } from 'obsidian';
@@ -45,7 +46,6 @@ const RegionLayer = ({
 }: RegionLayerProps): VNode | null => {
   const app = useApp();
   const { canvasRef, mapData, geometry, screenToWorld, screenToGrid } = useMapState();
-  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
   const isRegionTool = currentTool === 'regionPaint' || currentTool === 'regionBoundary';
 
@@ -78,22 +78,11 @@ const RegionLayer = ({
     onRegionsChange
   });
 
-  // Register handlers — always register context menu, tool handlers only when active
-  const regionHandlersRef = useRef<Record<string, unknown> | null>(null);
-  regionHandlersRef.current = {
+  // Context menu handler is always present; tool handlers resolve to undefined when inactive
+  useLayerHandlers('region', {
     handleContextMenu,
     ...(isRegionTool ? { handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick } : {})
-  };
-
-  useEffect(() => {
-    const proxy = new Proxy({} as Record<string, unknown>, {
-      get(_target, prop: string) {
-        return regionHandlersRef.current?.[prop];
-      }
-    });
-    registerHandlers('region', proxy);
-    return () => unregisterHandlers('region');
-  }, [registerHandlers, unregisterHandlers]);
+  });
 
   // Listen for edit-region events from sidebar panel
   useEffect(() => {
@@ -224,34 +213,28 @@ const RegionLayer = ({
       ctx.translate(-overlay.width / 2, -overlay.height / 2);
     }
 
-    const offsetX = overlay.width / 2 - viewState.center.x * viewState.zoom;
-    const offsetY = overlay.height / 2 - viewState.center.y * viewState.zoom;
+    const { offsetX, offsetY } = calculateViewportOffset(
+      geometry, viewState.center, { width: overlay.width, height: overlay.height }, viewState.zoom
+    );
 
     if (hexesToHighlight.length > 0) {
-      ctx.globalAlpha = editingRegion ? 0.15 : 0.4;
-      ctx.fillStyle = highlightColor;
-      ctx.beginPath();
+      const hexPath = new Path2D();
       for (const h of hexesToHighlight) {
         const vertices = hexGeom.getHexVertices(h.x, h.y);
         const sv = vertices.map((v: { worldX: number; worldY: number }) => hexGeom.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, viewState.zoom));
-        ctx.moveTo(sv[0].screenX, sv[0].screenY);
-        for (let i = 1; i < sv.length; i++) ctx.lineTo(sv[i].screenX, sv[i].screenY);
-        ctx.closePath();
+        hexPath.moveTo(sv[0].screenX, sv[0].screenY);
+        for (let i = 1; i < sv.length; i++) hexPath.lineTo(sv[i].screenX, sv[i].screenY);
+        hexPath.closePath();
       }
-      ctx.fill();
+
+      ctx.globalAlpha = editingRegion ? 0.15 : 0.4;
+      ctx.fillStyle = highlightColor;
+      ctx.fill(hexPath);
 
       ctx.globalAlpha = 0.8;
       ctx.strokeStyle = highlightColor;
       ctx.lineWidth = 2 * viewState.zoom;
-      ctx.beginPath();
-      for (const h of hexesToHighlight) {
-        const vertices = hexGeom.getHexVertices(h.x, h.y);
-        const sv = vertices.map((v: { worldX: number; worldY: number }) => hexGeom.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, viewState.zoom));
-        ctx.moveTo(sv[0].screenX, sv[0].screenY);
-        for (let i = 1; i < sv.length; i++) ctx.lineTo(sv[i].screenX, sv[i].screenY);
-        ctx.closePath();
-      }
-      ctx.stroke();
+      ctx.stroke(hexPath);
       ctx.globalAlpha = 1;
     }
 

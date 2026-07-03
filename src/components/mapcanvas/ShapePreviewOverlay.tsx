@@ -16,6 +16,7 @@ import type { EffectiveDistanceSettings } from '#types/hooks/distanceMeasurement
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { cellToScreen } from '../../drawing/cellToScreenConverter';
+import { createViewportTransform } from './viewportTransform';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
 import { Z_INDEX } from '../../core/dmtConstants';
 
@@ -67,34 +68,17 @@ function worldToScreen(
 ): Point {
   if (!mapData.viewState) return { x: 0, y: 0 };
   const { zoom, center } = mapData.viewState;
-  const northDirection = mapData.northDirection ?? 0;
 
-  let offsetX: number, offsetY: number;
-  if (geometry.type === 'grid') {
-    const scaledCellSize = geometry.getScaledCellSize(zoom);
-    offsetX = canvasWidth / 2 - center.x * scaledCellSize;
-    offsetY = canvasHeight / 2 - center.y * scaledCellSize;
-  } else {
-    offsetX = canvasWidth / 2 - center.x * zoom;
-    offsetY = canvasHeight / 2 - center.y * zoom;
-  }
+  const { worldToBuffer } = createViewportTransform({
+    geometry,
+    width: canvasWidth,
+    height: canvasHeight,
+    zoom,
+    center,
+    northDirection: mapData.northDirection
+  });
 
-  let screenX = offsetX + worldX * zoom;
-  let screenY = offsetY + worldY * zoom;
-
-  if (northDirection !== 0) {
-    const cx = canvasWidth / 2;
-    const cy = canvasHeight / 2;
-    screenX -= cx;
-    screenY -= cy;
-    const angleRad = (northDirection * Math.PI) / 180;
-    const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
-    const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
-    screenX = rotatedX + cx;
-    screenY = rotatedY + cy;
-  }
-
-  return { x: screenX, y: screenY };
+  return worldToBuffer(worldX, worldY);
 }
 
 /**

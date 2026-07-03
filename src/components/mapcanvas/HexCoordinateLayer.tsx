@@ -33,6 +33,7 @@ import { useMapState } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { axialToOffset, offsetToAxial, columnToLabel, rowToLabel } from '../../geometry/core/offsetCoordinates';
 import { getEffectiveSettings } from '../../core/settingsAccessor';
+import { createViewportTransform, getCanvasDisplayMetrics } from './viewportTransform';
 import type { ExtendedHexGeometry } from '#types/contexts/context.types';
 function isInsideFlatToppedHexagon(wx: number, wy: number, circumradius: number): boolean {
   const dx = Math.abs(wx);
@@ -104,56 +105,33 @@ function getVisibleHexes(geometry: ExtendedHexGeometry, mapData: MapData, canvas
 
   const { viewState, northDirection = 0 } = mapData;
   const { zoom, center } = viewState;
-  
-  // Calculate offset from center (hex maps use world pixel coordinates for center)
-  const offsetX = canvas.width / 2 - center.x * zoom;
-  const offsetY = canvas.height / 2 - center.y * zoom;
-  
-  // Get canvas display rect for coordinate scaling
-  const rect = canvas.getBoundingClientRect();
+
+  const { pxOffsetX: offsetX, pxOffsetY: offsetY, worldToBuffer } = createViewportTransform({
+    geometry,
+    width: canvas.width,
+    height: canvas.height,
+    zoom,
+    center,
+    northDirection
+  });
+
   // Use the positioning ancestor (.windrose-canvas-container) for offset calculation,
   // since .windrose-coordinate-layer is position:absolute relative to it
   const positioningAncestor = canvas.closest('.windrose-canvas-container');
-  const containerRect = positioningAncestor?.getBoundingClientRect() ?? rect;
+  const { canvasOffsetX, canvasOffsetY, scaleX, scaleY } = getCanvasDisplayMetrics(canvas, positioningAncestor);
 
-  // Calculate canvas offset within the positioning container (due to flex centering)
-  const canvasOffsetX = rect.left - containerRect.left;
-  const canvasOffsetY = rect.top - containerRect.top;
-  
-  // Scale factors from canvas internal to display coordinates
-  const scaleX = rect.width / canvas.width;
-  const scaleY = rect.height / canvas.height;
-  
-  const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2;
-  
   // Helper to convert axial coords to display position
   const getDisplayPosition = (q: number, r: number): { displayX: number; displayY: number } | null => {
     const { worldX, worldY } = geometry.hexToWorld(q, r);
-    
-    let screenX = offsetX + worldX * zoom;
-    let screenY = offsetY + worldY * zoom;
-    
-    // Apply rotation if north direction is set
-    if (northDirection !== 0) {
-      const relX = screenX - centerX;
-      const relY = screenY - centerY;
-      
-      const angleRad = (northDirection * Math.PI) / 180;
-      const rotatedX = relX * Math.cos(angleRad) - relY * Math.sin(angleRad);
-      const rotatedY = relX * Math.sin(angleRad) + relY * Math.cos(angleRad);
-      
-      screenX = centerX + rotatedX;
-      screenY = centerY + rotatedY;
-    }
-    
+    const { x: screenX, y: screenY } = worldToBuffer(worldX, worldY);
+
     // Check if on screen
     const padding = 50;
     if (screenX < -padding || screenX > canvas.width + padding ||
         screenY < -padding || screenY > canvas.height + padding) {
       return null;
     }
-    
+
     // Convert to display coordinates (CSS pixels)
     return {
       displayX: (screenX * scaleX) + canvasOffsetX,

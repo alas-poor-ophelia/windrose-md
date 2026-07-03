@@ -14,7 +14,7 @@ import type { DiagonalRule, DistanceDisplayFormat } from '#types/settings/settin
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
-import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useShapeOverlayTools } from '../../hooks/interactions/useShapeOverlayTools';
 import { buildShapeOverlayActions } from '../../hooks/interactions/useSelectionActions';
 import { SelectionActionsOverlay } from '../toolbars/SelectionActionsOverlay';
@@ -38,7 +38,6 @@ const ShapeOverlayLayer = ({
 }: ShapeOverlayLayerProps): VNode | null => {
   const { canvasRef, containerRef, mapData, geometry, screenToWorld } = useMapState();
   const { selectedItem, isDraggingSelection } = useMapSelection();
-  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
   const isShapeTool = currentTool === 'shape';
   const isShapeSelected = selectedItem?.type === 'shapeOverlay' && !isDraggingSelection;
@@ -65,21 +64,10 @@ const ShapeOverlayLayer = ({
     onShapeOverlaysChange
   });
 
-  // Register handlers via Proxy pattern — always expose handleShapeSelection for select tool
-  const shapeHandlersRef = useRef<Record<string, unknown> | null>(null);
-  shapeHandlersRef.current = isShapeTool
+  // Always expose handleShapeSelection so the select tool can hit shapes
+  useLayerHandlers('shapeOverlay', isShapeTool
     ? { handlePointerDown, handlePointerMove, handleShapeSelection, handleShapeDragging, stopShapeDragging }
-    : { handleShapeSelection, handleShapeDragging, stopShapeDragging };
-
-  useEffect(() => {
-    const proxy = new Proxy({} as Record<string, unknown>, {
-      get(_target, prop: string) {
-        return shapeHandlersRef.current?.[prop];
-      }
-    });
-    registerHandlers('shapeOverlay', proxy);
-    return () => unregisterHandlers('shapeOverlay');
-  }, [registerHandlers, unregisterHandlers]);
+    : { handleShapeSelection, handleShapeDragging, stopShapeDragging });
 
   // ESC to cancel placement
   useEffect(() => {

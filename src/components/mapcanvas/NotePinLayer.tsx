@@ -14,12 +14,12 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
 import type { ObjectTypeId } from '#types/objects/object.types';
 
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect } from 'preact/hooks';
 import { useNotePinInteraction } from '../../hooks/interactions/useNotePinInteraction';
 import { useMapState } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { openNativeNoteLinkModal } from '../modals/NoteLinkModal';
-import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useApp } from '../../context/AppContext';
 
 
@@ -58,20 +58,7 @@ const NotePinLayer = ({
     handleNoteLinkCancel,
   } = useNotePinInteraction(currentTool, selectedObjectType);
 
-  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
-
-  const notePinHandlersRef = useRef<Record<string, unknown> | null>(null);
-  notePinHandlersRef.current = { handleNotePinPlacement };
-
-  useEffect(() => {
-    const proxy = new Proxy({} as Record<string, unknown>, {
-      get(_target, prop: string) {
-        return notePinHandlersRef.current?.[prop];
-      }
-    });
-    registerHandlers('notePin', proxy);
-    return () => unregisterHandlers('notePin');
-  }, [registerHandlers, unregisterHandlers]);
+  useLayerHandlers('notePin', { handleNotePinPlacement });
 
   useEffect(() => {
     if (!showNoteLinkModal || pendingNotePinId == null || pendingNotePinId === '' || !mapData) return;

@@ -22,7 +22,7 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { useMapState, useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { useLinkingMode } from '../../context/ObjectLinkingContext';
-import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useObjectInteractions } from '../../hooks/objects/useObjectInteractions';
 import type { MenuItem } from 'obsidian';
 import { Menu } from 'obsidian';
@@ -380,8 +380,6 @@ const ObjectLayer = ({
     handleEditNoteLink,
   } = useObjectModals({ onObjectsChange, handleNoteSubmit: (content: string, objectId: string | null) => { if (objectId != null && objectId !== '') handleNoteSubmit(content, objectId); } });
 
-  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
-
   // Wrap handleObjectSelection to intercept clicks when in linking mode
   const wrappedHandleObjectSelection = useCallback((
     clientX: number,
@@ -456,8 +454,7 @@ const ObjectLayer = ({
     return handleObjectSelection(clientX, clientY, gridX, gridY, isTouchActive);
   }, [isLinkingMode, linkingFrom, mapData, handleObjectSelection, applyLinkUpdate, cancelLinking, setSelectedItem]);
 
-  const objectHandlersRef = useRef<Record<string, unknown> | null>(null);
-  objectHandlersRef.current = {
+  useLayerHandlers('object', {
     handleObjectPlacement,
     handleObjectSelection: wrappedHandleObjectSelection,
     handleObjectDragging, handleObjectResizing,
@@ -465,17 +462,7 @@ const ObjectLayer = ({
     handleHoverUpdate, handleObjectWheel, handleObjectKeyDown,
     isResizing, resizeCorner,
     edgeSnapMode, setEdgeSnapMode
-  };
-
-  useEffect(() => {
-    const proxy = new Proxy({} as Record<string, unknown>, {
-      get(_target, prop: string) {
-        return objectHandlersRef.current?.[prop];
-      }
-    });
-    registerHandlers('object', proxy);
-    return () => unregisterHandlers('object');
-  }, [registerHandlers, unregisterHandlers]);
+  });
 
   const handleResizeButtonClick = (e: TargetedMouseEvent<HTMLElement>): void => {
     if (selectedItem?.type === 'object') {

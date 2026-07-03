@@ -13,10 +13,10 @@ import type { FogTool } from '../toolbars/VisibilityToolbar.tsx';
 import type { VNode } from 'preact';
 import type { FogOfWar, MapData } from '#types/core/map.types';
 
-import { useEffect, useRef } from 'preact/hooks';
 import { useFogTools } from '../../hooks/interactions/useFogTools';
 import { useMapState } from '../../context/MapContext';
-import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
+import { createViewportTransform, getCanvasDisplayMetrics } from './viewportTransform';
 import { getSettings } from '../../core/settingsAccessor';
 import { offsetToAxial } from '../../geometry/core/offsetCoordinates';
 import { Z_INDEX } from '../../core/dmtConstants';
@@ -47,7 +47,6 @@ const FogOfWarLayer = ({
   onInitializeFog
 }: FogOfWarLayerProps): VNode | null => {
   const { canvasRef, containerRef, mapData, geometry } = useMapState();
-  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
   const fogTools = useFogTools(activeTool, onFogChange, onInitializeFog);
   const {
@@ -60,26 +59,10 @@ const FogOfWarLayer = ({
   } = fogTools;
   const rectangleHover = fogTools.rectangleHover;
 
-  const fogHandlersRef = useRef<Record<string, unknown> | null>(null);
-  fogHandlersRef.current = {
+  useLayerHandlers('fogOfWar', {
     handlePointerDown, handlePointerMove, handlePointerUp, handleKeyDown,
     isDrawing, rectangleStart, rectangleHover
-  };
-
-  useEffect(() => {
-    if (!activeTool) {
-      unregisterHandlers('fogOfWar');
-      return undefined;
-    }
-
-    const proxy = new Proxy({} as Record<string, unknown>, {
-      get(_target, prop: string) {
-        return fogHandlersRef.current?.[prop];
-      }
-    });
-    registerHandlers('fogOfWar', proxy);
-    return () => unregisterHandlers('fogOfWar');
-  }, [activeTool, registerHandlers, unregisterHandlers]);
+  }, { enabled: activeTool != null });
 
   const renderPreviewOverlay = (): VNode | null => {
     if (!activeTool || !rectangleStart || !canvasRef.current || !containerRef?.current || !geometry) {
@@ -93,48 +76,11 @@ const FogOfWarLayer = ({
     const { zoom, center } = viewState;
     const { width, height } = canvas;
 
-    let scaledSize: number;
-    let pxOffsetX: number;
-    let pxOffsetY: number;
-
     const isGrid = geometry.type === 'grid';
-    if (isGrid) {
-      scaledSize = geometry.getScaledCellSize(zoom);
-      pxOffsetX = width / 2 - center.x * scaledSize;
-      pxOffsetY = height / 2 - center.y * scaledSize;
-    } else {
-      pxOffsetX = width / 2 - center.x * zoom;
-      pxOffsetY = height / 2 - center.y * zoom;
-      scaledSize = geometry.getScaledCellSize(zoom);
-    }
-
-    const containerRect = containerRef.current.getBoundingClientRect();
-    const canvasRect = canvas.getBoundingClientRect();
-
-    const canvasOffsetX = canvasRect.left - containerRect.left;
-    const canvasOffsetY = canvasRect.top - containerRect.top;
-
-    const displayScale = canvasRect.width / width;
-
-    /** Convert world coordinates to buffer-space screen coords (viewport + zoom + rotation) */
-    const worldToBuffer = (worldX: number, worldY: number): { x: number; y: number } => {
-      let screenX = pxOffsetX + worldX * zoom;
-      let screenY = pxOffsetY + worldY * zoom;
-
-      if ((northDirection ?? 0) !== 0) {
-        const cx = width / 2;
-        const cy = height / 2;
-        screenX -= cx;
-        screenY -= cy;
-        const angleRad = ((northDirection ?? 0) * Math.PI) / 180;
-        const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
-        const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
-        screenX = rotatedX + cx;
-        screenY = rotatedY + cy;
-      }
-
-      return { x: screenX, y: screenY };
-    };
+    const { scaledSize, worldToBuffer } = createViewportTransform({
+      geometry, width, height, zoom, center, northDirection
+    });
+    const { canvasOffsetX, canvasOffsetY, scaleX: displayScale } = getCanvasDisplayMetrics(canvas, containerRef.current);
 
     /** Convert offset coords (col, row) to buffer-space screen coords */
     const toScreen = (col: number, row: number, useCenter = true): { x: number; y: number } => {

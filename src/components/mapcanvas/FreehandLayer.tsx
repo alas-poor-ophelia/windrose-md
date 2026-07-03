@@ -12,7 +12,7 @@ import type { Curve } from '#types/core/curve.types';
 
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useMapState, useMapOperations } from '../../context/MapContext';
-import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { fitPointsToBezier } from '../../geometry/curves/curveFitting';
 import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
 import { getActiveLayer } from '../../persistence/layerAccessor';
@@ -40,7 +40,6 @@ const FreehandLayer = ({
 
   const { mapData, geometry, screenToWorld, getClientCoords, canvasRef } = useMapState();
   const { onCurvesChange } = useMapOperations();
-  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
   // Drawing state
   const isDrawingRef = useRef(false);
@@ -258,19 +257,7 @@ const FreehandLayer = ({
     return () => removeOverlay();
   }, [removeOverlay]);
 
-  // Register event handlers (ref + proxy to avoid re-registration churn)
-  const freehandHandlersRef = useRef<Record<string, unknown> | null>(null);
-  freehandHandlersRef.current = { handlePointerDown, handlePointerMove, stopDrawing };
-
-  useEffect(() => {
-    const proxy = new Proxy({} as Record<string, unknown>, {
-      get(_target, prop: string) {
-        return freehandHandlersRef.current?.[prop];
-      }
-    });
-    registerHandlers('freehand', proxy);
-    return () => unregisterHandlers('freehand');
-  }, [registerHandlers, unregisterHandlers]);
+  useLayerHandlers('freehand', { handlePointerDown, handlePointerMove, stopDrawing });
 
   // No visual output — drawing happens on the overlay canvas
   return null;

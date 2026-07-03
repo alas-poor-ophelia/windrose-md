@@ -10,21 +10,41 @@
 
 import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
-import type { TileAssignment, TileRotation, TileLayerRole } from '#types/tiles/tile.types';
+import type { TileAssignment, TileRotation, TileLayerRole, TilesetDef } from '#types/tiles/tile.types';
 import type { TileSubtoolId } from '../../assets/tileForm';
 
-import { useCallback, useEffect, useRef } from 'preact/hooks';
+import { useCallback, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
-import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useApp } from '../../context/AppContext';
 import { getActiveLayer, getActiveBoardLayers } from '../../persistence/layerAccessor';
 import { preloadImage } from '../../assets/imageOperations';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
+import type { ResolvedTileRender } from '../../assets/tileRenderResolution';
 import { resolveTileRender, EDGE_BLEND_FEATHER } from '../../assets/tileRenderResolution';
 import { cellsCoveredByAssignment, assignmentsOverlap } from '../../assets/tileFootprint';
 import { getBrushCells, bresenhamLine, floodFillCells } from '../../drawing/tilePlacementOps';
 import { scatterSpacing, makeScatterDrop } from '../../drawing/scatterBrush';
 
+/**
+ * Grid-only paint-time render resolution for the selected tile. The blend
+ * choice is captured onto region placements at paint time — an explicit 0
+ * pins hard edges even if the tile later gains a metadata feather, so
+ * toggling blend never restyles already-painted cells.
+ */
+function resolvePaintTimeRender(
+  isGrid: boolean,
+  entry: { vaultPath?: string } | undefined,
+  tileset: TilesetDef | undefined,
+  paintEdgeBlend: boolean
+): { resolved: ResolvedTileRender | undefined; feather: number | undefined } {
+  const meta = isGrid && entry?.vaultPath != null && entry.vaultPath !== '' ? getTileMetadataForRender()[entry.vaultPath] : undefined;
+  const resolved = isGrid ? resolveTileRender(undefined, meta, tileset) : undefined;
+  const feather = resolved?.renderMode === 'region'
+    ? (paintEdgeBlend ? EDGE_BLEND_FEATHER : (resolved.edgeFeather > 0 ? 0 : undefined))
+    : undefined;
+  return { resolved, feather };
+}
 
 // ===========================================
 // Component
@@ -65,7 +85,6 @@ const TilePlacementLayer = ({
 }: TilePlacementLayerProps): VNode | null => {
   const { mapData, geometry, screenToGrid, screenToWorld } = useMapState();
   const app = useApp();
-  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
   const isTileTool = currentTool === 'tilePaint';
   const hasTileSelected = selectedTilesetId != null && selectedTilesetId !== '' && selectedTileId != null && selectedTileId !== '';
@@ -98,19 +117,10 @@ const TilePlacementLayer = ({
     // brush size and places a single footprint at the anchor. Resolution goes
     // through resolveTileRender so region tiles never carry a span (a seamless
     // texture's footprint would make each placement swallow its neighbours).
-    const isGrid = geometry?.type === 'grid';
-    const meta = isGrid && entry?.vaultPath != null && entry.vaultPath !== '' ? getTileMetadataForRender()[entry.vaultPath] : undefined;
-    const resolved = isGrid ? resolveTileRender(undefined, meta, ts) : undefined;
+    const { resolved, feather } = resolvePaintTimeRender(geometry?.type === 'grid', entry, ts, paintEdgeBlend);
     const spanW = resolved != null && resolved.spanW > 1 ? resolved.spanW : undefined;
     const spanH = resolved != null && resolved.spanH > 1 ? resolved.spanH : undefined;
     const hasFootprint = spanW != null || spanH != null;
-
-    // Capture the blend choice onto region placements at paint time — an
-    // explicit 0 pins hard edges even if the tile later gains a metadata
-    // feather, so toggling blend never restyles already-painted cells.
-    const feather = resolved?.renderMode === 'region'
-      ? (paintEdgeBlend ? EDGE_BLEND_FEATHER : (resolved.edgeFeather > 0 ? 0 : undefined))
-      : undefined;
 
     const cells = hasFootprint ? [{ col, row }] : getBrushCells(col, row, brushSize);
 
@@ -190,13 +200,7 @@ const TilePlacementLayer = ({
     const entry = ts?.tiles.find(t => t.id === selectedTileId);
     if (entry?.vaultPath != null && entry.vaultPath !== '') void preloadImage(app, entry.vaultPath);
 
-    // Same paint-time blend capture as the grid brush (see placeTilesInBrush).
-    const isGrid = geometry?.type === 'grid';
-    const meta = isGrid && entry?.vaultPath != null && entry.vaultPath !== '' ? getTileMetadataForRender()[entry.vaultPath] : undefined;
-    const resolved = isGrid ? resolveTileRender(undefined, meta, ts) : undefined;
-    const feather = resolved?.renderMode === 'region'
-      ? (paintEdgeBlend ? EDGE_BLEND_FEATHER : (resolved.edgeFeather > 0 ? 0 : undefined))
-      : undefined;
+    const { feather } = resolvePaintTimeRender(geometry?.type === 'grid', entry, ts, paintEdgeBlend);
 
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles ?? [];
@@ -422,20 +426,9 @@ const TilePlacementLayer = ({
     scatterLastDropRef.current = null;
   }, [onTilesChange]);
 
-  const tileHandlersRef = useRef<Record<string, unknown> | null>(null);
-  tileHandlersRef.current = isTileTool
+  useLayerHandlers('tilePlacement', isTileTool
     ? { handlePointerDown, handlePointerMove, handlePointerUp }
-    : {};
-
-  useEffect(() => {
-    const proxy = new Proxy({} as Record<string, unknown>, {
-      get(_target, prop: string) {
-        return tileHandlersRef.current?.[prop];
-      }
-    });
-    registerHandlers('tilePlacement', proxy);
-    return () => unregisterHandlers('tilePlacement');
-  }, [registerHandlers, unregisterHandlers]);
+    : {});
 
   return null;
 };

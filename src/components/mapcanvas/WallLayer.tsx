@@ -20,7 +20,7 @@ import type { VNode } from 'preact';
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
-import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
 import { renderWallPaths, flattenWallPath, quadPoint } from '../../geometry/renderers/wallPathRenderer';
 import { getActiveLayer } from '../../persistence/layerAccessor';
@@ -137,7 +137,6 @@ const WallLayer = ({
 }: WallLayerProps): VNode | null => {
   const app = useApp();
   const { mapData, geometry, screenToWorld, getClientCoords, canvasRef } = useMapState();
-  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
 
   // ---- Draw state ----
   const [vertices, setVertices] = useState<WallVertex[]>([]);
@@ -168,9 +167,7 @@ const WallLayer = ({
 
   const isWallTool = currentTool === 'wall';
   const isDrawing = vertices.length > 0;
-  const cellSize = geometry != null
-    ? (geometry.type === 'grid' ? (geometry as unknown as { cellSize: number }).cellSize : (geometry as unknown as { hexSize: number }).hexSize)
-    : 32;
+  const cellSize = geometry != null ? geometry.cellSize : 32;
   const snapDistance = cellSize * 0.5;
 
   const getWalls = useCallback((): WallPath[] => {
@@ -203,7 +200,7 @@ const WallLayer = ({
   const snapWorld = useCallback((wx: number, wy: number): { x: number; y: number } => {
     if (!snapRef.current || geometry == null) return { x: wx, y: wy };
     if (geometry.type === 'grid') {
-      const cs = (geometry as unknown as { cellSize: number }).cellSize;
+      const cs = geometry.cellSize;
       return { x: Math.round(wx / cs) * cs, y: Math.round(wy / cs) * cs };
     }
     const grid = geometry.worldToGrid(wx, wy);
@@ -837,20 +834,7 @@ const WallLayer = ({
   }, [isWallTool, cancelDrawing, removeOverlay]);
   useEffect(() => () => removeOverlay(), [removeOverlay]);
 
-  // Register event handlers (ref + proxy to avoid re-registration churn)
-  const handlersRef = useRef<Record<string, unknown> | null>(null);
-  handlersRef.current = { handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick };
-
-  useEffect(() => {
-    const proxy = new Proxy({} as Record<string, unknown>, {
-      get(_target, prop: string) {
-        return handlersRef.current?.[prop];
-      },
-    });
-    registerHandlers('wall', proxy);
-    return () => unregisterHandlers('wall');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useLayerHandlers('wall', { handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick });
 
   // ---- Publish the control surface to the drawer footer ----
   // WallLayer owns the wall-tool state but renders no chrome; the footer draws

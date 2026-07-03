@@ -10,12 +10,11 @@ import type { VNode } from 'preact';
 import type { EffectiveDistanceSettings, MapDistanceOverrides } from '#types/hooks/distanceMeasurement.types';
 import type { PluginSettings } from '#types/settings/settings.types';
 
-import { useEffect, useRef } from 'preact/hooks';
 import { useDistanceMeasurement } from '../../hooks/interactions/useDistanceMeasurement';
 import { getSettings } from '../../core/settingsAccessor';
 import { MeasurementOverlay } from '../overlays/MeasurementOverlay';
 import { useMapState } from '../../context/MapContext';
-import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 
 
 /** Props for MeasurementLayer component */
@@ -57,20 +56,7 @@ const MeasurementLayer = ({
     (mapDistanceOverrides ?? null) as MapDistanceOverrides | null
   );
 
-  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
-
-  const measureHandlersRef = useRef<Record<string, unknown> | null>(null);
-  measureHandlersRef.current = { handleMeasureClick, handleMeasureMove, clearMeasurement, measureOrigin };
-
-  useEffect(() => {
-    const proxy = new Proxy({} as Record<string, unknown>, {
-      get(_target, prop: string) {
-        return measureHandlersRef.current?.[prop];
-      }
-    });
-    registerHandlers('measure', proxy);
-    return () => unregisterHandlers('measure');
-  }, [registerHandlers, unregisterHandlers]);
+  useLayerHandlers('measure', { handleMeasureClick, handleMeasureMove, clearMeasurement, measureOrigin });
 
   if (currentTool !== 'measure' || !measureOrigin) {
     return null;
