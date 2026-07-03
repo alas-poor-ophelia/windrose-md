@@ -32,8 +32,8 @@ windrose/                     # Dev root (this directory)
 npm run build       # Build main.js with esbuild
 npm run deploy      # Build + copy main.js/styles.css/manifest.json to vault
 npm run build:watch # Watch mode (rebuilds on file change)
-npm run test:unit   # Unit tests (~300ms)
-npm run test:e2e    # E2E tests (~35-40s)
+npm run test:unit   # Unit tests (~4s)
+npm run test:e2e    # E2E tests (FULL SUITE ~15 MIN — see Test Output Capture below)
 npm run check       # Typecheck + lint
 ```
 
@@ -56,6 +56,18 @@ npm run check       # Typecheck + lint
 | Component rendering | Optional | Required |
 | Tool interactions | Optional | Required |
 | Before committing | Required | Required |
+
+## Test Output Capture (E2E)
+
+The full E2E suite takes ~15 minutes. **NEVER truncate its live output** (`| Select-Object -Last N`, `| Select-String`, `| tail`) — a truncated failing run loses the failure list and costs a full re-run just to learn which tests failed. This has happened repeatedly.
+
+- Every `npm run test:e2e` run automatically writes full machine-readable results to `test-results.json` (vitest `json` reporter, gitignored). Read failures from there after the run — the console can be truncated with impunity, the JSON cannot be lost.
+- PowerShell one-liner to list failures from the last run:
+  ```powershell
+  $r = Get-Content test-results.json -Raw | ConvertFrom-Json
+  $r.testResults | Where-Object { $_.status -ne 'passed' } | ForEach-Object { $f = $_.name; $_.assertionResults | Where-Object { $_.status -eq 'failed' } | ForEach-Object { "$f :: $($_.fullName)" } }
+  ```
+- If you must pipe console output, `Tee-Object` to a file first and filter the file afterward.
 
 ## Documentation Maintenance
 

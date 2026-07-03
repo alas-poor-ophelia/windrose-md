@@ -10,6 +10,9 @@ export default defineConfig({
     // Longer timeout for Obsidian startup
     testTimeout: 60000,
     hookTimeout: 60000,
+    // Always persist full results: a ~15 min run must never depend on scrollback
+    reporters: ["default", "json"],
+    outputFile: "test-results.json",
     // Retry flaky tests (Obsidian sometimes doesn't render)
     retry: 1,
     // Run tests sequentially since each launches Obsidian
