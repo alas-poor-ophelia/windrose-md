@@ -52,6 +52,27 @@ import { predictRenderMode } from '../../assets/renderModePredictor';
 import { MAX_TILE_SPAN } from '../../assets/tileRenderResolution';
 import { runDetectionScan } from '../../assets/tileImageScan';
 
+/** Pure ref-callback body: (re)binds a ResizeObserver to whichever node is
+ *  currently mounted. Module-level on purpose — it must not close over
+ *  component state, so the zero-dep useCallback wrappers can never go stale. */
+function observeWidth(
+  store: { current: HTMLDivElement | null },
+  roStore: { current: ResizeObserver | null },
+  setWidth: (w: number) => void,
+  node: HTMLDivElement | null
+): void {
+  store.current = node;
+  roStore.current?.disconnect();
+  roStore.current = null;
+  if (node == null) return;
+  const ro = new ResizeObserver(entries => {
+    const entry = entries[0];
+    if (entry != null) setWidth(entry.contentRect.width);
+  });
+  ro.observe(node);
+  roStore.current = ro;
+}
+
 // ===========================================
 // Content-bounds detection for tile thumbnails
 // ===========================================
@@ -589,16 +610,19 @@ const TileAssetBrowser = memo(({
     };
   }, []);
 
-  useEffect(() => {
-    const target = organize ? orgScrollRef.current : gridWrapRef.current;
-    if (!target) return;
-    const ro = new ResizeObserver(entries => {
-      const entry = entries[0];
-      if (entry != null) setContainerWidth(entry.contentRect.width);
-    });
-    ro.observe(target);
-    return () => ro.disconnect();
-  }, [organize]);
+  // Callback refs (not a mount effect): the first render after a map switch is
+  // often the no-tilesets empty state while the tileset scan is still in
+  // flight, so the wrapper node doesn't exist yet — a mount-time observer
+  // would find null and never retry, leaving containerWidth stuck at 0 and the
+  // grid permanently empty. Attaching per-node catches whenever it appears.
+  const gridRoRef = useRef<ResizeObserver | null>(null);
+  const orgRoRef = useRef<ResizeObserver | null>(null);
+  const attachGridWrap = useCallback((node: HTMLDivElement | null): void => {
+    observeWidth(gridWrapRef, gridRoRef, setContainerWidth, node);
+  }, []);
+  const attachOrgScroll = useCallback((node: HTMLDivElement | null): void => {
+    observeWidth(orgScrollRef, orgRoRef, setContainerWidth, node);
+  }, []);
 
   const handleToggleCategory = (category: string): void => {
     setCollapsedCategories(prev => {
@@ -1475,7 +1499,7 @@ const TileAssetBrowser = memo(({
             </span>
           </div>
 
-          <div className="windrose-tb-org-body" ref={orgScrollRef}>
+          <div className="windrose-tb-org-body" ref={attachOrgScroll}>
             <div style={{ height: orgVirtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
               {orgVirtualizer.getVirtualItems().map(virtualRow => {
                 const rowTiles = orgRows[virtualRow.index];
@@ -2212,7 +2236,7 @@ const TileAssetBrowser = memo(({
           </div>
         )}
 
-        <div className="windrose-tb-grid-wrap" ref={gridWrapRef}>
+        <div className="windrose-tb-grid-wrap" ref={attachGridWrap}>
           {compact ? (
             openCat != null ? (
               // Compact leaf — drilled into a category. Grid or list per viewMode.
