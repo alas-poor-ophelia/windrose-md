@@ -7,9 +7,10 @@ import {
   generateWallEdgesForCells,
   generateAllRoomBoundaryEdges,
 } from "../../../src/generation/dungeonGenerator.js";
+import type { CellCoord, DungeonRoom } from "../../../src/generation/dungeonGenerator.js";
 
 // Helper to create a simple rectangular room
-function createRoom(id: string, x: number, y: number, width: number, height: number) {
+function createRoom(id: string, x: number, y: number, width: number, height: number): DungeonRoom {
   return { id, x, y, width, height, shape: "rectangle" };
 }
 
@@ -29,7 +30,7 @@ describe("dungeonDoors", () => {
         { x: 6, y: 5 }, // east
         { x: 5, y: 5 }, // center
       ]);
-      const rooms: any[] = [];
+      const rooms: DungeonRoom[] = [];
       const pos = { x: 5, y: 5 };
 
       expect(isAtCorridorIntersection(pos, corridorSet, rooms)).toBe(true);
@@ -43,7 +44,7 @@ describe("dungeonDoors", () => {
         { x: 6, y: 5 }, // east
         { x: 5, y: 5 }, // center
       ]);
-      const rooms: any[] = [];
+      const rooms: DungeonRoom[] = [];
       const pos = { x: 5, y: 5 };
 
       expect(isAtCorridorIntersection(pos, corridorSet, rooms)).toBe(false);
@@ -55,7 +56,7 @@ describe("dungeonDoors", () => {
         { x: 5, y: 5 }, // center
         { x: 6, y: 5 }, // east
       ]);
-      const rooms: any[] = [];
+      const rooms: DungeonRoom[] = [];
       const pos = { x: 5, y: 5 };
 
       expect(isAtCorridorIntersection(pos, corridorSet, rooms)).toBe(false);
@@ -67,7 +68,7 @@ describe("dungeonDoors", () => {
         { x: 5, y: 5 }, // center
         { x: 5, y: 6 }, // south
       ]);
-      const rooms: any[] = [];
+      const rooms: DungeonRoom[] = [];
       const pos = { x: 5, y: 5 };
 
       expect(isAtCorridorIntersection(pos, corridorSet, rooms)).toBe(false);
@@ -273,14 +274,14 @@ describe("dungeonDoors", () => {
       const rooms = [createRoom("room1", 5, 5, 3, 3)];
       // Corridor cell north of room
       const corridorCellSet = createCorridorSet([{ x: 6, y: 4 }]);
-      const doorPositions: any[] = [];
+      const doorPositions: CellCoord[] = [];
 
       const edges = generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions);
 
       expect(edges.length).toBeGreaterThan(0);
       // Should have bottom edge on cell (6, 4) to close off room from corridor
       const hasExpectedEdge = edges.some(
-        (e: any) => e.x === 6 && e.y === 4 && e.side === "bottom"
+        (e) => e.x === 6 && e.y === 4 && e.side === "bottom"
       );
       expect(hasExpectedEdge).toBe(true);
     });
@@ -297,11 +298,11 @@ describe("dungeonDoors", () => {
       const edges = generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions);
 
       // Should NOT have edge at door position (6, 4)
-      const hasDoorEdge = edges.some((e: any) => e.x === 6 && e.y === 4);
+      const hasDoorEdge = edges.some((e) => e.x === 6 && e.y === 4);
       expect(hasDoorEdge).toBe(false);
 
       // Should have edge at non-door position (7, 4)
-      const hasOtherEdge = edges.some((e: any) => e.x === 7 && e.y === 4);
+      const hasOtherEdge = edges.some((e) => e.x === 7 && e.y === 4);
       expect(hasOtherEdge).toBe(true);
     });
 
@@ -313,12 +314,12 @@ describe("dungeonDoors", () => {
       ];
       // Corridor between them
       const corridorCellSet = createCorridorSet([{ x: 5, y: 7 }]);
-      const doorPositions: any[] = [];
+      const doorPositions: CellCoord[] = [];
 
       const edges = generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions);
 
       // Check for duplicate edges
-      const edgeKeys = edges.map((e: any) => `${e.x},${e.y},${e.side}`);
+      const edgeKeys = edges.map((e) => `${e.x},${e.y},${e.side}`);
       const uniqueKeys = new Set(edgeKeys);
       expect(edgeKeys.length).toBe(uniqueKeys.size);
     });
@@ -327,7 +328,7 @@ describe("dungeonDoors", () => {
       const rooms = [createRoom("room1", 5, 5, 3, 3)];
       // Corridor far from room
       const corridorCellSet = createCorridorSet([{ x: 0, y: 0 }]);
-      const doorPositions: any[] = [];
+      const doorPositions: CellCoord[] = [];
 
       const edges = generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions);
 

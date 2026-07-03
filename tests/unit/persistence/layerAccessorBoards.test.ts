@@ -35,37 +35,25 @@ import {
 
 import type { MapData, MapLayer, BoardId } from "#types/core/map.types";
 
+import { makeLayer, makeMapData } from "../helpers/fixtures";
+
 function mkLayer(
   id: string,
   order: number,
   boardId?: BoardId,
   extra: Partial<MapLayer> = {}
 ): MapLayer {
-  return {
+  return makeLayer({
     id,
     name: id,
     order,
-    visible: true,
-    cells: [],
-    curves: [],
-    edges: [],
-    objects: [],
-    textLabels: [],
-    fogOfWar: null,
     ...(boardId != null ? { boardId } : {}),
     ...extra,
-  } as MapLayer;
+  });
 }
 
 function mkMap(layers: MapLayer[], activeLayerId: string, partial: Partial<MapData> = {}): MapData {
-  return {
-    schemaVersion: 2,
-    mapType: "grid",
-    activeLayerId,
-    layerPanelVisible: false,
-    layers,
-    ...partial,
-  } as MapData;
+  return makeMapData({ layers, activeLayerId, ...partial });
 }
 
 /** Two-board fixture: A{a1@0, a2@1}, B{b1@0, b2@1}; active a1 on board A. */

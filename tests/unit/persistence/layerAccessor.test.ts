@@ -35,6 +35,8 @@ import {
 
 import type { MapData, MapLayer } from "#types/core/map.types";
 
+import { makeLayer, makeMapData } from "../helpers/fixtures";
+
 // Helper to create a basic layer
 function createLayer(
   id: string,
@@ -42,29 +44,12 @@ function createLayer(
   order: number,
   visible = true
 ): MapLayer {
-  return {
-    id,
-    name,
-    order,
-    visible,
-    cells: [],
-    curves: [],
-    edges: [],
-    objects: [],
-    textLabels: [],
-    fogOfWar: null,
-  } as MapLayer;
+  return makeLayer({ id, name, order, visible });
 }
 
 // Helper to create basic map data
 function createMapData(layers: MapLayer[], activeLayerId: string): MapData {
-  return {
-    schemaVersion: 2,
-    mapType: "grid",
-    activeLayerId,
-    layerPanelVisible: false,
-    layers,
-  };
+  return makeMapData({ layers, activeLayerId });
 }
 
 describe("layerAccessor", () => {
