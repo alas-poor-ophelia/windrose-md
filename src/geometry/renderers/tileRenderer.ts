@@ -86,6 +86,63 @@ function regionFeatherPx(cellPx: number, ratio: number): number {
   return cellPx * ratio;
 }
 
+/** Cached half-scale mip chains for pattern source images, keyed by the decoded
+ *  image. WebKit rasterizes canvas patterns without mip levels: at transform
+ *  scales far below 1 (a 3000px Dungeondraft texture on a zoomed-out map runs
+ *  ~0.01–0.05) the per-tile resampling aliases into moire/crosshatch and iPadOS
+ *  can drop pattern tiles outright at specific zoom levels. Chromium's Skia
+ *  mipmaps internally, which is why desktop never shows it. */
+const PATTERN_MIP_MAX_LEVEL = 5;
+const _patternMips = new WeakMap<HTMLImageElement, HTMLCanvasElement[]>();
+
+/** Swap a heavily-minified pattern source for a pre-downscaled mip so the
+ *  pattern's effective scale lands in (0.5, 1]. Scale ratios are corrected by
+ *  the mip's EXACT dimensions (not 2^level) so the on-screen repeat period —
+ *  and therefore the world anchoring — is identical to the full-res pattern. */
+function patternSourceForScale(
+  img: HTMLImageElement,
+  scale: number
+): { source: HTMLImageElement | HTMLCanvasElement; scaleX: number; scaleY: number } {
+  let level = 0;
+  for (let s = scale; s < 0.5 && level < PATTERN_MIP_MAX_LEVEL; s *= 2) level++;
+  if (level === 0 || typeof document === 'undefined') {
+    return { source: img, scaleX: scale, scaleY: scale };
+  }
+  let chain = _patternMips.get(img);
+  if (chain == null) {
+    chain = [];
+    _patternMips.set(img, chain);
+  }
+  let src: HTMLImageElement | HTMLCanvasElement = img;
+  let sw = img.naturalWidth;
+  let sh = img.naturalHeight;
+  for (let i = 0; i < level; i++) {
+    let mip = chain[i];
+    if (mip == null) {
+      const w = Math.floor(sw / 2);
+      const h = Math.floor(sh / 2);
+      if (w < 1 || h < 1) break;
+      mip = activeDocument.createElement('canvas');
+      mip.width = w;
+      mip.height = h;
+      const mctx = mip.getContext('2d');
+      if (mctx == null) break;
+      mctx.imageSmoothingEnabled = true;
+      mctx.drawImage(src, 0, 0, w, h);
+      chain[i] = mip;
+    }
+    src = mip;
+    sw = mip.width;
+    sh = mip.height;
+  }
+  if (src === img) return { source: img, scaleX: scale, scaleY: scale };
+  return {
+    source: src,
+    scaleX: (scale * img.naturalWidth) / sw,
+    scaleY: (scale * img.naturalHeight) / sh,
+  };
+}
+
 /** Shared render probe: draw a 16×16 white square through `blur` (expected
  *  sigma ≈ 3) and require a solid interior plus a partial-alpha tail 3px
  *  outside the edge. Chromium-measured: interior 253, tail 57 — thresholds
@@ -440,7 +497,8 @@ function renderRegionFills(
       hardFillRegion(ctx, img, grp, path, geometry, viewState, screenPerWorld, scale, translateX, translateY, alpha, minX, minY, maxX, maxY);
       continue;
     }
-    const pattern = octx.createPattern(img, 'repeat');
+    const patSrc = patternSourceForScale(img, scale);
+    const pattern = octx.createPattern(patSrc.source, 'repeat');
     if (!pattern) continue;
 
     octx.clearRect(0, 0, bw, bh);
@@ -486,7 +544,7 @@ function renderRegionFills(
     }
     // 2. Paint the texture only where the mask exists, weighted by mask alpha.
     octx.globalCompositeOperation = 'source-in';
-    pattern.setTransform(new DOMMatrix([scale, 0, 0, scale, translateX - bx, translateY - by]));
+    pattern.setTransform(new DOMMatrix([patSrc.scaleX, 0, 0, patSrc.scaleY, translateX - bx, translateY - by]));
     octx.fillStyle = pattern;
     octx.fillRect(0, 0, bw, bh);
     octx.globalCompositeOperation = 'source-over';
@@ -513,9 +571,10 @@ function hardFillRegion(
   alpha: number,
   minX: number, minY: number, maxX: number, maxY: number
 ): void {
-  const pattern = ctx.createPattern(img, 'repeat');
+  const patSrc = patternSourceForScale(img, scale);
+  const pattern = ctx.createPattern(patSrc.source, 'repeat');
   if (!pattern) return;
-  pattern.setTransform(new DOMMatrix([scale, 0, 0, scale, translateX, translateY]));
+  pattern.setTransform(new DOMMatrix([patSrc.scaleX, 0, 0, patSrc.scaleY, translateX, translateY]));
   ctx.save();
   ctx.globalAlpha = alpha;
   if (grp.cells.length > 0) {
