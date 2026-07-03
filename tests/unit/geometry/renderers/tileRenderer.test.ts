@@ -16,6 +16,7 @@ import {
   shadowBlurImage,
   pyramidLevels,
   pyramidBlurImage,
+  tileOrientationAdaptation,
 } from "../../../../src/geometry/renderers/tileRenderer";
 
 import type { TileAssignment, TilesetDef } from '#types/tiles/tile.types';
@@ -271,6 +272,35 @@ describe('tileRenderer', () => {
       // Override 'fill' should stretch to hex bounding box (independent scaling)
       expect(rect.drawWidth).toBeCloseTo(SQRT3 * 80, 2);
       expect(rect.drawHeight).toBeCloseTo(2 * 80, 2);
+    });
+  });
+
+  describe('tileOrientationAdaptation', () => {
+    it('rotates pointy art +30° and sizes in the pointy frame on flat maps', () => {
+      expect(tileOrientationAdaptation('flat', 'pointy'))
+        .toEqual({ sizeOrientation: 'pointy', rotationDeg: 30 });
+    });
+
+    it('rotates flat art -30° and sizes in the flat frame on pointy maps', () => {
+      expect(tileOrientationAdaptation('pointy', 'flat'))
+        .toEqual({ sizeOrientation: 'flat', rotationDeg: -30 });
+    });
+
+    it('adapts nothing when art matches the map orientation', () => {
+      expect(tileOrientationAdaptation('flat', 'flat'))
+        .toEqual({ sizeOrientation: 'flat', rotationDeg: 0 });
+      expect(tileOrientationAdaptation('pointy', 'pointy'))
+        .toEqual({ sizeOrientation: 'pointy', rotationDeg: 0 });
+    });
+
+    it('adapts nothing when art orientation is unknown', () => {
+      expect(tileOrientationAdaptation('flat', undefined))
+        .toEqual({ sizeOrientation: 'flat', rotationDeg: 0 });
+    });
+
+    it('adapts nothing on grid maps regardless of art orientation', () => {
+      expect(tileOrientationAdaptation('grid', 'pointy'))
+        .toEqual({ sizeOrientation: 'grid', rotationDeg: 0 });
     });
   });
 
@@ -808,6 +838,76 @@ describe('tileRenderer', () => {
       });
 
       expect(ctx.drawImage).toHaveBeenCalledTimes(1);
+    });
+
+    // ---- Art-orientation adaptation ----
+
+    it('sizes mismatched pointy art in the pointy frame and rotates 30° on flat maps', () => {
+      const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
+      const ctx = makeCtx();
+      const rects: Array<{ w: number; h: number }> = [];
+      ctx.drawImage.mockImplementation((_img: unknown, _x: number, _y: number, w: number, h: number) => {
+        rects.push({ w, h });
+      });
+
+      const ts = makeTileset({ artOrientation: 'pointy' });
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1' },
+      ];
+
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => fakeImg,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      // Map is flat (hexSize 32): pointy frame = sqrt(3)*32 wide, 2*32 tall
+      expect(rects[0].w).toBeCloseTo(SQRT3 * 32, 2);
+      expect(rects[0].h).toBeCloseTo(2 * 32, 2);
+      expect(ctx.rotate).toHaveBeenCalledWith((30 * Math.PI) / 180);
+    });
+
+    it('does not rotate or reframe when art orientation matches the map', () => {
+      const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
+      const ctx = makeCtx();
+      const rects: Array<{ w: number; h: number }> = [];
+      ctx.drawImage.mockImplementation((_img: unknown, _x: number, _y: number, w: number, h: number) => {
+        rects.push({ w, h });
+      });
+
+      const ts = makeTileset({ artOrientation: 'flat' });
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1' },
+      ];
+
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => fakeImg,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      // Flat frame on a flat map: 2*32 wide, sqrt(3)*32 tall, no rotation
+      expect(rects[0].w).toBeCloseTo(2 * 32, 2);
+      expect(rects[0].h).toBeCloseTo(SQRT3 * 32, 2);
+      expect(ctx.rotate).not.toHaveBeenCalled();
+    });
+
+    it('composes user rotation with the orientation adaptation', () => {
+      const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
+      const ctx = makeCtx();
+
+      const ts = makeTileset({ artOrientation: 'pointy' });
+      const tiles: TileAssignment[] = [
+        { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1', rotation: 60 },
+      ];
+
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [ts], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => fakeImg,
+        canvasWidth: 800,
+        canvasHeight: 600,
+      });
+
+      expect(ctx.rotate).toHaveBeenCalledWith((90 * Math.PI) / 180);
     });
 
     // ---- Error guard tests ----

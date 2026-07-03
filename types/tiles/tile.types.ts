@@ -30,6 +30,12 @@ interface TilesetBase {
    *  If naturalWidth/tileWidth < this OR naturalHeight/cellHeight < this,
    *  the tile uses stamp rendering instead of cell-filling. @default 0.5 */
   stampThreshold?: number;
+  /** Orientation of the hexagonal artwork itself ('pointy' = vertex-up art),
+   *  auto-detected from the alpha mask at probe time. When it differs from a
+   *  hex map's cell orientation, the renderer sizes the tile in the art's
+   *  frame and rotates ±30° so the art snaps to the cell. Absent = unknown
+   *  (non-hexagonal art, e.g. square DD textures) → no adaptation. */
+  artOrientation?: 'flat' | 'pointy';
   /** Minimum stamp scale as fraction of cell's smaller screen dimension.
    *  Prevents tiny stamps from becoming invisible at low zoom. @default 0.2 */
   minStampScale?: number;

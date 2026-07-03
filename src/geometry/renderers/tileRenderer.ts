@@ -644,6 +644,25 @@ function calculateTileDrawRect(
   return { drawX, drawY, drawWidth, drawHeight };
 }
 
+/**
+ * Pure: how a hex tile's art orientation adapts to the cell orientation.
+ * Hexagonal art can only match a hex cell of the same orientation — non-uniform
+ * scaling never turns a pointy-top hexagon into a flat-top one. When they
+ * differ, the tile is sized in the ART's frame (its own orientation's cell
+ * bbox) and rotated ±30° about the cell center so it lands on the cell.
+ * Grid maps and unknown art orientations adapt nothing.
+ */
+function tileOrientationAdaptation(
+  mapOrientation: string,
+  artOrientation: 'flat' | 'pointy' | undefined
+): { sizeOrientation: string; rotationDeg: number } {
+  const isHex = mapOrientation === 'flat' || mapOrientation === 'pointy';
+  if (!isHex || artOrientation == null || artOrientation === mapOrientation) {
+    return { sizeOrientation: mapOrientation, rotationDeg: 0 };
+  }
+  return { sizeOrientation: artOrientation, rotationDeg: artOrientation === 'pointy' ? 30 : -30 };
+}
+
 // ===========================================
 // Entry Map Cache
 // ===========================================
@@ -664,6 +683,7 @@ function getEntryMap(tilesets: TilesetDef[]): Map<string, { entry: { vaultPath: 
       + ':' + (ts.fitMode ?? '')
       + ':' + (ts.stampThreshold ?? '')
       + ':' + (ts.minStampScale ?? '')
+      + ':' + (ts.artOrientation ?? '')
       + ',';
   }
   if (_cachedEntryMap && sig === _cachedEntryMapSig) return _cachedEntryMap;
@@ -845,8 +865,15 @@ function renderTiles(
       : { spanW, spanH };
     const centerX = screen.screenX + ((eff.spanW - 1) / 2) * hexScreenWidth;
     const centerY = screen.screenY + ((eff.spanH - 1) / 2) * hexScreenHeight;
-    const cellW = hexScreenWidth * spanW;
-    const cellH = hexScreenHeight * spanH;
+
+    // Art-orientation adaptation (hex maps only): mismatched hexagonal art is
+    // sized in its own orientation's frame — the transpose of the cell bbox —
+    // then rotated ±30° about the cell center below.
+    const adapt = tileOrientationAdaptation(geometry.orientation, tileset.artOrientation);
+    const frameW = adapt.rotationDeg !== 0 ? hexScreenHeight : hexScreenWidth;
+    const frameH = adapt.rotationDeg !== 0 ? hexScreenWidth : hexScreenHeight;
+    const cellW = frameW * spanW;
+    const cellH = frameH * spanH;
 
     const folder = isFolderTileset(tileset) ? tileset : null;
     const hexHeight = folder?.hexHeight ?? tileset.tileHeight;
@@ -896,7 +923,7 @@ function renderTiles(
 
     let rect = drawOverride ?? calculateTileDrawRect(
       centerX, centerY,
-      tileset, geometry.hexSize, viewState.zoom, geometry.orientation,
+      tileset, geometry.hexSize, viewState.zoom, adapt.sizeOrientation,
       tile.fitMode, spanW, spanH
     );
 
@@ -916,13 +943,15 @@ function renderTiles(
       ctx.globalAlpha = previousAlpha * opacity * tileOpacity;
     }
 
-    // Apply rotation/flip if needed
-    const needsTransform = (tile.rotation != null && tile.rotation !== 0) || tile.flipH === true;
+    // Apply rotation/flip if needed. Orientation adaptation composes with the
+    // user rotation (both are about the cell center, so they commute).
+    const totalRotation = (tile.rotation ?? 0) + adapt.rotationDeg;
+    const needsTransform = totalRotation !== 0 || tile.flipH === true;
     if (needsTransform) {
       ctx.save();
       ctx.translate(centerX, centerY);
-      if (tile.rotation != null && tile.rotation !== 0) {
-        ctx.rotate((tile.rotation * Math.PI) / 180);
+      if (totalRotation !== 0) {
+        ctx.rotate((totalRotation * Math.PI) / 180);
       }
       if (tile.flipH === true) {
         ctx.scale(-1, 1);
@@ -963,4 +992,4 @@ function renderTiles(
   }
 }
 
-export { renderTiles, sortTilesForRendering, calculateTileDrawRect, computeRegionPatternTransform, regionFeatherPx, shadowBlurImage, pyramidLevels, pyramidBlurImage, canvasBlurCapabilities };
+export { renderTiles, sortTilesForRendering, calculateTileDrawRect, computeRegionPatternTransform, regionFeatherPx, shadowBlurImage, pyramidLevels, pyramidBlurImage, canvasBlurCapabilities, tileOrientationAdaptation };

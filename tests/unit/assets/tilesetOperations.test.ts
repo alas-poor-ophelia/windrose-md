@@ -10,6 +10,7 @@ import {
   generateTilesetId,
   autoDetectOverflow,
   createTilesetFromTiles,
+  classifyTileArtMask,
   ALPHA_COVERAGE_THRESHOLD,
 } from '../../../src/assets/tilesetOperations';
 
@@ -287,6 +288,77 @@ describe('tilesetOperations', () => {
 
     it('equals 0.6', () => {
       expect(ALPHA_COVERAGE_THRESHOLD).toBe(0.6);
+    });
+  });
+
+  describe('classifyTileArtMask', () => {
+    // Synthetic alpha masks: 255 inside the shape, 0 outside.
+    const W = 120;
+
+    /** Regular pointy-top hexagon centered in a w×h box: vertices top/bottom,
+     *  vertical edges left/right spanning the middle half of the height. */
+    const pointyHexAlpha = (w: number, h: number) => (x: number, y: number): number => {
+      const a = w / 2, b = h / 2;
+      const dx = Math.abs(x - w / 2), dy = Math.abs(y - h / 2);
+      return dx <= a && dy <= b - dx * (b / (2 * a)) ? 255 : 0;
+    };
+
+    /** Flat-top hexagon (transpose of pointy). */
+    const flatHexAlpha = (w: number, h: number) => (x: number, y: number): number => {
+      const a = w / 2, b = h / 2;
+      const dx = Math.abs(x - w / 2), dy = Math.abs(y - h / 2);
+      return dy <= b && dx <= a - dy * (a / (2 * b)) ? 255 : 0;
+    };
+
+    it('classifies a regular pointy-top hexagon as pointy', () => {
+      const h = Math.round(W * 2 / Math.sqrt(3));
+      expect(classifyTileArtMask(pointyHexAlpha(W, h), W, h)).toBe('pointy');
+    });
+
+    it('classifies a vertically squashed (isometric) pointy hexagon as pointy', () => {
+      // Pseudo-3D hex tile art: pointy topology squashed to ~0.85 of its width
+      const h = Math.round(W * 0.85);
+      expect(classifyTileArtMask(pointyHexAlpha(W, h), W, h)).toBe('pointy');
+    });
+
+    it('classifies a regular flat-top hexagon as flat', () => {
+      const h = Math.round(W * Math.sqrt(3) / 2);
+      expect(classifyTileArtMask(flatHexAlpha(W, h), W, h)).toBe('flat');
+    });
+
+    it('returns undefined for fully opaque square art (seamless textures)', () => {
+      expect(classifyTileArtMask(() => 255, W, W)).toBeUndefined();
+    });
+
+    it('returns undefined for fully transparent images', () => {
+      expect(classifyTileArtMask(() => 0, W, W)).toBeUndefined();
+    });
+
+    it('returns undefined for blobby prop art (tree: canopy over narrow trunk)', () => {
+      const h = 160;
+      const alpha = (x: number, y: number): number => {
+        // canopy: circle radius 40 at (60, 50); trunk: 10px column below it
+        const inCanopy = (x - 60) ** 2 + (y - 50) ** 2 <= 40 ** 2;
+        const inTrunk = Math.abs(x - 60) <= 5 && y >= 50 && y <= 150;
+        return inCanopy || inTrunk ? 255 : 0;
+      };
+      expect(classifyTileArtMask(alpha, W, h)).toBeUndefined();
+    });
+
+    it('still detects pointy when overflow art sits above the hex (canopy)', () => {
+      // Hex area in the lower 2/3 of a tall frame, wide blob overflow above —
+      // mirrors 256×384 hex tiles with tree/mountain headroom. The bottom band
+      // (vertex) decides, so the canopy must not flip the result.
+      const h = 180;
+      const hexTop = 60;
+      const hex = pointyHexAlpha(W, h - hexTop);
+      const alpha = (x: number, y: number): number => {
+        if (y >= hexTop) return hex(x, y - hexTop);
+        // overflow blob: wide ellipse hugging the hex top
+        const dx = (x - W / 2) / (W * 0.35), dy = (y - hexTop) / 50;
+        return dx * dx + dy * dy <= 1 ? 255 : 0;
+      };
+      expect(classifyTileArtMask(alpha, W, h)).toBe('pointy');
     });
   });
 

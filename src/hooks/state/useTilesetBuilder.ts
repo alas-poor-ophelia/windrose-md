@@ -42,7 +42,7 @@ function useTilesetBuilder(
           const tiles = await scanTilesetFolder(app, folder);
           const dims = await probeFirstTileImage(app, tiles);
           const options = dims
-            ? { tileWidth: dims.width, tileHeight: dims.height }
+            ? { tileWidth: dims.width, tileHeight: dims.height, artOrientation: dims.artOrientation }
             : undefined;
 
           const tileset = createTilesetFromTiles(folder, name, tiles, options);
