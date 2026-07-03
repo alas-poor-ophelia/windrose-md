@@ -44,19 +44,16 @@ interface DrawerDockProps {
   children: ComponentChildren;
 }
 
-function FlyoutThumb({ vaultPath }: { vaultPath: string }): VNode {
+function FlyoutThumb({ vaultPath, className = 'windrose-flyout-img' }: { vaultPath: string; className?: string }): VNode {
   const app = useApp();
   const src = app.vault.adapter.getResourcePath(vaultPath);
-  return <img className="windrose-flyout-img" src={src} loading="lazy" />;
+  return <img className={className} src={src} loading="lazy" />;
 }
 
 function FlyoutPreview({ tile }: { tile: FlyoutTile }): VNode {
-  const app = useApp();
-  const src = app.vault.adapter.getResourcePath(tile.vaultPath);
-
   return (
     <div className="windrose-flyout-preview">
-      <img src={src} className="windrose-flyout-preview-img" />
+      <FlyoutThumb vaultPath={tile.vaultPath} className="windrose-flyout-preview-img" />
       <div className="windrose-flyout-preview-label">{tile.filename}</div>
     </div>
   );
@@ -260,6 +257,14 @@ function DrawerDock({
 
   const closeFlyout = useCallback(() => setSpineFlyout(null), []);
 
+  // An unwired flyout (host didn't supply the tiles/handler) must not arm —
+  // the spine button would light up over a layer that never renders.
+  const handleSpineFlyout = useCallback((v: 'recent' | 'starred' | null) => {
+    if (v === 'recent' && (flyoutRecent == null || onFlyoutSelect == null)) return;
+    if (v === 'starred' && (flyoutStarred == null || onFlyoutSelect == null)) return;
+    setSpineFlyout(v);
+  }, [flyoutRecent, flyoutStarred, onFlyoutSelect]);
+
   const handleResizeStart = useCallback((e: MouseEvent) => {
     if (!onWidthChange) return;
     e.preventDefault();
@@ -337,7 +342,7 @@ function DrawerDock({
           selectedTileThumb={selectedTileThumb}
           ribbonWidth={ribbonWidth}
           spineFlyout={spineFlyout}
-          onSpineFlyout={setSpineFlyout}
+          onSpineFlyout={handleSpineFlyout}
           pane={pane}
           onPane={onPane}
           tilesEnabled={tilesEnabled}

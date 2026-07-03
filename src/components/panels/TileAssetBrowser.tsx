@@ -11,14 +11,11 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { WallToolSurface } from '#types/core/wallpath.types';
 import type { FlyoutTile } from './DrawerDock';
 import type { VNode, ComponentChildren } from 'preact';
-import { TFile } from 'obsidian';
-import type { App } from 'obsidian';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { memo } from 'preact/compat';
 import { useApp } from '../../context/AppContext';
 import { useThumbnailPipeline } from '../../hooks/state/useThumbnailPipeline';
-import { THUMB_SIZE } from '../../assets/thumbnailCache';
 import { usePreactVirtualizer } from '../../hooks/state/useVirtualizer';
 import { Icon } from '../shared/Icon';
 import { DrawerPaneHead, DrawerSearch } from './drawerChrome';
@@ -27,15 +24,8 @@ import {
   loadTileMetadata,
   saveTileMetadataDebounced,
   setTileMetadataForRender,
-  bulkAddTag,
-  bulkToggleStar,
   bulkSetDepthAffinity,
-  bulkSetCategoryOverride,
   bulkSetDetectionSignals,
-  bulkSetDefaultSpan,
-  bulkSetRenderMode,
-  bulkClearRenderMode,
-  bulkClearDefaultSpan,
   isStarred,
   collectUniqueTags,
   collectDepthAwareTags,
@@ -47,168 +37,12 @@ import type { TileSubtoolId } from '../../assets/tileForm';
 import { clusterCategories, NOISE, humanizePackName, detectTileGeometry } from '../../assets/categoryMerge';
 import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
 import type { FolderInput } from '../../assets/categoryMerge';
-import { predictSpan, DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
-import { predictRenderMode } from '../../assets/renderModePredictor';
-import { MAX_TILE_SPAN } from '../../assets/tileRenderResolution';
 import { runDetectionScan } from '../../assets/tileImageScan';
-
-/** Pure ref-callback body: (re)binds a ResizeObserver to whichever node is
- *  currently mounted. Module-level on purpose — it must not close over
- *  component state, so the zero-dep useCallback wrappers can never go stale. */
-function observeWidth(
-  store: { current: HTMLDivElement | null },
-  roStore: { current: ResizeObserver | null },
-  setWidth: (w: number) => void,
-  node: HTMLDivElement | null
-): void {
-  store.current = node;
-  roStore.current?.disconnect();
-  roStore.current = null;
-  if (node == null) return;
-  const ro = new ResizeObserver(entries => {
-    const entry = entries[0];
-    if (entry != null) setWidth(entry.contentRect.width);
-  });
-  ro.observe(node);
-  roStore.current = ro;
-}
-
-// ===========================================
-// Content-bounds detection for tile thumbnails
-// ===========================================
-
-const boundsCache = new Map<string, { x: number; y: number; w: number; h: number }>();
-// eslint-disable-next-line obsidianmd/prefer-active-doc -- detached offscreen scratch canvas for content-bounds detection; never attached to DOM, document-agnostic.
-const scratchCanvas = document.createElement('canvas');
-
-function getContentBounds(img: HTMLImageElement): { x: number; y: number; w: number; h: number } {
-  const key = img.src;
-  const cached = boundsCache.get(key);
-  if (cached) return cached;
-
-  const w = img.naturalWidth;
-  const h = img.naturalHeight;
-  if (w === 0 || h === 0) return { x: 0, y: 0, w, h };
-
-  scratchCanvas.width = w;
-  scratchCanvas.height = h;
-  // willReadFrequently: software-backed canvas so getImageData doesn't stall the GPU.
-  const ctx = scratchCanvas.getContext('2d', { willReadFrequently: true });
-  if (ctx == null) return { x: 0, y: 0, w, h };
-  ctx.clearRect(0, 0, w, h);
-  ctx.drawImage(img, 0, 0);
-  const data = ctx.getImageData(0, 0, w, h).data;
-
-  let minX = w, minY = h, maxX = 0, maxY = 0;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      if (data[(y * w + x) * 4 + 3] > 10) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
-  }
-
-  if (maxX < minX) {
-    const bounds = { x: 0, y: 0, w, h };
-    boundsCache.set(key, bounds);
-    return bounds;
-  }
-
-  const pad = 2;
-  minX = Math.max(0, minX - pad);
-  minY = Math.max(0, minY - pad);
-  maxX = Math.min(w - 1, maxX + pad);
-  maxY = Math.min(h - 1, maxY + pad);
-
-  const bounds = { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
-  boundsCache.set(key, bounds);
-  return bounds;
-}
-
-// ===========================================
-// Tile thumbnail with content cropping
-// ===========================================
-
-const PREVIEW_SIZE = 192;
-
-interface TileThumbnailProps {
-  url: string | null;
-}
-
-function drawTileToCanvas(
-  canvas: HTMLCanvasElement,
-  img: HTMLImageElement,
-  size: number,
-): void {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-  ctx.clearRect(0, 0, size, size);
-  try {
-    const bounds = getContentBounds(img);
-    const scale = Math.min(size / bounds.w, size / bounds.h);
-    const dw = bounds.w * scale;
-    const dh = bounds.h * scale;
-    ctx.drawImage(img, bounds.x, bounds.y, bounds.w, bounds.h,
-      (size - dw) / 2, (size - dh) / 2, dw, dh);
-  } catch {
-    const scale = Math.min(size / img.naturalWidth, size / img.naturalHeight);
-    const dw = img.naturalWidth * scale;
-    const dh = img.naturalHeight * scale;
-    ctx.drawImage(img, (size - dw) / 2, (size - dh) / 2, dw, dh);
-  }
-}
-
-function loadVaultImage(
-  app: App,
-  vaultPath: string,
-  getCachedImage: ((path: string) => HTMLImageElement | null) | undefined,
-  onDraw: (img: HTMLImageElement) => void,
-): (() => void) | undefined {
-  const cached = getCachedImage?.(vaultPath);
-  if (cached?.complete === true) {
-    onDraw(cached);
-    return undefined;
-  }
-  let blobUrl: string | null = null;
-  const file = app.vault.getAbstractFileByPath(vaultPath);
-  if (file instanceof TFile) {
-    void app.vault.readBinary(file).then((binary: ArrayBuffer) => {
-      const blob = new Blob([binary]);
-      blobUrl = URL.createObjectURL(blob);
-      const img = new Image();
-      img.onload = () => {
-        if (blobUrl != null) URL.revokeObjectURL(blobUrl);
-        blobUrl = null;
-        onDraw(img);
-      };
-      img.onerror = () => {
-        if (blobUrl != null) URL.revokeObjectURL(blobUrl);
-        blobUrl = null;
-      };
-      img.src = blobUrl;
-    });
-  }
-  return () => {
-    if (blobUrl != null) URL.revokeObjectURL(blobUrl);
-  };
-}
-
-const TileThumbnail = memo(({ url }: TileThumbnailProps): VNode => {
-  if (url != null && url !== '') {
-    return <img src={url} className="windrose-tile-thumb-img" width={THUMB_SIZE} height={THUMB_SIZE} alt="" />;
-  }
-  // '' = terminal load failure (static placeholder); null = still loading (shimmer).
-  const failed = url === '';
-  return (
-    <div
-      className={failed ? 'windrose-tile-thumb-placeholder is-failed' : 'windrose-tile-thumb-placeholder'}
-      style={{ width: THUMB_SIZE, height: THUMB_SIZE }}
-    />
-  );
-});
+import { drawTileToCanvas, loadVaultImage, observeWidth, TileThumbnail, PREVIEW_SIZE } from './tileBrowserCommon';
+import { TileOrganizePane } from './TileOrganizePane';
+import { TileFilterScreen } from './TileFilterScreen';
+import type { FilterFacet } from './TileFilterScreen';
+import { TilesetConfigPanel } from './TilesetConfigPanel';
 
 // ===========================================
 // Horizontal scroller (wheel→sideways + drag)
@@ -469,8 +303,6 @@ const TileAssetBrowser = memo(({
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [showTilesetConfig, setShowTilesetConfig] = useState<boolean>(false);
-  // Which tileset the config panel targets (null = follow the current selection).
-  const [configTilesetId, setConfigTilesetId] = useState<string | null>(null);
   const [hoveredTile, setHoveredTile] = useState<TileEntry | null>(null);
   // Controlled/uncontrolled hybrid: when the host supplies railSel + onRailSelChange
   // (so Recent/Starred can live on the drawer ribbon) we defer to it; otherwise we
@@ -483,8 +315,8 @@ const TileAssetBrowser = memo(({
   const [openCat, setOpenCat] = useState<string | null>(null);
   // Power-user Filter drill-down screen: null = closed, 'types' = top level, else a facet id ('tags' | 'packs').
   const [filterView, setFilterView] = useState<string | null>(null);
-  const [filterSearch, setFilterSearch] = useState<string>('');
   const previewRef = useRef<HTMLCanvasElement>(null);
+  const previewLabelRef = useRef<HTMLDivElement | null>(null);
   const browserRef = useRef<HTMLDivElement>(null);
   const portalRef = useRef<HTMLDivElement | null>(null);
   const [organize, setOrganize] = useState(false);
@@ -493,19 +325,8 @@ const TileAssetBrowser = memo(({
   const [viewModeLocal, setViewModeLocal] = useState<TileViewMode>('grid');
   const viewMode = viewModeProp ?? viewModeLocal;
   const setViewMode = onViewModeChange ?? setViewModeLocal;
-  const [orgSelection, setOrgSelection] = useState<Set<string>>(new Set());
-  const [orgSearch, setOrgSearch] = useState('');
-  const [orgShowTag, setOrgShowTag] = useState(false);
-  const [orgShowMode, setOrgShowMode] = useState(false);
-  const [orgSpanW, setOrgSpanW] = useState('');
-  const [orgSpanH, setOrgSpanH] = useState('');
-  const [orgTagInput, setOrgTagInput] = useState('');
-  const [orgShowTier, setOrgShowTier] = useState(false);
-  const [orgShowMove, setOrgShowMove] = useState(false);
-  const [orgMoveInput, setOrgMoveInput] = useState('');
   const [tileMetadata, setTileMetadata] = useState<TileMetadataStore>({});
   const { getThumbUrl, requestThumbs } = useThumbnailPipeline();
-  const orgScrollRef = useRef<HTMLDivElement>(null);
   const gridWrapRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
@@ -516,7 +337,6 @@ const TileAssetBrowser = memo(({
     setPackFilter(new Set());
     setOpenCat(null);
     setFilterView(null);
-    setFilterSearch('');
   }, [tileDepth, setRailSel]);
 
   const handleTileClick = (tilesetId: string, tileId: string): void => {
@@ -569,12 +389,13 @@ const TileAssetBrowser = memo(({
       activeDocument.body.appendChild(div);
       portalRef.current = div;
       previewRef.current = canvas;
+      previewLabelRef.current = label;
     }
 
     const portal = portalRef.current;
     const canvas = previewRef.current;
-    if (canvas == null) return undefined;
-    const label = portal.querySelector('.windrose-tile-preview-label') as HTMLElement;
+    const label = previewLabelRef.current;
+    if (canvas == null || label == null) return undefined;
 
     if (browserRef.current) {
       const rect = browserRef.current.getBoundingClientRect();
@@ -596,7 +417,7 @@ const TileAssetBrowser = memo(({
     }
 
     return loadVaultImage(app, hoveredTile.vaultPath, getCachedImage, (img) => {
-      drawTileToCanvas(canvas, img, PREVIEW_SIZE);
+      drawTileToCanvas(canvas, img, PREVIEW_SIZE, hoveredTile.vaultPath);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- app stable, getCachedImage low-churn; tileToTilesetId is a memo declared later (forward ref); exact-field hover effect
   }, [hoveredTile, rotation, flipH, selectedTilesetId, selectedTileId]);
@@ -607,6 +428,7 @@ const TileAssetBrowser = memo(({
       if (portalRef.current) {
         activeDocument.body.removeChild(portalRef.current);
         portalRef.current = null;
+        previewLabelRef.current = null;
       }
     };
   }, []);
@@ -617,12 +439,8 @@ const TileAssetBrowser = memo(({
   // would find null and never retry, leaving containerWidth stuck at 0 and the
   // grid permanently empty. Attaching per-node catches whenever it appears.
   const gridRoRef = useRef<ResizeObserver | null>(null);
-  const orgRoRef = useRef<ResizeObserver | null>(null);
   const attachGridWrap = useCallback((node: HTMLDivElement | null): void => {
     observeWidth(gridWrapRef, gridRoRef, setContainerWidth, node);
-  }, []);
-  const attachOrgScroll = useCallback((node: HTMLDivElement | null): void => {
-    observeWidth(orgScrollRef, orgRoRef, setContainerWidth, node);
   }, []);
 
   const handleToggleCategory = (category: string): void => {
@@ -655,7 +473,7 @@ const TileAssetBrowser = memo(({
     });
   };
 
-  // ---- Organize mode ----
+  // ---- Tile metadata ----
 
   useEffect(() => {
     void loadTileMetadata(app).then(setTileMetadata);
@@ -803,147 +621,9 @@ const TileAssetBrowser = memo(({
     return map;
   }, [tilesets]);
 
-  const orgFilteredTiles = useMemo((): TileEntry[] => {
-    if (!organize) return [];
-    if (orgSearch === '') return allTiles;
-    const lower = orgSearch.toLowerCase();
-    return allTiles.filter(t =>
-      t.filename.toLowerCase().includes(lower) ||
-      (t.category != null && t.category.toLowerCase().includes(lower)) ||
-      (t.tags != null && t.tags.some(tag => tag.toLowerCase().includes(lower)))
-    );
-  }, [organize, allTiles, orgSearch]);
-
-  const orgAllOn = orgFilteredTiles.length > 0 && orgFilteredTiles.every(t => orgSelection.has(t.vaultPath));
-
-  const orgTagSuggestions = useMemo((): string[] => {
-    if (!organize) return [];
-    return collectUniqueTags(allTiles, tileMetadata).slice(0, 12);
-  }, [organize, allTiles, tileMetadata]);
-
-  const toggleOrgSelect = (vaultPath: string): void => {
-    setOrgSelection(prev => {
-      const next = new Set(prev);
-      if (next.has(vaultPath)) next.delete(vaultPath);
-      else next.add(vaultPath);
-      return next;
-    });
-  };
-
-  const selectAllOrg = (): void => {
-    const allPaths = orgFilteredTiles.map(t => t.vaultPath);
-    setOrgSelection(orgAllOn ? new Set() : new Set(allPaths));
-  };
-
-  const handleBulkTag = (): void => {
-    if (orgTagInput.trim() === '' || orgSelection.size === 0) return;
-    const paths = Array.from(orgSelection);
-    const updated = bulkAddTag(tileMetadata, paths, orgTagInput.trim());
-    setTileMetadata(updated);
-    saveTileMetadataDebounced(app, updated);
-    setOrgTagInput('');
-    setOrgShowTag(false);
-  };
-
-  const handleBulkStar = (): void => {
-    if (orgSelection.size === 0) return;
-    const paths = Array.from(orgSelection);
-    const anyUnstarred = paths.some(p => !isStarred(tileMetadata, p));
-    const updated = bulkToggleStar(tileMetadata, paths, anyUnstarred);
-    setTileMetadata(updated);
-    saveTileMetadataDebounced(app, updated);
-  };
-
-  const handleBulkTier = (tier: TileLayerRole): void => {
-    if (orgSelection.size === 0) return;
-    const entries = Array.from(orgSelection).map(vaultPath => ({ vaultPath, depth: tier }));
-    const updated = bulkSetDepthAffinity(tileMetadata, entries);
-    setTileMetadata(updated);
-    saveTileMetadataDebounced(app, updated);
-    setOrgShowTier(false);
-  };
-
-  // Mode…: per-tile render-mode / footprint overrides (autodetect Phase 7,
-  // minimal). Predictions are shown live but NEVER bulk-persisted — writes
-  // happen only on an explicit user click (2026-06-10 RCA rule).
-  const handleBulkRenderMode = (mode: 'cell' | 'region' | undefined): void => {
-    if (orgSelection.size === 0) return;
-    const paths = Array.from(orgSelection);
-    const updated = mode == null
-      ? bulkClearRenderMode(tileMetadata, paths)
-      : bulkSetRenderMode(tileMetadata, paths.map(vaultPath => ({ vaultPath, mode })));
-    setTileMetadata(updated);
-    saveTileMetadataDebounced(app, updated);
-  };
-
-  const handleBulkSpanApply = (): void => {
-    if (orgSelection.size === 0) return;
-    const w = Math.min(Math.max(parseInt(orgSpanW, 10) || 1, 1), MAX_TILE_SPAN);
-    const h = Math.min(Math.max(parseInt(orgSpanH, 10) || 1, 1), MAX_TILE_SPAN);
-    const entries = Array.from(orgSelection).map(vaultPath => ({ vaultPath, spanW: w, spanH: h }));
-    const updated = bulkSetDefaultSpan(tileMetadata, entries);
-    setTileMetadata(updated);
-    saveTileMetadataDebounced(app, updated);
-  };
-
-  const handleBulkSpanAuto = (): void => {
-    if (orgSelection.size === 0) return;
-    const updated = bulkClearDefaultSpan(tileMetadata, Array.from(orgSelection));
-    setTileMetadata(updated);
-    saveTileMetadataDebounced(app, updated);
-    setOrgSpanW('');
-    setOrgSpanH('');
-  };
-
-  // Move… reassigns the category home via a read-time metadata override;
-  // undefined clears it, restoring the folder-derived category (lossless).
-  const handleBulkMove = (category: string | undefined): void => {
-    if (orgSelection.size === 0) return;
-    const updated = bulkSetCategoryOverride(tileMetadata, Array.from(orgSelection), category);
-    setTileMetadata(updated);
-    saveTileMetadataDebounced(app, updated);
-    setOrgMoveInput('');
-    setOrgShowMove(false);
-  };
-
-  // Detection preview for the Mode… popover: current override state across the
-  // selection, plus live predictions when exactly one tile is selected.
-  const orgModeInfo = useMemo(() => {
-    if (!orgShowMode || orgSelection.size === 0) return null;
-    const paths = Array.from(orgSelection);
-    const modes = new Set(paths.map(p => tileMetadata[p]?.renderMode ?? 'auto'));
-    const currentMode: string = modes.size === 1 ? Array.from(modes)[0] : 'mixed';
-    let detectedModeLabel: string | null = null;
-    let detectedSpanLabel: string | null = null;
-    if (paths.length === 1) {
-      const vaultPath = paths[0];
-      const tile = allTiles.find(t => t.vaultPath === vaultPath);
-      const meta = tileMetadata[vaultPath];
-      if (tile != null) {
-        const pred = predictRenderMode(tile, meta);
-        detectedModeLabel = `Auto (detected ${pred.mode === 'region' ? 'Region' : 'Cell'} ${Math.round(pred.confidence * 100)}%)`;
-      }
-      if (meta?.srcW != null && meta.srcH != null) {
-        const tsId = tileToTilesetId.get(vaultPath);
-        const ts = tilesets.find(t => t.id === tsId);
-        const span = predictSpan(meta.srcW, meta.srcH, ts?.pixelsPerCell ?? DEFAULT_PIXELS_PER_CELL);
-        detectedSpanLabel = `Auto (detected ${span.spanW}×${span.spanH})`;
-      }
-    }
-    return { currentMode, detectedModeLabel, detectedSpanLabel };
-  }, [orgShowMode, orgSelection, tileMetadata, allTiles, tileToTilesetId, tilesets]);
-
-  const exitOrganize = (): void => {
+  const exitOrganize = useCallback((): void => {
     setOrganize(false);
-    setOrgSelection(new Set());
-    setOrgSearch('');
-    setOrgShowTag(false);
-    setOrgShowMode(false);
-    setOrgShowTier(false);
-    setOrgShowMove(false);
-    setOrgTagInput('');
-    setOrgMoveInput('');
-  };
+  }, []);
 
   // Collect available tags for the filter chips, then drop folder/pack noise.
   // A tag is junk if it contains a grid/packaging NOISE word (hex/set/pack/… —
@@ -1103,12 +783,6 @@ const TileAssetBrowser = memo(({
     return groups;
   }, [filteredTiles, mergedCategories, tileToTilesetId, tileMetadata]);
 
-  // Destination chips for Move… — the canonical (merged) category labels.
-  const orgMoveSuggestions = useMemo((): string[] => {
-    if (!organize) return [];
-    return Array.from(new Set(mergedCategories.lookup.values())).sort((a, b) => a.localeCompare(b)).slice(0, 12);
-  }, [organize, mergedCategories]);
-
   // Merge banner (Option B): provenance for the currently-open single category.
   const openCategoryMerge = useMemo(() => {
     if (railSel === 'all' || railSel === 'recent' || railSel === 'starred') return null;
@@ -1169,13 +843,6 @@ const TileAssetBrowser = memo(({
   const gridGap = compact ? 3 : 6;
 
   // Virtualization: column counts and cell sizes
-  const orgColCount = organize && containerWidth > 0
-    ? Math.max(1, Math.floor((containerWidth + 6) / (52 + 6)))
-    : 1;
-  const orgCellWidth = orgColCount > 0 && containerWidth > 0
-    ? (containerWidth - (orgColCount - 1) * 6) / orgColCount
-    : 52;
-
   const fullColCount = !compact && !organize && containerWidth > 0
     ? Math.max(1, Math.floor((containerWidth + gridGap) / (tileMin + gridGap)))
     : 1;
@@ -1187,15 +854,6 @@ const TileAssetBrowser = memo(({
   const listMode = !compact && !organize && viewMode === 'list';
   const rowSlice = listMode ? 1 : fullColCount;
   const LIST_ROW_H = 44;
-
-  const orgRows = useMemo((): TileEntry[][] => {
-    if (!organize || containerWidth <= 0) return [];
-    const rows: TileEntry[][] = [];
-    for (let i = 0; i < orgFilteredTiles.length; i += orgColCount) {
-      rows.push(orgFilteredTiles.slice(i, i + orgColCount));
-    }
-    return rows;
-  }, [organize, containerWidth, orgFilteredTiles, orgColCount]);
 
   const fullRows = useMemo((): FullModeRow[] => {
     if (compact || organize || containerWidth <= 0) return [];
@@ -1230,15 +888,6 @@ const TileAssetBrowser = memo(({
     return rows;
   }, [compact, organize, containerWidth, railSel, recentTileEntries, shownGroups, collapsedCategories, filteredTiles.length, searchFilter, rowSlice]);
 
-  const orgVirtualizer = usePreactVirtualizer({
-    count: orgRows.length,
-    getScrollElement: () => orgScrollRef.current,
-    estimateSize: () => orgCellWidth,
-    gap: 6,
-    enabled: organize && containerWidth > 0,
-    overscan: 5,
-  });
-
   const fullVirtualizer = usePreactVirtualizer({
     count: fullRows.length,
     getScrollElement: () => gridWrapRef.current,
@@ -1271,27 +920,18 @@ const TileAssetBrowser = memo(({
     fullVirtualizer.measure();
   }, [fullVirtualizer, fullCellWidth, listMode, gridGap]);
 
-  useEffect(() => {
-    orgVirtualizer.measure();
-  }, [orgVirtualizer, orgCellWidth]);
-
-  // Request thumbnails only for visible tiles (virtualizer-driven)
-  const orgRange = orgVirtualizer.range;
+  // Request thumbnails only for visible tiles (virtualizer-driven).
+  // Organize mode requests its own visible rows (TileOrganizePane).
   const fullRange = fullVirtualizer.range;
   useEffect(() => {
     // A collapsed drawer keeps this component mounted for its fold animation;
     // generating thumbnails for an invisible grid re-decodes + rescans the whole
     // tile library on every parent re-render (i.e. every map interaction).
-    if (!active || tilesets.length === 0) return;
+    if (!active || organize || tilesets.length === 0) return;
 
     const paths: string[] = [];
 
-    if (organize) {
-      for (const v of orgVirtualizer.getVirtualItems()) {
-        const row = orgRows[v.index];
-        if (row != null) for (const t of row) paths.push(t.vaultPath);
-      }
-    } else if (!compact) {
+    if (!compact) {
       for (const v of fullVirtualizer.getVirtualItems()) {
         const row = fullRows[v.index];
         if (row?.type === 'tileRow') {
@@ -1313,7 +953,7 @@ const TileAssetBrowser = memo(({
     }
 
     if (paths.length > 0) requestThumbs(paths);
-  }, [active, tilesets, organize, compact, orgRows, fullRows, orgRange, fullRange, filteredTiles, requestThumbs, fullVirtualizer, orgVirtualizer, showRail, groupedTiles]);
+  }, [active, tilesets, organize, compact, fullRows, fullRange, filteredTiles, requestThumbs, fullVirtualizer, showRail, groupedTiles]);
 
   // ---- Empty state: no tilesets ----
 
@@ -1351,16 +991,7 @@ const TileAssetBrowser = memo(({
 
   // Unified facet model — the quick chips AND the dedicated Filter screen share one filter state.
   const activeFilterCount = activeTags.size + packFilter.size;
-  const filterTypes: Array<{
-    id: string;
-    label: string;
-    icon: string;
-    values: string[];
-    labelFor?: (v: string) => string;
-    has: (v: string) => boolean;
-    toggle: (v: string) => void;
-    size: number;
-  }> = [
+  const filterTypes: FilterFacet[] = [
     { id: 'tags', label: 'Tags', icon: 'lucide-tag', values: availableTags,
       has: (v: string): boolean => activeTags.has(v), toggle: toggleTag, size: activeTags.size },
     { id: 'packs', label: 'Packs', icon: 'lucide-folder-input', values: availablePacks.map(p => p.id),
@@ -1458,313 +1089,18 @@ const TileAssetBrowser = memo(({
   return (
     <div ref={browserRef} className="windrose-tile-browser">
       {organize ? (
-        <>
-          <div className="windrose-tb-head">
-            <Icon icon="lucide-check-square" size={16} />
-            <div className="windrose-tb-title">Organize</div>
-            <span className="windrose-tb-cap" style={{ marginRight: 'auto', marginLeft: 4 }}>
-              tag & sort the library
-            </span>
-            <button className="windrose-tb-iconbtn ghost" title="Done" onClick={exitOrganize}>
-              <Icon icon="lucide-check" size={16} />
-            </button>
-          </div>
-
-          <div className="windrose-tb-org-search">
-            <div className="windrose-tb-search">
-              <Icon icon="lucide-search" size={15} />
-              <input
-                value={orgSearch}
-                onInput={(e: Event) => setOrgSearch((e.target as HTMLInputElement).value)}
-                placeholder="Search to narrow…"
-                style={{ fontSize: 13 }}
-              />
-              <span className="windrose-tb-cap">{orgFilteredTiles.length}</span>
-            </div>
-          </div>
-
-          <div className="windrose-tb-org-bar">
-            <button
-              className={`windrose-tb-chip ${orgAllOn ? 'active' : ''}`}
-              style={{ fontWeight: 600 }}
-              onClick={selectAllOrg}
-            >
-              <Icon icon="lucide-check-square" size={12} />
-              {orgAllOn ? 'Deselect all' : `Select all ${orgFilteredTiles.length}`}
-            </button>
-            <span
-              className="windrose-tb-cap"
-              style={{ marginLeft: 'auto', color: orgSelection.size > 0 ? 'var(--windrose-gold-bright)' : undefined }}
-            >
-              <b>{orgSelection.size}</b> selected
-            </span>
-          </div>
-
-          <div className="windrose-tb-org-body" ref={attachOrgScroll}>
-            <div style={{ height: orgVirtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
-              {orgVirtualizer.getVirtualItems().map(virtualRow => {
-                const rowTiles = orgRows[virtualRow.index];
-                if (rowTiles == null) return null;
-                return (
-                  <div
-                    key={virtualRow.key}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: `${virtualRow.size}px`,
-                      transform: `translateY(${virtualRow.start}px)`,
-                    }}
-                  >
-                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${orgColCount}, 1fr)`, gap: 6 }}>
-                      {rowTiles.map(tile => {
-                        const on = orgSelection.has(tile.vaultPath);
-                        return (
-                          <div
-                            key={tile.vaultPath}
-                            className={`windrose-tile-thumb ${on ? 'sel' : 'dim'}`}
-                            onClick={() => toggleOrgSelect(tile.vaultPath)}
-                            title={tile.filename}
-                          >
-                            <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
-                            <div className={`windrose-tb-check ${on ? 'on' : ''}`}>
-                              {on && <Icon icon="lucide-check" size={12} />}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            {orgFilteredTiles.length === 0 && (
-              <div className="windrose-tb-empty">No matching tiles</div>
-            )}
-          </div>
-
-          {orgShowTag && (
-            <div className="windrose-tb-tag-pop">
-              <div style={{ fontSize: 11, color: 'var(--windrose-text-secondary)', marginBottom: 8 }}>
-                Add tag to <b style={{ color: 'var(--windrose-gold-bright)' }}>{orgSelection.size}</b> tiles
-              </div>
-              <div className="windrose-tb-search" style={{ marginBottom: 9 }}>
-                <Icon icon="lucide-tag" size={13} />
-                <input
-                  placeholder="New tag…"
-                  value={orgTagInput}
-                  onInput={(e: Event) => setOrgTagInput((e.target as HTMLInputElement).value)}
-                />
-              </div>
-              <div className="windrose-tb-chips-scroll" style={{ flexWrap: 'wrap' }}>
-                {orgTagSuggestions.map(t => (
-                  <button key={t} className="windrose-tb-chip" onClick={() => setOrgTagInput(t)}>
-                    {t}
-                  </button>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: 7, marginTop: 11 }}>
-                <button
-                  className="windrose-tb-act windrose-tb-act-cancel"
-                  onClick={() => { setOrgShowTag(false); setOrgTagInput(''); }}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="windrose-tb-act windrose-tb-act-apply"
-                  onClick={handleBulkTag}
-                >
-                  Apply
-                </button>
-              </div>
-            </div>
-          )}
-
-          {orgShowTier && (
-            <div className="windrose-tb-org-tier">
-              <div className="windrose-tb-org-tier-label">Assign depth tier:</div>
-              <div className="windrose-tb-org-tier-btns">
-                {(['ground', 'structure', 'props', 'decoration'] as TileLayerRole[]).map(role => (
-                  <button
-                    key={role}
-                    className="windrose-tb-act"
-                    onClick={() => handleBulkTier(role)}
-                  >
-                    <Icon icon={depthMeta(role).icon} size={14} />
-                    {depthMeta(role).label}
-                  </button>
-                ))}
-              </div>
-              <button
-                className="windrose-tb-act"
-                onClick={() => setOrgShowTier(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-
-          {orgShowMove && (
-            <div className="windrose-tb-tag-pop">
-              <div style={{ fontSize: 11, color: 'var(--windrose-text-secondary)', marginBottom: 8 }}>
-                Move <b style={{ color: 'var(--windrose-gold-bright)' }}>{orgSelection.size}</b> tiles to
-              </div>
-              <div className="windrose-tb-search" style={{ marginBottom: 9 }}>
-                <Icon icon="lucide-folder-input" size={13} />
-                <input
-                  placeholder="Category…"
-                  value={orgMoveInput}
-                  onInput={(e: Event) => setOrgMoveInput((e.target as HTMLInputElement).value)}
-                />
-              </div>
-              <div className="windrose-tb-chips-scroll" style={{ flexWrap: 'wrap' }}>
-                {orgMoveSuggestions.map(c => (
-                  <button key={c} className="windrose-tb-chip" onClick={() => setOrgMoveInput(c)}>
-                    {c}
-                  </button>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: 7, marginTop: 11 }}>
-                <button
-                  className="windrose-tb-act windrose-tb-act-cancel"
-                  onClick={() => { setOrgShowMove(false); setOrgMoveInput(''); }}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="windrose-tb-act"
-                  onClick={() => handleBulkMove(undefined)}
-                  title="Clear the override — restore each tile's folder-derived category"
-                >
-                  Reset to folder
-                </button>
-                <button
-                  className="windrose-tb-act windrose-tb-act-apply"
-                  disabled={orgMoveInput.trim() === ''}
-                  onClick={() => handleBulkMove(orgMoveInput.trim())}
-                >
-                  Move
-                </button>
-              </div>
-            </div>
-          )}
-
-          {orgShowMode && (
-            <div className="windrose-tb-tag-pop">
-              <div style={{ fontSize: 11, color: 'var(--windrose-text-secondary)', marginBottom: 8 }}>
-                Render mode for <b style={{ color: 'var(--windrose-gold-bright)' }}>{orgSelection.size}</b> tiles
-              </div>
-              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-                <button
-                  className={`windrose-tb-act ${orgModeInfo?.currentMode === 'auto' ? 'windrose-tb-act-apply' : ''}`}
-                  onClick={() => handleBulkRenderMode(undefined)}
-                  title="Clear the override — detection decides at import/read time"
-                >
-                  {orgModeInfo?.detectedModeLabel ?? 'Auto'}
-                </button>
-                <button
-                  className={`windrose-tb-act ${orgModeInfo?.currentMode === 'cell' ? 'windrose-tb-act-apply' : ''}`}
-                  onClick={() => handleBulkRenderMode('cell')}
-                >
-                  Cell
-                </button>
-                <button
-                  className={`windrose-tb-act ${orgModeInfo?.currentMode === 'region' ? 'windrose-tb-act-apply' : ''}`}
-                  onClick={() => handleBulkRenderMode('region')}
-                >
-                  Region
-                </button>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--windrose-text-secondary)', margin: '11px 0 6px' }}>
-                Footprint (cells)
-              </div>
-              <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap' }}>
-                <input
-                  className="windrose-tb-spanin"
-                  type="number"
-                  min={1}
-                  max={MAX_TILE_SPAN}
-                  placeholder="W"
-                  value={orgSpanW}
-                  onInput={(e: Event) => setOrgSpanW((e.target as HTMLInputElement).value)}
-                  style={{ width: 46 }}
-                />
-                <span style={{ color: 'var(--windrose-text-muted)' }}>×</span>
-                <input
-                  className="windrose-tb-spanin"
-                  type="number"
-                  min={1}
-                  max={MAX_TILE_SPAN}
-                  placeholder="H"
-                  value={orgSpanH}
-                  onInput={(e: Event) => setOrgSpanH((e.target as HTMLInputElement).value)}
-                  style={{ width: 46 }}
-                />
-                <button
-                  className="windrose-tb-act windrose-tb-act-apply"
-                  disabled={orgSpanW.trim() === '' && orgSpanH.trim() === ''}
-                  onClick={handleBulkSpanApply}
-                >
-                  Apply
-                </button>
-                <button
-                  className="windrose-tb-act"
-                  onClick={handleBulkSpanAuto}
-                  title="Clear the override — new placements re-detect from image size"
-                >
-                  {orgModeInfo?.detectedSpanLabel ?? 'Auto'}
-                </button>
-              </div>
-              <div style={{ fontSize: 10.5, color: 'var(--windrose-text-muted)', marginTop: 9 }}>
-                Render mode affects existing placements of these tiles; footprint applies to new placements.
-              </div>
-              <div style={{ display: 'flex', gap: 7, marginTop: 11 }}>
-                <button
-                  className="windrose-tb-act windrose-tb-act-cancel"
-                  onClick={() => setOrgShowMode(false)}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="windrose-tb-org-actions">
-            <button className="windrose-tb-act" disabled={orgSelection.size === 0} onClick={() => setOrgShowTag(true)}>
-              <Icon icon="lucide-tag" size={14} /> Tag…
-            </button>
-            <button
-              className="windrose-tb-act"
-              disabled={orgSelection.size === 0}
-              onClick={() => setOrgShowMode(!orgShowMode)}
-            >
-              <Icon icon="lucide-wand-2" size={14} /> Mode…
-            </button>
-            <button
-              className="windrose-tb-act"
-              disabled={orgSelection.size === 0}
-              onClick={() => setOrgShowTier(!orgShowTier)}
-            >
-              <Icon icon="lucide-layers" size={14} /> Tier…
-            </button>
-            <button
-              className="windrose-tb-act"
-              disabled={orgSelection.size === 0}
-              onClick={() => setOrgShowMove(!orgShowMove)}
-            >
-              <Icon icon="lucide-folder-input" size={14} /> Move…
-            </button>
-            <button
-              className="windrose-tb-act windrose-tb-act-star"
-              disabled={orgSelection.size === 0}
-              onClick={handleBulkStar}
-              title="Star selection"
-            >
-              <Icon icon="lucide-star" size={14} />
-            </button>
-          </div>
-        </>
+        <TileOrganizePane
+          tilesets={tilesets}
+          allTiles={allTiles}
+          tileToTilesetId={tileToTilesetId}
+          tileMetadata={tileMetadata}
+          setTileMetadata={setTileMetadata}
+          mergedCategoryLookup={mergedCategories.lookup}
+          getThumbUrl={getThumbUrl}
+          requestThumbs={requestThumbs}
+          active={active}
+          onExit={exitOrganize}
+        />
       ) : (<>
 
       {/* Header — shared with the objects pane via DrawerPaneHead */}
@@ -1817,174 +1153,16 @@ const TileAssetBrowser = memo(({
       )}
 
       {/* Tileset config panel (inline) */}
-      {showTilesetConfig && tilesets.length > 0 && onTilesetOverrideChange != null && (() => {
-        // Configure the explicitly-picked set, else the selected tile's set, else the first.
-        const configTileset =
-          tilesets.find(t => t.id === configTilesetId) ??
-          tilesets.find(t => t.id === selectedTilesetId) ??
-          tilesets[0];
-        const currentOverrides = tilesetOverrides?.[configTileset.id] ?? {};
-        const threshold = currentOverrides.stampThreshold ?? configTileset.stampThreshold ?? 0.5;
-        const minScale = currentOverrides.minStampScale ?? configTileset.minStampScale ?? 0.2;
-        const fitMode = currentOverrides.fitMode ?? configTileset.fitMode;
-        const renderMode = currentOverrides.renderMode ?? configTileset.renderMode ?? 'cell';
-        const worldRepeat = currentOverrides.worldRepeat ?? configTileset.worldRepeat ?? 4;
-        const edgeFeather = currentOverrides.edgeFeather ?? configTileset.edgeFeather ?? 0.25;
-        const pixelsPerCell = currentOverrides.pixelsPerCell ?? configTileset.pixelsPerCell ?? DEFAULT_PIXELS_PER_CELL;
-
-        const handleOverrideChange = (field: keyof TilesetOverrides, value: number | string | undefined): void => {
-          const updated = { ...currentOverrides, [field]: value };
-          if (value === undefined) delete updated[field];
-          onTilesetOverrideChange(configTileset.id, updated);
-        };
-
-        // pixelsPerCell is the footprint divisor (first ruler). Changing it must
-        // recompute every baked span in this tileset from the cached natural dims —
-        // pure arithmetic, no image re-decode.
-        const handlePixelsPerCellChange = (value: number | undefined): void => {
-          const updated = { ...currentOverrides, pixelsPerCell: value };
-          if (value === undefined) delete updated.pixelsPerCell;
-          onTilesetOverrideChange(configTileset.id, updated);
-          const ppc = value ?? DEFAULT_PIXELS_PER_CELL;
-          setTileMetadata(prev => {
-            const spanEntries: Array<{ vaultPath: string; spanW: number; spanH: number }> = [];
-            for (const tile of configTileset.tiles) {
-              const e = prev[tile.vaultPath];
-              if (e == null || e.renderMode === 'region') continue;
-              if (e.srcW == null || e.srcH == null) continue;
-              const { spanW, spanH } = predictSpan(e.srcW, e.srcH, ppc);
-              spanEntries.push({ vaultPath: tile.vaultPath, spanW, spanH });
-            }
-            if (spanEntries.length === 0) return prev;
-            const next = bulkSetDefaultSpan(prev, spanEntries);
-            saveTileMetadataDebounced(app, next);
-            return next;
-          });
-        };
-
-        return (
-          <div className="windrose-tb-config">
-            {tilesets.length > 1 && (
-              <div className="windrose-tile-config-row">
-                <label>Tileset</label>
-                <select
-                  value={configTileset.id}
-                  onChange={(e: Event) => setConfigTilesetId((e.target as HTMLSelectElement).value)}
-                  className="windrose-tile-config-select"
-                >
-                  {tilesets.map(ts => (
-                    <option key={ts.id} value={ts.id}>{ts.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            {isGrid && (
-              <div className="windrose-tile-config-row">
-                <label>Terrain fill</label>
-                <select
-                  value={renderMode}
-                  onChange={(e: Event) => {
-                    const v = (e.target as HTMLSelectElement).value;
-                    handleOverrideChange('renderMode', v === 'region' ? 'region' : undefined);
-                  }}
-                  className="windrose-tile-config-select"
-                >
-                  <option value="cell">Per-cell</option>
-                  <option value="region">Tiled (seamless)</option>
-                </select>
-              </div>
-            )}
-            {isGrid && renderMode === 'region' && (
-              <div className="windrose-tile-config-row">
-                <label>Texture size</label>
-                <input
-                  type="range"
-                  min="1"
-                  max="12"
-                  step="1"
-                  value={worldRepeat}
-                  onInput={(e: Event) => handleOverrideChange('worldRepeat', parseInt((e.target as HTMLInputElement).value, 10))}
-                  className="windrose-tile-config-slider"
-                />
-                <span className="windrose-tile-config-value">{worldRepeat} {worldRepeat === 1 ? 'cell' : 'cells'}</span>
-              </div>
-            )}
-            {isGrid && renderMode === 'region' && (
-              <div className="windrose-tile-config-row">
-                <label>Edge feather</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="0.6"
-                  step="0.05"
-                  value={edgeFeather}
-                  onInput={(e: Event) => handleOverrideChange('edgeFeather', parseFloat((e.target as HTMLInputElement).value))}
-                  className="windrose-tile-config-slider"
-                />
-                <span className="windrose-tile-config-value">{edgeFeather === 0 ? 'Hard' : `${(edgeFeather * 100).toFixed(0)}%`}</span>
-              </div>
-            )}
-            <div className="windrose-tile-config-row">
-              <label>Fit Mode</label>
-              <select
-                value={fitMode ?? 'auto'}
-                onChange={(e: Event) => {
-                  const v = (e.target as HTMLSelectElement).value;
-                  handleOverrideChange('fitMode', v === 'auto' ? undefined : v as 'fill' | 'contain');
-                }}
-                className="windrose-tile-config-select"
-              >
-                <option value="auto">Auto</option>
-                <option value="fill">Fill</option>
-                <option value="contain">Contain</option>
-              </select>
-            </div>
-            <div className="windrose-tile-config-row">
-              <label>Stamp threshold</label>
-              <input
-                type="range"
-                min="0.1"
-                max="0.9"
-                step="0.05"
-                value={threshold}
-                onInput={(e: Event) => handleOverrideChange('stampThreshold', parseFloat((e.target as HTMLInputElement).value))}
-                className="windrose-tile-config-slider"
-              />
-              <span className="windrose-tile-config-value">{(threshold * 100).toFixed(0)}%</span>
-            </div>
-            <div className="windrose-tile-config-row">
-              <label>Min stamp size</label>
-              <input
-                type="range"
-                min="0.05"
-                max="0.5"
-                step="0.05"
-                value={minScale}
-                onInput={(e: Event) => handleOverrideChange('minStampScale', parseFloat((e.target as HTMLInputElement).value))}
-                className="windrose-tile-config-slider"
-              />
-              <span className="windrose-tile-config-value">{(minScale * 100).toFixed(0)}%</span>
-            </div>
-            <div className="windrose-tile-config-row">
-              <label>Px / cell</label>
-              <input
-                type="number"
-                min="16"
-                max="2048"
-                step="1"
-                value={pixelsPerCell}
-                onChange={(e: Event) => {
-                  const raw = parseInt((e.target as HTMLInputElement).value, 10);
-                  const v = Number.isFinite(raw) && raw > 0 ? raw : undefined;
-                  handlePixelsPerCellChange(v === DEFAULT_PIXELS_PER_CELL ? undefined : v);
-                }}
-                className="windrose-tile-config-select"
-              />
-              <span className="windrose-tile-config-value">footprint scale</span>
-            </div>
-          </div>
-        );
-      })()}
+      {showTilesetConfig && tilesets.length > 0 && onTilesetOverrideChange != null && (
+        <TilesetConfigPanel
+          tilesets={tilesets}
+          selectedTilesetId={selectedTilesetId}
+          tilesetOverrides={tilesetOverrides}
+          onTilesetOverrideChange={onTilesetOverrideChange}
+          isGrid={isGrid}
+          setTileMetadata={setTileMetadata}
+        />
+      )}
 
       {/* Filter / breadcrumb */}
       {compact && openCat != null ? (
@@ -2008,7 +1186,7 @@ const TileAssetBrowser = memo(({
           <button
             className={`windrose-tb-filtbtn ${compact ? 'icon' : ''} ${activeFilterCount > 0 ? 'on' : ''}`}
             title="All filters"
-            onClick={() => { setFilterSearch(''); setFilterView('types'); }}
+            onClick={() => { setFilterView('types'); }}
           >
             <Icon icon="lucide-filter" size={13} />
             {!compact && 'Filter'}
@@ -2068,117 +1246,15 @@ const TileAssetBrowser = memo(({
 
       {/* Dedicated Filter screen (power-user) — drills Tags / Packs, searchable; shares state with the quick chips */}
       {filterView != null && (
-        <div className="windrose-tb-fscreen">
-          <div className="windrose-tb-fhead">
-            <button
-              className="windrose-tb-iconbtn"
-              title="Back"
-              onClick={() => { setFilterView(filterView === 'types' ? null : 'types'); }}
-            >
-              <Icon icon="lucide-arrow-left" size={15} />
-            </button>
-            <div className="windrose-tb-fcrumb">
-              {filterView === 'types' ? (
-                'Filter'
-              ) : (
-                <>
-                  <span className="dim">Filter</span>
-                  <Icon icon="lucide-chevron-right" size={11} className="windrose-tb-crumb-chev" />
-                  {filterTypes.find(f => f.id === filterView)?.label ?? ''}
-                </>
-              )}
-            </div>
-            <button
-              className="windrose-tb-iconbtn ghost"
-              style={{ marginLeft: 'auto' }}
-              title="Close"
-              onClick={() => { setFilterView(null); }}
-            >
-              <Icon icon="lucide-x" size={15} />
-            </button>
-          </div>
-
-          {filterView === 'types' ? (
-            <>
-              <div className="windrose-tb-fscroll">
-                {filterTypes.map(f => (
-                  <button
-                    key={f.id}
-                    className="windrose-tb-frow"
-                    onClick={() => { setFilterSearch(''); setFilterView(f.id); }}
-                  >
-                    <Icon icon={f.icon} size={16} />
-                    <span className="lbl">{f.label}</span>
-                    {f.size > 0 && <span className="badge">{f.size}</span>}
-                    <Icon icon="lucide-chevron-right" size={15} />
-                  </button>
-                ))}
-                <div className="windrose-tb-frow note">
-                  <Icon icon="lucide-layout-dashboard" size={16} />
-                  <span className="lbl">Grid</span>
-                  <span className="auto">auto · {isGrid ? 'grid' : String(mapType)} map</span>
-                </div>
-              </div>
-              {activeFilterCount > 0 && (
-                <button className="windrose-tb-fbig ghost" onClick={clearAllFilters}>
-                  Clear all filters
-                </button>
-              )}
-            </>
-          ) : (() => {
-            const f = filterTypes.find(x => x.id === filterView);
-            if (f == null) return null;
-            const q = filterSearch.toLowerCase();
-            const vis = f.values.filter(v =>
-              String(f.labelFor != null ? f.labelFor(v) : v).toLowerCase().includes(q));
-            return (
-              <>
-                <div className="windrose-tb-fsearchwrap">
-                  <div className="windrose-tb-search">
-                    <Icon icon="lucide-search" size={14} />
-                    <input
-                      autoFocus
-                      placeholder={`Search ${f.label.toLowerCase()}…`}
-                      value={filterSearch}
-                      onInput={(e: Event) => setFilterSearch((e.target as HTMLInputElement).value)}
-                    />
-                    {filterSearch !== '' && (
-                      <button
-                        className="windrose-tb-iconbtn ghost"
-                        style={{ width: 20, height: 20 }}
-                        title="Clear search"
-                        onClick={() => { setFilterSearch(''); }}
-                      >
-                        <Icon icon="lucide-x" size={12} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="windrose-tb-fscroll">
-                  {vis.map(v => {
-                    const on = f.has(v);
-                    const lbl = f.labelFor != null ? f.labelFor(v) : v;
-                    return (
-                      <button key={v} className="windrose-tb-vrow" onClick={() => { f.toggle(v); }}>
-                        <span className={`windrose-tb-fcheck ${on ? 'on' : ''}`}>
-                          {on && <Icon icon="lucide-check" size={13} />}
-                        </span>
-                        <span className="vlbl">{lbl}</span>
-                      </button>
-                    );
-                  })}
-                  {vis.length === 0 && (
-                    <div className="windrose-tb-fempty">No {f.label.toLowerCase()} match “{filterSearch}”.</div>
-                  )}
-                </div>
-                <button className="windrose-tb-fbig" onClick={() => { setFilterView('types'); }}>
-                  <Icon icon="lucide-check" size={15} />
-                  Done{f.size > 0 ? ` · ${f.size}` : ''}
-                </button>
-              </>
-            );
-          })()}
-        </div>
+        <TileFilterScreen
+          view={filterView}
+          onViewChange={setFilterView}
+          facets={filterTypes}
+          activeFilterCount={activeFilterCount}
+          onClearAll={clearAllFilters}
+          isGrid={isGrid}
+          mapType={mapType}
+        />
       )}
 
       {/* Body: rail + grid */}
