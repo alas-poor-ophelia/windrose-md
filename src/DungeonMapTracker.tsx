@@ -41,7 +41,7 @@ import { OnboardingSurvey } from './components/overlays/OnboardingSurvey';
 import { WhatsNewNotice } from './components/overlays/WhatsNewNotice';
 import { useAlignmentMode } from './hooks/interactions/useAlignmentMode';
 import { ModalPortal } from './components/modals/ModalPortal';
-import { getActiveLayer, getLayerById, getActiveBoardLayers, addBoard, setActiveBoard, removeBoard, setLayerMode, addLayer, updateActiveLayer } from './persistence/layerAccessor';
+import { getActiveLayer, getLayerById, getActiveBoardLayers, getBoardsOrdered, updateBoard, addBoard, setActiveBoard, removeBoard, setLayerMode, addLayer, updateActiveLayer } from './persistence/layerAccessor';
 import type { TileLayerRole } from '#types/tiles/tile.types';
 import { setCell as accessorSetCell, removeCell as accessorRemoveCell, cellToPoint } from './geometry/core/cellAccessor';
 import { FloatingPanel } from './components/panels/FloatingPanel';
@@ -590,6 +590,17 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       layers: prev.layers.map(l => l.id === layerId ? { ...l, visible: l.visible === false } : l),
     }));
   }, [updateMapData]);
+  const handleToggleShowBoardBelow = useCallback((boardId: string): void => {
+    updateMapData((prev: MapData) => {
+      const board = getBoardsOrdered(prev).find(b => b.id === boardId);
+      if (!board) return prev;
+      return updateBoard(prev, boardId, { showBoardBelow: board.showBoardBelow !== true });
+    });
+  }, [updateMapData]);
+  const handleSetBoardBelowOpacity = useCallback((boardId: string, opacity: number): void => {
+    const clampedOpacity = Math.max(0.1, Math.min(0.5, opacity));
+    updateMapData((prev: MapData) => updateBoard(prev, boardId, { boardBelowOpacity: clampedOpacity }));
+  }, [updateMapData]);
 
   // Wrap undo to let in-progress operations (e.g. region creation) cancel first
   const wrappedHandleUndo = useCallback(() => {
@@ -1009,6 +1020,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                       onBoardDelete={handleBoardDelete}
                       onAddLayerToStratum={handleAddLayerToStratum}
                       onToggleLayerVisible={handleToggleLayerVisible}
+                      onToggleShowBoardBelow={handleToggleShowBoardBelow}
+                      onSetBoardBelowOpacity={handleSetBoardBelowOpacity}
                     />
                   )
                 },
@@ -1430,6 +1443,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onBoardDelete={handleBoardDelete}
                 onAddLayerToStratum={handleAddLayerToStratum}
                 onToggleLayerVisible={handleToggleLayerVisible}
+                onToggleShowBoardBelow={handleToggleShowBoardBelow}
+                onSetBoardBelowOpacity={handleSetBoardBelowOpacity}
               />
             </FloatingPanel>
           )}
@@ -1655,6 +1670,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                       onBoardDelete={handleBoardDelete}
                       onAddLayerToStratum={handleAddLayerToStratum}
                       onToggleLayerVisible={handleToggleLayerVisible}
+                      onToggleShowBoardBelow={handleToggleShowBoardBelow}
+                      onSetBoardBelowOpacity={handleSetBoardBelowOpacity}
                     />
                   </DockPanel>
                 )}

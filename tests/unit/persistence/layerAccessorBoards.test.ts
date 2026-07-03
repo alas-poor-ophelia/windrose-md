@@ -29,6 +29,8 @@ import {
   removeLayer,
   reorderLayers,
   getLayerBelow,
+  getBoardBelow,
+  updateBoard,
 } from "../../../src/persistence/layerAccessor";
 
 import type { MapData, MapLayer, BoardId } from "#types/core/map.types";
@@ -170,6 +172,56 @@ describe("layerAccessor — board projection", () => {
     it("getBoardsOrdered sorts by order", () => {
       const map = twoBoardMap();
       expect(getBoardsOrdered(map).map(b => b.id)).toEqual(["A", "B"]);
+    });
+  });
+
+  describe("board-below ghost", () => {
+    it("getBoardBelow returns the board directly beneath by order", () => {
+      const map = twoBoardMap();
+      expect(getBoardBelow(map, "B")?.id).toBe("A");
+    });
+
+    it("getBoardBelow returns null for the bottom board", () => {
+      const map = twoBoardMap();
+      expect(getBoardBelow(map, "A")).toBeNull();
+    });
+
+    it("getBoardBelow returns null for an unknown board id", () => {
+      const map = twoBoardMap();
+      expect(getBoardBelow(map, "nope")).toBeNull();
+    });
+
+    it("getBoardBelow picks the nearest lower order across gaps", () => {
+      const map = mkMap(
+        [mkLayer("a1", 0, "A"), mkLayer("b1", 0, "B"), mkLayer("c1", 0, "C")],
+        "c1",
+        {
+          boards: [
+            { id: "A", name: "A", order: 0 },
+            { id: "B", name: "B", order: 3 },
+            { id: "C", name: "C", order: 7 },
+          ],
+          activeBoardId: "C",
+        }
+      );
+      expect(getBoardBelow(map, "C")?.id).toBe("B");
+    });
+
+    it("updateBoard immutably updates only the target board", () => {
+      const map = twoBoardMap();
+      const next = updateBoard(map, "B", { showBoardBelow: true, boardBelowOpacity: 0.4 });
+      expect(next).not.toBe(map);
+      expect(next.boards?.find(b => b.id === "B")).toMatchObject({
+        showBoardBelow: true,
+        boardBelowOpacity: 0.4,
+      });
+      expect(next.boards?.find(b => b.id === "A")?.showBoardBelow).toBeUndefined();
+      expect(map.boards?.find(b => b.id === "B")?.showBoardBelow).toBeUndefined();
+    });
+
+    it("updateBoard returns the map unchanged when boards are absent", () => {
+      const map = mkMap([mkLayer("l1", 0)], "l1");
+      expect(updateBoard(map, "A", { showBoardBelow: true })).toBe(map);
     });
   });
 

@@ -3,7 +3,7 @@ import type { MapData, MapLayer } from '#types/core/map.types';
 import type { TileLayerRole } from '#types/tiles/tile.types';
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { getLayersOrdered, getActiveBoardId, getActiveBoardLayers, getBoardsOrdered } from '../../persistence/layerAccessor';
+import { getLayersOrdered, getActiveBoardId, getActiveBoardLayers, getBoardsOrdered, getBoardBelow } from '../../persistence/layerAccessor';
 import { ROLE_META } from '../../assets/tileRoles';
 import { getIconInfo } from '../../assets/rpgAwesomeIcons';
 import { Icon } from '../shared/Icon';
@@ -31,6 +31,8 @@ interface DockLayerListProps {
   onBoardDelete?: (boardId: string) => void;
   onAddLayerToStratum?: (role: TileLayerRole) => void;
   onToggleLayerVisible?: (layerId: string) => void;
+  onToggleShowBoardBelow?: (boardId: string) => void;
+  onSetBoardBelowOpacity?: (boardId: string, opacity: number) => void;
 }
 
 const DockLayerList = ({
@@ -49,6 +51,8 @@ const DockLayerList = ({
   onBoardDelete,
   onAddLayerToStratum,
   onToggleLayerVisible,
+  onToggleShowBoardBelow,
+  onSetBoardBelowOpacity,
 }: DockLayerListProps): VNode => {
   const [expandedLayerId, setExpandedLayerId] = useState<string | null>(null);
   const [dragState, setDragState] = useState<DragState | null>(null);
@@ -65,6 +69,8 @@ const DockLayerList = ({
   const boards = getBoardsOrdered(mapData);
   const activeBoardId = getActiveBoardId(mapData);
   const boardLayers = getActiveBoardLayers(mapData);
+  const activeBoard = boards.find(b => b.id === activeBoardId) ?? null;
+  const activeBoardBelow = getBoardBelow(mapData, activeBoardId);
 
   useEffect((): (() => void) | undefined => {
     if (expandedLayerId == null) return undefined;
@@ -148,6 +154,39 @@ const DockLayerList = ({
   const handleOpacityChange = (layerId: string, e: TargetedEvent<HTMLInputElement>): void => {
     const value = parseFloat((e.target as HTMLInputElement).value);
     onSetLayerBelowOpacity(layerId, value);
+  };
+
+  const handleBoardGhostToggle = (boardId: string, e: TargetedMouseEvent<HTMLButtonElement>): void => {
+    e.stopPropagation();
+    // No floor below the bottom floor — the toggle is a no-op there.
+    if (getBoardBelow(mapData, boardId) == null) return;
+    onToggleShowBoardBelow?.(boardId);
+  };
+
+  const handleBoardGhostOpacity = (boardId: string, e: TargetedEvent<HTMLInputElement>): void => {
+    const value = parseFloat((e.target as HTMLInputElement).value);
+    onSetBoardBelowOpacity?.(boardId, value);
+  };
+
+  const renderBoardGhostOpacity = (): VNode | null => {
+    if (activeBoard == null || activeBoard.showBoardBelow !== true || activeBoardBelow == null) return null;
+    return (
+      <div className="windrose-dock-layer-opacity board-ghost">
+        <span className="windrose-dock-layer-opacity-label">Below opacity</span>
+        <input
+          type="range"
+          min="0.1"
+          max="0.5"
+          step="0.05"
+          value={activeBoard.boardBelowOpacity ?? 0.25}
+          onChange={(e) => handleBoardGhostOpacity(activeBoard.id, e)}
+          onClick={(e) => e.stopPropagation()}
+        />
+        <span className="windrose-dock-layer-opacity-value">
+          {Math.round((activeBoard.boardBelowOpacity ?? 0.25) * 100)}%
+        </span>
+      </div>
+    );
   };
 
   const handleDragStart = (layerId: string, index: number, e: TargetedDragEvent<HTMLDivElement>): void => {
@@ -328,6 +367,15 @@ const DockLayerList = ({
             ))}
           </select>
           <div className="windrose-dock-board-actions">
+            {onToggleShowBoardBelow != null && (
+              <button
+                className={`windrose-dock-board-btn ghost${activeBoard?.showBoardBelow === true ? ' active' : ''}`}
+                onClick={(e) => handleBoardGhostToggle(activeBoardId, e)}
+                title={activeBoard?.showBoardBelow === true ? 'Hide floor below' : 'Show floor below'}
+              >
+                <Icon icon="lucide-layers" size={14} />
+              </button>
+            )}
             {onBoardAdd != null && (
               <button className="windrose-dock-board-btn" onClick={onBoardAdd} title="Add floor">
                 <Icon icon="lucide-plus" size={14} />
@@ -349,6 +397,8 @@ const DockLayerList = ({
             )}
           </div>
         </div>
+
+        {renderBoardGhostOpacity()}
 
         {/* Strata sections, one per canonical role */}
         {ROLE_META.map(role => {
@@ -409,6 +459,15 @@ const DockLayerList = ({
             >
               <Icon icon="lucide-square-stack" size={14} />
               <span className="windrose-dock-floor-name">{board.name}</span>
+              {onToggleShowBoardBelow != null && (
+                <button
+                  className={`windrose-dock-layer-action transparency${board.showBoardBelow === true ? ' active' : ''}`}
+                  onClick={(e) => handleBoardGhostToggle(board.id, e)}
+                  title={board.showBoardBelow === true ? 'Hide floor below' : 'Show floor below'}
+                >
+                  <Icon icon="lucide-layers" size={14} />
+                </button>
+              )}
               {canDeleteBoard && onBoardDelete != null && (
                 <button
                   className="windrose-dock-floor-del"
@@ -421,6 +480,8 @@ const DockLayerList = ({
             </div>
           ))}
         </div>
+
+        {renderBoardGhostOpacity()}
 
         {onBoardAdd != null && (
           <div className="windrose-dock-layer-footer">

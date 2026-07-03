@@ -6,10 +6,11 @@ import {
   waitForContainer,
   waitForToolPalette,
   selectSubTool,
-  openLayerContextMenu,
-  clickTransparencyToggle,
-  isTransparencyToggleActive,
-  hoverTransparencyButton,
+  openLayerPanel,
+  ensureTwoFloors,
+  clickFloorGhostToggle,
+  isFloorGhostToggleActive,
+  selectFloorByIndex,
   expandObjectSidebarIfNeeded,
   TEST_MAPS,
 } from "./helpers";
@@ -199,157 +200,110 @@ test("Diagonal fill tool shows preview overlay on valid diagonal", async ({ page
 });
 
 // ===========================================
-// Layer Transparency Tests
+// Floor Ghost ("Show floor below") Tests
 // ===========================================
 //
-// SKIPPED (UI-modernization debt): the per-layer "show layer below" transparency
-// toggle was part of the old flat layer panel. The redesigned block-mode layer
-// dock (DockLayerList) renders either Simple/Floors rows (no per-layer controls)
-// or Strata rows (which explicitly omit the transparency toggle — `!isStrata`
-// guard in DockLayerList.tsx). There is currently NO block-mode entry point for
-// this control, so these tests target removed UI with no replacement. Re-enable
-// once transparency is re-exposed in the new dock. See findings report.
+// The old per-layer "show layer below" transparency toggle moved to the Board
+// (floor) level in the redesigned dock: the strata board bar exposes a ghost
+// toggle that renders the floor beneath the active one at reduced opacity.
+// Adding a floor promotes the map to Strata mode and switches to the new floor,
+// which has a floor below it — the toggleable case.
 
-test.skip("Layer transparency toggle can be activated", async ({ page }) => {
+test("Floor ghost toggle can be activated and deactivated", async ({ page }) => {
   const errors = setupErrorTracking(page);
 
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  // Open context menu for Layer 2 (index 1) which has a layer below it
-  const layerIndex = 1;
-  await openLayerContextMenu(page, layerIndex);
+  await openLayerPanel(page);
+  await ensureTwoFloors(page);
 
-  // Click to toggle transparency on (pass layerIndex to scope selector)
-  await clickTransparencyToggle(page, layerIndex);
-
-  // Verify the toggle shows active state
-  const isActive = await isTransparencyToggleActive(page, layerIndex);
-  expect(isActive).toBe(true);
-
-  // Verify no errors
-  expect(errors).toHaveLength(0);
-});
-
-test.skip("Layer transparency toggle can be deactivated", async ({ page }) => {
-  const errors = setupErrorTracking(page);
-
-  await navigateToMap(page, TEST_MAPS.grid);
-  await waitForContainer(page);
-
-  // Open context menu for Layer 2
-  const layerIndex = 1;
-  await openLayerContextMenu(page, layerIndex);
-
-  // Toggle on
-  await clickTransparencyToggle(page, layerIndex);
-  expect(await isTransparencyToggleActive(page, layerIndex)).toBe(true);
-
-  // Toggle off
-  await clickTransparencyToggle(page, layerIndex);
-  expect(await isTransparencyToggleActive(page, layerIndex)).toBe(false);
-
-  expect(errors).toHaveLength(0);
-});
-
-test.skip("Layer transparency slider appears on hover when active", async ({ page }) => {
-  const errors = setupErrorTracking(page);
-
-  await navigateToMap(page, TEST_MAPS.grid);
-  await waitForContainer(page);
-
-  // Open layer panel for Layer 2
-  const layerIndex = 1;
-  await openLayerContextMenu(page, layerIndex);
-
-  // Ensure toggle is active (explicitly set state, don't assume initial state)
-  if (!await isTransparencyToggleActive(page, layerIndex)) {
-    await clickTransparencyToggle(page, layerIndex);
-    await page.waitForTimeout(200);
+  // Normalize to off, then exercise both transitions
+  if (await isFloorGhostToggleActive(page)) {
+    await clickFloorGhostToggle(page);
   }
-  expect(await isTransparencyToggleActive(page, layerIndex)).toBe(true);
+  await clickFloorGhostToggle(page);
+  expect(await isFloorGhostToggleActive(page)).toBe(true);
 
-  // Hover to reveal slider (needs extra wait for CSS transition)
-  await hoverTransparencyButton(page, layerIndex);
+  await clickFloorGhostToggle(page);
+  expect(await isFloorGhostToggleActive(page)).toBe(false);
+
+  expect(errors).toHaveLength(0);
+});
+
+test("Floor ghost opacity slider appears only while active", async ({ page }) => {
+  const errors = setupErrorTracking(page);
+
+  await navigateToMap(page, TEST_MAPS.grid);
+  await waitForContainer(page);
+
+  await openLayerPanel(page);
+  await ensureTwoFloors(page);
+
+  const slider = page.locator('.windrose-dock-layer-opacity.board-ghost');
+
+  // Inactive → no slider
+  if (await isFloorGhostToggleActive(page)) {
+    await clickFloorGhostToggle(page);
+  }
+  expect(await slider.count()).toBe(0);
+
+  // Active → slider with a range input
+  await clickFloorGhostToggle(page);
+  await slider.waitFor({ state: "visible", timeout: 3000 });
+  expect(await slider.locator('input[type="range"]').count()).toBe(1);
+
+  // Cleanup: toggle back off
+  await clickFloorGhostToggle(page);
+  expect(await slider.count()).toBe(0);
+
+  expect(errors).toHaveLength(0);
+});
+
+test("Bottom floor ghost toggle is a no-op (no floor below)", async ({ page }) => {
+  const errors = setupErrorTracking(page);
+
+  await navigateToMap(page, TEST_MAPS.grid);
+  await waitForContainer(page);
+
+  await openLayerPanel(page);
+  await ensureTwoFloors(page);
+
+  // Switch to the bottom floor — no floor below, so the toggle must not activate
+  await selectFloorByIndex(page, 0);
+  await clickFloorGhostToggle(page);
+  expect(await isFloorGhostToggleActive(page)).toBe(false);
+
+  expect(errors).toHaveLength(0);
+});
+
+test("Floor ghost renders without errors", async ({ page }) => {
+  const errors = setupErrorTracking(page);
+
+  await navigateToMap(page, TEST_MAPS.grid);
+  await waitForContainer(page);
+
+  await openLayerPanel(page);
+  await ensureTwoFloors(page);
+
+  // Make sure the upper floor is active, then enable the ghost
+  await selectFloorByIndex(page, 1);
+  if (!await isFloorGhostToggleActive(page)) {
+    await clickFloorGhostToggle(page);
+  }
+
+  // Fold the drawer closed so the canvas is unobstructed, let it render
+  await openLayerPanel(page);
   await page.waitForTimeout(500);
 
-  // Verify slider popup appears
-  const sliderPopup = page.locator('.windrose-opacity-slider-popup');
-  await sliderPopup.waitFor({ state: "visible", timeout: 5000 });
-
-  // Verify slider input exists
-  const sliderInput = sliderPopup.locator('input[type="range"]');
-  expect(await sliderInput.count()).toBe(1);
-
-  expect(errors).toHaveLength(0);
-});
-
-test.skip("Layer transparency slider does not appear when toggle is inactive", async ({ page }) => {
-  const errors = setupErrorTracking(page);
-
-  await navigateToMap(page, TEST_MAPS.grid);
-  await waitForContainer(page);
-
-  // Open layer panel for Layer 2
-  const layerIndex = 1;
-  await openLayerContextMenu(page, layerIndex);
-
-  // Ensure toggle is inactive (explicitly set state, don't assume initial state)
-  if (await isTransparencyToggleActive(page, layerIndex)) {
-    await clickTransparencyToggle(page, layerIndex);
-    await page.waitForTimeout(200);
-  }
-  expect(await isTransparencyToggleActive(page, layerIndex)).toBe(false);
-
-  // Hover - slider should NOT appear since toggle is off
-  await hoverTransparencyButton(page, layerIndex);
-
-  // Slider should NOT appear
-  const sliderPopup = page.locator('.windrose-opacity-slider-popup');
-  expect(await sliderPopup.count()).toBe(0);
-
-  expect(errors).toHaveLength(0);
-});
-
-test.skip("Bottom layer transparency toggle is disabled (no layer below)", async ({ page }) => {
-  const errors = setupErrorTracking(page);
-
-  await navigateToMap(page, TEST_MAPS.grid);
-  await waitForContainer(page);
-
-  // Open context menu for Layer 1 (bottom layer, index 0)
-  const layerIndex = 0;
-  await openLayerContextMenu(page, layerIndex);
-
-  // The transparency toggle should still exist but clicking it should be a no-op
-  // since there's no layer below
-  await clickTransparencyToggle(page, layerIndex);
-
-  // It can be toggled on (spec says allow toggle, it's a no-op)
-  // The test is mainly checking it doesn't crash
-  expect(errors).toHaveLength(0);
-});
-
-test.skip("Layer transparency renders without errors", async ({ page }) => {
-  const errors = setupErrorTracking(page);
-
-  await navigateToMap(page, TEST_MAPS.grid);
-  await waitForContainer(page);
-
-  // Open context menu for a layer with content below it
-  // Layer 2 (index 1) has Layer 1 below it
-  const layerIndex = 1;
-  await openLayerContextMenu(page, layerIndex);
-
-  // Enable transparency
-  await clickTransparencyToggle(page, layerIndex);
-
-  // Wait for render
-  await page.waitForTimeout(500);
-
-  // Canvas should still be visible and no errors
   const canvas = page.locator(".windrose-canvas-wrapper canvas").first();
   await canvas.waitFor({ state: "visible", timeout: 3000 });
+
+  // Cleanup: ghost off, back to the bottom floor (where the fixture content lives)
+  await openLayerPanel(page);
+  await clickFloorGhostToggle(page);
+  await selectFloorByIndex(page, 0);
+  await openLayerPanel(page);
 
   expect(errors).toHaveLength(0);
 });

@@ -519,6 +519,52 @@ export async function hoverTransparencyButton(page: any, layerIndex: number = 1)
   await page.waitForTimeout(200);
 }
 
+// ===========================================
+// Floor Ghost ("Show floor below") Helpers
+// ===========================================
+
+/**
+ * Ensure the map has at least two floors (boards). In Simple/Floors mode the
+ * footer "Add Floor" button both adds a board and promotes the map to Strata
+ * mode, switching to the new (upper) floor. Requires the layer drawer open.
+ */
+export async function ensureTwoFloors(page: any): Promise<void> {
+  const boardSelect = page.locator('.windrose-dock-board-select');
+  if (await boardSelect.count() > 0) {
+    if (await boardSelect.locator('option').count() >= 2) return;
+    await page.locator('.windrose-dock-board-btn[title="Add floor"]').click();
+    await page.waitForTimeout(400);
+    return;
+  }
+  if (await page.locator('.windrose-dock-floor-row').count() >= 2) return;
+  const addFloor = page.locator('.windrose-dock-layer-add[title="Add floor"]');
+  await addFloor.waitFor({ state: "visible", timeout: 5000 });
+  await addFloor.click();
+  await page.waitForTimeout(400);
+}
+
+/** Click the strata board bar's floor-ghost toggle ("Show floor below"). */
+export async function clickFloorGhostToggle(page: any): Promise<void> {
+  const btn = page.locator('.windrose-dock-board-btn.ghost');
+  await btn.waitFor({ state: "visible", timeout: 3000 });
+  await btn.click();
+  await page.waitForTimeout(300);
+}
+
+/** Whether the board-bar floor-ghost toggle shows its active state. */
+export async function isFloorGhostToggleActive(page: any): Promise<boolean> {
+  return await page.locator('.windrose-dock-board-btn.ghost.active').count() > 0;
+}
+
+/** Switch the active floor via the strata board bar's dropdown (0 = bottom). */
+export async function selectFloorByIndex(page: any, index: number): Promise<void> {
+  const boardSelect = page.locator('.windrose-dock-board-select');
+  await boardSelect.waitFor({ state: "visible", timeout: 3000 });
+  const value = await boardSelect.locator('option').nth(index).getAttribute('value');
+  await boardSelect.selectOption(value);
+  await page.waitForTimeout(300);
+}
+
 /** Helper to get layer transparency settings from JSON data */
 export async function getLayerTransparency(page: any, mapId: string, layerId: string): Promise<{ showLayerBelow: boolean; layerBelowOpacity: number } | null> {
   return await doWithApp(page, async (app: any, params?: { mapId: string; layerId: string; dataPath: string }) => {

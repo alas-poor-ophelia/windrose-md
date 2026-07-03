@@ -165,6 +165,38 @@ function getActiveBoardLayers(mapData: MapData | null | undefined): MapLayer[] {
 }
 
 /**
+ * Get the board (floor) directly below the specified board (by order): the board
+ * with the highest `order` strictly less than the given board's. Returns null when
+ * the given board is the bottom board (or the board id is unknown).
+ */
+function getBoardBelow(mapData: MapData | null | undefined, boardId: BoardId): Board | null {
+  const boards = getBoardsOrdered(mapData);
+  const board = boards.find(b => b.id === boardId);
+  if (!board) return null;
+
+  let below: Board | null = null;
+  for (const candidate of boards) {
+    if (candidate.order < board.order) {
+      if (!below || candidate.order > below.order) {
+        below = candidate;
+      }
+    }
+  }
+  return below;
+}
+
+/** Update a specific board's fields (immutable). */
+function updateBoard(mapData: MapData, boardId: BoardId, updates: Partial<Omit<Board, 'id'>>): MapData {
+  if (!mapData.boards) return mapData;
+  return {
+    ...mapData,
+    boards: mapData.boards.map(board =>
+      board.id === boardId ? { ...board, ...updates } : board
+    )
+  };
+}
+
+/**
  * The layers the canvas should COMPOSITE (cells/curves/tiles), in draw order.
  * Strata maps composite the active board's visible layers as stacked strata;
  * every other map renders just the active layer (today's single-layer behavior).
@@ -1048,7 +1080,7 @@ export {
   migrateToLayerSchema, needsMigration,
   // Board (floor) projection
   DEFAULT_BOARD_ID, generateBoardId, layerBoardId, getBoardsOrdered, getActiveBoardId,
-  getBoardLayers, getActiveBoardLayers, getRenderLayers, ensureBoards, addBoard, removeBoard, setActiveBoard,
+  getBoardLayers, getActiveBoardLayers, getBoardBelow, updateBoard, getRenderLayers, ensureBoards, addBoard, removeBoard, setActiveBoard,
   promoteToStrata, setLayerMode,
   initializeFogOfWar, isCellFogged, fogCell, revealCell,
   fogRectangle, revealRectangle, fogAll, fogPaintedCells, revealAll,

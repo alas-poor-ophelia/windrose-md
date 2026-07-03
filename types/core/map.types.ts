@@ -242,6 +242,10 @@ export interface Board {
   name: string;
   /** Display/switch order among boards (ascending). */
   order: number;
+  /** Show the board (floor) below this one at reduced opacity (for alignment) */
+  showBoardBelow?: boolean;
+  /** Opacity for board below (0.1-0.5, default 0.25) */
+  boardBelowOpacity?: number;
 }
 
 /** Individual map layer */

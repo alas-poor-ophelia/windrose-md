@@ -50,7 +50,7 @@ import { buildMergeIndex } from '../../geometry/curves/curveCellOverlap';
 import { getCachedImage, getImageCacheVersion } from '../../assets/imageOperations';
 import { getSlotOffset, getMultiObjectScale, getObjectsInCell } from '../../objects/hexSlotPositioner';
 import { offsetToAxial, axialToOffset } from '../../geometry/core/offsetCoordinates';
-import { getActiveLayer, getLayerBelow, getRenderLayers, isCellFogged } from '../../persistence/layerAccessor';
+import { getActiveLayer, getLayerBelow, getRenderLayers, isCellFogged, getActiveBoardId, getBoardBelow, getBoardLayers } from '../../persistence/layerAccessor';
 
 interface Renderer {
   // Polymorphic properties
@@ -424,6 +424,12 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   const renderLayers = getRenderLayers(mapData);
   const isStrata = mapData.layerMode === 'strata';
 
+  // Board-below ghost: when the ACTIVE board opts in, render the floor beneath it
+  // at reduced opacity for alignment. Works in both simple and strata modes; only
+  // active when the map has a board below the active one (getBoardBelow != null).
+  const activeBoard = mapData.boards?.find(b => b.id === getActiveBoardId(mapData)) ?? null;
+  const boardBelow = activeBoard?.showBoardBelow === true ? getBoardBelow(mapData, activeBoard.id) : null;
+
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
@@ -511,6 +517,46 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     lineWidth: THEME.grid.lineWidth ?? 1,
     rotated: (northDirection ?? 0) % 360 !== 0
   });
+
+  // Draw board-below ghost (floor beneath the active board) if enabled. Works in
+  // both simple and strata modes: renders every visible layer of the board below,
+  // in ascending order, at the board's ghost opacity — for cross-floor alignment.
+  if (boardBelow != null && activeBoard != null) {
+    const ghostOpacity = activeBoard.boardBelowOpacity ?? 0.25;
+    const belowLayers = getBoardLayers(mapData, boardBelow.id).filter(l => l.visible !== false);
+    for (const belowLayer of belowLayers) {
+      renderLayerCellsAndEdges(ctx, belowLayer, geometry, rendererViewState, THEME, renderer, {
+        opacity: ghostOpacity,
+        showGrid: visibility.grid !== false,
+        northDirection: northDirection ?? 0
+      });
+      const hasTiles = belowLayer.tiles != null && belowLayer.tiles.length > 0;
+      const hasStrokes = belowLayer.terrainStrokes != null && belowLayer.terrainStrokes.length > 0;
+      if ((hasTiles || hasStrokes) && mapData.tilesets != null && mapData.tilesets.length > 0) {
+        renderTiles(
+          ctx,
+          belowLayer.tiles ?? [],
+          mapData.tilesets,
+          tileGeomShim,
+          rendererViewState,
+          { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, terrainStrokes: belowLayer.terrainStrokes }
+        );
+      }
+      if (belowLayer.curves.length > 0) {
+        const ghostGridConfig = geometry.type === 'grid'
+          ? { cellSize: geometry.cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth ?? 1, interiorRatio: 0.5 }
+          : undefined;
+        renderCurves(ctx, belowLayer.curves, rendererViewState, THEME, { opacity: ghostOpacity, gridConfig: ghostGridConfig });
+      }
+      if (belowLayer.wallPaths != null && belowLayer.wallPaths.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
+        const wallCellSize = geometry.type === 'grid' ? geometry.cellSize : geometry.hexSize;
+        renderWallPaths(ctx, belowLayer.wallPaths, mapData.tilesets, rendererViewState, wallCellSize, {
+          opacity: ghostOpacity,
+          getCachedImage
+        });
+      }
+    }
+  }
 
   // Draw ghost layer (layer below) if enabled. Disabled in strata mode: the
   // composite already draws the layer below at full opacity, so a ghost would
@@ -835,7 +881,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     mapData.shapeOverlays, mapData.subHexMaps, mapData.backgroundImage,
     mapData.dimensions, mapData.hexBounds, mapData.orientation,
     mapData.objectSetId, mapData.settings, mapData.activeLayerId, activeLayer,
-    mapData.activeBoardId, mapData.layerMode,
+    mapData.activeBoardId, mapData.layerMode, mapData.boards,
     geometry, hiddenTileLayers, adjacentSubHexes, showCoordinates,
     width, height, draggingWallId,
     JSON.stringify(THEME), JSON.stringify(visibility),
