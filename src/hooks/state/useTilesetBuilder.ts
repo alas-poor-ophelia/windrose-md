@@ -3,7 +3,7 @@ import type { TilesetDef } from '#types/tiles/tile.types';
 import type { App } from 'obsidian';
 
 import { useEffect, useRef } from 'preact/hooks';
-import { getTilesetFolders, getEffectiveSettings } from '../../core/settingsAccessor';
+import { getTilesetFolders, getEffectiveSettings, getSettings } from '../../core/settingsAccessor';
 import { createTilesetFromTiles, probeFirstTileImage, scanTilesetFolder } from '../../assets/tilesetOperations';
 import { clearUnusedTileImages } from '../../assets/imageOperations';
 import { getResolvedObjectTypes } from '../../objects/objectTypeResolver';
@@ -32,12 +32,17 @@ function useTilesetBuilder(
     const folders = getTilesetFolders().filter((f: string) => f.trim() !== '');
     if (folders.length === 0) return;
 
+    // Installed content packs store the human-readable pack name; the folder
+    // itself is named by pack id (a hash for Dungeondraft packs).
+    const installedPacks = getSettings().installedContentPacks ?? [];
+
     void (async () => {
       const newTilesets: TilesetDef[] = [];
       for (const folder of folders) {
         try {
           const parts = folder.split('/');
-          const name = parts[parts.length - 1] || folder;
+          const packName = installedPacks.find(p => p.vaultPath === folder)?.name;
+          const name = packName ?? (parts[parts.length - 1] || folder);
 
           const tiles = await scanTilesetFolder(app, folder);
           const dims = await probeFirstTileImage(app, tiles);
