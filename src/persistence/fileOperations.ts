@@ -314,10 +314,8 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
  * if it becomes empty.
  */
 async function deleteMapData(app: App, mapId: string): Promise<boolean> {
-  // Tombstone synchronously, BEFORE entering the mutex: any saveMapData call
-  // made after this point is refused, even while the delete itself is still
-  // queued. Saves already enqueued run first (mutex FIFO) and are then undone
-  // by this delete.
+  // Tombstone before enqueue so post-tombstone saves are refused immediately;
+  // pre-tombstone saves that beat us into the mutex write first and are deleted after.
   deletedMapIds.add(mapId);
   return enqueueSave(async () => {
     try {

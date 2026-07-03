@@ -122,13 +122,14 @@ function patternSourceForScale(
       const w = Math.floor(sw / 2);
       const h = Math.floor(sh / 2);
       if (w < 1 || h < 1) break;
-      mip = activeDocument.createElement('canvas');
-      mip.width = w;
-      mip.height = h;
-      const mctx = mip.getContext('2d');
+      const candidate = activeDocument.createElement('canvas');
+      const mctx = candidate.getContext('2d');
       if (mctx == null) break;
+      candidate.width = w;
+      candidate.height = h;
       mctx.imageSmoothingEnabled = true;
       mctx.drawImage(src, 0, 0, w, h);
+      mip = candidate;
       chain[i] = mip;
     }
     src = mip;

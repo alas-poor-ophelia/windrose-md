@@ -170,7 +170,8 @@ test("Settings modal has Save and Cancel buttons", async ({ page }) => {
   expect(saveBtnText).toContain("Save");
 
   // Cancel button: native uses plain button in .modal-button-container, fallback uses .windrose-modal-btn-cancel
-  const cancelBtn = page.locator('.windrose-modal-btn-cancel, .modal-button-container button:not(.mod-cta)').first();
+  // (exclude .mod-warning — the "Delete map…" button shares the container)
+  const cancelBtn = page.locator('.windrose-modal-btn-cancel, .modal-button-container button:not(.mod-cta):not(.mod-warning)').first();
   expect(await cancelBtn.isVisible()).toBe(true);
   const cancelBtnText = await cancelBtn.textContent();
   expect(cancelBtnText).toContain("Cancel");

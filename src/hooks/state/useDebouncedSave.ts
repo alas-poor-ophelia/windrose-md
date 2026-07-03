@@ -39,6 +39,7 @@ function useDebouncedSave(
     const currentVersion = ++saveVersionRef.current;
 
     saveTimerRef.current = window.setTimeout(() => { void (async () => {
+      if (deletedRef.current) return;
       setSaveStatus('Saving...');
       const success = await saveMapData(app, mapId, pendingData);
 
