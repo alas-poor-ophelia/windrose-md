@@ -12,6 +12,7 @@ geometry/
 │   ├── BaseGeometry.ts    # Abstract base class implementing IGeometry
 │   ├── GridGeometry.ts    # Square grid implementation
 │   ├── HexGeometry.ts     # Hexagonal grid implementation
+│   ├── createGeometry.ts  # Factory: MapData → Grid/HexGeometry with defaults
 │   ├── cellAccessor.ts    # Cell data access, manipulation, queries
 │   ├── hexMeasurements.ts # Hex-specific calculations
 │   └── offsetCoordinates.ts # Coordinate system conversions

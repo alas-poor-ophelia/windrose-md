@@ -12,22 +12,6 @@ import { CollapsibleSection } from '../../shared/CollapsibleSection';
 import { SettingItem } from '../SettingItem';
 import { NativeSlider } from '../NativeControls';
 
-
-
-
-
-
-
-
-
-/** Fine tune range */
-
-/** Context for density mode */
-
-/** Context for measurement mode */
-
-/** Context for sizing mode section */
-
 /**
  * Quick Setup tab content - density presets
  */
@@ -50,56 +34,24 @@ function DensityModeContent(): VNode {
     <div>
       <SettingItem name="Grid Density" vertical>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
-            <input
-              type="radio"
-              name="gridDensity"
-              value="sparse"
-              checked={gridDensity === 'sparse'}
-              onChange={() => handleDensityChange('sparse')}
-              style={{ marginTop: '2px' }}
-            />
-            <div>
-              <span style={{ fontWeight: 500 }}>{GRID_DENSITY_PRESETS.sparse.label}</span>
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                {GRID_DENSITY_PRESETS.sparse.description}
-              </p>
-            </div>
-          </label>
-
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
-            <input
-              type="radio"
-              name="gridDensity"
-              value="medium"
-              checked={gridDensity === 'medium'}
-              onChange={() => handleDensityChange('medium')}
-              style={{ marginTop: '2px' }}
-            />
-            <div>
-              <span style={{ fontWeight: 500 }}>{GRID_DENSITY_PRESETS.medium.label}</span>
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                {GRID_DENSITY_PRESETS.medium.description}
-              </p>
-            </div>
-          </label>
-
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
-            <input
-              type="radio"
-              name="gridDensity"
-              value="dense"
-              checked={gridDensity === 'dense'}
-              onChange={() => handleDensityChange('dense')}
-              style={{ marginTop: '2px' }}
-            />
-            <div>
-              <span style={{ fontWeight: 500 }}>{GRID_DENSITY_PRESETS.dense.label}</span>
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                {GRID_DENSITY_PRESETS.dense.description}
-              </p>
-            </div>
-          </label>
+          {(['sparse', 'medium', 'dense'] as const).map((presetKey) => (
+            <label key={presetKey} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="gridDensity"
+                value={presetKey}
+                checked={gridDensity === presetKey}
+                onChange={() => handleDensityChange(presetKey)}
+                style={{ marginTop: '2px' }}
+              />
+              <div>
+                <span style={{ fontWeight: 500 }}>{GRID_DENSITY_PRESETS[presetKey].label}</span>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  {GRID_DENSITY_PRESETS[presetKey].description}
+                </p>
+              </div>
+            </label>
+          ))}
 
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
             <input
@@ -139,7 +91,7 @@ function DensityModeContent(): VNode {
           <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
             Result: {hexBounds.maxCol} columns × {hexBounds.maxRow} rows
             {(() => {
-              const columns = gridDensity === 'custom' ? customColumns : GRID_DENSITY_PRESETS[gridDensity]?.columns || 24;
+              const columns = gridDensity === 'custom' ? customColumns : GRID_DENSITY_PRESETS[gridDensity]?.columns ?? 24;
               const calc = calculateGridFromColumns(imageDimensions.width, imageDimensions.height, columns, orientation);
               return ` (~${Math.round(hexSizeToMeasurement(calc.hexSize, MEASUREMENT_EDGE, orientation))}px hex width)`;
             })()}

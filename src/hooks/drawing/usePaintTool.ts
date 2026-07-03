@@ -25,19 +25,16 @@ import { eraseCellFromCurves, eraseWorldPolygonFromCurves } from '../../geometry
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { assignmentCoversCell } from '../../assets/tileFootprint';
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+/**
+ * Detects whether a stroke changed layer data against its start-of-stroke
+ * snapshot. Cheap reference/length checks first; deep compare only as fallback
+ * (equal-length arrays can still differ, e.g. a recolor).
+ */
+function strokeChanged<T>(current: readonly T[], initial: readonly T[]): boolean {
+  if (current === initial) return false;
+  if (current.length !== initial.length) return true;
+  return JSON.stringify(current) !== JSON.stringify(initial);
+}
 
 interface UsePaintToolOptions {
   currentTool: ToolId;
@@ -193,7 +190,7 @@ function usePaintTool({
             }
           }
           if (newCurves) {
-            strokeInitialCurvesRef.current ??= activeLayer.curves;
+            strokeInitialCurvesRef.current ??= [...activeLayer.curves];
             onCurvesChange(newCurves, isBatchedStroke);
             curveErased = true;
           }
@@ -249,25 +246,25 @@ function usePaintTool({
     const activeLayer = getActiveLayer(mapData);
 
     if (strokeInitialStateRef.current !== null) {
-      if (JSON.stringify(activeLayer.cells) !== JSON.stringify(strokeInitialStateRef.current)) {
+      if (strokeChanged(activeLayer.cells, strokeInitialStateRef.current)) {
         onCellsChange(activeLayer.cells, false);
       }
       strokeInitialStateRef.current = null;
     }
     if (strokeInitialEdgesRef.current !== null) {
-      if (JSON.stringify(activeLayer.edges) !== JSON.stringify(strokeInitialEdgesRef.current)) {
+      if (strokeChanged(activeLayer.edges, strokeInitialEdgesRef.current)) {
         onEdgesChange(activeLayer.edges, false);
       }
       strokeInitialEdgesRef.current = null;
     }
     if (strokeInitialCurvesRef.current !== null) {
-      if (JSON.stringify(activeLayer.curves) !== JSON.stringify(strokeInitialCurvesRef.current)) {
+      if (strokeChanged(activeLayer.curves, strokeInitialCurvesRef.current)) {
         onCurvesChange(activeLayer.curves, false);
       }
       strokeInitialCurvesRef.current = null;
     }
     if (strokeInitialTilesRef.current !== null && onTilesChange != null) {
-      if (JSON.stringify(activeLayer.tiles ?? []) !== JSON.stringify(strokeInitialTilesRef.current)) {
+      if (strokeChanged(activeLayer.tiles ?? [], strokeInitialTilesRef.current)) {
         onTilesChange(activeLayer.tiles ?? [], false);
       }
       strokeInitialTilesRef.current = null;

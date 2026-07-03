@@ -3,6 +3,7 @@ import { THEME, DEFAULTS } from '../../core/dmtConstants';
 import type { SettingsTabThis } from './settingsTabContext';
 import { ContentPackBrowserModal } from '../../content-packs/ContentPackBrowserModal';
 import { getInstalledPacks } from '../../content-packs/installedPacksService';
+import { fogPackImagePath } from '../../content-packs/contentPackConstants';
 
 const SETTING_DEFAULTS = {
   DEFAULT_HEX_ORIENTATION: DEFAULTS.hexOrientation,
@@ -268,7 +269,7 @@ export const TabRenderSettingsMethods = {
       const currentFogImage = this.plugin.settings.fogOfWarImage;
 
       for (const pack of fogPacks) {
-        const imagePath = pack.vaultPath + '/' + pack.id + '.jpg';
+        const imagePath = fogPackImagePath(pack);
         const isActive = currentFogImage === imagePath;
 
         const setting = new Setting(containerEl)

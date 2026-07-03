@@ -27,6 +27,7 @@ import { DEFAULTS } from '../../core/dmtConstants';
 import { getObjectAtPosition, addObject, removeObject, removeObjectAtPosition, removeObjectsInRectangle, updateObject, isAreaFree, canResizeObject } from '../../objects/objectOperations';
 import { addTextLabel, getTextLabelAtPosition, removeTextLabel, updateTextLabel } from '../../text/textLabelOperations';
 import { HexGeometry } from '../../geometry/core/HexGeometry';
+import { createGeometry } from '../../geometry/core/createGeometry';
 import { LinkedNoteHoverOverlays } from '../overlays/LinkedNoteHoverOverlays';
 import { MapStateProvider, MapOperationsProvider } from '../../context/MapContext';
 import { MapSelectionProvider, useMapSelection } from '../../context/MapSelectionContext';
@@ -89,7 +90,7 @@ interface MapCanvasContentProps {
   mapData: MapData | null;
   onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
   onCurvesChange: (curves: Curve[], skipHistory?: boolean) => void;
-  onObjectsChange: (objects: MapObject[]) => void;
+  onObjectsChange: (objects: MapObject[], suppressHistory?: boolean) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
   onTilesChange?: (tiles: TileAssignment[]) => void;
@@ -205,19 +206,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
   // Return null during loading to prevent errors
   const geometry = useMemo((): ExtendedGeometry | null => {
     if (!mapData) return null;
-
-    const mapType = mapData.mapType || DEFAULTS.mapType;
-
-    if (mapType === 'hex') {
-      const hexSize = mapData.hexSize ?? DEFAULTS.hexSize;
-      const orientation = mapData.orientation ?? DEFAULTS.hexOrientation;
-      const hexBounds = mapData.hexBounds ?? null; // null = infinite (backward compat)
-      return new HexGeometry(hexSize, orientation, hexBounds);
-    } else {
-      // Default to grid
-      const gridSize = mapData.gridSize ?? DEFAULTS.gridSize;
-      return new GridGeometry(gridSize);
-    }
+    return createGeometry(mapData);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional fine-grained deps: geometry rebuilds only on shape-param change, not every cell paint
   }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
 
@@ -410,7 +399,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     // State change callbacks for layers
     onDrawingStateChange: handleDrawingStateChange,
     onPanZoomStateChange: handlePanZoomStateChange
-  } as MapStateContextValue), [canvasRef, containerRef, mapData, mapId, notePath, geometry, currentTool, selectedColor,
+  } as MapStateContextValue), [mapData, mapId, notePath, geometry, currentTool, selectedColor,
     selectedObjectType, screenToGrid, screenToWorld, getClientCoords,
     handleDrawingStateChange, handlePanZoomStateChange]);
 
@@ -440,8 +429,6 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     onTilesChange,
     onMapDataUpdate
   } as MapOperationsContextValue), [onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onMapDataUpdate]);
-
-
 
   return (
     <EventHandlerProvider>

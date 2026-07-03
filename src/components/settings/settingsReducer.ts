@@ -64,8 +64,8 @@ export interface SettingsOverrides {
   coordinateKeyColor: HexColor;
   coordinateTextColor: HexColor;
   coordinateTextShadow: HexColor;
-  canvasHeight: number;
-  canvasHeightMobile: number;
+  canvasHeight?: number;
+  canvasHeightMobile?: number;
   fogOfWarColor: HexColor;
   fogOfWarOpacity: number;
   fogOfWarImage: string | null;
@@ -510,6 +510,14 @@ function getHexRing(q: number, r: number): number {
   return Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
 }
 
+/**
+ * Radial bounds for a given max ring: a ring-N hex spans a (2N+1)-hex square
+ */
+function deriveBoundsFromRing(maxRing: number): HexBounds {
+  const span = 2 * maxRing + 1;
+  return { maxCol: span, maxRow: span, maxRing };
+}
+
 function getOrphanedContentInfo(
   newBounds: HexBounds,
   mapType: MapType,
@@ -828,8 +836,7 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
       const newBounds = action.payload;
       // When radial, auto-compute maxCol/maxRow from maxRing
       if (state.boundsShape === 'radial' && newBounds.maxRing !== undefined) {
-        const derived = 2 * newBounds.maxRing + 1;
-        return { ...state, hexBounds: { ...newBounds, maxCol: derived, maxRow: derived } };
+        return { ...state, hexBounds: { ...newBounds, ...deriveBoundsFromRing(newBounds.maxRing) } };
       }
       return { ...state, hexBounds: newBounds };
     }
@@ -977,11 +984,10 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
       if (shape === 'radial') {
         // Derive maxRing from current rectangular bounds
         const maxRing = state.hexBounds.maxRing ?? Math.floor(Math.min(state.hexBounds.maxCol, state.hexBounds.maxRow) / 2);
-        const derived = 2 * maxRing + 1;
         return {
           ...state,
           boundsShape: 'radial',
-          hexBounds: { maxCol: derived, maxRow: derived, maxRing },
+          hexBounds: deriveBoundsFromRing(maxRing),
           coordinateDisplayMode: 'radial'
         };
       } else {
@@ -1007,4 +1013,4 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
 // Exports
 // ===========================================
 
-export { Actions, GRID_DENSITY_PRESETS, settingsReducer, buildInitialState, calculateBoundsFromSettings, getOrphanedContentInfo };
+export { Actions, GRID_DENSITY_PRESETS, settingsReducer, buildInitialState, calculateBoundsFromSettings, getOrphanedContentInfo, deriveBoundsFromRing };

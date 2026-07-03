@@ -9,20 +9,11 @@
 import type { MapData, MapLayer, SubHexMapData, StoredViewState } from '#types/core/map.types';
 import type { MapDataUpdater } from '#types/hooks/mapData.types';
 
-import { useCallback, useMemo, useState } from 'preact/hooks';
+import { useCallback, useMemo, useRef, useState } from 'preact/hooks';
 import { DEFAULTS, SCHEMA_VERSION } from '../../core/dmtConstants';
 import { isFeatureEnabled } from '../../core/featureFlags';
 import { generateLayerId } from '../../persistence/layerAccessor';
 import { calculateFitZoom } from '../../geometry/core/hexMeasurements';
-
-
-
-
-
-
-
-
-
 
 // =========================================================================
 // Types
@@ -149,6 +140,10 @@ function useSubHexNavigation({
 
   // Navigation stack: each frame holds the parent's state when we drilled down
   const [navStack, setNavStack] = useState<SubHexNavFrame[]>([]);
+  // Mirror for deferred propagation: setTimeout callbacks must read the stack
+  // as of when they fire, not the (possibly stale) closure they were scheduled with
+  const navStackRef = useRef<SubHexNavFrame[]>(navStack);
+  navStackRef.current = navStack;
   // The currently active sub-hex mapData (null = at root level)
   const [subHexMapData, setSubHexMapData] = useState<MapData | null>(null);
   // Counter to signal history resets
@@ -223,7 +218,9 @@ function useSubHexNavigation({
       hexKey
     };
 
-    setNavStack(prev => [...prev, frame]);
+    const newStack = [...navStack, frame];
+    navStackRef.current = newStack;
+    setNavStack(newStack);
     setSubHexMapData(subHex.mapData);
     setNavigationVersion(prev => prev + 1);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- propagateToRoot/rootUpdateMapData are stable but declared later; forward reference, safe to omit
@@ -282,6 +279,7 @@ function useSubHexNavigation({
     } as MapData;
 
     const newStack = navStack.slice(0, -1);
+    navStackRef.current = newStack;
     setNavStack(newStack);
 
     if (newStack.length === 0) {
@@ -323,6 +321,7 @@ function useSubHexNavigation({
       stack = stack.slice(0, -1);
     }
 
+    navStackRef.current = stack;
     setNavStack(stack);
 
     if (stack.length === 0) {
@@ -353,11 +352,11 @@ function useSubHexNavigation({
       if (newData == null) return prev;
 
       // Propagate to root for saving (async, after state update)
-      window.setTimeout(() => propagateToRoot(newData, navStack), 0);
+      window.setTimeout(() => propagateToRoot(newData, navStackRef.current), 0);
 
       return newData;
     });
-  }, [isInSubHex, rootUpdateMapData, navStack, propagateToRoot]);
+  }, [isInSubHex, rootUpdateMapData, propagateToRoot]);
 
   // Navigate to a sibling sub-hex (atomic exit + enter)
   const navigateToSibling = useCallback((q: number, r: number): void => {
@@ -398,13 +397,14 @@ function useSubHexNavigation({
     };
 
     const newStack = [...navStack.slice(0, -1), newFrame];
+    navStackRef.current = newStack;
     setNavStack(newStack);
     const siblingMapData = siblingSubHex.mapData;
     setSubHexMapData(siblingMapData);
     setNavigationVersion(prev => prev + 1);
 
     // Propagate to root
-    window.setTimeout(() => propagateToRoot(siblingMapData, newStack), 0);
+    window.setTimeout(() => propagateToRoot(siblingMapData, navStackRef.current), 0);
   }, [navStack, subHexMapData, propagateToRoot]);
 
   // Current hex key (for adjacent sub-hex lookup)

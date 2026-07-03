@@ -7,29 +7,34 @@
  */
 
 import { h } from 'preact';
-
-
-
-
-
-
-// ─── NativeToggle ───────────────────────────────────────────────
-
-
 import { useEffect, useRef } from 'preact/hooks';
+import type { MutableRef } from 'preact/hooks';
 import { Setting } from 'obsidian';
-import type { ToggleComponent, DropdownComponent, SliderComponent } from 'obsidian';
-interface NativeToggleProps {
-  value: boolean;
-  onChange: (value: boolean) => void;
+import type { ValueComponent, ToggleComponent, DropdownComponent, SliderComponent } from 'obsidian';
+
+interface NativeControlOptions<C extends ValueComponent<V>, V> {
+  value: V;
+  onChange: (value: V) => void;
   disabled?: boolean;
+  /** Adds the control to the throwaway Setting; emit forwards changes to the latest onChange. */
+  create: (setting: Setting, emit: (value: V) => void) => C | null;
 }
 
-function NativeToggle({ value, onChange, disabled }: NativeToggleProps): h.JSX.Element {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const toggleRef = useRef<ToggleComponent | null>(null);
+interface NativeControlRefs<C> {
+  containerRef: MutableRef<HTMLDivElement | null>;
+  controlRef: MutableRef<C | null>;
+}
 
-  // Store latest onChange in ref to avoid recreating toggle
+/**
+ * Shared scaffolding for the native control wrappers: creates the component
+ * via a temporary Setting, moves its element into the wrapper's container,
+ * and live-updates value/disabled without recreating.
+ */
+function useNativeControl<C extends ValueComponent<V>, V>({ value, onChange, disabled, create }: NativeControlOptions<C, V>): NativeControlRefs<C> {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const controlRef = useRef<C | null>(null);
+
+  // Store latest onChange in ref to avoid recreating the control
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -37,26 +42,17 @@ function NativeToggle({ value, onChange, disabled }: NativeToggleProps): h.JSX.E
     if (!containerRef.current) return undefined;
 
     try {
-      // Create a temporary setting to extract its toggle component
+      // Create a temporary setting to extract its control component
       const tempContainer = activeDocument.createElement('div');
       const setting = new Setting(tempContainer);
-      let toggleInstance: ToggleComponent | null = null;
+      const control = create(setting, (newVal: V) => onChangeRef.current(newVal));
 
-      setting.addToggle((toggle: ToggleComponent) => {
-        toggleInstance = toggle;
-        toggle.setValue(value);
-        toggle.onChange((newVal: boolean) => onChangeRef.current(newVal));
-        if (disabled === true) {
-          toggle.setDisabled(true);
-        }
-      });
-
-      // Move just the toggle element into our container
-      if (toggleInstance != null && setting.controlEl.firstChild) {
+      // Move just the control element into our container
+      if (control != null && setting.controlEl.firstChild) {
         containerRef.current.appendChild(setting.controlEl.firstChild);
       }
 
-      toggleRef.current = toggleInstance;
+      controlRef.current = control;
 
       const containerEl = containerRef.current;
       return () => {
@@ -66,22 +62,52 @@ function NativeToggle({ value, onChange, disabled }: NativeToggleProps): h.JSX.E
       // Fallback will render
       return undefined;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- builds native toggle once; value/disabled live-updated by sibling effects keyed on [value]/[disabled]
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- builds the native control once; value/disabled live-updated by the effects below
   }, []);
 
   // Update value without recreating
   useEffect(() => {
-    if (toggleRef.current) {
-      toggleRef.current.setValue(value);
+    if (controlRef.current != null) {
+      controlRef.current.setValue(value);
     }
   }, [value]);
 
   // Update disabled state without recreating
   useEffect(() => {
-    if (toggleRef.current != null) {
-      toggleRef.current.setDisabled(disabled === true);
+    if (controlRef.current != null) {
+      controlRef.current.setDisabled(disabled === true);
     }
   }, [disabled]);
+
+  return { containerRef, controlRef };
+}
+
+// ─── NativeToggle ───────────────────────────────────────────────
+
+interface NativeToggleProps {
+  value: boolean;
+  onChange: (value: boolean) => void;
+  disabled?: boolean;
+}
+
+function NativeToggle({ value, onChange, disabled }: NativeToggleProps): h.JSX.Element {
+  const { containerRef } = useNativeControl<ToggleComponent, boolean>({
+    value,
+    onChange,
+    disabled,
+    create: (setting, emit) => {
+      let instance: ToggleComponent | null = null;
+      setting.addToggle((toggle: ToggleComponent) => {
+        instance = toggle;
+        toggle.setValue(value);
+        toggle.onChange(emit);
+        if (disabled === true) {
+          toggle.setDisabled(true);
+        }
+      });
+      return instance;
+    }
+  });
 
   return h('div', { ref: containerRef });
 }
@@ -101,60 +127,27 @@ interface NativeDropdownProps {
 }
 
 function NativeDropdown({ value, options, onChange, disabled }: NativeDropdownProps): h.JSX.Element {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const dropdownRef = useRef<DropdownComponent | null>(null);
-
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-
-  useEffect((): (() => void) | undefined => {
-    if (!containerRef.current) return undefined;
-
-    try {
-      const tempContainer = activeDocument.createElement('div');
-      const setting = new Setting(tempContainer);
-      let dropdownInstance: DropdownComponent | null = null;
-
+  const { containerRef } = useNativeControl<DropdownComponent, string>({
+    value,
+    onChange,
+    disabled,
+    // Options are set imperatively at creation only
+    create: (setting, emit) => {
+      let instance: DropdownComponent | null = null;
       setting.addDropdown((dropdown: DropdownComponent) => {
-        dropdownInstance = dropdown;
+        instance = dropdown;
         for (const opt of options) {
           dropdown.addOption(opt.value, opt.label);
         }
         dropdown.setValue(value);
-        dropdown.onChange((newVal: string) => onChangeRef.current(newVal));
+        dropdown.onChange(emit);
         if (disabled === true) {
           dropdown.setDisabled(true);
         }
       });
-
-      if (dropdownInstance != null && setting.controlEl.firstChild) {
-        containerRef.current.appendChild(setting.controlEl.firstChild);
-      }
-
-      dropdownRef.current = dropdownInstance;
-
-      const containerEl = containerRef.current;
-      return () => {
-        containerEl.innerHTML = '';
-      };
-    } catch {
-      // Fallback will render
-      return undefined;
+      return instance;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- builds native dropdown once; value/disabled via siblings; options set imperatively at creation
-  }, []);
-
-  useEffect(() => {
-    if (dropdownRef.current) {
-      dropdownRef.current.setValue(value);
-    }
-  }, [value]);
-
-  useEffect(() => {
-    if (dropdownRef.current != null) {
-      dropdownRef.current.setDisabled(disabled === true);
-    }
-  }, [disabled]);
+  });
 
   return h('div', { ref: containerRef });
 }
@@ -171,65 +164,31 @@ interface NativeSliderProps {
 }
 
 function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSliderProps): h.JSX.Element {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const sliderRef = useRef<SliderComponent | null>(null);
-
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-
-  useEffect((): (() => void) | undefined => {
-    if (!containerRef.current) return undefined;
-
-    try {
-      const tempContainer = activeDocument.createElement('div');
-      const setting = new Setting(tempContainer);
-      let sliderInstance: SliderComponent | null = null;
-
+  const { containerRef, controlRef } = useNativeControl<SliderComponent, number>({
+    value,
+    onChange,
+    disabled,
+    create: (setting, emit) => {
+      let instance: SliderComponent | null = null;
       setting.addSlider((slider: SliderComponent) => {
-        sliderInstance = slider;
+        instance = slider;
         slider.setLimits(min, max, step ?? 1);
         slider.setValue(value);
-        slider.onChange((newVal: number) => onChangeRef.current(newVal));
+        slider.onChange(emit);
         if (disabled === true) {
           slider.setDisabled(true);
         }
       });
-
-      if (sliderInstance != null && setting.controlEl.firstChild) {
-        containerRef.current.appendChild(setting.controlEl.firstChild);
-      }
-
-      sliderRef.current = sliderInstance;
-
-      const containerEl = containerRef.current;
-      return () => {
-        containerEl.innerHTML = '';
-      };
-    } catch {
-      // Fallback will render
-      return undefined;
+      return instance;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- builds native slider once; value/disabled/limits live-updated by sibling effects keyed on [value]/[disabled]/[min,max,step]
-  }, []);
-
-  useEffect(() => {
-    if (sliderRef.current) {
-      sliderRef.current.setValue(value);
-    }
-  }, [value]);
-
-  useEffect(() => {
-    if (sliderRef.current != null) {
-      sliderRef.current.setDisabled(disabled === true);
-    }
-  }, [disabled]);
+  });
 
   // Update limits without recreating
   useEffect(() => {
-    if (sliderRef.current != null) {
-      sliderRef.current.setLimits(min, max, step ?? 1);
+    if (controlRef.current != null) {
+      controlRef.current.setLimits(min, max, step ?? 1);
     }
-  }, [min, max, step]);
+  }, [min, max, step, controlRef]);
 
   return h('div', { ref: containerRef, style: { width: '120px' } });
 }

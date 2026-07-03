@@ -19,19 +19,10 @@ import { SettingItem } from './SettingItem';
 import { ImageSearchField } from './ImageSearchField';
 import { NativeToggle, NativeSlider } from './NativeControls';
 import { Icon } from '../shared/Icon';
-import { useApp } from '../../context/AppContext';
+import { fogPackImageFilename } from '../../content-packs/contentPackConstants';
 import type { InstalledPack } from '#types/content-packs/contentPack.types';
 
 type ColorOverrideKey = keyof SettingsOverrides & keyof PluginSettings;
-
-
-
-
-
-
-
-
-
 
 /** Props for ColorPickerItem */
 interface ColorPickerItemProps {
@@ -394,7 +385,7 @@ function AppearanceTab(): VNode {
               type="number"
               placeholder={String(globalSettings.canvasHeight ?? 600)}
               value={useGlobalSettings ? '' : (overrides.canvasHeight ?? '')}
-              onChange={(e: Event) => !useGlobalSettings && handleColorChange('canvasHeight', ((e.target as HTMLInputElement).value === '' ? undefined : parseInt((e.target as HTMLInputElement).value, 10)) as number)}
+              onChange={(e: Event) => !useGlobalSettings && handleColorChange('canvasHeight', (e.target as HTMLInputElement).value === '' ? undefined : parseInt((e.target as HTMLInputElement).value, 10))}
               disabled={useGlobalSettings}
               style={{
                 width: '100%',
@@ -413,7 +404,7 @@ function AppearanceTab(): VNode {
               type="number"
               placeholder={String(globalSettings.canvasHeightMobile ?? 400)}
               value={useGlobalSettings ? '' : (overrides.canvasHeightMobile ?? '')}
-              onChange={(e: Event) => !useGlobalSettings && handleColorChange('canvasHeightMobile', ((e.target as HTMLInputElement).value === '' ? undefined : parseInt((e.target as HTMLInputElement).value, 10)) as number)}
+              onChange={(e: Event) => !useGlobalSettings && handleColorChange('canvasHeightMobile', (e.target as HTMLInputElement).value === '' ? undefined : parseInt((e.target as HTMLInputElement).value, 10))}
               disabled={useGlobalSettings}
               style={{
                 width: '100%',
@@ -437,25 +428,19 @@ function InstalledFogPacks({ currentImage, onSelect, disabled }: {
   onSelect: (displayName: string) => void;
   disabled: boolean;
 }): VNode | null {
-  const app = useApp();
+  const { globalSettings } = useAppearance();
 
-  const fogPacks = useMemo((): InstalledPack[] => {
-    try {
-      const plugin = app.plugins.plugins['windrose-md'] as { settings?: { installedContentPacks?: InstalledPack[] } } | undefined;
-      const packs = plugin?.settings?.installedContentPacks ?? [];
-      return packs.filter((p: InstalledPack) => p.type === 'fog-pack');
-    } catch {
-      return [];
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once content-pack read; app.plugins.plugins is a stable mutable registry object
-  }, []);
+  const fogPacks = useMemo(
+    (): InstalledPack[] => (globalSettings.installedContentPacks ?? []).filter((p: InstalledPack) => p.type === 'fog-pack'),
+    [globalSettings.installedContentPacks]
+  );
 
   if (fogPacks.length === 0) return null;
 
   return (
     <div style={{ marginBottom: '8px' }}>
       {fogPacks.map((pack: InstalledPack) => {
-        const filename = pack.id + '.jpg';
+        const filename = fogPackImageFilename(pack);
         const isActive = currentImage != null && currentImage.endsWith(filename);
         return (
           <div

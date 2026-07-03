@@ -20,8 +20,7 @@ import { useToolState } from './hooks/state/useToolState';
 import { useFeatureFlags } from './hooks/state/useFeatureFlags';
 import { useFogOfWar } from './hooks/interactions/useFogOfWar';
 import { useDataHandlers } from './hooks/state/useDataHandlers';
-import { GridGeometry } from './geometry/core/GridGeometry';
-import { HexGeometry } from './geometry/core/HexGeometry';
+import { createGeometry } from './geometry/core/createGeometry';
 import { MapHeader } from './components/controls/MapHeader';
 import { MapCanvas } from './components/mapcanvas/MapCanvas';
 import { MapControls } from './components/controls/MapControls';
@@ -34,7 +33,6 @@ import { WindroseCompass } from './components/shared/WindroseCompass';
 import { MapSettingsModal } from './components/settings/MapSettingsModal';
 import { getTheme, getEffectiveSettings, getSettings } from './core/settingsAccessor';
 import { isFeatureEnabled } from './core/featureFlags';
-import { DEFAULTS } from './core/dmtConstants';
 import { getColorByHex, isDefaultColor, DEFAULT_COLOR } from './drawing/colorOperations';
 import { ImageAlignmentMode } from './components/overlays/ImageAlignmentMode';
 import { OnboardingSurvey } from './components/overlays/OnboardingSurvey';
@@ -513,21 +511,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   } = useAlignmentMode({ mapData, updateMapData, setShowSettingsModal });
 
   // Create geometry instance for coordinate conversions
-  // Same logic as MapCanvas for consistency
   const geometry = useMemo((): ExtendedGeometry | null => {
     if (!mapData) return null;
-
-    const currentMapType = mapData.mapType ?? DEFAULTS.mapType;
-
-    if (currentMapType === 'hex') {
-      const hexSize = mapData.hexSize ?? DEFAULTS.hexSize;
-      const orientation = mapData.orientation ?? DEFAULTS.hexOrientation;
-      const hexBounds = mapData.hexBounds ?? null;
-      return new HexGeometry(hexSize, orientation, hexBounds);
-    } else {
-      const gridSize = mapData.gridSize ?? DEFAULTS.gridSize;
-      return new GridGeometry(gridSize);
-    }
+    return createGeometry(mapData);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional fine-grained deps: geometry rebuilds only on shape-param change, not every cell paint
   }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
 

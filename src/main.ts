@@ -10,11 +10,15 @@ import * as dungeonGenerator from './generation/dungeonGenerator';
 import * as objectPlacer from './generation/objectPlacer';
 import { registerDeepLinks } from './core/deepLinkRegistration';
 import { setPlugin, clearPlugin, FALLBACK_SETTINGS } from './core/settingsAccessor';
+import { DEFAULTS } from './core/dmtConstants';
 import { decideOnboardingState, isFeatureEnabled } from './core/featureFlags';
 import { WindroseMDSettingsTab } from './settings/WindroseSettingsTab';
 import { VIEW_TYPE_WINDROSE_MAP, WindroseMapView } from './views/WindroseMapView';
 import { recordPerfTelemetry } from './utils/perfTelemetry';
 import { writeCanvasCapabilityReport } from './utils/canvasCapabilityReport';
+
+/** View center used when a generated dungeon has no cells to derive bounds from. */
+const DUNGEON_FALLBACK_CENTER = { x: 5, y: 5 };
 
 /** Cell produced by the dungeon generator with grid coordinates. */
 interface DungeonCell {
@@ -213,16 +217,23 @@ export default class WindrosePlugin extends Plugin {
     }
   }
 
+  private get oldPluginDataPath(): string {
+    return `${this.app.vault.configDir}/plugins/dungeon-map-tracker-settings/data.json`;
+  }
+
+  private async readOldPluginData(): Promise<Record<string, unknown> | null> {
+    if (!await this.app.vault.adapter.exists(this.oldPluginDataPath)) return null;
+    const content = await this.app.vault.adapter.read(this.oldPluginDataPath);
+    return JSON.parse(content) as Record<string, unknown>;
+  }
+
   private async migrateFromOldPlugin(): Promise<void> {
     const existing = await this.loadData() as Record<string, unknown> | null;
     if (existing != null && Object.keys(existing).length > 1) return;
 
-    const oldDataPath = `${this.app.vault.configDir}/plugins/dungeon-map-tracker-settings/data.json`;
     try {
-      if (!await this.app.vault.adapter.exists(oldDataPath)) return;
-
-      const content = await this.app.vault.adapter.read(oldDataPath);
-      const oldSettings = JSON.parse(content) as Record<string, unknown>;
+      const oldSettings = await this.readOldPluginData();
+      if (oldSettings == null) return;
 
       const { version, ...importable } = oldSettings;
       this.settings = { ...FALLBACK_SETTINGS, ...importable } as PluginSettings;
@@ -240,15 +251,12 @@ export default class WindrosePlugin extends Plugin {
   }
 
   async mergeFromOldPlugin(): Promise<{ imported: string[] }> {
-    const oldDataPath = `${this.app.vault.configDir}/plugins/dungeon-map-tracker-settings/data.json`;
     const imported: string[] = [];
 
-    if (!await this.app.vault.adapter.exists(oldDataPath)) {
+    const oldSettings = await this.readOldPluginData();
+    if (oldSettings == null) {
       return { imported };
     }
-
-    const content = await this.app.vault.adapter.read(oldDataPath);
-    const oldSettings = JSON.parse(content) as Record<string, unknown>;
 
     const old = oldSettings as Partial<PluginSettings>;
     const cur = this.settings;
@@ -300,8 +308,7 @@ export default class WindrosePlugin extends Plugin {
   }
 
   async hasOldPluginData(): Promise<boolean> {
-    const oldDataPath = `${this.app.vault.configDir}/plugins/dungeon-map-tracker-settings/data.json`;
-    return this.app.vault.adapter.exists(oldDataPath);
+    return this.app.vault.adapter.exists(this.oldPluginDataPath);
   }
 
   private async resolveDataFilePath(): Promise<void> {
@@ -402,8 +409,7 @@ export default class WindrosePlugin extends Plugin {
 
       const layerId = 'layer-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 
-      let centerX = 5, centerY = 5;
-      const gridSize = 32;
+      let centerX = DUNGEON_FALLBACK_CENTER.x, centerY = DUNGEON_FALLBACK_CENTER.y;
       if (cells.length > 0) {
         const minX = Math.min(...cells.map((c) => c.x));
         const maxX = Math.max(...cells.map((c) => c.x));
@@ -455,8 +461,8 @@ export default class WindrosePlugin extends Plugin {
           textLabels: [],
           fogOfWar: this.buildFogOfWar(cells, options)
         }],
-        gridSize: gridSize,
-        dimensions: { width: 300, height: 300 },
+        gridSize: DEFAULTS.gridSize,
+        dimensions: { ...DEFAULTS.dimensions },
         viewState: {
           zoom: 1.5,
           center: { x: centerX, y: centerY }
