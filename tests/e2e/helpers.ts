@@ -181,9 +181,28 @@ export async function selectToolByIndex(page: any, index: number): Promise<void>
   await page.waitForTimeout(100);
 }
 
+/**
+ * Map a loose tool title pattern to a precise, non-colliding selector.
+ * The wall tool's title is "Draw Wall/Path (select from Walls tab)", which
+ * collides with a `[title*="Draw"]` match against the paint tool
+ * ("Draw (fill cells)"). Normalize common patterns to unambiguous ones.
+ */
+function toolTitleSelector(titlePattern: string): string {
+  const p = titlePattern.toLowerCase();
+  // "Draw" alone (or "Draw (fill cells)") should mean the paint/fill tool,
+  // NOT the wall tool. Disambiguate via "fill cells".
+  if (p === "draw" || p.includes("fill cells")) {
+    return `.windrose-tool-btn[title*="fill cells"]`;
+  }
+  if (p.includes("wall")) {
+    return `.windrose-tool-btn[title*="Wall"]`;
+  }
+  return `.windrose-tool-btn[title*="${titlePattern}"]`;
+}
+
 /** Select a tool by title attribute */
 export async function selectToolByTitle(page: any, titlePattern: string): Promise<void> {
-  const toolBtn = page.locator(`.windrose-tool-btn[title*="${titlePattern}"]`);
+  const toolBtn = page.locator(toolTitleSelector(titlePattern)).first();
   await toolBtn.waitFor({ state: "visible", timeout: 5000 });
   await toolBtn.click();
   await page.waitForTimeout(100);
@@ -191,8 +210,9 @@ export async function selectToolByTitle(page: any, titlePattern: string): Promis
 
 /** Select a sub-tool from a tool group's flyout menu */
 export async function selectSubTool(page: any, parentToolTitle: string, subToolLabel: string): Promise<void> {
-  // Right-click the parent tool button to open the flyout (sub-menu opens via context menu)
-  const parentBtn = page.locator(`.windrose-tool-btn[title*="${parentToolTitle}"]`);
+  // Right-click the parent tool button to open the flyout (sub-menu opens via context menu).
+  // Use the disambiguated selector so "Draw" resolves to the paint tool, not the wall tool.
+  const parentBtn = page.locator(toolTitleSelector(parentToolTitle)).first();
   await parentBtn.waitFor({ state: "visible", timeout: 5000 });
   await parentBtn.click({ button: 'right' });
   await page.waitForTimeout(200);
@@ -222,21 +242,39 @@ export async function getHistoryButtons(page: any) {
 // Object Sidebar Helpers
 // ===========================================
 
-/** Helper to check if object sidebar is visible and not collapsed */
+/**
+ * Whether the object palette is showing (expanded, with grid items).
+ * In block mode the ObjectSidebar is a pane inside the right tile drawer
+ * (`.windrose-cd`), selected via the "Objects" segmented control — not a
+ * standalone collapsible sidebar.
+ */
 export async function isObjectSidebarExpanded(page: any): Promise<boolean> {
-  const expandedSidebar = page.locator('.windrose-object-sidebar:not(.windrose-object-sidebar-collapsed)');
-  return await expandedSidebar.count() > 0;
+  const sidebar = page.locator('.windrose-object-sidebar:not(.windrose-object-sidebar-collapsed)');
+  return await sidebar.count() > 0;
 }
 
-/** Helper to expand object sidebar if collapsed */
+/**
+ * Ensure the object palette is visible by switching the drawer to the Objects
+ * pane (and expanding the drawer first if it's folded to its ribbon).
+ */
 export async function expandObjectSidebarIfNeeded(page: any): Promise<void> {
-  const isExpanded = await isObjectSidebarExpanded(page);
-  if (!isExpanded) {
-    const toggleBtn = page.locator('.windrose-object-sidebar-collapsed .windrose-sidebar-toggle');
-    if (await toggleBtn.count() > 0) {
-      await toggleBtn.click();
-      await page.waitForTimeout(300);
+  if (await isObjectSidebarExpanded(page)) return;
+
+  // If the tile drawer is folded to its ribbon, expand it via the pane spine btn.
+  const collapsedDrawer = page.locator('.windrose-tile-drawer:not(.is-open)');
+  if (await collapsedDrawer.count() > 0) {
+    const openBtn = page.locator('.windrose-tile-spine-panebtn').first();
+    if (await openBtn.count() > 0) {
+      await openBtn.click();
+      await page.waitForTimeout(500);
     }
+  }
+
+  // Switch to the Objects pane.
+  const objSeg = page.locator('.windrose-cd-segbtn', { hasText: 'Objects' });
+  if (await objSeg.count() > 0) {
+    await objSeg.first().click();
+    await page.waitForTimeout(400);
   }
 }
 
@@ -244,14 +282,20 @@ export async function expandObjectSidebarIfNeeded(page: any): Promise<void> {
 // Settings Modal Helpers
 // ===========================================
 
-/** Helper to open the settings modal by hovering over controls and clicking settings button */
+/**
+ * Open the map settings modal.
+ * In block/embed mode the old `.windrose-controls` hover → `.windrose-expand-btn`
+ * settings button is gone (MapControls renders with `minimalControls`). Settings
+ * now lives in the left EdgeRail's "View" panel as `.windrose-dock-view-settings`.
+ */
 export async function openSettingsModal(page: any): Promise<void> {
-  const controlsArea = page.locator('.windrose-controls');
-  await controlsArea.waitFor({ state: "visible", timeout: 5000 });
-  await controlsArea.hover();
-  await page.waitForTimeout(300);
+  // Open the View panel from the EdgeRail
+  const viewRailBtn = page.locator('.windrose-edge-rail-btn[title="View"]');
+  await viewRailBtn.waitFor({ state: "visible", timeout: 5000 });
+  await viewRailBtn.click();
+  await page.waitForTimeout(500); // fold animation
 
-  const settingsBtn = page.locator('.windrose-expand-btn[title="Map Settings"]');
+  const settingsBtn = page.locator('.windrose-dock-view-settings');
   await settingsBtn.waitFor({ state: "visible", timeout: 5000 });
   await settingsBtn.click();
   await page.waitForTimeout(300);
@@ -269,17 +313,18 @@ export async function closeSettingsModal(page: any): Promise<void> {
 // Layer Panel Helpers
 // ===========================================
 
-/** Helper to open layer panel via controls drawer */
+/**
+ * Toggle the layer panel via the block-mode EdgeRail.
+ * In block/embed mode the old `.windrose-expand-btn[title="Toggle layer panel"]`
+ * (rendered only in non-minimal MapControls) is not present — layers open from
+ * the left EdgeRail icon (`title="Layers"`) into `.windrose-edge-rail-drawer`.
+ * This helper is a toggle: calling it again folds the drawer closed.
+ */
 export async function openLayerPanel(page: any): Promise<void> {
-  const controlsArea = page.locator('.windrose-controls');
-  await controlsArea.waitFor({ state: "visible", timeout: 5000 });
-  await controlsArea.hover();
-  await page.waitForTimeout(400);
-
-  const layerToggleBtn = page.locator('.windrose-expand-btn[title="Toggle layer panel"]');
-  await layerToggleBtn.waitFor({ state: "visible", timeout: 5000 });
-  await layerToggleBtn.click();
-  await page.waitForTimeout(300);
+  const railBtn = page.locator('.windrose-edge-rail-btn[title="Layers"]');
+  await railBtn.waitFor({ state: "visible", timeout: 5000 });
+  await railBtn.click();
+  await page.waitForTimeout(500); // fold animation ~0.42s
 }
 
 // ===========================================
@@ -393,24 +438,61 @@ export async function getLayerEdgeCount(page: any, mapId: string, layerId: strin
 // Layer Context Menu Helpers
 // ===========================================
 
-/** Helper to right-click a layer button to open context menu */
-export async function openLayerContextMenu(page: any, layerIndex: number): Promise<void> {
-  // Open layer panel first
+/**
+ * Ensure the layer dock is in Strata mode, where per-layer rows
+ * (`.windrose-dock-layer-row`) and per-stratum add buttons render.
+ *
+ * Tile-capable maps default to "Simple" (Floors-only) mode, which shows floor
+ * rows instead of layer rows — so flat layer add/switch/delete assertions need
+ * Strata mode. Requires the layer drawer to already be open.
+ *
+ * The mode toggle button (`.windrose-dock-board-btn.mode`) switches Simple↔Strata;
+ * its title is "Switch to Strata (layers)" in Simple mode. If the map is a
+ * non-board (flat-list) map, no toggle is present and we no-op.
+ */
+export async function ensureStrataMode(page: any): Promise<void> {
+  // Already showing layer rows (strata or flat list) → nothing to do.
+  if (await page.locator('.windrose-dock-layer-row').count() > 0) return;
+
+  const toStrata = page.locator('.windrose-dock-board-btn.mode[title="Switch to Strata (layers)"]');
+  if (await toStrata.count() > 0) {
+    await toStrata.first().click();
+    await page.waitForTimeout(400);
+  }
+}
+
+/** Open the layer drawer and switch it into Strata mode (layer rows visible). */
+export async function openLayerPanelStrata(page: any): Promise<void> {
   await openLayerPanel(page);
+  await page.locator('.windrose-edge-rail-drawer.is-open').waitFor({ state: "visible", timeout: 5000 });
+  await ensureStrataMode(page);
+}
+
+/**
+ * Right-click a layer row to open its actions.
+ * Block-mode layers render as `.windrose-dock-layer-row` inside the EdgeRail
+ * drawer. The redesigned dock exposes per-row actions via a "more" button
+ * rather than a right-click context menu, so this expands that action menu.
+ */
+export async function openLayerContextMenu(page: any, layerIndex: number): Promise<void> {
+  // Open layer panel in Strata mode so per-layer rows are shown
+  await openLayerPanelStrata(page);
   await page.waitForTimeout(300);
 
-  // Find the layer button by index (layers are in reverse order in UI - bottom layer is last)
-  const layerBtn = page.locator('.windrose-layer-btn').nth(layerIndex);
-  await layerBtn.waitFor({ state: "visible", timeout: 5000 });
-  await layerBtn.click({ button: 'right' });
+  // Find the layer row by index (layers are in reverse order in UI - bottom layer is last)
+  const row = page.locator('.windrose-dock-layer-row').nth(layerIndex);
+  await row.waitFor({ state: "visible", timeout: 5000 });
+  const moreBtn = row.locator('.windrose-dock-layer-action.more');
+  await moreBtn.waitFor({ state: "visible", timeout: 3000 });
+  await moreBtn.click();
   await page.waitForTimeout(200);
 }
 
-/** Helper to click the transparency toggle for a specific layer */
+/** Helper to click the transparency toggle for a specific layer row */
 export async function clickTransparencyToggle(page: any, layerIndex: number = 1): Promise<void> {
-  // Scope to the specific layer's transparency button
-  const layerWrapper = page.locator('.windrose-layer-btn-wrapper').nth(layerIndex);
-  const transparencyBtn = layerWrapper.locator('.windrose-layer-option-btn.transparency');
+  // Scope to the specific layer row's transparency action button
+  const row = page.locator('.windrose-dock-layer-row').nth(layerIndex);
+  const transparencyBtn = row.locator('.windrose-dock-layer-action.transparency');
   await transparencyBtn.waitFor({ state: "visible", timeout: 3000 });
 
   // Ensure button is in viewport and clickable
@@ -422,18 +504,18 @@ export async function clickTransparencyToggle(page: any, layerIndex: number = 1)
   await page.waitForTimeout(300);
 }
 
-/** Helper to check if transparency toggle is active for a specific layer */
+/** Helper to check if transparency toggle is active for a specific layer row */
 export async function isTransparencyToggleActive(page: any, layerIndex: number = 1): Promise<boolean> {
-  const layerWrapper = page.locator('.windrose-layer-btn-wrapper').nth(layerIndex);
-  const activeBtn = layerWrapper.locator('.windrose-layer-option-btn.transparency.active');
+  const row = page.locator('.windrose-dock-layer-row').nth(layerIndex);
+  const activeBtn = row.locator('.windrose-dock-layer-action.transparency.active');
   return await activeBtn.count() > 0;
 }
 
-/** Helper to hover over transparency button for a specific layer */
+/** Helper to hover over transparency button for a specific layer row */
 export async function hoverTransparencyButton(page: any, layerIndex: number = 1): Promise<void> {
-  const layerWrapper = page.locator('.windrose-layer-btn-wrapper').nth(layerIndex);
-  const wrapper = layerWrapper.locator('.windrose-layer-transparency-wrapper');
-  await wrapper.hover();
+  const row = page.locator('.windrose-dock-layer-row').nth(layerIndex);
+  const transparencyBtn = row.locator('.windrose-dock-layer-action.transparency');
+  await transparencyBtn.hover();
   await page.waitForTimeout(200);
 }
 

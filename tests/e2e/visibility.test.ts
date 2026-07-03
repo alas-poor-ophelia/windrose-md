@@ -10,31 +10,37 @@ import {
 // ===========================================
 // Visibility Toolbar Tests
 // ===========================================
+//
+// The old floating `.windrose-visibility-toolbar` (opened from the controls
+// drawer) was replaced by the "Visibility" section of the left EdgeRail "View"
+// panel (DockViewPanel). Toggles are `.windrose-dock-view-toggle`; the off state
+// is a bare ` off` class (was `windrose-visibility-btn-hidden`).
 
-async function openVisibilityToolbar(page: any): Promise<void> {
-  const controlsArea = page.locator('.windrose-controls');
-  await controlsArea.waitFor({ state: "visible", timeout: 5000 });
-  await controlsArea.hover();
-  await page.waitForTimeout(300);
+/** Open the EdgeRail "View" panel and return the Visibility toggle section locator. */
+async function openVisibilitySection(page: any): Promise<any> {
+  const viewRailBtn = page.locator('.windrose-edge-rail-btn[title="View"]');
+  await viewRailBtn.waitFor({ state: "visible", timeout: 5000 });
+  await viewRailBtn.click();
+  await page.waitForTimeout(500); // fold animation
 
-  const visibilityBtn = page.locator('.windrose-expand-btn[title*="visibility"]');
-  await visibilityBtn.waitFor({ state: "visible", timeout: 5000 });
-  await visibilityBtn.click();
-  await page.waitForTimeout(300);
+  // The Visibility section is the one whose label reads "Visibility".
+  const section = page
+    .locator('.windrose-dock-view-section')
+    .filter({ has: page.locator('.windrose-dock-view-section-label', { hasText: "Visibility" }) });
+  await section.waitFor({ state: "visible", timeout: 5000 });
+  return section;
 }
 
-test("Visibility toolbar opens and shows toggle buttons", async ({ page }) => {
+test("Visibility panel opens and shows toggle buttons", async ({ page }) => {
   const errors = setupErrorTracking(page);
 
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  await openVisibilityToolbar(page);
+  const section = await openVisibilitySection(page);
+  expect(await section.isVisible()).toBe(true);
 
-  const toolbar = page.locator('.windrose-visibility-toolbar');
-  expect(await toolbar.isVisible()).toBe(true);
-
-  const toggleBtns = page.locator('.windrose-visibility-btn');
+  const toggleBtns = section.locator('.windrose-dock-view-toggle');
   const count = await toggleBtns.count();
   expect(count).toBeGreaterThanOrEqual(2);
 
@@ -47,30 +53,25 @@ test("Grid visibility can be toggled off and on", async ({ page }) => {
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  await openVisibilityToolbar(page);
+  const section = await openVisibilitySection(page);
 
-  const gridToggle = page.locator('.windrose-visibility-btn[title*="grid"]');
+  const gridToggle = section.locator('.windrose-dock-view-toggle[title*="Grid"]');
   await gridToggle.waitFor({ state: "visible", timeout: 3000 });
 
-  // Initially should not have hidden class
-  const initialClasses = await gridToggle.getAttribute("class") || "";
-  const wasHidden = initialClasses.includes("windrose-visibility-btn-hidden");
+  // Off state is the bare ` off` class.
+  const isOff = async (): Promise<boolean> =>
+    /\boff\b/.test((await gridToggle.getAttribute("class")) || "");
 
-  // Click to toggle
+  const wasOff = await isOff();
+
   await gridToggle.click();
   await page.waitForTimeout(300);
-
-  const afterToggleClasses = await gridToggle.getAttribute("class") || "";
-  const isNowHidden = afterToggleClasses.includes("windrose-visibility-btn-hidden");
-  expect(isNowHidden).not.toBe(wasHidden);
+  expect(await isOff()).not.toBe(wasOff);
 
   // Toggle back
   await gridToggle.click();
   await page.waitForTimeout(300);
-
-  const restoredClasses = await gridToggle.getAttribute("class") || "";
-  const restoredHidden = restoredClasses.includes("windrose-visibility-btn-hidden");
-  expect(restoredHidden).toBe(wasHidden);
+  expect(await isOff()).toBe(wasOff);
 
   expect(errors).toHaveLength(0);
 });
@@ -81,20 +82,18 @@ test("Object visibility can be toggled", async ({ page }) => {
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  await openVisibilityToolbar(page);
+  const section = await openVisibilitySection(page);
 
-  const objectToggle = page.locator('.windrose-visibility-btn[title*="object"]');
+  const objectToggle = section.locator('.windrose-dock-view-toggle[title*="Objects"]');
   await objectToggle.waitFor({ state: "visible", timeout: 3000 });
 
-  const initialClasses = await objectToggle.getAttribute("class") || "";
-  const wasHidden = initialClasses.includes("windrose-visibility-btn-hidden");
+  const wasOff = /\boff\b/.test((await objectToggle.getAttribute("class")) || "");
 
   await objectToggle.click();
   await page.waitForTimeout(300);
 
-  const afterClasses = await objectToggle.getAttribute("class") || "";
-  const isNowHidden = afterClasses.includes("windrose-visibility-btn-hidden");
-  expect(isNowHidden).not.toBe(wasHidden);
+  const isNowOff = /\boff\b/.test((await objectToggle.getAttribute("class")) || "");
+  expect(isNowOff).not.toBe(wasOff);
 
   expect(errors).toHaveLength(0);
 });
@@ -105,47 +104,41 @@ test("Text label visibility can be toggled", async ({ page }) => {
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  await openVisibilityToolbar(page);
+  const section = await openVisibilitySection(page);
 
-  const textToggle = page.locator('.windrose-visibility-btn[title*="text label"]');
+  // Text labels are labeled "Labels" in the View panel.
+  const textToggle = section.locator('.windrose-dock-view-toggle[title*="Labels"]');
   await textToggle.waitFor({ state: "visible", timeout: 3000 });
 
-  const initialClasses = await textToggle.getAttribute("class") || "";
-  const wasHidden = initialClasses.includes("windrose-visibility-btn-hidden");
+  const wasOff = /\boff\b/.test((await textToggle.getAttribute("class")) || "");
 
   await textToggle.click();
   await page.waitForTimeout(300);
 
-  const afterClasses = await textToggle.getAttribute("class") || "";
-  const isNowHidden = afterClasses.includes("windrose-visibility-btn-hidden");
-  expect(isNowHidden).not.toBe(wasHidden);
+  const isNowOff = /\boff\b/.test((await textToggle.getAttribute("class")) || "");
+  expect(isNowOff).not.toBe(wasOff);
 
   expect(errors).toHaveLength(0);
 });
 
-test("Visibility toolbar closes when button is clicked again", async ({ page }) => {
+test("Visibility panel closes when the rail button is clicked again", async ({ page }) => {
   const errors = setupErrorTracking(page);
 
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  await openVisibilityToolbar(page);
+  await openVisibilitySection(page);
 
-  const toolbar = page.locator('.windrose-visibility-toolbar');
-  expect(await toolbar.isVisible()).toBe(true);
+  // The drawer is open now.
+  const openDrawer = page.locator('.windrose-edge-rail-drawer.is-open');
+  expect(await openDrawer.count()).toBe(1);
 
-  // Click the visibility button again to close
-  const controlsArea = page.locator('.windrose-controls');
-  await controlsArea.hover();
-  await page.waitForTimeout(300);
-  const visibilityBtn = page.locator('.windrose-expand-btn[title*="visibility"]');
-  await visibilityBtn.click();
-  await page.waitForTimeout(300);
+  // Click the View rail button again to fold the drawer closed.
+  const viewRailBtn = page.locator('.windrose-edge-rail-btn[title="View"]');
+  await viewRailBtn.click();
+  await page.waitForTimeout(600);
 
-  // Toolbar should be hidden or not have open class
-  const isOpen = page.locator('.windrose-visibility-toolbar-open');
-  const openCount = await isOpen.count();
-  expect(openCount).toBe(0);
+  expect(await page.locator('.windrose-edge-rail-drawer.is-open').count()).toBe(0);
 
   expect(errors).toHaveLength(0);
 });
@@ -156,12 +149,12 @@ test("Hex map shows additional visibility toggles", async ({ page }) => {
   await navigateToMap(page, TEST_MAPS.hex);
   await waitForContainer(page);
 
-  await openVisibilityToolbar(page);
+  const section = await openVisibilitySection(page);
 
-  const toggleBtns = page.locator('.windrose-visibility-btn');
+  const toggleBtns = section.locator('.windrose-dock-view-toggle');
   const hexCount = await toggleBtns.count();
 
-  // Hex maps should have more toggles than grid (coordinates, regions, outlines)
+  // Hex maps add Coords, Regions, Outlines to Grid/Objects/Labels.
   expect(hexCount).toBeGreaterThanOrEqual(4);
 
   expect(errors).toHaveLength(0);

@@ -8,6 +8,7 @@ import {
   getCanvasCenter,
   waitForToolPalette,
   openLayerPanel,
+  openLayerPanelStrata,
   getActiveLayerId,
   getLayerCellCount,
   resetDataFile,
@@ -28,15 +29,15 @@ test("Layer panel can be opened", async ({ page }) => {
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  await openLayerPanel(page);
+  await openLayerPanelStrata(page);
 
-  // Layer controls should now be visible
-  const layerControls = page.locator('.windrose-layer-controls');
+  // Layer drawer should now be visible
+  const layerControls = page.locator('.windrose-edge-rail-drawer.is-open');
   await layerControls.waitFor({ state: "visible", timeout: 5000 });
   expect(await layerControls.isVisible()).toBe(true);
 
-  // Should have at least one layer button
-  const layerBtns = page.locator('.windrose-layer-btn');
+  // Should have at least one layer row (Strata mode renders per-layer rows)
+  const layerBtns = page.locator('.windrose-dock-layer-row');
   const count = await layerBtns.count();
   expect(count).toBeGreaterThanOrEqual(1);
 
@@ -49,19 +50,19 @@ test("New layer can be added", async ({ page }) => {
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  await openLayerPanel(page);
+  await openLayerPanelStrata(page);
 
   // Count initial layers
-  const layerBtns = page.locator('.windrose-layer-btn');
+  const layerBtns = page.locator('.windrose-dock-layer-row');
   const initialCount = await layerBtns.count();
 
-  // Click add layer button
-  const addLayerBtn = page.locator('.windrose-layer-add-btn');
+  // Add a layer via the per-stratum "+" (Strata mode has no flat add button)
+  const addLayerBtn = page.locator('.windrose-dock-stratum-add').first();
   await addLayerBtn.waitFor({ state: "visible", timeout: 5000 });
   await addLayerBtn.click();
   await page.waitForTimeout(300);
 
-  // Should now have one more layer
+  // Should now have one more layer row
   const newCount = await layerBtns.count();
   expect(newCount).toBe(initialCount + 1);
 
@@ -80,17 +81,17 @@ test.skipIf(process.env.WINDROSE_TEST_MODE === "compiled")("Layer can be switche
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  // Open layer panel
-  await openLayerPanel(page);
-  const layerControls = page.locator('.windrose-layer-controls');
+  // Open layer panel (Strata mode so per-layer rows exist)
+  await openLayerPanelStrata(page);
+  const layerControls = page.locator('.windrose-edge-rail-drawer.is-open');
   await layerControls.waitFor({ state: "visible", timeout: 5000 });
 
   // Ensure we have at least 2 layers (add one if needed)
-  const layerBtns = page.locator('.windrose-layer-btn');
+  const layerBtns = page.locator('.windrose-dock-layer-row');
   let layerCount = await layerBtns.count();
 
   if (layerCount < 2) {
-    const addLayerBtn = page.locator('.windrose-layer-add-btn');
+    const addLayerBtn = page.locator('.windrose-dock-stratum-add').first();
     await addLayerBtn.click();
     await page.waitForTimeout(300);
     layerCount = await layerBtns.count();
@@ -98,14 +99,14 @@ test.skipIf(process.env.WINDROSE_TEST_MODE === "compiled")("Layer can be switche
 
   expect(layerCount).toBeGreaterThanOrEqual(2);
 
-  // Get the non-active layer button and click it to switch
-  const allLayerBtns = page.locator('.windrose-layer-btn');
+  // Get the non-active layer row and click it to switch
+  const allLayerBtns = page.locator('.windrose-dock-layer-row');
 
   // Find a layer that isn't active and click it
   for (let i = 0; i < layerCount; i++) {
     const btn = allLayerBtns.nth(i);
     const isActive = await btn.getAttribute("class");
-    if (!isActive?.includes("windrose-layer-btn-active")) {
+    if (!/\bactive\b/.test(isActive ?? "")) {
       await btn.click();
       await page.waitForTimeout(200);
       break;
@@ -113,7 +114,7 @@ test.skipIf(process.env.WINDROSE_TEST_MODE === "compiled")("Layer can be switche
   }
 
   // Verify the clicked layer is now active
-  const newActiveBtn = page.locator('.windrose-layer-btn.windrose-layer-btn-active');
+  const newActiveBtn = page.locator('.windrose-dock-layer-row.active');
   expect(await newActiveBtn.count()).toBe(1);
 
   // Get the active layer ID and initial cell count
@@ -151,15 +152,15 @@ test("Layer switch does not cause errors", async ({ page }) => {
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  await openLayerPanel(page);
+  await openLayerPanelStrata(page);
 
-  // Add a new layer
-  const addLayerBtn = page.locator('.windrose-layer-add-btn');
+  // Add a new layer via the per-stratum "+"
+  const addLayerBtn = page.locator('.windrose-dock-stratum-add').first();
   await addLayerBtn.click();
   await page.waitForTimeout(300);
 
   // Switch between layers multiple times
-  const layerBtns = page.locator('.windrose-layer-btn');
+  const layerBtns = page.locator('.windrose-dock-layer-row');
   const count = await layerBtns.count();
 
   for (let i = 0; i < Math.min(count, 3); i++) {

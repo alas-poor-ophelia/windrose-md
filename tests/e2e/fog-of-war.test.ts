@@ -21,25 +21,34 @@ beforeEach(() => resetDataFile());
 // Fog of War Helpers
 // ===========================================
 
-async function openVisibilityToolbar(page: any): Promise<void> {
-  const controlsArea = page.locator('.windrose-controls');
-  await controlsArea.waitFor({ state: "visible", timeout: 5000 });
-  await controlsArea.hover();
-  await page.waitForTimeout(300);
+// The old floating fog toolbar was replaced by the "Fog of War" section of the
+// left EdgeRail "View" panel (DockViewPanel). Open the View panel to reach it.
+async function openViewPanel(page: any): Promise<void> {
+  const viewRailBtn = page.locator('.windrose-edge-rail-btn[title="View"]');
+  await viewRailBtn.waitFor({ state: "visible", timeout: 5000 });
+  await viewRailBtn.click();
+  await page.waitForTimeout(500); // fold animation
+}
 
-  const visibilityBtn = page.locator('.windrose-expand-btn[title*="visibility"]');
-  await visibilityBtn.waitFor({ state: "visible", timeout: 5000 });
-  await visibilityBtn.click();
-  await page.waitForTimeout(300);
+/** Locator for the Fog of War section within the View panel. */
+function fogSection(page: any): any {
+  return page
+    .locator('.windrose-dock-view-section')
+    .filter({ has: page.locator('.windrose-dock-view-section-label', { hasText: "Fog of War" }) });
 }
 
 async function openFogToolbar(page: any): Promise<void> {
-  await openVisibilityToolbar(page);
+  await openViewPanel(page);
+  await fogSection(page).waitFor({ state: "visible", timeout: 3000 });
+}
 
-  const fowToggle = page.locator('.windrose-fow-toggle-btn');
-  await fowToggle.waitFor({ state: "visible", timeout: 3000 });
-  await fowToggle.click();
-  await page.waitForTimeout(300);
+/** Fold the View drawer closed so the canvas receives pointer events. */
+async function closeViewPanel(page: any): Promise<void> {
+  const open = page.locator('.windrose-edge-rail-drawer.is-open');
+  if (await open.count() > 0) {
+    await page.locator('.windrose-edge-rail-btn[title="View"]').click();
+    await page.waitForTimeout(600); // fold animation
+  }
 }
 
 async function getFoggedCellCount(page: any, mapId: string, layerId: string): Promise<number> {
@@ -69,8 +78,10 @@ test("Fog of war toolbar opens from visibility panel", async ({ page }) => {
 
   await openFogToolbar(page);
 
-  const fowToolbar = page.locator('.windrose-fow-floating-toolbar');
-  expect(await fowToolbar.isVisible()).toBe(true);
+  const fow = fogSection(page);
+  expect(await fow.isVisible()).toBe(true);
+  // Paint / Erase / Rect fog tools should be present
+  expect(await fow.locator('.windrose-dock-view-toggle[title="Paint"]').count()).toBe(1);
 
   expect(errors).toHaveLength(0);
 });
@@ -90,10 +101,13 @@ test("Fog of war paint tool creates fogged cells", async ({ page }) => {
   await openFogToolbar(page);
 
   // Select fog paint tool
-  const paintBtn = page.locator('.windrose-fow-tool-btn[title*="Paint fog"]');
+  const paintBtn = fogSection(page).locator('.windrose-dock-view-toggle[title="Paint"]');
   await paintBtn.waitFor({ state: "visible", timeout: 3000 });
   await paintBtn.click();
   await page.waitForTimeout(300);
+
+  // Fold the drawer so canvas clicks aren't intercepted by the overlay.
+  await closeViewPanel(page);
 
   // Paint fog cells with individual clicks on different grid positions
   const center = await getCanvasCenter(page);
@@ -126,10 +140,11 @@ test("Fog of war erase tool removes fogged cells", async ({ page }) => {
   await openFogToolbar(page);
 
   // First paint some fog
-  const paintBtn = page.locator('.windrose-fow-tool-btn[title*="Paint fog"]');
+  const paintBtn = fogSection(page).locator('.windrose-dock-view-toggle[title="Paint"]');
   await paintBtn.waitFor({ state: "visible", timeout: 3000 });
   await paintBtn.click();
   await page.waitForTimeout(300);
+  await closeViewPanel(page);
 
   const center = await getCanvasCenter(page);
   await page.mouse.click(center.x, center.y);
@@ -145,11 +160,13 @@ test("Fog of war erase tool removes fogged cells", async ({ page }) => {
   const countAfterPaint = await getFoggedCellCount(page, mapId, activeLayerId!);
   expect(countAfterPaint).toBeGreaterThan(0);
 
-  // Now erase fog at one position
-  const eraseBtn = page.locator('.windrose-fow-tool-btn[title*="Erase fog"]');
+  // Now erase fog at one position (re-open panel to switch tool, then fold)
+  await openViewPanel(page);
+  const eraseBtn = fogSection(page).locator('.windrose-dock-view-toggle[title="Erase"]');
   await eraseBtn.waitFor({ state: "visible", timeout: 3000 });
   await eraseBtn.click();
   await page.waitForTimeout(300);
+  await closeViewPanel(page);
 
   await page.mouse.click(center.x, center.y);
   await page.waitForTimeout(500);
@@ -161,27 +178,27 @@ test("Fog of war erase tool removes fogged cells", async ({ page }) => {
   expect(errors).toHaveLength(0);
 });
 
-test("Fog of war toggle button shows expanded state", async ({ page }) => {
+test("Fog of war tool becomes active when selected", async ({ page }) => {
   const errors = setupErrorTracking(page);
 
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  await openVisibilityToolbar(page);
+  await openFogToolbar(page);
 
-  const fowToggle = page.locator('.windrose-fow-toggle-btn');
-  await fowToggle.waitFor({ state: "visible", timeout: 3000 });
+  // Selecting the Paint fog tool marks it active (the old floating fow-toggle-btn
+  // expanded-state concept is gone; the tool now carries an `active` class).
+  const paintBtn = fogSection(page).locator('.windrose-dock-view-toggle[title="Paint"]');
+  await paintBtn.waitFor({ state: "visible", timeout: 3000 });
 
-  // Initially not expanded
-  const initialClasses = await fowToggle.getAttribute("class") || "";
-  expect(initialClasses).not.toContain("expanded");
+  const before = await paintBtn.getAttribute("class") || "";
+  expect(before).not.toContain("active");
 
-  // Click to expand
-  await fowToggle.click();
+  await paintBtn.click();
   await page.waitForTimeout(300);
 
-  const expandedClasses = await fowToggle.getAttribute("class") || "";
-  expect(expandedClasses).toContain("expanded");
+  const after = await paintBtn.getAttribute("class") || "";
+  expect(after).toContain("active");
 
   expect(errors).toHaveLength(0);
 });

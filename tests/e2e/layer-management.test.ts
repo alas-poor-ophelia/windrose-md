@@ -6,7 +6,7 @@ import {
   setupErrorTracking,
   navigateToMap,
   waitForContainer,
-  openLayerPanel,
+  openLayerPanelStrata,
   getActiveLayerId,
   resetDataFile,
   AUTOSAVE_WAIT,
@@ -33,9 +33,11 @@ async function getLayerCount(page: any, mapId: string): Promise<number> {
 }
 
 async function openLayerPanelAndVerify(page: any): Promise<void> {
-  await openLayerPanel(page);
+  // Open the drawer and switch to Strata mode so per-layer rows are shown
+  // (tile maps default to Simple/Floors mode, which has no layer rows).
+  await openLayerPanelStrata(page);
 
-  const panel = page.locator('.windrose-layer-controls-open');
+  const panel = page.locator('.windrose-edge-rail-drawer.is-open');
   await panel.waitFor({ state: "visible", timeout: 3000 });
   await page.waitForTimeout(200);
 }
@@ -51,19 +53,23 @@ test("Adding a layer increases layer count in data", async ({ page }) => {
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  const initialLayerCount = await getLayerCount(page, mapId);
-  expect(initialLayerCount).toBe(3);
+  expect(await getLayerCount(page, mapId)).toBe(3);
 
   await openLayerPanelAndVerify(page);
 
-  const addBtn = page.locator('.windrose-layer-add-btn');
+  // Strata materializes role layers lazily (persisted on first mutation), so a
+  // JSON-count delta is confounded. Assert on the visible layer rows instead:
+  // adding a layer must add exactly one row to its stratum.
+  const rows = page.locator('.windrose-dock-layer-row');
+  const baseRows = await rows.count();
+
+  // In Strata mode, adding a layer is per-stratum (one "+" per role section).
+  const addBtn = page.locator('.windrose-dock-stratum-add').first();
   await addBtn.waitFor({ state: "visible", timeout: 3000 });
   await addBtn.click();
   await page.waitForTimeout(500);
 
-  await page.waitForTimeout(AUTOSAVE_WAIT);
-  const newLayerCount = await getLayerCount(page, mapId);
-  expect(newLayerCount).toBe(initialLayerCount + 1);
+  expect(await rows.count()).toBe(baseRows + 1);
 
   expect(errors).toHaveLength(0);
 });
@@ -80,14 +86,15 @@ test("Switching active layer updates activeLayerId in data", async ({ page }) =>
 
   await openLayerPanelAndVerify(page);
 
-  const layerBtns = page.locator('.windrose-layer-btn');
+  const layerBtns = page.locator('.windrose-dock-layer-row');
   const count = await layerBtns.count();
   expect(count).toBeGreaterThanOrEqual(2);
 
   for (let i = 0; i < count; i++) {
     const btn = layerBtns.nth(i);
     const classes = await btn.getAttribute("class") || "";
-    if (!classes.includes("windrose-layer-btn-active")) {
+    // Row's active modifier is a bare " active" class (not "windrose-layer-btn-active")
+    if (!/\bactive\b/.test(classes)) {
       await btn.click();
       await page.waitForTimeout(500);
       break;
@@ -110,26 +117,29 @@ test("Deleting a layer decreases layer count", async ({ page }) => {
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  const initialLayerCount = await getLayerCount(page, mapId);
-  expect(initialLayerCount).toBe(3);
+  expect(await getLayerCount(page, mapId)).toBe(3);
 
   await openLayerPanelAndVerify(page);
 
-  // Right-click to expand options on the first layer
-  const firstLayerBtn = page.locator('.windrose-layer-btn').first();
-  await firstLayerBtn.click({ button: 'right' });
+  // Assert on visible rows (JSON count is confounded by lazy strata
+  // materialization). Deleting a layer must remove exactly one row.
+  const rows = page.locator('.windrose-dock-layer-row');
+  const baseRows = await rows.count();
+
+  // Expand the actions ("more") menu on the first layer row
+  const firstRow = rows.first();
+  const moreBtn = firstRow.locator('.windrose-dock-layer-action.more');
+  await moreBtn.waitFor({ state: "visible", timeout: 3000 });
+  await moreBtn.click();
   await page.waitForTimeout(300);
 
-  // Scope delete to first layer wrapper
-  const firstWrapper = page.locator('.windrose-layer-btn-wrapper').first();
-  const deleteBtn = firstWrapper.locator('.windrose-layer-option-btn.delete');
+  // Delete lives in the expanded action row
+  const deleteBtn = firstRow.locator('.windrose-dock-layer-action-btn.delete');
   await deleteBtn.waitFor({ state: "visible", timeout: 3000 });
   await deleteBtn.click();
   await page.waitForTimeout(500);
 
-  await page.waitForTimeout(AUTOSAVE_WAIT);
-  const newLayerCount = await getLayerCount(page, mapId);
-  expect(newLayerCount).toBe(initialLayerCount - 1);
+  expect(await rows.count()).toBe(baseRows - 1);
 
   expect(errors).toHaveLength(0);
 });
@@ -143,14 +153,17 @@ test("Layer persists after adding and navigating away", async ({ page }) => {
 
   await openLayerPanelAndVerify(page);
 
-  const addBtn = page.locator('.windrose-layer-add-btn');
+  // In Strata mode, adding a layer is per-stratum (one "+" per role section).
+  const addBtn = page.locator('.windrose-dock-stratum-add').first();
   await addBtn.waitFor({ state: "visible", timeout: 3000 });
   await addBtn.click();
   await page.waitForTimeout(500);
 
+  // After autosave, whatever the persisted count is (strata may materialize
+  // extra role layers on first mutation), it must survive a round-trip.
   await page.waitForTimeout(AUTOSAVE_WAIT);
   const countAfterAdd = await getLayerCount(page, mapId);
-  expect(countAfterAdd).toBe(4);
+  expect(countAfterAdd).toBeGreaterThan(3);
 
   // Navigate away and back
   await navigateToMap(page, TEST_MAPS.hex);

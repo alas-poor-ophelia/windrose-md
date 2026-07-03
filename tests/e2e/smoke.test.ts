@@ -10,6 +10,7 @@ import {
   clickTransparencyToggle,
   isTransparencyToggleActive,
   hoverTransparencyButton,
+  expandObjectSidebarIfNeeded,
   TEST_MAPS,
 } from "./helpers";
 
@@ -200,8 +201,16 @@ test("Diagonal fill tool shows preview overlay on valid diagonal", async ({ page
 // ===========================================
 // Layer Transparency Tests
 // ===========================================
+//
+// SKIPPED (UI-modernization debt): the per-layer "show layer below" transparency
+// toggle was part of the old flat layer panel. The redesigned block-mode layer
+// dock (DockLayerList) renders either Simple/Floors rows (no per-layer controls)
+// or Strata rows (which explicitly omit the transparency toggle — `!isStrata`
+// guard in DockLayerList.tsx). There is currently NO block-mode entry point for
+// this control, so these tests target removed UI with no replacement. Re-enable
+// once transparency is re-exposed in the new dock. See findings report.
 
-test("Layer transparency toggle can be activated", async ({ page }) => {
+test.skip("Layer transparency toggle can be activated", async ({ page }) => {
   const errors = setupErrorTracking(page);
 
   await navigateToMap(page, TEST_MAPS.grid);
@@ -222,7 +231,7 @@ test("Layer transparency toggle can be activated", async ({ page }) => {
   expect(errors).toHaveLength(0);
 });
 
-test("Layer transparency toggle can be deactivated", async ({ page }) => {
+test.skip("Layer transparency toggle can be deactivated", async ({ page }) => {
   const errors = setupErrorTracking(page);
 
   await navigateToMap(page, TEST_MAPS.grid);
@@ -243,7 +252,7 @@ test("Layer transparency toggle can be deactivated", async ({ page }) => {
   expect(errors).toHaveLength(0);
 });
 
-test("Layer transparency slider appears on hover when active", async ({ page }) => {
+test.skip("Layer transparency slider appears on hover when active", async ({ page }) => {
   const errors = setupErrorTracking(page);
 
   await navigateToMap(page, TEST_MAPS.grid);
@@ -275,7 +284,7 @@ test("Layer transparency slider appears on hover when active", async ({ page }) 
   expect(errors).toHaveLength(0);
 });
 
-test("Layer transparency slider does not appear when toggle is inactive", async ({ page }) => {
+test.skip("Layer transparency slider does not appear when toggle is inactive", async ({ page }) => {
   const errors = setupErrorTracking(page);
 
   await navigateToMap(page, TEST_MAPS.grid);
@@ -302,7 +311,7 @@ test("Layer transparency slider does not appear when toggle is inactive", async 
   expect(errors).toHaveLength(0);
 });
 
-test("Bottom layer transparency toggle is disabled (no layer below)", async ({ page }) => {
+test.skip("Bottom layer transparency toggle is disabled (no layer below)", async ({ page }) => {
   const errors = setupErrorTracking(page);
 
   await navigateToMap(page, TEST_MAPS.grid);
@@ -321,7 +330,7 @@ test("Bottom layer transparency toggle is disabled (no layer below)", async ({ p
   expect(errors).toHaveLength(0);
 });
 
-test("Layer transparency renders without errors", async ({ page }) => {
+test.skip("Layer transparency renders without errors", async ({ page }) => {
   const errors = setupErrorTracking(page);
 
   await navigateToMap(page, TEST_MAPS.grid);
@@ -360,6 +369,7 @@ test("Object rotation via toolbar button rotates 45 degrees", async ({ page }) =
   await addObjectBtn.click();
   await page.waitForTimeout(200);
 
+  await expandObjectSidebarIfNeeded(page);
   const sidebar = page.locator('.windrose-object-sidebar');
   await sidebar.waitFor({ state: "visible", timeout: 5000 });
   const objectItem = page.locator('.windrose-object-grid-item').first();
@@ -401,6 +411,7 @@ test("Object rotation via R key rotates 45 degrees", async ({ page }) => {
   await addObjectBtn.click();
   await page.waitForTimeout(200);
 
+  await expandObjectSidebarIfNeeded(page);
   const sidebar = page.locator('.windrose-object-sidebar');
   await sidebar.waitFor({ state: "visible", timeout: 5000 });
   const objectItem = page.locator('.windrose-object-grid-item').first();

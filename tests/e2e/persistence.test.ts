@@ -209,9 +209,9 @@ test("Drawing on specific layer adds cells to that layer only", async ({ page })
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  // Open layer panel
+  // Open the layer panel (EdgeRail drawer) to confirm the UI is reachable
   await openLayerPanel(page);
-  const layerControls = page.locator('.windrose-layer-controls');
+  const layerControls = page.locator('.windrose-edge-rail-drawer.is-open');
   await layerControls.waitFor({ state: "visible", timeout: 5000 });
 
   // Get the currently active layer ID
