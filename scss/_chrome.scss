@@ -93,6 +93,14 @@
     height: 36px;
     width: 36px;
   }
+
+  .is-tablet button.windrose-header-action-btn.windrose-header-action-btn--danger,
+  .windrose-header button.windrose-header-action-btn.windrose-header-action-btn--danger {
+    &:hover {
+      color: var(--text-error);
+      border-color: var(--text-error);
+    }
+  }
 }
 
 /* `.windrose-header input.` (0,2,1) — the bare `.windrose-map-name` (0,1,0) lost

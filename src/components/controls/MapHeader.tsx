@@ -17,9 +17,10 @@ interface MapHeaderProps {
   mapList?: MapListEntry[];
   onMapSelect?: (entry: MapListEntry) => void;
   onNewMap?: () => void;
+  onDeleteMap?: () => void;
 }
 
-const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFooter, fullPane, mapId, mapList, onMapSelect, onNewMap }: MapHeaderProps): VNode => {
+const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFooter, fullPane, mapId, mapList, onMapSelect, onNewMap, onDeleteMap }: MapHeaderProps): VNode => {
   const getStatusIcon = (): string => {
     if (saveStatus === 'Unsaved changes') return '○';
     if (saveStatus === 'Saving...') return '⟳';
@@ -106,6 +107,15 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
             title="Copy as windrose-map code block"
           >
             <Icon icon="lucide-copy" />
+          </button>
+        )}
+        {fullPane === true && mapId != null && mapId !== '' && onDeleteMap && (
+          <button
+            className="windrose-header-action-btn windrose-header-action-btn--danger interactive-child"
+            onClick={onDeleteMap}
+            title="Delete map"
+          >
+            <Icon icon="lucide-trash-2" />
           </button>
         )}
         <button

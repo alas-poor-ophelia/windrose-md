@@ -43,6 +43,9 @@ export interface UseMapDataResult {
   /** Force immediate save (for unmount or critical saves) */
   forceSave: () => Promise<void>;
 
+  /** Permanently disable all saves for this instance (post-deletion guard) */
+  markDeleted: () => void;
+
   /** Whether the background image has been preloaded */
   backgroundImageReady: boolean;
 

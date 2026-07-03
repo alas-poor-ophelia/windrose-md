@@ -108,6 +108,16 @@ class WindroseMapView extends ItemView {
     this.app.workspace.requestSaveLayout();
   };
 
+  private handleMapDeleted = (): void => {
+    this.mapId = '';
+    this.mapName = '';
+    this.mapType = 'grid';
+    this.leaf.updateHeader();
+    this.titleEl.textContent = this.getDisplayText();
+    this.app.workspace.requestSaveLayout();
+    void this.renderPicker();
+  };
+
   private handlePanelStateChange = (state: Record<string, unknown>): void => {
     this.floatingPanels = state;
     this.app.workspace.requestSaveLayout();
@@ -145,6 +155,7 @@ class WindroseMapView extends ItemView {
           onPanelStateChange: this.handlePanelStateChange,
           savedDockCollapsed: this.dockCollapsed,
           onDockCollapsedChange: this.handleDockCollapsedChange,
+          onMapDeleted: this.handleMapDeleted,
         })
       ),
       this.contentEl

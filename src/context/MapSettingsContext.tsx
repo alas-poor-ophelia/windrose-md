@@ -224,6 +224,9 @@ export interface ModalShellContextValue {
   // Sub-hex context
   isInSubHex: boolean;
   subMapName: string | null;
+  // Delete map (hidden when unavailable)
+  mapId: string | undefined;
+  onDeleteMap: (() => void) | undefined;
 }
 
 /** Appearance context - colors, overrides, fog image */
@@ -338,6 +341,8 @@ export interface MapSettingsProviderProps {
   geometry?: ExtendedGeometry | null;
   isInSubHex?: boolean;
   subMapName?: string | null;
+  mapId?: string;
+  onDeleteMap?: () => void;
 }
 
 // ===========================================
@@ -397,7 +402,9 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   mapData = null,
   geometry = null,
   isInSubHex = false,
-  subMapName = null
+  subMapName = null,
+  mapId,
+  onDeleteMap
 }) => {
   const globalSettings = getSettings();
   const isHexMap = mapType === 'hex';
@@ -793,9 +800,10 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     preferences: state.preferences,
     handlePreferenceToggle: handlers.handlePreferenceToggle,
     mapData, geometry,
-    isInSubHex, subMapName
+    isInSubHex, subMapName,
+    mapId, onDeleteMap
   }), [isOpen, state.activeTab, state.isLoading, state.distanceSettings, state.preferences, isInSubHex, subMapName,
-    geometry, isHexMap, mapData, mapType, tabs, stableHandleSave,
+    geometry, isHexMap, mapData, mapType, tabs, stableHandleSave, mapId, onDeleteMap,
     handlers.handleCancel, handlers.handlePreferenceToggle, handlers.setActiveTab, handlers.setDistanceSettings]);
 
   const appearanceValue = useMemo((): AppearanceContextValue => ({

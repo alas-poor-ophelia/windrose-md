@@ -76,8 +76,9 @@ import { injectIconCSS } from './assets/rpgAwesomeLoader';
 import { useApp } from './context/AppContext';
 import { Icon } from './components/shared/Icon';
 import { CornerBrackets } from './components/shared/CornerBrackets';
-import { listMaps } from './persistence/fileOperations';
+import { listMaps, deleteMapData } from './persistence/fileOperations';
 import type { MapListEntry } from './persistence/fileOperations';
+import { ConfirmModal } from './settings/modals/ConfirmModal';
 import { loadTileMetadata, setTileMetadataForRender } from './persistence/tileMetadata';
 import { NewMapModal } from './components/modals/NewMapModal';
 
@@ -100,16 +101,18 @@ interface DungeonMapTrackerProps {
   onPanelStateChange?: (state: Partial<Record<PanelId, PanelState>>) => void;
   savedDockCollapsed?: boolean;
   onDockCollapsedChange?: (collapsed: boolean) => void;
+  onMapDeleted?: () => void;
 }
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange }: DungeonMapTrackerProps): VNode => {
+const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange, onMapDeleted }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
   useThemeMode();
-  const { mapData: rootMapData, isLoading, saveStatus, updateMapData: rootUpdateMapData, forceSave, tileImagesReady, getCachedImage } = useMapData(mapId, mapName, mapType);
+  const { mapData: rootMapData, isLoading, saveStatus, updateMapData: rootUpdateMapData, forceSave, markDeleted, tileImagesReady, getCachedImage } = useMapData(mapId, mapName, mapType);
+  const [mapDeleted, setMapDeleted] = useState(false);
 
   const {
     activeMapData: mapData,
@@ -357,6 +360,41 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       onMapChange?.(newId, newName, newType);
     }).open();
   }, [app, onMapChange]);
+
+  // Read at delete time via ref so handleDeleteMap doesn't churn identity on
+  // every map edit just to name the confirm prompt.
+  const rootMapNameRef = useRef<string | undefined>(undefined);
+  rootMapNameRef.current = rootMapData?.name;
+
+  const handleDeleteMap = useCallback(async (): Promise<void> => {
+    if (mapId == null || mapId === '') return;
+    const dataName = rootMapNameRef.current ?? '';
+    const displayName = mapName !== '' ? mapName : dataName !== '' ? dataName : mapId;
+    const lines = [
+      `Delete "${displayName}"? This permanently removes the map's data and cannot be undone.`,
+    ];
+    if (!fullPane) {
+      lines.push('The windrose-map code block in your note will remain — remove it manually.');
+    }
+    const confirmed = await new ConfirmModal(app, {
+      message: lines.join('\n'),
+      confirmText: 'Delete map',
+      cancelText: 'Cancel',
+      isDestructive: true,
+    }).openAndGetValue();
+    if (!confirmed) return;
+
+    // Resurrection guard: disable all saves for this instance BEFORE deleting, so
+    // no trailing autosave can rewrite (and thus recreate) the map.
+    markDeleted();
+    await deleteMapData(app, mapId);
+
+    if (fullPane) {
+      onMapDeleted?.();
+    } else {
+      setMapDeleted(true);
+    }
+  }, [app, mapId, mapName, fullPane, markDeleted, onMapDeleted]);
 
   const floatingPickerPendingRef = useRef<string | null>(null);
 
@@ -856,6 +894,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleCellsChange, wrappedHandleUndo, handleRedo, handleLayerSelect, forceSave,
   ]);
 
+  if (mapDeleted) {
+    return <div className="windrose-loading">Map deleted. You can remove this windrose-map code block.</div>;
+  }
+
   if (isLoading || !mapData) {
     return <div className="windrose-loading">Loading map...</div>;
   }
@@ -890,6 +932,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           mapList={mapListEntries}
           onMapSelect={handleMapSelect}
           onNewMap={fullPane ? handleNewMap : undefined}
+          onDeleteMap={fullPane ? () => { void handleDeleteMap(); } : undefined}
         />
 
         {/* One-time upgrader notice pointing at the Features settings section. */}
@@ -1767,6 +1810,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           geometry={geometry}
           isInSubHex={isInSubHex}
           subMapName={isInSubHex ? (mapData?.name ?? undefined) : undefined}
+          mapId={isInSubHex ? undefined : mapId}
+          onDeleteMap={isInSubHex ? undefined : () => {
+            handleSettingsClose();
+            void handleDeleteMap();
+          }}
         />
 
         {/* Image Alignment Mode */}

@@ -103,7 +103,9 @@ function MapSettingsModalContent(): VNode | null {
     handleSave,
     handleCancel,
     isInSubHex,
-    subMapName
+    subMapName,
+    mapId,
+    onDeleteMap
   } = shellCtx;
 
   if (!isOpen) return null;
@@ -144,6 +146,16 @@ function MapSettingsModalContent(): VNode | null {
         <TabContent tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} mapType={mapType} />
 
         <div class="modal-button-container">
+          {onDeleteMap != null && mapId != null && mapId !== '' && (
+            <button
+              class="mod-warning"
+              style={{ marginRight: 'auto' }}
+              onClick={onDeleteMap}
+              disabled={isLoading}
+            >
+              Delete map…
+            </button>
+          )}
           <button onClick={handleCancel} disabled={isLoading}>Cancel</button>
           <button class="mod-cta" onClick={handleSave} disabled={isLoading}>
             {isLoading ? 'Saving...' : 'Save'}

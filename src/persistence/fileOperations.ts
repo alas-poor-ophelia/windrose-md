@@ -47,6 +47,13 @@ interface DataFile {
   maps: Record<string, MapData>;
 }
 
+// Session-lifetime tombstones for deleted map IDs. loadMapData silently
+// re-creates missing maps, so a stale autosave from ANY still-mounted instance
+// of a deleted map (e.g. the same map open in both a note block and a
+// full-pane view) would resurrect it. saveMapData refuses tombstoned IDs.
+// Map IDs are timestamp+random, so a new map can't collide with a tombstone.
+const deletedMapIds = new Set<string>();
+
 function migrateMapData(mapData: MapData): MapData {
   mapData.objects ??= [];
   mapData.textLabels ??= [];
@@ -239,6 +246,10 @@ async function loadMapData(app: App, mapId: string, mapName: string = '', mapTyp
  *      (prevents silently overwriting corrupted data with partial state).
  */
 async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<boolean> {
+  // Tombstoned map: silently drop the write. Returning true (not false) lets a
+  // stale instance's save status settle to 'Saved' instead of flagging an error
+  // for an intentional no-op.
+  if (deletedMapIds.has(mapId)) return true;
   return enqueueSave(async () => {
     try {
       let allData: DataFile = { maps: {} };
@@ -289,6 +300,60 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
       return true;
     } catch (error) {
       console.error('Error saving map data:', error);
+      return false;
+    }
+  });
+}
+
+/**
+ * Delete a map from the data file.
+ *
+ * Serialized through the same mutex as saveMapData so it can't race a pending
+ * autosave. Returns true if the map existed and was removed, false if the mapId
+ * was absent (no write performed). The data file itself is never deleted, even
+ * if it becomes empty.
+ */
+async function deleteMapData(app: App, mapId: string): Promise<boolean> {
+  // Tombstone synchronously, BEFORE entering the mutex: any saveMapData call
+  // made after this point is refused, even while the delete itself is still
+  // queued. Saves already enqueued run first (mutex FIFO) and are then undone
+  // by this delete.
+  deletedMapIds.add(mapId);
+  return enqueueSave(async () => {
+    try {
+      const dataPath = getDataFilePath();
+      const abstractFile = app.vault.getAbstractFileByPath(dataPath);
+      if (!(abstractFile instanceof TFile)) return false;
+
+      const content = await app.vault.read(abstractFile);
+      let allData: DataFile;
+      try {
+        allData = JSON.parse(content) as DataFile;
+      } catch (parseError) {
+        console.error(
+          '[deleteMapData] Existing data file is unparseable. Refusing to modify to avoid data loss.',
+          parseError
+        );
+        notifyCorruptedDataFile(dataPath);
+        return false;
+      }
+
+      if (allData.maps[mapId] == null) return false;
+
+      delete allData.maps[mapId];
+
+      let jsonString: string;
+      try {
+        jsonString = JSON.stringify(allData);
+      } catch (serializeError) {
+        console.error('[deleteMapData] Serialization failed, delete aborted:', serializeError);
+        return false;
+      }
+
+      await app.vault.modify(abstractFile, jsonString);
+      return true;
+    } catch (error) {
+      console.error('Error deleting map data:', error);
       return false;
     }
   });
@@ -437,5 +502,5 @@ async function listMaps(app: App): Promise<MapListEntry[]> {
   }
 }
 
-export { loadMapData, saveMapData, createNewMap, listMaps, migrateMapData };
+export { loadMapData, saveMapData, deleteMapData, createNewMap, listMaps, migrateMapData };
 export type { MapListEntry };

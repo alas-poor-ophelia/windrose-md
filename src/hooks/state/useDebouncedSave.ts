@@ -11,6 +11,7 @@ interface UseDebouncedSaveResult {
   saveStatus: SaveStatus;
   updateMapData: MapDataUpdater;
   forceSave: () => Promise<void>;
+  markDeleted: () => void;
 }
 
 function useDebouncedSave(
@@ -22,9 +23,14 @@ function useDebouncedSave(
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('Saved');
   const saveTimerRef = useRef<number | null>(null);
   const saveVersionRef = useRef<number>(0);
+  // Resurrection guard: once the map is deleted, no save may ever fire again for
+  // this instance. loadMapData silently re-creates a missing map, so a trailing
+  // autosave (debounce timer, unmount flush, or forceSave) would resurrect a
+  // deleted map as a blank. Every save path checks this ref before writing.
+  const deletedRef = useRef(false);
 
   useEffect(() => {
-    if (!pendingData) return undefined;
+    if (!pendingData || deletedRef.current) return undefined;
 
     if (saveTimerRef.current != null) {
       window.clearTimeout(saveTimerRef.current);
@@ -36,6 +42,7 @@ function useDebouncedSave(
       setSaveStatus('Saving...');
       const success = await saveMapData(app, mapId, pendingData);
 
+      if (deletedRef.current) return;
       if (saveVersionRef.current === currentVersion) {
         setSaveStatus(success ? 'Saved' : 'Save failed');
         setPendingData(null);
@@ -65,7 +72,7 @@ function useDebouncedSave(
   useEffect(() => {
     return () => {
       const { app: a, mapId: m, pendingData: pd } = flushRef.current;
-      if (pd && saveTimerRef.current != null) {
+      if (pd && saveTimerRef.current != null && !deletedRef.current) {
         window.clearTimeout(saveTimerRef.current);
         void saveMapData(a, m, pd);
       }
@@ -84,7 +91,23 @@ function useDebouncedSave(
     });
   }, [setMapData]);
 
+  const markDeleted = useCallback((): void => {
+    deletedRef.current = true;
+    if (saveTimerRef.current != null) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    // Invalidate any in-flight save's completion bookkeeping and drop pending
+    // data so nothing re-enqueues after the delete. Settle the status too — an
+    // in-flight save that loses the version race would otherwise leave it
+    // frozen at 'Saving...' (its completion handlers bail on deletedRef).
+    saveVersionRef.current++;
+    setPendingData(null);
+    setSaveStatus('Saved');
+  }, []);
+
   const forceSave = useCallback(async (): Promise<void> => {
+    if (deletedRef.current) return;
     if (pendingData) {
       if (saveTimerRef.current != null) {
         window.clearTimeout(saveTimerRef.current);
@@ -96,6 +119,7 @@ function useDebouncedSave(
       setSaveStatus('Saving...');
       const success = await saveMapData(app, mapId, pendingData);
 
+      if (deletedRef.current) return;
       if (saveVersionRef.current === versionAtSaveStart) {
         setSaveStatus(success ? 'Saved' : 'Save failed');
         setPendingData(null);
@@ -107,7 +131,7 @@ function useDebouncedSave(
     }
   }, [pendingData, mapId, app]);
 
-  return { saveStatus, updateMapData, forceSave };
+  return { saveStatus, updateMapData, forceSave, markDeleted };
 }
 
 export { useDebouncedSave };

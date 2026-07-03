@@ -50,7 +50,7 @@ function useMapData(
   const { backgroundImageReady, fowImageReady, tileImagesReady } =
     useImagePreloading(app, mapData, settingsVersion);
 
-  const { saveStatus, updateMapData, forceSave } =
+  const { saveStatus, updateMapData, forceSave, markDeleted } =
     useDebouncedSave(app, mapId, setMapData);
 
   return {
@@ -59,6 +59,7 @@ function useMapData(
     saveStatus,
     updateMapData,
     forceSave,
+    markDeleted,
     backgroundImageReady,
     fowImageReady,
     tileImagesReady,
