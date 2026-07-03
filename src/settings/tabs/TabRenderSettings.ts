@@ -18,6 +18,95 @@ const SETTING_DEFAULTS = {
 // WindroseMDSettingsTab render methods - Settings sections
 // This file is concatenated into the settings plugin template by the assembler
 
+type PluginSettingsShape = SettingsTabThis['plugin']['settings'];
+
+type StringSettingKey = Exclude<{
+  [K in keyof PluginSettingsShape]: PluginSettingsShape[K] extends string ? K : never;
+}[keyof PluginSettingsShape], undefined>;
+
+function addColorSetting(
+  tab: SettingsTabThis,
+  containerEl: HTMLElement,
+  opts: { name: string; desc: string; key: StringSettingKey; default: string }
+): void {
+  const settings = tab.plugin.settings as Record<StringSettingKey, string>;
+  new Setting(containerEl)
+    .setName(opts.name)
+    .setDesc(opts.desc)
+    .addColorPicker(color => color
+      .setValue(settings[opts.key])
+      .onChange(async (value: string) => {
+        settings[opts.key] = value;
+        tab.settingsChanged = true;
+        await tab.plugin.saveSettings();
+      }))
+    .addText(text => text
+      .setPlaceholder(opts.default)
+      .setValue(settings[opts.key])
+      .onChange(async (value: string) => {
+        if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+          settings[opts.key] = value;
+          tab.settingsChanged = true;
+          await tab.plugin.saveSettings();
+        }
+      }))
+    .addExtraButton(btn => btn
+      .setIcon('rotate-ccw')
+      .setTooltip('Reset to default')
+      .onClick(async () => {
+        settings[opts.key] = opts.default;
+        tab.settingsChanged = true;
+        await tab.plugin.saveSettings();
+        tab.display();
+      }));
+}
+
+type NumberSettingKey = Exclude<{
+  [K in keyof PluginSettingsShape]: PluginSettingsShape[K] extends number ? K : never;
+}[keyof PluginSettingsShape], undefined>;
+
+function addDistancePerCellSetting(
+  tab: SettingsTabThis,
+  containerEl: HTMLElement,
+  opts: {
+    name: string;
+    desc: string;
+    placeholder: string;
+    valueKey: NumberSettingKey;
+    unitKey: StringSettingKey;
+    units: [string, string][];
+  }
+): void {
+  const numbers = tab.plugin.settings as Record<NumberSettingKey, number>;
+  const strings = tab.plugin.settings as Record<StringSettingKey, string>;
+  new Setting(containerEl)
+    .setName(opts.name)
+    .setDesc(opts.desc)
+    .addText(text => text
+      .setPlaceholder(opts.placeholder)
+      .setValue(String(numbers[opts.valueKey]))
+      .onChange(async (value: string) => {
+        const num = parseFloat(value);
+        if (!isNaN(num) && num > 0) {
+          numbers[opts.valueKey] = num;
+          tab.settingsChanged = true;
+          await tab.plugin.saveSettings();
+        }
+      }))
+    .addDropdown(dropdown => {
+      for (const [value, label] of opts.units) {
+        dropdown.addOption(value, label);
+      }
+      dropdown
+        .setValue(strings[opts.unitKey])
+        .onChange(async (value: string) => {
+          strings[opts.unitKey] = value;
+          tab.settingsChanged = true;
+          await tab.plugin.saveSettings();
+        });
+    });
+}
+
 export const TabRenderSettingsMethods = {
   renderHexSettingsContent(this: SettingsTabThis, containerEl: HTMLElement): void {
     // Hex Orientation
@@ -49,66 +138,20 @@ export const TabRenderSettingsMethods = {
         }));
 
     // Coordinate Text Color
-    new Setting(containerEl)
-      .setName('Coordinate text color')
-      .setDesc('Primary color for hex coordinate overlay text (hex format: #RRGGBB)')
-      .addColorPicker(color => color
-        .setValue(this.plugin.settings.coordinateTextColor)
-        .onChange(async (value: string) => {
-          this.plugin.settings.coordinateTextColor = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }))
-      .addText(text => text
-        .setPlaceholder(SETTING_DEFAULTS.DEFAULT_COORDINATE_TEXT_COLOR)
-        .setValue(this.plugin.settings.coordinateTextColor)
-        .onChange(async (value: string) => {
-          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
-            this.plugin.settings.coordinateTextColor = value;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }))
-      .addExtraButton(btn => btn
-        .setIcon('rotate-ccw')
-        .setTooltip('Reset to default')
-        .onClick(async () => {
-          this.plugin.settings.coordinateTextColor = SETTING_DEFAULTS.DEFAULT_COORDINATE_TEXT_COLOR;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
+    addColorSetting(this, containerEl, {
+      name: 'Coordinate text color',
+      desc: 'Primary color for hex coordinate overlay text (hex format: #RRGGBB)',
+      key: 'coordinateTextColor',
+      default: SETTING_DEFAULTS.DEFAULT_COORDINATE_TEXT_COLOR
+    });
 
     // Coordinate Text Shadow
-    new Setting(containerEl)
-      .setName('Coordinate text shadow')
-      .setDesc('Shadow/outline color for hex coordinate overlay text (hex format: #RRGGBB)')
-      .addColorPicker(color => color
-        .setValue(this.plugin.settings.coordinateTextShadow)
-        .onChange(async (value: string) => {
-          this.plugin.settings.coordinateTextShadow = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }))
-      .addText(text => text
-        .setPlaceholder(SETTING_DEFAULTS.DEFAULT_COORDINATE_TEXT_SHADOW)
-        .setValue(this.plugin.settings.coordinateTextShadow)
-        .onChange(async (value: string) => {
-          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
-            this.plugin.settings.coordinateTextShadow = value;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }))
-      .addExtraButton(btn => btn
-        .setIcon('rotate-ccw')
-        .setTooltip('Reset to default')
-        .onClick(async () => {
-          this.plugin.settings.coordinateTextShadow = SETTING_DEFAULTS.DEFAULT_COORDINATE_TEXT_SHADOW;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
+    addColorSetting(this, containerEl, {
+      name: 'Coordinate text shadow',
+      desc: 'Shadow/outline color for hex coordinate overlay text (hex format: #RRGGBB)',
+      key: 'coordinateTextShadow',
+      default: SETTING_DEFAULTS.DEFAULT_COORDINATE_TEXT_SHADOW
+    });
   },
   renderColorSettingsContent(this: SettingsTabThis, containerEl: HTMLElement): void {
     containerEl.createEl('p', {
@@ -117,35 +160,12 @@ export const TabRenderSettingsMethods = {
     });
 
     // Grid Line Color
-    new Setting(containerEl)
-      .setName('Grid line color')
-      .setDesc('Color for grid lines (hex format: #RRGGBB)')
-      .addColorPicker(color => color
-        .setValue(this.plugin.settings.gridLineColor)
-        .onChange(async (value: string) => {
-          this.plugin.settings.gridLineColor = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }))
-      .addText(text => text
-        .setPlaceholder(SETTING_DEFAULTS.DEFAULT_GRID_LINE_COLOR)
-        .setValue(this.plugin.settings.gridLineColor)
-        .onChange(async (value: string) => {
-          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
-            this.plugin.settings.gridLineColor = value;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }))
-      .addExtraButton(btn => btn
-        .setIcon('rotate-ccw')
-        .setTooltip('Reset to default')
-        .onClick(async () => {
-          this.plugin.settings.gridLineColor = SETTING_DEFAULTS.DEFAULT_GRID_LINE_COLOR;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
+    addColorSetting(this, containerEl, {
+      name: 'Grid line color',
+      desc: 'Color for grid lines (hex format: #RRGGBB)',
+      key: 'gridLineColor',
+      default: SETTING_DEFAULTS.DEFAULT_GRID_LINE_COLOR
+    });
 
     // Grid Line Width (grid maps only)
     new Setting(containerEl)
@@ -171,97 +191,28 @@ export const TabRenderSettingsMethods = {
         }));
 
     // Background Color
-    new Setting(containerEl)
-      .setName('Background color')
-      .setDesc('Canvas background color (hex format: #RRGGBB)')
-      .addColorPicker(color => color
-        .setValue(this.plugin.settings.backgroundColor)
-        .onChange(async (value: string) => {
-          this.plugin.settings.backgroundColor = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }))
-      .addText(text => text
-        .setPlaceholder(SETTING_DEFAULTS.DEFAULT_BACKGROUND_COLOR)
-        .setValue(this.plugin.settings.backgroundColor)
-        .onChange(async (value: string) => {
-          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
-            this.plugin.settings.backgroundColor = value;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }))
-      .addExtraButton(btn => btn
-        .setIcon('rotate-ccw')
-        .setTooltip('Reset to default')
-        .onClick(async () => {
-          this.plugin.settings.backgroundColor = SETTING_DEFAULTS.DEFAULT_BACKGROUND_COLOR;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
+    addColorSetting(this, containerEl, {
+      name: 'Background color',
+      desc: 'Canvas background color (hex format: #RRGGBB)',
+      key: 'backgroundColor',
+      default: SETTING_DEFAULTS.DEFAULT_BACKGROUND_COLOR
+    });
 
     // Border Color
-    new Setting(containerEl)
-      .setName('Border color')
-      .setDesc('Color for painted cell borders (hex format: #RRGGBB)')
-      .addColorPicker(color => color
-        .setValue(this.plugin.settings.borderColor)
-        .onChange(async (value: string) => {
-          this.plugin.settings.borderColor = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }))
-      .addText(text => text
-        .setPlaceholder(SETTING_DEFAULTS.DEFAULT_BORDER_COLOR)
-        .setValue(this.plugin.settings.borderColor)
-        .onChange(async (value: string) => {
-          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
-            this.plugin.settings.borderColor = value;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }))
-      .addExtraButton(btn => btn
-        .setIcon('rotate-ccw')
-        .setTooltip('Reset to default')
-        .onClick(async () => {
-          this.plugin.settings.borderColor = SETTING_DEFAULTS.DEFAULT_BORDER_COLOR;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
+    addColorSetting(this, containerEl, {
+      name: 'Border color',
+      desc: 'Color for painted cell borders (hex format: #RRGGBB)',
+      key: 'borderColor',
+      default: SETTING_DEFAULTS.DEFAULT_BORDER_COLOR
+    });
 
     // Coordinate Key Color
-    new Setting(containerEl)
-      .setName('Coordinate key color')
-      .setDesc('Background color for coordinate key indicator (hex format: #RRGGBB)')
-      .addColorPicker(color => color
-        .setValue(this.plugin.settings.coordinateKeyColor)
-        .onChange(async (value: string) => {
-          this.plugin.settings.coordinateKeyColor = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }))
-      .addText(text => text
-        .setPlaceholder(SETTING_DEFAULTS.DEFAULT_COORDINATE_KEY_COLOR)
-        .setValue(this.plugin.settings.coordinateKeyColor)
-        .onChange(async (value: string) => {
-          if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
-            this.plugin.settings.coordinateKeyColor = value;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }))
-      .addExtraButton(btn => btn
-        .setIcon('rotate-ccw')
-        .setTooltip('Reset to default')
-        .onClick(async () => {
-          this.plugin.settings.coordinateKeyColor = SETTING_DEFAULTS.DEFAULT_COORDINATE_KEY_COLOR;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
+    addColorSetting(this, containerEl, {
+      name: 'Coordinate key color',
+      desc: 'Background color for coordinate key indicator (hex format: #RRGGBB)',
+      key: 'coordinateKeyColor',
+      default: SETTING_DEFAULTS.DEFAULT_COORDINATE_KEY_COLOR
+    });
   },
   renderFogOfWarSettingsContent(this: SettingsTabThis, containerEl: HTMLElement): void {
     containerEl.createEl('p', {
@@ -472,60 +423,24 @@ export const TabRenderSettingsMethods = {
   },
   renderDistanceMeasurementSettingsContent(this: SettingsTabThis, containerEl: HTMLElement): void {
     // Grid: Distance per cell
-    new Setting(containerEl)
-      .setName('Grid map: Distance per cell')
-      .setDesc('Distance each cell represents on grid maps (default: 5 ft for d&d)')
-      .addText(text => text
-        .setPlaceholder('5')
-        .setValue(String(this.plugin.settings.distancePerCellGrid))
-        .onChange(async (value: string) => {
-          const num = parseFloat(value);
-          if (!isNaN(num) && num > 0) {
-            this.plugin.settings.distancePerCellGrid = num;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }))
-      .addDropdown(dropdown => dropdown
-        .addOption('ft', 'Feet')
-        .addOption('m', 'Meters')
-        .addOption('mi', 'Miles')
-        .addOption('km', 'Kilometers')
-        .addOption('yd', 'Yards')
-        .setValue(this.plugin.settings.distanceUnitGrid)
-        .onChange(async (value: string) => {
-          this.plugin.settings.distanceUnitGrid = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }));
+    addDistancePerCellSetting(this, containerEl, {
+      name: 'Grid map: Distance per cell',
+      desc: 'Distance each cell represents on grid maps (default: 5 ft for d&d)',
+      placeholder: '5',
+      valueKey: 'distancePerCellGrid',
+      unitKey: 'distanceUnitGrid',
+      units: [['ft', 'Feet'], ['m', 'Meters'], ['mi', 'Miles'], ['km', 'Kilometers'], ['yd', 'Yards']]
+    });
 
     // Hex: Distance per cell
-    new Setting(containerEl)
-      .setName('Hex map: Distance per hex')
-      .setDesc('Distance each hex represents on hex maps (default: 6 miles for world maps)')
-      .addText(text => text
-        .setPlaceholder('6')
-        .setValue(String(this.plugin.settings.distancePerCellHex))
-        .onChange(async (value: string) => {
-          const num = parseFloat(value);
-          if (!isNaN(num) && num > 0) {
-            this.plugin.settings.distancePerCellHex = num;
-            this.settingsChanged = true;
-            await this.plugin.saveSettings();
-          }
-        }))
-      .addDropdown(dropdown => dropdown
-        .addOption('mi', 'Miles')
-        .addOption('km', 'Kilometers')
-        .addOption('ft', 'Feet')
-        .addOption('m', 'Meters')
-        .addOption('yd', 'Yards')
-        .setValue(this.plugin.settings.distanceUnitHex)
-        .onChange(async (value: string) => {
-          this.plugin.settings.distanceUnitHex = value;
-          this.settingsChanged = true;
-          await this.plugin.saveSettings();
-        }));
+    addDistancePerCellSetting(this, containerEl, {
+      name: 'Hex map: Distance per hex',
+      desc: 'Distance each hex represents on hex maps (default: 6 miles for world maps)',
+      placeholder: '6',
+      valueKey: 'distancePerCellHex',
+      unitKey: 'distanceUnitHex',
+      units: [['mi', 'Miles'], ['km', 'Kilometers'], ['ft', 'Feet'], ['m', 'Meters'], ['yd', 'Yards']]
+    });
 
     // Grid diagonal rule
     new Setting(containerEl)

@@ -12,7 +12,7 @@ import { useBackgroundImage, useModalShell } from '../../../context/MapSettingsC
 import { CollapsibleSection } from '../../shared/CollapsibleSection';
 import { SettingItem } from '../SettingItem';
 import { NativeSlider } from '../NativeControls';
-import { Z_INDEX } from '../../../core/dmtConstants';
+import { ImageSearchField } from '../ImageSearchField';
 
 
 
@@ -74,84 +74,19 @@ function GridBackgroundTab(): VNode | null {
         subtitle={backgroundImagePath != null && backgroundImagePath !== '' ? (backgroundImageDisplayName || 'Image selected') : 'No image'}
       >
         <SettingItem name="Image" description="Add a background image for your grid map" vertical>
-          <div style={{ position: 'relative' }}>
-            <input
-              type="text"
-              placeholder="Search for image..."
-              value={backgroundImageDisplayName}
-              onChange={(e: Event) => {
-                const value = (e.target as HTMLInputElement).value;
-                setBackgroundImageDisplayName(value);
-                void handleImageSearch(value);
-              }}
-              style={{
-                width: '100%',
-                padding: '8px 32px 8px 10px',
-                borderRadius: '4px',
-                border: '1px solid var(--background-modifier-border)',
-                background: 'var(--background-primary)',
-                color: 'var(--text-normal)',
-                fontSize: '14px'
-              }}
-            />
-
-            {backgroundImagePath != null && backgroundImagePath !== '' && (
-              <button
-                onClick={handleImageClear}
-                style={{
-                  position: 'absolute',
-                  right: '6px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  fontSize: '16px',
-                  lineHeight: '1'
-                }}
-                title="Clear image"
-              >
-                x
-              </button>
-            )}
-
-            {/* Autocomplete dropdown */}
-            {imageSearchResults.length > 0 && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                right: 0,
-                maxHeight: '200px',
-                overflowY: 'auto',
-                background: 'var(--background-primary)',
-                border: '1px solid var(--background-modifier-border)',
-                borderRadius: '4px',
-                marginTop: '2px',
-                zIndex: Z_INDEX.INTERACTIVE_LAYER,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-              }}>
-                {imageSearchResults.map((name: string, idx: number) => (
-                  <div
-                    key={idx}
-                    onClick={() => handleImageSelect(name)}
-                    style={{
-                      padding: '8px 10px',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                      borderBottom: idx < imageSearchResults.length - 1 ? '1px solid var(--background-modifier-border)' : 'none'
-                    }}
-                    onMouseEnter={(e: Event) => (e.currentTarget as HTMLElement).classList.add('windrose-dropdown-item-hover')}
-                    onMouseLeave={(e: Event) => (e.currentTarget as HTMLElement).classList.remove('windrose-dropdown-item-hover')}
-                  >
-                    {name}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <ImageSearchField
+            value={backgroundImageDisplayName}
+            placeholder="Search for image..."
+            onSearch={(value: string) => {
+              setBackgroundImageDisplayName(value);
+              void handleImageSearch(value);
+            }}
+            showClear={backgroundImagePath != null && backgroundImagePath !== ''}
+            onClear={handleImageClear}
+            results={imageSearchResults}
+            onSelect={handleImageSelect}
+            clearGlyph="x"
+          />
         </SettingItem>
       </CollapsibleSection>
 

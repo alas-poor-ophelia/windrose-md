@@ -14,8 +14,9 @@ import { ColorPicker } from '../shared/ColorPicker';
 import { CollapsibleSection } from '../shared/CollapsibleSection';
 import { useAppearance, useModalShell } from '../../context/MapSettingsContext';
 import type { SettingsOverrides } from '../../context/MapSettingsContext';
-import { Z_INDEX, resolveThemeColor } from '../../core/dmtConstants';
+import { resolveThemeColor } from '../../core/dmtConstants';
 import { SettingItem } from './SettingItem';
+import { ImageSearchField } from './ImageSearchField';
 import { NativeToggle, NativeSlider } from './NativeControls';
 import { Icon } from '../shared/Icon';
 import { useApp } from '../../context/AppContext';
@@ -121,11 +122,9 @@ function FogOfWarSection(): VNode {
     THEME
   } = useAppearance();
 
-  const [_userToggled, setUserToggled] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
   const handleToggle = (newIsOpen: boolean): void => {
-    setUserToggled(true);
     setIsOpen(newIsOpen);
   };
 
@@ -211,86 +210,19 @@ function FogOfWarSection(): VNode {
           description="Select a tileable image to use instead of solid color"
           vertical
         >
-          <div style={{ position: 'relative' }}>
-            <input
-              type="text"
-              placeholder="Search for tileable image..."
-              value={fogImageDisplayName}
-              disabled={useGlobalSettings}
-              onChange={(e: Event) => {
-                if (useGlobalSettings) return;
-                const value = (e.target as HTMLInputElement).value;
-                setFogImageDisplayName(value);
-                void handleFogImageSearch(value);
-              }}
-              style={{
-                width: '100%',
-                padding: '8px 32px 8px 10px',
-                borderRadius: '4px',
-                border: '1px solid var(--background-modifier-border)',
-                background: 'var(--background-primary)',
-                color: 'var(--text-normal)',
-                fontSize: '14px',
-                cursor: useGlobalSettings ? 'not-allowed' : 'text'
-              }}
-            />
-
-            {overrides.fogOfWarImage != null && overrides.fogOfWarImage !== '' && !useGlobalSettings && (
-              <button
-                onClick={handleFogImageClear}
-                style={{
-                  position: 'absolute',
-                  right: '6px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  fontSize: '16px',
-                  lineHeight: '1'
-                }}
-                title="Clear image"
-              >
-                ×
-              </button>
-            )}
-
-            {fogImageSearchResults.length > 0 && !useGlobalSettings && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                right: 0,
-                maxHeight: '200px',
-                overflowY: 'auto',
-                background: 'var(--background-primary)',
-                border: '1px solid var(--background-modifier-border)',
-                borderRadius: '4px',
-                marginTop: '2px',
-                zIndex: Z_INDEX.INTERACTIVE_LAYER,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-              }}>
-                {fogImageSearchResults.map((name: string, idx: number) => (
-                  <div
-                    key={idx}
-                    onClick={() => handleFogImageSelect(name)}
-                    style={{
-                      padding: '8px 10px',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                      borderBottom: idx < fogImageSearchResults.length - 1 ? '1px solid var(--background-modifier-border)' : 'none'
-                    }}
-                    onMouseEnter={(e: MouseEvent) => (e.currentTarget as HTMLElement).classList.add('windrose-dropdown-item-hover')}
-                    onMouseLeave={(e: MouseEvent) => (e.currentTarget as HTMLElement).classList.remove('windrose-dropdown-item-hover')}
-                  >
-                    {name}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <ImageSearchField
+            value={fogImageDisplayName}
+            placeholder="Search for tileable image..."
+            disabled={useGlobalSettings}
+            onSearch={(value: string) => {
+              setFogImageDisplayName(value);
+              void handleFogImageSearch(value);
+            }}
+            showClear={overrides.fogOfWarImage != null && overrides.fogOfWarImage !== ''}
+            onClear={handleFogImageClear}
+            results={fogImageSearchResults}
+            onSelect={handleFogImageSelect}
+          />
         </SettingItem>
 
         <InstalledFogPacks

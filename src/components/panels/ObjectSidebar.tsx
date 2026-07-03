@@ -1,16 +1,10 @@
-
-
-
-// Use resolver for dynamic object types (supports overrides and custom objects)
-
-
-
 import type { VNode } from 'preact';
 import type { MapType } from '#types/core/map.types';
 import type { ObjectSet } from '#types/settings/settings.types';
 import type { ToolId } from '#types/tools/tool.types';
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
+import { memo } from 'preact/compat';
 import { useApp } from '../../context/AppContext';
 import { getResolvedObjectTypes, getResolvedCategories, hasIconClass, hasImagePath } from '../../objects/objectTypeResolver';
 import { Icon } from '../shared/Icon';
@@ -40,19 +34,18 @@ interface ObjectSidebarProps {
   ribbon?: VNode;
 }
 
-const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange, mapType = 'grid', objectSetId, onObjectSetChange, isFreeformMode = false, onFreeformToggle, hideHeader = false, viewMode = 'grid', onViewModeChange, onCollapse, ribbon }: ObjectSidebarProps): VNode => {
+// memo: the map root re-renders on EVERY pointermove (viewState lives in its
+// state). Its sibling TileAssetBrowser is memoized for the same reason — without
+// it this whole tree re-renders and re-diffs per touch event.
+const ObjectSidebar = memo(({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange, mapType = 'grid', objectSetId, onObjectSetChange, isFreeformMode = false, onFreeformToggle, hideHeader = false, viewMode = 'grid', onViewModeChange, onCollapse, ribbon }: ObjectSidebarProps): VNode => {
   const app = useApp();
   const [searchFilter, setSearchFilter] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
   // Read available object sets from plugin settings
   const objectSets = useMemo(() => {
-    try {
-      const plugin = app.plugins.plugins['windrose-md'] as { settings?: { objectSets?: ObjectSet[] } } | undefined;
-      return (plugin && plugin.settings && plugin.settings.objectSets) ?? [];
-    } catch {
-      return [];
-    }
+    const plugin = app.plugins.plugins['windrose-md'] as { settings?: { objectSets?: ObjectSet[] } } | undefined;
+    return plugin?.settings?.objectSets ?? [];
   // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once read of plugin settings; app.plugins.plugins is a stable mutable registry object
   }, []);
 
@@ -70,8 +63,8 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
     onObjectSetChange(newSetId);
   };
 
-  const allObjectTypes = getResolvedObjectTypes(mapType, activeSetId);
-  const allCategories = getResolvedCategories(mapType, activeSetId);
+  const allObjectTypes = useMemo(() => getResolvedObjectTypes(mapType, activeSetId), [mapType, activeSetId]);
+  const allCategories = useMemo(() => getResolvedCategories(mapType, activeSetId), [mapType, activeSetId]);
 
   const filteredObjects = (searchFilter == null || searchFilter === '') ? allObjectTypes : allObjectTypes.filter(obj => {
     const lower = searchFilter.toLowerCase();
@@ -262,6 +255,6 @@ const ObjectSidebar = ({ selectedObjectType, onObjectTypeSelect, onToolChange, i
       </div>
     </div>
   );
-};
+});
 
 export { ObjectSidebar };
