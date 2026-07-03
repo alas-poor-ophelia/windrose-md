@@ -60,6 +60,12 @@ import { calculateGridFromColumns, calculateGridFromMeasurement, measurementToHe
 
 
 
+function filterImagesByTerm(allImages: string[], searchTerm: string): string[] {
+  return allImages
+    .filter((name: string) => name.toLowerCase().includes(searchTerm.toLowerCase()))
+    .slice(0, 10);
+}
+
 // ===========================================
 // Local Types (context-specific, not in #types/)
 // ===========================================
@@ -406,6 +412,8 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   // Refs
   const pendingCustomColorRef = useRef<HexColor | null>(null);
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
+  const imageSearchSeqRef = useRef(0);
+  const fogImageSearchSeqRef = useRef(0);
 
   // Derived: available tabs
   const tabs = useMemo<SettingsTab[]>(() => {
@@ -520,9 +528,10 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       dispatch({ type: Actions.SET_IMAGE_SEARCH_RESULTS, payload: [] });
       return;
     }
+    const seq = ++imageSearchSeqRef.current;
     const allImages = await getImageDisplayNames();
-    const filtered = allImages.filter((name: string) => name.toLowerCase().includes(searchTerm.toLowerCase()));
-    dispatch({ type: Actions.SET_IMAGE_SEARCH_RESULTS, payload: filtered.slice(0, 10) });
+    if (seq !== imageSearchSeqRef.current) return;
+    dispatch({ type: Actions.SET_IMAGE_SEARCH_RESULTS, payload: filterImagesByTerm(allImages, searchTerm) });
   }, [dispatch]);
 
   const handleImageSelect = useCallback(async (displayName: string): Promise<void> => {
@@ -548,9 +557,10 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       dispatch({ type: Actions.SET_FOG_IMAGE_SEARCH_RESULTS, payload: [] });
       return;
     }
+    const seq = ++fogImageSearchSeqRef.current;
     const allImages = await getImageDisplayNames();
-    const filtered = allImages.filter((name: string) => name.toLowerCase().includes(searchTerm.toLowerCase()));
-    dispatch({ type: Actions.SET_FOG_IMAGE_SEARCH_RESULTS, payload: filtered.slice(0, 10) });
+    if (seq !== fogImageSearchSeqRef.current) return;
+    dispatch({ type: Actions.SET_FOG_IMAGE_SEARCH_RESULTS, payload: filterImagesByTerm(allImages, searchTerm) });
   }, [dispatch]);
 
   const handleFogImageSelect = useCallback(async (displayName: string): Promise<void> => {

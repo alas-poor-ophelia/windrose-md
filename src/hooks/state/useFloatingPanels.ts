@@ -85,8 +85,8 @@ function useFloatingPanels({ fullPane, savedState, onStateChange }: UseFloatingP
     setPanels(prev => {
       const current = prev[panelId];
       if (current?.floating !== true) return prev;
+      if (current.focusOrder === focusCounterRef.current) return prev;
       focusCounterRef.current += 1;
-      if (current.focusOrder === focusCounterRef.current - 1) return prev;
       return {
         ...prev,
         [panelId]: { ...current, focusOrder: focusCounterRef.current }

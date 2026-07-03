@@ -150,7 +150,6 @@ const useObjectInteractions = (
     handleObjectRotation,
     handleObjectDeletion,
     handleObjectDuplicate,
-    longPressTimerRef: { current: null },
 
     calculateLabelButtonPosition,
     calculateLinkNoteButtonPosition,

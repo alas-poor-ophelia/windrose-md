@@ -163,6 +163,10 @@ function loadVaultImage(
         blobUrl = null;
         onDraw(img);
       };
+      img.onerror = () => {
+        if (blobUrl != null) URL.revokeObjectURL(blobUrl);
+        blobUrl = null;
+      };
       img.src = blobUrl;
     });
   }

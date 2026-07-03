@@ -82,7 +82,7 @@ const FreehandLayer = ({
    */
   const drawPreview = useCallback((points: { x: number; y: number }[]) => {
     const overlay = overlayRef.current;
-    if (!overlay || points.length < 2 || !mapData) return;
+    if (!overlay || points.length < 2 || !mapData || !geometry) return;
 
     const ctx = overlay.getContext('2d');
     if (!ctx) return;
@@ -94,7 +94,7 @@ const FreehandLayer = ({
     const { width, height } = overlay;
 
     const { offsetX, offsetY } = calculateViewportOffset(
-      geometry ?? { type: 'hex', cellSize: 1 },
+      geometry,
       center,
       { width, height },
       zoom

@@ -209,7 +209,7 @@ function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSlide
       // Fallback will render
       return undefined;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- builds native slider once; value/disabled via siblings; min/max/step fixed at setLimits()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- builds native slider once; value/disabled/limits live-updated by sibling effects keyed on [value]/[disabled]/[min,max,step]
   }, []);
 
   useEffect(() => {
@@ -223,6 +223,13 @@ function NativeSlider({ value, min, max, step, onChange, disabled }: NativeSlide
       sliderRef.current.setDisabled(disabled === true);
     }
   }, [disabled]);
+
+  // Update limits without recreating
+  useEffect(() => {
+    if (sliderRef.current != null) {
+      sliderRef.current.setLimits(min, max, step ?? 1);
+    }
+  }, [min, max, step]);
 
   return h('div', { ref: containerRef, style: { width: '120px' } });
 }

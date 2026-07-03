@@ -178,7 +178,6 @@ export interface UseObjectInteractionsResult {
   pendingObjectCustomColorRef: PendingObjectCustomColorRef;
   edgeSnapMode: boolean;
   setEdgeSnapMode: (value: boolean) => void;
-  longPressTimerRef: LongPressTimerRef;
   /** Whether a freeform drag preview is active (Alt+Shift modifier) */
   freeformDragPreview: boolean;
 

@@ -773,8 +773,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       mapName: mapData.name ?? mapName,
       mapType: mapData.mapType ?? 'grid',
       viewState: {
-        x: mapData.viewState?.offsetX ?? 0,
-        y: mapData.viewState?.offsetY ?? 0,
+        x: mapData.viewState?.center?.x ?? mapData.viewState?.offsetX ?? 0,
+        y: mapData.viewState?.center?.y ?? mapData.viewState?.offsetY ?? 0,
         zoom: mapData.viewState?.zoom ?? 1,
       },
       activeLayerId: activeLayer?.id ?? '',

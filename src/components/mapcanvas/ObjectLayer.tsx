@@ -112,6 +112,14 @@ const ObjectLayer = ({
   const { isLinkingMode, linkingFrom, startLinking, cancelLinking } = useLinkingMode();
 
 
+  const applyObjectUpdates = useCallback((updates: Record<string, unknown>) => {
+    if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
+    const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, updates);
+    contextOnObjectsChange(updatedObjects);
+    const updatedObj = updatedObjects.find((o: MapObject) => o.id === selectedItem.id);
+    if (updatedObj) setSelectedItem({ ...selectedItem, data: updatedObj });
+  }, [selectedItem, mapData, updateObject, contextOnObjectsChange, setSelectedItem]);
+
   const handlePlayerToggle = useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
     const obj = getActiveLayer(mapData).objects?.find(o => o.id === selectedItem.id);
@@ -123,36 +131,21 @@ const ObjectLayer = ({
       updates.lightColor = 'rgba(255, 255, 100, 1)';
       updates.lightEnabled = true;
     }
-    const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, updates);
-    contextOnObjectsChange(updatedObjects);
-    const updatedObj = updatedObjects.find((o: MapObject) => o.id === selectedItem.id);
-    if (updatedObj) setSelectedItem({ ...selectedItem, data: updatedObj });
-  }, [selectedItem, mapData, updateObject, contextOnObjectsChange, setSelectedItem]);
+    applyObjectUpdates(updates);
+  }, [selectedItem, mapData, applyObjectUpdates]);
 
   const handleLightToggle = useCallback(() => {
-    if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
-    const lightEnabled = selectedItem.data?.lightEnabled !== true;
-    const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, { lightEnabled });
-    contextOnObjectsChange(updatedObjects);
-    const updatedObj = updatedObjects.find((o: MapObject) => o.id === selectedItem.id);
-    if (updatedObj) setSelectedItem({ ...selectedItem, data: updatedObj });
-  }, [selectedItem, mapData, updateObject, contextOnObjectsChange, setSelectedItem]);
+    if (selectedItem?.type !== 'object') return;
+    applyObjectUpdates({ lightEnabled: selectedItem.data?.lightEnabled !== true });
+  }, [selectedItem, applyObjectUpdates]);
 
   const handleLightRadiusChange = useCallback((radius: number) => {
-    if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
-    const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, { lightRadius: radius });
-    contextOnObjectsChange(updatedObjects);
-    const updatedObj = updatedObjects.find((o: MapObject) => o.id === selectedItem.id);
-    if (updatedObj) setSelectedItem({ ...selectedItem, data: updatedObj });
-  }, [selectedItem, mapData, updateObject, contextOnObjectsChange, setSelectedItem]);
+    applyObjectUpdates({ lightRadius: radius });
+  }, [applyObjectUpdates]);
 
   const handleLightColorSelect = useCallback((color: string) => {
-    if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
-    const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, { lightColor: color });
-    contextOnObjectsChange(updatedObjects);
-    const updatedObj = updatedObjects.find((o: MapObject) => o.id === selectedItem.id);
-    if (updatedObj) setSelectedItem({ ...selectedItem, data: updatedObj });
-  }, [selectedItem, mapData, updateObject, contextOnObjectsChange, setSelectedItem]);
+    applyObjectUpdates({ lightColor: color });
+  }, [applyObjectUpdates]);
 
   const [showLightColorPicker, setShowLightColorPicker] = useState(false);
   const lightColorBtnRef = useRef<HTMLButtonElement>(null);
@@ -202,7 +195,7 @@ const ObjectLayer = ({
   const [showObjectColorPicker, setShowObjectColorPicker] = useState(false);
 
   const handleScaleChange = useCallback((newScale: number) => {
-    if (!selectedItem || selectedItem.type !== 'object' || !mapData?.objects) return;
+    if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
 
     const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, { scale: newScale });
     contextOnObjectsChange(updatedObjects);
@@ -753,8 +746,8 @@ const ObjectLayer = ({
     };
   };
 
-  const selectedObject = selectedItem?.type === 'object' && mapData?.objects
-    ? getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === selectedItem.id)
+  const selectedObject = selectedItem?.type === 'object' && mapData
+    ? getActiveLayer(mapData).objects?.find((obj: MapObject) => obj.id === selectedItem.id)
     : null;
 
   const indicatorPositions = edgeSnapMode && selectedObject && mapData?.mapType !== 'hex'

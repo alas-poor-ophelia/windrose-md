@@ -547,7 +547,7 @@ function getSegmentAtPosition(localX: number, localY: number): SegmentName {
   let angle = Math.atan2(-dy, dx) * (180 / Math.PI);
   if (angle < 0) angle += 360;
   
-  // Map angle to segment (each segment is 45Â°)
+  // Map angle to segment (each segment is 45°)
   if (angle >= 337.5 || angle < 22.5) return 'e';
   if (angle >= 22.5 && angle < 67.5) return 'ne';
   if (angle >= 67.5 && angle < 112.5) return 'n';
