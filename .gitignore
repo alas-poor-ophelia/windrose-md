@@ -57,6 +57,11 @@ internal/
 # Claude Code
 memory/
 .claude/scheduled_tasks.lock
+.claude/tile-metadata-backup-*.json
+.claude/worktrees/
+
+# Agent worktrees
+.wt/
 
 # Test vault plugin artifacts
 tests/fixtures/test-vault/.obsidian/plugins/windrose-md/
