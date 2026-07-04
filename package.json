@@ -1,6 +1,6 @@
 {
   "name": "windrose-md",
-  "version": "2.0.0-preview4",
+  "version": "2.0.0",
   "description": "Interactive dungeon and world mapping plugin for Obsidian",
   "type": "module",
   "scripts": {

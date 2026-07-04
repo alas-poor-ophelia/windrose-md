@@ -608,6 +608,59 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.0.0
+
+It's here. Windrose MapDesigner 2.0.0 — the standalone release — is final. No Datacore dependency, no preview label: install and start mapping. If you're coming from 1.7.x, your maps and settings migrate automatically on first load, no manual steps. This entry consolidates the 2.0.0-preview line (see those notes below for the full conversion story) and everything shipped since.
+
+### Standalone Plugin
+- Windrose is now a standard Obsidian Community Plugin. Everything from v1.7.0 was preserved through a ground-up conversion: full light mode support, native Obsidian modals throughout, and a deep-link system that works in Reading, Live Preview, and full-pane views.
+- **First-run survey** — On a fresh install, Windrose asks how you plan to use it and tailors which features are visible. Nothing is ever locked away: every feature has a toggle in settings (Settings → Windrose MapDesigner → Features), so you can start simple and turn things on as you need them. Upgraders get a What's-New notice instead and keep everything enabled.
+
+### Tiles, Everywhere
+The tile system grew from a hex-only experiment into the heart of this release.
+- **Tiles on grid maps** — Tile placement, previously hex-only, now works fully on grid maps: named tile layers, depth tiers, and brush painting tools.
+- **Subtool ribbon** — Tile placement now has proper subtools in the drawer: **Paint** (grid-snapped), **Stamp** (freeform world placement), **Scatter** (jittered stamp brush), **Flood fill**, **Terrain brush**, and **Line** (couples to the wall tool). Per-subtool footer options cover brush size, softness, and edge blend.
+- **Terrain brush** — Paint soft-edged, world-space terrain strokes using seamless textures. Terrain strokes share a region mask with region fills, blend at their edges (verified working on iPad), and support undo like everything else.
+- **"Add tiles" import wizard** — A 3-step wizard (Source / Tiers / Tags) for importing tile folders from your vault, with automatic render-mode and footprint detection at import time. Dungeondraft packs flow through the same wizard.
+- **Dungeondraft pack import** — Import `.dungeondraft_pack` files directly: assets are extracted into your vault with their tags mapped, terrains imported as seamless textures, and pack categories merged with your existing library.
+- **Smart tile detection** — Windrose now distinguishes cell art (a door, a chest) from seamless region textures (grass, water) per tile, and detects multi-cell footprints (that 2×3 building places as 2×3, not squeezed into one cell). Per-tileset pixel density is configurable, and every prediction can be overridden per tile via Organize Mode.
+- **Redesigned tile browser** — The tile drawer was rebuilt end to end: depth-tier bar, cross-pack category merging, pack and tag filter chips with a full filter drill-down screen, grid/list view toggle (persisted per map), Recent and Starred views on the ribbon, organize mode for bulk tagging/tiering/moving, and a virtualized thumbnail pipeline that stays smooth in libraries with thousands of tiles.
+
+### Walls & Paths
+- **Wall and path tiles** — Draw textured walls, fences, and paths along polylines: click-click placement with a live textured preview, drag while placing to bow a segment into a curve, and a full edit mode to select, drag, bow, insert, and delete vertices after the fact. Joints are miter-clipped so angled runs render contiguously. Wall controls live in the drawer footer next to the transform options.
+
+### Boards, Strata, and Layers
+- **New layer organization** — Layers are now organized as Boards → Strata → Layers. A board is a whole place (the tower, the dungeon), strata are its floors, and layers are the drawing surfaces within each floor. The Layers dock has a Simple mode (boards only) and a Strata mode for full control, plus a board switcher dropdown. Existing maps migrate automatically.
+- **Show floor below** — A board-level ghost option renders the stratum beneath your working floor at reduced opacity — draw the second floor while seeing the first.
+
+### Full-Pane & UI
+- **Rebuilt full-pane chrome** — Vertical tool palette with subtool flyouts, unified tiles/objects drawers with shared header chrome, collapsible dock, and a folding left rail in embedded (note) mode that switches between Layers, Colors, and View panels without crowding the canvas.
+- **Map deletion** — Delete a map from the full-pane view, with a confirmation speedbump and a persistence-layer guard that prevents a pending autosave from resurrecting the deleted map.
+- **Tablet pass** — Touch targets, header controls, and drawer chrome all got explicit iPad sizing.
+
+### Performance
+This cycle included a deep performance investigation after a reported iPad slowdown, which turned into a systemic cleanup:
+- Root cause fixed: a full-resolution fog-of-war texture was being pattern-filled every frame. Fog patterns are now downscaled and cached.
+- Panning now blits a cached static-layer image instead of redrawing the map each frame.
+- Canvas renders are coalesced per animation frame; cell rendering is viewport-culled; grid passes batch into single Path2D fills.
+- Fixed a save storm where a full-file save fired per pan/draw event; saves are compact JSON now.
+- The tile thumbnail pipeline no longer re-scans the library on every interaction.
+- Wall edit-drags render ephemerally instead of re-rasterizing the strip per frame.
+
+### Bug Fixes
+- Hex tile art snaps to the cell orientation when a tileset's art doesn't match your map's (pointy vs flat).
+- Terrain textures no longer develop crosshatch artifacts at far zoom on iPad (WebKit pattern minification — mip-chained texture sources).
+- Dungeondraft pack tileset names resolve from the installed-pack registry instead of raw folder names.
+- Drawer buttons and selects no longer inherit broken chrome from the host theme, on desktop or tablet.
+- Paint stroke integrity fixes: batched strokes undo as one action, flood fills are bounded, and edge blend captures per placement instead of per tile.
+- Many more small fixes across the preview line — see the preview entries below.
+
+### Under the Hood
+- **Zero-warning lint gate** — The entire codebase now passes ESLint with `--max-warnings 0` (from ~750 warnings), including the full react-hooks/exhaustive-deps cluster, enforced by a pre-commit hook.
+- **Release-prep audit** — A final dedup/SRP pass removed a net ~1,400 lines: shared layer handler registration, one viewport transform, decomposed panel components, and typed test fixtures throughout.
+- **Persistence hardening** — Map saves serialize through a mutex with validation and refuse-to-overwrite guards; a recovery utility exists for truncated data files.
+- **1,748 unit tests** and a modernized E2E suite running against real Obsidian.
+
 ## Version 2.0.0-preview4
 
 ### Bug Fixes
