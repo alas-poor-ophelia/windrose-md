@@ -36,14 +36,14 @@
     "eslint": "^9.17.0",
     "eslint-plugin-obsidianmd": "0.4.1",
     "eslint-plugin-react-hooks": "^5.1.0",
-    "happy-dom": "^20.1.0",
+    "happy-dom": "^20.8.9",
     "interactjs": "^1.10.27",
     "obsidian": "^1.11.0",
     "obsidian-testing-framework": "^0.1.6",
     "obsidian-typings": "^4.50.0",
     "patch-package": "^8.0.1",
     "polygon-clipping": "^0.15.7",
-    "preact": "^10.25.0",
+    "preact": "^10.28.2",
     "sass": "^1.100.0",
     "typescript": "^5.7.0",
     "vitest": "^2.1.4"
@@ -58,5 +58,36 @@
   "dependencies": {
     "@tanstack/virtual-core": "^3.17.0",
     "fflate": "^0.8.3"
+  },
+  "//overrides": "Security pins for transitive dev/test tooling flagged by the Obsidian store dependency scan. None of these ship in main.js (esbuild externalizes obsidian/electron/codemirror; the mermaid subtree comes from obsidian-typings for type annotations only and is never imported at runtime). preact is the sole runtime-bundled package and is pinned separately in devDependencies.",
+  "overrides": {
+    "mermaid": "^11.16.0",
+    "dompurify": "^3.4.11",
+    "uuid": "^11.1.1",
+    "lodash-es": "^4.18.0",
+    "qs": "^6.15.2",
+    "postcss": "^8.5.10",
+    "rollup": "^4.59.0",
+    "ws": "^8.21.0",
+    "tmp": "^0.2.6",
+    "yaml": "^2.8.3",
+    "js-yaml": "^4.2.0",
+    "flatted": "^3.4.2",
+    "fast-uri": "^3.1.2"
+  },
+  "resolutions": {
+    "mermaid": "^11.16.0",
+    "dompurify": "^3.4.11",
+    "uuid": "^11.1.1",
+    "lodash-es": "^4.18.0",
+    "qs": "^6.15.2",
+    "postcss": "^8.5.10",
+    "rollup": "^4.59.0",
+    "ws": "^8.21.0",
+    "tmp": "^0.2.6",
+    "yaml": "^2.8.3",
+    "js-yaml": "^4.2.0",
+    "flatted": "^3.4.2",
+    "fast-uri": "^3.1.2"
   }
 }
