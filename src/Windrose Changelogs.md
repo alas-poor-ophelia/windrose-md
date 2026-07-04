@@ -608,6 +608,18 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.0.1
+
+A maintenance release for Obsidian community store compliance. No user-facing
+changes — this is internal code-quality and dependency housekeeping:
+
+- Resolved all store-review linter findings: pop-out-window-safe DOM access,
+  Obsidian `createEl` helpers, removed unnecessary type assertions, and tidied
+  unused bindings.
+- Patched a security advisory in a bundled dependency (Preact) and pinned safe
+  versions of transitive build/test tooling.
+- Fixed CSS lint findings (removed avoidable `!important` and `:has()` selectors).
+
 ## Version 2.0.0
 
 It's here. Windrose MapDesigner 2.0.0 — the standalone release — is final. No Datacore dependency, no preview label: install and start mapping. If you're coming from 1.7.x, your maps and settings migrate automatically on first load, no manual steps. This entry consolidates the 2.0.0-preview line (see those notes below for the full conversion story) and everything shipped since.
