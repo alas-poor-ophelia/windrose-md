@@ -10,15 +10,7 @@
   scroll-margin-top: clamp(20px, 3vh, 40px);
 }
 
-/* ===========================================
- * Accessibility: Reduced Motion
- * =========================================== */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
+/* Accessibility: reduced motion is handled app-wide by Obsidian and, for our own
+ * animated components, by component-scoped `prefers-reduced-motion` rules. A
+ * plugin must not ship a global `*` reset — it reaches into every note and other
+ * plugins' UI. */

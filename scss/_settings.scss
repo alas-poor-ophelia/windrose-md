@@ -892,8 +892,9 @@
   min-width: 400px;
 }
 
-/* Soften the modal container's border and shadow */
-.modal:has(.windrose-insert-dungeon-modal) {
+/* Soften the modal container's border and shadow. The host class is added to
+   .modalEl in InsertDungeonModal.onOpen(), avoiding a `:has()` selector. */
+.modal.windrose-insert-dungeon-host {
   border: 1px solid var(--background-modifier-border);
   box-shadow: 0 8px 24px oklch(0% 0 0deg / 0.25);
 }

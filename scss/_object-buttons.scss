@@ -199,7 +199,9 @@
 
   > * {
     color: transparent;
-    text-indent: -9999px;
+    /* font-size: 0 collapses the child text just like the off-screen
+       text-indent hack, but is fully supported (no partial-support warning). */
+    font-size: 0;
   }
 }
 

@@ -342,7 +342,13 @@ button.windrose-dock-panel-collapse {
   &:hover {
     background: oklch(from var(--windrose-border-primary) l c h / 0.2);
     color: var(--windrose-text-primary);
-    opacity: 1 !important;
+  }
+
+  /* Direct hover must beat the less-specific `.windrose-dock-layer-row:hover &`
+     dim rule (0.5). Qualifying with the row-hover ancestor raises specificity
+     above it, so no !important is needed. */
+  .windrose-dock-layer-row:hover &:hover {
+    opacity: 1;
   }
 
   &.active {

@@ -251,6 +251,9 @@ class InsertDungeonModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-insert-dungeon-modal');
+    // Marker on the .modal container so its chrome can be softened without a
+    // `:has()` selector (which the store flags for selector-invalidation cost).
+    this.modalEl.addClass('windrose-insert-dungeon-host');
 
     // === Header with Visualizer ===
     const headerContainer = contentEl.createDiv({ cls: 'windrose-dungeon-header' });

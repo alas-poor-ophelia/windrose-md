@@ -174,11 +174,6 @@ body {
   overflow: visible;
 }
 
-.markdown-reading-view:has(.windrose-container),
-.markdown-source-view.is-live-preview:has(.windrose-container) {
-  container-type: inline-size;
-}
-
 .markdown-source-view.is-live-preview .windrose-container.windrose-expanded,
 .markdown-source-view.is-live-preview .windrose-container.windrose-animating {
   --windrose-offset: 20px;
@@ -3403,11 +3398,13 @@ input.windrose-tb-spanin:focus {
 
 /* ---- Reduced motion ---- */
 @media (prefers-reduced-motion: reduce) {
-  .windrose-db-seg,
-  .windrose-db-fan,
-  .windrose-db-chev {
-    transition: none !important;
-    animation: none !important;
+  /* Double-class specificity beats each element's own transition/animation rule
+     without needing !important. */
+  .windrose-db-seg.windrose-db-seg,
+  .windrose-db-fan.windrose-db-fan,
+  .windrose-db-chev.windrose-db-chev {
+    transition: none;
+    animation: none;
   }
 }
 /* ==========================================================================
@@ -3894,11 +3891,12 @@ button:is(.windrose-tb-iconbtn,
 
 /* Reduced motion: disable fold transitions */
 @media (prefers-reduced-motion: reduce) {
-  .windrose-tile-drawer {
-    transition: none !important;
+  /* Double-class specificity beats the base transition rule without !important. */
+  .windrose-tile-drawer.windrose-tile-drawer {
+    transition: none;
   }
-  .windrose-tile-panel-layer {
-    transition: none !important;
+  .windrose-tile-panel-layer.windrose-tile-panel-layer {
+    transition: none;
   }
 }
 /* ---- Spine flyout buttons ---- */
@@ -4274,7 +4272,9 @@ button:is(.windrose-tb-iconbtn,
 }
 .windrose-object-hover-link.windrose-object-hover-link > * {
   color: transparent;
-  text-indent: -9999px;
+  /* font-size: 0 collapses the child text just like the off-screen
+     text-indent hack, but is fully supported (no partial-support warning). */
+  font-size: 0;
 }
 
 .windrose-linking-banner {
@@ -8284,8 +8284,9 @@ button.windrose-breadcrumb-link {
   min-width: 400px;
 }
 
-/* Soften the modal container's border and shadow */
-.modal:has(.windrose-insert-dungeon-modal) {
+/* Soften the modal container's border and shadow. The host class is added to
+   .modalEl in InsertDungeonModal.onOpen(), avoiding a `:has()` selector. */
+.modal.windrose-insert-dungeon-host {
   border: 1px solid var(--background-modifier-border);
   box-shadow: 0 8px 24px oklch(0% 0 0deg / 0.25);
 }
@@ -10281,7 +10282,14 @@ button.windrose-dock-panel-collapse:hover {
 .windrose-dock-layer-action:hover {
   background: oklch(from var(--windrose-border-primary) l c h/0.2);
   color: var(--windrose-text-primary);
-  opacity: 1 !important;
+}
+.windrose-dock-layer-action {
+  /* Direct hover must beat the less-specific `.windrose-dock-layer-row:hover &`
+     dim rule (0.5). Qualifying with the row-hover ancestor raises specificity
+     above it, so no !important is needed. */
+}
+.windrose-dock-layer-row:hover .windrose-dock-layer-action:hover {
+  opacity: 1;
 }
 .windrose-dock-layer-action.active {
   opacity: 0.8;
@@ -11029,15 +11037,7 @@ button.windrose-dock-panel-collapse:hover {
   scroll-margin-top: clamp(20px, 3vh, 40px);
 }
 
-/* ===========================================
- * Accessibility: Reduced Motion
- * =========================================== */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
+/* Accessibility: reduced motion is handled app-wide by Obsidian and, for our own
+ * animated components, by component-scoped `prefers-reduced-motion` rules. A
+ * plugin must not ship a global `*` reset — it reaches into every note and other
+ * plugins' UI. */

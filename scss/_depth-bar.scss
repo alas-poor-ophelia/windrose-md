@@ -323,10 +323,12 @@
 
 /* ---- Reduced motion ---- */
 @media (prefers-reduced-motion: reduce) {
-  .windrose-db-seg,
-  .windrose-db-fan,
-  .windrose-db-chev {
-    transition: none !important;
-    animation: none !important;
+  /* Double-class specificity beats each element's own transition/animation rule
+     without needing !important. */
+  .windrose-db-seg.windrose-db-seg,
+  .windrose-db-fan.windrose-db-fan,
+  .windrose-db-chev.windrose-db-chev {
+    transition: none;
+    animation: none;
   }
 }

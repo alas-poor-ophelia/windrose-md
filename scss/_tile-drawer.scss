@@ -510,12 +510,13 @@ button:is(
 
 /* Reduced motion: disable fold transitions */
 @media (prefers-reduced-motion: reduce) {
-  .windrose-tile-drawer {
-    transition: none !important;
+  /* Double-class specificity beats the base transition rule without !important. */
+  .windrose-tile-drawer.windrose-tile-drawer {
+    transition: none;
   }
 
-  .windrose-tile-panel-layer {
-    transition: none !important;
+  .windrose-tile-panel-layer.windrose-tile-panel-layer {
+    transition: none;
   }
 }
 

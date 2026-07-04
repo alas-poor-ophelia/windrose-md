@@ -108,6 +108,14 @@ export default [
       "@typescript-eslint/no-unnecessary-type-assertion": "warn",
       "@typescript-eslint/prefer-nullish-coalescing": "warn",
 
+      // WindroseMDSettingsTab is a fully custom, tabbed Preact-rendered settings
+      // UI (dozens of render*Content methods), not standard declarative Setting
+      // rows. The declarative getSettingDefinitions() API (Obsidian 1.13.0
+      // settings-search) does not model this UI without a full tab rewrite, which
+      // is out of scope. The store reviewer did not flag this rule; it only
+      // surfaced locally after the obsidianmd 0.3.0 -> 0.4.1 bump. Off by design.
+      "obsidianmd/settings-tab/prefer-setting-definitions": "off",
+
       // React Hooks (Preact compatible)
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",

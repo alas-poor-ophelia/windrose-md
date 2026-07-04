@@ -75,11 +75,6 @@
   overflow: visible;
 }
 
-.markdown-reading-view:has(.windrose-container),
-.markdown-source-view.is-live-preview:has(.windrose-container) {
-  container-type: inline-size;
-}
-
 .markdown-source-view.is-live-preview {
   .windrose-container.windrose-expanded,
   .windrose-container.windrose-animating {
