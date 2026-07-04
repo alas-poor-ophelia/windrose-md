@@ -134,7 +134,7 @@ export class DungeonEssenceVisualizer {
   }
 
   sampleColors(): void {
-    const style = getComputedStyle(document.body);
+    const style = getComputedStyle(activeDocument.body);
     this.colors = {
       node: style.getPropertyValue('--text-muted').trim() || '#888',
       nodePulse: style.getPropertyValue('--interactive-accent').trim() || '#7c5cbf',

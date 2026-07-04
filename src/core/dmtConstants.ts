@@ -173,7 +173,7 @@ const DARK_GRID_LINES = '#666666';
 const LIGHT_GRID_LINES = '#d5cfc8';
 
 function isLightMode(): boolean {
-  return document.body.classList.contains('theme-light');
+  return activeDocument.body.classList.contains('theme-light');
 }
 
 function resolveBackground(color: string): string {
