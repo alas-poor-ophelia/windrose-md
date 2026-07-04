@@ -23,7 +23,7 @@ const ModalPortal = ({ children }: ModalPortalProps): VNode => {
   useEffect(() => {
     let portal = activeDocument.getElementById('windrose-modal-portal') as HTMLDivElement | null;
     if (!portal) {
-      portal = activeDocument.createElement('div');
+      portal = activeWindow.createDiv();
       portal.id = 'windrose-modal-portal';
       portal.className = 'windrose-modal-portal';
       activeDocument.body.appendChild(portal);

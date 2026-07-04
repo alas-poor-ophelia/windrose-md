@@ -198,7 +198,7 @@ const OutlineLayer = ({
     }
 
     if (!overlayRef.current) {
-      const overlay = activeDocument.createElement('canvas');
+      const overlay = activeWindow.createEl('canvas');
       overlay.classList.add('windrose-overlay-layer');
       mainCanvas.parentElement.appendChild(overlay);
       overlayRef.current = overlay;

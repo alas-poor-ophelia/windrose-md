@@ -140,7 +140,7 @@ async function measureAlphaCoverage(app: App, tile: TileEntry): Promise<number |
         const h = img.naturalHeight;
         if (w === 0 || h === 0) { resolve(null); URL.revokeObjectURL(url); return; }
 
-        const canvas = activeDocument.createElement('canvas');
+        const canvas = activeWindow.createEl('canvas');
         canvas.width = w;
         canvas.height = h;
         // willReadFrequently: software-backed canvas so getImageData doesn't stall the GPU.
@@ -343,7 +343,7 @@ async function detectArtOrientation(app: App, tile: TileEntry): Promise<'flat' |
         try {
           const w = img.naturalWidth;
           const h = img.naturalHeight;
-          const canvas = activeDocument.createElement('canvas');
+          const canvas = activeWindow.createEl('canvas');
           canvas.width = w;
           canvas.height = h;
           const ctx = canvas.getContext('2d', { willReadFrequently: true });

@@ -227,7 +227,7 @@ const WallLayer = ({
     if (overlayRef.current != null) return overlayRef.current;
     const mainCanvas = canvasRef.current;
     if (!mainCanvas || !mainCanvas.parentElement) return null;
-    const overlay = activeDocument.createElement('canvas');
+    const overlay = activeWindow.createEl('canvas');
     overlay.width = mainCanvas.width;
     overlay.height = mainCanvas.height;
     overlay.classList.add('windrose-overlay-layer');

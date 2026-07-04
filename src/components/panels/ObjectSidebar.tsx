@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { memo } from 'preact/compat';
 import { useApp } from '../../context/AppContext';
 import { getResolvedObjectTypes, getResolvedCategories, hasIconClass, hasImagePath } from '../../objects/objectTypeResolver';
+import { getIconChar } from '../../assets/rpgAwesomeIcons';
 import { Icon } from '../shared/Icon';
 import { DrawerPaneHead, DrawerSearch, type DrawerViewMode } from './drawerChrome';
 
@@ -112,7 +113,7 @@ const ObjectSidebar = memo(({ selectedObjectType, onObjectTypeSelect, onToolChan
       return <img src={app.vault.adapter.getResourcePath(objType.imagePath ?? '')} alt={objType.label} className="windrose-object-grid-image" />;
     }
     if (hasIconClass(objType)) {
-      return <span className={`ra ${objType.iconClass}`}></span>;
+      return <span className="ra">{getIconChar(objType.iconClass ?? '') ?? '?'}</span>;
     }
     return <span>{objType.symbol ?? '?'}</span>;
   };

@@ -173,7 +173,6 @@ const DARK_GRID_LINES = '#666666';
 const LIGHT_GRID_LINES = '#d5cfc8';
 
 function isLightMode(): boolean {
-  // eslint-disable-next-line obsidianmd/prefer-active-doc -- theme class lives on the MAIN app document body, not a popout's.
   return document.body.classList.contains('theme-light');
 }
 

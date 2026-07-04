@@ -31,8 +31,8 @@ class NewMapModal extends Modal {
       });
 
     const typeContainer = contentEl.createDiv({ cls: 'windrose-map-type-selection' });
-    typeContainer.createEl('div', { text: 'Map type', cls: 'setting-item-name' });
-    typeContainer.createEl('div', {
+    typeContainer.createDiv({ text: 'Map type', cls: 'setting-item-name' });
+    typeContainer.createDiv({
       text: 'Choose the grid style for this map',
       cls: 'setting-item-description'
     });

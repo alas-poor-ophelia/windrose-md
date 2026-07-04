@@ -93,12 +93,12 @@ class ColorEditModal extends Modal {
       .setName('Opacity')
       .setDesc('Default opacity when selecting this color');
 
-    const opacityContainer = opacitySetting.controlEl.createEl('div', { cls: 'windrose-opacity-control' });
+    const opacityContainer = opacitySetting.controlEl.createDiv({ cls: 'windrose-opacity-control' });
     const opacitySlider = opacityContainer.createEl('input', {
       type: 'range',
       attr: { min: '10', max: '100', value: String(Math.round(opacityValue * 100)) }
     });
-    const opacityDisplay = opacityContainer.createEl('span', {
+    const opacityDisplay = opacityContainer.createSpan({
       text: `${Math.round(opacityValue * 100)}%`,
       cls: 'windrose-opacity-value'
     });
@@ -110,17 +110,17 @@ class ColorEditModal extends Modal {
 
     // Show original values for built-ins
     if (isBuiltIn && originalBuiltIn) {
-      const origInfo = contentEl.createEl('div', { cls: 'windrose-color-original-info' });
-      origInfo.createEl('span', { text: 'Original: ' });
-      origInfo.createEl('span', {
+      const origInfo = contentEl.createDiv({ cls: 'windrose-color-original-info' });
+      origInfo.createSpan({ text: 'Original: ' });
+      origInfo.createSpan({
         cls: 'windrose-color-mini-swatch',
         attr: { style: `background-color: ${originalBuiltIn.color}` }
       });
-      origInfo.createEl('span', { text: ` ${originalBuiltIn.label} (${originalBuiltIn.color})` });
+      origInfo.createSpan({ text: ` ${originalBuiltIn.label} (${originalBuiltIn.color})` });
     }
 
     // Action buttons
-    const btnContainer = contentEl.createEl('div', { cls: 'windrose-modal-buttons' });
+    const btnContainer = contentEl.createDiv({ cls: 'windrose-modal-buttons' });
 
     const saveBtn = btnContainer.createEl('button', {
       text: 'Save',

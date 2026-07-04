@@ -120,7 +120,7 @@ function getFogPatternSource(
   let source: CanvasImageSource = fowImage;
   let invScale = 1;
   if (scale < 1 && typeof document !== 'undefined') {
-    const c = activeDocument.createElement('canvas');
+    const c = activeWindow.createEl('canvas');
     c.width = Math.max(1, Math.round(fowImage.naturalWidth * scale));
     c.height = Math.max(1, Math.round(fowImage.naturalHeight * scale));
     const cctx = c.getContext('2d');

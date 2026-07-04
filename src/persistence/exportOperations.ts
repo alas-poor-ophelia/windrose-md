@@ -101,7 +101,7 @@ function calculateContentBounds(
 
   // 3. Text labels (need temporary canvas for measurement)
   if (layer.textLabels.length > 0) {
-    const tempCanvas = activeDocument.createElement('canvas');
+    const tempCanvas = activeWindow.createEl('canvas');
     const tempCtx = tempCanvas.getContext('2d');
     
     if (tempCtx) {
@@ -134,7 +134,7 @@ function renderMapToCanvas(
 ): void {
   const { mapData, geometry, width, height } = params;
 
-  const tempCanvas = activeDocument.createElement('canvas');
+  const tempCanvas = activeWindow.createEl('canvas');
   tempCanvas.width = width;
   tempCanvas.height = height;
 
@@ -209,7 +209,7 @@ async function exportMapAsImage(
   const height = Math.ceil(exportBounds.maxY - exportBounds.minY);
   
   // Create offscreen canvas
-  const canvas = activeDocument.createElement('canvas');
+  const canvas = activeWindow.createEl('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');

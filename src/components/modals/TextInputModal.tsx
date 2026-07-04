@@ -50,7 +50,7 @@ function openNativeTextInputModal(options: {
           }
         });
 
-        const buttonContainer = contentEl.createEl('div', {
+        const buttonContainer = contentEl.createDiv({
           cls: 'windrose-modal-buttons windrose-modal-button-row'
         });
 

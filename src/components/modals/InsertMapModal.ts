@@ -39,13 +39,13 @@ export class InsertMapModal extends Modal {
 
   private renderExistingMaps(contentEl: HTMLElement, maps: MapListEntry[]): void {
     const section = contentEl.createDiv({ cls: 'windrose-insert-section' });
-    section.createEl('div', { text: 'Existing maps', cls: 'windrose-insert-section-title' });
+    section.createDiv({ text: 'Existing maps', cls: 'windrose-insert-section-title' });
 
     const list = section.createDiv({ cls: 'windrose-insert-map-list' });
     for (const entry of maps) {
       const row = list.createDiv({ cls: 'windrose-insert-map-item' });
-      row.createEl('span', { text: entry.name || entry.id, cls: 'windrose-insert-map-item-name' });
-      row.createEl('span', { text: entry.type, cls: 'windrose-insert-map-item-type' });
+      row.createSpan({ text: entry.name || entry.id, cls: 'windrose-insert-map-item-name' });
+      row.createSpan({ text: entry.type, cls: 'windrose-insert-map-item-type' });
       row.onclick = () => {
         this.onInsert(entry.id, entry.name, entry.type);
         this.close();
@@ -56,7 +56,7 @@ export class InsertMapModal extends Modal {
   private renderNewMapSection(contentEl: HTMLElement, hasExisting: boolean): void {
     const section = contentEl.createDiv({ cls: 'windrose-insert-section' });
     if (hasExisting) {
-      section.createEl('div', { text: 'Create new', cls: 'windrose-insert-section-title' });
+      section.createDiv({ text: 'Create new', cls: 'windrose-insert-section-title' });
     }
 
     new Setting(section)
@@ -72,8 +72,8 @@ export class InsertMapModal extends Modal {
       });
 
     const typeContainer = section.createDiv({ cls: 'windrose-map-type-selection' });
-    typeContainer.createEl('div', { text: 'Map type', cls: 'setting-item-name' });
-    typeContainer.createEl('div', {
+    typeContainer.createDiv({ text: 'Map type', cls: 'setting-item-name' });
+    typeContainer.createDiv({
       text: 'Choose the grid style for this map',
       cls: 'setting-item-description'
     });

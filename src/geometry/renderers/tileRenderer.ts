@@ -62,7 +62,7 @@ const DEFAULT_WORLD_REPEAT = 4;
 let _featherCanvas: HTMLCanvasElement | null = null;
 function getFeatherCanvas(w: number, h: number): HTMLCanvasElement | null {
   if (typeof document === 'undefined') return null;
-  _featherCanvas ??= activeDocument.createElement('canvas');
+  _featherCanvas ??= activeWindow.createEl('canvas');
   if (_featherCanvas.width !== w) _featherCanvas.width = w;
   if (_featherCanvas.height !== h) _featherCanvas.height = h;
   return _featherCanvas;
@@ -74,7 +74,7 @@ function getFeatherCanvas(w: number, h: number): HTMLCanvasElement | null {
 let _maskCanvas: HTMLCanvasElement | null = null;
 function getMaskCanvas(w: number, h: number): HTMLCanvasElement | null {
   if (typeof document === 'undefined') return null;
-  _maskCanvas ??= activeDocument.createElement('canvas');
+  _maskCanvas ??= activeWindow.createEl('canvas');
   if (_maskCanvas.width !== w) _maskCanvas.width = w;
   if (_maskCanvas.height !== h) _maskCanvas.height = h;
   return _maskCanvas;
@@ -122,7 +122,7 @@ function patternSourceForScale(
       const w = Math.floor(sw / 2);
       const h = Math.floor(sh / 2);
       if (w < 1 || h < 1) break;
-      const candidate = activeDocument.createElement('canvas');
+      const candidate = activeWindow.createEl('canvas');
       const mctx = candidate.getContext('2d');
       if (mctx == null) break;
       candidate.width = w;
@@ -155,9 +155,9 @@ function probeBlurRender(
 ): boolean {
   if (typeof document === 'undefined') return false;
   try {
-    const src = activeDocument.createElement('canvas');
+    const src = activeWindow.createEl('canvas');
     src.width = 32; src.height = 32;
-    const dst = activeDocument.createElement('canvas');
+    const dst = activeWindow.createEl('canvas');
     dst.width = 32; dst.height = 32;
     const sctx = src.getContext('2d');
     const dctx = dst.getContext('2d');
@@ -179,7 +179,7 @@ function probeBlurRender(
  *  yes while rendering nothing — never gate rendering on this. */
 function canvasFilterAttrReflects(): boolean {
   if (typeof document === 'undefined') return false;
-  const probe = activeDocument.createElement('canvas').getContext('2d');
+  const probe = activeWindow.createEl('canvas').getContext('2d');
   if (!probe) return false;
   probe.filter = 'blur(1px)';
   return probe.filter === 'blur(1px)';
@@ -231,8 +231,8 @@ let _pyrCanvasA: HTMLCanvasElement | null = null;
 let _pyrCanvasB: HTMLCanvasElement | null = null;
 function getPyrPair(w: number, h: number): { a: HTMLCanvasElement; b: HTMLCanvasElement } | null {
   if (typeof document === 'undefined') return null;
-  _pyrCanvasA ??= activeDocument.createElement('canvas');
-  _pyrCanvasB ??= activeDocument.createElement('canvas');
+  _pyrCanvasA ??= activeWindow.createEl('canvas');
+  _pyrCanvasB ??= activeWindow.createEl('canvas');
   for (const c of [_pyrCanvasA, _pyrCanvasB]) {
     if (c.width !== w) c.width = w;
     if (c.height !== h) c.height = h;

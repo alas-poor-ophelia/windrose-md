@@ -76,18 +76,18 @@ export const TabRenderColorsMethods = {
     const hiddenBuiltIns = BUILT_IN_COLORS.filter(c => hiddenColors.has(c.id));
 
     // Visible colors container
-    const visibleContainer = containerEl.createEl('div', { cls: 'windrose-settings-category' });
-    const visibleHeader = visibleContainer.createEl('div', { cls: 'windrose-settings-category-header' });
-    visibleHeader.createEl('span', { text: `Active Colors (${visibleColors.length})`, cls: 'windrose-settings-category-label' });
+    const visibleContainer = containerEl.createDiv({ cls: 'windrose-settings-category' });
+    const visibleHeader = visibleContainer.createDiv({ cls: 'windrose-settings-category-header' });
+    visibleHeader.createSpan({ text: `Active Colors (${visibleColors.length})`, cls: 'windrose-settings-category-label' });
 
-    const visibleList = visibleContainer.createEl('div', { cls: 'windrose-color-list' });
+    const visibleList = visibleContainer.createDiv({ cls: 'windrose-color-list' });
 
     visibleColors.forEach((color, index) => {
       this.renderColorRow(visibleList, color as unknown as Record<string, unknown>, index, false);
     });
 
     if (visibleColors.length === 0) {
-      visibleList.createEl('div', {
+      visibleList.createDiv({
         text: 'No colors visible. Use "show" to restore hidden colors.',
         cls: 'windrose-settings-empty-message'
       });
@@ -95,11 +95,11 @@ export const TabRenderColorsMethods = {
 
     // Hidden colors (if any)
     if (hiddenBuiltIns.length > 0) {
-      const hiddenContainer = containerEl.createEl('div', { cls: 'windrose-settings-category windrose-settings-category-muted' });
-      const hiddenHeader = hiddenContainer.createEl('div', { cls: 'windrose-settings-category-header' });
-      hiddenHeader.createEl('span', { text: `Hidden Colors (${hiddenBuiltIns.length})`, cls: 'windrose-settings-category-label' });
+      const hiddenContainer = containerEl.createDiv({ cls: 'windrose-settings-category windrose-settings-category-muted' });
+      const hiddenHeader = hiddenContainer.createDiv({ cls: 'windrose-settings-category-header' });
+      hiddenHeader.createSpan({ text: `Hidden Colors (${hiddenBuiltIns.length})`, cls: 'windrose-settings-category-label' });
 
-      const hiddenList = hiddenContainer.createEl('div', { cls: 'windrose-color-list' });
+      const hiddenList = hiddenContainer.createDiv({ cls: 'windrose-color-list' });
 
       hiddenBuiltIns.forEach((color, index) => {
         // Build display version with override if exists
@@ -111,24 +111,24 @@ export const TabRenderColorsMethods = {
   },
   renderColorRow(this: SettingsTabThis, containerEl: HTMLElement, colorRecord: Record<string, unknown>, _index: number, isHidden: boolean): void {
     const color = colorRecord as unknown as DisplayColor;
-    const row = containerEl.createEl('div', { cls: 'windrose-color-row' });
+    const row = containerEl.createDiv({ cls: 'windrose-color-row' });
 
     // Color swatch - apply opacity if set
     const swatchOpacity = color.opacity ?? 1;
-    row.createEl('div', {
+    row.createDiv({
       cls: 'windrose-color-row-swatch',
       attr: { style: `background-color: ${color.color}; opacity: ${swatchOpacity}` }
     });
 
     // Label with modified indicator
-    const labelContainer = row.createEl('div', { cls: 'windrose-color-row-label' });
-    labelContainer.createEl('span', { text: color.label, cls: 'windrose-color-row-name' });
+    const labelContainer = row.createDiv({ cls: 'windrose-color-row-label' });
+    labelContainer.createSpan({ text: color.label, cls: 'windrose-color-row-name' });
 
     if (color.isModified === true) {
-      labelContainer.createEl('span', { text: ' (modified)', cls: 'windrose-color-row-modified' });
+      labelContainer.createSpan({ text: ' (modified)', cls: 'windrose-color-row-modified' });
     }
     if (color.isCustom === true) {
-      labelContainer.createEl('span', { text: ' (custom)', cls: 'windrose-color-row-custom' });
+      labelContainer.createSpan({ text: ' (custom)', cls: 'windrose-color-row-custom' });
     }
 
     // Hex value + opacity if not 100%
@@ -138,7 +138,7 @@ export const TabRenderColorsMethods = {
     row.createEl('code', { text: hexText, cls: 'windrose-color-row-hex' });
 
     // Actions
-    const actions = row.createEl('div', { cls: 'windrose-color-row-actions' });
+    const actions = row.createDiv({ cls: 'windrose-color-row-actions' });
 
     // Edit button
     const editBtn = actions.createEl('button', { cls: 'windrose-btn-icon', attr: { 'aria-label': 'Edit color' } });

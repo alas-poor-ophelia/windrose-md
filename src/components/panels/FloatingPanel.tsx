@@ -8,7 +8,7 @@ import { Icon } from '../shared/Icon';
 function getFloatingPortalContainer(): HTMLElement {
   let portal = activeDocument.getElementById('windrose-floating-portal');
   if (!portal) {
-    portal = activeDocument.createElement('div');
+    portal = activeWindow.createDiv();
     portal.id = 'windrose-floating-portal';
     portal.className = 'windrose-floating-portal';
     activeDocument.body.appendChild(portal);

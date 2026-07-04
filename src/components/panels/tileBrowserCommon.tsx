@@ -49,8 +49,7 @@ function predictSpanFromMeta(
 
 const BOUNDS_CACHE_MAX = 256;
 const boundsCache = new Map<string, { x: number; y: number; w: number; h: number }>();
-// eslint-disable-next-line obsidianmd/prefer-active-doc -- detached offscreen scratch canvas for content-bounds detection; never attached to DOM, document-agnostic.
-const scratchCanvas = document.createElement('canvas');
+const scratchCanvas = createEl('canvas');
 
 function putBounds(key: string, bounds: { x: number; y: number; w: number; h: number }): void {
   if (boundsCache.size >= BOUNDS_CACHE_MAX) {

@@ -74,7 +74,7 @@ function registerPostProcessor(plugin: Plugin): void {
         : dataHref.startsWith('windrose:') ? dataHref : '';
       if (original === '') return;
 
-      const replacement = activeDocument.createElement('a');
+      const replacement = activeWindow.createEl('a');
       replacement.textContent = link.textContent;
       replacement.className = 'windrose-deep-link';
       replacement.setAttribute('href', '#');

@@ -376,13 +376,13 @@ const TileAssetBrowser = memo(({
     }
 
     if (!portalRef.current) {
-      const div = activeDocument.createElement('div');
+      const div = activeWindow.createDiv();
       div.className = 'windrose-tile-preview-portal';
-      const canvas = activeDocument.createElement('canvas');
+      const canvas = activeWindow.createEl('canvas');
       canvas.width = PREVIEW_SIZE;
       canvas.height = PREVIEW_SIZE;
       canvas.classList.add('windrose-tile-preview-canvas');
-      const label = activeDocument.createElement('div');
+      const label = activeWindow.createDiv();
       label.className = 'windrose-tile-preview-label';
       div.appendChild(canvas);
       div.appendChild(label);

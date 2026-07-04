@@ -98,7 +98,6 @@ const MODULE_MAP: Record<string, string> = {
   'imageOperations.ts': './assets/imageOperations.ts',
   'tilesetOperations.ts': './assets/tilesetOperations.ts',
   'rpgAwesomeIcons.ts': './assets/rpgAwesomeIcons.ts',
-  'rpgAwesomeLoader.ts': './assets/rpgAwesomeLoader.ts',
   // Persistence
   'fileOperations.ts': './persistence/fileOperations.ts',
   'deepLinkHandler.ts': './persistence/deepLinkHandler.ts',

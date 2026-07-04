@@ -1,4 +1,3 @@
-/* eslint-disable obsidianmd/prefer-active-doc -- Obsidian's theme class lives on the MAIN app document body; a popout document doesn't carry it, so theme detection must read the main document. */
 import { useState, useEffect } from 'preact/hooks';
 
 function useThemeMode(): boolean {

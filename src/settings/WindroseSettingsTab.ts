@@ -23,7 +23,7 @@ interface WindrosePlugin extends Plugin {
 // safe. The "proper" structural fix (mixins as free functions) is DEFERRED to the
 // Obsidian declarative Settings API migration — that rewrites this whole tab, so
 // restructuring now would be throwaway work. See project_eslint_0_3_migration.
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- mixin methods are Object.assign'd onto the prototype at runtime (see note above); restructuring is deferred to the Settings API migration
 interface WindroseMDSettingsTab {
   renderSearchBar(containerEl: HTMLElement): void;
   renderHexSettingsContent(el: HTMLElement): void;
@@ -134,9 +134,9 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     this.sections.push({ details, title });
 
     const summary = details.createEl('summary');
-    summary.createEl('span', { text: title });
+    summary.createSpan({ text: title });
 
-    const contentEl = details.createEl('div', { cls: 'windrose-settings-section-content' });
+    const contentEl = details.createDiv({ cls: 'windrose-settings-section-content' });
 
     renderFn(contentEl);
 

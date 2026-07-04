@@ -43,7 +43,7 @@ function useNativeControl<C extends ValueComponent<V>, V>({ value, onChange, dis
 
     try {
       // Create a temporary setting to extract its control component
-      const tempContainer = activeDocument.createElement('div');
+      const tempContainer = activeWindow.createDiv();
       const setting = new Setting(tempContainer);
       const control = create(setting, (newVal: V) => onChangeRef.current(newVal));
 

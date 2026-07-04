@@ -69,8 +69,6 @@ import { TileAssetBrowser } from './components/panels/TileAssetBrowser';
 import type { RailSelection } from './components/panels/TileAssetBrowser';
 import { DrawerDock } from './components/panels/DrawerDock';
 import type { FlyoutTile } from './components/panels/DrawerDock';
-import { RA_ICONS } from './assets/rpgAwesomeIcons';
-import { injectIconCSS } from './assets/rpgAwesomeLoader';
 import { useApp } from './context/AppContext';
 import { Icon } from './components/shared/Icon';
 import { CornerBrackets } from './components/shared/CornerBrackets';
@@ -79,9 +77,6 @@ import type { MapListEntry } from './persistence/fileOperations';
 import { ConfirmModal } from './settings/modals/ConfirmModal';
 import { loadTileMetadata, setTileMetadataForRender } from './persistence/tileMetadata';
 import { NewMapModal } from './components/modals/NewMapModal';
-
-// Inject RPGAwesome icon CSS classes on module load
-injectIconCSS(RA_ICONS);
 
 // ============================================================================
 // LOCAL TYPE DEFINITIONS

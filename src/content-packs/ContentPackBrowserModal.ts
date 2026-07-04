@@ -167,7 +167,7 @@ class ContentPackBrowserModal extends Modal {
         });
         updateBtn.onclick = () => void this.installPack(pack, updateBtn);
       } else {
-        action.createEl('span', {
+        action.createSpan({
           text: 'Installed ✓',
           cls: 'windrose-content-pack-installed',
         });
@@ -194,7 +194,7 @@ class ContentPackBrowserModal extends Modal {
       const parent = btn.parentElement;
       if (parent != null) {
         parent.empty();
-        parent.createEl('span', {
+        parent.createSpan({
           text: 'Installed ✓',
           cls: 'windrose-content-pack-installed',
         });

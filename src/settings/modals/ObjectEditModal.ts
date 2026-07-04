@@ -378,7 +378,7 @@ class ObjectEditModal extends Modal {
       });
 
       // Create the icon span with the character
-      const iconSpan = iconBtn.createEl('span', { cls: 'ra' });
+      const iconSpan = iconBtn.createSpan({ cls: 'ra' });
       iconSpan.textContent = icon.char;
 
       iconBtn.onclick = () => {
@@ -415,7 +415,7 @@ class ObjectEditModal extends Modal {
 
     // Large preview
     const previewBox = container.createDiv({ cls: 'windrose-icon-preview-large' });
-    const iconSpan = previewBox.createEl('span', { cls: 'ra' });
+    const iconSpan = previewBox.createSpan({ cls: 'ra' });
     iconSpan.textContent = iconInfo.char;
 
     // Info

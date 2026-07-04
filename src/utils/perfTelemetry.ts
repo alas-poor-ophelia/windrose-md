@@ -94,7 +94,7 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
       fillRect: P.fillRect, drawImage: P.drawImage, getImageData: P.getImageData,
       clearRect: P.clearRect, createPattern: P.createPattern,
     };
-    /* eslint-enable @typescript-eslint/unbound-method */
+    /* eslint-enable @typescript-eslint/unbound-method -- end of captured-method block */
     P.fillRect = function (this: CanvasRenderingContext2D, ...a) { c.fillRect++; return orig.fillRect.apply(this, a); };
     P.drawImage = function (this: CanvasRenderingContext2D, ...a) { c.drawImage++; return orig.drawImage.apply(this, a as Parameters<typeof orig.drawImage>); } as typeof P.drawImage;
     P.getImageData = function (this: CanvasRenderingContext2D, ...a) { c.getImageData++; return orig.getImageData.apply(this, a); };
@@ -272,8 +272,6 @@ async function recordPerfTelemetry(app: App, durationMs = 60000): Promise<void> 
   const env = {
     when: new Date().toISOString(),
     platform: Platform.isMobile ? (Platform.isTablet ? 'tablet' : 'phone') : 'desktop',
-    // eslint-disable-next-line obsidianmd/platform -- raw UA captured as a diagnostic string, not for platform branching
-    ua: navigator.userAgent.slice(0, 160),
     dpr: window.devicePixelRatio,
     screen: { w: window.screen.width, h: window.screen.height },
     canvases,

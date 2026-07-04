@@ -124,7 +124,7 @@ export const ObjectHelpers = {
       imgEl.style.setProperty('height', height);
     } else if (obj.iconClass != null && obj.iconClass !== '' && RPGAwesomeHelpers.isValid(obj.iconClass)) {
       const iconInfo = RPGAwesomeHelpers.getInfo(obj.iconClass);
-      const iconSpan = container.createEl('span', { cls: 'ra' });
+      const iconSpan = container.createSpan({ cls: 'ra' });
       iconSpan.textContent = iconInfo?.char ?? '?';
     } else {
       container.textContent = obj.symbol ?? '?';

@@ -90,7 +90,7 @@ export default class WindrosePlugin extends Plugin {
       const mapType = (config.type ?? 'grid') as MapType;
 
       if (mapId === '') {
-        el.createEl('div', {
+        el.createDiv({
           text: 'Windrose: missing required "ID" field in windrose-map block.',
           cls: 'windrose-error'
         });

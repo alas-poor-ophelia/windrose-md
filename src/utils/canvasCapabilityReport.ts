@@ -22,9 +22,6 @@ async function writeCanvasCapabilityReport(app: App): Promise<void> {
         isTablet: Platform.isTablet,
         isIosApp: Platform.isIosApp,
         isDesktopApp: Platform.isDesktopApp,
-        // Diagnostic payload, not OS detection — the UA carries the WebKit build.
-        // eslint-disable-next-line obsidianmd/platform
-        userAgent: navigator.userAgent,
         devicePixelRatio: window.devicePixelRatio,
       },
       canvas: caps,

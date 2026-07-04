@@ -264,7 +264,7 @@ export const TabRenderSettingsMethods = {
     // Installed fog textures
     const fogPacks = getInstalledPacks(this.plugin).filter(p => p.type === 'fog-pack');
     if (fogPacks.length > 0) {
-      containerEl.createEl('div', { text: 'Installed fog textures', cls: 'setting-item-heading' });
+      containerEl.createDiv({ text: 'Installed fog textures', cls: 'setting-item-heading' });
 
       const currentFogImage = this.plugin.settings.fogOfWarImage;
 

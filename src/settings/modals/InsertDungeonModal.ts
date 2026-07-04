@@ -106,10 +106,11 @@ type OnInsertCallback = (
 ) => void | Promise<void>;
 
 interface WindrosePlugin {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  loadDungeonGenerator(): Promise<{ generateDungeon: (...args: any[]) => any }>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  loadObjectPlacer(): Promise<{ stockDungeon: (...args: any[]) => any }>;
+  // Method syntax (not property-arrow) so parameters are checked bivariantly:
+  // the concrete plugin's typed generateDungeon/stockDungeon signatures stay
+  // assignable to this structural duck-type without resorting to `any`.
+  loadDungeonGenerator(): Promise<{ generateDungeon(...args: unknown[]): unknown }>;
+  loadObjectPlacer(): Promise<{ stockDungeon(...args: unknown[]): unknown }>;
 }
 
 const DUNGEON_STYLE_DEFAULTS: Record<DungeonStyleName, DungeonStyleDefaults> = {
@@ -279,8 +280,8 @@ class InsertDungeonModal extends Modal {
       });
 
     const styleContainer = contentEl.createDiv({ cls: 'windrose-dungeon-style-selection' });
-    styleContainer.createEl('div', { text: 'Style', cls: 'setting-item-name' });
-    styleContainer.createEl('div', {
+    styleContainer.createDiv({ text: 'Style', cls: 'setting-item-name' });
+    styleContainer.createDiv({
       text: 'Choose the architectural style of the dungeon',
       cls: 'setting-item-description'
     });
@@ -316,8 +317,8 @@ class InsertDungeonModal extends Modal {
     styleButtons.classic.addClass('selected');
 
     const sizeContainer = contentEl.createDiv({ cls: 'windrose-dungeon-size-selection' });
-    sizeContainer.createEl('div', { text: 'Dungeon size', cls: 'setting-item-name' });
-    sizeContainer.createEl('div', {
+    sizeContainer.createDiv({ text: 'Dungeon size', cls: 'setting-item-name' });
+    sizeContainer.createDiv({
       text: 'Choose the overall size of the generated dungeon',
       cls: 'setting-item-description'
     });
@@ -349,8 +350,8 @@ class InsertDungeonModal extends Modal {
     }
 
     const distContainer = contentEl.createDiv({ cls: 'windrose-dungeon-size-selection' });
-    distContainer.createEl('div', { text: 'Distance measurement', cls: 'setting-item-name' });
-    distContainer.createEl('div', {
+    distContainer.createDiv({ text: 'Distance measurement', cls: 'setting-item-name' });
+    distContainer.createDiv({
       text: 'Set the scale for distance measurement on this map',
       cls: 'setting-item-description'
     });
@@ -366,7 +367,7 @@ class InsertDungeonModal extends Modal {
       this.distancePerCell = parseInt((e.target as HTMLInputElement).value) || 5;
     });
 
-    distRow.createEl('span', { text: 'Per cell, unit:' });
+    distRow.createSpan({ text: 'Per cell, unit:' });
 
     const unitInput = distRow.createEl('input', {
       type: 'text',
@@ -452,12 +453,12 @@ class InsertDungeonModal extends Modal {
     const diagonalLabel = (v: number): string => v === 0 ? 'None' : `${Math.round(v * 100)}%`;
     createSlider(advancedContent, 'Diagonal Corridors', 'diagonalCorridorChance', 0, 1, 0.1, 0.5, diagonalLabel);
 
-    advancedContent.createEl('div', { cls: 'windrose-dungeon-section-header', text: 'Environment' });
+    advancedContent.createDiv({ cls: 'windrose-dungeon-section-header', text: 'Environment' });
 
     const waterLabel = (v: number): string => v === 0 ? 'None' : `${Math.round(v * 100)}%`;
     createSlider(advancedContent, 'Water Features', 'waterChance', 0, 0.5, 0.05, 0.15, waterLabel);
 
-    advancedContent.createEl('div', { cls: 'windrose-dungeon-section-header', text: 'Object placement' });
+    advancedContent.createDiv({ cls: 'windrose-dungeon-section-header', text: 'Object placement' });
 
     const densityLabel = (v: number): string => v < 0.75 ? 'Sparse' : v > 1.25 ? 'Dense' : 'Normal';
     createSlider(advancedContent, 'Object Density', 'objectDensity', 0.5, 2, 0.1, 1.0, densityLabel);
@@ -478,18 +479,18 @@ class InsertDungeonModal extends Modal {
     templateCheckbox.addEventListener('change', (e: Event) => {
       this.configOverrides.useTemplates = (e.target as HTMLInputElement).checked;
     });
-    advancedContent.createEl('div', {
+    advancedContent.createDiv({
       cls: 'windrose-checkbox-hint',
       text: 'Generates themed rooms (library, shrine, barracks) with appropriate objects'
     });
 
-    advancedContent.createEl('div', { cls: 'windrose-dungeon-subsection', text: 'Room categories' });
+    advancedContent.createDiv({ cls: 'windrose-dungeon-subsection', text: 'Room categories' });
     createSlider(advancedContent, 'Monsters', 'monsterWeight', 0, 1, 0.05, 0.33, pct);
     createSlider(advancedContent, 'Empty Rooms', 'emptyWeight', 0, 1, 0.05, 0.33, pct);
     createSlider(advancedContent, 'Features', 'featureWeight', 0, 1, 0.05, 0.17, pct);
     createSlider(advancedContent, 'Traps', 'trapWeight', 0, 1, 0.05, 0.17, pct);
 
-    advancedContent.createEl('div', { cls: 'windrose-dungeon-section-header', text: 'Solo play' });
+    advancedContent.createDiv({ cls: 'windrose-dungeon-section-header', text: 'Solo play' });
 
     const fogRow = advancedContent.createDiv({ cls: 'windrose-dungeon-slider-row' });
     fogRow.createEl('label', { text: 'Auto-fog dungeon' });
@@ -507,7 +508,7 @@ class InsertDungeonModal extends Modal {
     fogCheckbox.addEventListener('change', (e: Event) => {
       this.configOverrides.autoFogEnabled = (e.target as HTMLInputElement).checked;
     });
-    advancedContent.createEl('div', {
+    advancedContent.createDiv({
       cls: 'windrose-checkbox-hint',
       text: 'Cover dungeon with fog, revealing only the entrance room'
     });

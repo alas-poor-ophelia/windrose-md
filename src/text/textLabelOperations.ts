@@ -175,7 +175,7 @@ function getTextLabelAtPosition(
   let tempCanvas: HTMLCanvasElement | null = null;
   let context = ctx;
   if (!context) {
-    tempCanvas = activeDocument.createElement('canvas');
+    tempCanvas = activeWindow.createEl('canvas');
     context = tempCanvas.getContext('2d');
     if (!context) return null;
   }

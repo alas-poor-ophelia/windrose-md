@@ -79,7 +79,7 @@ export const TabRenderObjectsMethods = {
 
     this.renderObjectSetsBlock(containerEl);
 
-    containerEl.createEl('div', { cls: 'windrose-set-separator' });
+    containerEl.createDiv({ cls: 'windrose-set-separator' });
 
     // Map Type selector dropdown
     new Setting(containerEl)
@@ -617,7 +617,7 @@ export const TabRenderObjectsMethods = {
     const s = this.plugin.settings;
     const sets = s.objectSets ?? [];
 
-    containerEl.createEl('div', { cls: 'windrose-settings-subheading', text: 'Object sets' });
+    containerEl.createDiv({ cls: 'windrose-settings-subheading', text: 'Object sets' });
     containerEl.createEl('p', {
       text: 'Save and swap between named collections of object customizations.',
       cls: 'setting-item-description'

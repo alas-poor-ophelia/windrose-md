@@ -92,9 +92,8 @@ export interface WindroseEventMap {
 }
 
 declare global {
-  // Empty-body interface merge is the canonical way to extend the DOM event maps.
-  /* eslint-disable @typescript-eslint/no-empty-object-type */
+  /* eslint-disable @typescript-eslint/no-empty-object-type -- empty-body interface merge is the canonical way to extend the DOM event maps */
   interface WindowEventMap extends WindroseEventMap {}
   interface DocumentEventMap extends WindroseEventMap {}
-  /* eslint-enable @typescript-eslint/no-empty-object-type */
+  /* eslint-enable @typescript-eslint/no-empty-object-type -- end of DOM event map merges */
 }

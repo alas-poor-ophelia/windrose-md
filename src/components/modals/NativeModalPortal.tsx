@@ -89,7 +89,7 @@ async function setupModalInteract(
   if (options.resizable === true) {
     const edges = ['top', 'right', 'bottom', 'left', 'top-right', 'top-left', 'bottom-right', 'bottom-left'];
     for (const edge of edges) {
-      const handle = activeDocument.createElement('div');
+      const handle = activeWindow.createDiv();
       handle.className = `windrose-resize-handle windrose-resize-${edge}`;
       modalEl.appendChild(handle);
     }

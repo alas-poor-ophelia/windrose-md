@@ -276,7 +276,6 @@ function normalizeCell(cell: Cell): Cell | null {
     ).length;
 
     if (filledCount === 8) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { segments, ...simpleCell } = cell;
       return simpleCell as Cell;
     }

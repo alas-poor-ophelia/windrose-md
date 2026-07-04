@@ -6,11 +6,11 @@ import { IconHelpers } from '../helpers/iconHelpers';
 
 export const TabRenderCoreMethods = {
   renderSearchBar(this: SettingsTabThis, containerEl: HTMLElement): void {
-    const wrapper = containerEl.createEl('div', { cls: 'windrose-settings-search-wrapper' });
-    const searchBox = wrapper.createEl('div', { cls: 'windrose-settings-search-box' });
+    const wrapper = containerEl.createDiv({ cls: 'windrose-settings-search-wrapper' });
+    const searchBox = wrapper.createDiv({ cls: 'windrose-settings-search-box' });
 
     // Search icon
-    const searchIcon = searchBox.createEl('span', { cls: 'search-icon' });
+    const searchIcon = searchBox.createSpan({ cls: 'search-icon' });
     IconHelpers.set(searchIcon, 'search');
 
     // Input
@@ -25,7 +25,7 @@ export const TabRenderCoreMethods = {
     IconHelpers.set(clearBtn, 'x');
 
     // No results message (hidden initially)
-    this.noResultsEl = containerEl.createEl('div', {
+    this.noResultsEl = containerEl.createDiv({
       cls: 'windrose-settings-no-results',
       text: 'No settings found matching your search.'
     });
