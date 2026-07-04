@@ -1,4 +1,4 @@
----
+﻿---
 name: release
 description: Automate Windrose standalone plugin release - bump version, build, test, tag, and publish via GitHub Actions. Use when preparing a new version of Windrose.
 ---
@@ -52,7 +52,7 @@ The release pipeline (`scripts/release/index.ts`) performs these steps:
 3. **Build production** - `npm run build:prod` (esbuild minified + SCSS compilation)
 4. **Run tests** - unit tests always run; E2E optional via `--include-e2e`
 5. **Commit version bump** - only if files changed (manifest.json, package.json, versions.json)
-6. **Tag and push** - creates annotated `vX.Y.Z` tag, pushes branch + tag to origin
+6. **Tag and push** - creates annotated `X.Y.Z` tag (NO v prefix - the Obsidian store requires the tag to exactly match the manifest.json version), pushes branch + tag to origin
 7. **Verify release** - polls GitHub for release with correct assets (main.js, styles.css, manifest.json)
 
 ### Step 3: Verify Release
@@ -86,7 +86,7 @@ git push origin main
 ## GitHub Actions Workflow
 
 `.github/workflows/release.yml` triggers on:
-- **Tag push** matching `v*` (normal flow from `npm run release`)
+- **Tag push** matching a bare semver tag (`[0-9]*`; legacy `v*` also matches) (normal flow from `npm run release`)
 - **Manual dispatch** with a tag input (fallback)
 
 The workflow:
@@ -128,10 +128,10 @@ ls -la main.js styles.css
 
 ```bash
 # Delete local tag
-git tag -d vX.Y.Z
+git tag -d X.Y.Z
 
 # Delete remote tag (if pushed)
-git push origin :refs/tags/vX.Y.Z
+git push origin :refs/tags/X.Y.Z
 
 # Bump to new version and retry
 npm run release -- --bump X.Y.Z+1
@@ -141,7 +141,7 @@ npm run release -- --bump X.Y.Z+1
 
 ```bash
 # Manual dispatch as fallback
-gh workflow run release.yml -f tag=vX.Y.Z
+gh workflow run release.yml -f tag=X.Y.Z
 ```
 
 ### Tests Fail During Release

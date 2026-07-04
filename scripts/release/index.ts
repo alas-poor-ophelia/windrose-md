@@ -1,4 +1,4 @@
-#!/usr/bin/env npx tsx
+﻿#!/usr/bin/env npx tsx
 /**
  * Windrose Standalone Release Pipeline
  *
@@ -63,14 +63,14 @@ function bumpVersion(newVersion: string): void {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
   manifest.version = newVersion;
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
-  console.log(`    manifest.json → ${newVersion}`);
+  console.log(`    manifest.json â†’ ${newVersion}`);
 
   // package.json
   const pkgPath = path.join(DEV_ROOT, "package.json");
   const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
   pkg.version = newVersion;
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
-  console.log(`    package.json → ${newVersion}`);
+  console.log(`    package.json â†’ ${newVersion}`);
 
   // versions.json
   const versionsPath = path.join(DEV_ROOT, "versions.json");
@@ -79,7 +79,7 @@ function bumpVersion(newVersion: string): void {
     : {};
   versions[newVersion] = manifest.minAppVersion;
   writeFileSync(versionsPath, JSON.stringify(versions, null, 2) + "\n");
-  console.log(`    versions.json → ${newVersion}: ${manifest.minAppVersion}`);
+  console.log(`    versions.json â†’ ${newVersion}: ${manifest.minAppVersion}`);
   console.log("");
 }
 
@@ -101,7 +101,7 @@ function checkPrerequisites(version: string, allowBranch: boolean): void {
   console.log(`  Version: ${version}`);
 
   // Check if tag already exists
-  const tagName = `v${version}`;
+  const tagName = `${version}`;
   try {
     execSync(`git rev-parse ${tagName}`, { cwd: DEV_ROOT, stdio: "pipe" });
     throw new Error(`Tag ${tagName} already exists. Bump the version first.`);
@@ -162,12 +162,12 @@ function printTestSummary(jsonPath: string): { passed: boolean } {
     }
   }
 
-  console.log(`\n  ── Test Results ──────────────────────────────`);
+  console.log(`\n  â”€â”€ Test Results â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`);
   console.log(`  Files:  ${passedFiles} passed, ${failedFiles.length} failed (${testFiles.length} total)`);
   console.log(`  Tests:  ${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped (${totalTests} total)`);
 
   if (failedFiles.length > 0) {
-    console.log(`\n  ── Failures ─────────────────────────────────`);
+    console.log(`\n  â”€â”€ Failures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`);
     for (const file of failedFiles) {
       const f = file as Record<string, unknown>;
       const relPath = path.relative(DEV_ROOT, f.name as string);
@@ -175,7 +175,7 @@ function printTestSummary(jsonPath: string): { passed: boolean } {
       for (const test of (f.assertionResults as Record<string, unknown>[]) || []) {
         if (test.status === "failed") {
           const ancestors = (test.ancestorTitles as string[]) || [];
-          console.log(`    ✗ ${ancestors.join(" > ")}${ancestors.length ? " > " : ""}${test.title}`);
+          console.log(`    âœ— ${ancestors.join(" > ")}${ancestors.length ? " > " : ""}${test.title}`);
           const msg = ((test.failureMessages as string[]) || []).join("\n");
           const lines = msg.split("\n").slice(0, 10);
           for (const line of lines) {
@@ -251,7 +251,7 @@ function runE2EBackground(): Promise<void> {
 }
 
 function commitAndTag(version: string, dryRun: boolean): void {
-  const tagName = `v${version}`;
+  const tagName = `${version}`;
 
   // Check if there are version-related changes to commit
   const gitStatus = execSync("git status --porcelain manifest.json package.json versions.json", {
@@ -294,7 +294,7 @@ function commitAndTag(version: string, dryRun: boolean): void {
 }
 
 function waitForRelease(version: string, maxWait: number = 180000): void {
-  const tagName = `v${version}`;
+  const tagName = `${version}`;
   console.log(`Step 5: Verifying GitHub release...\n`);
   console.log(`  Waiting for GitHub Actions to create release for ${tagName}...`);
 
@@ -332,12 +332,12 @@ function waitForRelease(version: string, maxWait: number = 180000): void {
 async function main(): Promise<void> {
   const options = parseArgs();
 
-  console.log("╔════════════════════════════════════════════╗");
-  console.log("║    Windrose Standalone Release Pipeline    ║");
-  console.log("╚════════════════════════════════════════════╝\n");
+  console.log("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+  console.log("â•‘    Windrose Standalone Release Pipeline    â•‘");
+  console.log("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•\n");
 
   if (options.dryRun) {
-    console.log("*** DRY RUN MODE — will build and test but not tag/push ***\n");
+    console.log("*** DRY RUN MODE â€” will build and test but not tag/push ***\n");
   }
 
   // Bump version if requested
@@ -366,22 +366,22 @@ async function main(): Promise<void> {
     waitForRelease(version);
   }
 
-  console.log("╔════════════════════════════════════════════╗");
-  console.log("║    Release Pipeline Complete!              ║");
-  console.log("╚════════════════════════════════════════════╝\n");
+  console.log("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+  console.log("â•‘    Release Pipeline Complete!              â•‘");
+  console.log("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•\n");
 
   if (!options.dryRun) {
     console.log(`  Version ${version} tagged and pushed.`);
     console.log(`  GitHub Actions creating release with main.js + styles.css + manifest.json`);
   } else {
-    console.log(`  Dry run complete. Build and tests passed for v${version}.`);
+    console.log(`  Dry run complete. Build and tests passed for ${version}.`);
   }
 }
 
 main().catch((e) => {
-  console.error("\n╔════════════════════════════════════════════╗");
-  console.error("║    Release Pipeline FAILED                ║");
-  console.error("╚════════════════════════════════════════════╝\n");
+  console.error("\nâ•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+  console.error("â•‘    Release Pipeline FAILED                â•‘");
+  console.error("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•\n");
   console.error("Error:", e.message);
   process.exit(1);
 });

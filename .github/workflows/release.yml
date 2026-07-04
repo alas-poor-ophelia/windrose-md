@@ -3,11 +3,14 @@ name: Release Obsidian Plugin
 on:
   push:
     tags:
+      # Bare semver tags (Obsidian store requires the tag to match manifest.json
+      # version exactly, no v prefix); v* kept for the legacy preview tags
+      - "[0-9]*"
       - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to release (e.g. v2.0.0-preview)"
+        description: "Tag to release (e.g. 2.0.0)"
         required: true
 
 permissions:
