@@ -3,6 +3,10 @@
   "version": "2.0.0",
   "description": "Interactive dungeon and world mapping plugin for Obsidian",
   "type": "module",
+  "imports": {
+    "#types": "./types/index.ts",
+    "#types/*": "./types/*.ts"
+  },
   "scripts": {
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 0",
     "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
