@@ -416,7 +416,8 @@ const useGroupDrag = (): UseGroupDragResult => {
 
         // Grid object that was temporarily made freeform → restore to grid
         if (offset.freeform !== true && obj.freeform === true) {
-          const { freeform: _f, worldPosition: _wp, ...rest } = obj;
+          const { freeform, worldPosition, ...rest } = obj;
+          void freeform; void worldPosition; // dropped from the copy
           updatedObjects[idx] = rest;
           needsRestore = true;
         }

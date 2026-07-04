@@ -202,7 +202,8 @@ function useCustomEventHandlers({
               if (update.link !== undefined) {
                 return { ...obj, linkedObject: update.link };
               }
-              const { linkedObject: _removed, ...rest } = obj;
+              const { linkedObject, ...rest } = obj;
+              void linkedObject; // dropped from the copy
               return rest;
             })
           };

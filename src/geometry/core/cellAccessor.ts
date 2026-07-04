@@ -339,6 +339,7 @@ function normalizeCell(cell: Cell): Cell | null {
     if (filledCount === 8) {
       // All segments filled - collapse to simple cell
       const { segments, ...simpleCell } = cell;
+      void segments; // collapsed away
       return simpleCell;
     }
     

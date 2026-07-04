@@ -51,6 +51,7 @@ export const ObjectHelpers = {
         const defaultOrder = index * 10;
         if (override != null) {
           const { hidden, ...overrideProps } = override;
+          void hidden; // excluded from the spread
           return {
             ...obj,
             ...overrideProps,

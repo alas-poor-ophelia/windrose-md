@@ -19,6 +19,7 @@ export const ColorHelpers = {
         const override = colorPaletteOverrides[c.id];
         if (override != null) {
           const { hidden, ...overrideProps } = override;
+          void hidden; // excluded from the spread
           return {
             ...c,
             ...overrideProps,

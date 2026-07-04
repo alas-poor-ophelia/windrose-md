@@ -196,6 +196,7 @@ function getResolvedObjectTypes(mapType: MapType = 'grid', objectSetId?: string 
       if (override != null) {
         // Merge override properties (excluding 'hidden' which is handled above)
         const { hidden, ...overrideProps } = override;
+        void hidden; // handled above; excluded from the spread
         return {
           ...obj,
           ...overrideProps,
@@ -292,6 +293,7 @@ function getObjectType(typeId: string | null | undefined, mapType: MapType = 'gr
     const override = objectOverrides[typeId];
     if (override != null) {
       const { hidden, ...overrideProps } = override;
+      void hidden; // excluded from the spread
       return {
         ...builtIn,
         ...overrideProps,

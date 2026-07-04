@@ -290,7 +290,8 @@ function getColorPaletteSettings(): ResolvedColorEntry[] {
       .map((c, index) => {
         const override = colorPaletteOverrides[c.id];
         if (override != null) {
-          const { hidden: _hidden, ...overrideProps } = override;
+          const { hidden, ...overrideProps } = override;
+          void hidden; // dropped from the copy
           return {
             ...c,
             ...overrideProps,

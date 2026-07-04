@@ -588,7 +588,8 @@ const ObjectLayer = ({
     const sourceObjectId = selectedItem.id;
 
     const removeLinkedObject = (o: MapObject): MapObject => {
-      const { linkedObject: _removed, ...rest } = o;
+      const { linkedObject, ...rest } = o;
+      void linkedObject; // dropped from the copy
       return rest;
     };
 
@@ -603,7 +604,8 @@ const ObjectLayer = ({
       }
     );
 
-    const { linkedObject: _removed, ...restData } = obj;
+    const { linkedObject, ...restData } = obj;
+    void linkedObject; // dropped from the copy
     setSelectedItem({
       type: 'object',
       id: selectedItem.id,

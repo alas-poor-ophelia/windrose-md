@@ -992,7 +992,8 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
         };
       } else {
         // Remove maxRing, keep maxCol/maxRow
-        const { maxRing: _removed, ...rectBounds } = state.hexBounds;
+        const { maxRing, ...rectBounds } = state.hexBounds;
+        void maxRing; // dropped from the copy
         return {
           ...state,
           boundsShape: 'rectangular',
