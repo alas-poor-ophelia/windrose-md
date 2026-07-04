@@ -87,7 +87,7 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
         const geometry: ExtendedGeometry = focused.mapType === 'hex'
           ? new HexGeometry(
               (focused.hexSize as number) || (DEFAULTS.hexSize),
-              ((focused.orientation as string) || (DEFAULTS.hexOrientation as string)) as 'flat' | 'pointy',
+              focused.orientation ?? DEFAULTS.hexOrientation,
               focused.hexBounds ?? null
             )
           : new GridGeometry((focused.gridSize as number) || (DEFAULTS.gridSize));

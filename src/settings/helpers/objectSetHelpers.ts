@@ -1,5 +1,5 @@
-import { TFile } from 'obsidian';
-import type { App, Vault, TAbstractFile } from 'obsidian';
+import { TFile, TFolder } from 'obsidian';
+import type { App, Vault } from 'obsidian';
 import type { PluginSettings, ObjectSet, ObjectSetData } from '#types/settings/settings.types';
 
 interface PluginLike {
@@ -278,8 +278,8 @@ export const ObjectSetHelpers = {
   },
 
   async importSetFromFolder(plugin: PluginLike, folderPath: string): Promise<ObjectSet> {
-    const folder = plugin.app.vault.getAbstractFileByPath(folderPath) as TAbstractFile & { children?: unknown[] } | null;
-    if (folder == null || folder.children == null) {
+    const folder = plugin.app.vault.getAbstractFileByPath(folderPath);
+    if (!(folder instanceof TFolder)) {
       throw new Error('Folder not found: ' + folderPath);
     }
 
@@ -321,14 +321,14 @@ export const ObjectSetHelpers = {
     const folderPath = plugin.settings.objectSetsAutoLoadFolder;
     if (folderPath == null || folderPath === '') return 0;
 
-    const folder = plugin.app.vault.getAbstractFileByPath(folderPath) as TAbstractFile & { children?: (TAbstractFile & { children?: unknown[]; name: string; path: string })[] } | null;
-    if (folder == null || folder.children == null) return 0;
+    const folder = plugin.app.vault.getAbstractFileByPath(folderPath);
+    if (!(folder instanceof TFolder)) return 0;
 
     plugin.settings.objectSets ??= [];
 
     let added = 0;
     for (const child of folder.children) {
-      if (child.children == null) continue;
+      if (!(child instanceof TFolder)) continue;
 
       const jsonFile = plugin.app.vault.getAbstractFileByPath(child.path + '/objects.json');
       if (!(jsonFile instanceof TFile)) continue;
