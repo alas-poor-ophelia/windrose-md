@@ -57,11 +57,23 @@ jobs:
             echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Extract changelog section
+        run: |
+          awk -v ver="${{ steps.meta.outputs.version }}" '
+            $0 == "## Version " ver { flag = 1; next }
+            /^## Version / { if (flag) exit }
+            flag { print }
+          ' "src/Windrose Changelogs.md" > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "No changelog entry found for ${{ steps.meta.outputs.version }}." > release-notes.md
+          fi
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: "Windrose MapDesigner ${{ steps.meta.outputs.version }}"
+          body_path: release-notes.md
           draft: false
           prerelease: ${{ contains(steps.meta.outputs.version, '-') }}
           files: |
