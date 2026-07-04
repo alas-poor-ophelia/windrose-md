@@ -7,7 +7,7 @@
 
 import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
-import type { EffectiveDistanceSettings, MapDistanceOverrides } from '#types/hooks/distanceMeasurement.types';
+import type { EffectiveDistanceSettings } from '#types/hooks/distanceMeasurement.types';
 import type { PluginSettings } from '#types/settings/settings.types';
 
 import { useDistanceMeasurement } from '../../hooks/interactions/useDistanceMeasurement';
@@ -53,7 +53,7 @@ const MeasurementLayer = ({
     geometry,
     mapType,
     globalSettings ?? getSettings(),
-    (mapDistanceOverrides ?? null) as MapDistanceOverrides | null
+    (mapDistanceOverrides ?? null)
   );
 
   useLayerHandlers('measure', { handleMeasureClick, handleMeasureMove, clearMeasurement, measureOrigin });

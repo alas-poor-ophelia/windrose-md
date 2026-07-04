@@ -203,7 +203,7 @@ function useCustomEventHandlers({
                 return { ...obj, linkedObject: update.link };
               }
               const { linkedObject: _removed, ...rest } = obj;
-              return rest as MapObject;
+              return rest;
             })
           };
         })

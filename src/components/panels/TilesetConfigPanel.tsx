@@ -150,7 +150,7 @@ const TilesetConfigPanel = ({
           value={fitMode ?? 'auto'}
           onChange={(e: Event) => {
             const v = (e.target as HTMLSelectElement).value;
-            handleOverrideChange('fitMode', v === 'auto' ? undefined : v as 'fill' | 'contain');
+            handleOverrideChange('fitMode', v === 'auto' ? undefined : v);
           }}
           className="windrose-tile-config-select"
         >

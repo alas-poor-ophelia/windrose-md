@@ -710,7 +710,7 @@ function validateMigration(originalData: LegacyMapData, migratedData: MapData): 
 function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMapData {
   // Already migrated? Return as-is
   if ((legacyMapData.schemaVersion ?? 0) >= SCHEMA_VERSION && 'layers' in legacyMapData) {
-    return legacyMapData as MapData;
+    return legacyMapData;
   }
   
   console.debug('[layerAccessor] Starting migration to schema version', SCHEMA_VERSION);
@@ -794,7 +794,7 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
     
     console.debug('[layerAccessor] Migration successful to schema version', SCHEMA_VERSION);
 
-    return cleanedData as MapData;
+    return cleanedData;
 
   } catch (error) {
     console.error('[layerAccessor] Migration failed with error:', error);

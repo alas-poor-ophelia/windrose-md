@@ -241,7 +241,7 @@ const ObjectSelectionToolbar = ({
               onClick={(e: Event) => {
                 e.preventDefault();
                 e.stopPropagation();
-                void openNoteInNewTab(selectedObjectData?.linkedNote as string);
+                void openNoteInNewTab(selectedObjectData?.linkedNote);
               }}
             />
             <Icon icon="lucide-external-link" />

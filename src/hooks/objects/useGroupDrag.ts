@@ -417,7 +417,7 @@ const useGroupDrag = (): UseGroupDragResult => {
         // Grid object that was temporarily made freeform → restore to grid
         if (offset.freeform !== true && obj.freeform === true) {
           const { freeform: _f, worldPosition: _wp, ...rest } = obj;
-          updatedObjects[idx] = rest as MapObject;
+          updatedObjects[idx] = rest;
           needsRestore = true;
         }
         // Freeform object that was snapped to grid → keep freeform, snap worldPosition to cell center

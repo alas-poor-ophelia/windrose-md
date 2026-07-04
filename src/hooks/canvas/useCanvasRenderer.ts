@@ -235,7 +235,7 @@ function blitStaticContent(
  */
 function getRenderer(geometry: IGeometry): Renderer {
   // Safe polymorphic cast: runtime geometry always satisfies the renderer's narrower param types
-  return geometry.type === 'hex' ? hexRenderer as Renderer : gridRenderer as Renderer;
+  return geometry.type === 'hex' ? hexRenderer : gridRenderer;
 }
 
 /** Options for rendering layer content */
@@ -456,7 +456,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Calculate viewport using shared utility
   const scaledSize = renderer.getScaledSize(geometry, zoom);
   const { offsetX, offsetY } = calculateViewportOffset(
-    geometry as { type: string; cellSize: number },
+    geometry,
     center,
     { width, height },
     zoom

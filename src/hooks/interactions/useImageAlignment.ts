@@ -123,7 +123,7 @@ function useImageAlignment({
       return undefined;
     }
 
-    const proxy = new Proxy({} as Record<string, unknown>, {
+    const proxy = new Proxy({}, {
       get(_target, prop: string) {
         return alignmentHandlersRef.current?.[prop];
       }

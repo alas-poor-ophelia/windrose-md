@@ -1116,7 +1116,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               mapId={mapId}
               notePath={notePath}
               mapData={availableTilesets.length > 0
-                ? { ...mapData, ...(mapData.mapType === 'hex' ? { northDirection: 0 } : {}), tilesets: availableTilesets } as MapData
+                ? { ...mapData, ...(mapData.mapType === 'hex' ? { northDirection: 0 } : {}), tilesets: availableTilesets }
                 : mapData}
               onCellsChange={handleCellsChange}
               onCurvesChange={handleCurvesChange}

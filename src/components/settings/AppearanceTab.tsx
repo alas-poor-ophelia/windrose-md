@@ -80,7 +80,7 @@ function ColorPickerItem({ colorKey, label, defaultColor, align = 'left' }: Colo
           selectedColor={displayColor}
           onColorSelect={(color: HexColor) => handleColorChange(colorKey, color)}
           onClose={() => setActiveColorPicker(null)}
-          onReset={() => handleColorChange(colorKey, globalSettings[colorKey] as HexColor)}
+          onReset={() => handleColorChange(colorKey, globalSettings[colorKey])}
           customColors={[]}
           pendingCustomColorRef={pendingCustomColorRef}
           title={label}

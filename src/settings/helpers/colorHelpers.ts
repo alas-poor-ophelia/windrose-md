@@ -25,9 +25,9 @@ export const ColorHelpers = {
             order: (override.order as number) ?? index,
             isBuiltIn: true,
             isModified: true
-          } as ResolvedColor;
+          };
         }
-        return { ...c, order: index, isBuiltIn: true, isModified: false } as ResolvedColor;
+        return { ...c, order: index, isBuiltIn: true, isModified: false };
       });
 
     const resolvedCustom = customPaletteColors.map((c, index) => ({
@@ -35,7 +35,7 @@ export const ColorHelpers = {
       order: c.order ?? (100 + index),
       isCustom: true,
       isBuiltIn: false
-    } as ResolvedColor));
+    }));
 
     return [...resolvedBuiltIns, ...resolvedCustom].sort((a, b) => a.order - b.order);
   },

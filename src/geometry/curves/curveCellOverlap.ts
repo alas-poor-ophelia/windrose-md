@@ -103,7 +103,7 @@ function buildMergeIndex(
     // Build inner ring polygons (for hole checking)
     let innerPolys: Pt[][] | undefined;
     if (curve.innerRings && curve.innerRings.length > 0) {
-      innerPolys = curve.innerRings.filter(r => r.length >= 3) as Pt[][];
+      innerPolys = curve.innerRings.filter(r => r.length >= 3);
     }
 
     // Compute bounding box of the curve polygon â†’ grid coordinate range

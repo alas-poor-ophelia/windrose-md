@@ -449,7 +449,7 @@ const useEventCoordinator = ({
     }
 
     if (isDraggingSelection && dragStart?.isGroupDrag === true) {
-      handleGroupDrag(e as PointerEvent);
+      handleGroupDrag(e);
       return;
     }
 

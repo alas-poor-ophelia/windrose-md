@@ -87,7 +87,7 @@ function useDataHandlers({
 
         if (!suppressHistory) {
           const activeLayer = getActiveLayer(currentMapData);
-          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue } as Partial<LayerHistorySnapshot>, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar));
+          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar));
         }
 
         return newMapData;
@@ -137,7 +137,7 @@ function useDataHandlers({
 
         const activeLayer = getActiveLayer(currentMapData);
         if (!suppressHistory) {
-          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { tiles: newValue } as Partial<LayerHistorySnapshot>, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar));
+          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { tiles: newValue }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar));
         }
 
         let nextMapData = updateActiveLayer(currentMapData, { tiles: newValue });

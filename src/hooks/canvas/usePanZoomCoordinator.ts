@@ -91,7 +91,7 @@ const usePanZoomCoordinator = ({
 
   // Register once on mount with stable proxy that delegates to handlersRef
   useEffect(() => {
-    const proxy = new Proxy({} as Record<string, unknown>, {
+    const proxy = new Proxy({}, {
       get(_target, prop: string) {
         return handlersRef.current?.[prop];
       }

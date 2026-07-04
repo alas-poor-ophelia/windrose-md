@@ -58,7 +58,7 @@ function DockPanel({
         {onUndock && (
           <button
             className="windrose-dock-panel-undock"
-            onClick={(e) => { e.stopPropagation(); handleUndock(e as unknown as MouseEvent); }}
+            onClick={(e) => { e.stopPropagation(); handleUndock(e); }}
             title="Pop out panel"
           >
             <Icon icon="lucide-maximize-2" size={12} />

@@ -996,7 +996,7 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
         return {
           ...state,
           boundsShape: 'rectangular',
-          hexBounds: rectBounds as HexBounds,
+          hexBounds: rectBounds,
           coordinateDisplayMode: 'rectangular'
         };
       }

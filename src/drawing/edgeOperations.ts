@@ -77,7 +77,7 @@ function normalizeEdge(x: number, y: number, side: EdgeSideInput): NormalizedEdg
       return { x, y: y - 1, side: 'bottom' };
     default:
       // 'right' and 'bottom' are already canonical
-      return { x, y, side: side as EdgeSideNormalized };
+      return { x, y, side: side };
   }
 }
 

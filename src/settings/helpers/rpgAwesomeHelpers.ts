@@ -17,7 +17,7 @@ export const RPGAwesomeHelpers = {
   getByCategory(categoryId: string): RAIconEntry[] {
     const icons = Object.entries(RA_ICONS).map(([iconClass, data]) => ({
       iconClass,
-      ...(data as { char: string; label: string; category: string })
+      ...(data)
     }));
 
     if (categoryId === 'all') return icons;
@@ -33,7 +33,7 @@ export const RPGAwesomeHelpers = {
         iconClass.toLowerCase().includes(q) ||
         (data as { label: string }).label.toLowerCase().includes(q)
       )
-      .map(([iconClass, data]) => ({ iconClass, ...(data as { char: string; label: string; category: string }) }));
+      .map(([iconClass, data]) => ({ iconClass, ...(data) }));
   },
 
   getCategories(): RACategory[] {

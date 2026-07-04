@@ -107,7 +107,7 @@ function registerDomCapture(plugin: Plugin): void {
 
     const sourcePath = plugin.app.workspace.getActiveFile()?.path ?? '';
     await navigateToLink(plugin, parsed, sourcePath);
-  }, { capture: true } as AddEventListenerOptions);
+  }, { capture: true });
 }
 
 /** The Extension type Obsidian's registerEditorExtension accepts (from @codemirror/state). */

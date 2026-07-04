@@ -539,7 +539,7 @@ const TileAssetBrowser = memo(({
 
     const id = typeof requestIdleCallback === 'function'
       ? requestIdleCallback(run)
-      : window.setTimeout(run, 200) as unknown as number;
+      : window.setTimeout(run, 200);
     return () => {
       if (typeof cancelIdleCallback === 'function') { cancelIdleCallback(id); } else { window.clearTimeout(id); }
     };
@@ -590,7 +590,7 @@ const TileAssetBrowser = memo(({
 
     const id = typeof requestIdleCallback === 'function'
       ? requestIdleCallback(() => void run())
-      : window.setTimeout(() => void run(), 400) as unknown as number;
+      : window.setTimeout(() => void run(), 400);
     return () => {
       controller.abort();
       if (typeof cancelIdleCallback === 'function') { cancelIdleCallback(id); } else { window.clearTimeout(id); }

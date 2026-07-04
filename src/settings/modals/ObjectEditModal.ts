@@ -1,6 +1,6 @@
 import type { App} from 'obsidian';
 import { Modal, Setting, Notice } from 'obsidian';
-import type { PluginSettings, ObjectOverride, CustomObject } from '#types/settings/settings.types';
+import type { PluginSettings, CustomObject } from '#types/settings/settings.types';
 import { ObjectHelpers } from '../helpers/objectHelpers';
 import { RPGAwesomeHelpers } from '../helpers/rpgAwesomeHelpers';
 import { OBJECT_TYPES as BUILT_IN_OBJECTS } from '../../objects/objectTypes';
@@ -611,7 +611,7 @@ class ObjectEditModal extends Modal {
       }
 
       if (Object.keys(override).length > 0) {
-        this.plugin.settings[overridesKey][objId] = override as unknown as ObjectOverride;
+        this.plugin.settings[overridesKey][objId] = override;
       } else {
         delete this.plugin.settings[overridesKey][objId];
       }

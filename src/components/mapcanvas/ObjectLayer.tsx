@@ -589,7 +589,7 @@ const ObjectLayer = ({
 
     const removeLinkedObject = (o: MapObject): MapObject => {
       const { linkedObject: _removed, ...rest } = o;
-      return rest as MapObject;
+      return rest;
     };
 
     applyLinkUpdate(
@@ -607,7 +607,7 @@ const ObjectLayer = ({
     setSelectedItem({
       type: 'object',
       id: selectedItem.id,
-      data: restData as MapObject
+      data: restData
     });
 
     new Notice('Link removed');

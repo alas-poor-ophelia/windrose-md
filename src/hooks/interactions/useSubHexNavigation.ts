@@ -386,7 +386,7 @@ function useSubHexNavigation({
       restoredParent.subHexMaps = {
         ...(restoredParent.subHexMaps ?? {}),
         [siblingKey]: siblingSubHex
-      } as Record<string, SubHexMapData>;
+      };
     }
 
     // Replace the top frame with the sibling's frame

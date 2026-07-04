@@ -236,7 +236,7 @@ export default class WindrosePlugin extends Plugin {
       if (oldSettings == null) return;
 
       const { version, ...importable } = oldSettings;
-      this.settings = { ...FALLBACK_SETTINGS, ...importable } as PluginSettings;
+      this.settings = { ...FALLBACK_SETTINGS, ...importable };
       await this.saveData(this.settings);
 
       new Notice(

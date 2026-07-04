@@ -57,9 +57,9 @@ export const ObjectHelpers = {
             order: (override.order as number) ?? defaultOrder,
             isBuiltIn: true,
             isModified: true
-          } as ResolvedObject;
+          };
         }
-        return { ...obj, order: defaultOrder, isBuiltIn: true, isModified: false } as ResolvedObject;
+        return { ...obj, order: defaultOrder, isBuiltIn: true, isModified: false };
       });
 
     const resolvedCustom = customObjects.map((obj, index) => ({
@@ -67,7 +67,7 @@ export const ObjectHelpers = {
       order: obj.order ?? (1000 + index * 10),
       isCustom: true,
       isBuiltIn: false
-    } as ResolvedObject));
+    }));
 
     return [...resolvedBuiltIns, ...resolvedCustom];
   },
@@ -79,14 +79,14 @@ export const ObjectHelpers = {
       ...c,
       isBuiltIn: true,
       order: CATEGORY_ORDER[c.id] ?? 50
-    } as ResolvedCategory));
+    }));
 
     const resolvedCustom = customCategories.map(c => ({
       ...c,
       isCustom: true,
       isBuiltIn: false,
       order: c.order ?? 100
-    } as ResolvedCategory));
+    }));
 
     return [...resolvedBuiltIns, ...resolvedCustom].sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
   },
@@ -95,7 +95,7 @@ export const ObjectHelpers = {
     const objectOverrides = (settings.objectOverrides ?? {}) as Record<string, { hidden?: boolean }>;
     return (BUILT_IN_OBJECTS as ObjectEntry[])
       .filter(obj => objectOverrides[obj.id]?.hidden === true)
-      .map(obj => ({ ...obj, order: 0, isBuiltIn: true, isHidden: true } as ResolvedObject));
+      .map(obj => ({ ...obj, order: 0, isBuiltIn: true, isHidden: true }));
   },
 
   getAllCategories(settings: Record<string, unknown>): (CategoryEntry & { isBuiltIn?: boolean; isCustom?: boolean })[] {

@@ -12,7 +12,6 @@ import type {
   ObjectSettings,
   ResolvedColorEntry,
   MapSpecificSettings,
-  CoordinateKeyMode,
   ColorOverride,
   PaletteColor
 } from '#types/settings/settings.types';
@@ -70,7 +69,7 @@ const FALLBACK_SETTINGS: PluginSettings = {
   coordinateKeyColor: THEME.coordinateKey.color,
   coordinateTextColor: THEME.coordinateText.color,
   coordinateTextShadow: THEME.coordinateText.shadow,
-  coordinateKeyMode: 'hold' as CoordinateKeyMode,
+  coordinateKeyMode: 'hold',
   expandedByDefault: false,
   
   // Canvas dimensions

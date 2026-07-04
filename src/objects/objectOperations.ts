@@ -527,7 +527,7 @@ function convertObjectToFreeform(
       x: cellCenterWorldX + alignOffset.offsetX * cellSize,
       y: cellCenterWorldY + alignOffset.offsetY * cellSize
     },
-    alignment: 'center' as ObjectAlignment
+    alignment: 'center'
   };
 }
 
@@ -542,7 +542,7 @@ function snapObjectToGrid(
     position: nearestGridPos,
     freeform: undefined,
     worldPosition: undefined,
-    alignment: 'center' as ObjectAlignment
+    alignment: 'center'
   };
 }
 

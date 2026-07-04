@@ -95,7 +95,7 @@ const FogOfWarLayer = ({
           worldY = row * geometry.cellSize;
         }
       } else {
-        const axial = offsetToAxial(col, row, (mapData.orientation ?? 'flat') as 'flat' | 'pointy');
+        const axial = offsetToAxial(col, row, (mapData.orientation ?? 'flat'));
         const world = geometry.gridToWorld(axial.q, axial.r);
         worldX = world.worldX;
         worldY = world.worldY;
@@ -130,7 +130,7 @@ const FogOfWarLayer = ({
       } else {
         // Hex: compute axis-aligned bounding box from corner cell world centers
         const getCellWorld = (col: number, row: number): { worldX: number; worldY: number } => {
-          const axial = offsetToAxial(col, row, (mapData.orientation ?? 'flat') as 'flat' | 'pointy');
+          const axial = offsetToAxial(col, row, (mapData.orientation ?? 'flat'));
           return geometry.gridToWorld(axial.q, axial.r);
         };
         const cellCenters = [

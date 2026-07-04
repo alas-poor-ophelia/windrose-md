@@ -8,7 +8,7 @@
 
 // Type-only imports
 import type { MapType } from '#types/core/map.types';
-import type { IGeometry, DistanceOptions } from '#types/core/geometry.types';
+import type { IGeometry } from '#types/core/geometry.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type {
@@ -60,7 +60,7 @@ const useDistanceMeasurement = (
       return geometry.getCellDistance(
         measureOrigin.x, measureOrigin.y,
         targetX, targetY,
-        { diagonalRule: distanceSettings.gridDiagonalRule } as DistanceOptions
+        { diagonalRule: distanceSettings.gridDiagonalRule }
       );
     },
     [measureOrigin, geometry, distanceSettings.gridDiagonalRule]

@@ -16,7 +16,7 @@
 
 // Structural object types that should be preserved during objects-only reroll
 
-import type { Cell, MapObject, Edge } from '#types/index';
+import type { MapObject, Edge } from '#types/index';
 import type { VNode } from 'preact';
 
 import { useState } from 'preact/hooks';
@@ -72,7 +72,7 @@ const RerollDungeonButton = (): VNode | null => {
     );
     const allObjects = [...result.objects, ...stockResult.objects];
 
-    onCellsChange(result.cells as Cell[], false);
+    onCellsChange(result.cells, false);
     onObjectsChange(allObjects as MapObject[], false);
     onEdgesChange((result.edges ?? []) as Edge[], false);
     setShowConfirm(false);

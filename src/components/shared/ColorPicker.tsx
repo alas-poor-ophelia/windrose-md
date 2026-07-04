@@ -270,10 +270,10 @@ const ColorPicker = ({
   });
 
   const allColors: ColorDef[] = [
-    { id: 'reset', color: '' as HexColor, label: 'Reset to default', isReset: true },
+    { id: 'reset', color: '', label: 'Reset to default', isReset: true },
     ...paletteColorsWithOverrides,
     ...customColors.map(c => ({ ...c, label: c.label ?? c.color, isCustom: true })),
-    { id: 'add-custom', color: '' as HexColor, label: 'Add custom color', isAddButton: true }
+    { id: 'add-custom', color: '', label: 'Add custom color', isAddButton: true }
   ];
 
   const horizontalStyle = align === 'right'
