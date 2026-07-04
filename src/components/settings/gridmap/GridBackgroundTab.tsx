@@ -84,7 +84,7 @@ function GridBackgroundTab(): VNode | null {
             showClear={backgroundImagePath != null && backgroundImagePath !== ''}
             onClear={handleImageClear}
             results={imageSearchResults}
-            onSelect={handleImageSelect}
+            onSelect={(image) => void handleImageSelect(image)}
             clearGlyph="x"
           />
         </SettingItem>

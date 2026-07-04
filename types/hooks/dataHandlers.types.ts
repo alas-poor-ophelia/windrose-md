@@ -34,9 +34,6 @@ export interface UseDataHandlersOptions {
 // History State
 // ===========================================
 
-/** @deprecated Use LayerHistorySnapshot from layerHistory.types instead */
-export type MapHistorySnapshot = LayerHistorySnapshot;
-
 // ===========================================
 // Handler Types
 // ===========================================

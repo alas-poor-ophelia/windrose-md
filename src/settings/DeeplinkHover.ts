@@ -39,10 +39,10 @@ const DeeplinkHover = (() => {
   function destroyPopover(state: LinkState | undefined): void {
     if (!state) return;
     if (state.hoverEl && state.host) {
-      try { unmountHoverPreview(state.host); } catch (_err: unknown) { /* ignore */ }
+      try { unmountHoverPreview(state.host); } catch { /* ignore */ }
     }
     if (state.popover) {
-      try { state.popover.hide(); } catch (_err: unknown) { /* ignore */ }
+      try { state.popover.hide(); } catch { /* ignore */ }
       state.popover = null;
     }
     state.hoverEl = null;

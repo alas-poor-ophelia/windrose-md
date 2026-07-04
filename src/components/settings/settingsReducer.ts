@@ -1003,7 +1003,8 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
     }
 
     default: {
-      const _exhaustive: never = action;
+      // Compile-time exhaustiveness guard without binding an unused variable.
+      action satisfies never;
       return state;
     }
   }

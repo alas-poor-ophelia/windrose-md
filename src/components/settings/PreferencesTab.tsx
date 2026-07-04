@@ -119,7 +119,7 @@ function PreferencesTab(): VNode {
       >
         <button
           class="mod-cta"
-          onClick={handleExportImage}
+          onClick={() => void handleExportImage()}
           disabled={isExporting}
           style={{ opacity: isExporting ? 0.6 : 1 }}
         >

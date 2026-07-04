@@ -76,7 +76,6 @@ const TextLayer = ({
     handleRotateClick,
     handleEditClick,
     handleCanvasDoubleClick,
-    handleTextRotation: _handleTextRotation,
     handleTextDeletion
   } = useTextLabelInteraction(currentTool, onAddCustomColor, customColors?.map(c => c.color) ?? []);
 

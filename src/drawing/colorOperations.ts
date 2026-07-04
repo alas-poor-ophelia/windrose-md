@@ -48,7 +48,7 @@ const COLOR_PALETTE: ColorDefinition[] = BUILT_IN_COLORS;
 function getColorPalette(): ColorDefinition[] {
   try {
     return getColorPaletteSettings();
-  } catch (_error) {
+  } catch {
     // Fallback to built-in colors
     return BUILT_IN_COLORS;
   }

@@ -59,7 +59,6 @@ function useLayerHistory({
   };
 
   const {
-    currentState: _historyState,
     addToHistory: addToHistoryInternal,
     undo: undoInternal,
     redo: redoInternal,

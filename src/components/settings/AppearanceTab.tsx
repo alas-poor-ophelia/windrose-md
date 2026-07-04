@@ -212,13 +212,13 @@ function FogOfWarSection(): VNode {
             showClear={overrides.fogOfWarImage != null && overrides.fogOfWarImage !== ''}
             onClear={handleFogImageClear}
             results={fogImageSearchResults}
-            onSelect={handleFogImageSelect}
+            onSelect={(image) => void handleFogImageSelect(image)}
           />
         </SettingItem>
 
         <InstalledFogPacks
           currentImage={overrides.fogOfWarImage}
-          onSelect={handleFogImageSelect}
+          onSelect={(image) => void handleFogImageSelect(image)}
           disabled={useGlobalSettings}
         />
 

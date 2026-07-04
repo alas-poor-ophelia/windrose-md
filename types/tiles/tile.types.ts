@@ -220,9 +220,6 @@ interface FreeformTile extends TileAssignmentBase {
 /** A tile placed on a map cell (grid-snapped or freeform at world coords) */
 export type TileAssignment = SnappedTile | FreeformTile;
 
-/** @deprecated Use TileAssignment instead */
-export type HexTileAssignment = TileAssignment;
-
 // ===========================================
 // Tile Metadata (user tags, stars, etc.)
 // ===========================================

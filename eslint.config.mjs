@@ -99,7 +99,7 @@ export default [
       "@typescript-eslint/strict-boolean-expressions": "warn",
       "@typescript-eslint/no-non-null-assertion": "warn",
       "@typescript-eslint/no-misused-promises": ["warn", {
-        checksVoidReturn: { attributes: false }
+        checksVoidReturn: { attributes: true }
       }],
       "@typescript-eslint/consistent-type-imports": ["warn", {
         prefer: "type-imports",

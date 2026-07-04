@@ -153,7 +153,6 @@ export type {
   TileEntry,
   TileRotation,
   TileAssignment,
-  HexTileAssignment,
   TilesetOverrides,
   TileLayerRole,
   TileRenderContext,
@@ -432,7 +431,6 @@ export type {
 
 export type {
   UseDataHandlersOptions,
-  MapHistorySnapshot,
   LayerDataChangeHandler,
   HandleCellsChange,
   HandleCurvesChange,

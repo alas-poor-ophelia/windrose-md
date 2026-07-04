@@ -148,7 +148,7 @@ function createFogPattern(
       pattern.setTransform(new DOMMatrix([invScale, 0, 0, invScale, 0, 0]));
     }
     return pattern;
-  } catch (_e) {
+  } catch {
     return null;
   }
 }
