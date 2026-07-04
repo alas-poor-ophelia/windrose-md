@@ -1,4 +1,4 @@
-import type { PckArchive, PckFileEntry } from './pckParser';
+import type { PckArchive, PckFileEntry, PckSource } from './pckParser';
 import { extractFileData } from './pckParser';
 
 interface DungeondraftPackMeta {
@@ -32,14 +32,14 @@ function findTagsFile(archive: PckArchive): PckFileEntry | undefined {
 	return archive.files.find(f => f.path.endsWith('.dungeondraft_tags'));
 }
 
-function parsePackMetadata(buffer: ArrayBuffer, archive: PckArchive): MetadataResult {
+async function parsePackMetadata(source: PckSource, archive: PckArchive): Promise<MetadataResult> {
 	const entry = findPackJson(archive);
 	if (entry == null) {
 		return { ok: false, error: 'No pack.json found in archive' };
 	}
 
 	const decoder = new TextDecoder('utf-8');
-	const data = extractFileData(buffer, entry);
+	const data = await extractFileData(source, entry);
 	const text = decoder.decode(data);
 
 	let json: Record<string, unknown>;
@@ -79,12 +79,12 @@ function parsePackMetadata(buffer: ArrayBuffer, archive: PckArchive): MetadataRe
 	return { ok: true, meta };
 }
 
-function parseDungeondraftTags(buffer: ArrayBuffer, archive: PckArchive): DungeondraftTags | null {
+async function parseDungeondraftTags(source: PckSource, archive: PckArchive): Promise<DungeondraftTags | null> {
 	const entry = findTagsFile(archive);
 	if (entry == null) return null;
 
 	const decoder = new TextDecoder('utf-8');
-	const data = extractFileData(buffer, entry);
+	const data = await extractFileData(source, entry);
 	const text = decoder.decode(data);
 
 	try {
@@ -109,7 +109,7 @@ interface WallSidecarInfo {
  * The stem matches the wall texture's filename stem in textures/walls/.
  * Sidecars are optional — many packs ship walls without them.
  */
-function parseWallSidecars(buffer: ArrayBuffer, archive: PckArchive): Map<string, WallSidecarInfo> {
+async function parseWallSidecars(source: PckSource, archive: PckArchive): Promise<Map<string, WallSidecarInfo>> {
 	const result = new Map<string, WallSidecarInfo>();
 	const decoder = new TextDecoder('utf-8');
 
@@ -120,7 +120,7 @@ function parseWallSidecars(buffer: ArrayBuffer, archive: PckArchive): Map<string
 		if (stem === '') continue;
 
 		try {
-			const text = decoder.decode(extractFileData(buffer, entry));
+			const text = decoder.decode(await extractFileData(source, entry));
 			const json = JSON.parse(text) as Record<string, unknown>;
 			const info: WallSidecarInfo = {};
 			if (typeof json.color === 'string') {

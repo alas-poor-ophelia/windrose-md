@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parsePck, GDPC_MAGIC } from '../../../src/content-packs/pckParser';
+import { parsePck, GDPC_MAGIC, BufferPckSource } from '../../../src/content-packs/pckParser';
 import { parseWallSidecars } from '../../../src/content-packs/pckMetadata';
 import {
 	countAssets,
@@ -66,6 +66,10 @@ function buildPckBuffer(files: Array<{ path: string; data: Uint8Array }>): Array
 	}
 
 	return buffer;
+}
+
+function buildPckSource(files: Array<{ path: string; data: Uint8Array }>): BufferPckSource {
+	return new BufferPckSource(buildPckBuffer(files));
 }
 
 const enc = (s: string): Uint8Array => new TextEncoder().encode(s);
@@ -152,8 +156,8 @@ describe('pairWallEndCaps', () => {
 });
 
 describe('countAssets', () => {
-	it('counts walls and paths alongside legacy categories', () => {
-		const buffer = buildPckBuffer([
+	it('counts walls and paths alongside legacy categories', async () => {
+		const source = buildPckSource([
 			{ path: 'res://packs/p1/pack.json', data: enc('{}') },
 			{ path: 'res://packs/p1/textures/objects/a.webp', data: px },
 			{ path: 'res://packs/p1/textures/terrain/b.webp', data: px },
@@ -162,7 +166,7 @@ describe('countAssets', () => {
 			{ path: 'res://packs/p1/textures/paths/p.webp', data: px },
 			{ path: 'res://packs/p1/textures/walls/thumbnails/w.webp', data: px },
 		]);
-		const archive = parsePck(buffer);
+		const archive = await parsePck(source);
 		const counts = countAssets(archive);
 		expect(counts.objects).toBe(1);
 		expect(counts.terrain).toBe(1);
@@ -173,8 +177,8 @@ describe('countAssets', () => {
 });
 
 describe('parseWallSidecars', () => {
-	it('parses sidecars keyed by stem, stripping leading # from colors', () => {
-		const buffer = buildPckBuffer([
+	it('parses sidecars keyed by stem, stripping leading # from colors', async () => {
+		const source = buildPckSource([
 			{
 				path: 'res://packs/p1/data/walls/Wall_A.dungeondraft_wall',
 				data: enc('{"path":"textures/walls/Wall_A.webp","color":"#aabbcc"}'),
@@ -184,19 +188,19 @@ describe('parseWallSidecars', () => {
 				data: enc('{"path":"textures/walls/Wall_B.webp","color":"ffffff"}'),
 			},
 		]);
-		const archive = parsePck(buffer);
-		const sidecars = parseWallSidecars(buffer, archive);
+		const archive = await parsePck(source);
+		const sidecars = await parseWallSidecars(source, archive);
 		expect(sidecars.get('Wall_A')?.color).toBe('aabbcc');
 		expect(sidecars.get('Wall_B')?.color).toBe('ffffff');
 	});
 
-	it('tolerates malformed sidecars', () => {
-		const buffer = buildPckBuffer([
+	it('tolerates malformed sidecars', async () => {
+		const source = buildPckSource([
 			{ path: 'res://packs/p1/data/walls/Bad.dungeondraft_wall', data: enc('not json') },
 			{ path: 'res://packs/p1/data/walls/Good.dungeondraft_wall', data: enc('{"color":"112233"}') },
 		]);
-		const archive = parsePck(buffer);
-		const sidecars = parseWallSidecars(buffer, archive);
+		const archive = await parsePck(source);
+		const sidecars = await parseWallSidecars(source, archive);
 		expect(sidecars.has('Bad')).toBe(false);
 		expect(sidecars.get('Good')?.color).toBe('112233');
 	});
@@ -231,7 +235,7 @@ describe('destFolderOf', () => {
 });
 
 describe('analyzePckForWizard', () => {
-	function buildWizardPack(): ArrayBuffer {
+	function buildWizardPack(): BufferPckSource {
 		const tagsJson = JSON.stringify({
 			tags: {
 				'Furniture Wood': [
@@ -240,7 +244,7 @@ describe('analyzePckForWizard', () => {
 				],
 			},
 		});
-		return buildPckBuffer([
+		return buildPckSource([
 			{ path: 'res://packs/t1/pack.json', data: enc('{}') },
 			{ path: 'res://packs/t1/data/default.dungeondraft_tags', data: enc(tagsJson) },
 			{ path: 'res://packs/t1/textures/objects/Furniture/Chair_01.webp', data: px },
@@ -250,9 +254,9 @@ describe('analyzePckForWizard', () => {
 		]);
 	}
 
-	it('builds cell pseudo-tiles keyed by destination folder, excluding strips', () => {
-		const buffer = buildWizardPack();
-		const analysis = analyzePckForWizard(buffer, parsePck(buffer));
+	it('builds cell pseudo-tiles keyed by destination folder, excluding strips', async () => {
+		const source = buildWizardPack();
+		const analysis = await analyzePckForWizard(source, await parsePck(source));
 		expect(analysis.cellTiles).toHaveLength(3);
 		expect(analysis.stripCount).toBe(1);
 
@@ -266,17 +270,17 @@ describe('analyzePckForWizard', () => {
 		expect(grass?.tags).toBeUndefined();
 	});
 
-	it('counts pack tags over cell textures', () => {
-		const buffer = buildWizardPack();
-		const analysis = analyzePckForWizard(buffer, parsePck(buffer));
+	it('counts pack tags over cell textures', async () => {
+		const source = buildWizardPack();
+		const analysis = await analyzePckForWizard(source, await parsePck(source));
 		expect(analysis.packTags).toEqual([{ tag: 'Furniture Wood', count: 2 }]);
 	});
 
-	it('handles packs without a tags file', () => {
-		const buffer = buildPckBuffer([
+	it('handles packs without a tags file', async () => {
+		const source = buildPckSource([
 			{ path: 'res://packs/t2/textures/objects/Rock_01.webp', data: px },
 		]);
-		const analysis = analyzePckForWizard(buffer, parsePck(buffer));
+		const analysis = await analyzePckForWizard(source, await parsePck(source));
 		expect(analysis.cellTiles).toHaveLength(1);
 		expect(analysis.cellTiles[0].category).toBe('objects');
 		expect(analysis.packTags).toEqual([]);

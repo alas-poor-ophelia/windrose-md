@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parsePck } from '../../../src/content-packs/pckParser';
+import { parsePck, BufferPckSource } from '../../../src/content-packs/pckParser';
 import {
 	parsePackMetadata,
 	parseDungeondraftTags,
@@ -70,6 +70,10 @@ function buildPckBuffer(files: Array<{ path: string; data: Uint8Array }>): Array
 	return buffer;
 }
 
+function buildPckSource(files: Array<{ path: string; data: Uint8Array }>): BufferPckSource {
+	return new BufferPckSource(buildPckBuffer(files));
+}
+
 function textBytes(s: string): Uint8Array {
 	return new TextEncoder().encode(s);
 }
@@ -113,34 +117,34 @@ const VALID_TAGS = JSON.stringify({
 
 describe('pckMetadata', () => {
 	describe('findPackJson', () => {
-		it('finds pack.json in a typical archive', () => {
-			const buffer = buildPckBuffer([
+		it('finds pack.json in a typical archive', async () => {
+			const source = buildPckSource([
 				{ path: 'res://packs/ABC/preview.png', data: new Uint8Array([1]) },
 				{ path: 'res://packs/ABC/pack.json', data: textBytes(VALID_PACK_JSON) },
 			]);
-			const archive = parsePck(buffer);
+			const archive = await parsePck(source);
 			const entry = findPackJson(archive);
 
 			expect(entry).toBeDefined();
 			expect(entry!.path).toBe('res://packs/ABC/pack.json');
 		});
 
-		it('returns undefined when no pack.json exists', () => {
-			const buffer = buildPckBuffer([
+		it('returns undefined when no pack.json exists', async () => {
+			const source = buildPckSource([
 				{ path: 'res://packs/ABC/preview.png', data: new Uint8Array([1]) },
 			]);
-			const archive = parsePck(buffer);
+			const archive = await parsePck(source);
 
 			expect(findPackJson(archive)).toBeUndefined();
 		});
 	});
 
 	describe('findTagsFile', () => {
-		it('finds .dungeondraft_tags file', () => {
-			const buffer = buildPckBuffer([
+		it('finds .dungeondraft_tags file', async () => {
+			const source = buildPckSource([
 				{ path: 'res://packs/ABC/data/default.dungeondraft_tags', data: textBytes(VALID_TAGS) },
 			]);
-			const archive = parsePck(buffer);
+			const archive = await parsePck(source);
 			const entry = findTagsFile(archive);
 
 			expect(entry).toBeDefined();
@@ -149,12 +153,12 @@ describe('pckMetadata', () => {
 	});
 
 	describe('parsePackMetadata', () => {
-		it('parses valid pack metadata with 3rd party access', () => {
-			const buffer = buildPckBuffer([
+		it('parses valid pack metadata with 3rd party access', async () => {
+			const source = buildPckSource([
 				{ path: 'res://packs/ABC/pack.json', data: textBytes(VALID_PACK_JSON) },
 			]);
-			const archive = parsePck(buffer);
-			const result = parsePackMetadata(buffer, archive);
+			const archive = await parsePck(source);
+			const result = await parsePackMetadata(source, archive);
 
 			expect(result.ok).toBe(true);
 			if (!result.ok) return;
@@ -172,62 +176,62 @@ describe('pckMetadata', () => {
 			});
 		});
 
-		it('rejects packs without 3rd party permission', () => {
-			const buffer = buildPckBuffer([
+		it('rejects packs without 3rd party permission', async () => {
+			const source = buildPckSource([
 				{ path: 'res://packs/LOCKED/pack.json', data: textBytes(DENIED_PACK_JSON) },
 			]);
-			const archive = parsePck(buffer);
-			const result = parsePackMetadata(buffer, archive);
+			const archive = await parsePck(source);
+			const result = await parsePackMetadata(source, archive);
 
 			expect(result.ok).toBe(false);
 			if (result.ok) return;
 			expect(result.error).toContain('does not allow third-party');
 		});
 
-		it('rejects when allow_3rd_party field is missing', () => {
+		it('rejects when allow_3rd_party field is missing', async () => {
 			const json = JSON.stringify({ name: 'No Flag', id: 'X', version: '1', author: 'A' });
-			const buffer = buildPckBuffer([
+			const source = buildPckSource([
 				{ path: 'res://packs/X/pack.json', data: textBytes(json) },
 			]);
-			const archive = parsePck(buffer);
-			const result = parsePackMetadata(buffer, archive);
+			const archive = await parsePck(source);
+			const result = await parsePackMetadata(source, archive);
 
 			expect(result.ok).toBe(false);
 		});
 
-		it('returns error when no pack.json exists', () => {
-			const buffer = buildPckBuffer([
+		it('returns error when no pack.json exists', async () => {
+			const source = buildPckSource([
 				{ path: 'res://packs/X/image.png', data: new Uint8Array([1]) },
 			]);
-			const archive = parsePck(buffer);
-			const result = parsePackMetadata(buffer, archive);
+			const archive = await parsePck(source);
+			const result = await parsePackMetadata(source, archive);
 
 			expect(result.ok).toBe(false);
 			if (result.ok) return;
 			expect(result.error).toContain('No pack.json');
 		});
 
-		it('returns error for invalid JSON', () => {
-			const buffer = buildPckBuffer([
+		it('returns error for invalid JSON', async () => {
+			const source = buildPckSource([
 				{ path: 'res://packs/X/pack.json', data: textBytes('not json {{{') },
 			]);
-			const archive = parsePck(buffer);
-			const result = parsePackMetadata(buffer, archive);
+			const archive = await parsePck(source);
+			const result = await parsePackMetadata(source, archive);
 
 			expect(result.ok).toBe(false);
 			if (result.ok) return;
 			expect(result.error).toContain('Invalid JSON');
 		});
 
-		it('handles missing optional fields gracefully', () => {
+		it('handles missing optional fields gracefully', async () => {
 			const json = JSON.stringify({
 				allow_3rd_party_mapping_software_to_read: true,
 			});
-			const buffer = buildPckBuffer([
+			const source = buildPckSource([
 				{ path: 'res://packs/X/pack.json', data: textBytes(json) },
 			]);
-			const archive = parsePck(buffer);
-			const result = parsePackMetadata(buffer, archive);
+			const archive = await parsePck(source);
+			const result = await parsePackMetadata(source, archive);
 
 			expect(result.ok).toBe(true);
 			if (!result.ok) return;
@@ -237,13 +241,13 @@ describe('pckMetadata', () => {
 			expect(result.meta.colorOverrides).toBeUndefined();
 		});
 
-		it('finds pack.json when duplicate exists at different path', () => {
-			const buffer = buildPckBuffer([
+		it('finds pack.json when duplicate exists at different path', async () => {
+			const source = buildPckSource([
 				{ path: 'res://packs/ABC/ABC.json', data: textBytes(VALID_PACK_JSON) },
 				{ path: 'res://packs/ABC/pack.json', data: textBytes(VALID_PACK_JSON) },
 			]);
-			const archive = parsePck(buffer);
-			const result = parsePackMetadata(buffer, archive);
+			const archive = await parsePck(source);
+			const result = await parsePackMetadata(source, archive);
 
 			expect(result.ok).toBe(true);
 			if (!result.ok) return;
@@ -252,12 +256,12 @@ describe('pckMetadata', () => {
 	});
 
 	describe('parseDungeondraftTags', () => {
-		it('parses valid tags file', () => {
-			const buffer = buildPckBuffer([
+		it('parses valid tags file', async () => {
+			const source = buildPckSource([
 				{ path: 'res://packs/ABC/data/default.dungeondraft_tags', data: textBytes(VALID_TAGS) },
 			]);
-			const archive = parsePck(buffer);
-			const tags = parseDungeondraftTags(buffer, archive);
+			const archive = await parsePck(source);
+			const tags = await parseDungeondraftTags(source, archive);
 
 			expect(tags).not.toBeNull();
 			expect(tags!.tags.Furniture).toHaveLength(2);
@@ -265,31 +269,31 @@ describe('pckMetadata', () => {
 			expect(tags!.sets).toEqual({ Interior: ['Furniture', 'Lighting'] });
 		});
 
-		it('returns null when no tags file exists', () => {
-			const buffer = buildPckBuffer([
+		it('returns null when no tags file exists', async () => {
+			const source = buildPckSource([
 				{ path: 'res://packs/ABC/pack.json', data: textBytes(VALID_PACK_JSON) },
 			]);
-			const archive = parsePck(buffer);
+			const archive = await parsePck(source);
 
-			expect(parseDungeondraftTags(buffer, archive)).toBeNull();
+			expect(await parseDungeondraftTags(source, archive)).toBeNull();
 		});
 
-		it('returns null for invalid JSON', () => {
-			const buffer = buildPckBuffer([
+		it('returns null for invalid JSON', async () => {
+			const source = buildPckSource([
 				{ path: 'res://packs/ABC/data/default.dungeondraft_tags', data: textBytes('broken') },
 			]);
-			const archive = parsePck(buffer);
+			const archive = await parsePck(source);
 
-			expect(parseDungeondraftTags(buffer, archive)).toBeNull();
+			expect(await parseDungeondraftTags(source, archive)).toBeNull();
 		});
 
-		it('handles tags without sets', () => {
+		it('handles tags without sets', async () => {
 			const json = JSON.stringify({ tags: { Misc: ['a.webp'] } });
-			const buffer = buildPckBuffer([
+			const source = buildPckSource([
 				{ path: 'res://packs/X/data/default.dungeondraft_tags', data: textBytes(json) },
 			]);
-			const archive = parsePck(buffer);
-			const tags = parseDungeondraftTags(buffer, archive);
+			const archive = await parsePck(source);
+			const tags = await parseDungeondraftTags(source, archive);
 
 			expect(tags).not.toBeNull();
 			expect(tags!.tags.Misc).toEqual(['a.webp']);

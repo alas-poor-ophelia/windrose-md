@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { parsePck, extractFileData, readUint64LE, GDPC_MAGIC } from '../../../src/content-packs/pckParser';
+import {
+	parsePck,
+	extractFileData,
+	readUint64LE,
+	GDPC_MAGIC,
+	BufferPckSource,
+} from '../../../src/content-packs/pckParser';
 
 function buildPckBuffer(files: Array<{ path: string; data: Uint8Array }>): ArrayBuffer {
 	const HEADER_SIZE = 0x58;
@@ -63,19 +69,23 @@ function buildPckBuffer(files: Array<{ path: string; data: Uint8Array }>): Array
 	return buffer;
 }
 
+function buildPckSource(files: Array<{ path: string; data: Uint8Array }>): BufferPckSource {
+	return new BufferPckSource(buildPckBuffer(files));
+}
+
 function textBytes(s: string): Uint8Array {
 	return new TextEncoder().encode(s);
 }
 
 describe('pckParser', () => {
 	describe('parsePck', () => {
-		it('parses a minimal single-file archive', () => {
+		it('parses a minimal single-file archive', async () => {
 			const data = textBytes('hello world');
-			const buffer = buildPckBuffer([
+			const source = buildPckSource([
 				{ path: 'res://packs/TEST/hello.txt', data },
 			]);
 
-			const archive = parsePck(buffer);
+			const archive = await parsePck(source);
 
 			expect(archive.header.packVersion).toBe(1);
 			expect(archive.header.godotMajor).toBe(3);
@@ -87,14 +97,14 @@ describe('pckParser', () => {
 			expect(archive.files[0].size).toBe(11);
 		});
 
-		it('parses multiple files', () => {
-			const buffer = buildPckBuffer([
+		it('parses multiple files', async () => {
+			const source = buildPckSource([
 				{ path: 'res://packs/ABC/a.png', data: new Uint8Array([1, 2, 3]) },
 				{ path: 'res://packs/ABC/b.webp', data: new Uint8Array([4, 5, 6, 7]) },
 				{ path: 'res://packs/ABC/data/tags.json', data: textBytes('{}') },
 			]);
 
-			const archive = parsePck(buffer);
+			const archive = await parsePck(source);
 
 			expect(archive.header.fileCount).toBe(3);
 			expect(archive.files).toHaveLength(3);
@@ -106,7 +116,7 @@ describe('pckParser', () => {
 			expect(archive.files[2].size).toBe(2);
 		});
 
-		it('handles various path lengths without alignment padding', () => {
+		it('handles various path lengths without alignment padding', async () => {
 			const paths = [
 				'res://packs/X/a',
 				'res://packs/X/ab',
@@ -116,45 +126,45 @@ describe('pckParser', () => {
 			];
 
 			for (const path of paths) {
-				const buffer = buildPckBuffer([
+				const source = buildPckSource([
 					{ path, data: new Uint8Array([42]) },
 				]);
-				const archive = parsePck(buffer);
+				const archive = await parsePck(source);
 				expect(archive.files[0].path).toBe(path);
 			}
 		});
 
-		it('handles empty archive (zero files)', () => {
-			const buffer = buildPckBuffer([]);
-			const archive = parsePck(buffer);
+		it('handles empty archive (zero files)', async () => {
+			const source = buildPckSource([]);
+			const archive = await parsePck(source);
 
 			expect(archive.header.fileCount).toBe(0);
 			expect(archive.files).toHaveLength(0);
 		});
 
-		it('rejects non-GDPC files', () => {
+		it('rejects non-GDPC files', async () => {
 			const buffer = new ArrayBuffer(0x58);
 			const view = new DataView(buffer);
 			view.setUint32(0, 0x504B0304, true); // ZIP magic
 
-			expect(() => parsePck(buffer)).toThrow('Not a valid Godot PCK file');
+			await expect(parsePck(new BufferPckSource(buffer))).rejects.toThrow('Not a valid Godot PCK file');
 		});
 
-		it('rejects files too small for a header', () => {
+		it('rejects files too small for a header', async () => {
 			const buffer = new ArrayBuffer(16);
-			expect(() => parsePck(buffer)).toThrow('File too small');
+			await expect(parsePck(new BufferPckSource(buffer))).rejects.toThrow('File too small');
 		});
 
-		it('rejects truncated file table', () => {
+		it('rejects truncated file table', async () => {
 			const buffer = new ArrayBuffer(0x58);
 			const view = new DataView(buffer);
 			view.setUint32(0, GDPC_MAGIC, true);
 			view.setUint32(0x54, 100, true);
 
-			expect(() => parsePck(buffer)).toThrow('Unexpected end of file');
+			await expect(parsePck(new BufferPckSource(buffer))).rejects.toThrow('Unexpected end of file');
 		});
 
-		it('preserves MD5 bytes', () => {
+		it('preserves MD5 bytes', async () => {
 			const buffer = buildPckBuffer([
 				{ path: 'res://test.txt', data: textBytes('x') },
 			]);
@@ -169,47 +179,47 @@ describe('pckParser', () => {
 				0x55, 0x66, 0x77, 0x88, 0x99, 0x00, 0xFF, 0xEE,
 			]);
 
-			const archive = parsePck(buffer);
+			const archive = await parsePck(new BufferPckSource(buffer));
 			expect(archive.files[0].md5[0]).toBe(0xAA);
 			expect(archive.files[0].md5[15]).toBe(0xEE);
 		});
 	});
 
 	describe('extractFileData', () => {
-		it('extracts correct bytes for a file entry', () => {
+		it('extracts correct bytes for a file entry', async () => {
 			const content = textBytes('file content here');
-			const buffer = buildPckBuffer([
+			const source = buildPckSource([
 				{ path: 'res://packs/X/file.txt', data: content },
 			]);
 
-			const archive = parsePck(buffer);
-			const extracted = extractFileData(buffer, archive.files[0]);
+			const archive = await parsePck(source);
+			const extracted = await extractFileData(source, archive.files[0]);
 
 			expect(new TextDecoder().decode(extracted)).toBe('file content here');
 		});
 
-		it('extracts correct bytes when multiple files exist', () => {
-			const buffer = buildPckBuffer([
+		it('extracts correct bytes when multiple files exist', async () => {
+			const source = buildPckSource([
 				{ path: 'res://a.txt', data: textBytes('first') },
 				{ path: 'res://b.txt', data: textBytes('second') },
 				{ path: 'res://c.txt', data: textBytes('third') },
 			]);
 
-			const archive = parsePck(buffer);
+			const archive = await parsePck(source);
 
-			expect(new TextDecoder().decode(extractFileData(buffer, archive.files[0]))).toBe('first');
-			expect(new TextDecoder().decode(extractFileData(buffer, archive.files[1]))).toBe('second');
-			expect(new TextDecoder().decode(extractFileData(buffer, archive.files[2]))).toBe('third');
+			expect(new TextDecoder().decode(await extractFileData(source, archive.files[0]))).toBe('first');
+			expect(new TextDecoder().decode(await extractFileData(source, archive.files[1]))).toBe('second');
+			expect(new TextDecoder().decode(await extractFileData(source, archive.files[2]))).toBe('third');
 		});
 
-		it('handles binary data correctly', () => {
+		it('handles binary data correctly', async () => {
 			const binary = new Uint8Array([0x00, 0xFF, 0x89, 0x50, 0x4E, 0x47]);
-			const buffer = buildPckBuffer([
+			const source = buildPckSource([
 				{ path: 'res://image.png', data: binary },
 			]);
 
-			const archive = parsePck(buffer);
-			const extracted = extractFileData(buffer, archive.files[0]);
+			const archive = await parsePck(source);
+			const extracted = await extractFileData(source, archive.files[0]);
 
 			expect(Array.from(extracted)).toEqual([0x00, 0xFF, 0x89, 0x50, 0x4E, 0x47]);
 		});

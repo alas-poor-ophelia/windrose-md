@@ -11,7 +11,7 @@ import { TFile } from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type { InstalledPack } from '#types/content-packs/contentPack.types';
 import type { TileEntry, TileLayerRole } from '#types/tiles/tile.types';
-import type { PckArchive } from './pckParser';
+import type { PckArchive, PckSource } from './pckParser';
 import { extractFileData } from './pckParser';
 import type { DungeondraftPackMeta } from './pckMetadata';
 import { parseDungeondraftTags, parseWallSidecars } from './pckMetadata';
@@ -127,13 +127,13 @@ function listTextureEntries(archive: PckArchive): PckArchive['files'] {
 }
 
 /** Pack tag lookup tables keyed by relative texture path. */
-function buildPackTagIndex(
-	buffer: ArrayBuffer,
+async function buildPackTagIndex(
+	source: PckSource,
 	archive: PckArchive,
-): { pathToFirstTag: Map<string, string>; pathToAllTags: Map<string, string[]> } {
+): Promise<{ pathToFirstTag: Map<string, string>; pathToAllTags: Map<string, string[]> }> {
 	const pathToFirstTag = new Map<string, string>();
 	const pathToAllTags = new Map<string, string[]>();
-	const tags = parseDungeondraftTags(buffer, archive);
+	const tags = await parseDungeondraftTags(source, archive);
 	const isBracketOnly = (t: string): boolean => /^\s*\[[^\]]*\]\s*$/.test(t);
 	if (tags != null) {
 		for (const [tag, paths] of Object.entries(tags.tags)) {
@@ -173,8 +173,8 @@ interface PckWizardAnalysis {
  * In-memory analysis of a pack for the Add-tiles wizard steps ②③ —
  * no extraction, no vault writes.
  */
-function analyzePckForWizard(buffer: ArrayBuffer, archive: PckArchive): PckWizardAnalysis {
-	const { pathToFirstTag, pathToAllTags } = buildPackTagIndex(buffer, archive);
+async function analyzePckForWizard(source: PckSource, archive: PckArchive): Promise<PckWizardAnalysis> {
+	const { pathToFirstTag, pathToAllTags } = await buildPackTagIndex(source, archive);
 	const cellTiles: TileEntry[] = [];
 	let stripCount = 0;
 	const tagCounts = new Map<string, number>();
@@ -273,7 +273,7 @@ type DdProgressFn = (done: number, total: number, stage: string) => void;
 async function runDdImport(
 	app: App,
 	plugin: PluginLike,
-	buffer: ArrayBuffer,
+	source: PckSource,
 	archive: PckArchive,
 	meta: DungeondraftPackMeta,
 	onProgress?: DdProgressFn,
@@ -284,7 +284,7 @@ async function runDdImport(
 
 	const textures = listTextureEntries(archive);
 
-	const { pathToFirstTag, pathToAllTags } = buildPackTagIndex(buffer, archive);
+	const { pathToFirstTag, pathToAllTags } = await buildPackTagIndex(source, archive);
 	// Wizard-applied (mined/manual) tags ride along with the pack tags so the
 	// extraction loop below writes them into importTags in one pass.
 	for (const { tag, rels } of wizard?.extraTags ?? []) {
@@ -295,7 +295,7 @@ async function runDdImport(
 		}
 	}
 
-	const wallSidecars = parseWallSidecars(buffer, archive);
+	const wallSidecars = await parseWallSidecars(source, archive);
 	const endCapByStrip = pairWallEndCaps(
 		textures
 			.map(t => toRelativeTexturePath(t.path))
@@ -327,7 +327,7 @@ async function runDdImport(
 			const parentDir = destPath.substring(0, destPath.lastIndexOf('/'));
 			await ensureFolder(app, parentDir);
 
-			const data = extractFileData(buffer, entry);
+			const data = await extractFileData(source, entry);
 			const arrayBuf = new ArrayBuffer(data.byteLength);
 			new Uint8Array(arrayBuf).set(data);
 			const existing = app.vault.getAbstractFileByPath(destPath);

@@ -20,8 +20,8 @@ import type { TileEntry, TileLayerRole } from '#types/tiles/tile.types';
 import type { InstalledPack } from '#types/content-packs/contentPack.types';
 import type { PluginLike, PckWizardAnalysis, DdWizardDecisions } from '../../content-packs/ddImportCore';
 import { runDdImport, analyzePckForWizard } from '../../content-packs/ddImportCore';
-import type { PckArchive } from '../../content-packs/pckParser';
-import { parsePck } from '../../content-packs/pckParser';
+import type { PckArchive, PckSource } from '../../content-packs/pckParser';
+import { parsePck, FilePckSource } from '../../content-packs/pckParser';
 import type { DungeondraftPackMeta } from '../../content-packs/pckMetadata';
 import { parsePackMetadata } from '../../content-packs/pckMetadata';
 import { FolderSuggest } from '../helpers/FolderSuggest';
@@ -62,8 +62,10 @@ class AddTilesModal extends Modal {
   private tiles: TileEntry[] = [];
   private scanTimer: number | undefined;
 
-  // Pack source state (parsed in memory; nothing extracts until Finish).
-  private packBuffer: ArrayBuffer | null = null;
+  // Pack source state (directory parsed up front; file bytes stream on demand,
+  // so multi-GB packs never allocate a whole-file buffer — nothing extracts
+  // until Finish).
+  private packSource: PckSource | null = null;
   private packArchive: PckArchive | null = null;
   private packMeta: DungeondraftPackMeta | null = null;
   private packAnalysis: PckWizardAnalysis | null = null;
@@ -245,25 +247,27 @@ class AddTilesModal extends Modal {
 
   private async handlePackFile(file: File, preview: HTMLElement): Promise<void> {
     preview.empty();
-    this.packBuffer = null;
+    this.packSource = null;
     this.packArchive = null;
     this.packMeta = null;
     this.packAnalysis = null;
     preview.createEl('p', { text: 'Reading pack…' });
 
     try {
-      const buffer = await file.arrayBuffer();
-      const archive = parsePck(buffer);
-      const result = parsePackMetadata(buffer, archive);
+      // Stream the pack: only the directory + individual entries are read, so a
+      // multi-GB file never trips Blob.arrayBuffer()'s single-allocation ceiling.
+      const source = new FilePckSource(file);
+      const archive = await parsePck(source);
+      const result = await parsePackMetadata(source, archive);
       preview.empty();
       if (!result.ok) {
         preview.createEl('p', { text: result.error, cls: 'windrose-wz-error' });
         return;
       }
-      this.packBuffer = buffer;
+      this.packSource = source;
       this.packArchive = archive;
       this.packMeta = result.meta;
-      this.packAnalysis = analyzePckForWizard(buffer, archive);
+      this.packAnalysis = await analyzePckForWizard(source, archive);
       this.renderPackPreview(preview);
     } catch (err: unknown) {
       preview.empty();
@@ -568,7 +572,7 @@ class AddTilesModal extends Modal {
     foot: HTMLElement,
     finishBtn: HTMLButtonElement,
   ): Promise<void> {
-    if (this.packBuffer == null || this.packArchive == null || this.packMeta == null) return;
+    if (this.packSource == null || this.packArchive == null || this.packMeta == null) return;
     finishBtn.disabled = true;
     finishBtn.setText('Importing…');
     body.empty();
@@ -583,7 +587,7 @@ class AddTilesModal extends Modal {
       const result = await runDdImport(
         this.app,
         this.plugin,
-        this.packBuffer,
+        this.packSource,
         this.packArchive,
         this.packMeta,
         (done, total, stage) => {
