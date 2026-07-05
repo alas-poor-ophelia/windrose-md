@@ -22,6 +22,8 @@ import type { TileAssignment } from '#types/tiles/tile.types';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCanvasRenderer, renderCanvas } from '../../hooks/canvas/useCanvasRenderer';
 import { useCanvasInteraction } from '../../hooks/canvas/useCanvasInteraction';
+import { useViewController } from '../../hooks/canvas/useViewController';
+import type { ViewController } from '#types/hooks/viewController.types';
 import { GridGeometry } from '../../geometry/core/GridGeometry';
 import { DEFAULTS } from '../../core/dmtConstants';
 import { getObjectAtPosition, addObject, removeObject, removeObjectAtPosition, removeObjectsInRectangle, updateObject, isAreaFree, canResizeObject } from '../../objects/objectOperations';
@@ -82,6 +84,7 @@ interface CoordinatorsProps {
   isFocused: boolean;
   isColorPickerOpen: boolean;
   isAlignmentMode: boolean;
+  viewController: ViewController;
 }
 
 interface MapCanvasContentProps {
@@ -131,13 +134,14 @@ interface MapCanvasProps extends MapCanvasContentProps {
  * so the hooks have access to MapState, MapSelection, and EventHandler contexts.
  * Returns null (no visual rendering) - only manages behavioral coordination.
  */
-const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOpen, isAlignmentMode }: CoordinatorsProps): null => {
+const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOpen, isAlignmentMode, viewController }: CoordinatorsProps): null => {
   // Coordinator hooks need to be called inside the provider tree
   usePanZoomCoordinator({
     canvasRef,
     mapData,
     geometry,
-    isFocused
+    isFocused,
+    viewController
   });
 
   useEventCoordinator({
@@ -210,12 +214,24 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional fine-grained deps: geometry rebuilds only on shape-param change, not every cell paint
   }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
 
+  // Shared live pan/zoom controller. Holds viewState off the React path during a
+  // gesture and commits to mapData once at gesture end (sink = onViewStateChange).
+  // The SAME instance is passed to the coordinator's interaction handlers, this
+  // coord-utility instance, and the renderer, so canvas + hit-testing never desync.
+  const viewController = useViewController(mapData?.viewState, onViewStateChange);
+
+  // External viewState changes (navigate / undo / load / fit-view) flow into the
+  // live controller; syncCommitted no-ops while a gesture is in flight.
+  useEffect(() => {
+    if (mapData?.viewState) viewController.syncCommitted(mapData.viewState);
+  }, [mapData?.viewState, viewController]);
+
   // Use canvas interaction ONLY for coordinate utility functions
   const {
     screenToGrid,
     screenToWorld,
     getClientCoords
-  } = useCanvasInteraction(canvasRef, mapData, geometry, undefined, isFocused);
+  } = useCanvasInteraction(canvasRef, mapData, geometry, isFocused, viewController);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -257,7 +273,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
   }, [isAnimating]);
 
   // Render canvas whenever relevant state changes
-  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, hiddenTileLayers, draggingWallId });
+  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, hiddenTileLayers, draggingWallId }, viewController);
 
   // Trigger redraw when canvas dimensions change (from expand/collapse)
   useEffect(() => {
@@ -442,6 +458,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
             isFocused={isFocused}
             isColorPickerOpen={isColorPickerOpen}
             isAlignmentMode={isAlignmentMode}
+            viewController={viewController}
           />
 
           <div className="windrose-canvas-container" ref={containerRef}>

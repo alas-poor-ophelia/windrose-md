@@ -6,8 +6,9 @@
  */
 
 import type { RefObject } from 'preact';
-import type { MapData } from '../core/map.types';
+import type { MapData, StoredViewState } from '../core/map.types';
 import type { ExtendedGeometry, LayerVisibility, SelectedItem } from '../contexts/context.types';
+import type { ViewController } from './viewController.types';
 export type { LayerVisibility };
 
 /** Adjacent sub-hex map for ghost preview rendering */
@@ -77,6 +78,12 @@ export interface RenderCanvasOptions {
    * (to drop it) and one on commit (to re-include it), not one per frame.
    */
   draggingWallId?: string | null;
+  /**
+   * Live viewState from the ViewController during a pan/zoom/pinch gesture.
+   * When present it OVERRIDES mapData.viewState for the canvas transform, so
+   * the canvas follows the gesture without setMapData reconciling the tree.
+   */
+  liveViewState?: StoredViewState | null;
 }
 
 /** Main render function */
@@ -98,6 +105,7 @@ export type UseCanvasRenderer = (
   fogCanvasRef: RefObject<HTMLCanvasElement> | null,
   mapData: MapData | null,
   geometry: ExtendedGeometry | null,
-  selectedItems?: RendererSelectedItem | RendererSelectedItem[],
-  options?: UseCanvasRendererOptions,
+  selectedItems: RendererSelectedItem | RendererSelectedItem[] | undefined,
+  options: UseCanvasRendererOptions | undefined,
+  viewController: ViewController,
 ) => void;

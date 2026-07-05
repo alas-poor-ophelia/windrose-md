@@ -19,12 +19,19 @@ import type {
   TouchCenter,
   ClientCoords,
   WorldCoords,
-  OnViewStateChangeCallback,
   UseCanvasInteractionResult,
 } from '#types/hooks/canvasInteraction.types';
+import type { ViewController } from '#types/hooks/viewController.types';
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULTS } from '../../core/dmtConstants';
+
+/**
+ * Wheel zoom has no natural gesture "end": it fires a burst of discrete ticks.
+ * We open a ViewController gesture on the first tick and commit once the ticks
+ * stop for this long — mirroring the static-layer cache's own settle window.
+ */
+const ZOOM_SETTLE_MS = 150;
 
 
 
@@ -41,11 +48,15 @@ function useCanvasInteraction(
   canvasRef: CanvasRef,
   mapData: MapData | null,
   geometry: (IGeometry & { getScaledCellSize?: (zoom: number) => number }) | null,
-  onViewStateChange: OnViewStateChangeCallback = () => {},
-  focused: boolean
+  focused: boolean,
+  viewController: ViewController
 ): UseCanvasInteractionResult {
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [isTouchPanning, setIsTouchPanning] = useState<boolean>(false);
+  // `panStart` state stays only as an exposed non-null GATE (useEventCoordinator
+  // reads it to decide whether to call updatePan). The live per-tick anchor is
+  // rolled forward through `panStartRef` so panning no longer setStates per
+  // pointermove — that reconciliation was the measured lag.
   const [panStart, setPanStart] = useState<PanStart | null>(null);
   const [touchPanStart, setTouchPanStart] = useState<TouchCenter | null>(null);
 
@@ -57,8 +68,14 @@ function useCanvasInteraction(
   const isPanningRef = useRef<boolean>(false);
   const spaceKeyPressedRef = useRef<boolean>(false);
   const isTouchPanningRef = useRef<boolean>(false);
+  const panStartRef = useRef<PanStart | null>(null);
   const touchPanStartRef = useRef<TouchCenter | null>(null);
   const initialPinchDistanceRef = useRef<number | null>(null);
+
+  // Active ViewController gesture token (pan / wheel-settle / pinch). Guards the
+  // eventual commit so a stale settle timer can't clobber a newer gesture.
+  const gestureIdRef = useRef<number | null>(null);
+  const wheelSettleTimerRef = useRef<number | null>(null);
 
   // Keep refs in sync with state for stable effect closures
   isPanningRef.current = isPanning;
@@ -66,6 +83,25 @@ function useCanvasInteraction(
   isTouchPanningRef.current = isTouchPanning;
   touchPanStartRef.current = touchPanStart;
   initialPinchDistanceRef.current = initialPinchDistance;
+
+  // Commit any in-flight gesture to mapData. Called from stopPan/stopTouchPan,
+  // the wheel-settle timer, and the blur/pointercancel/unmount safety nets.
+  const commitActiveGesture = (): void => {
+    if (gestureIdRef.current != null) {
+      viewController.commitIfCurrent(gestureIdRef.current, viewController.getLive());
+      gestureIdRef.current = null;
+    }
+  };
+
+  // Cancel a pending wheel-settle commit. Called when a pan/pinch takes over from
+  // an in-flight wheel gesture so the old settle timer can't fire as a ghost
+  // holding the new gesture's token.
+  const clearWheelSettle = (): void => {
+    if (wheelSettleTimerRef.current != null) {
+      window.clearTimeout(wheelSettleTimerRef.current);
+      wheelSettleTimerRef.current = null;
+    }
+  };
 
   // Track recent touch to ignore synthetic mouse events
   const lastTouchTimeRef = useRef<number>(0);
@@ -122,9 +158,7 @@ function useCanvasInteraction(
     x *= scaleX;
     y *= scaleY;
 
-    const viewState = mapData.viewState;
-    if (!viewState) return null;
-    const { zoom, center } = viewState;
+    const { zoom, center } = viewController.getLive();
     const northDirection = mapData.northDirection ?? 0;
 
     if (northDirection !== 0) {
@@ -174,9 +208,7 @@ function useCanvasInteraction(
     x *= scaleX;
     y *= scaleY;
 
-    const viewState = mapData.viewState;
-    if (!viewState) return null;
-    const { zoom, center } = viewState;
+    const { zoom, center } = viewController.getLive();
     const northDirection = mapData.northDirection ?? 0;
 
     let offsetX: number, offsetY: number;
@@ -222,8 +254,7 @@ function useCanvasInteraction(
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    const viewState = mapData.viewState;
-    if (!viewState) return;
+    const viewState = viewController.getLive();
 
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
     const newZoom = Math.max(DEFAULTS.minZoom, Math.min(4, viewState.zoom + delta));
@@ -254,33 +285,49 @@ function useCanvasInteraction(
     const newCenterX = (canvas.width / 2 - newOffsetX) / newScale;
     const newCenterY = (canvas.height / 2 - newOffsetY) / newScale;
 
-    onViewStateChange({
+    // Wheel has no natural end — open a gesture on the first tick (reusing any
+    // in-flight one) and (re)arm a settle timer that commits once ticks stop.
+    gestureIdRef.current ??= viewController.beginGesture();
+    const wheelGestureId = gestureIdRef.current;
+
+    viewController.setLive({
       zoom: newZoom,
       center: { x: newCenterX, y: newCenterY }
     });
+
+    if (wheelSettleTimerRef.current != null) window.clearTimeout(wheelSettleTimerRef.current);
+    wheelSettleTimerRef.current = window.setTimeout(() => {
+      wheelSettleTimerRef.current = null;
+      viewController.commitIfCurrent(wheelGestureId, viewController.getLive());
+      if (gestureIdRef.current === wheelGestureId) gestureIdRef.current = null;
+    }, ZOOM_SETTLE_MS);
   };
 
   const startPan = (clientX: number, clientY: number): void => {
-    if (!mapData?.viewState) return;
+    if (!mapData) return;
+    clearWheelSettle(); // a pan takes over any in-flight wheel gesture
+    const viewState = viewController.getLive();
     setIsPanning(true);
-    setPanStart({
+    const anchor: PanStart = {
       x: clientX,
       y: clientY,
-      centerX: mapData.viewState.center.x,
-      centerY: mapData.viewState.center.y
-    });
+      centerX: viewState.center.x,
+      centerY: viewState.center.y
+    };
+    panStartRef.current = anchor;
+    setPanStart(anchor); // exposed non-null gate (one render at gesture start)
+    gestureIdRef.current = viewController.beginGesture();
   };
 
   const updatePan = (clientX: number, clientY: number): void => {
-    if (!isPanning || !panStart || !mapData) return;
+    if (!isPanningRef.current || !panStartRef.current || !mapData) return;
     if (!geometry) return;
 
-    const deltaX = clientX - panStart.x;
-    const deltaY = clientY - panStart.y;
+    const anchor = panStartRef.current;
+    const deltaX = clientX - anchor.x;
+    const deltaY = clientY - anchor.y;
 
-    const viewState = mapData.viewState;
-    if (!viewState) return;
-    const { zoom, center } = viewState;
+    const { zoom, center } = viewController.getLive();
     const northDirection = mapData.northDirection ?? 0;
 
     const angleRad = (-northDirection * Math.PI) / 180;
@@ -297,27 +344,32 @@ function useCanvasInteraction(
       gridDeltaY = -rotatedDeltaY / zoom;
     }
 
-    onViewStateChange({
-      zoom: viewState.zoom,
+    viewController.setLive({
+      zoom,
       center: {
         x: center.x + gridDeltaX,
         y: center.y + gridDeltaY
       }
     });
 
-    setPanStart({ x: clientX, y: clientY, centerX: center.x + gridDeltaX, centerY: center.y + gridDeltaY });
+    // Roll the anchor forward through the ref only — no per-tick setState.
+    panStartRef.current = { x: clientX, y: clientY, centerX: center.x + gridDeltaX, centerY: center.y + gridDeltaY };
   };
 
   const stopPan = (): void => {
     setIsPanning(false);
+    panStartRef.current = null;
     setPanStart(null);
+    commitActiveGesture();
   };
 
   const startTouchPan = (center: TouchCenter): void => {
+    clearWheelSettle(); // a pinch/two-finger pan takes over any in-flight wheel gesture
     setIsTouchPanning(true);
     isTouchPanningRef.current = true;
     setTouchPanStart(center);
     touchPanStartRef.current = center;
+    gestureIdRef.current = viewController.beginGesture();
   };
 
   const updateTouchPan = (touches: TouchList): void => {
@@ -334,9 +386,7 @@ function useCanvasInteraction(
     const deltaX = center.x - startCenter.x;
     const deltaY = center.y - startCenter.y;
 
-    const viewState = mapData.viewState;
-    if (!viewState) return;
-    const { zoom, center: viewCenter } = viewState;
+    const { zoom, center: viewCenter } = viewController.getLive();
     const northDirection = mapData.northDirection ?? 0;
 
     const angleRad = (-northDirection * Math.PI) / 180;
@@ -365,11 +415,11 @@ function useCanvasInteraction(
         y: viewCenter.y + gridDeltaY
       }
     };
-    onViewStateChange(newViewState);
+    viewController.setLive(newViewState);
 
-    setTouchPanStart(center);
+    // Roll both anchors forward through refs only — drop the per-frame setState
+    // mirrors that used to reconcile the whole tree on every pinch/pan tick.
     touchPanStartRef.current = center;
-    setInitialPinchDistance(distance);
     initialPinchDistanceRef.current = distance;
   };
 
@@ -380,6 +430,7 @@ function useCanvasInteraction(
     touchPanStartRef.current = null;
     setInitialPinchDistance(null);
     initialPinchDistanceRef.current = null;
+    commitActiveGesture();
   };
 
   useEffect(() => {
@@ -416,7 +467,32 @@ function useCanvasInteraction(
       window.removeEventListener('keydown', handleSpaceDown);
       window.removeEventListener('keyup', handleSpaceUp);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resubscribe on focus only; stopPan called with current-closure semantics via refs
   }, [focused]);
+
+  // Safety nets for gestures that never see a normal pointerup: a window blur
+  // (alt-tab / OS focus steal) or a pointercancel (browser aborts the pointer)
+  // mid-drag, and unmount mid-gesture. Each commits the live viewState so it is
+  // never stranded off the mapData path — an uncommitted gesture would make
+  // syncCommitted no-op forever and freeze external navigate/undo/load.
+  useEffect(() => {
+    const finish = (): void => {
+      if (isPanningRef.current) stopPan();
+      else if (isTouchPanningRef.current) stopTouchPan();
+      else commitActiveGesture();
+    };
+    window.addEventListener('blur', finish);
+    window.addEventListener('pointercancel', finish);
+    return () => {
+      window.removeEventListener('blur', finish);
+      window.removeEventListener('pointercancel', finish);
+      // On unmount, commit the live viewState directly — skip stopPan's setState
+      // calls (the component is going away; state cleanup is meaningless and would
+      // warn), but still persist any in-flight gesture so it isn't lost.
+      commitActiveGesture();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/unmount only; handlers read live state via refs/stable controller
+  }, []);
 
   return {
     isPanning,

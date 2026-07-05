@@ -14,34 +14,28 @@
  */
 
 // Type-only imports
-import type { StoredViewState } from '#types/core/map.types';
 import type { UsePanZoomCoordinatorOptions } from '#types/hooks/panZoomCoordinator.types';
 
-import { useCallback, useEffect, useRef } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
 import { useCanvasInteraction } from './useCanvasInteraction';
 import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
-import { useMapOperations } from '../../context/MapContext';
 
 
 /**
- * Coordinator hook for pan/zoom interactions
+ * Coordinator hook for pan/zoom interactions.
+ *
+ * viewState commits are owned by the shared ViewController (created in MapCanvas
+ * with onViewStateChange as its commit sink); this coordinator just wires the
+ * interaction handlers to it. Live pan/zoom no longer routes through
+ * onMapDataUpdate per tick — that reconciliation was the measured lag.
  */
 const usePanZoomCoordinator = ({
   canvasRef,
   mapData,
   geometry,
-  isFocused
+  isFocused,
+  viewController
 }: UsePanZoomCoordinatorOptions): void => {
-  // Get onMapDataUpdate from context to handle viewState changes
-  const { onMapDataUpdate } = useMapOperations();
-
-  // Create local callback for viewState changes
-  const handleStoredViewStateChange = useCallback((newStoredViewState: StoredViewState) => {
-    if (onMapDataUpdate) {
-      onMapDataUpdate({ viewState: newStoredViewState });
-    }
-  }, [onMapDataUpdate]);
-
   // Use canvas interaction hook for pan/zoom logic
   const {
     isPanning,
@@ -70,7 +64,7 @@ const usePanZoomCoordinator = ({
     setPanStart,
     setTouchPanStart,
     setInitialPinchDistance
-  } = useCanvasInteraction(canvasRef, mapData, geometry, handleStoredViewStateChange, isFocused);
+  } = useCanvasInteraction(canvasRef, mapData, geometry, isFocused, viewController);
 
   // Register pan/zoom handlers with EventHandlerContext for event coordination
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();

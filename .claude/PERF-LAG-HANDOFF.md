@@ -2,6 +2,33 @@
 
 ---
 
+## SESSION 5 (2026-07-05) — ViewController THREADED (steps 1–5) + LIVE-VERIFIED
+
+**Status: DONE & verified on desktop. iPad + real-input edge cases pending Guildmaster.**
+
+Implemented the full Session-4 plan across 8 files (branch `fix/streaming-pck-import`, uncommitted):
+- `types/hooks/viewController.types.ts` (new) — moved the `ViewController` interface here so types don't import from src; `useViewController.ts` now imports + re-exports it.
+- `useCanvasInteraction.ts` — signature `(canvasRef, mapData, geometry, focused, viewController)` (dropped the `onViewStateChange` param). ALL viewState reads → `viewController.getLive()`; all writes → `setLive()`. Gesture lifecycle: startPan/startTouchPan → `beginGesture()` (id in `gestureIdRef`); stopPan/stopTouchPan → `commitActiveGesture()`; wheel has no end → per-tick `??=` beginGesture + reschedule a `ZOOM_SETTLE_MS=150` timer that commits on settle (token-captured so a pan taking over can't be clobbered). `panStart` moved to `panStartRef` (per-tick anchor) — the `panStart` STATE stays only as the exposed non-null gate for `useEventCoordinator.ts:430`, set once at start/stop. Touch per-frame `setTouchPanStart`/`setInitialPinchDistance` mirrors DROPPED (refs already existed). Added `clearWheelSettle()` at pan/pinch start (kills ghost settle timers). Blur/pointercancel/unmount safety net commits in-flight gestures (unmount path commits directly, no setState-on-unmount).
+- `useCanvasRenderer.ts` — added `viewController` param; render effect registers `setRenderCallback(scheduleRender)`; the rAF callback passes `liveViewState: viewController.getLive()`; `renderCanvas` transform reads `options.liveViewState ?? mapData.viewState`. Standalone `renderCanvas` callers (HoverPreview, exportOperations) unaffected (optional option).
+- `usePanZoomCoordinator.ts` — takes `viewController` via options, forwards to its `useCanvasInteraction`; removed the now-dead `handleStoredViewStateChange`/`onMapDataUpdate`/`useMapOperations`.
+- `MapCanvas.tsx` — `MapCanvasContent` creates the ONE shared `const viewController = useViewController(mapData?.viewState, onViewStateChange)`, adds a `syncCommitted(mapData.viewState)` effect (external navigate/undo/load/fit-view), and passes the SAME instance to the direct coord-utility `useCanvasInteraction` (~:230), the renderer (~:275), and the coordinator (via `Coordinators` prop). Both interaction instances share it → canvas + hit-testing never desync.
+
+**Gates:** typecheck clean, eslint 0-warning gate held, 1748 unit tests pass. Adversarial review (reviewer agent) found 3 issues — all FIXED: (1) ghost settle timer on wheel→pan/pinch (clearWheelSettle); (2) setState-on-unmount (commit directly); (3) same in startTouchPan.
+
+**LIVE measurement (desktop, `scratch/Hexlandia.md` grid map, synthetic 24-tick wheel-zoom burst spread across rAFs):**
+- **longtasks: 0 (0ms total, 0ms max)** — pre-fix this class of gesture produced 100–327ms synchronous-reconciliation longtasks. THE headline win.
+- 144 fillRects / 113 clears coalesced across the burst (canvas redraws live via setLive→scheduleRender), 0 errors.
+- Commit-on-settle → autosave → **survives plugin reload** (pan→release→reload persists ✓). `windrose_get_state` still shows the stale frozen viewState (known MCP snapshot bug) — verified via screenshot + reload-persistence instead.
+
+**STILL TO VERIFY (couldn't automate / no device):**
+1. Round-trip `worldToScreen(screenToWorld(px,py))` within 1px on HEX + ROTATED maps (grid unrotated confirmed visually). The #1 trap = one missed hot-path transform → wrong-cell drops mid-gesture; invisible in smoke tests.
+2. Mouse DRAG-pan path (only wheel-zoom was driven synthetically; drag-pan goes through the same setLive/getLive but exercises panStartRef + the useEventCoordinator gate).
+3. Overlap/interrupt cases: undo/navigate/fit-view during wheel-settle window; pointercancel; window blur mid-drag.
+4. **iPad** — the original catastrophe case. DPR + the whole gesture off the React path should help most here. Untested.
+Recommend: Guildmaster drives real pan/zoom with the Session-4 longtask + "assert no setMapData mid-gesture" probes; check hex + a rotated map; then iPad.
+
+---
+
 ## SESSION 4 (2026-07-04) — ROOT CAUSE #2: per-input Preact reconciliation (the REAL remaining lag)
 
 **Overturns the old "GPU-compositor" theory.** Live profiling (wrap CanvasRenderingContext2D ops + wrap requestAnimationFrame callbacks + PerformanceObserver longtasks + rAF frame-gap recorder; user drove `my-test-map` = 145 tiles/5 strokes) proved:

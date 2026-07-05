@@ -21,29 +21,13 @@
  */
 
 import type { StoredViewState } from '#types/core/map.types';
+import type { ViewController } from '#types/hooks/viewController.types';
 
 import { useRef } from 'preact/hooks';
 
-const DEFAULT_VIEW_STATE: StoredViewState = { zoom: 1, center: { x: 0, y: 0 } };
+export type { ViewController };
 
-export interface ViewController {
-  /** Current authoritative viewState for the canvas transform + hit-testing. */
-  getLive: () => StoredViewState;
-  /** True while a pan/zoom/pinch gesture is in flight. */
-  isGesturing: () => boolean;
-  /** Write a live viewState mid-gesture and schedule an imperative render. */
-  setLive: (vs: StoredViewState) => void;
-  /** Open a gesture; returns a token used to guard the eventual commit. */
-  beginGesture: () => number;
-  /** Commit to mapData ONCE at gesture end — only if the token is still current. */
-  commitIfCurrent: (gestureId: number, vs: StoredViewState) => void;
-  /** Abandon a gesture without committing (pointercancel / blur / unmount). */
-  cancelIfCurrent: (gestureId: number) => void;
-  /** External mapData.viewState change (navigate/undo/load) → live; no-op mid-gesture. */
-  syncCommitted: (vs: StoredViewState) => void;
-  /** The renderer registers its rAF-coalesced draw here. */
-  setRenderCallback: (cb: () => void) => void;
-}
+const DEFAULT_VIEW_STATE: StoredViewState = { zoom: 1, center: { x: 0, y: 0 } };
 
 /**
  * Create (once) the stable ViewController for a map canvas.

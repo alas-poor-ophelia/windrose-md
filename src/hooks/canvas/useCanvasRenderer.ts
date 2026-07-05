@@ -404,7 +404,7 @@ function renderLayerCellsAndEdges(
 }
 
 const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, selectedItems = [], options = {}) => {
-  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null, hiddenTileLayers = undefined, draggingWallId = null } = options;
+  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null, hiddenTileLayers = undefined, draggingWallId = null, liveViewState = null } = options;
   if (canvas == null) return;
 
   // Normalize selectedItems to array (backward compatibility)
@@ -434,7 +434,11 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   if (!ctx) return;
 
   const { width, height } = canvas;
-  const { viewState, northDirection } = mapData;
+  const { northDirection } = mapData;
+  // During a gesture the ViewController supplies the live viewState so the canvas
+  // transform tracks pan/zoom without setMapData reconciling the tree; otherwise
+  // fall back to the committed mapData.viewState.
+  const viewState = liveViewState ?? mapData.viewState;
   if (!viewState) return;
   const { zoom, center } = viewState;
 
@@ -959,7 +963,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   ctx.restore();
 };
 
-const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], options = {}) => {
+const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], options = {}, viewController) => {
   const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false, adjacentSubHexes = null, hiddenTileLayers = undefined, draggingWallId = null } = options;
   // Coalesce renders to at most one per animation frame. Pan/zoom writes viewState
   // (stored on mapData) on EVERY pointermove/touchmove; on a 120Hz touch device that
@@ -992,15 +996,19 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
         const a = renderInputsRef.current;
         if (a && a.mapData && a.geometry && canvasRef.current) {
           const fogCanvas = fogCanvasRef?.current ?? null;
-          renderCanvas(canvasRef.current, fogCanvas, a.mapData, a.geometry, a.selectedItems, { isResizeMode: a.isResizeMode, theme: a.theme, showCoordinates: a.showCoordinates, layerVisibility: a.layerVisibility, adjacentSubHexes: a.adjacentSubHexes, hiddenTileLayers: a.hiddenTileLayers, tileImagesReady: a.tileImagesReady, draggingWallId: a.draggingWallId });
+          // Read the live viewState at FIRE time so a gesture's setLive→scheduleRender
+          // path paints the current pan/zoom even though mapData hasn't changed.
+          renderCanvas(canvasRef.current, fogCanvas, a.mapData, a.geometry, a.selectedItems, { isResizeMode: a.isResizeMode, theme: a.theme, showCoordinates: a.showCoordinates, layerVisibility: a.layerVisibility, adjacentSubHexes: a.adjacentSubHexes, hiddenTileLayers: a.hiddenTileLayers, tileImagesReady: a.tileImagesReady, draggingWallId: a.draggingWallId, liveViewState: viewController.getLive() });
         }
       });
     };
     // The static-layer cache requests a follow-up render to redraw crisp after
     // a zoom gesture settles.
     if (canvasRef.current) setStaticSettleCallback(canvasRef.current, scheduleRender);
+    // The ViewController drives imperative renders on setLive() during a gesture.
+    viewController.setRenderCallback(scheduleRender);
     scheduleRender();
-  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, hiddenTileLayers, draggingWallId]);
+  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, hiddenTileLayers, draggingWallId, viewController]);
 
   // Cancel any frame still pending when the component unmounts.
   useEffect(() => () => {
