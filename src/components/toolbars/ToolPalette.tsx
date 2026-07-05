@@ -5,16 +5,11 @@
  */
 
 import type { ComponentChildren, TargetedMouseEvent, VNode } from 'preact';
-import type { HexColor } from '#types/core/common.types';
 import type { MapType } from '#types/core/map.types';
 import type { ToolId } from '#types/tools/tool.types';
-import type { CustomColor } from '#types/core/common.types';
 import type { WindroseFeature } from '#types/settings/settings.types';
-import type { ColorOpacityOverrides } from '../shared/ColorPicker.tsx';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { DEFAULT_COLOR } from '../../drawing/colorOperations';
-import { ColorPicker } from '../shared/ColorPicker';
 import { CornerBrackets } from '../shared/CornerBrackets';
 import { getSettings } from '../../core/settingsAccessor';
 import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
@@ -109,24 +104,11 @@ export interface ToolPaletteProps {
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-  selectedColor: HexColor | null;
-  onColorChange: (color: HexColor) => void;
-  selectedOpacity?: number;
-  onOpacityChange?: (opacity: number) => void;
-  isColorPickerOpen: boolean;
-  onColorPickerOpenChange: (open: boolean) => void;
-  customColors: CustomColor[];
-  paletteColorOpacityOverrides?: ColorOpacityOverrides;
-  onAddCustomColor?: (color: HexColor) => void;
-  onDeleteCustomColor?: (colorId: string) => void;
-  onUpdateColorOpacity?: (colorId: string, opacity: number) => void;
   mapType: MapType;
   isFocused?: boolean;
-  /** When provided, color button opens floating panel instead of inline picker */
-  onColorBtnPopout?: (position: { x: number; y: number }) => void;
   /** Dock/undock button rendered at the end of the toolbar */
   dockButton?: ComponentChildren;
-  /** Full-pane vertical layout: 54px left bar, color chip below a divider, right-opening flyouts */
+  /** Full-pane vertical layout: 54px left bar, right-opening flyouts */
   vertical?: boolean;
 }
 
@@ -363,8 +345,7 @@ const simpleTools: SimpleTool[] = [
   { id: 'outline', title: 'Draw Outline', icon: 'lucide-spline', hexOnly: true, feature: 'outlines' },
   { id: 'shape', title: 'Place Shape Overlay', icon: 'lucide-shapes', feature: 'shapeOverlays' },
   { id: 'measure', title: 'Measure Distance', icon: 'lucide-ruler', shortcut: 'm', actionId: 'measureTool', feature: 'measurement' },
-  { id: 'tilePaint', title: 'Place Tile (select from tile browser)', icon: 'lucide-image-plus', feature: 'tiles' },
-  { id: 'wall', title: 'Draw Wall/Path (select from Walls tab)', icon: 'lucide-brick-wall', feature: 'walls' }
+  { id: 'tilePaint', title: 'Place Tile (select from tile browser)', icon: 'lucide-image-plus', feature: 'tiles' }
 ];
 
 // ToolId → gating feature, derived from the tool config (used to guard
@@ -435,26 +416,11 @@ const ToolPalette = ({
   onRedo,
   canUndo,
   canRedo,
-  selectedColor,
-  onColorChange,
-  selectedOpacity = 1,
-  onOpacityChange,
-  isColorPickerOpen,
-  onColorPickerOpenChange,
-  customColors,
-  paletteColorOpacityOverrides = {},
-  onAddCustomColor,
-  onDeleteCustomColor,
-  onUpdateColorOpacity,
   mapType,
   isFocused = false,
-  onColorBtnPopout,
   dockButton,
   vertical = false
 }: ToolPaletteProps): VNode => {
-  const colorBtnRef = useRef<HTMLButtonElement>(null);
-  const pendingCustomColorRef = useRef<HexColor | null>(null);
-
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const [subToolSelections, setSubToolSelections] = useState<SubToolSelections>(INITIAL_SUB_TOOL_SELECTIONS);
   const featureFlags = useFeatureFlags();
@@ -531,31 +497,6 @@ const ToolPalette = ({
     }));
   };
 
-  const toggleColorPicker = (e: TargetedMouseEvent<HTMLButtonElement>): void => {
-    e.stopPropagation();
-    if (onColorBtnPopout) {
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      onColorBtnPopout({ x: rect.left, y: rect.top });
-      return;
-    }
-    onColorPickerOpenChange(!isColorPickerOpen);
-  };
-
-  const handleColorReset = (): void => {
-    onColorChange(DEFAULT_COLOR);
-    onColorPickerOpenChange(false);
-  };
-
-  const handleCloseColorPicker = (): void => {
-    if (pendingCustomColorRef.current != null && pendingCustomColorRef.current !== '') {
-      const colorValue = pendingCustomColorRef.current;
-      onAddCustomColor?.(colorValue);
-      onColorChange(colorValue);
-      pendingCustomColorRef.current = null;
-    }
-    onColorPickerOpenChange(false);
-  };
-
   useEffect((): (() => void) | undefined => {
     if (openSubMenu == null || openSubMenu === '') return undefined;
 
@@ -589,40 +530,6 @@ const ToolPalette = ({
   }, [openSubMenu]);
 
 
-  const colorBlock = (
-    <div className="windrose-tool-btn-container">
-      <button
-        ref={colorBtnRef}
-        className={`windrose-tool-btn windrose-color-tool-btn interactive-child ${isColorPickerOpen ? 'windrose-tool-btn-active' : ''}`}
-        onClick={toggleColorPicker}
-        title="Choose color"
-        style={{
-          borderBottom: `4px solid ${selectedColor ?? DEFAULT_COLOR}`
-        }}
-      >
-        <Icon icon="lucide-palette" />
-      </button>
-
-      <ColorPicker
-        isOpen={isColorPickerOpen && !onColorBtnPopout}
-        selectedColor={selectedColor}
-        onColorSelect={onColorChange}
-        onClose={handleCloseColorPicker}
-        onReset={handleColorReset}
-        customColors={customColors}
-        paletteColorOpacityOverrides={paletteColorOpacityOverrides}
-        onAddCustomColor={onAddCustomColor}
-        onDeleteCustomColor={onDeleteCustomColor}
-        onUpdateColorOpacity={onUpdateColorOpacity}
-        position={null}
-        pendingCustomColorRef={pendingCustomColorRef}
-        title="Color"
-        opacity={selectedOpacity}
-        onOpacityChange={onOpacityChange}
-      />
-    </div>
-  );
-
   return (
     <div className={`windrose-tool-palette${vertical ? ' windrose-tool-palette-vertical' : ''}`}>
       <CornerBrackets classPrefix="windrose-tool-palette-bracket" variant="compact" filterId="palette-bracket" />
@@ -642,9 +549,6 @@ const ToolPalette = ({
           vertical={vertical}
         />
       ))}
-
-      {/* Horizontal: color chip sits mid-row. Vertical: relocated below a divider (see foot). */}
-      {!vertical && colorBlock}
 
       {toolGroups.slice(2).map(group => {
         if (group.gridOnly === true && mapType === 'hex') return null;
@@ -676,13 +580,6 @@ const ToolPalette = ({
           <Icon icon={tool.icon} />
         </button>
       ))}
-
-      {vertical && (
-        <>
-          <div className="windrose-tool-palette-divider" />
-          {colorBlock}
-        </>
-      )}
 
       <div className="windrose-history-controls">
         <button

@@ -531,20 +531,45 @@ class AddTilesModal extends Modal {
     sync();
   }
 
+  /** Tags applied automatically, without an explicit toggle: folder-name tags for a
+   *  folder import, pack-shipped tags for a pack import. These are rendered as
+   *  already-applied chips in the body, so they must also count toward the caption
+   *  and post-import summary — otherwise both read 0 until the user toggles a
+   *  suggestion by hand. */
+  private autoAppliedTagNames(): string[] {
+    if (this.source === 'pack') {
+      return Array.from(new Set((this.packAnalysis?.packTags ?? []).map(t => t.tag.toLowerCase())));
+    }
+    return Array.from(new Set(
+      this.tiles.flatMap(t => (t.category ?? '').split('/'))
+        .filter(s => s !== '')
+        .map(s => s.toLowerCase()),
+    ));
+  }
+
+  /** Total applied tags across auto (folder/pack), toggled suggestions, and manual. */
+  private totalAppliedTagCount(): number {
+    return this.autoAppliedTagNames().length + this.appliedTags.size + this.manualTags.length;
+  }
+
   private updateTagCaption(foot: HTMLElement): void {
     const caption = foot.querySelector('.windrose-wz-cap');
     if (caption == null) return;
-    const applied = this.appliedTags.size + this.manualTags.length;
+    const autoTags = this.autoAppliedTagNames();
+    const applied = autoTags.length + this.appliedTags.size + this.manualTags.length;
     const tilesTouched = new Set<string>();
     for (const suggestion of this.suggestions) {
       if (this.appliedTags.has(suggestion.tag)) {
         for (const p of suggestion.paths) tilesTouched.add(p);
       }
     }
-    if (this.manualTags.length > 0) {
+    // Auto folder/pack tags and manual tags apply across every imported tile.
+    if (autoTags.length > 0 || this.manualTags.length > 0) {
       for (const t of this.tiles) tilesTouched.add(t.vaultPath);
     }
-    caption.textContent = `${applied} tag(s) · ${tilesTouched.size} tiles`;
+    const autoCats = this.tierRows.filter(r => r.auto).length;
+    const catPart = autoCats > 0 ? ` · ${autoCats} categor${autoCats === 1 ? 'y' : 'ies'} auto-sorted` : '';
+    caption.textContent = `${applied} tag(s) · ${tilesTouched.size} tiles${catPart}`;
   }
 
   // ========================= Finish =========================
@@ -705,11 +730,13 @@ class AddTilesModal extends Modal {
 
       progressBar.value = 100;
       progress.empty();
+      const autoCats = this.tierRows.filter(r => r.auto).length;
       progress.createEl('p', {
         cls: 'windrose-wz-done',
         text: `Imported ${this.tiles.length} tile(s): ${stats.scanned} scanned · ` +
           `${stats.region} terrain · ${stats.spans} multi-cell · ` +
-          `${this.appliedTags.size + this.manualTags.length} tag(s) applied.`,
+          `${this.totalAppliedTagCount()} tag(s) applied · ` +
+          `${autoCats} categor${autoCats === 1 ? 'y' : 'ies'} auto-sorted.`,
       });
       new Notice(`Windrose: "${folder}" imported (${this.tiles.length} tiles).`);
 

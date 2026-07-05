@@ -7313,6 +7313,16 @@ button.windrose-breadcrumb-link {
   height: 22px;
 }
 
+/* Full-pane: no top-right map controls to dodge (they only render in block mode),
+   but the tile drawer floats over the canvas from the right edge. Anchor the button
+   to the true top-right corner and offset it by the drawer overhang (published as
+   --windrose-reroll-inset on .windrose-canvas-and-controls) so it tracks the panel
+   as it expands, collapses, and drags. Double-class (0,3,0) to beat both the base
+   self-doubled rule (0,2,0) and the .is-tablet override (0,2,0). */
+.windrose-full-pane .windrose-reroll-btn.windrose-reroll-btn {
+  right: calc(var(--windrose-reroll-inset, 0px) + 12px);
+}
+
 .windrose-reroll-confirm-overlay {
   position: fixed;
   inset: 0;

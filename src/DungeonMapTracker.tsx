@@ -681,11 +681,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     }
   }, [handleNameChange, onNameChange, fullPane, mapId]);
 
-  const handleColorPickerPopout = useCallback((pos: { x: number; y: number }) => {
-    toggleFloat('colorPicker', pos);
-    setIsColorPickerOpen(!isFloating('colorPicker'));
-  }, [toggleFloat, isFloating, setIsColorPickerOpen]);
-
   const handleFloatingPickerClose = useCallback(() => {
     if (floatingPickerPendingRef.current != null && floatingPickerPendingRef.current !== '') {
       const colorValue = floatingPickerPendingRef.current;
@@ -956,21 +951,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onRedo={handleRedo}
               canUndo={canUndo}
               canRedo={canRedo}
-              selectedColor={selectedColor}
-              onColorChange={setSelectedColor}
-              selectedOpacity={selectedOpacity}
-              onOpacityChange={handleOpacityChange}
-              isColorPickerOpen={isColorPickerOpen || isFloating('colorPicker')}
-              onColorPickerOpenChange={setIsColorPickerOpen}
-              customColors={mapData.customColors ?? []}
-              paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides ?? {}}
-              onAddCustomColor={handleAddCustomColor}
-              onDeleteCustomColor={handleDeleteCustomColor}
-              onUpdateColorOpacity={handleUpdateColorOpacity}
               mapType={mapData.mapType}
               isFocused={isFocused}
               vertical={fullPane}
-              onColorBtnPopout={fullPane ? handleColorPickerPopout : undefined}
               dockButton={fullPane ? (
                 <button
                   className="windrose-tool-btn windrose-tool-palette-dock-btn interactive-child"
@@ -1111,7 +1094,20 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
           {/* For hex maps, override northDirection to 0 for rendering while keeping real value for compass display */}
           {/* This allows the compass to show and persist the north direction without actually rotating hex maps */}
-          <div className="windrose-canvas-and-controls">
+          <div
+            className="windrose-canvas-and-controls"
+            // Full-pane: the tile drawer floats over the canvas from the right edge
+            // (position:absolute; right:100%). Expose how far it overhangs so canvas
+            // overlays (the reroll button) can sit clear of it and track it as it
+            // folds/resizes. 0 in block mode or when the drawer is hidden/floating.
+            style={{
+              '--windrose-reroll-inset': `${
+                fullPane && showTilePanel && !isFloating('tiles')
+                  ? (tileBrowserCollapsed ? 54 : tileBrowserWidth)
+                  : 0
+              }px`
+            }}
+          >
             <MapCanvas
               mapId={mapId}
               notePath={notePath}
@@ -1413,20 +1409,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onRedo={handleRedo}
                 canUndo={canUndo}
                 canRedo={canRedo}
-                selectedColor={selectedColor}
-                onColorChange={setSelectedColor}
-                selectedOpacity={selectedOpacity}
-                onOpacityChange={handleOpacityChange}
-                isColorPickerOpen={isColorPickerOpen || isFloating('colorPicker')}
-                onColorPickerOpenChange={setIsColorPickerOpen}
-                customColors={mapData.customColors ?? []}
-                paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides ?? {}}
-                onAddCustomColor={handleAddCustomColor}
-                onDeleteCustomColor={handleDeleteCustomColor}
-                onUpdateColorOpacity={handleUpdateColorOpacity}
                 mapType={mapData.mapType}
                 isFocused={isFocused}
-                onColorBtnPopout={handleColorPickerPopout}
                 dockButton={
                   <button
                     className="windrose-tool-btn windrose-tool-palette-dock-btn interactive-child"
