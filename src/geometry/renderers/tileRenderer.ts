@@ -12,6 +12,7 @@ import type { TerrainStroke } from '#types/core/terrainstroke.types';
 import { axialToOffset } from '../core/offsetCoordinates';
 import { resolveTileRender } from '../../assets/tileRenderResolution';
 import { effectiveSpan } from '../../assets/tileFootprint';
+import { getRenderSource } from '../../assets/imageOperations';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import { strokeBoundsWorld } from '../strokes/terrainStrokeGeometry';
 
@@ -1018,7 +1019,9 @@ function renderTiles(
       ctx.translate(-centerX, -centerY);
     }
 
-    ctx.drawImage(img, rect.drawX, rect.drawY, rect.drawWidth, rect.drawHeight);
+    // Draw the capped render-source for oversized images (built at load) so the
+    // GPU never uploads a full-res 6.5MP+ texture during an interactive frame.
+    ctx.drawImage(getRenderSource(img), rect.drawX, rect.drawY, rect.drawWidth, rect.drawHeight);
 
     if (needsTransform) {
       ctx.restore();

@@ -33,6 +33,19 @@ const loadingPromises = new Map<string, Promise<HTMLImageElement | null>>();
 const dimensionsCache = new Map<string, ImageDimensions>();
 const pinnedImages = new Set<string>();
 
+/**
+ * Downscaled render-source cache. Large tile source images (e.g. Dungeondraft
+ * "fill" terrain textures at 2560px+) are 6.5MP+; the first time one is drawn the
+ * GPU uploads the full texture, stalling a render frame (~200ms) — and it repeats
+ * whenever the LRU evicts and reloads it. We build a capped copy ONCE at load time
+ * (off the render frame) and hand THAT to the whole-image tile draw path, so the
+ * renderer never uploads the full-res texture during a gesture. Keyed by the
+ * source image element, so it is GC'd when the image is evicted. Full-res stays in
+ * imageCache for alpha-scans / wall sub-rect draws / naturalWidth math.
+ */
+const TILE_RENDER_SOURCE_MAX_PX = 1280;
+const renderSourceCache = new WeakMap<HTMLImageElement, HTMLCanvasElement>();
+
 /** Bumped whenever an image finishes loading into the cache. Lets render-side
  *  caches (static-layer cache) key on "the set of ready images changed". */
 let imageCacheVersion = 0;
@@ -207,6 +220,9 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
       // can re-decode under memory pressure. clearCachedImage revokes it
       // when the entry is actually evicted.
       imageCache.set(vaultPath, img);
+      // Build the capped render-source now (off the render frame) so oversized
+      // textures never stall an interactive frame on first draw.
+      buildRenderSource(img);
       imageCacheVersion++;
       evictIfNeeded();
       loadingPromises.delete(vaultPath);
@@ -221,6 +237,32 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
 
   loadingPromises.set(vaultPath, loadPromise);
   return loadPromise;
+}
+
+/** Build the capped render-source for a large image (no-op for small ones). */
+function buildRenderSource(img: HTMLImageElement): void {
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  const maxDim = Math.max(w, h);
+  if (maxDim <= TILE_RENDER_SOURCE_MAX_PX) return;
+  const scale = TILE_RENDER_SOURCE_MAX_PX / maxDim;
+  const canvas = activeWindow.createEl('canvas');
+  canvas.width = Math.max(1, Math.round(w * scale));
+  canvas.height = Math.max(1, Math.round(h * scale));
+  const cctx = canvas.getContext('2d');
+  if (cctx == null) return;
+  cctx.imageSmoothingQuality = 'high';
+  cctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  renderSourceCache.set(img, canvas);
+}
+
+/**
+ * Render source for a cached tile image: a capped downscaled copy for oversized
+ * images (built at load), else the image itself. Use ONLY for whole-image scaled
+ * draws (drawCellTile) — NOT for pixel-coord source sub-rects or naturalWidth math.
+ */
+function getRenderSource(img: HTMLImageElement): HTMLImageElement | HTMLCanvasElement {
+  return renderSourceCache.get(img) ?? img;
 }
 
 /**
@@ -341,4 +383,4 @@ function clearUnusedTileImages(activePaths: Set<string>): void {
   }
 }
 
-export { buildImageIndex, getImageDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, preloadImage, getCachedImage, getImageDimensions, getImageCacheVersion, clearCachedImage, clearUnusedTileImages, calculateGridFromImage, GRID_DENSITY_PRESETS, MAX_CACHE_SIZE, setMaxCacheSize, pinImage, unpinImage };
+export { buildImageIndex, getImageDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, preloadImage, getCachedImage, getRenderSource, getImageDimensions, getImageCacheVersion, clearCachedImage, clearUnusedTileImages, calculateGridFromImage, GRID_DENSITY_PRESETS, MAX_CACHE_SIZE, setMaxCacheSize, pinImage, unpinImage };
