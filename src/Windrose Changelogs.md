@@ -608,6 +608,21 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.0.2
+
+A performance-and-polish maintenance release on top of 2.0.
+
+### Performance
+- Pan and zoom no longer re-render the whole map on every mouse/touch move. The live view is now held off the React render path during a gesture and committed once when you let go, which removes the main-thread stalls that could make drag-panning and wheel-zooming feel choppy — most noticeable on larger maps. Cursor hit-testing (which cell you're pointing at) follows the live view, so nothing drifts while you pan.
+
+### Improvements
+- Tidied up the tool palette.
+- Fixed the reroll button's anchoring so it stays put.
+- The tile import wizard now reports accurate stats.
+
+### Bug Fixes
+- Large (multi-gigabyte) Dungeondraft pack imports now stream from disk instead of loading the entire file into memory at once, so very large packs import successfully instead of failing.
+
 ## Version 2.0.1
 
 A maintenance release for Obsidian community store compliance. No user-facing
