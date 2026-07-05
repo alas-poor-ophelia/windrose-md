@@ -1,5 +1,47 @@
 # Windrose Performance Lag — Investigation Handoff
 
+---
+
+## SESSION 4 (2026-07-04) — ROOT CAUSE #2: per-input Preact reconciliation (the REAL remaining lag)
+
+**Overturns the old "GPU-compositor" theory.** Live profiling (wrap CanvasRenderingContext2D ops + wrap requestAnimationFrame callbacks + PerformanceObserver longtasks + rAF frame-gap recorder; user drove `my-test-map` = 145 tiles/5 strokes) proved:
+- **Canvas render is CHEAP:** longest single rAF (render) callback = **8ms**; ALL canvas ops ~300ms spread over a whole 15-20s session; canvas resizes cost 2ms total; `getImageData` was a one-time thumbnail artifact (0 on repeat).
+- **The stalls are NON-rAF:** longtasks of **100-327ms** fire synchronously in the wheel/pointer INPUT handlers, not the render frame. Drawer open vs closed made no difference (rules out tile browser).
+- **KEY TECHNIQUE:** wrap rAF callbacks — if rAF-max is tiny but longtasks are large, the cost is in event handlers, not rendering.
+
+**Root cause (3 scouts, code-confirmed):** `viewState` (zoom/center) lives inside `mapData` (`useMapData.ts:21` useState). Every wheel/pointermove tick → `updateMapData` → `setMapData` (+`setPendingData`+`setSaveStatus`, 3 setStates, `useDebouncedSave.ts:83`) → synchronous Preact reconciliation of **17 unmemoized layer components** (all consume `useMapState()` whose context value churns) + the DungeonMapTracker anchor. The existing rAF coalescing (`useCanvasRenderer`) batches the DRAW, not the reconciliation. The static-layer cache excludes viewState — so these re-renders are entirely WASTED (canvas doesn't need React to show pan/zoom).
+
+Contributors: `screenToGrid/screenToWorld/getClientCoords` not `useCallback`'d (defeat the `mapStateValue` memo); `theme`/`customColors`/`mapData`-spread rebuilt inline in DMT.
+
+**The ineffective feather-blur "fix" (tileRenderer blurMaskFilterDownscaled) was REVERTED** — it targeted canvas cost, which isn't the bottleneck.
+
+### VETTED FIX (Parallax adversarial + Meridian, cross-model converged): encapsulated ViewController
+Hold live viewState OFF the React path; commit to mapData once per gesture end.
+
+- **DONE:** `src/hooks/canvas/useViewController.ts` — the encapsulated controller (getLive/setLive/beginGesture/commitIfCurrent/cancelIfCurrent/syncCommitted/setRenderCallback), gesture-token-guarded.
+
+### Remaining per-file steps (Meridian's decisive plan):
+1. **useCanvasRenderer.ts** — add `viewController` param; in the render effect register `viewController.setRenderCallback(scheduleRender)`; in `renderCanvas` (~:437) read `viewController.getLive()` instead of `mapData.viewState` for the transform (thread through the `renderInputsRef` stash ~:986). Static-settle callback stays.
+2. **useCanvasInteraction.ts** — add `viewController` param; replace every `mapData.viewState` read (lines ~125,177,225,264,269,281,337) with `getLive()`; in handleWheel/updatePan/updateTouchPan change `onViewStateChange(...)` → `setLive(...)`; **move `panStart` state → ref** (setPanStart per tick is a reconciliation trigger). Gesture lifecycle: startPan→`beginGesture()` (store id in ref); stopPan→`commitIfCurrent(id, getLive())` + add `pointercancel` + window `blur` handlers; WHEEL has no end → settle timer (ZOOM_SETTLE_MS=150) begins gesture on first tick, resets per tick, commits on settle-fire; touch pinch is its own gesture (wrap begin/commit; drop the touchPanStart/initialPinchDistance setState mirrors — refs already exist).
+3. **usePanZoomCoordinator.ts** — add `viewController` to options, forward to inner `useCanvasInteraction`. `handleStoredViewStateChange` becomes the controller's commit sink only.
+4. **MapCanvas.tsx (MapCanvasContent)** — `const vc = useViewController(mapData.viewState, onViewStateChange)`; pass `vc` to the DIRECT `useCanvasInteraction` (~:218), `useCanvasRenderer` (~:260), and into `usePanZoomCoordinator` (~:136). Add `useEffect([mapData.viewState])` → `vc.syncCommitted(mapData.viewState)`.
+5. Types: `UsePanZoomCoordinatorOptions`, `UseCanvasInteractionResult` params, renderer params.
+
+### Meridian's corrections to earlier assumptions:
+- **Dual updatePan listeners are ALREADY deduped** (window handler bails `if (canvas.contains(e.target)) return`, `useEventCoordinator.ts:1044-1055`). LEAVE — it's the safety net for panning off-canvas. Do NOT dedupe.
+- **`useCanvasInteraction` is instantiated TWICE** (in usePanZoomCoordinator for handlers, AND directly in MapCanvas ~:218 for screenToGrid/World used by tools). BOTH must get the controller or hit-testing reads committed state while canvas pans on the ref → the invisible regression.
+- Overlay layers derive transform from mapData.viewState but only re-run on their own props — once viewState leaves the mapData prop path they naturally stop reconciling. Previews-during-pure-pan is not a real workflow; don't engineer for it.
+- Coordinate-fn `useCallback` + collapse-the-triple-setState: DEFER to a secondary memoization/cleanup pass.
+
+### Traps (Parallax) + verification:
+- Stale reads (redirect ALL hot-path transforms). Ref/state desync (gesture token drops stale settle commits during undo/load/navigate). Lost gesture end (pointercancel/blur/unmount). Wheel/pan/pinch overlap. Coordinate drift (renderer + hit-testing share exact transform incl north rotation/DPR).
+- **Most likely regression:** ONE missed `mapData.viewState` read in hit-testing → hover/drop offset during gesture (passes smoke test, invisible until a user reports wrong-cell drops).
+- **Verify:** longtask profiler ~0 during driven gesture; assert NO setMapData mid-gesture; `console.count` on WallLayer stops firing during pan; `worldToScreen(screenToWorld(px,py))` round-trips within 1px on grid+hex, rotated+unrotated; pan→release→reload persists; test undo/navigate/fit-view during wheel-settle, pointercancel, blur.
+- **If longtasks persist after step 4:** a SECOND per-tick setState in another hook (hover/selection) is firing — find it with DevTools "why did this render" on DMT, don't add refs blindly.
+
+---
+
+
 **Date:** 2026-06-09 (updated session 2, late night)
 **Status:** Desktop fixed & measured. **iPad untested with Move 2** — needs user verification.
 **Branch:** `standalone-conversion`
