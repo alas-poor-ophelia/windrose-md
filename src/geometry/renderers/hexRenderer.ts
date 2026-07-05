@@ -122,31 +122,28 @@ const hexRenderer = {
     viewState: RenderViewState
   ): void {
     if (cells == null || cells.length === 0) return;
-    
+
     const previousAlpha = ctx.globalAlpha;
 
+    // Group by (opacity, color) and draw each group as a single batched Path2D
+    // fill via geometry.drawCells, instead of one beginPath/fill per hex.
+    const groups = new Map<string, { opacity: number; color: string; cells: Point[] }>();
     for (const cell of cells) {
-      // Apply opacity if specified (multiply with current globalAlpha)
       const opacity = cell.opacity ?? 1;
-      if (opacity < 1) {
-        ctx.globalAlpha = previousAlpha * opacity;
+      const key = `${opacity}|${cell.color}`;
+      let group = groups.get(key);
+      if (group == null) {
+        group = { opacity, color: cell.color, cells: [] };
+        groups.set(key, group);
       }
-
-      geometry.drawHex(
-        ctx,
-        cell.q,
-        cell.r,
-        viewState.x,
-        viewState.y,
-        viewState.zoom,
-        cell.color
-      );
-
-      // Restore previous opacity
-      if (opacity < 1) {
-        ctx.globalAlpha = previousAlpha;
-      }
+      group.cells.push({ x: cell.q, y: cell.r });
     }
+
+    for (const group of groups.values()) {
+      ctx.globalAlpha = previousAlpha * group.opacity;
+      geometry.drawCells(ctx, group.cells, viewState.x, viewState.y, viewState.zoom, group.color);
+    }
+    ctx.globalAlpha = previousAlpha;
   },
 
   /**

@@ -146,6 +146,14 @@ export interface IHexRenderer extends IGeometry {
     zoom: number,
     color: string
   ): void;
+  drawCells(
+    ctx: CanvasRenderingContext2D,
+    cells: Point[],
+    offsetX: number,
+    offsetY: number,
+    zoom: number,
+    color: string
+  ): void;
   drawHexOutline(
     ctx: CanvasRenderingContext2D,
     q: number,

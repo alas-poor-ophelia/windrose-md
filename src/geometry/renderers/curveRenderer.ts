@@ -154,17 +154,18 @@ function renderCurveInteriorGrid(
   ctx.clip(path, 'evenodd');
   ctx.fillStyle = lineColor;
 
-  // Draw vertical grid lines
+  // Batch every grid line into one Path2D and fill once (uniform lineColor),
+  // instead of a fillRect per line — one draw call instead of ~(cols+rows).
+  const linePath = new Path2D();
   for (let col = startCol; col <= endCol; col++) {
     const x = col * cellSize;
-    ctx.fillRect(x - halfWidth, bounds.minY - cellSize, actualLineWidth, bounds.maxY - bounds.minY + cellSize * 2);
+    linePath.rect(x - halfWidth, bounds.minY - cellSize, actualLineWidth, bounds.maxY - bounds.minY + cellSize * 2);
   }
-
-  // Draw horizontal grid lines
   for (let row = startRow; row <= endRow; row++) {
     const y = row * cellSize;
-    ctx.fillRect(bounds.minX - cellSize, y - halfWidth, bounds.maxX - bounds.minX + cellSize * 2, actualLineWidth);
+    linePath.rect(bounds.minX - cellSize, y - halfWidth, bounds.maxX - bounds.minX + cellSize * 2, actualLineWidth);
   }
+  ctx.fill(linePath);
 
   ctx.restore();
 }
@@ -193,15 +194,17 @@ function renderUnionInteriorGrid(
   ctx.clip(path, 'evenodd');
   ctx.fillStyle = lineColor;
 
+  // Batch every grid line into one Path2D and fill once (uniform lineColor).
+  const linePath = new Path2D();
   for (let col = startCol; col <= endCol; col++) {
     const x = col * cellSize;
-    ctx.fillRect(x - halfWidth, bounds.minY - cellSize, actualLineWidth, bounds.maxY - bounds.minY + cellSize * 2);
+    linePath.rect(x - halfWidth, bounds.minY - cellSize, actualLineWidth, bounds.maxY - bounds.minY + cellSize * 2);
   }
-
   for (let row = startRow; row <= endRow; row++) {
     const y = row * cellSize;
-    ctx.fillRect(bounds.minX - cellSize, y - halfWidth, bounds.maxX - bounds.minX + cellSize * 2, actualLineWidth);
+    linePath.rect(bounds.minX - cellSize, y - halfWidth, bounds.maxX - bounds.minX + cellSize * 2, actualLineWidth);
   }
+  ctx.fill(linePath);
 
   ctx.restore();
 }

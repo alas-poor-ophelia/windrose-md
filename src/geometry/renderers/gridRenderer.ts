@@ -142,9 +142,7 @@ const gridRenderer = {
     viewState: RenderViewState
   ): void {
     if (cells == null || cells.length === 0) return;
-    
-    const scaledSize = geometry.getScaledCellSize(viewState.zoom);
-    
+
     // Separate cells by whether they have custom opacity
     const fullOpacityCells: RenderCell[] = [];
     const customOpacityCells: RenderCell[] = [];
@@ -172,15 +170,25 @@ const gridRenderer = {
       }
     }
     
-    // Draw cells with custom opacity individually
+    // Draw custom-opacity cells grouped by (opacity, color): one Path2D fill per
+    // group via geometry.drawCells (globalAlpha applies to the whole batch),
+    // instead of one fillRect per cell. Collapses N draw calls to N-groups.
     if (customOpacityCells.length > 0) {
       const previousAlpha = ctx.globalAlpha;
+      const groups = new Map<string, { opacity: number; color: string; cells: RenderCell[] }>();
       for (const cell of customOpacityCells) {
         const opacity = cell.opacity ?? 1;
-        ctx.globalAlpha = previousAlpha * opacity;
-        ctx.fillStyle = cell.color;
-        const { screenX, screenY } = geometry.gridToScreen(cell.x, cell.y, viewState.x, viewState.y, viewState.zoom);
-        ctx.fillRect(screenX, screenY, scaledSize, scaledSize);
+        const key = `${opacity}|${cell.color}`;
+        let group = groups.get(key);
+        if (group == null) {
+          group = { opacity, color: cell.color, cells: [] };
+          groups.set(key, group);
+        }
+        group.cells.push(cell);
+      }
+      for (const group of groups.values()) {
+        ctx.globalAlpha = previousAlpha * group.opacity;
+        geometry.drawCells(ctx, group.cells, viewState.x, viewState.y, viewState.zoom, group.color);
       }
       ctx.globalAlpha = previousAlpha;
     }

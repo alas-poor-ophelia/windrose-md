@@ -539,22 +539,23 @@ class HexGeometry extends BaseGeometry {
     zoom: number,
     color: string
   ): void {
-    ctx.fillStyle = color;
-    
+    // Accumulate every hexagon into one Path2D and fill once, instead of a
+    // beginPath/fill per cell — one GPU draw call per color group.
+    const path = new Path2D();
     for (const cell of cells) {
       const vertices = this.getHexVertices(cell.x, cell.y);
-      const scaledVertices = vertices.map(v => 
+      const scaledVertices = vertices.map(v =>
         this.worldToScreen(v.worldX, v.worldY, offsetX, offsetY, zoom)
       );
-      
-      ctx.beginPath();
-      ctx.moveTo(scaledVertices[0].screenX, scaledVertices[0].screenY);
+
+      path.moveTo(scaledVertices[0].screenX, scaledVertices[0].screenY);
       for (let i = 1; i < scaledVertices.length; i++) {
-        ctx.lineTo(scaledVertices[i].screenX, scaledVertices[i].screenY);
+        path.lineTo(scaledVertices[i].screenX, scaledVertices[i].screenY);
       }
-      ctx.closePath();
-      ctx.fill();
+      path.closePath();
     }
+    ctx.fillStyle = color;
+    ctx.fill(path);
   }
   
   /**
