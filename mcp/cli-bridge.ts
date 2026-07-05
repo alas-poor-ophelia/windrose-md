@@ -21,7 +21,11 @@ const OBSIDIAN_CLI = path.join(
 );
 
 const VAULT = "Absalom";
-const PLUGIN_ID = "dungeon-map-tracker-settings";
+// Current plugin id. The legacy "dungeon-map-tracker-settings" id left
+// windrose_reload targeting a non-existent plugin, which forced callers to
+// hand-roll a raw disablePlugin/enablePlugin via windrose_eval — and a raw
+// teardown mid-autosave truncated the map-data JSON (512 KiB cut, ~13 maps lost).
+const PLUGIN_ID = "windrose-md";
 
 /** Default timeout for CLI commands (ms) */
 const DEFAULT_TIMEOUT = 15_000;
@@ -158,10 +162,33 @@ export async function obsidianErrors(): Promise<string> {
 }
 
 /**
- * Reload the Windrose settings plugin.
+ * Reload the Windrose plugin SAFELY.
+ *
+ * A raw disable/enable can sever an in-flight autosave mid-write and truncate the
+ * map-data JSON at an OS buffer boundary (a 512 KiB cut cost ~13 maps once). This
+ * flushes every open map instance's pending save, then WAITS for `saveStatus` to
+ * settle to 'Saved' before tearing the plugin down — so no reload can interrupt a
+ * write. The disable/enable runs in the window context, so it survives its own
+ * plugin teardown. Falls back to proceeding after a 5s timeout rather than hang.
  */
 export async function obsidianReload(): Promise<string> {
-  return cli("plugin:reload", `id=${PLUGIN_ID}`);
+  const code =
+    `(async () => {` +
+    `const id = ${JSON.stringify(PLUGIN_ID)};` +
+    `const insts = () => Object.values((window.__windrose && window.__windrose.mcpInstances) || {});` +
+    `let flushed = 0;` +
+    `for (const i of insts()) { try { if (i.ops && i.ops.forceSave) { i.ops.forceSave(); flushed++; } } catch (e) {} }` +
+    // Give saveStatus a beat to flip to 'Saving' before we poll for it to settle.
+    `await new Promise(r => setTimeout(r, 200));` +
+    `const deadline = Date.now() + 5000;` +
+    `const pending = () => insts().some(i => i.saveStatus && i.saveStatus !== 'Saved');` +
+    `while (pending() && Date.now() < deadline) { await new Promise(r => setTimeout(r, 100)); }` +
+    `const timedOut = pending();` +
+    `await app.plugins.disablePlugin(id);` +
+    `await app.plugins.enablePlugin(id);` +
+    `return JSON.stringify({ reloaded: true, flushed: flushed, timedOut: timedOut });` +
+    `})()`;
+  return obsidianEval(code);
 }
 
 /**
