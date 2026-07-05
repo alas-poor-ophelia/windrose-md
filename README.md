@@ -4,7 +4,7 @@ A TTRPG mapping tool that lives in your Obsidian notes. Windrose started as some
 
 Low tech enough to run in your note-taking app, high tech enough to make you forget you're in your note-taking app.
 
-![The full Windrose interface in a workspace tab: a generated dungeon on the canvas, with the tile drawer, floors, and color palette docked at the right](docs/images/full-pane-docs-screenshot.png)
+![The full Windrose interface in a workspace tab: a hex world map on the canvas, painted with image tiles and stocked with objects, and the tile drawer docked at the right](docs/images/full-pane-hex-docs-screenshot.png)
 
 Windrose supports both **grid (square) maps** — dungeons, battlemaps, building plans — and **hex maps** — world and region maps, with radial or rectangular layouts, named regions, and nested sub-maps. Touch is first class: it's designed to be fully usable on a tablet, and everything also works on desktop with keyboard and mouse conveniences layered on top.
 
@@ -51,6 +51,9 @@ Maps live in your notes as a small `windrose-map` code block; the drawing data i
 
 ---
 
+> [!alert] FOR A FULLER FEATURE LIST....
+> Check the more exhaustive [Feature List](docs/FEATURES.md) for a bit more detail on what features Windrose has and how they all work.
+
 ## Features
 
 ### Drawing
@@ -66,7 +69,7 @@ Painting is the core loop — think filling in squares on graph paper, but it ca
 - **Eraser** and **clear area** tools, for when your artistic vision is scuffed or a cat walks on your keyboard.
 - **50-level undo/redo**, for when the cat walks on your keyboard a lot.
 
-![Drawing tools in action on a grid map](docs/images/drawing-tools-docs-screenshot.png)
+![A grid dungeon painted inline in a note: the color palette open on the left, painted cells, placed objects, and a "Bloody Hallway" text label](docs/images/drawing-palette-docs-screenshot.png)
 
 ### Image tiles
 
@@ -78,10 +81,20 @@ New in 2.0, and the biggest thing Windrose has grown: paint your maps with **ima
 - **Dungeondraft import** — bring in a `.dungeondraft_pack` file via the **Add tiles** wizard (Settings → Tilesets) and its assets arrive already grouped and tagged. Plain image folders from your vault import through the same wizard, with automatic detection of how each tile should render.
 - **Rotation, flipping, and scaling** on placed tiles; per-tileset render settings for fine control.
 
+![Drawing walls with the wall/path tool in full-pane view: a room outlined in stone wall segments with draggable vertices and a bowed, curved wall](docs/images/tiles-walls-docs-screenshot.png)
+
+The **Add tiles** wizard walks a Dungeondraft pack (or a plain folder of images) through three steps — pick the source, confirm the guessed strata for each category, and apply tags — then extracts everything into your vault:
+
+| 1. Source | 2. Tiers | 3. Tags | Importing |
+| --- | --- | --- | --- |
+| ![Add tiles wizard, step 1: choosing a Dungeondraft pack or a folder of images as the source](docs/images/dungeondraft-import-1-docs-screenshot.png) | ![Add tiles wizard, step 2: confirming the auto-guessed strata for each category](docs/images/dungeondraft-import-2-docs-screenshot.png) | ![Add tiles wizard, step 3: tags imported from the pack plus tags suggested from filenames](docs/images/dungeondraft-import-3-docs-screenshot.png) | ![Add tiles wizard extracting tile assets into the vault](docs/images/dungeondraft-import-4-docs-screenshot.png) |
+
 
 ### Content packs
 
-Don't have tile art? Browse and install **content packs** — curated tile sets and fog-of-war textures — directly from the plugin (Settings → Tilesets → *Browse tile packs*). Packs download into your vault and are ready to paint with immediately.
+Want more variety? Browse and install **content packs** — curated object sets and fog-of-war textures — directly from the plugin (Settings → Objects → *Browse object packs*). Packs download into your vault and are ready to use immediately.
+
+![The object drawer showing an installed "Classic Dungeons by Bloated Blowfish" content pack, with Navigation, Hazards, and Features categories](docs/images/content-pack-docs-screenshot.png)
 
 ### Hex maps
 
@@ -91,7 +104,9 @@ Don't have tile art? Browse and install **content packs** — curated tile sets 
 - **Coordinates**, pointy or flat-top orientation, and up to four objects per hex.
 - **Background images** — lay a map image under the grid and size the hexes to it, with presets or full sub-pixel control. (Grid maps support background images too.)
 
-![A hex world map with regions and objects](docs/images/hex-map-docs-screenshot.png)
+![A hex world map named Hexlandia with named regions, objects, and painted terrain tiles, the tile drawer docked at the right](docs/images/hex-map-hexlandia-docs-screenshot.png)
+
+![A nested sub-map, "Region of More Volcanos", opened from a hex on the world map — breadcrumbs above the tool palette, terrain strata selected, and volcanic tiles painted from the tile drawer](docs/images/sub-map-tiles-docs-screenshot.png)
 
 ### Objects
 
@@ -102,16 +117,37 @@ Don't have tile art? Browse and install **content packs** — curated tile sets 
 - **Link any object to a note** — hover to preview, Ctrl/Cmd+click to open. Link objects *to each other* for staircases between floors or portals across maps.
 - **Deep links** — copy a link to any object and paste it in another note; clicking it opens the map and zooms to that object. Hovering shows a thumbnail preview with a crosshair on the target.
 
-![Objects placed on a dungeon map, with the object browser open](docs/images/objects-docs-screenshot.png)
+![A dungeon map inline in a note with objects placed across it, the object browser open on the right and a selected object's menu showing rotate, resize, label, duplicate, color, delete, and link actions](docs/images/objects-inline-docs-screenshot.png)
 
 ### Text labels and note pins
 
 - **Text labels** go anywhere, free of the grid — drag, rotate, edit in place, with configurable font, size, color, and opacity, and optional note links.
 - **Note pins** link a spot on the map straight to a vault note and display as a pin icon — a lighter-weight alternative to objects when the note *is* the point.
 
-### Layers
+### Boards, Strata, and Layers
 
-Give a map multiple **layers** — floors of a dungeon, states of a battlefield, before-and-after. Rename them, give them icons, and adjust per-layer opacity so lower floors ghost through for alignment. Objects can link between layers.
+Windrose is like an onion. It has layers. No but really. There's 3 layers of layers.
+
+#### Boards
+Give an entire map multiple layers — floors of a dungeon, states of a battlefield, before-and-after with the **boards** feature (previously layers). Rename them, give them icons, and adjust per-layer opacity so lower floors ghost through for alignment. Objects can link between layers.
+
+The Boards/overall layers display can be swapped between a "simple" mode that only shows a flat list of **boards** and the more complex view that shows the other layer classifications.
+
+**_NOTE**: If you don't care about image tiles, you don't need to care about Strata or Layers. You are however, still free to use them even without image tiles._
+
+#### Strata
+When painting with images tiles, there are 4 hardcoded **Strata**. From the ground and up, starting with **Terrain**, there is:
+1. Terrain - Your base ground layer
+2. Structure - Walls, paths, etc
+3. Props - Furniture, clutter, accoutrements
+4. Decorations - Your finishing touches, items on tables, etc.
+
+Although you can put anything on any strata, Dungeondraft packs in specific will get auto-categorized to put appropriate styles of tiles in the right strata. You can however change this either while importing, or later. 
+
+Of course, you may want to work with multiple layers in each strata...
+
+#### Layers
+**Layers** are the sub-categorization of strata. Have a base of grass, but want to soft brush in some patches of old cobble as a separately editable composition? You can with these layers. Layers can be individually toggled for visibility.
 
 ![The layers menu with several floors](docs/images/docs-layers-screenshot.png)
 
@@ -136,6 +172,11 @@ Generate a full dungeon layout from the command palette — pure old-fashioned m
 | The generator | The result |
 | --- | --- |
 | ![The Generate Random Dungeon modal, with its live layout preview, style and size selectors, and distance settings](docs/images/dungeon-generator-docs-screenshot.png) | ![A generated dungeon: rooms and corridors stocked with monsters, traps, doors, and furniture](docs/images/random-dungeon-docs-screenshot.png) |
+
+#### Solo-play
+Windrose has a small set of solo play features that are more by emergence than purposeful design, but worth calling out.
+
+**Player tokens**: An object can be designated as a "player". This unlocks the ability to measure/show movement across the grid, as well as a toggleable **lighty radius** that will auto clear **fog of war** if dropped onto it.
 
 ### Full-pane view
 
@@ -172,13 +213,23 @@ type: grid
 ```
 ````
 
+This works the same as any other codeblock in Obsidian. For instance, put it in a callout like this:
+````
+> [!INFO]
+> ```windrose-map
+> id: your-map-id
+> name: My Map
+> type: grid
+```
+````
+
+![A hex map embedded inline in a note: ordinary note text above, then a "Map of Hexlandia" callout containing the live, fully interactive map block](docs/images/note-callout-docs-screenshot.png)
+
 The drawing data lives in `windrose-map-data.json` in your vault, keyed by `id` — plain JSON that travels with your vault and works with Obsidian Sync and friends. Delete the code block and your data is still there; paste the block somewhere else and the map comes with it.
 
 ---
 
 ## Thanks to
-
-Blacksmithgu for creating [Datacore](https://github.com/blacksmithgu/datacore) — Windrose started life as a Datacore compiled script, and that framework is what made it possible to trick myself into thinking that learning React was a good idea. v2.0 is a standalone plugin, but we wouldn't be here without that foundation.
 
 Many members of the Obsidian TTRPG discord, including:
 - BloatedBlowfish
@@ -187,7 +238,9 @@ Many members of the Obsidian TTRPG discord, including:
 - LastElf
 - And many others, especially those who goaded me into and taught me about hex mapping.
 
-And my DM, who got me excited about both TTRPGs, and about having fun with software dev again.
+My DM, who got me excited about both TTRPGs, and about having fun with software dev again.
+
+And Blacksmithgu for creating [Datacore](https://github.com/blacksmithgu/datacore) — Windrose started life as a Datacore compiled script, and that framework is what made it possible to trick myself into thinking that learning React was a good idea. v2.0 is a standalone plugin, but we wouldn't be here without that foundation.
 
 ## License
 
