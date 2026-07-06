@@ -1,0 +1,55 @@
+#!/bin/sh
+# Windrose pre-commit gate — lock in ESLint errors = 0.
+#
+# Blocks a commit if any STAGED .ts/.tsx file has ESLint *errors*. Warnings are
+# allowed through here (the full warning ratchet lives in `npm run check`, which
+# enforces --max-warnings). This hook is activated via the package.json `prepare`
+# script (`git config core.hooksPath .githooks`); run `npm install` once to wire it.
+#
+# Bypass in an emergency with `git commit --no-verify`.
+
+files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx)$' || true)
+[ -z "$files" ] && exit 0
+
+# shellcheck disable=SC2086
+echo "$files" | xargs npx eslint
+status=$?
+if [ "$status" -ne 0 ]; then
+  echo ""
+  echo "✖ Commit blocked: ESLint errors in staged files. Fix them or run 'npm run lint:fix'."
+  echo "  (To bypass in an emergency: git commit --no-verify)"
+fi
+exit "$status"
+
+# --- BEGIN BEADS INTEGRATION v1.1.0 ---
+# This section is managed by beads. Do not remove these markers.
+if command -v bd >/dev/null 2>&1; then
+  export BD_GIT_HOOK=1
+  _bd_timeout=${BEADS_HOOK_TIMEOUT:-300}
+  _bd_used_perl=0
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$_bd_timeout" bd hooks run pre-commit "$@"
+    _bd_exit=$?
+  elif command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$_bd_timeout" bd hooks run pre-commit "$@"
+    _bd_exit=$?
+  elif command -v perl >/dev/null 2>&1; then
+    _bd_used_perl=1
+    perl -e 'alarm shift; exec @ARGV' "$_bd_timeout" bd hooks run pre-commit "$@"
+    _bd_exit=$?
+  else
+    echo >&2 "beads: hook 'pre-commit' running without timeout; install coreutils or perl to enable BEADS_HOOK_TIMEOUT"
+    bd hooks run pre-commit "$@"
+    _bd_exit=$?
+  fi
+  if [ $_bd_exit -eq 124 ] || { [ $_bd_used_perl -eq 1 ] && [ $_bd_exit -eq 142 ]; }; then
+    echo >&2 "beads: hook 'pre-commit' timed out after ${_bd_timeout}s — continuing without beads"
+    _bd_exit=0
+  fi
+  if [ $_bd_exit -eq 3 ]; then
+    echo >&2 "beads: database not initialized — skipping hook 'pre-commit'"
+    _bd_exit=0
+  fi
+  if [ $_bd_exit -ne 0 ]; then exit $_bd_exit; fi
+fi
+# --- END BEADS INTEGRATION v1.1.0 ---

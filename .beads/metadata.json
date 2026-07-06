@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "windrose",
+  "project_id": "4a2753cf-cd0a-4bde-9f51-53793a8c5afa"
+}
