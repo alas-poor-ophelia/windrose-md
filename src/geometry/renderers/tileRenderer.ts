@@ -13,6 +13,7 @@ import { axialToOffset } from '../core/offsetCoordinates';
 import { resolveTileRender } from '../../assets/tileRenderResolution';
 import { effectiveSpan } from '../../assets/tileFootprint';
 import { getRenderSource } from '../../assets/imageOperations';
+import { tileIdBasename } from '../../assets/tilesetOperations';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import { strokeBoundsWorld } from '../strokes/terrainStrokeGeometry';
 
@@ -748,10 +749,24 @@ function getEntryMap(tilesets: TilesetDef[]): Map<string, { entry: { vaultPath: 
   }
   if (_cachedEntryMap && sig === _cachedEntryMapSig) return _cachedEntryMap;
 
+  // Must mirror resolveTileEntry (tilesetOperations.ts) semantics exactly:
+  // exact id match first-wins, then legacy basename aliases for folder-relative
+  // ids. Dungeondraft packs duplicate basenames across subfolders — last-wins
+  // here made the renderer resolve a different twin than the preloader, so the
+  // cache lookup missed and placements rendered invisible.
   const map = new Map<string, { entry: { vaultPath: string }; tileset: TilesetDef }>();
   for (const ts of tilesets) {
     for (const entry of ts.tiles) {
-      map.set(ts.id + ':' + entry.id, { entry, tileset: ts });
+      const key = ts.id + ':' + entry.id;
+      if (!map.has(key)) map.set(key, { entry, tileset: ts });
+    }
+  }
+  for (const ts of tilesets) {
+    for (const entry of ts.tiles) {
+      const base = tileIdBasename(entry.id);
+      if (base === entry.id) continue;
+      const key = ts.id + ':' + base;
+      if (!map.has(key)) map.set(key, { entry, tileset: ts });
     }
   }
   _cachedEntryMapSig = sig;

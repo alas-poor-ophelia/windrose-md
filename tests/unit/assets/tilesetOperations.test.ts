@@ -11,6 +11,8 @@ import {
   autoDetectOverflow,
   createTilesetFromTiles,
   classifyTileArtMask,
+  resolveTileEntry,
+  tileIdBasename,
   ALPHA_COVERAGE_THRESHOLD,
 } from '../../../src/assets/tilesetOperations';
 
@@ -359,6 +361,72 @@ describe('tilesetOperations', () => {
         return dx * dx + dy * dy <= 1 ? 255 : 0;
       };
       expect(classifyTileArtMask(alpha, W, h)).toBe('pointy');
+    });
+  });
+
+  describe('tileIdBasename', () => {
+    it('returns the id unchanged when it has no path segments', () => {
+      expect(tileIdBasename('Cracked_Stone_01_A')).toBe('Cracked_Stone_01_A');
+    });
+
+    it('returns the last segment of a folder-relative id', () => {
+      expect(tileIdBasename('terrain/Natural/Cracked_Stone_01_A')).toBe('Cracked_Stone_01_A');
+    });
+  });
+
+  describe('resolveTileEntry', () => {
+    const entry = (id: string): TileEntry => ({
+      id,
+      filename: tileIdBasename(id) + '.webp',
+      vaultPath: 'Pack/' + id + '.webp',
+    });
+    const tileset = (ids: string[]): { tiles: TileEntry[] } => ({ tiles: ids.map(entry) });
+
+    it('resolves a unique exact id', () => {
+      const ts = tileset(['grass', 'forest', 'water']);
+      expect(resolveTileEntry(ts, 'forest')?.id).toBe('forest');
+    });
+
+    it('returns undefined for unknown ids, undefined tilesets, and empty ids', () => {
+      const ts = tileset(['grass']);
+      expect(resolveTileEntry(ts, 'lava')).toBeUndefined();
+      expect(resolveTileEntry(undefined, 'grass')).toBeUndefined();
+      expect(resolveTileEntry(ts, '')).toBeUndefined();
+      expect(resolveTileEntry(ts, undefined)).toBeUndefined();
+    });
+
+    it('resolves the FIRST occurrence when ids are duplicated (DD pack twins)', () => {
+      // Same basename in two subfolders — the invisible-tile bug scenario.
+      const ts = {
+        tiles: [
+          { id: 'Cracked_Stone_01_A', filename: 'Cracked_Stone_01_A.webp', vaultPath: 'Pack/terrain/Natural/Cracked_Stone_01_A.webp' },
+          { id: 'Cracked_Stone_01_A', filename: 'Cracked_Stone_01_A.webp', vaultPath: 'Pack/patterns/normal/Natural/Cracked_Stone_01_A.webp' },
+        ],
+      };
+      expect(resolveTileEntry(ts, 'Cracked_Stone_01_A')?.vaultPath)
+        .toBe('Pack/terrain/Natural/Cracked_Stone_01_A.webp');
+    });
+
+    it('resolves legacy basename references against folder-relative ids', () => {
+      const ts = tileset(['terrain/Natural/Cracked_Stone_01_A', 'props/Barrel_01']);
+      expect(resolveTileEntry(ts, 'Cracked_Stone_01_A')?.id).toBe('terrain/Natural/Cracked_Stone_01_A');
+      expect(resolveTileEntry(ts, 'Barrel_01')?.id).toBe('props/Barrel_01');
+    });
+
+    it('prefers an exact match over an earlier legacy basename match', () => {
+      const ts = tileset(['terrain/Natural/X', 'X']);
+      expect(resolveTileEntry(ts, 'X')?.id).toBe('X');
+    });
+
+    it('takes the first legacy candidate when several basenames collide', () => {
+      const ts = tileset(['terrain/Natural/X', 'patterns/normal/Natural/X']);
+      expect(resolveTileEntry(ts, 'X')?.id).toBe('terrain/Natural/X');
+    });
+
+    it('resolves folder-relative ids exactly', () => {
+      const ts = tileset(['terrain/Natural/X', 'patterns/normal/Natural/X']);
+      expect(resolveTileEntry(ts, 'patterns/normal/Natural/X')?.vaultPath)
+        .toBe('Pack/patterns/normal/Natural/X.webp');
     });
   });
 

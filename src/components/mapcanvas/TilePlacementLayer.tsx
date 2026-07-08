@@ -19,6 +19,7 @@ import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useApp } from '../../context/AppContext';
 import { getActiveLayer, getActiveBoardLayers } from '../../persistence/layerAccessor';
 import { preloadImage } from '../../assets/imageOperations';
+import { resolveTileEntry } from '../../assets/tilesetOperations';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import type { ResolvedTileRender } from '../../assets/tileRenderResolution';
 import { resolveTileRender, EDGE_BLEND_FEATHER } from '../../assets/tileRenderResolution';
@@ -104,7 +105,7 @@ const TilePlacementLayer = ({
 
     // Ensure the selected tile image is cached for rendering
     const ts = mapData.tilesets?.find(t => t.id === selectedTilesetId);
-    const entry = ts?.tiles.find(t => t.id === selectedTileId);
+    const entry = resolveTileEntry(ts, selectedTileId);
     if (entry?.vaultPath != null && entry.vaultPath !== '') void preloadImage(app, entry.vaultPath);
 
     let currentTiles = strokeTilesRef.current ?? getActiveLayer(mapData).tiles ?? [];
@@ -197,7 +198,7 @@ const TilePlacementLayer = ({
     if (!mapData || selectedTilesetId == null || selectedTilesetId === '' || selectedTileId == null || selectedTileId === '') return;
 
     const ts = mapData.tilesets?.find(t => t.id === selectedTilesetId);
-    const entry = ts?.tiles.find(t => t.id === selectedTileId);
+    const entry = resolveTileEntry(ts, selectedTileId);
     if (entry?.vaultPath != null && entry.vaultPath !== '') void preloadImage(app, entry.vaultPath);
 
     const { feather } = resolvePaintTimeRender(geometry?.type === 'grid', entry, ts, paintEdgeBlend);
@@ -266,7 +267,7 @@ const TilePlacementLayer = ({
     if (!mapData || selectedTilesetId == null || selectedTilesetId === '' || selectedTileId == null || selectedTileId === '') return;
 
     const ts = mapData.tilesets?.find(t => t.id === selectedTilesetId);
-    const entry = ts?.tiles.find(t => t.id === selectedTileId);
+    const entry = resolveTileEntry(ts, selectedTileId);
     if (entry?.vaultPath != null && entry.vaultPath !== '') void preloadImage(app, entry.vaultPath);
 
     const currentTiles = strokeTilesRef.current ?? getActiveLayer(mapData).tiles ?? [];

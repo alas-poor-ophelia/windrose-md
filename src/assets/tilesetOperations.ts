@@ -117,6 +117,47 @@ async function scanTilesetFolder(app: App, folderPath: string): Promise<TileEntr
 }
 
 // ===========================================
+// Tile Resolution
+// ===========================================
+
+/** Last path segment of a tile id. Folder-relative ids ("terrain/Natural/X")
+ *  reduce to their basename ("X") for legacy-reference matching. */
+function tileIdBasename(id: string): string {
+  const idx = id.lastIndexOf('/');
+  return idx >= 0 ? id.slice(idx + 1) : id;
+}
+
+/**
+ * Resolve a tile entry within a tileset by tile ID.
+ *
+ * Single source of truth for tileId → TileEntry resolution — every lookup of
+ * a stored tilesetId/tileId pair must go through this (or mirror its
+ * semantics exactly, as the renderer's entry map does):
+ *   1. Exact id match — FIRST occurrence wins. Dungeondraft packs reuse
+ *      basenames across subfolders, so ids can be duplicated within one
+ *      tileset; divergent pick order between resolution sites renders
+ *      placements invisible (preloader loads one twin, renderer asks the
+ *      cache for the other).
+ *   2. Legacy fallback — match the basename of a folder-relative entry id,
+ *      so placements saved under old basename-derived ids keep resolving
+ *      after ids become folder-relative paths.
+ */
+function resolveTileEntry(
+  tileset: Pick<TilesetDef, 'tiles'> | undefined,
+  tileId: string | undefined
+): TileEntry | undefined {
+  if (tileset == null || tileId == null || tileId === '') return undefined;
+  let legacy: TileEntry | undefined;
+  for (const entry of tileset.tiles) {
+    if (entry.id === tileId) return entry;
+    if (legacy === undefined && entry.id !== tileIdBasename(entry.id) && tileIdBasename(entry.id) === tileId) {
+      legacy = entry;
+    }
+  }
+  return legacy;
+}
+
+// ===========================================
 // Tileset Creation
 // ===========================================
 
@@ -432,4 +473,4 @@ async function createTileset(
 // Module Exports
 // ===========================================
 
-export { scanTilesetFolder, createTileset, createTilesetFromTiles, probeFirstTileImage, measureAlphaCoverage, autoDetectOverflow, generateTilesetId, classifyTileArtMask, detectArtOrientation, ALPHA_COVERAGE_THRESHOLD };
+export { scanTilesetFolder, createTileset, createTilesetFromTiles, probeFirstTileImage, measureAlphaCoverage, autoDetectOverflow, generateTilesetId, classifyTileArtMask, detectArtOrientation, resolveTileEntry, tileIdBasename, ALPHA_COVERAGE_THRESHOLD };

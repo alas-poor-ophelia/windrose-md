@@ -43,6 +43,7 @@ import { getActiveLayer, getLayerById, getActiveBoardLayers, getBoardsOrdered, u
 import type { TileLayerRole } from '#types/tiles/tile.types';
 import { setCell as accessorSetCell, removeCell as accessorRemoveCell, cellToPoint } from './geometry/core/cellAccessor';
 import { assignmentsOverlap } from './assets/tileFootprint';
+import { resolveTileEntry } from './assets/tilesetOperations';
 import { placeObject as opsPlaceObject } from './objects/objectOperations';
 import { getResolvedObjectTypes } from './objects/objectTypeResolver';
 import { FloatingPanel } from './components/panels/FloatingPanel';
@@ -480,7 +481,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     return recentTiles
       .map(r => {
         const ts = availableTilesets.find(t => t.id === r.tilesetId);
-        const tile = ts?.tiles.find(t => t.id === r.tileId);
+        const tile = resolveTileEntry(ts, r.tileId);
         if (!tile || !ts) return null;
         return { tilesetId: ts.id, tileId: tile.id, filename: tile.filename, vaultPath: tile.vaultPath };
       })
@@ -910,18 +911,18 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           })),
         selectTile: (tilesetId: string, tileId: string): { ok: boolean; note?: string; availableTilesetIds?: string[] } => {
           const ts = availableTilesets.find(t => t.id === tilesetId);
-          const tile = ts?.tiles.find(t => t.id === tileId);
+          const tile = resolveTileEntry(ts, tileId);
           if (ts == null || tile == null) {
             return { ok: false, availableTilesetIds: availableTilesets.map(t => t.id) };
           }
-          handleTileSelect(tilesetId, tileId);
+          handleTileSelect(tilesetId, tile.id);
           setCurrentTool('tilePaint');
           return { ok: true, note: 'subtool defaults to single-stamp when selected programmatically' };
         },
         placeTile: (a: { col: number; row: number; tilesetId: string; tileId: string; rotation?: number; depth?: string; scale?: number }): { ok: boolean; tileCount: number; error?: string } => {
           if (activeLayer == null) return { ok: false, tileCount: 0, error: 'No active layer' };
           const ts = availableTilesets.find(t => t.id === a.tilesetId);
-          const tile = ts?.tiles.find(t => t.id === a.tileId);
+          const tile = resolveTileEntry(ts, a.tileId);
           if (ts == null || tile == null) {
             return { ok: false, tileCount: activeLayer.tiles?.length ?? 0, error: `Unknown tile ${a.tilesetId}/${a.tileId}` };
           }
@@ -929,7 +930,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             col: a.col,
             row: a.row,
             tilesetId: a.tilesetId,
-            tileId: a.tileId,
+            tileId: tile.id,
             rotation: (a.rotation != null && a.rotation !== 0 ? a.rotation : undefined) as TileRotation | undefined,
             depth: (a.depth != null && a.depth !== 'ground' ? a.depth : undefined) as TileLayerRole | undefined,
             scale: a.scale != null && a.scale !== 1 ? a.scale : undefined,

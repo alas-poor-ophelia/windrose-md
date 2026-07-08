@@ -3,6 +3,7 @@ import type { App } from 'obsidian';
 
 import { useEffect, useState } from 'preact/hooks';
 import { preloadImage, pinImage, getCachedImage } from '../../assets/imageOperations';
+import { resolveTileEntry } from '../../assets/tilesetOperations';
 import { collectWallPathImagePaths } from '../../geometry/renderers/wallPathRenderer';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import { getEffectiveSettings } from '../../core/settingsAccessor';
@@ -87,7 +88,7 @@ function useImagePreloading(
           const tsId = tile.tilesetId;
           const tId = tile.tileId;
           const ts = mapData.tilesets.find(t => t.id === tsId);
-          const entry = ts?.tiles.find(t => t.id === tId);
+          const entry = resolveTileEntry(ts, tId);
           if (entry?.vaultPath != null && entry.vaultPath !== '') placedPaths.add(entry.vaultPath);
         }
       }
@@ -101,7 +102,7 @@ function useImagePreloading(
       if (layer.terrainStrokes != null && layer.terrainStrokes.length > 0) {
         for (const s of layer.terrainStrokes) {
           const ts = mapData.tilesets.find(t => t.id === s.tilesetId);
-          const entry = ts?.tiles.find(t => t.id === s.tileId);
+          const entry = resolveTileEntry(ts, s.tileId);
           if (entry?.vaultPath != null && entry.vaultPath !== '') placedPaths.add(entry.vaultPath);
         }
       }

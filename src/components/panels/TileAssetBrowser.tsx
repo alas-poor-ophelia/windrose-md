@@ -38,6 +38,7 @@ import { clusterCategories, NOISE, humanizePackName, detectTileGeometry } from '
 import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
 import type { FolderInput } from '../../assets/categoryMerge';
 import { runDetectionScan } from '../../assets/tileImageScan';
+import { resolveTileEntry } from '../../assets/tilesetOperations';
 import { drawTileToCanvas, loadVaultImage, observeWidth, TileThumbnail, PREVIEW_SIZE } from './tileBrowserCommon';
 import { TileOrganizePane } from './TileOrganizePane';
 import { TileFilterScreen } from './TileFilterScreen';
@@ -348,7 +349,7 @@ const TileAssetBrowser = memo(({
       // selection); everything else arms tile placement. Portals derive as
       // stamps, not strips, so they route to tilePaint like other tiles.
       const src = tileMetadata[
-        tilesets.find(t => t.id === tilesetId)?.tiles.find(t => t.id === tileId)?.vaultPath ?? ''
+        resolveTileEntry(tilesets.find(t => t.id === tilesetId), tileId)?.vaultPath ?? ''
       ]?.ddSourceType?.toLowerCase();
       onToolChange(src === 'walls' || src === 'paths' ? 'wall' : 'tilePaint');
     }
@@ -833,7 +834,7 @@ const TileAssetBrowser = memo(({
     return recentTiles
       .map(r => {
         const ts = tilesets.find(t => t.id === r.tilesetId);
-        return ts?.tiles.find(t => t.id === r.tileId);
+        return resolveTileEntry(ts, r.tileId);
       })
       .filter((t): t is TileEntry => t != null);
   }, [recentTiles, tilesets]);

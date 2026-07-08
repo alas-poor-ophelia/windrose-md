@@ -22,6 +22,7 @@ import type { TilesetDef, TileMetadataStore } from '#types/tiles/tile.types';
 
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import { DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
+import { resolveTileEntry } from '../../assets/tilesetOperations';
 
 // ===========================================
 // Types
@@ -217,7 +218,7 @@ function resolveWallStrip(
   getCachedImage: (vaultPath: string) => HTMLImageElement | null,
 ): ResolvedWallStrip | null {
   const tileset = tilesets.find(ts => ts.id === wallPath.tilesetId);
-  const entry = tileset?.tiles.find(t => t.id === wallPath.tileId);
+  const entry = resolveTileEntry(tileset, wallPath.tileId);
   if (entry == null) return null;
 
   const img = getCachedImage(entry.vaultPath);
@@ -406,7 +407,7 @@ function collectWallPathImagePaths(
   const paths = new Set<string>();
   for (const wp of wallPaths) {
     const ts = tilesets.find(t => t.id === wp.tilesetId);
-    const entry = ts?.tiles.find(t => t.id === wp.tileId);
+    const entry = resolveTileEntry(ts, wp.tileId);
     if (entry?.vaultPath == null) continue;
     paths.add(entry.vaultPath);
     const cap = metadata[entry.vaultPath]?.wallEndCapPath;
