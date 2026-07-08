@@ -608,6 +608,20 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.0.3
+
+A patch release focused on tile reliability and a long-requested eraser improvement.
+
+### Improvements
+- **The eraser now works on every kind of image tile.** Clicking a wall or path strip with the eraser removes the whole strip; clicking inside a soft terrain brush stroke removes the whole stroke — matching how single tiles already erased in one click. Precise targets win first (tiles, then walls, then drawings and cells), so a broad terrain stroke never swallows a click aimed at something on top of it. Every erase is a single undo step. (Partial, soft-brush erasing of terrain strokes is planned for a future release.)
+
+### Bug Fixes
+- **Fixed image tiles rendering invisible or as the wrong texture.** Dungeondraft packs commonly contain multiple tiles with the same filename in different subfolders; Windrose previously identified tiles by filename alone, so one of the duplicates would silently win — leaving placed terrain invisible or showing the wrong art. Tile identities are now folder-qualified, stored maps are migrated automatically on save, and wall/path texture references are validated at load.
+
+### Performance
+- Oversized tile source images are downscaled once at load instead of being resampled at full size every frame.
+- Remaining per-cell canvas fills are batched into single paths, trimming redraw cost on large painted maps.
+
 ## Version 2.0.2
 
 A performance-and-polish maintenance release on top of 2.0.
