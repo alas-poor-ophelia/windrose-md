@@ -730,6 +730,7 @@ function tileOrientationAdaptation(
 
 let _cachedEntryMap: Map<string, { entry: { vaultPath: string }; tileset: TilesetDef }> | null = null;
 let _cachedEntryMapSig = '';
+let _cachedEntryMapTiles: Array<readonly unknown[]> = [];
 
 function getEntryMap(tilesets: TilesetDef[]): Map<string, { entry: { vaultPath: string }; tileset: TilesetDef }> {
   // Signature MUST include every render-affecting field that can change without
@@ -747,7 +748,13 @@ function getEntryMap(tilesets: TilesetDef[]): Map<string, { entry: { vaultPath: 
       + ':' + (ts.artOrientation ?? '')
       + ',';
   }
-  if (_cachedEntryMap && sig === _cachedEntryMapSig) return _cachedEntryMap;
+  // Tile IDS can change without altering tile count (a rescan re-mints ids in
+  // place — same 5497 tiles, every key different), which the string sig cannot
+  // see. Rescans always REPLACE the tiles arrays, so reference identity on
+  // each ts.tiles is the reliable staleness check for entry-level changes.
+  const tilesUnchanged = tilesets.length === _cachedEntryMapTiles.length
+    && tilesets.every((ts, i) => ts.tiles === _cachedEntryMapTiles[i]);
+  if (_cachedEntryMap && sig === _cachedEntryMapSig && tilesUnchanged) return _cachedEntryMap;
 
   // Must mirror resolveTileEntry (tilesetOperations.ts) semantics exactly:
   // exact id match first-wins, then legacy basename aliases for folder-relative
@@ -770,6 +777,7 @@ function getEntryMap(tilesets: TilesetDef[]): Map<string, { entry: { vaultPath: 
     }
   }
   _cachedEntryMapSig = sig;
+  _cachedEntryMapTiles = tilesets.map(ts => ts.tiles);
   _cachedEntryMap = map;
   return map;
 }

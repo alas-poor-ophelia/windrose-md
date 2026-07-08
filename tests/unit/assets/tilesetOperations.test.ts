@@ -13,6 +13,7 @@ import {
   classifyTileArtMask,
   resolveTileEntry,
   tileIdBasename,
+  mintTileId,
   ALPHA_COVERAGE_THRESHOLD,
 } from '../../../src/assets/tilesetOperations';
 
@@ -361,6 +362,36 @@ describe('tilesetOperations', () => {
         return dx * dx + dy * dy <= 1 ? 255 : 0;
       };
       expect(classifyTileArtMask(alpha, W, h)).toBe('pointy');
+    });
+  });
+
+  describe('mintTileId', () => {
+    it('keeps the historical basename-derived id for root-level tiles', () => {
+      expect(mintTileId('grass.png', new Set())).toBe('grass');
+    });
+
+    it('mints folder-relative ids for nested tiles', () => {
+      expect(mintTileId('terrain/Natural/Cracked_Stone_01_A.webp', new Set()))
+        .toBe('terrain/Natural/Cracked_Stone_01_A');
+    });
+
+    it('never duplicates ids for the same basename in different folders', () => {
+      const seen = new Set<string>();
+      const a = mintTileId('terrain/Natural/X.webp', seen);
+      const b = mintTileId('patterns/normal/Natural/X.webp', seen);
+      expect(a).not.toBe(b);
+      expect(a).toBe('terrain/Natural/X');
+      expect(b).toBe('patterns/normal/Natural/X');
+    });
+
+    it('keeps the extension when two files in one folder share a stem', () => {
+      const seen = new Set<string>();
+      expect(mintTileId('rock.png', seen)).toBe('rock');
+      expect(mintTileId('rock.webp', seen)).toBe('rock.webp');
+    });
+
+    it('treats a dotfile-like name without a real stem as its own id', () => {
+      expect(mintTileId('.hidden', new Set())).toBe('.hidden');
     });
   });
 

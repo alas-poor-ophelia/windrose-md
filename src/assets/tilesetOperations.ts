@@ -19,6 +19,21 @@ const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
 // ID Generation
 // ===========================================
 
+/**
+ * Mint a tile id from its folder-relative path: the relative path with the
+ * extension stripped. Unique across subfolders by construction (paths are
+ * unique), and root-level tiles keep their historical basename-derived ids —
+ * placements saved under those never need remapping. If two files in one
+ * folder share a stem (rock.png + rock.webp), later ones keep the extension.
+ */
+function mintTileId(relativePath: string, seenIds: Set<string>): string {
+  const dotIdx = relativePath.lastIndexOf('.');
+  const stem = dotIdx > 0 ? relativePath.slice(0, dotIdx) : relativePath;
+  const id = seenIds.has(stem) ? relativePath : stem;
+  seenIds.add(id);
+  return id;
+}
+
 /** Generate a deterministic tileset ID from folder path */
 function generateTilesetId(folderPath?: string): string {
   if (folderPath != null && folderPath !== '') {
@@ -75,6 +90,7 @@ async function scanTilesetFolder(app: App, folderPath: string): Promise<TileEntr
     : folderPath;
 
   const tiles: TileEntry[] = [];
+  const seenIds = new Set<string>();
 
   // Recursively collect image files via adapter.list (folder-scoped, not vault-wide)
   const queue = [normalizedFolder];
@@ -107,7 +123,7 @@ async function scanTilesetFolder(app: App, folderPath: string): Promise<TileEntr
 
       const slashIdx = filePath.lastIndexOf('/');
       const filename = slashIdx >= 0 ? filePath.slice(slashIdx + 1) : filePath;
-      const id = filename.slice(0, filename.lastIndexOf('.'));
+      const id = mintTileId(relativePath, seenIds);
 
       tiles.push({ id, filename, vaultPath: filePath, category, tags });
     }
@@ -473,4 +489,4 @@ async function createTileset(
 // Module Exports
 // ===========================================
 
-export { scanTilesetFolder, createTileset, createTilesetFromTiles, probeFirstTileImage, measureAlphaCoverage, autoDetectOverflow, generateTilesetId, classifyTileArtMask, detectArtOrientation, resolveTileEntry, tileIdBasename, ALPHA_COVERAGE_THRESHOLD };
+export { scanTilesetFolder, createTileset, createTilesetFromTiles, probeFirstTileImage, measureAlphaCoverage, autoDetectOverflow, generateTilesetId, classifyTileArtMask, detectArtOrientation, resolveTileEntry, tileIdBasename, mintTileId, ALPHA_COVERAGE_THRESHOLD };
