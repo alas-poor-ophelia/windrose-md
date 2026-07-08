@@ -14,6 +14,8 @@ import type { GroupDragInitialState } from '../hooks/groupDrag.types';
 import type { Cell } from '../core/cell.types';
 import type { BorderSide, Edge } from '../core/rendering.types';
 import type { TileAssignment } from '../tiles/tile.types';
+import type { WallPath } from '../core/wallpath.types';
+import type { TerrainStroke } from '../core/terrainstroke.types';
 import type { ToolId } from '../tools/tool.types';
 
 // ===========================================
@@ -146,6 +148,10 @@ export interface MapOperationsContextValue {
 
   // Tile operations
   onTilesChange?: (tiles: TileAssignment[], suppressHistory?: boolean) => void;
+
+  // Wall/path strip and terrain stroke operations (whole-entry erase)
+  onWallPathsChange?: (wallPaths: WallPath[], suppressHistory?: boolean) => void;
+  onTerrainStrokesChange?: (strokes: TerrainStroke[], suppressHistory?: boolean) => void;
 
   // Note pin operations (optional — not all providers include these)
   onNotePinsChange?: (pins: NotePin[]) => void;

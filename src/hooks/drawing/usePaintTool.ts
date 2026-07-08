@@ -1,7 +1,8 @@
 /**
  * usePaintTool.ts
  *
- * Manages the paint/erase drag tool for cells, edges, objects, text labels, and curves.
+ * Manages the paint/erase drag tool for cells, edges, objects, text labels, curves,
+ * tiles, wall/path strips, and terrain strokes (the latter three erase whole entries).
  * Owns its own isDrawing state for paint/erase strokes.
  */
 
@@ -13,6 +14,8 @@ import type { MapObject } from '#types/objects/object.types';
 import type { Curve } from '#types/core/curve.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { TileAssignment } from '#types/tiles/tile.types';
+import type { WallPath } from '#types/core/wallpath.types';
+import type { TerrainStroke } from '#types/core/terrainstroke.types';
 import type { DragStartContext } from '#types/hooks/drawingTools.types';
 import type { Edge } from '#types/core/rendering.types';
 import type { ExtendedGeometry, MapStateContextValue } from '#types/contexts/context.types';
@@ -24,6 +27,8 @@ import { eraseObjectAt } from '../../objects/objectOperations';
 import { eraseCellFromCurves, eraseWorldPolygonFromCurves } from '../../geometry/curves/curveBoolean';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { assignmentCoversCell } from '../../assets/tileFootprint';
+import { distanceToWallPath } from '../../drawing/wallPathOperations';
+import { distancePointToPolyline } from '../../geometry/strokes/terrainStrokeGeometry';
 
 /**
  * Detects whether a stroke changed layer data against its start-of-stroke
@@ -52,6 +57,8 @@ interface UsePaintToolOptions {
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
   onTilesChange?: (tiles: TileAssignment[], suppressHistory?: boolean) => void;
+  onWallPathsChange?: (wallPaths: WallPath[], suppressHistory?: boolean) => void;
+  onTerrainStrokesChange?: (strokes: TerrainStroke[], suppressHistory?: boolean) => void;
   getTextLabelAtPosition: (labels: TextLabel[], worldX: number, worldY: number, ctx: CanvasRenderingContext2D | null) => TextLabel | null;
   removeTextLabel: (labels: TextLabel[], id: string) => TextLabel[];
   getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
@@ -75,7 +82,8 @@ function usePaintTool({
   currentTool, mapData, geometry, selectedColor, selectedOpacity,
   canvasRef, screenToGrid, screenToWorld, getClientCoords,
   onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
-  onTilesChange, getTextLabelAtPosition, removeTextLabel, getObjectAtPosition
+  onTilesChange, onWallPathsChange, onTerrainStrokesChange,
+  getTextLabelAtPosition, removeTextLabel, getObjectAtPosition
 }: UsePaintToolOptions): UsePaintToolResult {
 
   const [paintIsDrawing, setPaintIsDrawing] = useState<boolean>(false);
@@ -86,6 +94,8 @@ function usePaintTool({
   const strokeInitialEdgesRef = useRef<Edge[] | null>(null);
   const strokeInitialCurvesRef = useRef<Curve[] | null>(null);
   const strokeInitialTilesRef = useRef<TileAssignment[] | null>(null);
+  const strokeInitialWallPathsRef = useRef<WallPath[] | null>(null);
+  const strokeInitialTerrainStrokesRef = useRef<TerrainStroke[] | null>(null);
 
   const toggleCell = (coords: Point, shouldFill: boolean, dragStart: DragStartContext | null = null): void => {
     if (!mapData || !geometry) return;
@@ -173,7 +183,25 @@ function usePaintTool({
             }
           }
         }
-        if (!tileErased) {
+        // Wall/path strips: a click inside a strip's corridor erases the whole
+        // polyline (last-drawn wins). Same corridor as wall-edit selection.
+        let wallErased = false;
+        if (!tileErased && onWallPathsChange != null && worldCoords != null) {
+          const walls = activeLayer.wallPaths ?? [];
+          if (walls.length > 0) {
+            const zoom = mapData.viewState?.zoom ?? 1;
+            const corridor = Math.max((geometry.cellSize ?? 32) * 0.4, 22 / zoom);
+            for (let i = walls.length - 1; i >= 0; i--) {
+              if (distanceToWallPath(walls[i], worldCoords.worldX, worldCoords.worldY) <= corridor) {
+                strokeInitialWallPathsRef.current ??= [...walls];
+                onWallPathsChange(walls.filter((_: WallPath, j: number) => j !== i), isBatchedStroke);
+                wallErased = true;
+                break;
+              }
+            }
+          }
+        }
+        if (!tileErased && !wallErased) {
         let curveErased = false;
         if (activeLayer.curves.length > 0) {
           let newCurves: Curve[] | null = null;
@@ -195,9 +223,24 @@ function usePaintTool({
             curveErased = true;
           }
         }
+        let cellErased = false;
         if (!curveErased && getCellIndex(activeLayer.cells, coords, geometry) !== -1) {
           const newCells = accessorRemoveCell(activeLayer.cells, coords, geometry);
           onCellsChange(newCells, isBatchedStroke);
+          cellErased = true;
+        }
+        // Terrain strokes last: their capsule hit area is broad, so precision
+        // targets (tiles, walls, curves, cells) win first. A hit deletes the
+        // whole stroke — matching the brush tool's Alt+drag whole-stroke erase.
+        if (!curveErased && !cellErased && onTerrainStrokesChange != null && worldCoords != null) {
+          const strokes = activeLayer.terrainStrokes ?? [];
+          for (let i = strokes.length - 1; i >= 0; i--) {
+            if (distancePointToPolyline(worldCoords.worldX, worldCoords.worldY, strokes[i].points) <= strokes[i].radius) {
+              strokeInitialTerrainStrokesRef.current ??= [...strokes];
+              onTerrainStrokesChange(strokes.filter((_: TerrainStroke, j: number) => j !== i), isBatchedStroke);
+              break;
+            }
+          }
         }
         }
       }
@@ -231,6 +274,8 @@ function usePaintTool({
     strokeInitialEdgesRef.current = null;
     strokeInitialCurvesRef.current = null;
     strokeInitialTilesRef.current = null;
+    strokeInitialWallPathsRef.current = null;
+    strokeInitialTerrainStrokesRef.current = null;
     processCellDuringDrag(e, dragStart);
   };
 
@@ -269,6 +314,18 @@ function usePaintTool({
       }
       strokeInitialTilesRef.current = null;
     }
+    if (strokeInitialWallPathsRef.current !== null && onWallPathsChange != null) {
+      if (strokeChanged(activeLayer.wallPaths ?? [], strokeInitialWallPathsRef.current)) {
+        onWallPathsChange(activeLayer.wallPaths ?? [], false);
+      }
+      strokeInitialWallPathsRef.current = null;
+    }
+    if (strokeInitialTerrainStrokesRef.current !== null && onTerrainStrokesChange != null) {
+      if (strokeChanged(activeLayer.terrainStrokes ?? [], strokeInitialTerrainStrokesRef.current)) {
+        onTerrainStrokesChange(activeLayer.terrainStrokes ?? [], false);
+      }
+      strokeInitialTerrainStrokesRef.current = null;
+    }
   };
 
   const cancelPaintDrawing = (): void => {
@@ -280,6 +337,8 @@ function usePaintTool({
       strokeInitialEdgesRef.current = null;
       strokeInitialCurvesRef.current = null;
       strokeInitialTilesRef.current = null;
+      strokeInitialWallPathsRef.current = null;
+      strokeInitialTerrainStrokesRef.current = null;
     }
   };
 

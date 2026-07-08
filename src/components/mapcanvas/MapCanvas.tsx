@@ -18,6 +18,8 @@ import type { ResolvedTheme } from '#types/settings/settings.types';
 import type { ExtendedGeometry, MapStateContextValue, MapOperationsContextValue } from '#types/contexts/context.types';
 import type { AdjacentSubHexRenderData } from '#types/hooks/canvasRenderer.types';
 import type { TileAssignment } from '#types/tiles/tile.types';
+import type { WallPath } from '#types/core/wallpath.types';
+import type { TerrainStroke } from '#types/core/terrainstroke.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useCanvasRenderer, renderCanvas } from '../../hooks/canvas/useCanvasRenderer';
@@ -97,6 +99,8 @@ interface MapCanvasContentProps {
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
   onTilesChange?: (tiles: TileAssignment[]) => void;
+  onWallPathsChange?: (wallPaths: WallPath[], suppressHistory?: boolean) => void;
+  onTerrainStrokesChange?: (strokes: TerrainStroke[], suppressHistory?: boolean) => void;
   tileImagesReady?: boolean;
   hiddenTileLayers?: Set<string>;
   adjacentSubHexes?: AdjacentSubHexRenderData[] | null;
@@ -158,7 +162,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, draggingWallId, children }: MapCanvasContentProps): VNode => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, draggingWallId, children }: MapCanvasContentProps): VNode => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -443,8 +447,10 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     onTextLabelsChange,
     onEdgesChange,
     onTilesChange,
+    onWallPathsChange,
+    onTerrainStrokesChange,
     onMapDataUpdate
-  } as MapOperationsContextValue), [onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onMapDataUpdate]);
+  } as MapOperationsContextValue), [onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onWallPathsChange, onTerrainStrokesChange, onMapDataUpdate]);
 
   return (
     <EventHandlerProvider>

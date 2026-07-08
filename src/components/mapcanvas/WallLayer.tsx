@@ -26,7 +26,7 @@ import { renderWallPaths, flattenWallPath, quadPoint } from '../../geometry/rend
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import { getCachedImage, preloadImage } from '../../assets/imageOperations';
-import { createWallPath } from '../../drawing/wallPathOperations';
+import { createWallPath, distanceToWallPath as distanceToWall } from '../../drawing/wallPathOperations';
 import { useApp } from '../../context/AppContext';
 
 export interface WallLayerProps {
@@ -106,25 +106,6 @@ function wallBounds(wall: WallPath): { minX: number; minY: number; maxX: number;
     }
   }
   return { minX, minY, maxX, maxY };
-}
-
-/** Min distance from a point to a wall's flattened centerline. */
-function distanceToWall(wall: WallPath, wx: number, wy: number): number {
-  const flat = flattenWallPath(wall);
-  let best = Infinity;
-  const pts = flat.points;
-  for (let i = 1; i < pts.length; i++) {
-    const [x0, y0] = pts[i - 1];
-    const [x1, y1] = pts[i];
-    const len2 = (x1 - x0) ** 2 + (y1 - y0) ** 2;
-    let t = 0;
-    if (len2 > 0) {
-      t = Math.max(0, Math.min(1, ((wx - x0) * (x1 - x0) + (wy - y0) * (y1 - y0)) / len2));
-    }
-    const d = Math.hypot(wx - (x0 + t * (x1 - x0)), wy - (y0 + t * (y1 - y0)));
-    if (d < best) best = d;
-  }
-  return best;
 }
 
 const WallLayer = ({
