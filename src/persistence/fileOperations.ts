@@ -15,6 +15,7 @@ import { offsetToAxial } from '../geometry/core/offsetCoordinates';
 import { getSettings } from '../core/settingsAccessor';
 import { migrateToLayerSchema, needsMigration, generateLayerId, ensureBoards, DEFAULT_BOARD_ID } from './layerAccessor';
 import { calculateFitZoom } from '../geometry/core/hexMeasurements';
+import { resolveTileEntry } from '../assets/tilesetOperations';
 
 // Serializes saveMapData calls so concurrent writes can't race or interleave.
 // The chain is kept healthy by catching errors before re-assigning, so one
@@ -140,7 +141,8 @@ function migrateMapData(mapData: MapData): MapData {
     }
 
     layer.wallPaths ??= [];
-    layer.wallPaths = layer.wallPaths.filter(w => Array.isArray(w.vertices) && w.vertices.length >= 2);
+    layer.wallPaths = layer.wallPaths.filter(w => Array.isArray(w.vertices) && w.vertices.length >= 2 &&
+      typeof w.tilesetId === 'string' && typeof w.tileId === 'string');
 
     layer.terrainStrokes ??= [];
     layer.terrainStrokes = layer.terrainStrokes.filter(s =>
@@ -185,7 +187,8 @@ function migrateMapData(mapData: MapData): MapData {
           layer.curves ??= [];
           layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
           layer.wallPaths ??= [];
-          layer.wallPaths = layer.wallPaths.filter(w => Array.isArray(w.vertices) && w.vertices.length >= 2);
+          layer.wallPaths = layer.wallPaths.filter(w => Array.isArray(w.vertices) && w.vertices.length >= 2 &&
+            typeof w.tilesetId === 'string' && typeof w.tileId === 'string');
           layer.terrainStrokes ??= [];
           layer.terrainStrokes = layer.terrainStrokes.filter(s =>
             Array.isArray(s.points) && s.points.length >= 2 && s.points.length % 2 === 0 &&
@@ -245,6 +248,61 @@ async function loadMapData(app: App, mapId: string, mapName: string = '', mapTyp
  *      write, and refuse to save if existing on-disk file is unparseable
  *      (prevents silently overwriting corrupted data with partial state).
  */
+/**
+ * Upgrade stored tile ids to their canonical form against the map's tileset
+ * registry (legacy basename ids → folder-relative ids minted at scan).
+ *
+ * Runs at save time, NOT load time: the live tileset rescan completes async
+ * after load, and rewriting against an incomplete registry is how the
+ * 304-tile render-mode regression happened. This pass is safe against a
+ * stale registry by construction — a registry still holding old-style ids
+ * exact-matches every stored id, so nothing rewrites. Idempotent: canonical
+ * ids resolve to themselves.
+ */
+function canonicalizeTileIds(mapData: MapData): void {
+  const tilesets = mapData.tilesets;
+  if (tilesets == null || tilesets.length === 0) return;
+
+  // Memoized per (tilesetId, tileId) pair: placements repeat the same few
+  // tiles thousands of times, and resolveTileEntry is a linear scan.
+  const memo = new Map<string, string | null>();
+  const canon = (tilesetId: string, tileId: string): string | null => {
+    const key = tilesetId + ':' + tileId;
+    let c = memo.get(key);
+    if (c === undefined) {
+      const entry = resolveTileEntry(tilesets.find(t => t.id === tilesetId), tileId);
+      c = entry != null && entry.id !== tileId ? entry.id : null;
+      memo.set(key, c);
+    }
+    return c;
+  };
+
+  const upgradeLayers = (layers: MapLayer[]): void => {
+    for (const layer of layers) {
+      for (const t of layer.tiles ?? []) {
+        const c = canon(t.tilesetId, t.tileId);
+        if (c != null) t.tileId = c;
+      }
+      for (const s of layer.terrainStrokes ?? []) {
+        const c = canon(s.tilesetId, s.tileId);
+        if (c != null) s.tileId = c;
+      }
+      for (const w of layer.wallPaths ?? []) {
+        const c = canon(w.tilesetId, w.tileId);
+        if (c != null) w.tileId = c;
+      }
+    }
+  };
+
+  upgradeLayers(mapData.layers);
+  if (mapData.subHexMaps) {
+    for (const hexKey of Object.keys(mapData.subHexMaps)) {
+      const sub = mapData.subHexMaps[hexKey];
+      if (sub?.mapData != null) upgradeLayers(sub.mapData.layers);
+    }
+  }
+}
+
 async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<boolean> {
   // Tombstoned map: silently drop the write. Returning true (not false) lets a
   // stale instance's save status settle to 'Saved' instead of flagging an error
@@ -273,7 +331,9 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
         }
       }
 
-      // Update specific map
+      // Update specific map — upgrading any legacy tile ids in place first so
+      // disk and memory converge on canonical ids.
+      canonicalizeTileIds(mapData);
       allData.maps[mapId] = mapData;
 
       // Serialize BEFORE touching disk. A circular ref or BigInt makes
@@ -500,5 +560,5 @@ async function listMaps(app: App): Promise<MapListEntry[]> {
   }
 }
 
-export { loadMapData, saveMapData, deleteMapData, createNewMap, listMaps, migrateMapData };
+export { loadMapData, saveMapData, deleteMapData, createNewMap, listMaps, migrateMapData, canonicalizeTileIds };
 export type { MapListEntry };
