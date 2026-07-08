@@ -193,6 +193,7 @@ export default class WindrosePlugin extends Plugin {
   private initMcpNamespace(): void {
     window.__windrose = window.__windrose ?? {};
     window.__windrose.version = this.manifest.version;
+    window.__windrose.ready = true;
   }
 
   private async resolveDebugConfig(): Promise<void> {

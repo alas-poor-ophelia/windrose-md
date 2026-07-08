@@ -18,7 +18,7 @@ export function registerStateTools(server: McpServer): void {
       ),
     },
     async ({ toolId }) => {
-      const code = opCall(`ops.setTool(${jsStr(toolId)});JSON.stringify({ok:true,tool:${jsStr(toolId)}})`);
+      const code = opCall(`ops.setTool(${jsStr(toolId)});return JSON.stringify({ok:true,tool:${jsStr(toolId)}})`);
       const result = await obsidianEvalJson<{ ok?: boolean; error?: string }>(code);
       if (result.error) {
         return { content: [{ type: "text" as const, text: result.error }], isError: true };
@@ -39,7 +39,7 @@ export function registerStateTools(server: McpServer): void {
       if (opacity !== undefined) {
         body += `ops.setOpacity(${opacity});`;
       }
-      body += `JSON.stringify({ok:true,color:${jsStr(color)}${opacity !== undefined ? `,opacity:${opacity}` : ''}})`;
+      body += `return JSON.stringify({ok:true,color:${jsStr(color)}${opacity !== undefined ? `,opacity:${opacity}` : ''}})`;
       const result = await obsidianEvalJson<{ ok?: boolean; error?: string }>(opCall(body));
       if (result.error) {
         return { content: [{ type: "text" as const, text: result.error }], isError: true };
@@ -52,7 +52,7 @@ export function registerStateTools(server: McpServer): void {
     "windrose_undo",
     "Undo the last drawing operation",
     async () => {
-      const code = opCall(`var r=ops.undo();JSON.stringify({ok:r})`);
+      const code = opCall(`var r=ops.undo();return JSON.stringify({ok:r})`);
       const result = await obsidianEvalJson<{ ok: boolean; error?: string }>(code);
       if (result.error) {
         return { content: [{ type: "text" as const, text: result.error }], isError: true };
@@ -67,7 +67,7 @@ export function registerStateTools(server: McpServer): void {
     "windrose_redo",
     "Redo the last undone drawing operation",
     async () => {
-      const code = opCall(`var r=ops.redo();JSON.stringify({ok:r})`);
+      const code = opCall(`var r=ops.redo();return JSON.stringify({ok:r})`);
       const result = await obsidianEvalJson<{ ok: boolean; error?: string }>(code);
       if (result.error) {
         return { content: [{ type: "text" as const, text: result.error }], isError: true };
@@ -85,7 +85,7 @@ export function registerStateTools(server: McpServer): void {
       layerId: z.string().describe("Layer ID to activate (get available IDs from windrose_get_state)"),
     },
     async ({ layerId }) => {
-      const code = opCall(`ops.selectLayer(${jsStr(layerId)});JSON.stringify({ok:true,layerId:${jsStr(layerId)}})`);
+      const code = opCall(`ops.selectLayer(${jsStr(layerId)});return JSON.stringify({ok:true,layerId:${jsStr(layerId)}})`);
       const result = await obsidianEvalJson<{ ok?: boolean; error?: string }>(code);
       if (result.error) {
         return { content: [{ type: "text" as const, text: result.error }], isError: true };
@@ -98,7 +98,7 @@ export function registerStateTools(server: McpServer): void {
     "windrose_force_save",
     "Trigger an immediate save (bypasses the normal 2-second debounce)",
     async () => {
-      const code = opCall(`ops.forceSave();JSON.stringify({ok:true})`);
+      const code = opCall(`ops.forceSave();return JSON.stringify({ok:true})`);
       const result = await obsidianEvalJson<{ ok?: boolean; error?: string }>(code);
       if (result.error) {
         return { content: [{ type: "text" as const, text: result.error }], isError: true };

@@ -14,6 +14,8 @@ import { registerQueryTools } from "./tools/query-tools.js";
 import { registerNavTools } from "./tools/nav-tools.js";
 import { registerStateTools } from "./tools/state-tools.js";
 import { registerDrawTools } from "./tools/draw-tools.js";
+import { registerVisionTools } from "./tools/vision-tools.js";
+import { registerInteractTools } from "./tools/interact-tools.js";
 
 const server = new McpServer({
   name: "windrose",
@@ -25,6 +27,8 @@ registerQueryTools(server);
 registerNavTools(server);
 registerStateTools(server);
 registerDrawTools(server);
+registerVisionTools(server);
+registerInteractTools(server);
 
 // Connect via stdio
 const transport = new StdioServerTransport();

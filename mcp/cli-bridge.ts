@@ -5,6 +5,32 @@
  * in the Obsidian window context with access to `window.__windrose` and `app`.
  *
  * Non-Windrose operations use dedicated CLI commands (screenshot, errors, etc).
+ *
+ * ─── EVAL SCOPE RULES (empirically verified 2026-07-07) ────────────────────
+ *
+ * The Obsidian eval runtime behaves like a module-level async context:
+ *
+ * 1. TOP-LEVEL `return`  → SyntaxError ("Illegal return statement"). NEVER use.
+ * 2. TOP-LEVEL `await`   → Error ("await is only valid in async functions …"). NEVER use.
+ * 3. ASYNC IIFE          → WORKS. The runtime auto-awaits the returned Promise.
+ *      `(async () => { await thing; return value; })()`  → value
+ *      `(async () => { await thing; })()`                 → (no output) [undefined]
+ *      You MUST include an explicit `return` to get output.
+ * 4. BARE PROMISE        → auto-awaited. `Promise.resolve(42)` → 42.
+ * 5. PLAIN EXPRESSION    → returned as-is. `1+1` → 2.
+ * 6. `undefined` result  → "(no output)" in CLI output. Not an error.
+ *
+ * KEY RULE: `(no output)` always means the expression evaluated to `undefined`.
+ * It does NOT mean an unresolved promise (all Promises are auto-awaited).
+ * The most common cause: async IIFE without a `return` statement.
+ *
+ * USE wrapAsync() FOR ALL ASYNC CODE. It wraps in an async IIFE with a
+ * closing `return` — callers write plain `await`/`return` statements.
+ *
+ * NEWLINES: newlines/tabs are collapsed to spaces by shellQuoteEval.
+ * Separate statements with `;`. Do NOT use backtick template literals
+ * with embedded newlines.
+ * ───────────────────────────────────────────────────────────────────────────
  */
 
 import { exec } from "node:child_process";
@@ -108,8 +134,35 @@ export async function cli(...args: string[]): Promise<string> {
 }
 
 /**
+ * Wrap async code so it runs inside an async IIFE.
+ *
+ * This is THE standard way to run any code that needs `await` or `return`.
+ * The caller writes plain JS body with `await` and `return` statements.
+ * wrapAsync produces: `(async () => { <body> })()`
+ *
+ * IMPORTANT: The body MUST contain at least one `return <value>` statement
+ * if you want output. A body that falls off the end returns `undefined`,
+ * which the CLI reports as "(no output)".
+ *
+ * Example:
+ *   wrapAsync(`const f = app.vault.getAbstractFileByPath('foo.md'); return !!f;`)
+ *   → (async () => { const f = app.vault.getAbstractFileByPath('foo.md'); return !!f; })()
+ */
+export function wrapAsync(body: string): string {
+  return `(async () => { ${body} })()`;
+}
+
+/**
  * Evaluate JavaScript in the Obsidian window context.
  * Returns the stringified result.
+ *
+ * "(no output)" is returned as the literal string "(no output)" when the
+ * evaluated expression is `undefined`. This is NOT an error — it means the
+ * code ran but produced no return value. The most common fix: add `return`.
+ *
+ * EVAL_PROMISE_UNRESOLVED is never expected in normal operation (the runtime
+ * auto-awaits all Promises), but is kept as a safeguard label for callers
+ * that detect unexpected "(no output)" where a value was required.
  */
 export async function obsidianEval(code: string): Promise<string> {
   const cmd = [
@@ -123,7 +176,12 @@ export async function obsidianEval(code: string): Promise<string> {
     const { stdout } = await execAsync(cmd, { timeout: EVAL_TIMEOUT });
     // Obsidian CLI prefixes eval output with "=> "
     const result = stdout.trim();
-    return result.startsWith("=> ") ? result.slice(3) : result;
+    const value = result.startsWith("=> ") ? result.slice(3) : result;
+
+    // "(no output)" means the expression evaluated to undefined.
+    // If the caller used wrapAsync and forgot a `return`, this is why.
+    // We pass it through as-is — callers that need a value should check.
+    return value;
   } catch (err: any) {
     if (err.killed) throw new Error(`Eval timed out after ${EVAL_TIMEOUT}ms`);
     if (err.code === "ENOENT") {
@@ -133,11 +191,23 @@ export async function obsidianEval(code: string): Promise<string> {
   }
 }
 
+/** Sentinel returned by obsidianEval when code evaluated to undefined. */
+export const EVAL_NO_OUTPUT = "(no output)";
+
 /**
- * Evaluate JS and parse the result as JSON.
+ * Evaluate JS and parse the result as JSON, with a clear error if the result
+ * is "(no output)" (undefined from eval — most likely a missing `return`).
  */
+
 export async function obsidianEvalJson<T = unknown>(code: string): Promise<T> {
   const raw = await obsidianEval(code);
+  if (raw === EVAL_NO_OUTPUT) {
+    throw new Error(
+      `EVAL_PROMISE_UNRESOLVED: eval returned undefined (no output). ` +
+      `The code likely used wrapAsync/async IIFE but forgot a 'return' statement. ` +
+      `Add 'return <value>' before the closing brace of your async IIFE.`
+    );
+  }
   try {
     return JSON.parse(raw);
   } catch {
@@ -170,15 +240,16 @@ export async function obsidianErrors(): Promise<string> {
  * settle to 'Saved' before tearing the plugin down — so no reload can interrupt a
  * write. The disable/enable runs in the window context, so it survives its own
  * plugin teardown. Falls back to proceeding after a 5s timeout rather than hang.
+ *
+ * After reload: rerenders all markdown leaf previews (required for block-mode maps)
+ * and polls for window.__windrose?.ready up to 3s.
  */
 export async function obsidianReload(): Promise<string> {
-  const code =
-    `(async () => {` +
+  const code = wrapAsync(
     `const id = ${JSON.stringify(PLUGIN_ID)};` +
     `const insts = () => Object.values((window.__windrose && window.__windrose.mcpInstances) || {});` +
     `let flushed = 0;` +
     `for (const i of insts()) { try { if (i.ops && i.ops.forceSave) { i.ops.forceSave(); flushed++; } } catch (e) {} }` +
-    // Give saveStatus a beat to flip to 'Saving' before we poll for it to settle.
     `await new Promise(r => setTimeout(r, 200));` +
     `const deadline = Date.now() + 5000;` +
     `const pending = () => insts().some(i => i.saveStatus && i.saveStatus !== 'Saved');` +
@@ -186,8 +257,15 @@ export async function obsidianReload(): Promise<string> {
     `const timedOut = pending();` +
     `await app.plugins.disablePlugin(id);` +
     `await app.plugins.enablePlugin(id);` +
-    `return JSON.stringify({ reloaded: true, flushed: flushed, timedOut: timedOut });` +
-    `})()`;
+    // Rerender markdown blocks so windrose code fences re-mount
+    `app.workspace.getLeavesOfType('markdown').forEach(l => { try { l.view.previewMode?.rerender?.(true); } catch(e) {} });` +
+    // Poll for ready flag up to 3s
+    `const readyDeadline = Date.now() + 3000;` +
+    `while (!window.__windrose?.ready && Date.now() < readyDeadline) { await new Promise(r => setTimeout(r, 100)); }` +
+    `const ready = !!window.__windrose?.ready;` +
+    `const version = window.__windrose?.version || null;` +
+    `return JSON.stringify({ reloaded: true, flushed, timedOut, ready, version });`
+  );
   return obsidianEval(code);
 }
 
@@ -207,11 +285,24 @@ export async function obsidianVersion(): Promise<string> {
 
 /**
  * Get the Windrose MCP state snapshot for the active map.
- * Looks up the active file in mcpInstances — no race conditions.
+ * Uses the shared RESOLVE logic from ops-helper (activeFile → ItemView → sole instance).
  * Returns null if no map is open or MCP bridge isn't initialized.
+ *
+ * @deprecated Prefer obsidianEvalJson with RESOLVE_JSON from ops-helper for richer context.
  */
 export async function getWindroseState(): Promise<Record<string, unknown> | null> {
-  const code = `var i=window.__windrose?.mcpInstances; if(!i) JSON.stringify(null); else { var p=app.workspace.getActiveFile()?.path; var m=p&&i[p]; m ? JSON.stringify(m) : JSON.stringify(null); }`;
+  // Use the same RESOLVE logic as ops-helper: activeFile key → ItemView leaf → sole instance
+  const code = wrapAsync(
+    `const i = window.__windrose?.mcpInstances;` +
+    `if (!i) return JSON.stringify(null);` +
+    `const p = app.workspace.getActiveFile()?.path;` +
+    `if (p && i[p]) return JSON.stringify(i[p]);` +
+    `const vl = app.workspace.getLeavesOfType('windrose-map-view');` +
+    `if (vl.length > 0) { const k = '__view__:' + (vl[0].view.getState()?.mapId||''); if (i[k]) return JSON.stringify(i[k]); }` +
+    `const keys = Object.keys(i);` +
+    `if (keys.length === 1) return JSON.stringify(i[keys[0]]);` +
+    `return JSON.stringify(null);`
+  );
   return obsidianEvalJson(code);
 }
 

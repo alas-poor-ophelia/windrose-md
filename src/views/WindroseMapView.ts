@@ -148,6 +148,7 @@ class WindroseMapView extends ItemView {
           mapName: this.mapName,
           mapType: this.mapType,
           notePath: '',
+          mcpKey: this.mapId !== '' ? `__view__:${this.mapId}` : undefined,
           fullPane: true,
           onMapChange: this.handleMapChange,
           onNameChange: this.handleNameChange,

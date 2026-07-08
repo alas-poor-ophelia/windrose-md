@@ -10,7 +10,7 @@ import type { ResolvedTheme, OnboardingState } from '#types/settings/settings.ty
 import type { ToolId } from '#types/tools/tool.types';
 import type { Cell } from '#types/core/cell.types';
 import type { WallToolSurface } from '#types/core/wallpath.types';
-import type { TilesetOverrides } from '#types/tiles/tile.types';
+import type { TilesetOverrides, TileAssignment, TileRotation } from '#types/tiles/tile.types';
 import type { CustomColor } from '#types/core/common.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -31,7 +31,7 @@ import { FogOfWarToolbar } from './components/toolbars/FogOfWarToolbar';
 import { WindroseCompass } from './components/shared/WindroseCompass';
 
 import { MapSettingsModal } from './components/settings/MapSettingsModal';
-import { getTheme, getEffectiveSettings, getSettings } from './core/settingsAccessor';
+import { getTheme, getEffectiveSettings, getSettings, getDataFilePath } from './core/settingsAccessor';
 import { isFeatureEnabled } from './core/featureFlags';
 import { getColorByHex, isDefaultColor, DEFAULT_COLOR } from './drawing/colorOperations';
 import { ImageAlignmentMode } from './components/overlays/ImageAlignmentMode';
@@ -42,6 +42,9 @@ import { ModalPortal } from './components/modals/ModalPortal';
 import { getActiveLayer, getLayerById, getActiveBoardLayers, getBoardsOrdered, updateBoard, addBoard, setActiveBoard, removeBoard, setLayerMode, addLayer, updateActiveLayer } from './persistence/layerAccessor';
 import type { TileLayerRole } from '#types/tiles/tile.types';
 import { setCell as accessorSetCell, removeCell as accessorRemoveCell, cellToPoint } from './geometry/core/cellAccessor';
+import { assignmentsOverlap } from './assets/tileFootprint';
+import { placeObject as opsPlaceObject } from './objects/objectOperations';
+import { getResolvedObjectTypes } from './objects/objectTypeResolver';
 import { FloatingPanel } from './components/panels/FloatingPanel';
 import { DockPanel } from './components/panels/DockPanel';
 import { DockRibbon } from './components/panels/DockRibbon';
@@ -87,6 +90,10 @@ interface DungeonMapTrackerProps {
   mapName?: string;
   mapType?: MapType;
   notePath?: string;
+  /** Optional explicit MCP registration key. When provided and non-empty, overrides
+   *  notePath as the key in window.__windrose.mcpInstances. Used by full-pane ItemViews
+   *  which have notePath === '' and would otherwise be invisible to MCP tools. */
+  mcpKey?: string;
   fullPane?: boolean;
   onMapChange?: (mapId: string, mapName: string, mapType: MapType) => void;
   onNameChange?: (name: string) => void;
@@ -101,7 +108,7 @@ interface DungeonMapTrackerProps {
 // MAIN COMPONENT
 // ============================================================================
 
-const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange, onMapDeleted }: DungeonMapTrackerProps): VNode => {
+const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', mcpKey, fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange, onMapDeleted }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
   useThemeMode();
   const { mapData: rootMapData, isLoading, saveStatus, updateMapData: rootUpdateMapData, forceSave, markDeleted, tileImagesReady, getCachedImage } = useMapData(mapId, mapName, mapType);
@@ -787,13 +794,34 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleUndo: wrappedHandleUndo, handleRedo, handleLayerSelect
   });
 
-  // MCP bridge: each map instance registers its own state + operations keyed by notePath.
+  // MCP bridge: each map instance registers its own state + operations.
+  // Key priority: mcpKey (explicit, used by full-pane ItemView) > notePath (block mode).
+  // Bail when the effective key is empty — nothing useful to register.
   useEffect(() => {
-    if (window.__windrose == null || mapData == null || notePath === '' || geometry == null) return;
+    const key = (mcpKey !== undefined && mcpKey !== '') ? mcpKey : notePath;
+    if (window.__windrose == null || mapData == null || key === '' || geometry == null) return;
     window.__windrose.mcpInstances ??= {};
 
     const activeLayer = getActiveLayer(mapData);
-    window.__windrose.mcpInstances[notePath] = {
+    const cellCount = activeLayer?.cells.length ?? 0;
+    const layerCellCounts: Record<string, number> = {};
+    let objectCount = 0;
+    let wallPathCount = 0;
+    let textLabelCount = 0;
+    for (const layer of mapData.layers) {
+      layerCellCounts[layer.id] = layer.cells.length;
+      objectCount += layer.objects.length;
+      wallPathCount += layer.wallPaths?.length ?? 0;
+      textLabelCount += layer.textLabels.length;
+    }
+
+    // Capture canUndo/canRedo at registration time so honest return values are
+    // available. The handler is always called (never gated) to avoid stale-closure
+    // issues with the actual undo stack — but we report what was true at last render.
+    const couldUndo = canUndo;
+    const couldRedo = canRedo;
+
+    window.__windrose.mcpInstances[key] = {
       mapId,
       mapName: mapData.name ?? mapName,
       mapType: mapData.mapType ?? 'grid',
@@ -812,9 +840,15 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       canRedo,
       saveStatus,
       isExpanded,
-      dataFilePath: 'windrose-md-data.json',
+      dataFilePath: getDataFilePath(),
       notePath,
       timestamp: Date.now(),
+      cellCount,
+      layerCellCounts,
+      objectCount,
+      wallPathCount,
+      textLabelCount,
+      context: fullPane ? 'fullPane' : 'block',
       ops: {
         setTool: (toolId: string) => setCurrentTool(toolId as ToolId),
         setColor: (color: string) => setSelectedColor(color),
@@ -844,30 +878,122 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           handleCellsChange(newCells);
           return true;
         },
-        getCells: (): Array<{ x: number; y: number; color: string; opacity: number }> => {
+        getCells: (bbox?: { x0: number; y0: number; x1: number; y1: number }): Array<{ x: number; y: number; color: string; opacity: number }> => {
           if (activeLayer == null) return [];
-          return activeLayer.cells.map((cell: Cell) => ({
+          const mapped = activeLayer.cells.map((cell: Cell) => ({
             ...cellToPoint(cell),
             color: cell.color,
             opacity: cell.opacity ?? 1,
           }));
+          if (bbox == null) return mapped;
+          const xLo = Math.min(bbox.x0, bbox.x1);
+          const xHi = Math.max(bbox.x0, bbox.x1);
+          const yLo = Math.min(bbox.y0, bbox.y1);
+          const yHi = Math.max(bbox.y0, bbox.y1);
+          return mapped.filter(c => c.x >= xLo && c.x <= xHi && c.y >= yLo && c.y <= yHi);
         },
-        undo: (): boolean => { wrappedHandleUndo(); return true; },
-        redo: (): boolean => { handleRedo(); return true; },
+        undo: (): boolean => { wrappedHandleUndo(); return couldUndo; },
+        redo: (): boolean => { handleRedo(); return couldRedo; },
         selectLayer: (layerId: string) => handleLayerSelect(layerId),
         forceSave: () => { void forceSave(); },
+        setViewport: (x: number, y: number, zoom?: number): { ok: boolean; viewState: { x: number; y: number; zoom: number } } => {
+          const nextZoom = zoom ?? mapData.viewState?.zoom ?? 1;
+          handleViewStateChange({ center: { x, y }, zoom: nextZoom });
+          return { ok: true, viewState: { x, y, zoom: nextZoom } };
+        },
+        listTiles: (): Array<{ tilesetId: string; tilesetName: string; tileCount: number; tiles: Array<{ id: string; vaultPath: string }> }> =>
+          availableTilesets.map(ts => ({
+            tilesetId: ts.id,
+            tilesetName: ts.name,
+            tileCount: ts.tiles.length,
+            tiles: ts.tiles.map(t => ({ id: t.id, vaultPath: t.vaultPath })),
+          })),
+        selectTile: (tilesetId: string, tileId: string): { ok: boolean; note?: string; availableTilesetIds?: string[] } => {
+          const ts = availableTilesets.find(t => t.id === tilesetId);
+          const tile = ts?.tiles.find(t => t.id === tileId);
+          if (ts == null || tile == null) {
+            return { ok: false, availableTilesetIds: availableTilesets.map(t => t.id) };
+          }
+          handleTileSelect(tilesetId, tileId);
+          setCurrentTool('tilePaint');
+          return { ok: true, note: 'subtool defaults to single-stamp when selected programmatically' };
+        },
+        placeTile: (a: { col: number; row: number; tilesetId: string; tileId: string; rotation?: number; depth?: string; scale?: number }): { ok: boolean; tileCount: number; error?: string } => {
+          if (activeLayer == null) return { ok: false, tileCount: 0, error: 'No active layer' };
+          const ts = availableTilesets.find(t => t.id === a.tilesetId);
+          const tile = ts?.tiles.find(t => t.id === a.tileId);
+          if (ts == null || tile == null) {
+            return { ok: false, tileCount: activeLayer.tiles?.length ?? 0, error: `Unknown tile ${a.tilesetId}/${a.tileId}` };
+          }
+          const newTile: TileAssignment = {
+            col: a.col,
+            row: a.row,
+            tilesetId: a.tilesetId,
+            tileId: a.tileId,
+            rotation: (a.rotation != null && a.rotation !== 0 ? a.rotation : undefined) as TileRotation | undefined,
+            depth: (a.depth != null && a.depth !== 'ground' ? a.depth : undefined) as TileLayerRole | undefined,
+            scale: a.scale != null && a.scale !== 1 ? a.scale : undefined,
+            spanW: 1,
+            spanH: 1,
+          };
+          const targetPlacement = newTile.placement ?? 'fill';
+          const current = activeLayer.tiles ?? [];
+          const remaining = current.filter(
+            (t: TileAssignment) => (t.placement ?? 'fill') !== targetPlacement || !assignmentsOverlap(t, newTile)
+          );
+          const nextTiles = [...remaining, newTile];
+          handleTilesChange(nextTiles);
+          return { ok: true, tileCount: nextTiles.length };
+        },
+        listObjectTypes: (): Array<{ id: string; label: string; category: string }> =>
+          getResolvedObjectTypes(mapData.mapType ?? 'grid', mapData.objectSetId)
+            .map(t => ({ id: t.id, label: t.label, category: t.category })),
+        listObjects: (): Array<{ id: string; type: string; x: number; y: number; label?: string }> => {
+          if (activeLayer == null) return [];
+          return activeLayer.objects.map(o => ({
+            id: o.id,
+            type: o.type,
+            x: o.position.x,
+            y: o.position.y,
+            label: o.label,
+          }));
+        },
+        placeObject: (typeId: string, x: number, y: number): { ok: boolean; objectId?: string; error?: string } => {
+          if (activeLayer == null) return { ok: false, error: 'No active layer' };
+          const result = opsPlaceObject(activeLayer.objects, typeId, x, y, {
+            mapType: mapData.mapType ?? 'grid',
+            objectSetId: mapData.objectSetId,
+          });
+          if (!result.success) return { ok: false, error: result.error };
+          handleObjectsChange(result.objects);
+          return { ok: true, objectId: result.object?.id };
+        },
+        openDrawer: (pane: 'tiles' | 'objects' | 'layers' | 'colors' | 'regions' | 'view' | null): { ok: boolean; note?: string } => {
+          if (pane === 'tiles' || pane === 'objects') {
+            selectPane(pane);
+            setTileBrowserCollapsed(false);
+            return { ok: true, note: 'selecting a pane also switches the active tool (Tiles→tilePaint, Objects→addObject)' };
+          }
+          if (fullPane) {
+            return { ok: false, note: 'edge-rail panels (layers/colors/regions/view) only exist in block mode, not full-pane' };
+          }
+          setRailOpenId(pane);
+          return { ok: true };
+        },
       },
     };
 
     return () => {
-      if (window.__windrose?.mcpInstances != null) delete window.__windrose.mcpInstances[notePath];
+      if (window.__windrose?.mcpInstances != null) delete window.__windrose.mcpInstances[key];
     };
   }, [
-    mapData, mapId, mapName, notePath, geometry,
+    mapData, mapId, mapName, notePath, mcpKey, fullPane, geometry,
     currentTool, selectedColor, selectedOpacity,
     canUndo, canRedo, saveStatus, isExpanded,
     setCurrentTool, setSelectedColor, handleOpacityChange,
     handleCellsChange, wrappedHandleUndo, handleRedo, handleLayerSelect, forceSave,
+    handleViewStateChange, availableTilesets, handleTileSelect,
+    handleTilesChange, handleObjectsChange, selectPane, setTileBrowserCollapsed,
   ]);
 
   if (mapDeleted) {
