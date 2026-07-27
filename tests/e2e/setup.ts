@@ -23,6 +23,9 @@ const DEV_FIXTURE_TARGET = path.join(TEST_DATA_DIR, "dungeon-maps-data.json");
 const GENERATION_TEST_CLEAN = path.join(FIXTURES_DIR, "dungeon-generation-test.clean.md");
 const GENERATION_TEST_TARGET = path.join(TEST_VAULT, "_testing/dungeon-generation-test.md");
 
+const WORKSPACE_CLEAN = path.join(FIXTURES_DIR, "workspace.clean.json");
+const WORKSPACE_TARGET = path.join(TEST_VAULT, ".obsidian", "workspace.json");
+
 export async function setup() {
   console.log("Setting up test vault...");
 
@@ -59,6 +62,15 @@ export async function setup() {
   if (existsSync(GENERATION_TEST_CLEAN)) {
     cpSync(GENERATION_TEST_CLEAN, GENERATION_TEST_TARGET);
     console.log("  Reset: dungeon-generation-test.md to clean state");
+  }
+
+  // Reset workspace.json — every Obsidian boot writes its layout back on exit,
+  // and a dirty layout (e.g. left sidedock open) squeezes the editor pane so
+  // canvas centers land below the window, silently killing every canvas-click
+  // test with "0 cells" assertions (root-caused 2026-07-26).
+  if (existsSync(WORKSPACE_CLEAN)) {
+    cpSync(WORKSPACE_CLEAN, WORKSPACE_TARGET);
+    console.log("  Reset: .obsidian/workspace.json to clean state");
   }
 
   // Install the standalone plugin into the test vault
@@ -98,10 +110,28 @@ export async function setup() {
       settings = {};
     }
   }
+  let settingsChanged = false;
   if (settings.onboardingState !== "done") {
     settings.onboardingState = "done";
-    writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
+    settingsChanged = true;
     console.log("  Pinned: plugin settings onboardingState = 'done'");
+  }
+
+  // Register the walls-fixture folder as a tileset so the wall/path strips and
+  // the portal (Door_256.png) get scanned into `availableTilesets`. Their
+  // ddSourceType metadata lives in the committed windrose-tile-metadata.json;
+  // without this folder in tilesetFolders the tiles are never scanned, so the
+  // structure-tier depth band never appears (the historical cause of the
+  // wall/opening E2E timeouts). Additive — leaves any existing folders intact.
+  const folders = Array.isArray(settings.tilesetFolders) ? (settings.tilesetFolders as string[]) : [];
+  if (!folders.includes("walls-fixture")) {
+    settings.tilesetFolders = [...folders, "walls-fixture"];
+    settingsChanged = true;
+    console.log("  Registered: tilesetFolders += 'walls-fixture'");
+  }
+
+  if (settingsChanged) {
+    writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
   }
 
   console.log("Test vault setup complete.");

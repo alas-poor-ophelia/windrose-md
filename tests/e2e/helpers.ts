@@ -5,7 +5,9 @@ import { expect } from "vitest";
 // Re-export for convenience
 export { test, expect, doWithApp };
 
-const CONTAINER_TIMEOUT = 10000;
+// Healthy map renders take ~9s on a loaded machine (measured 2026-07-26), so
+// the old 10000ms default sat right at the edge and flaked under suite load.
+const CONTAINER_TIMEOUT = 25000;
 
 export const AUTOSAVE_WAIT = 3000;
 
@@ -24,6 +26,26 @@ export function resetDataFile(): void {
   const target = path.join(fixturesDir, "test-vault", DATA_FILE_PATH);
   if (fs.existsSync(cleanFile)) {
     fs.copyFileSync(cleanFile, target);
+  }
+  resetWorkspaceLayout();
+}
+
+/**
+ * Reset the vault's workspace.json to the clean fixture. Every Obsidian exit
+ * writes its layout back, so one test's exit state (detached leaves, open
+ * sidedock) becomes the NEXT test's boot layout — a squeezed/leafless layout
+ * pushes canvas centers off-screen and every canvas click silently misses
+ * (root-caused 2026-07-26: suite-wide "expected 0 to be greater than 0").
+ * Called from resetDataFile so each booting test starts from a known layout.
+ */
+export function resetWorkspaceLayout(): void {
+  const fs = require("fs");
+  const path = require("path");
+  const fixturesDir = path.resolve(__dirname, "../fixtures");
+  const cleanWorkspace = path.join(fixturesDir, "workspace.clean.json");
+  const target = path.join(fixturesDir, "test-vault", ".obsidian", "workspace.json");
+  if (fs.existsSync(cleanWorkspace)) {
+    fs.copyFileSync(cleanWorkspace, target);
   }
 }
 
@@ -49,14 +71,26 @@ export function setupErrorTracking(page: any): string[] {
 
 /** Navigate to a test map file */
 export async function navigateToMap(page: any, mapPath: string): Promise<void> {
-  await doWithApp(page, async (app: any, path?: string) => {
-    const file = app.vault.getAbstractFileByPath(path!);
-    if (file) {
+  // Fast boots race the vault index and workspace readiness (an empty/neutral
+  // workspace boots quicker than the vault finishes indexing), so a single
+  // openLinkText can silently no-op — retry until a markdown leaf actually
+  // shows the target file (root-caused 2026-07-26: "Container count: 0"
+  // timeouts on every test after the first in a file).
+  const deadline = Date.now() + 15000;
+  for (;;) {
+    const opened = await doWithApp(page, async (app: any, path?: string) => {
+      const file = app.vault.getAbstractFileByPath(path!);
+      if (!file) return false;
       await app.workspace.openLinkText(file.path, "", false);
-    } else {
-      throw new Error(`Test file ${path!} not found in vault`);
+      const active = app.workspace.getActiveFile?.();
+      return active?.path === file.path;
+    }, mapPath);
+    if (opened === true) break;
+    if (Date.now() > deadline) {
+      throw new Error(`Test file ${mapPath} not found/openable in vault after 15s`);
     }
-  }, mapPath);
+    await page.waitForTimeout(500);
+  }
 
   await page.waitForTimeout(300);
 }
@@ -148,6 +182,16 @@ export async function waitForContainer(page: any, timeout: number = CONTAINER_TI
 /** Helper to get canvas center coordinates */
 export async function getCanvasCenter(page: any): Promise<{ x: number; y: number }> {
   const canvas = page.locator(".windrose-canvas-wrapper canvas").first();
+  // A freshly opened note starts scrolled to the top; on notes with content
+  // above the map block the canvas sits below the window, so coordinate
+  // clicks silently miss (root-caused 2026-07-26: "expected 0 to be greater
+  // than 0" across canvas tests). Scroll it into view before measuring.
+  try {
+    await canvas.scrollIntoViewIfNeeded({ timeout: 3000 });
+    await page.waitForTimeout(100);
+  } catch {
+    // proceed — boundingBox below still reports honestly
+  }
   const canvasBox = await canvas.boundingBox();
   if (!canvasBox) throw new Error("Canvas not found");
   return {
@@ -222,6 +266,87 @@ export async function selectSubTool(page: any, parentToolTitle: string, subToolL
   await subToolOption.waitFor({ state: "visible", timeout: 3000 });
   await subToolOption.click();
   await page.waitForTimeout(100);
+}
+
+// ===========================================
+// Tile Arming Helpers (ops bridge)
+// ===========================================
+
+/**
+ * Arm a tile by its filename via the plugin's ops bridge
+ * (`window.__windrose.mcpInstances[*].ops.armTile`), bypassing the tile
+ * drawer's depth-band DOM entirely. This is the deterministic arming path for
+ * structure assets (wall/path strips, portals): `armTile` derives the tile's
+ * form and lets the wall/opening coupling route the tool — form 'line' and
+ * 'opening' auto-arm the wall tool; every other form falls back to tile-paint.
+ *
+ * Polls `listTiles()` first because the tileset scan is async (it re-runs when
+ * the container mounts), so the walls-fixture tileset may not be present the
+ * instant `waitForContainer` resolves. When `expectedForm` is given it also
+ * waits for the async tile-metadata load to resolve the tile to that form
+ * (`ops.deriveForm`) — the ddSourceType store is a non-reactive singleton, so
+ * arming a structure asset before it loads would derive 'cell' and mis-route to
+ * tile-paint. Returns the arm result ({ ok, form }).
+ */
+export async function armTileByFilename(
+  page: any,
+  filename: string,
+  expectedForm?: "cell" | "region" | "line" | "opening" | "autotile",
+): Promise<{ ok: boolean; form?: string }> {
+  // Wait until the tileset scan surfaces a tile whose vaultPath ends with the
+  // filename AND (if requested) its metadata-derived form matches, then capture
+  // its tileset/tile ids.
+  const handle = await page.waitForFunction((args: { fname: string; expForm: string | null }) => {
+    const insts = (window as any).__windrose?.mcpInstances ?? {};
+    for (const inst of Object.values(insts) as any[]) {
+      const sets = inst?.ops?.listTiles?.() ?? [];
+      for (const ts of sets) {
+        const tile = ts.tiles.find((t: any) => String(t.vaultPath).split("/").pop() === args.fname);
+        if (tile != null) {
+          if (args.expForm != null) {
+            const form = inst.ops.deriveForm?.(ts.tilesetId, tile.id);
+            if (form !== args.expForm) return null; // metadata not loaded yet
+          }
+          return { tilesetId: ts.tilesetId, tileId: tile.id };
+        }
+      }
+    }
+    return null;
+  }, { fname: filename, expForm: expectedForm ?? null }, { timeout: 20000, polling: 300 });
+
+  const ids = await handle.jsonValue();
+  const res = await page.evaluate((args: { tilesetId: string; tileId: string }) => {
+    const insts = (window as any).__windrose?.mcpInstances ?? {};
+    for (const inst of Object.values(insts) as any[]) {
+      const sets = inst?.ops?.listTiles?.() ?? [];
+      if (sets.some((ts: any) => ts.tilesetId === args.tilesetId)) {
+        return inst.ops.armTile(args.tilesetId, args.tileId);
+      }
+    }
+    return { ok: false };
+  }, ids);
+
+  // Let the form→subtool effect and the wall/opening coupling effect settle,
+  // and the wall-tool control surface publish to the drawer footer.
+  await page.waitForTimeout(500);
+  return res;
+}
+
+/**
+ * Read the active board's raw wall/gap fields from the LIVE plugin instance via
+ * the ops bridge (`ops.readWallGaps`), rather than from the persisted data file.
+ * The E2E data file is shared across the sequential per-test Obsidian instances,
+ * so a lagging autosave from a prior test can pollute a file read; this live read
+ * is instance-scoped and race-immune.
+ */
+export async function readWallGapsLive(page: any): Promise<{ walls: number; gaps: Array<{ wallId: string; seg: number; t: number; widthCells: number; widthLocked: boolean; bound: boolean; flip: boolean }> }> {
+  return await page.evaluate(() => {
+    const insts = (window as any).__windrose?.mcpInstances ?? {};
+    for (const inst of Object.values(insts) as any[]) {
+      if (inst?.ops?.readWallGaps != null) return inst.ops.readWallGaps();
+    }
+    return { walls: 0, gaps: [] };
+  });
 }
 
 // ===========================================

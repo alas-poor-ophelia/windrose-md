@@ -1,4 +1,4 @@
-{
+﻿{
   "walls-fixture/Test_Wall_01.png": {
     "ddSourceType": "walls",
     "wallEndCapPath": "walls-fixture/Test_Wall_01_end.png",
@@ -18,5 +18,14 @@
     "opaqueH": 16,
     "srcW": 8,
     "srcH": 16
+  },
+  "walls-fixture/Door_256.png": {
+    "ddSourceType": "portals",
+    "depthAffinity": "structure",
+    "alphaCoverage": 0.71636962890625,
+    "opaqueW": 194,
+    "opaqueH": 242,
+    "srcW": 256,
+    "srcH": 256
   }
 }
