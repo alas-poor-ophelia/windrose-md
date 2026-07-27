@@ -4738,6 +4738,259 @@ button.windrose-sel-icon-btn,
   color: var(--windrose-bg-primary);
 }
 
+/* ==========================================================================
+   Party Pin Controls (floating card shown with the party pin tool)
+   Card shell/brackets come from .windrose-selection-card; this partial
+   styles the pin-specific content.
+   ========================================================================== */
+.windrose-party-controls-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 2px 4px;
+  color: var(--windrose-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.windrose-party-controls-header > span {
+  flex: 1;
+}
+.is-tablet button.windrose-party-controls-remove,
+button.windrose-party-controls-remove,
+.windrose-party-controls-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  min-width: unset;
+  min-height: unset;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  opacity: 0.65;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+}
+.is-tablet button.windrose-party-controls-remove:hover,
+button.windrose-party-controls-remove:hover,
+.windrose-party-controls-remove:hover {
+  opacity: 1;
+  color: oklch(65% 0.18 25deg);
+  border-color: oklch(65% 0.18 25deg / 0.4);
+}
+
+.windrose-party-controls-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px;
+  font-size: 11px;
+  color: var(--windrose-text-primary);
+}
+.windrose-party-controls-field > span {
+  width: 40px;
+  opacity: 0.7;
+}
+.windrose-party-controls-field input {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 2px 6px;
+  background: oklch(25% 0 0deg / 0.4);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.35);
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  font-size: 12px;
+}
+.windrose-party-controls-field.is-invalid input {
+  border-color: oklch(60% 0.19 25deg);
+}
+.windrose-party-controls-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.windrose-party-controls-unit {
+  flex-shrink: 0;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.windrose-party-controls-error {
+  padding: 0 2px 2px 48px;
+  color: oklch(70% 0.17 25deg);
+  font-size: 10px;
+}
+.windrose-party-controls-styles {
+  display: flex;
+  gap: 2px;
+  padding: 4px 2px 2px;
+}
+.is-tablet button.windrose-party-controls-styles button,
+.windrose-party-controls-styles button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  height: 28px;
+  min-height: 28px;
+  padding: 4px 8px;
+  min-width: unset;
+  background: oklch(25% 0 0deg / 0.25);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  transition: var(--windrose-transition);
+}
+.is-tablet button.windrose-party-controls-styles button:hover,
+.windrose-party-controls-styles button:hover {
+  background: oklch(30% 0 0deg / 0.4);
+}
+.is-tablet button.windrose-party-controls-styles button.is-active,
+.windrose-party-controls-styles button.is-active {
+  background: oklch(from var(--windrose-border-primary) l c h/0.2);
+  border-color: oklch(from var(--windrose-border-primary) l c h/0.6);
+}
+
+.windrose-party-controls-nearby {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid oklch(from var(--windrose-border-primary) l c h/0.25);
+}
+.windrose-party-controls-nearby-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px;
+  color: var(--windrose-text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.windrose-party-controls-nearby-header > span:first-of-type {
+  flex: 1;
+}
+.windrose-party-controls-nearby-count {
+  padding: 0 6px;
+  background: oklch(from var(--windrose-border-primary) l c h/0.2);
+  border-radius: 8px;
+  font-size: 10px;
+}
+.windrose-party-controls-nearby-subheader {
+  padding: 4px 2px 0;
+  color: var(--windrose-text-primary);
+  font-size: 10px;
+  opacity: 0.55;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.windrose-party-controls-nearby-empty {
+  padding: 4px 2px 2px;
+  color: var(--windrose-text-primary);
+  font-size: 11px;
+  font-style: italic;
+  opacity: 0.55;
+}
+.windrose-party-controls-nearby-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 168px;
+  overflow-y: auto;
+}
+.is-tablet button.windrose-party-controls-nearby-row,
+button.windrose-party-controls-nearby-row,
+.windrose-party-controls-nearby-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  height: 26px;
+  min-height: 26px;
+  padding: 2px 6px;
+  min-width: unset;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+  transition: var(--windrose-transition);
+}
+.is-tablet button.windrose-party-controls-nearby-row a,
+button.windrose-party-controls-nearby-row a,
+.windrose-party-controls-nearby-row a {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+  text-decoration: none;
+}
+.is-tablet button.windrose-party-controls-nearby-row > span:first-child,
+button.windrose-party-controls-nearby-row > span:first-child,
+.windrose-party-controls-nearby-row > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.is-tablet button.windrose-party-controls-nearby-row:hover,
+button.windrose-party-controls-nearby-row:hover,
+.windrose-party-controls-nearby-row:hover {
+  background: oklch(30% 0 0deg / 0.4);
+}
+.is-tablet button.windrose-party-controls-nearby-row.is-static,
+button.windrose-party-controls-nearby-row.is-static,
+.windrose-party-controls-nearby-row.is-static {
+  cursor: default;
+}
+.is-tablet button.windrose-party-controls-nearby-row.is-static:hover,
+button.windrose-party-controls-nearby-row.is-static:hover,
+.windrose-party-controls-nearby-row.is-static:hover {
+  background: transparent;
+}
+
+.windrose-party-controls-nearby-distance {
+  flex-shrink: 0;
+  font-size: 11px;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Touch: comfortable targets without inflating the desktop card */
+@media (pointer: coarse) {
+  .windrose-party-controls-field input {
+    height: 36px;
+    font-size: 14px;
+  }
+  .windrose-party-controls-styles button {
+    height: 40px;
+    min-height: 40px;
+  }
+  .windrose-party-controls button.windrose-party-controls-remove {
+    width: 36px;
+    height: 36px;
+  }
+  .windrose-party-controls-nearby-row {
+    height: 44px;
+    min-height: 44px;
+  }
+  .windrose-party-controls-nearby-list {
+    max-height: 264px;
+  }
+}
 /* ============================================
    TEXT LABEL/MODAL SYSTEM
    ============================================ */
