@@ -130,6 +130,29 @@ export async function setup() {
     console.log("  Registered: tilesetFolders += 'walls-fixture'");
   }
 
+  // Pin one enabled travel pack so the measure card's Travel block renders
+  // deterministically from boot (travel-time and unit E2E tests depend on
+  // it). Stable ids; March at 300 ft/h gives exact minutes on the default
+  // 5 ft/cell grid fixture. Idempotent — matched by pack id.
+  const E2E_TRAVEL_PACK = {
+    id: "travel-pack-e2e-fixture",
+    name: "E2E Pack",
+    enabled: true,
+    units: [{ id: "unit-e2e-hex", name: "Hex", abbreviation: "hex", factor: 6, baseUnit: "mi" }],
+    terrains: [
+      { id: "terrain-e2e-forest", name: "Forest", multiplier: 0.5, color: "#2d5a27" },
+      { id: "terrain-e2e-road", name: "Road", multiplier: 1.25, color: "#a58d5f" },
+    ],
+    modes: [{ id: "mode-e2e-march", name: "March", distance: 300, unit: { type: "standard", unit: "ft" }, timeValue: 1, timeUnit: "hours" }],
+    allowances: [{ id: "allow-e2e-normal", name: "Normal pace", timeValue: 8, timeUnit: "hours" }],
+  };
+  const packs = Array.isArray(settings.travelPacks) ? (settings.travelPacks as { id: string }[]) : [];
+  if (!packs.some(p => p.id === E2E_TRAVEL_PACK.id)) {
+    settings.travelPacks = [...packs, E2E_TRAVEL_PACK];
+    settingsChanged = true;
+    console.log("  Pinned: travel pack 'E2E Pack' in plugin settings");
+  }
+
   if (settingsChanged) {
     writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
   }

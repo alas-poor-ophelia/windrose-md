@@ -7,6 +7,7 @@ import {
   getCanvasCenter,
   selectToolByTitle,
   getHistoryButtons,
+  doWithApp,
   TEST_MAPS
 } from "./helpers";
 
@@ -158,6 +159,97 @@ test("Removing the pin clears the overlay and undo restores it", async ({ page }
   await undoBtn.click();
   await page.waitForTimeout(300);
   expect(await page.locator(".windrose-party-pin-overlay").isVisible()).toBe(true);
+
+  expect(errors).toHaveLength(0);
+});
+
+test("Icon picker assigns a glyph to the pin head and clear restores the dot", async ({ page }) => {
+  const errors = setupErrorTracking(page);
+
+  await navigateToMap(page, TEST_MAPS.grid);
+  await waitForContainer(page);
+
+  await placePartyPin(page);
+
+  const card = page.locator(".windrose-party-controls");
+  await card.locator('button[aria-label="Pin Icon"]').click();
+  await page.waitForTimeout(300);
+
+  const picker = page.locator(".windrose-icon-picker");
+  expect(await picker.isVisible()).toBe(true);
+
+  await picker.locator(".windrose-icon-picker-search").fill("dragon");
+  await page.waitForTimeout(250);
+  await picker.locator('.windrose-icon-picker-cell[title="Dragon"]').click();
+  await page.waitForTimeout(400);
+
+  // Picker closes on select; the glyph renders in the pin head in the
+  // RPGAwesome font, replacing the plain dot
+  expect(await page.locator(".windrose-icon-picker").count()).toBe(0);
+  const glyph = page.locator('.windrose-party-pin-overlay text[font-family="rpgawesome"]');
+  expect(await glyph.count()).toBe(1);
+
+  // Clear restores the dot
+  await card.locator('button[aria-label="Pin Icon"]').click();
+  await page.waitForTimeout(300);
+  await page.locator(".windrose-icon-picker-clear").click();
+  await page.waitForTimeout(400);
+  expect(await page.locator('.windrose-party-pin-overlay text[font-family="rpgawesome"]').count()).toBe(0);
+
+  expect(errors).toHaveLength(0);
+});
+
+test("Nearby list shows an explicit empty state when nothing is in range", async ({ page }) => {
+  const errors = setupErrorTracking(page);
+
+  await navigateToMap(page, TEST_MAPS.grid);
+  await waitForContainer(page);
+
+  await placePartyPin(page);
+
+  const empty = page.locator(".windrose-party-controls-nearby-empty");
+  expect(await empty.isVisible()).toBe(true);
+  expect(await empty.textContent()).toBe("Nothing in range");
+
+  expect(errors).toHaveLength(0);
+});
+
+test("Party note is created in the vault and pin removal offers guarded deletion", async ({ page }) => {
+  const errors = setupErrorTracking(page);
+
+  await navigateToMap(page, TEST_MAPS.grid);
+  await waitForContainer(page);
+
+  await placePartyPin(page);
+
+  // Create the note (default folder = vault root; label 'The Party')
+  const createRow = page.locator(".windrose-party-controls-note-create");
+  await createRow.locator("button", { hasText: "Create" }).click();
+  await page.waitForTimeout(1000);
+
+  const notePath = "The Party - Nearby.md";
+  const created = await doWithApp(page, async (app: any, params: any) => {
+    return app.vault.getAbstractFileByPath(params.notePath) != null;
+  }, { notePath });
+  expect(created).toBe(true);
+
+  // The card now offers open + live-update controls instead of Create
+  expect(await page.locator('.windrose-party-controls button[aria-label="Open party note"]').isVisible()).toBe(true);
+
+  // Removing the pin offers note deletion (never silent) — accept it
+  await page.locator('.windrose-party-controls button[aria-label="Remove Party Pin"]').click();
+  await page.waitForTimeout(400);
+
+  const confirm = page.locator(".modal").last();
+  expect(await confirm.isVisible()).toBe(true);
+  await confirm.locator("button", { hasText: "Delete note" }).click();
+  await page.waitForTimeout(600);
+
+  const stillThere = await doWithApp(page, async (app: any, params: any) => {
+    return app.vault.getAbstractFileByPath(params.notePath) != null;
+  }, { notePath });
+  expect(stillThere).toBe(false);
+  expect(await page.locator(".windrose-party-pin-overlay").count()).toBe(0);
 
   expect(errors).toHaveLength(0);
 });
