@@ -80,6 +80,9 @@ export type {
   PartyPin,
   PartyRangeStyle,
   PartyNoteSettings,
+  PartyLayerScope,
+  PartyQueryFilters,
+  PartyRelatedMode,
 } from './core/map.types';
 
 export type {

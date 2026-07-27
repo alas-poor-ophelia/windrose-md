@@ -13,12 +13,23 @@
  */
 
 // Type-only imports
-import type { MapData, PartyPin } from '#types/core/map.types';
+import type { MapData, MapLayer, PartyPin } from '#types/core/map.types';
 import type { IGeometry, Point } from '#types/core/geometry.types';
 import type { MapObject, ObjectId } from '#types/objects/object.types';
 import type { DiagonalRule, DistanceDisplayFormat } from '#types/settings/settings.types';
 
 import { formatDistance } from '../drawing/distanceOperations';
+
+/** Vault-side metadata for a note, sourced from Obsidian's in-memory caches */
+export interface NoteMetadata {
+  /** Tags without the leading #, lowercased */
+  tags: string[];
+  /** Frontmatter properties */
+  frontmatter: Record<string, unknown>;
+}
+
+/** Metadata accessor injected by the caller; null when the note is unknown */
+export type NoteMetadataAccessor = (notePath: string) => NoteMetadata | null;
 
 /** A linked note within range of the party pin */
 export interface PartyRangeNoteResult {
@@ -52,6 +63,8 @@ interface PartyRangeQuerySettings {
   distanceUnit: string;
   diagonalRule: DiagonalRule;
   displayFormat: DistanceDisplayFormat;
+  /** Resolves note tags/frontmatter for filtering; omit to skip filters */
+  noteMetadata?: NoteMetadataAccessor;
 }
 
 const RANGE_EPSILON = 1e-6;
@@ -71,6 +84,54 @@ function objectCellPosition(obj: MapObject, geometry: IGeometry): Point {
 }
 
 /**
+ * Resolve which layers the query covers. A 'selected' scope whose layer ids
+ * no longer exist on the map degrades gracefully to all layers rather than
+ * silently returning nothing.
+ */
+function resolveScopedLayers(mapData: MapData, pin: PartyPin): MapLayer[] {
+  const scope = pin.layerScope;
+  if (scope == null || scope.mode !== 'selected') return mapData.layers;
+  const selected = mapData.layers.filter(layer => scope.layerIds.includes(layer.id));
+  return selected.length > 0 ? selected : mapData.layers;
+}
+
+/**
+ * Apply the pin's tag/property filters to a linked note's metadata.
+ * Unknown notes (no metadata) fail configured filters — an unresolvable
+ * link cannot demonstrate a required tag or property.
+ */
+function passesFilters(pin: PartyPin, notePath: string, noteMetadata?: NoteMetadataAccessor): boolean {
+  const filters = pin.filters;
+  const tagFilter = filters?.tags ?? [];
+  const propertyFilter = filters?.properties ?? {};
+  const propertyNames = Object.keys(propertyFilter);
+  if (tagFilter.length === 0 && propertyNames.length === 0) return true;
+  if (noteMetadata == null) return true;
+
+  const metadata = noteMetadata(notePath);
+  if (metadata == null) return false;
+
+  if (tagFilter.length > 0) {
+    const noteTags = new Set(metadata.tags.map(t => t.toLowerCase()));
+    const hasTag = tagFilter.some(tag => noteTags.has(tag.replace(/^#/, '').toLowerCase()));
+    if (!hasTag) return false;
+  }
+
+  for (const property of propertyNames) {
+    const accepted = propertyFilter[property];
+    if (accepted.length === 0) continue;
+    const raw = metadata.frontmatter[property];
+    const values = Array.isArray(raw) ? raw : [raw];
+    const matched = values.some(value =>
+      value != null && accepted.some(a => String(value).toLowerCase() === a.toLowerCase())
+    );
+    if (!matched) return false;
+  }
+
+  return true;
+}
+
+/**
  * Collect the markers within range of the party pin.
  * @returns Linked notes (deduplicated, min distance first) and labeled
  *          unlinked markers, both sorted nearest-first.
@@ -81,11 +142,11 @@ function queryPartyRange(
   pin: PartyPin,
   settings: PartyRangeQuerySettings
 ): PartyRangeResults {
-  const { rangeInCells, distancePerCell, distanceUnit, diagonalRule, displayFormat } = settings;
+  const { rangeInCells, distancePerCell, distanceUnit, diagonalRule, displayFormat, noteMetadata } = settings;
   const byNote = new Map<string, PartyRangeNoteResult>();
   const unlinked: PartyRangeUnlinkedResult[] = [];
 
-  for (const layer of mapData.layers) {
+  for (const layer of resolveScopedLayers(mapData, pin)) {
     for (const obj of layer.objects ?? []) {
       const cell = objectCellPosition(obj, geometry);
       const distance = geometry.getCellDistance(
@@ -95,6 +156,7 @@ function queryPartyRange(
 
       const notePath = obj.linkedNote ?? null;
       if (notePath != null && notePath !== '') {
+        if (!passesFilters(pin, notePath, noteMetadata)) continue;
         const existing = byNote.get(notePath);
         if (!existing || distance < existing.distanceInCells) {
           byNote.set(notePath, {

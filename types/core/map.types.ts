@@ -472,6 +472,24 @@ export interface PartyNoteSettings {
   path: string;
 }
 
+/** Which map layers a party pin's range query covers. */
+export interface PartyLayerScope {
+  mode: 'all' | 'selected';
+  /** Layer ids consulted when mode is 'selected' */
+  layerIds: LayerId[];
+}
+
+/** Optional result filters for a party pin's range query. */
+export interface PartyQueryFilters {
+  /** A note qualifies if it bears at least one of these tags (no leading #) */
+  tags?: string[];
+  /** Per property: accepted values; a note must match one value per configured property */
+  properties?: Record<string, string[]>;
+}
+
+/** Related-notes expansion mode for a party pin. */
+export type PartyRelatedMode = 'off' | 'tags' | 'backlinks';
+
 /**
  * Marks the adventuring party's current location. Position is cell-aligned:
  * {x: col, y: row} on grid maps, {x: q, y: r} axial on hex maps.
@@ -490,6 +508,12 @@ export interface PartyPin {
   rangeStyle: PartyRangeStyle;
   /** Generated note settings; absent means no note was ever created */
   partyNote?: PartyNoteSettings;
+  /** Layer scoping for the range query; absent means all layers */
+  layerScope?: PartyLayerScope;
+  /** Result filters; absent means no filtering */
+  filters?: PartyQueryFilters;
+  /** Related-notes expansion; absent means off */
+  relatedMode?: PartyRelatedMode;
 }
 
 // ===========================================

@@ -27,8 +27,8 @@ function makeObject(overrides: Partial<MapObject>): MapObject {
 function makeMapData(objects: MapObject[], secondLayerObjects: MapObject[] = []): MapData {
   return {
     layers: [
-      { objects },
-      { objects: secondLayerObjects }
+      { id: 'layer-one', objects },
+      { id: 'layer-two', objects: secondLayerObjects }
     ]
   } as unknown as MapData;
 }
@@ -125,6 +125,86 @@ describe('queryPartyRange', () => {
     const { linked } = queryPartyRange(makeMapData([freeform]), geometry, makePin(10, 10), settings(4));
     expect(linked).toHaveLength(1);
     expect(linked[0].distanceInCells).toBe(2);
+  });
+
+  it("scopes to selected layers when configured", () => {
+    const mapData = makeMapData(
+      [makeObject({ position: { x: 11, y: 10 }, linkedNote: 'One.md' })],
+      [makeObject({ position: { x: 12, y: 10 }, linkedNote: 'Two.md' })]
+    );
+    const pin = { ...makePin(10, 10), layerScope: { mode: 'selected' as const, layerIds: ['layer-two'] } };
+    const { linked } = queryPartyRange(mapData, geometry, pin, settings(4));
+    expect(linked.map(r => r.displayName)).toEqual(['Two']);
+  });
+
+  it('degrades to all layers when the selected layers no longer exist', () => {
+    const mapData = makeMapData(
+      [makeObject({ position: { x: 11, y: 10 }, linkedNote: 'One.md' })],
+      [makeObject({ position: { x: 12, y: 10 }, linkedNote: 'Two.md' })]
+    );
+    const pin = { ...makePin(10, 10), layerScope: { mode: 'selected' as const, layerIds: ['layer-deleted'] } };
+    const { linked } = queryPartyRange(mapData, geometry, pin, settings(4));
+    expect(linked).toHaveLength(2);
+  });
+
+  it('filters linked notes by tag', () => {
+    const mapData = makeMapData([
+      makeObject({ position: { x: 11, y: 10 }, linkedNote: 'Town.md' }),
+      makeObject({ position: { x: 12, y: 10 }, linkedNote: 'Lair.md' })
+    ]);
+    const pin = { ...makePin(10, 10), filters: { tags: ['settlement'] } };
+    const metadata = (path: string) =>
+      path === 'Town.md'
+        ? { tags: ['settlement', 'visited'], frontmatter: {} }
+        : { tags: ['dungeon'], frontmatter: {} };
+    const { linked } = queryPartyRange(mapData, geometry, pin, { ...settings(4), noteMetadata: metadata });
+    expect(linked.map(r => r.displayName)).toEqual(['Town']);
+  });
+
+  it('filters by frontmatter property with multiple accepted values', () => {
+    const mapData = makeMapData([
+      makeObject({ position: { x: 11, y: 10 }, linkedNote: 'A.md' }),
+      makeObject({ position: { x: 12, y: 10 }, linkedNote: 'B.md' }),
+      makeObject({ position: { x: 13, y: 10 }, linkedNote: 'C.md' })
+    ]);
+    const pin = { ...makePin(10, 10), filters: { properties: { status: ['active', 'rumored'] } } };
+    const metadata = (path: string) => ({
+      tags: [],
+      frontmatter: path === 'A.md' ? { status: 'active' } : path === 'B.md' ? { status: 'cleared' } : {}
+    });
+    const { linked } = queryPartyRange(mapData, geometry, pin, { ...settings(4), noteMetadata: metadata });
+    expect(linked.map(r => r.displayName)).toEqual(['A']);
+  });
+
+  it('requires every configured property but only one tag', () => {
+    const mapData = makeMapData([
+      makeObject({ position: { x: 11, y: 10 }, linkedNote: 'Both.md' }),
+      makeObject({ position: { x: 12, y: 10 }, linkedNote: 'OneProp.md' })
+    ]);
+    const pin = {
+      ...makePin(10, 10),
+      filters: { properties: { status: ['active'], region: ['north'] } }
+    };
+    const metadata = (path: string) => ({
+      tags: [],
+      frontmatter: path === 'Both.md'
+        ? { status: 'active', region: 'north' }
+        : { status: 'active' }
+    });
+    const { linked } = queryPartyRange(mapData, geometry, pin, { ...settings(4), noteMetadata: metadata });
+    expect(linked.map(r => r.displayName)).toEqual(['Both']);
+  });
+
+  it('drops unresolvable notes when filters are configured, keeps them otherwise', () => {
+    const mapData = makeMapData([
+      makeObject({ position: { x: 11, y: 10 }, linkedNote: 'Ghost.md' })
+    ]);
+    const noMeta = () => null;
+    const unfiltered = queryPartyRange(mapData, geometry, makePin(10, 10), { ...settings(4), noteMetadata: noMeta });
+    expect(unfiltered.linked).toHaveLength(1);
+    const pin = { ...makePin(10, 10), filters: { tags: ['any'] } };
+    const filtered = queryPartyRange(mapData, geometry, pin, { ...settings(4), noteMetadata: noMeta });
+    expect(filtered.linked).toHaveLength(0);
   });
 
   it('uses hex distance on hex maps', () => {
