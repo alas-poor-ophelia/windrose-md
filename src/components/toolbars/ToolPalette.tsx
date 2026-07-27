@@ -341,6 +341,7 @@ const simpleTools: SimpleTool[] = [
   { id: 'edgeLine', title: 'Paint Line (click two points)', icon: 'lucide-git-commit-horizontal', gridOnly: true },
   { id: 'addObject', title: 'Add Object (select from sidebar)', icon: 'lucide-map-pin-plus' },
   { id: 'addNote', title: 'Place Note Pin', icon: 'lucide-pin', shortcut: 'n', actionId: 'notePinTool', feature: 'notePins' },
+  { id: 'partyPin', title: 'Place Party Pin', icon: 'lucide-users' },
   { id: 'addText', title: 'Add Text Label', icon: 'lucide-type' },
   { id: 'outline', title: 'Draw Outline', icon: 'lucide-spline', hexOnly: true, feature: 'outlines' },
   { id: 'shape', title: 'Place Shape Overlay', icon: 'lucide-shapes', feature: 'shapeOverlays' },

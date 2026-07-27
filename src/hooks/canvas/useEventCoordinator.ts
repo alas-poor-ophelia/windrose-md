@@ -306,6 +306,14 @@ const useEventCoordinator = ({
           measureHandlers.handleMeasureClick(gridX, gridY, isTouchEvent);
         }
 
+      } else if (currentTool === 'partyPin') {
+        if (hasMultiSelection) clearSelection();
+
+        const partyPinHandlers = getHandlers('partyPin');
+        if (partyPinHandlers?.handlePartyPinPointerDown) {
+          partyPinHandlers.handlePartyPinPointerDown(gridX, gridY);
+        }
+
       } else if (currentTool === 'diagonalFill') {
         if (hasMultiSelection) clearSelection();
 
@@ -549,6 +557,17 @@ const useEventCoordinator = ({
           const gridX = coords.x;
           const gridY = coords.y;
           measureHandlers.handleMeasureMove(gridX, gridY);
+        }
+      }
+      return;
+    }
+
+    if (currentTool === 'partyPin') {
+      const partyPinHandlers = getHandlers('partyPin');
+      if (partyPinHandlers?.handlePartyPinMove && toGrid != null) {
+        const coords = toGrid(clientX, clientY);
+        if (coords) {
+          partyPinHandlers.handlePartyPinMove(coords.x, coords.y);
         }
       }
       return;
@@ -1033,6 +1052,11 @@ const useEventCoordinator = ({
 
       if (textHandlers?.stopTextDragging) {
         textHandlers.stopTextDragging();
+      }
+
+      const partyPinHandlers = getHandlers('partyPin');
+      if (partyPinHandlers?.stopPartyPinDrag) {
+        partyPinHandlers.stopPartyPinDrag();
       }
 
       if (isDraggingSelection) {

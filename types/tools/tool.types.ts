@@ -37,6 +37,7 @@ export type ToolId =
   | 'addObject'
   | 'addText'
   | 'addNote'
+  | 'partyPin'
   // Region tools (hex maps)
   | 'regionPaint'
   | 'regionBoundary'

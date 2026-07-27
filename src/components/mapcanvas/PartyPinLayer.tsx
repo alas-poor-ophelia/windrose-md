@@ -1,13 +1,14 @@
 /**
  * PartyPinLayer.tsx
  *
- * Layer component for the party pin. Resolves the map's distance settings,
- * converts the pin's range from map units to cells, and renders the pin with
- * its range ring. The ring is visible whenever a pin exists, independent of
- * the active tool.
+ * Layer component for the party pin. Registers the placement/drag tool
+ * handlers, resolves the map's distance settings, converts the pin's range
+ * from map units to cells, and renders the pin with its range ring. The
+ * ring is visible whenever a pin exists, independent of the active tool.
  */
 
 import type { VNode } from 'preact';
+import type { PartyPin } from '#types/core/map.types';
 import type { MapDistanceOverrides } from '../../drawing/distanceOperations';
 
 import { getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
@@ -16,9 +17,22 @@ import { getPartyPin } from '../../objects/partyPinOperations';
 import { getSettings } from '../../core/settingsAccessor';
 import { PartyPinOverlay } from '../overlays/PartyPinOverlay';
 import { useMapState } from '../../context/MapContext';
+import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
+import { usePartyPinInteraction } from '../../hooks/interactions/usePartyPinInteraction';
 
-const PartyPinLayer = (): VNode | null => {
+/** Props for PartyPinLayer component */
+export interface PartyPinLayerProps {
+  /** Change handler for the map's party pins (history-aware) */
+  onPartyPinsChange: (partyPins: PartyPin[], suppressHistory?: boolean) => void;
+}
+
+const PartyPinLayer = ({ onPartyPinsChange }: PartyPinLayerProps): VNode | null => {
   const { mapData, geometry, canvasRef } = useMapState();
+
+  const { handlePartyPinPointerDown, handlePartyPinMove, stopPartyPinDrag } =
+    usePartyPinInteraction(mapData?.partyPins, onPartyPinsChange);
+
+  useLayerHandlers('partyPin', { handlePartyPinPointerDown, handlePartyPinMove, stopPartyPinDrag });
 
   const pin = getPartyPin(mapData?.partyPins);
   if (!pin || !mapData || !geometry) {

@@ -721,7 +721,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleTextLabelSettingsChange,
     handleRegionsChange,
     handleOutlinesChange,
-    handleShapeOverlaysChange
+    handleShapeOverlaysChange,
+    handlePartyPinsChange
   } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
 
   const wrappedHandleNameChange = useCallback((newName: string) => {
@@ -1534,7 +1535,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               <MapCanvas.HexCoordinateLayer />
 
               {/* PartyPinLayer - party pin marker and range ring */}
-              <MapCanvas.PartyPinLayer />
+              <MapCanvas.PartyPinLayer onPartyPinsChange={handlePartyPinsChange} />
 
               {/* MeasurementLayer - distance measurement tool overlay */}
               <MapCanvas.MeasurementLayer

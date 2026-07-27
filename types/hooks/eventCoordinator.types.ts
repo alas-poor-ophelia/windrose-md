@@ -137,6 +137,13 @@ export interface NotePinHandlers {
   handleNotePinPlacement?: (gridX: number, gridY: number) => boolean;
 }
 
+/** Party pin handlers */
+export interface PartyPinHandlers {
+  handlePartyPinPointerDown?: (gridX: number, gridY: number) => void;
+  handlePartyPinMove?: (gridX: number, gridY: number) => void;
+  stopPartyPinDrag?: () => void;
+}
+
 /** Pan/zoom handlers */
 export interface PanZoomHandlers {
   getClientCoords: (e: Event) => { clientX: number; clientY: number };
@@ -232,6 +239,7 @@ export interface HandlerTypeMap {
   object: ObjectHandlers;
   text: TextHandlers;
   notePin: NotePinHandlers;
+  partyPin: PartyPinHandlers;
   panZoom: PanZoomHandlers;
   measure: MeasureHandlers;
   imageAlignment: AlignmentHandlers;
