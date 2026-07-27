@@ -240,12 +240,50 @@ function findTerrainById(
   return null;
 }
 
+/**
+ * Compact per-mode travel label for a single point-to-point distance,
+ * e.g. "March 8 min · Wagon 2 h". Incompatible modes are skipped here —
+ * surface findTravelMismatch once per surface instead of repeating the
+ * guidance on every row. Null when nothing is computable.
+ */
+function formatTravelTimesLabel(
+  distanceInMapUnits: number,
+  mapUnit: string,
+  selectedModes: { mode: TravelMode; pack: TravelPack }[],
+  allowance: TravelAllowance | null
+): string | null {
+  const parts: string[] = [];
+  for (const { mode, pack } of selectedModes) {
+    const result = computeTravelTime(distanceInMapUnits, mapUnit, mode, pack);
+    if (result.ok) parts.push(`${mode.name} ${formatTravelTime(result, allowance)}`);
+  }
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+/**
+ * The first selected mode whose units cannot be reconciled with the map's
+ * unit, as an actionable guidance string — or null when all modes compute.
+ * Distance-independent: unit compatibility does not depend on magnitude.
+ */
+function findTravelMismatch(
+  mapUnit: string,
+  selectedModes: { mode: TravelMode; pack: TravelPack }[]
+): string | null {
+  for (const { mode, pack } of selectedModes) {
+    const result = computeTravelTime(1, mapUnit, mode, pack);
+    if (!result.ok) return result.reason;
+  }
+  return null;
+}
+
 export {
   unitsMatch,
   computeTravelTime,
   computeRouteTravelTime,
   allowanceHoursPerDay,
   formatTravelTime,
+  formatTravelTimesLabel,
+  findTravelMismatch,
   resolveSelectedModes,
   resolveSelectedAllowance,
   collectEnabledTerrains,

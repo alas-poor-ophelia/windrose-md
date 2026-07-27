@@ -23,12 +23,20 @@ import { queryPartyRange } from '../../objects/partyRangeQuery';
 import type { NoteMetadataAccessor } from '../../objects/partyRangeQuery';
 import type { RelatedNotes, RelatedNotesSource } from '../../objects/partyRelatedNotes';
 import { extractCacheTags, getRelatedByBacklinks, getRelatedByTags } from '../../objects/partyRelatedNotes';
+import type { PartyNoteTravelLabels } from '../../persistence/partyNoteOperations';
 import {
   buildPartyNoteContent,
   buildPartyNotePath,
   deletePartyNote,
   upsertPartyNote
 } from '../../persistence/partyNoteOperations';
+import { getEnabledTravelPacks } from '../../travel/travelPackOperations';
+import {
+  findTravelMismatch,
+  formatTravelTimesLabel,
+  resolveSelectedAllowance,
+  resolveSelectedModes,
+} from '../../travel/travelTimeOperations';
 import { getSettings } from '../../core/settingsAccessor';
 import { ConfirmModal } from '../../settings/modals/ConfirmModal';
 import { PartyPinOverlay } from '../overlays/PartyPinOverlay';
@@ -109,6 +117,75 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     });
   }, [pin, mapData, geometry, noteMetadataAccessor]);
 
+  // ===========================================
+  // Travel times per result (PP-35)
+  // ===========================================
+
+  // Travel packs come from plugin settings; re-read when settings change
+  const [settingsVersion, setSettingsVersion] = useState(0);
+  useEffect(() => {
+    const handler = (): void => setSettingsVersion(v => v + 1);
+    window.addEventListener('windrose-settings-changed', handler);
+    return () => window.removeEventListener('windrose-settings-changed', handler);
+  }, []);
+
+  const enabledPacks = useMemo(
+    () => getEnabledTravelPacks(getSettings().travelPacks),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- settingsVersion re-reads the plugin settings singleton
+    [settingsVersion]
+  );
+  const selectedTravelModes = useMemo(
+    () => resolveSelectedModes(enabledPacks, mapData?.travelSettings?.modeIds ?? []),
+    [enabledPacks, mapData?.travelSettings]
+  );
+  const travelAllowance = useMemo(
+    () => resolveSelectedAllowance(enabledPacks, mapData?.travelSettings?.allowanceId),
+    [enabledPacks, mapData?.travelSettings]
+  );
+
+  /** Compact "mode time · mode time" label for a result's distance, or null */
+  const travelLabelFor = useCallback((distanceInCells: number): string | null => {
+    if (selectedTravelModes.length === 0 || !mapData) return null;
+    const distanceSettings = getEffectiveDistanceSettings(
+      mapData.mapType,
+      getSettings(),
+      (mapData.settings?.distanceSettings ?? null) as MapDistanceOverrides | null
+    );
+    return formatTravelTimesLabel(
+      distanceInCells * distanceSettings.distancePerCell,
+      distanceSettings.distanceUnit,
+      selectedTravelModes,
+      travelAllowance
+    );
+  }, [selectedTravelModes, travelAllowance, mapData]);
+
+  /** One explicit unit-guidance line when a selected mode cannot compute */
+  const travelHint = useMemo((): string | null => {
+    if (selectedTravelModes.length === 0 || !mapData) return null;
+    const distanceSettings = getEffectiveDistanceSettings(
+      mapData.mapType,
+      getSettings(),
+      (mapData.settings?.distanceSettings ?? null) as MapDistanceOverrides | null
+    );
+    return findTravelMismatch(distanceSettings.distanceUnit, selectedTravelModes);
+  }, [selectedTravelModes, mapData]);
+
+  /** Per-result travel labels for the party note's Travel column */
+  const travelLabels = useMemo((): PartyNoteTravelLabels | undefined => {
+    if (selectedTravelModes.length === 0) return undefined;
+    const linked = new Map<string, string>();
+    for (const result of results.linked) {
+      const label = travelLabelFor(result.distanceInCells);
+      if (label != null) linked.set(result.notePath, label);
+    }
+    const unlinked = new Map<string, string>();
+    for (const result of results.unlinked) {
+      const label = travelLabelFor(result.distanceInCells);
+      if (label != null) unlinked.set(result.objectId, label);
+    }
+    return { linked, unlinked };
+  }, [selectedTravelModes.length, results, travelLabelFor]);
+
   // Related notes per result (tags or backlinks), for the party note table
   const relatedMap = useMemo((): Map<string, RelatedNotes> | undefined => {
     const mode = pin?.relatedMode ?? 'off';
@@ -146,8 +223,8 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
   // only re-arms when the rendered content actually differs
   const noteContent = useMemo(() => {
     if (pin?.partyNote?.enabled !== true) return null;
-    return buildPartyNoteContent(pin, results, noteContext, relatedMap);
-  }, [pin, results, noteContext, relatedMap]);
+    return buildPartyNoteContent(pin, results, noteContext, relatedMap, travelLabels);
+  }, [pin, results, noteContext, relatedMap, travelLabels]);
 
   useEffect(() => {
     if (noteContent == null || pin?.partyNote == null) return undefined;
@@ -163,22 +240,22 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     if (!currentPin || !mapData) return;
     const path = buildPartyNotePath(folder, currentPin.label);
     const updatedPin: PartyPin = { ...currentPin, partyNote: { enabled: true, path } };
-    const outcome = await upsertPartyNote(app, updatedPin, buildPartyNoteContent(updatedPin, results, noteContext, relatedMap));
+    const outcome = await upsertPartyNote(app, updatedPin, buildPartyNoteContent(updatedPin, results, noteContext, relatedMap, travelLabels));
     if (outcome === 'blocked') {
       new Notice(`A note already exists at ${path} — choose another folder or rename the pin.`);
       return;
     }
     onPartyPinsChange(upsertPartyPin(mapData.partyPins ?? [], updatedPin));
-  }, [mapData, results, noteContext, relatedMap, app, onPartyPinsChange]);
+  }, [mapData, results, noteContext, relatedMap, travelLabels, app, onPartyPinsChange]);
 
   const handleRecalculate = useCallback((): void => {
     const currentPin = getPartyPin(mapData?.partyPins);
     if (currentPin?.partyNote?.enabled !== true || !mapData || !geometry) return;
-    void upsertPartyNote(app, currentPin, buildPartyNoteContent(currentPin, results, noteContext, relatedMap))
+    void upsertPartyNote(app, currentPin, buildPartyNoteContent(currentPin, results, noteContext, relatedMap, travelLabels))
       .then(outcome => {
         if (outcome === 'blocked') new Notice('Party note is blocked by an unrelated file at its path.');
       });
-  }, [mapData, geometry, results, noteContext, relatedMap, app]);
+  }, [mapData, geometry, results, noteContext, relatedMap, travelLabels, app]);
 
   const handleRemovePin = useCallback(async (): Promise<void> => {
     const currentPin = getPartyPin(mapData?.partyPins);
@@ -229,6 +306,8 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
           partyPins={mapData.partyPins ?? []}
           distanceUnit={distanceSettings.distanceUnit}
           results={results}
+          travelLabelFor={travelLabelFor}
+          travelHint={travelHint}
           geometry={geometry}
           mapData={mapData}
           canvasRef={canvasRef}

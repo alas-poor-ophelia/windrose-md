@@ -83,17 +83,28 @@ function relatedCell(related: RelatedNotes | undefined): string {
   return related.overflow > 0 ? `${links} +${related.overflow} more` : links;
 }
 
+/** Per-result travel-time labels for the note's Travel column (PP-35) */
+export interface PartyNoteTravelLabels {
+  /** Keyed by linked result note path */
+  linked: Map<string, string>;
+  /** Keyed by unlinked result object id */
+  unlinked: Map<string, string>;
+}
+
 /**
  * Render the note's full markdown content for the current results.
  * Pure — content equality doubles as the change detector.
  * @param related - Per-result related notes (keyed by note path); when
  *                  provided, the table gains a Related column
+ * @param travel - Per-result travel-time labels; when provided, both
+ *                 tables gain a Travel column (PP-35)
  */
 function buildPartyNoteContent(
   pin: PartyPin,
   results: PartyRangeResults,
   context: PartyNoteContext,
-  related?: Map<string, RelatedNotes>
+  related?: Map<string, RelatedNotes>,
+  travel?: PartyNoteTravelLabels
 ): string {
   const lines: string[] = [];
   lines.push('---');
@@ -114,13 +125,17 @@ function buildPartyNoteContent(
   if (results.linked.length > 0) {
     const hasDeepLinks = context.mapNotePath !== '';
     const hasRelated = related != null;
-    const header = ['Note', 'Distance', ...(hasRelated ? ['Related'] : []), ...(hasDeepLinks ? ['Map'] : [])];
+    const hasTravel = travel != null;
+    const header = ['Note', 'Distance', ...(hasTravel ? ['Travel'] : []), ...(hasRelated ? ['Related'] : []), ...(hasDeepLinks ? ['Map'] : [])];
     lines.push(`| ${header.join(' | ')} |`);
     lines.push(`|${header.map(() => ' --- ').join('|')}|`);
     for (const result of results.linked) {
       const linkTarget = result.notePath.replace(/\.md$/, '');
       const link = `[[${escapeTableCell(linkTarget)}\\|${escapeTableCell(result.displayName)}]]`;
       const cells = [link, escapeTableCell(result.distanceLabel)];
+      if (hasTravel) {
+        cells.push(escapeTableCell(travel.linked.get(result.notePath) ?? '—'));
+      }
       if (hasRelated) {
         cells.push(relatedCell(related.get(result.notePath)));
       }
@@ -140,10 +155,19 @@ function buildPartyNoteContent(
   if (results.unlinked.length > 0) {
     lines.push('## Unlinked');
     lines.push('');
-    lines.push('| Marker | Distance |');
-    lines.push('| --- | --- |');
-    for (const result of results.unlinked) {
-      lines.push(`| ${escapeTableCell(result.label)} | ${escapeTableCell(result.distanceLabel)} |`);
+    if (travel != null) {
+      lines.push('| Marker | Distance | Travel |');
+      lines.push('| --- | --- | --- |');
+      for (const result of results.unlinked) {
+        const label = travel.unlinked.get(result.objectId) ?? '—';
+        lines.push(`| ${escapeTableCell(result.label)} | ${escapeTableCell(result.distanceLabel)} | ${escapeTableCell(label)} |`);
+      }
+    } else {
+      lines.push('| Marker | Distance |');
+      lines.push('| --- | --- |');
+      for (const result of results.unlinked) {
+        lines.push(`| ${escapeTableCell(result.label)} | ${escapeTableCell(result.distanceLabel)} |`);
+      }
     }
     lines.push('');
   }

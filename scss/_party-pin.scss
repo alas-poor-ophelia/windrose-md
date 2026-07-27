@@ -466,6 +466,32 @@
     font-variant-numeric: tabular-nums;
   }
 
+  &-nearby-item {
+    display: flex;
+    flex-direction: column;
+  }
+
+  &-nearby-travel {
+    padding: 0 8px 3px;
+    font-size: 10px;
+    opacity: 0.6;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &-travel-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    padding: 2px 4px;
+    color: oklch(70% 0.14 75deg);
+    font-size: 10px;
+    line-height: 1.35;
+
+    > span {
+      flex: 1;
+    }
+  }
+
   @at-root {
     .is-tablet button#{$ctl}-locate,
     button#{$ctl}-locate,

@@ -20,6 +20,8 @@ import {
   computeTravelTime,
   computeRouteTravelTime,
   formatTravelTime,
+  formatTravelTimesLabel,
+  findTravelMismatch,
   resolveSelectedModes,
   resolveSelectedAllowance,
   findTerrainById,
@@ -174,6 +176,34 @@ describe("travelTimeOperations", () => {
     it("supports minute-based allowances", () => {
       const shortDay = createTravelAllowance({ name: "March", timeValue: 480, timeUnit: "minutes" });
       expect(formatTravelTime(time(26, "hours"), shortDay)).toBe("3 days + 2 h");
+    });
+  });
+
+  // ===========================================================================
+  // Per-result labels (party pin, PP-35)
+  // ===========================================================================
+
+  describe("formatTravelTimesLabel and findTravelMismatch", () => {
+    const pack = buildPack();
+    const selections = pack.modes.map(mode => ({ mode, pack }));
+
+    it("joins per-mode times, skipping incompatible modes", () => {
+      // Map in mi: On foot 48 mi → 16 h; Hex crawl 36 mi (18 mi/day) → 2 days
+      const label = formatTravelTimesLabel(48, "mi", selections, null);
+      expect(label).toContain("On foot 16 h");
+      expect(label).toContain("Hex crawl");
+      expect(label).toContain(" · ");
+    });
+
+    it("returns null when no selected mode can compute", () => {
+      expect(formatTravelTimesLabel(48, "km", selections, null)).toBeNull();
+      expect(formatTravelTimesLabel(48, "mi", [], null)).toBeNull();
+    });
+
+    it("findTravelMismatch surfaces the first incompatible mode's guidance", () => {
+      expect(findTravelMismatch("mi", selections)).toBeNull();
+      const mismatch = findTravelMismatch("km", selections);
+      expect(mismatch).toContain("km");
     });
   });
 

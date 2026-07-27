@@ -45,6 +45,10 @@ interface PartyPinControlsProps {
   distanceUnit: string;
   /** Markers currently within range, from the party range query */
   results: PartyRangeResults;
+  /** Compact per-mode travel label for a result distance (PP-35); null = none */
+  travelLabelFor?: (distanceInCells: number) => string | null;
+  /** One explicit unit-guidance line when a selected travel mode cannot compute */
+  travelHint?: string | null;
   geometry: IGeometry | null;
   mapData: MapData | null;
   canvasRef: RefObject<HTMLCanvasElement> | null;
@@ -64,6 +68,8 @@ const PartyPinControls = ({
   partyPins,
   distanceUnit,
   results,
+  travelLabelFor,
+  travelHint,
   geometry,
   mapData,
   canvasRef,
@@ -452,34 +458,49 @@ const PartyPinControls = ({
             </button>
           </div>
 
+          {travelHint != null && (
+            <div className="windrose-party-controls-travel-hint">
+              <Icon icon="lucide-alert-triangle" size={11} />
+              <span>{travelHint}</span>
+            </div>
+          )}
+
           {results.linked.length === 0 && results.unlinked.length === 0 && (
             <div className="windrose-party-controls-nearby-empty">Nothing in range</div>
           )}
 
           {results.linked.length > 0 && (
             <div className="windrose-party-controls-nearby-list">
-              {results.linked.map(result => (
-                <div
-                  key={result.notePath}
-                  className="windrose-party-controls-nearby-row"
-                  title={result.notePath}
-                >
-                  <InternalLink link={result.notePath.replace(/\.md$/, '')}>
-                    {result.displayName}
-                  </InternalLink>
-                  <span className="windrose-party-controls-nearby-distance">{result.distanceLabel}</span>
-                  {onShowOnMap && (
-                    <button
-                      className="windrose-party-controls-locate"
-                      title="Show on map"
-                      aria-label={`Show ${result.displayName} on map`}
-                      onClick={() => onShowOnMap(result.position)}
-                    >
-                      <Icon icon="lucide-crosshair" size={12} />
-                    </button>
-                  )}
-                </div>
-              ))}
+              {results.linked.map(result => {
+                const travel = travelLabelFor?.(result.distanceInCells) ?? null;
+                return (
+                  <div
+                    key={result.notePath}
+                    className="windrose-party-controls-nearby-item"
+                    title={result.notePath}
+                  >
+                    <div className="windrose-party-controls-nearby-row">
+                      <InternalLink link={result.notePath.replace(/\.md$/, '')}>
+                        {result.displayName}
+                      </InternalLink>
+                      <span className="windrose-party-controls-nearby-distance">{result.distanceLabel}</span>
+                      {onShowOnMap && (
+                        <button
+                          className="windrose-party-controls-locate"
+                          title="Show on map"
+                          aria-label={`Show ${result.displayName} on map`}
+                          onClick={() => onShowOnMap(result.position)}
+                        >
+                          <Icon icon="lucide-crosshair" size={12} />
+                        </button>
+                      )}
+                    </div>
+                    {travel != null && (
+                      <div className="windrose-party-controls-nearby-travel">{travel}</div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -487,22 +508,30 @@ const PartyPinControls = ({
             <>
               <div className="windrose-party-controls-nearby-subheader">Unlinked</div>
               <div className="windrose-party-controls-nearby-list">
-                {results.unlinked.map(result => (
-                  <div key={result.objectId} className="windrose-party-controls-nearby-row is-static">
-                    <span>{result.label}</span>
-                    <span className="windrose-party-controls-nearby-distance">{result.distanceLabel}</span>
-                    {onShowOnMap && (
-                      <button
-                        className="windrose-party-controls-locate"
-                        title="Show on map"
-                        aria-label={`Show ${result.label} on map`}
-                        onClick={() => onShowOnMap(result.position)}
-                      >
-                        <Icon icon="lucide-crosshair" size={12} />
-                      </button>
-                    )}
-                  </div>
-                ))}
+                {results.unlinked.map(result => {
+                  const travel = travelLabelFor?.(result.distanceInCells) ?? null;
+                  return (
+                    <div key={result.objectId} className="windrose-party-controls-nearby-item">
+                      <div className="windrose-party-controls-nearby-row is-static">
+                        <span>{result.label}</span>
+                        <span className="windrose-party-controls-nearby-distance">{result.distanceLabel}</span>
+                        {onShowOnMap && (
+                          <button
+                            className="windrose-party-controls-locate"
+                            title="Show on map"
+                            aria-label={`Show ${result.label} on map`}
+                            onClick={() => onShowOnMap(result.position)}
+                          >
+                            <Icon icon="lucide-crosshair" size={12} />
+                          </button>
+                        )}
+                      </div>
+                      {travel != null && (
+                        <div className="windrose-party-controls-nearby-travel">{travel}</div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </>
           )}

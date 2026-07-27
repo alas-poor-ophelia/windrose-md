@@ -5163,6 +5163,28 @@ button.windrose-party-controls-nearby-row.is-static:hover,
   opacity: 0.65;
   font-variant-numeric: tabular-nums;
 }
+.windrose-party-controls-nearby-item {
+  display: flex;
+  flex-direction: column;
+}
+.windrose-party-controls-nearby-travel {
+  padding: 0 8px 3px;
+  font-size: 10px;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+.windrose-party-controls-travel-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 2px 4px;
+  color: oklch(70% 0.14 75deg);
+  font-size: 10px;
+  line-height: 1.35;
+}
+.windrose-party-controls-travel-hint > span {
+  flex: 1;
+}
 .is-tablet button.windrose-party-controls-locate,
 button.windrose-party-controls-locate,
 .windrose-party-controls-locate {

@@ -58,6 +58,51 @@ describe('buildPartyNotePath', () => {
   });
 });
 
+describe('buildPartyNoteContent travel column (PP-35)', () => {
+  const travelResults = makeResults({
+    linked: [{
+      notePath: 'Places/Tavern.md',
+      displayName: 'Tavern',
+      distanceInCells: 3,
+      distanceLabel: '15 ft',
+      sourceObjectId: 'obj-1',
+      position: { x: 12, y: 10 },
+    }],
+    unlinked: [{
+      label: 'Old well',
+      distanceInCells: 5,
+      distanceLabel: '25 ft',
+      objectId: 'obj-2',
+      position: { x: 8, y: 9 },
+    }],
+  });
+
+  it('adds a Travel column to both tables when labels are provided', () => {
+    const content = buildPartyNoteContent(makePin(), travelResults, context, undefined, {
+      linked: new Map([['Places/Tavern.md', 'March 8 min']]),
+      unlinked: new Map([['obj-2', 'March 12 min']]),
+    });
+    expect(content).toContain('| Note | Distance | Travel | Map |');
+    expect(content).toContain('March 8 min');
+    expect(content).toContain('| Marker | Distance | Travel |');
+    expect(content).toContain('March 12 min');
+  });
+
+  it('renders an em dash for results without a computable time', () => {
+    const content = buildPartyNoteContent(makePin(), travelResults, context, undefined, {
+      linked: new Map(),
+      unlinked: new Map(),
+    });
+    expect(content).toContain('| Travel |');
+    expect(content).toContain('—');
+  });
+
+  it('omits the column entirely when no travel labels are provided', () => {
+    const content = buildPartyNoteContent(makePin(), travelResults, context);
+    expect(content).not.toContain('Travel');
+  });
+});
+
 describe('buildPartyNoteContent', () => {
   it('carries the ownership marker in frontmatter', () => {
     const content = buildPartyNoteContent(makePin(), makeResults(), context);
