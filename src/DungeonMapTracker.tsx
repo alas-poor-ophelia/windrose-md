@@ -12,6 +12,7 @@ import type { Cell } from '#types/core/cell.types';
 import type { WallToolSurface } from '#types/core/wallpath.types';
 import type { TilesetOverrides, TileAssignment, TileRotation } from '#types/tiles/tile.types';
 import type { CustomColor } from '#types/core/common.types';
+import type { WindroseWallGapDebug, WindroseRawGap } from '#types/core/global.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useMapData } from './hooks/state/useMapData';
@@ -40,10 +41,13 @@ import { WhatsNewNotice } from './components/overlays/WhatsNewNotice';
 import { useAlignmentMode } from './hooks/interactions/useAlignmentMode';
 import { ModalPortal } from './components/modals/ModalPortal';
 import { getActiveLayer, getLayerById, getActiveBoardLayers, getBoardsOrdered, updateBoard, addBoard, setActiveBoard, removeBoard, setLayerMode, addLayer, updateActiveLayer } from './persistence/layerAccessor';
-import type { TileLayerRole } from '#types/tiles/tile.types';
+import type { TileLayerRole, TileForm } from '#types/tiles/tile.types';
 import { setCell as accessorSetCell, removeCell as accessorRemoveCell, cellToPoint } from './geometry/core/cellAccessor';
 import { assignmentsOverlap } from './assets/tileFootprint';
 import { resolveTileEntry } from './assets/tilesetOperations';
+import { deriveTileForm } from './assets/tileForm';
+import { computeGapSpans, seatedLeafSize } from './geometry/renderers/wallPathRenderer';
+import { buildGapFlatten, clampGapToSegment, pointAtLength } from './drawing/wallGapOperations';
 import { placeObject as opsPlaceObject } from './objects/objectOperations';
 import { getResolvedObjectTypes } from './objects/objectTypeResolver';
 import { FloatingPanel } from './components/panels/FloatingPanel';
@@ -79,7 +83,7 @@ import { CornerBrackets } from './components/shared/CornerBrackets';
 import { listMaps, deleteMapData } from './persistence/fileOperations';
 import type { MapListEntry } from './persistence/fileOperations';
 import { ConfirmModal } from './settings/modals/ConfirmModal';
-import { loadTileMetadata, setTileMetadataForRender } from './persistence/tileMetadata';
+import { loadTileMetadata, setTileMetadataForRender, getTileMetadataForRender } from './persistence/tileMetadata';
 import { NewMapModal } from './components/modals/NewMapModal';
 
 // ============================================================================
@@ -211,6 +215,16 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Wall-tool control surface published by WallLayer and consumed by the tile
   // drawer footer, which renders the tool's draw/edit controls.
   const [wallSurface, setWallSurface] = useState<WallToolSurface | null>(null);
+  // Bare-threshold placement mode (§5.3 primary trigger): the built-in Threshold
+  // ribbon entry arms NO asset, so WallLayer cuts empty 1-cell gaps. It is a
+  // sub-mode of portal arming (the entry only surfaces on an opening-form tile,
+  // so the wall tool is already active). Toggled by the ribbon; disarmed on tool
+  // switch, on Escape (via WallLayer), and when the opening asset is un-armed.
+  const [bareThresholdArmed, setBareThresholdArmed] = useState(false);
+  const handleThreshold = useCallback((): void => {
+    setBareThresholdArmed(prev => !prev);
+    setCurrentTool('wall');
+  }, [setCurrentTool]);
   // Vertical left ribbon: Tiles/Objects tabs + (on Tiles with a tile selected) placement subtools.
   const renderDrawerRibbon = (): VNode => (
     <div className="windrose-fd-subrib">
@@ -227,7 +241,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         <>
           <div className="windrose-fd-subrib-div" />
           <div className="windrose-fd-subrib-cap">Mode</div>
-          <TileSubtoolRibbon form={selectedTileForm} activeSubtool={tileSubtool} onSubtoolChange={setTileSubtool} />
+          <TileSubtoolRibbon form={selectedTileForm} activeSubtool={tileSubtool} onSubtoolChange={setTileSubtool} onThreshold={handleThreshold} thresholdActive={bareThresholdArmed} />
         </>
       )}
     </div>
@@ -450,15 +464,46 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const currentToolRef = useRef(currentTool);
   currentToolRef.current = currentTool;
   const prevSubtoolRef = useRef<typeof tileSubtool>(null);
+  const prevOpeningArmedRef = useRef(false);
+  // A DD portal is an opening asset — it travels with the wall tool just like a
+  // strip's 'line' subtool. Detected via metadata (union-free): the 'opening'
+  // subtool literal isn't a TileSubtoolId until P3 lands (see GOTCHAS). This
+  // also covers the Alt-click bare-threshold path (portal armed, no 'opening'
+  // subtool). The built-in Threshold ribbon entry (arms NO asset) still needs
+  // the subtool-based trigger — deferred to P3/P5 integration.
+  const openingArmed = useMemo((): boolean => {
+    const tilesets = rootMapData?.tilesets ?? mapData?.tilesets ?? [];
+    const ts = tilesets.find(t => t.id === selectedTilesetId);
+    const entry = ts != null && selectedTileId != null ? resolveTileEntry(ts, selectedTileId) : null;
+    return entry?.vaultPath != null && getTileMetadataForRender()[entry.vaultPath]?.ddSourceType === 'portals';
+  }, [rootMapData?.tilesets, mapData?.tilesets, selectedTilesetId, selectedTileId]);
   useEffect(() => {
     const prev = prevSubtoolRef.current;
     prevSubtoolRef.current = tileSubtool;
-    if (tileSubtool === 'line' && prev !== 'line') {
+    const prevOpening = prevOpeningArmedRef.current;
+    prevOpeningArmedRef.current = openingArmed;
+    // The wall tool is armed whenever a wall/path strip (subtool 'line') OR an
+    // opening asset (portal / bare threshold) is armed. Toggle the tool only on
+    // ENTERING or LEAVING that combined "wall-relevant" state — never on a
+    // transition BETWEEN two wall-relevant states (e.g. picking a portal right
+    // after a wall strip: 'line' → 'opening'), which must keep the wall tool.
+    const nowWallRelevant = tileSubtool === 'line' || openingArmed;
+    const wasWallRelevant = prev === 'line' || prevOpening;
+    if (nowWallRelevant && !wasWallRelevant) {
       setCurrentTool('wall');
-    } else if (prev === 'line' && tileSubtool !== 'line' && currentToolRef.current === 'wall') {
+    } else if (!nowWallRelevant && wasWallRelevant && currentToolRef.current === 'wall') {
       setCurrentTool('tilePaint');
     }
-  }, [tileSubtool, setCurrentTool]);
+  }, [tileSubtool, openingArmed, setCurrentTool]);
+
+  // Disarm the bare-threshold mode when it no longer applies: the tool leaves the
+  // wall tool, or the opening asset it rode in on is un-armed (portal deselected /
+  // a strip picked). Keeps a stale bare mode from hijacking the wall tool.
+  useEffect(() => {
+    if (bareThresholdArmed && (currentTool !== 'wall' || !openingArmed)) {
+      setBareThresholdArmed(false);
+    }
+  }, [bareThresholdArmed, currentTool, openingArmed]);
 
   // Use rootMapData for tileset check — tilesets are built from global settings and stored on root,
   // but sub-maps should also have access to tiles
@@ -919,6 +964,36 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           setCurrentTool('tilePaint');
           return { ok: true, note: 'subtool defaults to single-stamp when selected programmatically' };
         },
+        // Form-aware arming (mirrors a drawer pick, unlike selectTile which
+        // always forces tilePaint). Sets selection + derived FORM so the
+        // wall/opening coupling effect routes the tool: a wall/path strip
+        // (form 'line') and a portal (form 'opening') both auto-arm the wall
+        // tool; every other form falls back to tilePaint. This is the path
+        // E2E uses to arm structure assets without driving the depth-band DOM.
+        armTile: (tilesetId: string, tileId: string): { ok: boolean; form?: TileForm; availableTilesetIds?: string[] } => {
+          const ts = availableTilesets.find(t => t.id === tilesetId);
+          const tile = resolveTileEntry(ts, tileId);
+          if (ts == null || tile == null) {
+            return { ok: false, availableTilesetIds: availableTilesets.map(t => t.id) };
+          }
+          const meta = tile.vaultPath != null ? getTileMetadataForRender()[tile.vaultPath] : undefined;
+          const form = deriveTileForm(meta, ts);
+          handleTileSelect(tilesetId, tile.id);
+          setSelectedTileForm(form);
+          if (form !== 'line' && form !== 'opening') setCurrentTool('tilePaint');
+          return { ok: true, form };
+        },
+        // Non-mutating form probe. The tile-metadata store (ddSourceType) loads
+        // async on mount into a non-reactive singleton, so E2E arming must wait
+        // until this resolves to the expected form before calling armTile —
+        // otherwise a structure asset derives 'cell' and mis-routes to tilePaint.
+        deriveForm: (tilesetId: string, tileId: string): TileForm | null => {
+          const ts = availableTilesets.find(t => t.id === tilesetId);
+          const tile = resolveTileEntry(ts, tileId);
+          if (ts == null || tile == null) return null;
+          const meta = tile.vaultPath != null ? getTileMetadataForRender()[tile.vaultPath] : undefined;
+          return deriveTileForm(meta, ts);
+        },
         placeTile: (a: { col: number; row: number; tilesetId: string; tileId: string; rotation?: number; depth?: string; scale?: number }): { ok: boolean; tileCount: number; error?: string } => {
           if (activeLayer == null) return { ok: false, tileCount: 0, error: 'No active layer' };
           const ts = availableTilesets.find(t => t.id === a.tilesetId);
@@ -981,6 +1056,74 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           setRailOpenId(pane);
           return { ok: true };
         },
+        // Structured gap-geometry read for E2E (openings, §10/G-F9) — asserts
+        // computed skip intervals + seated-art transforms per wall directly,
+        // reserving pixel sampling (canvas dump) for a single smoke test.
+        // Scoped to the active board's wall paths, mirroring the fill barrier.
+        debugWallGaps: (): WindroseWallGapDebug[] => {
+          if (geometry == null) return [];
+          const cellSize = geometry.cellSize;
+          const out: WindroseWallGapDebug[] = [];
+          for (const layer of getActiveBoardLayers(mapData)) {
+            for (const wp of layer.wallPaths ?? []) {
+              if (wp.gaps == null || wp.gaps.length === 0) continue;
+              const flat = buildGapFlatten(wp);
+              if (flat.points.length < 2) continue;
+              const skips = computeGapSpans(wp, flat, cellSize);
+              const wallWidthScale = wp.widthScale > 0 ? wp.widthScale : 1;
+              const gaps = wp.gaps.map(gap => {
+                const span = clampGapToSegment(gap, flat, cellSize);
+                let seated: { x: number; y: number; angle: number; w: number; h: number } | null = null;
+                if (gap.tile != null) {
+                  const ts = availableTilesets.find(t => t.id === gap.tile?.tilesetId);
+                  const entry = resolveTileEntry(ts, gap.tile.tileId);
+                  const img = entry?.vaultPath != null ? getCachedImage(entry.vaultPath) : null;
+                  if (img != null && img.naturalWidth > 0) {
+                    const { x, y, angle } = pointAtLength(flat, span.centerLen);
+                    const { w, h } = seatedLeafSize(span.widthWorld, img.naturalWidth, img.naturalHeight, wallWidthScale, gap.tile.heightScale);
+                    seated = { x, y, angle: angle + (gap.tile.rotation ?? 0), w, h };
+                  }
+                }
+                return {
+                  gapId: gap.id,
+                  seg: gap.seg,
+                  hasTile: gap.tile != null,
+                  span: { lo: span.lo, hi: span.hi, widthWorld: span.widthWorld },
+                  seated,
+                };
+              });
+              out.push({ wallId: wp.id, kind: wp.kind, totalLength: flat.totalLength, skips, gaps });
+            }
+          }
+          return out;
+        },
+        // Raw active-board wall/gap fields for E2E assertions, read from the LIVE
+        // in-memory map (not the persisted file). The E2E data file is shared
+        // across the sequential Obsidian instances, so a lagging autosave from a
+        // prior test can pollute a file read; this live read is instance-scoped
+        // and race-immune. Returns the wall count plus per-gap fields the
+        // placement/editing suites assert on.
+        readWallGaps: (): { walls: number; gaps: WindroseRawGap[] } => {
+          let walls = 0;
+          const gaps: WindroseRawGap[] = [];
+          for (const layer of getActiveBoardLayers(mapData)) {
+            for (const wp of layer.wallPaths ?? []) {
+              walls += 1;
+              for (const g of wp.gaps ?? []) {
+                gaps.push({
+                  wallId: wp.id,
+                  seg: g.seg,
+                  t: g.t,
+                  widthCells: g.widthCells,
+                  widthLocked: g.widthLocked === true,
+                  bound: g.tile != null,
+                  flip: g.tile?.flip === true,
+                });
+              }
+            }
+          }
+          return { walls, gaps };
+        },
       },
     };
 
@@ -993,8 +1136,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     canUndo, canRedo, saveStatus, isExpanded,
     setCurrentTool, setSelectedColor, handleOpacityChange,
     handleCellsChange, wrappedHandleUndo, handleRedo, handleLayerSelect, forceSave,
-    handleViewStateChange, availableTilesets, handleTileSelect,
+    handleViewStateChange, availableTilesets, handleTileSelect, setSelectedTileForm,
     handleTilesChange, handleObjectsChange, selectPane, setTileBrowserCollapsed,
+    getCachedImage,
   ]);
 
   if (mapDeleted) {
@@ -1358,6 +1502,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onWallPathsChange={handleWallPathsChange}
                 onDragStateChange={setDraggingWallId}
                 onSurfaceChange={setWallSurface}
+                bareThresholdArmed={bareThresholdArmed}
+                onDisarmOpening={() => setBareThresholdArmed(false)}
               />
 
               {/* RegionLayer - hex region creation and editing */}

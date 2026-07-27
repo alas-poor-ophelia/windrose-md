@@ -1,0 +1,93 @@
+{
+  "_note": "Hand-authored openings (WallGap) render fixture for P2 manual/MCP visual verification (OPENINGS-PLAN §11 Phase 2). Covers: bound + bare gaps, straight + curved + closed walls, and a flip:true wall. Replace tilesetId/tileId and gap.tile.tilesetId/tileId with real installed pack ids before loading (a wall strip pack + a DD Portals door). cellSize below is illustrative; a gap's world width = widthCells * map cellSize. Not executed by the unit suite — load it in Obsidian (or via MCP windrose_read_map_data / canvas dump) and confirm: strip holes align with seated art, gap-edge caps face into each opening, seated leaf height tracks wall widthScale, and the flipped wall's hole + art stay put across repeated static rebuilds (edit an unrelated wall to force rebuilds).",
+  "_cellSize": 50,
+  "_tilesetIdPlaceholder": "REPLACE_WITH_WALL_PACK_ID",
+  "_gapTilesetIdPlaceholder": "REPLACE_WITH_PORTAL_PACK_ID",
+  "wallPaths": [
+    {
+      "id": "wall-straight-bound",
+      "vertices": [{ "x": 0, "y": 0 }, { "x": 400, "y": 0 }],
+      "closed": false,
+      "tilesetId": "REPLACE_WITH_WALL_PACK_ID",
+      "tileId": "REPLACE_WITH_WALL_TILE_ID",
+      "kind": "wall",
+      "widthScale": 1,
+      "gaps": [
+        {
+          "id": "gap-straight-1",
+          "seg": 0,
+          "t": 0.5,
+          "widthCells": 1,
+          "tile": { "tilesetId": "REPLACE_WITH_PORTAL_PACK_ID", "tileId": "REPLACE_WITH_DOOR_TILE_ID" }
+        }
+      ]
+    },
+    {
+      "id": "wall-straight-bare",
+      "vertices": [{ "x": 0, "y": 120 }, { "x": 400, "y": 120 }],
+      "closed": false,
+      "tilesetId": "REPLACE_WITH_WALL_PACK_ID",
+      "tileId": "REPLACE_WITH_WALL_TILE_ID",
+      "kind": "wall",
+      "widthScale": 2,
+      "gaps": [
+        { "id": "gap-bare-1", "seg": 0, "t": 0.4, "widthCells": 1.5 }
+      ]
+    },
+    {
+      "id": "wall-curved-bound",
+      "vertices": [{ "x": 0, "y": 260, "arc": [200, 360] }, { "x": 400, "y": 260 }],
+      "closed": false,
+      "tilesetId": "REPLACE_WITH_WALL_PACK_ID",
+      "tileId": "REPLACE_WITH_WALL_TILE_ID",
+      "kind": "wall",
+      "widthScale": 1,
+      "gaps": [
+        {
+          "id": "gap-curved-1",
+          "seg": 0,
+          "t": 0.65,
+          "widthCells": 1,
+          "tile": { "tilesetId": "REPLACE_WITH_PORTAL_PACK_ID", "tileId": "REPLACE_WITH_DOOR_TILE_ID" }
+        }
+      ]
+    },
+    {
+      "id": "wall-closed-loop",
+      "vertices": [{ "x": 500, "y": 0 }, { "x": 800, "y": 0 }, { "x": 800, "y": 300 }, { "x": 500, "y": 300 }],
+      "closed": true,
+      "tilesetId": "REPLACE_WITH_WALL_PACK_ID",
+      "tileId": "REPLACE_WITH_WALL_TILE_ID",
+      "kind": "wall",
+      "widthScale": 1,
+      "gaps": [
+        {
+          "id": "gap-closing-seg",
+          "seg": 3,
+          "t": 0.5,
+          "widthCells": 1,
+          "tile": { "tilesetId": "REPLACE_WITH_PORTAL_PACK_ID", "tileId": "REPLACE_WITH_DOOR_TILE_ID" }
+        }
+      ]
+    },
+    {
+      "id": "wall-flipped",
+      "vertices": [{ "x": 500, "y": 420 }, { "x": 900, "y": 420 }],
+      "closed": false,
+      "tilesetId": "REPLACE_WITH_WALL_PACK_ID",
+      "tileId": "REPLACE_WITH_WALL_TILE_ID",
+      "kind": "wall",
+      "widthScale": 1,
+      "flip": true,
+      "gaps": [
+        {
+          "id": "gap-flipped-1",
+          "seg": 0,
+          "t": 0.5,
+          "widthCells": 1,
+          "tile": { "tilesetId": "REPLACE_WITH_PORTAL_PACK_ID", "tileId": "REPLACE_WITH_DOOR_TILE_ID" }
+        }
+      ]
+    }
+  ]
+}

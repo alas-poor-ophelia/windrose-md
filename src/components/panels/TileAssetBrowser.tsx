@@ -1004,8 +1004,54 @@ const TileAssetBrowser = memo(({
   // Wall-tool footer controls (relocated from the old floating bar). Rendered in
   // the loaded-brush footer whenever the wall tool publishes a control surface.
   const renderWallBar = (surface: WallToolSurface): VNode => {
+    if (surface.assetForm === 'opening') {
+      return <span className="windrose-tb-cap">Click a wall to place a door · Alt-click for a bare opening</span>;
+    }
     if (!surface.hasAsset) {
       return <span className="windrose-tb-cap">Pick a wall or path strip</span>;
+    }
+    if (surface.mode === 'edit' && surface.edit?.gap != null) {
+      // A gap handle is selected → the footer edits the door, not the wall.
+      const g = surface.edit.gap;
+      return (
+        <>
+          <span className="windrose-tb-cap" style={{ minWidth: 34 }}>{g.bound ? 'Door' : 'Opening'}</span>
+          <span className="label">Width</span>
+          <input
+            className="windrose-tb-range"
+            type="range"
+            min="0.25"
+            max="6"
+            step="0.25"
+            value={g.widthCells}
+            onInput={(e: Event) => g.setWidth(parseFloat((e.target as HTMLInputElement).value))}
+            style={{ flex: 1, minWidth: 40 }}
+          />
+          <span className="windrose-tb-cap" style={{ minWidth: 40, textAlign: 'right' }}>{g.widthCells} cell</span>
+          <button
+            className={`windrose-tb-iconbtn ${g.flip ? 'active' : ''}`}
+            title="Flip door (mirror across the wall)"
+            disabled={!g.bound}
+            onClick={g.toggleFlip}
+          >
+            <Icon icon="lucide-flip-horizontal" size={14} />
+          </button>
+          <button
+            className="windrose-tb-iconbtn"
+            title="Remove door art (leave a bare opening)"
+            disabled={!g.bound}
+            onClick={g.unbind}
+          >
+            <Icon icon="lucide-unlink" size={14} />
+          </button>
+          <button className="windrose-tb-iconbtn" title="Delete opening (Delete)" onClick={g.deleteGap}>
+            <Icon icon="lucide-trash-2" size={14} />
+          </button>
+          <button className="windrose-tb-iconbtn" title="Done editing opening (Escape)" onClick={g.deselectGap}>
+            <Icon icon="lucide-x" size={14} />
+          </button>
+        </>
+      );
     }
     if (surface.mode === 'edit' && surface.edit != null) {
       const edit = surface.edit;

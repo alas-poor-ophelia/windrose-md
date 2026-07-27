@@ -17,12 +17,19 @@
  * cache, so cost is per-edit, not per-frame.
  */
 
-import type { WallPath } from '#types/core/wallpath.types';
+import type { WallGapTile, WallPath } from '#types/core/wallpath.types';
 import type { TilesetDef, TileMetadataStore } from '#types/tiles/tile.types';
 
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import { DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
 import { resolveTileEntry } from '../../assets/tilesetOperations';
+import {
+  buildGapFlatten,
+  clampGapToSegment,
+  pointAtLength,
+  subtractIntervals,
+} from '../../drawing/wallGapOperations';
+import type { GapFlatten } from '../../drawing/wallGapOperations';
 
 // ===========================================
 // Types
@@ -109,6 +116,25 @@ function flattenWallPath(wallPath: WallPath): FlattenedPath {
   if (cached != null) return cached;
   const result = computeFlattenWallPath(wallPath);
   flattenCache.set(wallPath, result);
+  return result;
+}
+
+/**
+ * Per-object STABLE flatten cache (fixed-subdivision; geometry F6), keyed by
+ * WallPath ref. Gap math and gap-aware rendering (skip-spans, caps, seated art)
+ * all run on this flatten so a gap's arc-length position does not step as a bow's
+ * adaptive subdivision count changes. Strip texturing rides the same flatten so
+ * the holes it cuts stay exactly aligned with the drawn strip. Immutable — never
+ * mutated in place (the old `flat.points.reverse()` flip bug, geometry F1/§4.0).
+ */
+const gapFlattenCache = new WeakMap<WallPath, GapFlatten>();
+
+/** Cached stable flatten for gap math + gap-aware rendering (see gapFlattenCache). */
+function stableFlatten(wallPath: WallPath): GapFlatten {
+  const cached = gapFlattenCache.get(wallPath);
+  if (cached != null) return cached;
+  const result = buildGapFlatten(wallPath);
+  gapFlattenCache.set(wallPath, result);
   return result;
 }
 
@@ -247,25 +273,85 @@ function resolveWallStrip(
 /** World-unit overlap between drawn chunks; hides hairline seams on curves. */
 const CHUNK_OVERLAP = 0.5;
 
+/**
+ * Skip intervals (gap spans) for one wall, in GLOBAL flattened arc length on the
+ * STABLE flatten (geometry F6). Each gap's span is clamped inside its own segment
+ * (invariant 3) WITHOUT touching stored values, so a door wider than its segment
+ * cuts a segment-wide hole yet returns to full size when the wall is lengthened.
+ */
+function computeGapSpans(
+  wall: WallPath,
+  flat: GapFlatten,
+  cellSize: number,
+): Array<[number, number]> {
+  const gaps = wall.gaps;
+  if (gaps == null || gaps.length === 0) return [];
+  const spans: Array<[number, number]> = [];
+  for (const gap of gaps) {
+    const s = clampGapToSegment(gap, flat, cellSize);
+    if (s.hi > s.lo) spans.push([s.lo, s.hi]);
+  }
+  return spans;
+}
+
+/**
+ * Split a wall's centerline into solid sub-polylines with each gap's derived
+ * span (invariant 3, clamp-at-derive) cut out. Consumed by the flood-fill wall
+ * barrier (§9, Guildmaster ruling D7): a doorway is a hole in the barrier —
+ * fill leaks through it regardless of seated art — so the barrier is built
+ * from these gap-free pieces rather than the raw centerline. Runs on the same
+ * STABLE flatten as rendering (geometry F6) so the hole lines up with what's
+ * drawn. A gapless wall returns its single unbroken polyline; a wall whose
+ * gaps consume it entirely returns [].
+ */
+function solidWallPolylines(wall: WallPath, cellSize: number): Array<Array<[number, number]>> {
+  if (wall.vertices.length < 2) return [];
+  const flat = stableFlatten(wall);
+  if (flat.points.length < 2) return [];
+  const skips = computeGapSpans(wall, flat, cellSize);
+  if (skips.length === 0) return [flat.points];
+
+  const solids = subtractIntervals(0, flat.totalLength, skips);
+  const out: Array<Array<[number, number]>> = [];
+  for (const [lo, hi] of solids) {
+    if (hi - lo < 1e-9) continue;
+    const start = pointAtLength(flat, lo);
+    const pts: Array<[number, number]> = [[start.x, start.y]];
+    for (let i = 0; i < flat.points.length; i++) {
+      const len = flat.cumLen[i];
+      if (len > lo + 1e-9 && len < hi - 1e-9) pts.push(flat.points[i]);
+    }
+    const end = pointAtLength(flat, hi);
+    pts.push([end.x, end.y]);
+    if (pts.length >= 2) out.push(pts);
+  }
+  return out;
+}
+
 function drawStripAlong(
   ctx: CanvasRenderingContext2D,
-  flat: FlattenedPath,
+  flat: GapFlatten,
   strip: ResolvedWallStrip,
+  skips: ReadonlyArray<readonly [number, number]>,
+  flip: boolean,
 ): void {
   const { points } = flat;
   const { img, srcW, srcH, worldScale } = strip;
   const widthWorld = srcH * worldScale;
   const halfW = widthWorld / 2;
 
-  // Non-degenerate sub-segments with tangent angles, so joint turns compare
-  // true neighbours even when the polyline repeats a point.
-  const segs: Array<{ x0: number; y0: number; angle: number; len: number }> = [];
+  // Non-degenerate sub-segments with tangent angles and their global arc-length
+  // start, so joint turns compare true neighbours and the texture u-coordinate
+  // (derived from global arc length) advances continuously across gaps.
+  const segs: Array<{ x0: number; y0: number; angle: number; len: number; gStart: number }> = [];
+  let acc = 0;
   for (let i = 1; i < points.length; i++) {
     const [x0, y0] = points[i - 1];
     const [x1, y1] = points[i];
     const len = Math.hypot(x1 - x0, y1 - y0);
     if (len <= 0) continue;
-    segs.push({ x0, y0, angle: Math.atan2(y1 - y0, x1 - x0), len });
+    segs.push({ x0, y0, angle: Math.atan2(y1 - y0, x1 - x0), len, gStart: acc });
+    acc += len;
   }
   if (segs.length === 0) return;
 
@@ -274,12 +360,10 @@ function drawStripAlong(
   const [lx, ly] = points[points.length - 1];
   const isClosed = segs.length > 1 && Math.hypot(lx - fx, ly - fy) < 1e-6;
 
-  // Texture u-coordinate in source px, advancing with arc length.
-  let u = 0;
-
   for (let j = 0; j < segs.length; j++) {
     const seg = segs[j];
     const segLen = seg.len;
+    const segEnd = seg.gStart + segLen;
     const prev = j > 0 ? segs[j - 1] : isClosed ? segs[segs.length - 1] : null;
     const next = j < segs.length - 1 ? segs[j + 1] : isClosed ? segs[0] : null;
 
@@ -302,55 +386,178 @@ function drawStripAlong(
       ctx.clip(clip);
     }
 
-    // Walk the sub-segment, wrapping the texture at its seam.
-    let drawn = 0;
-    while (drawn < segLen) {
-      const uStart = u % srcW;
-      const remainingSrc = (segLen - drawn) / worldScale;
-      const chunkSrc = Math.min(srcW - uStart, remainingSrc);
-      const chunkWorld = chunkSrc * worldScale;
-      ctx.drawImage(
-        img,
-        uStart, 0, chunkSrc, srcH,
-        drawn, -halfW, chunkWorld + CHUNK_OVERLAP, widthWorld,
-      );
-      drawn += chunkWorld;
-      u += chunkSrc;
+    // Draw only the solid sub-pieces of this segment (gap spans subtracted). The
+    // texture u-coordinate is derived from the GLOBAL arc position, so it keeps
+    // advancing across gaps — the wall reads as continuous stone with holes cut.
+    const visible = subtractIntervals(seg.gStart, segEnd, skips);
+    for (const [gA, gB] of visible) {
+      const pieceEndIsSegEnd = Math.abs(gB - segEnd) < 1e-6;
+      let sPos = gA;
+      while (sPos < gB - 1e-9) {
+        const uStart = (sPos / worldScale) % srcW;
+        const remWorld = gB - sPos;
+        const chunkSrc = Math.min(srcW - uStart, remWorld / worldScale);
+        const chunkWorld = chunkSrc * worldScale;
+        const localX = sPos - seg.gStart;
+        const isLastChunk = sPos + chunkWorld >= gB - 1e-9;
+        // Overlap bridges intra-piece chunk seams and the miter join at a
+        // segment end, but must NOT bleed texture into a gap edge.
+        const overlap = !isLastChunk || pieceEndIsSegEnd ? CHUNK_OVERLAP : 0;
+        if (flip) {
+          // Invert only the source-u mapping (geometry F1/§4.0): read the
+          // mirrored source columns and draw flipped along the wall. The
+          // overlap must still land on the SAME dest interval as the unflipped
+          // path ([localX, localX + chunkWorld + overlap]) so it bleeds forward
+          // into safe territory, never backward into the start of a gap: shift
+          // the mirror origin by +overlap so the mirrored rect ends at
+          // localX + chunkWorld + overlap rather than localX + chunkWorld.
+          ctx.save();
+          ctx.translate(localX + chunkWorld + overlap, 0);
+          ctx.scale(-1, 1);
+          ctx.drawImage(
+            img,
+            srcW - uStart - chunkSrc, 0, chunkSrc, srcH,
+            0, -halfW, chunkWorld + overlap, widthWorld,
+          );
+          ctx.restore();
+        } else {
+          ctx.drawImage(
+            img,
+            uStart, 0, chunkSrc, srcH,
+            localX, -halfW, chunkWorld + overlap, widthWorld,
+          );
+        }
+        sPos += chunkWorld;
+      }
     }
 
     ctx.restore();
   }
 }
 
-function drawEndCaps(
+/**
+ * Draw a cap texture at a world point, rotated to the local tangent. `mirror`
+ * flips it across the wall normal so it extends in the -tangent direction.
+ * Used for whole-wall termini AND gap-edge framing (§4.3).
+ */
+function drawCapAt(
   ctx: CanvasRenderingContext2D,
-  flat: FlattenedPath,
+  x: number,
+  y: number,
+  angle: number,
+  cap: HTMLImageElement,
+  worldScale: number,
+  mirror: boolean,
+): void {
+  const capW = cap.naturalWidth * worldScale;
+  const capH = cap.naturalHeight * worldScale;
+  const halfH = capH / 2;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  if (mirror) ctx.scale(-1, 1);
+  ctx.drawImage(cap, 0, -halfH, capW, capH);
+  ctx.restore();
+}
+
+/** Cap the open termini of a non-closed wall (extends outward past each end). */
+function drawTerminusCaps(
+  ctx: CanvasRenderingContext2D,
+  flat: GapFlatten,
   strip: ResolvedWallStrip,
 ): void {
   const cap = strip.capImg;
   if (cap == null) return;
   const { points } = flat;
-  const { worldScale } = strip;
-  const capW = cap.naturalWidth * worldScale;
-  const capH = cap.naturalHeight * worldScale;
-  const halfH = capH / 2;
-
-  // End cap: extends outward past the final point along the exit tangent.
   const [ex, ey] = points[points.length - 1];
-  ctx.save();
-  ctx.translate(ex, ey);
-  ctx.rotate(endAngle(points));
-  ctx.drawImage(cap, 0, -halfH, capW, capH);
-  ctx.restore();
-
-  // Start cap: mirrored, extends outward before the first point.
+  drawCapAt(ctx, ex, ey, endAngle(points), cap, strip.worldScale, false);
   const [sx, sy] = points[0];
-  ctx.save();
-  ctx.translate(sx, sy);
-  ctx.rotate(startAngle(points));
-  ctx.scale(-1, 1);
-  ctx.drawImage(cap, 0, -halfH, capW, capH);
-  ctx.restore();
+  drawCapAt(ctx, sx, sy, startAngle(points), cap, strip.worldScale, true);
+}
+
+/**
+ * Frame each gap with the strip's `_end` cap at both edges, each cap facing INTO
+ * the opening (low edge unmirrored → +tangent; high edge mirrored → -tangent).
+ * No `_end` texture → blunt edges (same as open walls today). §4.3.
+ */
+function drawGapEdgeCaps(
+  ctx: CanvasRenderingContext2D,
+  flat: GapFlatten,
+  strip: ResolvedWallStrip,
+  skips: ReadonlyArray<readonly [number, number]>,
+): void {
+  const cap = strip.capImg;
+  if (cap == null || skips.length === 0) return;
+  for (const [lo, hi] of skips) {
+    const a = pointAtLength(flat, lo);
+    drawCapAt(ctx, a.x, a.y, a.angle, cap, strip.worldScale, false);
+    const b = pointAtLength(flat, hi);
+    drawCapAt(ctx, b.x, b.y, b.angle, cap, strip.worldScale, true);
+  }
+}
+
+/** Resolve a gap's seated art image; null (bare gap) when unresolvable (invariant 5). */
+function resolveGapImage(
+  tile: WallGapTile,
+  tilesets: TilesetDef[],
+  getCachedImage: (vaultPath: string) => HTMLImageElement | null,
+): HTMLImageElement | null {
+  const ts = tilesets.find(t => t.id === tile.tilesetId);
+  const entry = resolveTileEntry(ts, tile.tileId);
+  if (entry == null) return null;
+  const img = getCachedImage(entry.vaultPath);
+  if (img == null || img.naturalWidth === 0) return null;
+  return img;
+}
+
+/**
+ * Seated-leaf world size. The along-wall scale fills the gap width (aspect
+ * preserved); the perpendicular (leaf-height) scale folds in the host wall's
+ * `widthScale` so the leaf height tracks the rendered wall thickness — the
+ * skip-span cut a widthScale-tall hole (geometry F3). `heightScale` (default 1)
+ * is the per-door escape hatch on top of that default. Exported for tests.
+ */
+function seatedLeafSize(
+  widthWorld: number,
+  imgW: number,
+  imgH: number,
+  wallWidthScale: number,
+  heightScale: number | undefined,
+): { w: number; h: number } {
+  const w = widthWorld;
+  const uScale = imgW > 0 ? w / imgW : 0;
+  const vScale = uScale * (wallWidthScale > 0 ? wallWidthScale : 1) * (heightScale ?? 1);
+  return { w, h: imgH * vScale };
+}
+
+/** Draw the seated door/window art centered in each bound gap, on top of caps. */
+function drawSeatedOpenings(
+  ctx: CanvasRenderingContext2D,
+  wall: WallPath,
+  flat: GapFlatten,
+  tilesets: TilesetDef[],
+  cellSize: number,
+  getCachedImage: (vaultPath: string) => HTMLImageElement | null,
+): void {
+  const gaps = wall.gaps;
+  if (gaps == null || gaps.length === 0) return;
+  const wallWidthScale = wall.widthScale > 0 ? wall.widthScale : 1;
+  for (const gap of gaps) {
+    if (gap.tile == null) continue;
+    const img = resolveGapImage(gap.tile, tilesets, getCachedImage);
+    if (img == null) continue; // bare gap fallback (already cut + capped)
+    const span = clampGapToSegment(gap, flat, cellSize);
+    const { x, y, angle } = pointAtLength(flat, span.centerLen);
+    const { w, h } = seatedLeafSize(
+      span.widthWorld, img.naturalWidth, img.naturalHeight, wallWidthScale, gap.tile.heightScale,
+    );
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle + (gap.tile.rotation ?? 0));
+    if (gap.tile.flip === true) ctx.scale(1, -1);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
 }
 
 /**
@@ -384,21 +591,28 @@ function renderWallPaths(
     const strip = resolveWallStrip(wallPath, tilesets, metadata, cellSize, getImage);
     if (strip == null) continue;
 
-    const flat = flattenWallPath(wallPath);
+    // Stable, IMMUTABLE flatten (never reversed for flip — geometry F1/§4.0);
+    // all gap math + gap-aware rendering runs on it.
+    const flat = stableFlatten(wallPath);
     if (flat.points.length < 2) continue;
-    // DD convention: flip reverses the texture's travel direction.
-    if (wallPath.flip === true) flat.points.reverse();
 
-    drawStripAlong(ctx, flat, strip);
-    if (!wallPath.closed) {
-      drawEndCaps(ctx, flat, strip);
-    }
+    const skips = computeGapSpans(wallPath, flat, cellSize);
+    // Z-order (§4.4): (a) strip with holes, (b) gap-edge caps, (c) seated art.
+    drawStripAlong(ctx, flat, strip, skips, wallPath.flip === true);
+    if (!wallPath.closed) drawTerminusCaps(ctx, flat, strip);
+    drawGapEdgeCaps(ctx, flat, strip, skips);
+    drawSeatedOpenings(ctx, wallPath, flat, tilesets, cellSize, getImage);
   }
 
   ctx.restore();
 }
 
-/** Collect the vault paths a set of wall paths needs preloaded (strips + caps). */
+/**
+ * Collect the vault paths a set of wall paths needs preloaded (strips + caps +
+ * seated gap art). The caller invokes this per layer over ALL boards, matching
+ * the strip-image preloader scope so other-board ghost renders never pop in bare
+ * (I-F8). Gap-tile art is enumerated here even for unresolved-strip walls.
+ */
 function collectWallPathImagePaths(
   wallPaths: WallPath[],
   tilesets: TilesetDef[],
@@ -408,10 +622,20 @@ function collectWallPathImagePaths(
   for (const wp of wallPaths) {
     const ts = tilesets.find(t => t.id === wp.tilesetId);
     const entry = resolveTileEntry(ts, wp.tileId);
-    if (entry?.vaultPath == null) continue;
-    paths.add(entry.vaultPath);
-    const cap = metadata[entry.vaultPath]?.wallEndCapPath;
-    if (cap != null) paths.add(cap);
+    if (entry?.vaultPath != null) {
+      paths.add(entry.vaultPath);
+      const cap = metadata[entry.vaultPath]?.wallEndCapPath;
+      if (cap != null) paths.add(cap);
+    }
+    if (wp.gaps != null) {
+      for (const gap of wp.gaps) {
+        const gapTile = gap.tile;
+        if (gapTile == null) continue;
+        const gts = tilesets.find(t => t.id === gapTile.tilesetId);
+        const gEntry = resolveTileEntry(gts, gapTile.tileId);
+        if (gEntry?.vaultPath != null) paths.add(gEntry.vaultPath);
+      }
+    }
   }
   return Array.from(paths);
 }
@@ -421,6 +645,9 @@ export {
   flattenWallPath,
   resolveWallStrip,
   collectWallPathImagePaths,
+  computeGapSpans,
+  solidWallPolylines,
+  seatedLeafSize,
   quadPoint,
   arcSubdivisions,
   wrapAngle,

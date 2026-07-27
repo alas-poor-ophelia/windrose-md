@@ -174,6 +174,22 @@ describe('countAssets', () => {
 		expect(counts.paths).toBe(1);
 		expect(counts.total).toBe(5);
 	});
+
+	it('counts portals (doors/windows) as their own bucket, not walls/paths/other', async () => {
+		const source = buildPckSource([
+			{ path: 'res://packs/p1/pack.json', data: enc('{}') },
+			{ path: 'res://packs/p1/textures/portals/Door_256.webp', data: px },
+			{ path: 'res://packs/p1/textures/portals/Window_256.webp', data: px },
+			{ path: 'res://packs/p1/textures/portals/thumbnails/Door_256.webp', data: px },
+			{ path: 'res://packs/p1/textures/walls/w.webp', data: px },
+		]);
+		const archive = await parsePck(source);
+		const counts = countAssets(archive);
+		expect(counts.portals).toBe(2);
+		expect(counts.walls).toBe(1);
+		expect(counts.other).toBe(0);
+		expect(counts.total).toBe(3);
+	});
 });
 
 describe('parseWallSidecars', () => {
@@ -232,6 +248,13 @@ describe('destFolderOf', () => {
 		expect(destFolderOf('textures/objects/Furniture/Chair_01.webp', 'objects', '[EA]'))
 			.toBe('objects/Furniture');
 	});
+
+	it('routes portals like any other non-strip cell texture (tag, then subpath) — not a strip folder', () => {
+		expect(destFolderOf('textures/portals/Door_256.webp', 'portals', 'Doors'))
+			.toBe('Doors');
+		expect(destFolderOf('textures/portals/Door_256.webp', 'portals', undefined))
+			.toBe('portals');
+	});
 });
 
 describe('analyzePckForWizard', () => {
@@ -284,5 +307,17 @@ describe('analyzePckForWizard', () => {
 		expect(analysis.cellTiles).toHaveLength(1);
 		expect(analysis.cellTiles[0].category).toBe('objects');
 		expect(analysis.packTags).toEqual([]);
+	});
+
+	it('counts portals as cell tiles, not strips (no sidecar, no strip metadata)', async () => {
+		const source = buildPckSource([
+			{ path: 'res://packs/t3/textures/portals/Door_256.webp', data: px },
+			{ path: 'res://packs/t3/textures/walls/Wall_Stone_01.webp', data: px },
+		]);
+		const analysis = await analyzePckForWizard(source, await parsePck(source));
+		expect(analysis.stripCount).toBe(1);
+		expect(analysis.cellTiles).toHaveLength(1);
+		expect(analysis.cellTiles[0].vaultPath).toBe('textures/portals/Door_256.webp');
+		expect(analysis.cellTiles[0].category).toBe('portals');
 	});
 });

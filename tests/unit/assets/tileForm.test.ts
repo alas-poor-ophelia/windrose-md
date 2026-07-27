@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
   deriveTileForm,
+  deriveOpeningWidthCells,
   formDef,
   subtoolMeta,
   subtoolGate,
   ribbonSubtoolsForForm,
   FORM_DEFS,
   RIBBON_SUBTOOL_ORDER,
+  OPENING_DD_SOURCES,
+  THRESHOLD_ENTRY,
 } from '../../../src/assets/tileForm';
 import type { TileSubtoolId } from '../../../src/assets/tileForm';
 import type { TileForm, TileMetadataEntry, TilesetDef } from '../../../types/tiles/tile.types';
@@ -43,10 +46,6 @@ describe('deriveTileForm', () => {
       expect(deriveTileForm({ ddSourceType: src }, makeTileset())).toBe('line');
     });
 
-    it('does NOT treat portals as line (DD ships them beside walls, but they stamp like props)', () => {
-      expect(deriveTileForm({ ddSourceType: 'portals' }, makeTileset())).toBe('cell');
-    });
-
     it('is case-insensitive on ddSourceType', () => {
       expect(deriveTileForm({ ddSourceType: 'Walls' }, makeTileset())).toBe('line');
     });
@@ -58,6 +57,31 @@ describe('deriveTileForm', () => {
     it('does NOT treat terrain/objects as line', () => {
       expect(deriveTileForm({ ddSourceType: 'terrain' }, makeTileset())).not.toBe('line');
       expect(deriveTileForm({ ddSourceType: 'objects' }, makeTileset())).not.toBe('line');
+    });
+  });
+
+  describe('opening (portals)', () => {
+    it('classifies ddSourceType portals as opening — seated wall-gap art, not a stamped prop', () => {
+      expect(deriveTileForm({ ddSourceType: 'portals' }, makeTileset())).toBe('opening');
+    });
+
+    it('is case-insensitive on ddSourceType', () => {
+      expect(deriveTileForm({ ddSourceType: 'Portals' }, makeTileset())).toBe('opening');
+    });
+
+    it('opening beats a region renderMode', () => {
+      expect(deriveTileForm({ ddSourceType: 'portals', renderMode: 'region' }, makeTileset())).toBe('opening');
+    });
+
+    it('OPENING_DD_SOURCES contains only portals and is disjoint from the line sources', () => {
+      expect(OPENING_DD_SOURCES.has('portals')).toBe(true);
+      expect(OPENING_DD_SOURCES.has('walls')).toBe(false);
+      expect(OPENING_DD_SOURCES.has('paths')).toBe(false);
+    });
+
+    it('loses to autotile', () => {
+      const ts = makeTileset({ autoTileConfig: { type: '4bit', bitmaskMap: {} } });
+      expect(deriveTileForm({ ddSourceType: 'portals' }, ts)).toBe('autotile');
     });
   });
 
@@ -93,6 +117,7 @@ describe('deriveTileForm', () => {
       { meta: { renderMode: 'region' }, expected: 'region' },
       { meta: { ddSourceType: 'terrain', renderMode: 'region' }, expected: 'region' },
       { meta: { ddSourceType: 'paths' }, expected: 'line' },
+      { meta: { ddSourceType: 'portals' }, expected: 'opening' },
       { ts: { autoTileConfig: { type: '8bit-blob', bitmaskMap: {} } }, expected: 'autotile' },
     ];
     it.each(cases)('classifies %o', ({ meta, ts, expected }) => {
@@ -101,11 +126,34 @@ describe('deriveTileForm', () => {
   });
 });
 
-describe('form×subtool matrix (lenient tri-state)', () => {
-  const allForms: TileForm[] = ['cell', 'region', 'line', 'autotile'];
-  const allSubtools: TileSubtoolId[] = ['paint', 'stamp', 'scatter', 'fill', 'brush', 'line', 'autotile'];
+describe('deriveOpeningWidthCells', () => {
+  it('derives exactly 1.0 cell for a spec-compliant 256px asset', () => {
+    expect(deriveOpeningWidthCells(256, undefined, 10, 0.25)).toBe(1);
+  });
 
-  it('FORM_DEFS covers exactly the four derivable forms', () => {
+  it('respects a per-tileset pixelsPerCell override', () => {
+    expect(deriveOpeningWidthCells(512, 512, 10, 0.25)).toBe(1);
+    expect(deriveOpeningWidthCells(1024, 512, 10, 0.25)).toBe(2);
+  });
+
+  it('clamps to the segment length when the asset is wider than the wall', () => {
+    expect(deriveOpeningWidthCells(2000, 256, 3, 0.25)).toBeCloseTo(3);
+  });
+
+  it('clamps up to the minimum gap width for a tiny asset', () => {
+    expect(deriveOpeningWidthCells(16, 256, 10, 0.25)).toBe(0.25);
+  });
+
+  it('resolves to the segment length (not the floor) when the segment is shorter than minGapCells', () => {
+    expect(deriveOpeningWidthCells(256, 256, 0.1, 0.25)).toBe(0.1);
+  });
+});
+
+describe('form×subtool matrix (lenient tri-state)', () => {
+  const allForms: TileForm[] = ['cell', 'region', 'line', 'opening', 'autotile'];
+  const allSubtools: TileSubtoolId[] = ['paint', 'stamp', 'scatter', 'fill', 'brush', 'line', 'autotile', 'opening'];
+
+  it('FORM_DEFS covers exactly the five derivable forms', () => {
     expect(Object.keys(FORM_DEFS).sort()).toEqual([...allForms].sort());
   });
 
@@ -123,13 +171,17 @@ describe('form×subtool matrix (lenient tri-state)', () => {
     }
   });
 
-  it('lenient invariant: at most 2 disabled subtools per form (line + autotile only)', () => {
-    for (const form of allForms) {
-      const disabled = allSubtools.filter(st => subtoolGate(form, st) === 'disabled');
-      expect(disabled.length).toBeLessThanOrEqual(2);
-      for (const st of disabled) {
-        expect(['line', 'autotile']).toContain(st);
-      }
+  it('non-opening forms disable the opening subtool', () => {
+    for (const form of ['cell', 'region', 'line', 'autotile'] as TileForm[]) {
+      expect(subtoolGate(form, 'opening')).toBe('disabled');
+    }
+  });
+
+  it('the opening form recommends opening, allows stamp as a manual override, and disables the rest', () => {
+    expect(subtoolGate('opening', 'opening')).toBe('recommended');
+    expect(subtoolGate('opening', 'stamp')).toBe('available');
+    for (const st of ['paint', 'scatter', 'fill', 'brush', 'line', 'autotile'] as TileSubtoolId[]) {
+      expect(subtoolGate('opening', st)).toBe('disabled');
     }
   });
 
@@ -138,6 +190,7 @@ describe('form×subtool matrix (lenient tri-state)', () => {
     expect(subtoolGate('cell', 'line')).toBe('disabled');
     expect(subtoolGate('region', 'line')).toBe('disabled');
     expect(subtoolGate('autotile', 'line')).toBe('disabled');
+    expect(subtoolGate('opening', 'line')).toBe('disabled');
   });
 
   it('region defaults to fill; cell defaults to paint', () => {
@@ -153,10 +206,17 @@ describe('form×subtool matrix (lenient tri-state)', () => {
     }
   });
 
+  it('the built-in Threshold entry is not a graded subtool (arms no asset)', () => {
+    expect(THRESHOLD_ENTRY.id).toBe('threshold');
+    expect(THRESHOLD_ENTRY.icon).toMatch(/^lucide-/);
+    expect(allSubtools).not.toContain(THRESHOLD_ENTRY.id);
+  });
+
   describe('ribbon visibility', () => {
-    it('autotile is hidden from the ribbon for non-autotile forms', () => {
+    it('autotile and opening are hidden from the ribbon for other forms', () => {
       for (const form of ['cell', 'region', 'line'] as TileForm[]) {
         expect(ribbonSubtoolsForForm(form)).not.toContain('autotile');
+        expect(ribbonSubtoolsForForm(form)).not.toContain('opening');
         expect(ribbonSubtoolsForForm(form)).toEqual(RIBBON_SUBTOOL_ORDER);
       }
     });
@@ -165,9 +225,13 @@ describe('form×subtool matrix (lenient tri-state)', () => {
       expect(ribbonSubtoolsForForm('autotile')).toEqual(['autotile', ...RIBBON_SUBTOOL_ORDER]);
     });
 
-    it('ribbon order lists every non-autotile subtool exactly once', () => {
+    it('opening form prepends the opening subtool', () => {
+      expect(ribbonSubtoolsForForm('opening')).toEqual(['opening', ...RIBBON_SUBTOOL_ORDER]);
+    });
+
+    it('ribbon order lists every non-autotile, non-opening subtool exactly once', () => {
       expect([...RIBBON_SUBTOOL_ORDER].sort()).toEqual(
-        allSubtools.filter(st => st !== 'autotile').sort(),
+        allSubtools.filter(st => st !== 'autotile' && st !== 'opening').sort(),
       );
     });
   });

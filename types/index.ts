@@ -477,4 +477,6 @@ export type {
   WindroseMcpOps,
   WindroseMcpInstance,
   WindroseGlobal,
+  WindroseWallGapDebug,
+  WindroseRawGap,
 } from './core/global.types';

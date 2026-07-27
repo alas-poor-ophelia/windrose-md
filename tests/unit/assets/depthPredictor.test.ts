@@ -153,6 +153,13 @@ describe('predictDepthTier', () => {
       expect(result.tier).toBe('decoration');
       expect(result.confidence).toBeGreaterThanOrEqual(0.5);
     });
+
+    it('boosts structure confidence for portals source (doors/windows, now live via DD import)', () => {
+      const entry: TileMetadataEntry = { ddSourceType: 'portals' };
+      const result = predictDepthTier(makeTile('unknown.png'), entry);
+      expect(result.tier).toBe('structure');
+      expect(result.confidence).toBeGreaterThanOrEqual(0.5);
+    });
   });
 
   describe('combined signals', () => {

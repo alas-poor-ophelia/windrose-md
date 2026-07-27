@@ -16,18 +16,25 @@
  */
 
 import type { TileForm, TileMetadataEntry, TilesetDef } from '#types/tiles/tile.types';
+import { DEFAULT_PIXELS_PER_CELL } from './spanPredictor';
+
+/** DD source dirs drawn ALONG edges/curves (swept strips). */
+const LINE_DD_SOURCES = new Set(['walls', 'paths']);
 
 /**
- * DD source directories whose art is drawn ALONG edges/curves, not stamped per
- * cell. Portals are deliberately NOT here: DD ships them beside walls, but they
- * are stamped like props — and the wall tool has no strip metadata for them.
+ * DD source dir seated into wall GAPS (doors/windows/thresholds) — plain
+ * single PNGs (256px-wide = 1 cell convention), never strips. An opening is
+ * not an independent placed tile: the art is a property of the WallGap it
+ * seats into (see wallGapOperations.ts), so this form gets its own dedicated
+ * 'opening' placement subtool rather than being treated as a stamped prop.
  */
-const LINE_DD_SOURCES = new Set(['walls', 'paths']);
+const OPENING_DD_SOURCES = new Set(['portals']);
 
 /**
  * Classify a tile into its render form. Priority (most specific first):
  *   autotile  — the tileset declares an autoTileConfig
  *   line      — DD source is walls/paths
+ *   opening   — DD source is portals
  *   region    — effective renderMode is 'region'
  *   cell      — residual default
  */
@@ -39,6 +46,7 @@ function deriveTileForm(
 
   const src = metadata?.ddSourceType?.toLowerCase();
   if (src != null && LINE_DD_SOURCES.has(src)) return 'line';
+  if (src != null && OPENING_DD_SOURCES.has(src)) return 'opening';
 
   // Per-tile metadata renderMode wins; else the tileset default; else 'cell'.
   const renderMode = metadata?.renderMode ?? tileset?.renderMode ?? 'cell';
@@ -48,7 +56,7 @@ function deriveTileForm(
 }
 
 /** A placement subtool the ribbon can offer. */
-export type TileSubtoolId = 'paint' | 'stamp' | 'scatter' | 'fill' | 'brush' | 'line' | 'autotile';
+export type TileSubtoolId = 'paint' | 'stamp' | 'scatter' | 'fill' | 'brush' | 'line' | 'autotile' | 'opening';
 
 /**
  * How a form grades a subtool:
@@ -74,11 +82,12 @@ const SUBTOOL_META: Record<TileSubtoolId, TileSubtoolDef> = {
   brush: { id: 'brush', label: 'Brush', icon: 'lucide-brush', title: 'Soft round terrain brush' },
   line: { id: 'line', label: 'Draw', icon: 'lucide-spline', title: 'Draw along a wall / path curve' },
   autotile: { id: 'autotile', label: 'Auto', icon: 'lucide-grid-3x3', title: 'Auto-tile by neighbours' },
+  opening: { id: 'opening', label: 'Opening', icon: 'lucide-door-open', title: 'Place a door / window in a wall' },
 };
 
 /**
- * Ribbon display order. 'autotile' is NOT listed — it is prepended only when
- * the selected tile's form is 'autotile' (hidden otherwise, per design).
+ * Ribbon display order. 'autotile' and 'opening' are NOT listed — each is
+ * prepended only when the selected tile's form matches (hidden otherwise).
  */
 const RIBBON_SUBTOOL_ORDER: TileSubtoolId[] = ['paint', 'stamp', 'scatter', 'fill', 'brush', 'line'];
 
@@ -93,8 +102,9 @@ interface FormDef {
 
 /**
  * The form×subtool matrix, as data. 'line' is disabled off the line form (it
- * needs wall/path strip metadata); 'autotile' is hidden from the ribbon for
- * non-autotile forms so its gate there is moot (kept 'disabled' for honesty).
+ * needs wall/path strip metadata); 'autotile' and 'opening' are hidden from
+ * the ribbon for forms that don't match, so their gate there is moot (kept
+ * 'disabled' for honesty).
  */
 const FORM_DEFS: Record<TileForm, FormDef> = {
   cell: {
@@ -109,6 +119,7 @@ const FORM_DEFS: Record<TileForm, FormDef> = {
       brush: 'available',
       line: 'disabled',
       autotile: 'disabled',
+      opening: 'disabled',
     },
   },
   region: {
@@ -123,6 +134,7 @@ const FORM_DEFS: Record<TileForm, FormDef> = {
       brush: 'recommended',
       line: 'disabled',
       autotile: 'disabled',
+      opening: 'disabled',
     },
   },
   line: {
@@ -137,6 +149,7 @@ const FORM_DEFS: Record<TileForm, FormDef> = {
       brush: 'available',
       line: 'recommended',
       autotile: 'disabled',
+      opening: 'disabled',
     },
   },
   autotile: {
@@ -151,6 +164,26 @@ const FORM_DEFS: Record<TileForm, FormDef> = {
       brush: 'available',
       line: 'disabled',
       autotile: 'recommended',
+      opening: 'disabled',
+    },
+  },
+  // A door/window is wall furniture (seated into a WallGap), not a placed
+  // tile — paint/scatter/fill/brush would place it as a loose cell tile,
+  // contradicting that architecture, so they stay disabled. 'stamp' is kept
+  // as a manual override (a door CAN be stamped as a decorative prop).
+  opening: {
+    form: 'opening',
+    label: 'Opening',
+    defaultSubtool: 'opening',
+    gates: {
+      paint: 'disabled',
+      stamp: 'available',
+      scatter: 'disabled',
+      fill: 'disabled',
+      brush: 'disabled',
+      line: 'disabled',
+      autotile: 'disabled',
+      opening: 'recommended',
     },
   },
 };
@@ -170,11 +203,56 @@ function subtoolGate(form: TileForm, subtool: TileSubtoolId): SubtoolGate {
 
 /** Subtools the ribbon shows for a form, in display order. */
 function ribbonSubtoolsForForm(form: TileForm): TileSubtoolId[] {
-  return form === 'autotile' ? ['autotile', ...RIBBON_SUBTOOL_ORDER] : RIBBON_SUBTOOL_ORDER;
+  if (form === 'autotile') return ['autotile', ...RIBBON_SUBTOOL_ORDER];
+  if (form === 'opening') return ['opening', ...RIBBON_SUBTOOL_ORDER];
+  return RIBBON_SUBTOOL_ORDER;
+}
+
+/**
+ * Built-in ribbon entry that arms NO asset (§5.3) — cuts a bare, capped gap
+ * regardless of which tile (if any) is selected. It is deliberately NOT a
+ * `TileSubtoolId`/`FORM_DEFS` matrix entry: unlike every other subtool it
+ * doesn't act on the selected tile's art, so grading it against a form would
+ * be meaningless. This is the id/metadata stub only — the ribbon renders it
+ * for the 'opening' form, but arming WallLayer's bare-threshold placement
+ * (and any always-visible affordance for it, tile selected or not) is wired
+ * by the placement-flow phase, not here.
+ */
+const THRESHOLD_ENTRY_ID = 'threshold' as const;
+const THRESHOLD_ENTRY: { id: typeof THRESHOLD_ENTRY_ID; label: string; icon: string; title: string } = {
+  id: THRESHOLD_ENTRY_ID,
+  label: 'Threshold',
+  icon: 'lucide-square-dashed',
+  title: 'Cut a bare threshold (no door art) in a wall',
+};
+
+/**
+ * Derive a door/window's default width in grid cells from its art's natural
+ * pixel width (§3.3, placement-time — no scan-time schema change). DD authors
+ * portals at 256px = 1 cell like every other strip/prop asset; `pixelsPerCell`
+ * respects a per-tileset override. Clamped to `[minGapCells, segmentLengthCells]`
+ * so an oversized asset never overhangs its host wall segment (invariant 3);
+ * when the segment is shorter than `minGapCells` the clamp resolves to the
+ * segment length (G-F8), never below it. Callers pass wallGapOperations'
+ * `MIN_GAP_CELLS` as `minGapCells` to share the one tuning constant.
+ */
+function deriveOpeningWidthCells(
+  naturalWidth: number,
+  pixelsPerCell: number | undefined,
+  segmentLengthCells: number,
+  minGapCells: number,
+): number {
+  const ppc = pixelsPerCell ?? DEFAULT_PIXELS_PER_CELL;
+  const raw = ppc > 0 ? naturalWidth / ppc : 1;
+  const hi = segmentLengthCells;
+  const lo = minGapCells;
+  if (lo > hi) return hi;
+  return Math.max(lo, Math.min(hi, raw));
 }
 
 export {
   deriveTileForm,
+  deriveOpeningWidthCells,
   formDef,
   subtoolMeta,
   subtoolGate,
@@ -183,4 +261,7 @@ export {
   SUBTOOL_META,
   RIBBON_SUBTOOL_ORDER,
   LINE_DD_SOURCES,
+  OPENING_DD_SOURCES,
+  THRESHOLD_ENTRY_ID,
+  THRESHOLD_ENTRY,
 };

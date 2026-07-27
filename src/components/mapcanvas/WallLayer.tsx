@@ -27,7 +27,19 @@ import { getActiveLayer } from '../../persistence/layerAccessor';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import { getCachedImage, preloadImage } from '../../assets/imageOperations';
 import { createWallPath, distanceToWallPath as distanceToWall } from '../../drawing/wallPathOperations';
+import {
+  planGapInsert,
+  gapHandleAnchors,
+  resolveGapMove,
+  resolveGapEdgeResize,
+  remapGapsAfterInsertVertex,
+  remapGapsAfterDeleteVertex,
+  snapInsertPointOutsideGaps,
+  MIN_GAP_CELLS,
+} from '../../drawing/wallGapOperations';
+import { DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
 import { useApp } from '../../context/AppContext';
+import { Notice } from 'obsidian';
 
 export interface WallLayerProps {
   currentTool: string;
@@ -47,14 +59,48 @@ export interface WallLayerProps {
    * of its own — its controls live in the drawer. Null when the tool is idle.
    */
   onSurfaceChange?: (surface: WallToolSurface | null) => void;
+  /**
+   * Arms the built-in "Threshold" placement mode (§5.3 primary trigger): every
+   * click cuts a BARE gap (no seated art) at a default 1-cell width, regardless
+   * of whether a portal asset is also armed. Independent of the Alt-click bare
+   * path (which uses the armed asset's derived width).
+   */
+  bareThresholdArmed?: boolean;
+  /** Called on Escape while bare-threshold placement is armed, to disarm it. */
+  onDisarmOpening?: () => void;
 }
+
+/** Default gap width (grid cells) for a bare Threshold placement (§5.3). */
+const BARE_THRESHOLD_WIDTH_CELLS = 1;
 
 /** Hide edit handles below this zoom — too small to grab, pure clutter. */
 const MIN_HANDLE_ZOOM = 0.3;
 
+/**
+ * Perpendicular offset (screen px) of a gap's CENTER handle off the centerline.
+ * Moves it clear of the segment-midpoint bow diamond so a mid-segment door and
+ * its bow are both grabbable (geometry F5). MUST exceed the handle hit radius
+ * (22/zoom) or the offset handle's hit circle still covers the centerline
+ * midpoint and masks the bow — so clicking the bow would select the gap instead.
+ */
+const GAP_CENTER_PERP = 30;
+
 type DragState =
   | { type: 'vertex'; wallId: string; index: number }
-  | { type: 'bow'; wallId: string; index: number };
+  | { type: 'bow'; wallId: string; index: number }
+  | { type: 'gapMove'; wallId: string; gapId: string }
+  | { type: 'gapEdge'; wallId: string; gapId: string; edge: 'lo' | 'hi' };
+
+/** A gap center handle sits offset perpendicular to the wall tangent. */
+function gapCenterHandlePos(
+  anchor: { x: number; y: number; angle: number },
+  perpWorld: number,
+): { x: number; y: number } {
+  return {
+    x: anchor.x - Math.sin(anchor.angle) * perpWorld,
+    y: anchor.y + Math.cos(anchor.angle) * perpWorld,
+  };
+}
 
 /** Midpoint of segment i (curve point at t=0.5 when arced, else chord midpoint). */
 function segmentMidpoint(wall: WallPath, i: number): { x: number; y: number } {
@@ -115,6 +161,8 @@ const WallLayer = ({
   onWallPathsChange,
   onDragStateChange,
   onSurfaceChange,
+  bareThresholdArmed,
+  onDisarmOpening,
 }: WallLayerProps): VNode | null => {
   const app = useApp();
   const { mapData, geometry, screenToWorld, getClientCoords, canvasRef } = useMapState();
@@ -136,10 +184,13 @@ const WallLayer = ({
   // ---- Edit state ----
   const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
   const [selectedVertexIndex, setSelectedVertexIndex] = useState<number | null>(null);
+  const [selectedGapId, setSelectedGapId] = useState<string | null>(null);
   const selectedWallIdRef = useRef(selectedWallId);
   selectedWallIdRef.current = selectedWallId;
   const selectedVertexRef = useRef(selectedVertexIndex);
   selectedVertexRef.current = selectedVertexIndex;
+  const selectedGapRef = useRef(selectedGapId);
+  selectedGapRef.current = selectedGapId;
   const dragRef = useRef<DragState | null>(null);
   const dragMovedRef = useRef(false);
   // Working copy of the wall under drag. Mutated per-frame in place of mapData,
@@ -159,6 +210,9 @@ const WallLayer = ({
   const selectedWall = selectedWallId != null
     ? getWalls().find(w => w.id === selectedWallId) ?? null
     : null;
+  const selectedGap = selectedGapId != null
+    ? selectedWall?.gaps?.find(g => g.id === selectedGapId) ?? null
+    : null;
 
   // ---- Asset resolution for drawing ----
   const selectedEntry = (() => {
@@ -168,14 +222,25 @@ const WallLayer = ({
   })();
   const selectedMeta = selectedEntry != null ? getTileMetadataForRender()[selectedEntry.vaultPath] : undefined;
   const isStripAsset = selectedMeta?.ddSourceType === 'walls' || selectedMeta?.ddSourceType === 'paths';
+  // Opening mode: a DD portal is armed → click a wall to seat a door/window.
+  // Detected via metadata (mirrors isStripAsset), NOT the 'opening' subtool —
+  // that literal isn't a TileSubtoolId until P3 lands (see GOTCHAS).
+  const isOpeningAsset = selectedMeta?.ddSourceType === 'portals';
+  // Opening PLACEMENT mode is active for either an armed portal (seated art) or
+  // the built-in bare Threshold entry (no art). Both route clicks to gap inserts
+  // and own the hover ghost; bare-threshold just forces an empty gap.
+  const isBareThreshold = bareThresholdArmed === true;
+  const isOpeningMode = isOpeningAsset || isBareThreshold;
 
   useEffect(() => {
-    if (selectedEntry?.vaultPath != null && isStripAsset) {
+    if (selectedEntry?.vaultPath != null && (isStripAsset || isOpeningAsset)) {
       void preloadImage(app, selectedEntry.vaultPath);
-      const cap = selectedMeta?.wallEndCapPath;
-      if (cap != null) void preloadImage(app, cap);
+      if (isStripAsset) {
+        const cap = selectedMeta?.wallEndCapPath;
+        if (cap != null) void preloadImage(app, cap);
+      }
     }
-  }, [app, selectedEntry?.vaultPath, isStripAsset, selectedMeta?.wallEndCapPath]);
+  }, [app, selectedEntry?.vaultPath, isStripAsset, isOpeningAsset, selectedMeta?.wallEndCapPath]);
 
   // ---- Snapping ----
   const snapWorld = useCallback((wx: number, wy: number): { x: number; y: number } => {
@@ -377,6 +442,40 @@ const WallLayer = ({
         ctx.fillRect(v.x - vsz, v.y - vsz, vsz * 2, vsz * 2);
         ctx.strokeRect(v.x - vsz, v.y - vsz, vsz * 2, vsz * 2);
       }
+
+      // Gap handles: two edge dots on the centerline + a center dot offset
+      // perpendicular (clear of the bow diamond, geometry F5).
+      const gr = 4 / zoom;
+      const perpWorld = GAP_CENTER_PERP / zoom;
+      for (const g of wall.gaps ?? []) {
+        const a = gapHandleAnchors(wall, g, cellSize);
+        if (a == null) continue;
+        // Edge dots
+        for (const edge of [a.lo, a.hi]) {
+          ctx.beginPath();
+          ctx.arc(edge.x, edge.y, gr, 0, Math.PI * 2);
+          ctx.fillStyle = '#4a9eff';
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 1 / zoom;
+          ctx.fill();
+          ctx.stroke();
+        }
+        // Center dot (offset), a connector stub back to the centerline.
+        const cp = gapCenterHandlePos(a.center, perpWorld);
+        ctx.beginPath();
+        ctx.moveTo(a.center.x, a.center.y);
+        ctx.lineTo(cp.x, cp.y);
+        ctx.strokeStyle = 'rgba(74, 158, 255, 0.7)';
+        ctx.lineWidth = 1 / zoom;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cp.x, cp.y, gr * 1.15, 0, Math.PI * 2);
+        ctx.fillStyle = selectedGapRef.current === g.id ? '#ffd700' : '#4a9eff';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1 / zoom;
+        ctx.fill();
+        ctx.stroke();
+      }
     }
 
     ctx.restore();
@@ -385,13 +484,16 @@ const WallLayer = ({
   // Keep handles in sync with selection, data, and view changes.
   useEffect(() => {
     if (!isWallTool || isDrawing) return;
+    // Opening mode owns the ghost overlay via pointer-move; don't nuke it here.
+    // When isOpeningMode flips false this effect re-runs and cleans it up.
+    if (isOpeningMode) return;
     if (selectedWallId == null) {
       if (!isDrawing) removeOverlay();
       return;
     }
     createOverlay();
     drawEditHandles();
-  }, [isWallTool, isDrawing, selectedWallId, selectedVertexIndex, mapData, drawEditHandles, createOverlay, removeOverlay]);
+  }, [isWallTool, isDrawing, isOpeningMode, selectedWallId, selectedVertexIndex, selectedGapId, mapData, drawEditHandles, createOverlay, removeOverlay]);
 
   // ---- Wall mutation helpers ----
   const updateWall = useCallback((wallId: string, mutate: (w: WallPath) => WallPath, suppress: boolean) => {
@@ -412,6 +514,83 @@ const WallLayer = ({
     onDragStateChange?.(wall.id);
     drawEditHandles();
   }, [onDragStateChange, drawEditHandles]);
+
+  // ---- Opening mode (portal armed → seat a door/window in a wall gap) ----
+  // Width from the armed art (§3.3): naturalWidth ÷ the tileset's authoring
+  // resolution; planGapInsert clamps it to the host segment. Falls back to 1
+  // cell (a spec 256-px portal) until the image decodes.
+  const deriveOpeningWidthCells = useCallback((): number => {
+    const vp = selectedEntry?.vaultPath;
+    const img = vp != null ? getCachedImage(vp) : null;
+    const ts = mapData?.tilesets?.find(t => t.id === selectedTilesetId);
+    const ppc = ts?.pixelsPerCell ?? DEFAULT_PIXELS_PER_CELL;
+    const natW = img?.naturalWidth ?? 0;
+    return natW > 0 ? natW / ppc : 1;
+  }, [selectedEntry?.vaultPath, mapData?.tilesets, selectedTilesetId]);
+
+  // Nearest kind:'wall' strip whose corridor contains the point (paths are not
+  // openable — §5.1). Reuses the edit-mode bbox pre-filter + distanceToWall.
+  const nearestOpeningWall = useCallback((wx: number, wy: number, corridor: number): WallPath | null => {
+    let best: WallPath | null = null;
+    let bestDist = Infinity;
+    for (const w of getWalls()) {
+      if (w.kind !== 'wall') continue;
+      const bb = wallBounds(w);
+      if (wx < bb.minX - corridor || wx > bb.maxX + corridor ||
+          wy < bb.minY - corridor || wy > bb.maxY + corridor) continue;
+      const d = distanceToWall(w, wx, wy);
+      if (d < bestDist) { bestDist = d; best = w; }
+    }
+    return best != null && bestDist < corridor ? best : null;
+  }, [getWalls]);
+
+  // WYSIWYG hover ghost (§5.2): render the target wall WITH the pending gap at
+  // 50% alpha via the real render path. Off any wall → cleared overlay, no ghost.
+  const drawOpeningGhost = useCallback((wx: number, wy: number) => {
+    const overlay = overlayRef.current;
+    if (overlay == null || mapData?.tilesets == null || mapData.tilesets.length === 0) return;
+    const ctx = overlay.getContext('2d');
+    if (ctx == null) return;
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    const view = getViewTransform(overlay);
+    if (view == null) return;
+    const corridor = Math.max(cellSize * 0.4, 22 / view.zoom);
+    const wall = nearestOpeningWall(wx, wy, corridor);
+    if (wall == null) return;
+    // Bare Threshold: empty gap at a default 1-cell width, ignoring any armed art.
+    const tile = isBareThreshold || selectedTilesetId == null || selectedTileId == null
+      ? undefined
+      : { tilesetId: selectedTilesetId, tileId: selectedTileId };
+    const widthCells = isBareThreshold ? BARE_THRESHOLD_WIDTH_CELLS : deriveOpeningWidthCells();
+    const plan = planGapInsert(wall, wx, wy, widthCells, cellSize, tile);
+    if (plan == null) return;
+    const ghost: WallPath = { ...wall, gaps: [...(wall.gaps ?? []), plan.gap] };
+    renderWallPaths(ctx, [ghost], mapData.tilesets, { x: view.offsetX, y: view.offsetY, zoom: view.zoom }, cellSize, {
+      opacity: 0.5,
+      getCachedImage,
+    });
+  }, [mapData?.tilesets, getViewTransform, cellSize, nearestOpeningWall, selectedTilesetId, selectedTileId, deriveOpeningWidthCells, isBareThreshold]);
+
+  // Click commits a single gap insert (one undo entry via suppress=false, G-F2).
+  // Alt-click omits the art → a bare capped threshold (§5.3 secondary trigger).
+  const commitOpeningInsert = useCallback((wx: number, wy: number, bare: boolean) => {
+    const zoom = mapData?.viewState?.zoom ?? 1;
+    const corridor = Math.max(cellSize * 0.4, 22 / zoom);
+    const wall = nearestOpeningWall(wx, wy, corridor);
+    if (wall == null) { new Notice('Click on a wall to place a door'); return; }
+    // Bare threshold (ribbon entry OR Alt-click) omits the art. The ribbon entry
+    // uses a default 1-cell width; Alt-click keeps the armed asset's derived width.
+    const bareEffective = bare || isBareThreshold;
+    const tile = bareEffective || selectedTilesetId == null || selectedTileId == null
+      ? undefined
+      : { tilesetId: selectedTilesetId, tileId: selectedTileId };
+    const widthCells = isBareThreshold ? BARE_THRESHOLD_WIDTH_CELLS : deriveOpeningWidthCells();
+    const plan = planGapInsert(wall, wx, wy, widthCells, cellSize, tile);
+    if (plan == null) { new Notice('Not enough room on this wall segment for a door'); return; }
+    // suppress=false → exactly one history entry; the wall stays in the static
+    // raster (passing true would drop it AND write no undo entry — G-F2).
+    updateWall(wall.id, w => ({ ...w, gaps: [...(w.gaps ?? []), plan.gap] }), false);
+  }, [mapData?.viewState?.zoom, cellSize, nearestOpeningWall, selectedTilesetId, selectedTileId, deriveOpeningWidthCells, updateWall, isBareThreshold]);
 
   // ---- Draw-mode actions ----
   const cancelDrawing = useCallback(() => {
@@ -457,12 +636,14 @@ const WallLayer = ({
     verticesRef.current = next;
     drawPreview();
   }, [cancelDrawing, drawPreview]);
-  const deselect = useCallback(() => { setSelectedWallId(null); setSelectedVertexIndex(null); }, []);
+  const deselect = useCallback(() => { setSelectedWallId(null); setSelectedVertexIndex(null); setSelectedGapId(null); }, []);
   const deleteSelectedWall = useCallback((wallId: string) => {
     onWallPathsChange(getWalls().filter(w => w.id !== wallId), false);
     setSelectedWallId(null);
     setSelectedVertexIndex(null);
+    setSelectedGapId(null);
   }, [getWalls, onWallPathsChange]);
+  const deselectGap = useCallback(() => setSelectedGapId(null), []);
 
   // Stable action wrappers for the published control surface. The wrappers keep
   // a fixed identity (created once) and dispatch through a ref that always holds
@@ -472,11 +653,13 @@ const WallLayer = ({
   // render loop while drawing (Preact doesn't guard against it).
   const liveRef = useRef({
     toggleSnap, toggleAngleSnap, undoLastPoint, cancelDrawing, finishWall,
-    updateWall, deleteSelectedWall, deselect, selectedWallId: null as string | null,
+    updateWall, deleteSelectedWall, deselect, deselectGap,
+    selectedWallId: null as string | null, selectedGapId: null as string | null,
   });
   liveRef.current = {
     toggleSnap, toggleAngleSnap, undoLastPoint, cancelDrawing, finishWall,
-    updateWall, deleteSelectedWall, deselect, selectedWallId: selectedWallId,
+    updateWall, deleteSelectedWall, deselect, deselectGap,
+    selectedWallId, selectedGapId,
   };
   const surfaceActions = useRef({
     toggleSnap: () => liveRef.current.toggleSnap(),
@@ -497,6 +680,52 @@ const WallLayer = ({
       if (id != null) liveRef.current.deleteSelectedWall(id);
     },
     deselect: () => liveRef.current.deselect(),
+    // --- selected-gap actions ---
+    setGapWidth: (cells: number) => {
+      const id = liveRef.current.selectedWallId;
+      const gid = liveRef.current.selectedGapId;
+      if (id == null || gid == null) return;
+      const w = Math.max(MIN_GAP_CELLS, cells);
+      liveRef.current.updateWall(id, wall => ({
+        ...wall,
+        gaps: (wall.gaps ?? []).map(g => (g.id === gid ? { ...g, widthCells: w, widthLocked: true } : g)),
+      }), false);
+    },
+    toggleGapFlip: () => {
+      const id = liveRef.current.selectedWallId;
+      const gid = liveRef.current.selectedGapId;
+      if (id == null || gid == null) return;
+      liveRef.current.updateWall(id, wall => ({
+        ...wall,
+        gaps: (wall.gaps ?? []).map(g =>
+          g.id === gid && g.tile != null ? { ...g, tile: { ...g.tile, flip: g.tile.flip !== true } } : g),
+      }), false);
+    },
+    unbindGap: () => {
+      const id = liveRef.current.selectedWallId;
+      const gid = liveRef.current.selectedGapId;
+      if (id == null || gid == null) return;
+      liveRef.current.updateWall(id, wall => ({
+        ...wall,
+        gaps: (wall.gaps ?? []).map(g => {
+          if (g.id !== gid) return g;
+          const next = { ...g };
+          delete next.tile;
+          return next;
+        }),
+      }), false);
+    },
+    deleteGap: () => {
+      const id = liveRef.current.selectedWallId;
+      const gid = liveRef.current.selectedGapId;
+      if (id == null || gid == null) return;
+      liveRef.current.updateWall(id, wall => ({
+        ...wall,
+        gaps: (wall.gaps ?? []).filter(g => g.id !== gid),
+      }), false);
+      liveRef.current.deselectGap();
+    },
+    deselectGap: () => liveRef.current.deselectGap(),
   }).current;
 
   // ---- Pointer handlers ----
@@ -508,18 +737,57 @@ const WallLayer = ({
     const zoom = mapData?.viewState?.zoom ?? 1;
     const verts = verticesRef.current;
 
+    // ---- OPENING MODE (portal armed) ----
+    // Owns the click before draw/edit: seat a gap in the nearest wall. Openings
+    // never draw or select a wall. Alt-click cuts a bare threshold (§5.2/§5.3).
+    if (isOpeningMode) {
+      commitOpeningInsert(coords.worldX, coords.worldY, (e as MouseEvent).altKey === true);
+      return;
+    }
+
     // ---- EDIT MODE (not drawing) ----
     if (verts.length === 0) {
       const walls = getWalls();
       const hitR = Math.max(8 / zoom, 22 / zoom);
 
-      // Handle hit-test on the selected wall first
+      // Handle hit-test on the selected wall first. Precedence (geometry F5):
+      // gap-edge → gap-center → vertex → bow → centerline.
       const selWall = selectedWallIdRef.current != null ? walls.find(w => w.id === selectedWallIdRef.current) : null;
       if (selWall != null && zoom >= MIN_HANDLE_ZOOM) {
+        const perpWorld = GAP_CENTER_PERP / zoom;
+        // Gap edges first, then gap centers (edges win where they overlap).
+        for (const g of selWall.gaps ?? []) {
+          const a = gapHandleAnchors(selWall, g, cellSize);
+          if (a == null) continue;
+          if (Math.hypot(coords.worldX - a.lo.x, coords.worldY - a.lo.y) < hitR) {
+            dragRef.current = { type: 'gapEdge', wallId: selWall.id, gapId: g.id, edge: 'lo' };
+            setSelectedGapId(g.id); setSelectedVertexIndex(null);
+            beginDrag(selWall);
+            return;
+          }
+          if (Math.hypot(coords.worldX - a.hi.x, coords.worldY - a.hi.y) < hitR) {
+            dragRef.current = { type: 'gapEdge', wallId: selWall.id, gapId: g.id, edge: 'hi' };
+            setSelectedGapId(g.id); setSelectedVertexIndex(null);
+            beginDrag(selWall);
+            return;
+          }
+        }
+        for (const g of selWall.gaps ?? []) {
+          const a = gapHandleAnchors(selWall, g, cellSize);
+          if (a == null) continue;
+          const cp = gapCenterHandlePos(a.center, perpWorld);
+          if (Math.hypot(coords.worldX - cp.x, coords.worldY - cp.y) < hitR) {
+            dragRef.current = { type: 'gapMove', wallId: selWall.id, gapId: g.id };
+            setSelectedGapId(g.id); setSelectedVertexIndex(null);
+            beginDrag(selWall);
+            return;
+          }
+        }
         for (let i = 0; i < selWall.vertices.length; i++) {
           const v = selWall.vertices[i];
           if (Math.hypot(coords.worldX - v.x, coords.worldY - v.y) < hitR) {
             dragRef.current = { type: 'vertex', wallId: selWall.id, index: i };
+            setSelectedGapId(null);
             beginDrag(selWall);
             return;
           }
@@ -528,6 +796,7 @@ const WallLayer = ({
           const m = segmentMidpoint(selWall, i);
           if (Math.hypot(coords.worldX - m.x, coords.worldY - m.y) < hitR) {
             dragRef.current = { type: 'bow', wallId: selWall.id, index: i };
+            setSelectedGapId(null);
             beginDrag(selWall);
             return;
           }
@@ -552,6 +821,7 @@ const WallLayer = ({
       if (bestWall != null && bestDist < corridor) {
         setSelectedWallId(bestWall.id);
         setSelectedVertexIndex(null);
+        setSelectedGapId(null);
         return;
       }
 
@@ -559,6 +829,7 @@ const WallLayer = ({
       if (selectedWallIdRef.current != null) {
         setSelectedWallId(null);
         setSelectedVertexIndex(null);
+        setSelectedGapId(null);
         return;
       }
 
@@ -586,7 +857,7 @@ const WallLayer = ({
     verticesRef.current = next;
     pressActiveRef.current = next.length >= 2;
     drawPreview();
-  }, [currentTool, mapData, getWalls, selectedEntry, isStripAsset, getClientCoords, screenToWorld, cellSize, snapDistance, snapWorld, angleSnap, createOverlay, commitWall, drawPreview, beginDrag]);
+  }, [currentTool, mapData, getWalls, selectedEntry, isStripAsset, isOpeningMode, commitOpeningInsert, getClientCoords, screenToWorld, cellSize, snapDistance, snapWorld, angleSnap, createOverlay, commitWall, drawPreview, beginDrag]);
 
   const handlePointerMove = useCallback((e: MouseEvent | TouchEvent | PointerEvent) => {
     if (currentTool !== 'wall') return;
@@ -594,6 +865,13 @@ const WallLayer = ({
     const coords = screenToWorld(clientX, clientY);
     if (!coords) return;
     const zoom = mapData?.viewState?.zoom ?? 1;
+
+    // ---- OPENING MODE hover ghost ----
+    if (isOpeningMode) {
+      createOverlay();
+      drawOpeningGhost(coords.worldX, coords.worldY);
+      return;
+    }
 
     // ---- EDIT DRAG ----
     // Mutate the working copy only — mapData stays untouched for the whole gesture
@@ -603,7 +881,18 @@ const WallLayer = ({
       const base = dragWorkingRef.current;
       if (base == null) return;
       dragMovedRef.current = true;
-      if (drag.type === 'vertex') {
+      if (drag.type === 'gapMove' || drag.type === 'gapEdge') {
+        const gaps = base.gaps;
+        if (gaps == null) return;
+        const gi = gaps.findIndex(g => g.id === drag.gapId);
+        if (gi < 0) return;
+        const nextGap = drag.type === 'gapMove'
+          ? resolveGapMove(base, gaps[gi], coords.worldX, coords.worldY, cellSize)
+          : resolveGapEdgeResize(base, gaps[gi], drag.edge, coords.worldX, coords.worldY, cellSize);
+        const nextGaps = gaps.slice();
+        nextGaps[gi] = nextGap;
+        dragWorkingRef.current = { ...base, gaps: nextGaps };
+      } else if (drag.type === 'vertex') {
         const snapped = snapWorld(coords.worldX, coords.worldY);
         const nextVerts = base.vertices.slice();
         nextVerts[drag.index] = { ...nextVerts[drag.index], x: snapped.x, y: snapped.y };
@@ -668,7 +957,7 @@ const WallLayer = ({
     const constrained = angleSnap(coords.worldX, coords.worldY, (e as MouseEvent).altKey === true);
     cursorRef.current = snapWorld(constrained.x, constrained.y);
     drawPreview();
-  }, [currentTool, mapData, getClientCoords, screenToWorld, snapWorld, angleSnap, drawEditHandles, drawPreview]);
+  }, [currentTool, mapData, cellSize, getClientCoords, screenToWorld, snapWorld, angleSnap, drawEditHandles, drawPreview, isOpeningMode, createOverlay, drawOpeningGhost]);
 
   const handlePointerUp = useCallback((_e: MouseEvent | TouchEvent | PointerEvent) => {
     pressActiveRef.current = false;
@@ -680,8 +969,11 @@ const WallLayer = ({
       if (dragMovedRef.current && working != null) {
         // Commit the working copy as ONE history entry — but skip a sub-epsilon
         // twitch (no geometry change ⇒ no history write, no re-render).
+        // Gap drags mutate `gaps` (not vertices), so wallGeometryChanged can't
+        // see them — always commit a moved gap drag (suppress=false, geometry F2).
+        const isGapDrag = drag.type === 'gapMove' || drag.type === 'gapEdge';
         const orig = getWalls().find(w => w.id === working.id);
-        if (orig == null || wallGeometryChanged(orig, working)) {
+        if (isGapDrag || orig == null || wallGeometryChanged(orig, working)) {
           onWallPathsChange(getWalls().map(w => (w.id === working.id ? working : w)), false);
         }
       } else if (drag.type === 'vertex') {
@@ -732,16 +1024,30 @@ const WallLayer = ({
     if (bestSeg < 0) return;
 
     const snapped = snapWorld(coords.worldX, coords.worldY);
+    // If the snapped point lands inside an existing gap's span on this
+    // segment, snap it to the gap's nearer edge instead — invariant 3 forbids
+    // straddling a door, and splitting through its middle would otherwise
+    // silently shift it rather than preserve it (§2.3 insert row).
+    const insertPoint = wall.gaps != null && wall.gaps.length > 0
+      ? snapInsertPointOutsideGaps(wall, bestSeg, snapped.x, snapped.y, cellSize)
+      : snapped;
     updateWall(selId, w => {
       const nextVerts = w.vertices.slice();
       // Inserting flattens the split segment (its arc no longer fits both halves).
       const va = { ...nextVerts[bestSeg] };
       delete va.arc;
       nextVerts[bestSeg] = va;
-      nextVerts.splice(bestSeg + 1, 0, { x: snapped.x, y: snapped.y });
-      return { ...w, vertices: nextVerts };
+      nextVerts.splice(bestSeg + 1, 0, { x: insertPoint.x, y: insertPoint.y });
+      const next = { ...w, vertices: nextVerts };
+      // Re-home gaps via reprojectGap: the insert flattens the split segment's
+      // arc, so an analytic t/p split would slide the door (geometry F4, §2.3).
+      if (w.gaps != null && w.gaps.length > 0) {
+        next.gaps = remapGapsAfterInsertVertex(w.gaps, w, next, cellSize);
+      }
+      return next;
     }, false);
     setSelectedVertexIndex(bestSeg + 1);
+    setSelectedGapId(null);
   }, [currentTool, mapData, getWalls, getClientCoords, screenToWorld, cellSize, snapWorld, updateWall, commitWall]);
 
   // ---- Keyboard ----
@@ -750,6 +1056,13 @@ const WallLayer = ({
     const onKeyDown = (e: KeyboardEvent): void => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
+      // Bare-threshold placement: Escape disarms the mode (nothing to draw/select).
+      if (isBareThreshold && e.key === 'Escape' && verticesRef.current.length === 0) {
+        e.preventDefault();
+        onDisarmOpening?.();
+        return;
+      }
 
       if (verticesRef.current.length > 0) {
         // Drawing
@@ -779,30 +1092,48 @@ const WallLayer = ({
       if (selId == null) return;
       if (e.key === 'Escape') {
         e.preventDefault();
-        setSelectedWallId(null);
-        setSelectedVertexIndex(null);
+        // A selected gap deselects first (keeps the wall selected); a second
+        // Escape then deselects the wall.
+        if (selectedGapRef.current != null) {
+          setSelectedGapId(null);
+        } else {
+          setSelectedWallId(null);
+          setSelectedVertexIndex(null);
+        }
       } else if (e.key === 'Backspace' || e.key === 'Delete') {
         e.preventDefault();
+        const gapId = selectedGapRef.current;
         const vIdx = selectedVertexRef.current;
         const wall = getWalls().find(w => w.id === selId);
         if (wall == null) return;
-        if (vIdx != null && wall.vertices.length > 2) {
+        // Delete precedence: selected gap → vertex → whole wall.
+        if (gapId != null) {
+          updateWall(selId, w => ({ ...w, gaps: (w.gaps ?? []).filter(g => g.id !== gapId) }), false);
+          setSelectedGapId(null);
+        } else if (vIdx != null && wall.vertices.length > 2) {
           updateWall(selId, w => {
             const nextVerts = w.vertices.slice();
             nextVerts.splice(vIdx, 1);
-            return { ...w, vertices: nextVerts };
+            const next = { ...w, vertices: nextVerts };
+            // Merging two segments can drop a corner between two doors — remap
+            // via reprojectGap + overlap resolver (§2.3 delete row, integrity F3).
+            if (w.gaps != null && w.gaps.length > 0) {
+              next.gaps = remapGapsAfterDeleteVertex(w.gaps, w, next, cellSize);
+            }
+            return next;
           }, false);
           setSelectedVertexIndex(null);
         } else {
           onWallPathsChange(getWalls().filter(w => w.id !== selId), false);
           setSelectedWallId(null);
           setSelectedVertexIndex(null);
+          setSelectedGapId(null);
         }
       }
     };
     activeDocument.addEventListener('keydown', onKeyDown);
     return () => activeDocument.removeEventListener('keydown', onKeyDown);
-  }, [isWallTool, getWalls, updateWall, onWallPathsChange, cancelDrawing, commitWall, drawPreview]);
+  }, [isWallTool, getWalls, updateWall, onWallPathsChange, cancelDrawing, commitWall, drawPreview, cellSize, isBareThreshold, onDisarmOpening]);
 
   // Reset transient state when the tool changes away.
   useEffect(() => {
@@ -810,6 +1141,7 @@ const WallLayer = ({
       if (verticesRef.current.length > 0) cancelDrawing();
       setSelectedWallId(null);
       setSelectedVertexIndex(null);
+      setSelectedGapId(null);
       removeOverlay();
     }
   }, [isWallTool, cancelDrawing, removeOverlay]);
@@ -823,11 +1155,17 @@ const WallLayer = ({
   // surfaceActions) so publishing — which sets state in the parent and re-renders
   // this layer — can't re-trigger itself into an infinite loop.
   const hasAsset = selectedEntry != null && isStripAsset;
+  const assetForm: 'strip' | 'opening' = isOpeningMode ? 'opening' : 'strip';
   const assetKind: 'wall' | 'path' = selectedMeta?.ddSourceType === 'paths' ? 'path' : 'wall';
   const hasSelectedWall = selectedWall != null;
   const editVertexCount = selectedWall?.vertices.length ?? 0;
   const editWidthScale = selectedWall?.widthScale ?? 1;
   const editFlip = selectedWall?.flip === true;
+  // Selected-gap footer state (primitives only, per the loop-safety note).
+  const hasSelectedGap = selectedGap != null;
+  const gapWidthCells = selectedGap?.widthCells ?? 1;
+  const gapBound = selectedGap?.tile != null;
+  const gapFlip = selectedGap?.tile?.flip === true;
   useEffect(() => {
     if (onSurfaceChange == null) return;
     if (!isWallTool) { onSurfaceChange(null); return; }
@@ -835,6 +1173,7 @@ const WallLayer = ({
     onSurfaceChange({
       mode: inEdit ? 'edit' : 'draw',
       hasAsset,
+      assetForm,
       assetKind,
       isDrawing,
       vertexCount: vertices.length,
@@ -855,12 +1194,25 @@ const WallLayer = ({
             toggleFlip: surfaceActions.toggleFlip,
             deleteWall: surfaceActions.deleteWall,
             deselect: surfaceActions.deselect,
+            gap: inEdit && hasSelectedGap
+              ? {
+                  widthCells: gapWidthCells,
+                  flip: gapFlip,
+                  bound: gapBound,
+                  setWidth: surfaceActions.setGapWidth,
+                  toggleFlip: surfaceActions.toggleGapFlip,
+                  unbind: surfaceActions.unbindGap,
+                  deleteGap: surfaceActions.deleteGap,
+                  deselectGap: surfaceActions.deselectGap,
+                }
+              : null,
           }
         : null,
     });
   }, [
     onSurfaceChange, isWallTool, isDrawing, vertices.length, snapEnabled, angleSnapEnabled,
-    hasAsset, assetKind, hasSelectedWall, editVertexCount, editWidthScale, editFlip,
+    hasAsset, assetForm, assetKind, hasSelectedWall, editVertexCount, editWidthScale, editFlip,
+    hasSelectedGap, gapWidthCells, gapBound, gapFlip,
     surfaceActions,
   ]);
   // Clear the surface on unmount so a stale footer can't linger.

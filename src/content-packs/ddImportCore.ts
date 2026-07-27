@@ -40,6 +40,8 @@ interface AssetCounts {
 	terrain: number;
 	walls: number;
 	paths: number;
+	/** Doors/windows/thresholds — plain single PNGs, never a strip source (§3). */
+	portals: number;
 	other: number;
 	total: number;
 }
@@ -47,10 +49,17 @@ interface AssetCounts {
 /** DD source directories whose textures are line-strip assets, not cell tiles. */
 const STRIP_SOURCE_TYPES = new Set(['walls', 'paths']);
 
-const TEXTURE_DIRS = ['objects', 'patterns', 'terrain', 'walls', 'paths'] as const;
+/**
+ * `portals` is deliberately NOT in STRIP_SOURCE_TYPES: doors/windows are
+ * plain centered images (256px-wide = 1 cell convention), not tiling strips —
+ * they seat into a wall GAP as a unit, they aren't drawn/repeated along it.
+ */
+const TEXTURE_DIRS = ['objects', 'patterns', 'terrain', 'walls', 'paths', 'portals'] as const;
 
 function countAssets(archive: PckArchive): AssetCounts {
-	const counts: AssetCounts = { objects: 0, patterns: 0, terrain: 0, walls: 0, paths: 0, other: 0, total: 0 };
+	const counts: AssetCounts = {
+		objects: 0, patterns: 0, terrain: 0, walls: 0, paths: 0, portals: 0, other: 0, total: 0,
+	};
 	for (const f of archive.files) {
 		if (!f.path.endsWith('.webp') && !f.path.endsWith('.png')) continue;
 		if (f.path.includes('/thumbnails/')) continue;
@@ -59,9 +68,11 @@ function countAssets(archive: PckArchive): AssetCounts {
 		else if (f.path.includes('/textures/terrain/')) counts.terrain++;
 		else if (f.path.includes('/textures/walls/')) counts.walls++;
 		else if (f.path.includes('/textures/paths/')) counts.paths++;
+		else if (f.path.includes('/textures/portals/')) counts.portals++;
 		else counts.other++;
 	}
-	counts.total = counts.objects + counts.patterns + counts.terrain + counts.walls + counts.paths + counts.other;
+	counts.total =
+		counts.objects + counts.patterns + counts.terrain + counts.walls + counts.paths + counts.portals + counts.other;
 	return counts;
 }
 

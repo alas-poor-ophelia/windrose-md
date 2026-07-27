@@ -12,7 +12,7 @@ import type { VNode } from 'preact';
 import type { TileForm } from '#types/tiles/tile.types';
 import type { TileSubtoolId } from '../../assets/tileForm';
 
-import { SUBTOOL_META, formDef, ribbonSubtoolsForForm, subtoolGate } from '../../assets/tileForm';
+import { SUBTOOL_META, THRESHOLD_ENTRY, formDef, ribbonSubtoolsForForm, subtoolGate } from '../../assets/tileForm';
 import { Icon } from '../shared/Icon';
 
 interface TileSubtoolRibbonProps {
@@ -20,9 +20,17 @@ interface TileSubtoolRibbonProps {
   form: TileForm | null;
   activeSubtool: TileSubtoolId | null;
   onSubtoolChange: (id: TileSubtoolId) => void;
+  /**
+   * Arms the built-in "Threshold" entry (§5.3) — cuts a bare gap regardless of
+   * the selected tile's art. Only rendered for the 'opening' form. When present,
+   * clicking it toggles WallLayer's bare-threshold placement mode.
+   */
+  onThreshold?: () => void;
+  /** True while the built-in Threshold entry is the armed placement mode. */
+  thresholdActive?: boolean;
 }
 
-const TileSubtoolRibbon = ({ form, activeSubtool, onSubtoolChange }: TileSubtoolRibbonProps): VNode | null => {
+const TileSubtoolRibbon = ({ form, activeSubtool, onSubtoolChange, onThreshold, thresholdActive }: TileSubtoolRibbonProps): VNode | null => {
   if (form == null) return null;
 
   const def = formDef(form);
@@ -51,6 +59,16 @@ const TileSubtoolRibbon = ({ form, activeSubtool, onSubtoolChange }: TileSubtool
           </button>
         );
       })}
+      {form === 'opening' && (
+        <button
+          key={THRESHOLD_ENTRY.id}
+          className={`windrose-fd-subtool interactive-child ${thresholdActive === true ? 'on' : ''}`}
+          title={THRESHOLD_ENTRY.title}
+          onClick={() => onThreshold?.()}
+        >
+          <Icon icon={THRESHOLD_ENTRY.icon} size={15} />
+        </button>
+      )}
     </div>
   );
 };

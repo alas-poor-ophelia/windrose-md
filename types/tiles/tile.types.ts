@@ -148,10 +148,11 @@ export type TileLayerRole = 'ground' | 'structure' | 'props' | 'decoration';
  *   cell     — discrete per-cell stamp (the default)
  *   region   — seamless world-anchored terrain fill (renderMode === 'region')
  *   line     — wall/path art meant to be drawn along edges/curves
+ *   opening  — door/window art seated into a wall GAP (ddSourceType 'portals')
  *   autotile — bitmask-driven auto-tiling (tileset has autoTileConfig)
  * (Scatter is a placement SUBTOOL, not a form — every form can scatter.)
  */
-export type TileForm = 'cell' | 'region' | 'line' | 'autotile';
+export type TileForm = 'cell' | 'region' | 'line' | 'opening' | 'autotile';
 
 /** Default layer stack for grid tile maps */
 export const DEFAULT_TILE_LAYERS: ReadonlyArray<{

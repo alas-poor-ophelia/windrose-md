@@ -6,6 +6,7 @@
  */
 
 import type { MapData, MapLayer, MapType } from '#types/core/map.types';
+import type { WallPath } from '#types/core/wallpath.types';
 import type { App } from 'obsidian';
 import { TFile, Notice } from 'obsidian';
 
@@ -54,6 +55,41 @@ interface DataFile {
 // full-pane view) would resurrect it. saveMapData refuses tombstoned IDs.
 // Map IDs are timestamp+random, so a new map can't collide with a tombstone.
 const deletedMapIds = new Set<string>();
+
+/**
+ * Sanitize a wall's openings on load. Drops ONLY structurally-invalid gaps
+ * (invariants 1-2): non-object, missing id, non-integer/out-of-range `seg`,
+ * non-finite `t` outside [0,1], or `widthCells <= 0`/non-finite. These are the
+ * only conditions that delete a gap (integrity F1).
+ *
+ * Geometric invariants (3 door-wider-than-segment, 4 overlap) are NOT enforced
+ * here: they are clamp/nudge-at-derive (§2.2), and computing them would require
+ * flattening every wall against `cellSize`, which this migration deliberately
+ * avoids (§2.5 note — the cheapest correct approach). A `gap.tile` binding is
+ * NEVER destroyed (integrity F2). Empty/absent → the field is removed so
+ * gapless walls stay byte-identical.
+ */
+function sanitizeWallGaps(w: WallPath): void {
+  const raw = (w as { gaps?: unknown }).gaps;
+  if (!Array.isArray(raw)) {
+    delete (w as { gaps?: unknown }).gaps;
+    return;
+  }
+  const V = w.vertices.length;
+  const segCount = w.closed ? V : V - 1;
+  const valid = raw.filter((g: unknown): boolean => {
+    if (g == null || typeof g !== 'object') return false;
+    const gap = g as Record<string, unknown>;
+    return (
+      typeof gap.id === 'string' &&
+      Number.isInteger(gap.seg) && (gap.seg as number) >= 0 && (gap.seg as number) < segCount &&
+      Number.isFinite(gap.t) && (gap.t as number) >= 0 && (gap.t as number) <= 1 &&
+      Number.isFinite(gap.widthCells) && (gap.widthCells as number) > 0
+    );
+  });
+  if (valid.length > 0) w.gaps = valid;
+  else delete (w as { gaps?: unknown }).gaps;
+}
 
 function migrateMapData(mapData: MapData): MapData {
   mapData.objects ??= [];
@@ -143,6 +179,7 @@ function migrateMapData(mapData: MapData): MapData {
     layer.wallPaths ??= [];
     layer.wallPaths = layer.wallPaths.filter(w => Array.isArray(w.vertices) && w.vertices.length >= 2 &&
       typeof w.tilesetId === 'string' && typeof w.tileId === 'string');
+    for (const w of layer.wallPaths) sanitizeWallGaps(w);
 
     layer.terrainStrokes ??= [];
     layer.terrainStrokes = layer.terrainStrokes.filter(s =>
@@ -189,6 +226,7 @@ function migrateMapData(mapData: MapData): MapData {
           layer.wallPaths ??= [];
           layer.wallPaths = layer.wallPaths.filter(w => Array.isArray(w.vertices) && w.vertices.length >= 2 &&
             typeof w.tilesetId === 'string' && typeof w.tileId === 'string');
+          for (const w of layer.wallPaths) sanitizeWallGaps(w);
           layer.terrainStrokes ??= [];
           layer.terrainStrokes = layer.terrainStrokes.filter(s =>
             Array.isArray(s.points) && s.points.length >= 2 && s.points.length % 2 === 0 &&
@@ -290,6 +328,16 @@ function canonicalizeTileIds(mapData: MapData): void {
       for (const w of layer.wallPaths ?? []) {
         const c = canon(w.tilesetId, w.tileId);
         if (c != null) w.tileId = c;
+        // Seated opening art canonicalizes exactly like the strip's tileId:
+        // resolve-only (never null an unresolved ref — the pack may be
+        // temporarily uninstalled), save-time, and inside this shared walk so
+        // sub-hex doors canonicalize too (integrity F7).
+        for (const gap of w.gaps ?? []) {
+          if (gap.tile != null) {
+            const gc = canon(gap.tile.tilesetId, gap.tile.tileId);
+            if (gc != null) gap.tile.tileId = gc;
+          }
+        }
       }
     }
   };
