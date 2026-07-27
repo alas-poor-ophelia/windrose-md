@@ -33,6 +33,7 @@ The plugin must be built before running E2E tests. The test setup copies `main.j
 | `keyboard.test.ts` | Keyboard shortcuts (D=draw, E=erase, etc.) |
 | `keyboard-integration.test.ts` | Keyboard shortcuts with data verification |
 | `measurement.test.ts` | Measurement tool activation |
+| `party-pin.test.ts` | Party pin placement, range ring styles, drag, removal |
 | `layers.test.ts` | Layer panel, adding/switching layers |
 | `layer-management.test.ts` | Layer CRUD with data verification |
 | `settings.test.ts` | Settings modal accessibility |
