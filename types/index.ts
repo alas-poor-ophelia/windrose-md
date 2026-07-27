@@ -77,6 +77,8 @@ export type {
   SubHexMapData,
   HexBounds,
   Edge,
+  PartyPin,
+  PartyRangeStyle,
 } from './core/map.types';
 
 export type {

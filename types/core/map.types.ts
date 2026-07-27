@@ -365,6 +365,9 @@ export interface MapData {
   // Shape overlays (global, both grid and hex maps)
   shapeOverlays?: ShapeOverlay[];
 
+  // Party pins (global, not per-layer; UI exposes a single pin per map)
+  partyPins?: PartyPin[];
+
   // Regions (hex maps only, global not per-layer)
   regions?: Region[];
 
@@ -452,6 +455,31 @@ export interface ShapeOverlay {
   opacity: number;
   freeform: boolean;
   visible: boolean;
+}
+
+// ===========================================
+// Party Pins (party location markers, both grid and hex)
+// ===========================================
+
+/** How a party pin's range is drawn on the canvas. */
+export type PartyRangeStyle = 'circle' | 'cells';
+
+/**
+ * Marks the adventuring party's current location. Position is cell-aligned:
+ * {x: col, y: row} on grid maps, {x: q, y: r} axial on hex maps.
+ * Range is expressed in the map's distance units and converts to cells via
+ * the map's distance-per-cell setting, so it follows the same rules as the
+ * measure tool.
+ */
+export interface PartyPin {
+  id: string;
+  position: Point;
+  label: string;
+  color: string;
+  icon?: string;
+  /** Range radius in map distance units; always > 0 */
+  range: number;
+  rangeStyle: PartyRangeStyle;
 }
 
 // ===========================================

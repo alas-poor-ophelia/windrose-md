@@ -99,6 +99,7 @@ function migrateMapData(mapData: MapData): MapData {
   mapData.regions ??= [];
   mapData.outlines ??= [];
   mapData.shapeOverlays ??= [];
+  mapData.partyPins ??= [];
   if (!mapData.mapType) mapData.mapType = 'grid';
   mapData.settings ??= { useGlobalSettings: true, overrides: {} };
   mapData.uiPreferences ??= {
@@ -236,6 +237,7 @@ function migrateMapData(mapData: MapData): MapData {
         subHex.mapData.regions ??= [];
         subHex.mapData.outlines ??= [];
         subHex.mapData.shapeOverlays ??= [];
+        subHex.mapData.partyPins ??= [];
         // Sub-hex maps get their own implicit board too (Parallax: don't leave
         // sub-hex layers boardless or board filters would drop them).
         ensureBoards(subHex.mapData);
