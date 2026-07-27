@@ -134,6 +134,40 @@ describe('buildPartyNoteContent', () => {
     expect(content).toContain('| A\\|B | 5 ft |');
   });
 
+  it('adds a Related column with capped links and overflow when provided', () => {
+    const results = makeResults({
+      linked: [{
+        notePath: 'Places/Tavern.md',
+        displayName: 'Tavern',
+        distanceInCells: 3,
+        distanceLabel: '15 ft',
+        sourceObjectId: 'obj-1',
+        position: { x: 13, y: 10 },
+      }],
+    });
+    const related = new Map([
+      ['Places/Tavern.md', { paths: ['Places/Port.md', 'People/Innkeep.md'], overflow: 3 }],
+    ]);
+    const content = buildPartyNoteContent(makePin(), results, context, related);
+    expect(content).toContain('| Note | Distance | Related | Map |');
+    expect(content).toContain('[[Places/Port\\|Port]], [[People/Innkeep\\|Innkeep]] +3 more');
+  });
+
+  it('renders an em-dash for results without related notes', () => {
+    const results = makeResults({
+      linked: [{
+        notePath: 'Places/Tavern.md',
+        displayName: 'Tavern',
+        distanceInCells: 3,
+        distanceLabel: '15 ft',
+        sourceObjectId: 'obj-1',
+        position: { x: 13, y: 10 },
+      }],
+    });
+    const content = buildPartyNoteContent(makePin(), results, context, new Map());
+    expect(content).toContain('| [[Places/Tavern\\|Tavern]] | 15 ft | — |');
+  });
+
   it('is deterministic for identical inputs (change-detection contract)', () => {
     const results = makeResults();
     const a = buildPartyNoteContent(makePin(), results, context);

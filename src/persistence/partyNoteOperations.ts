@@ -17,6 +17,7 @@
 import type { App } from 'obsidian';
 import type { PartyPin } from '#types/core/map.types';
 import type { PartyRangeResults } from '../objects/partyRangeQuery';
+import type { RelatedNotes } from '../objects/partyRelatedNotes';
 
 import { normalizePath, TFile as ObsidianTFile } from 'obsidian';
 import { generateDeepLink } from './deepLinkHandler';
@@ -68,14 +69,31 @@ function escapeTableCell(value: string): string {
   return value.replace(/\|/g, '\\|');
 }
 
+/** Render a wiki link with the note's basename as display text */
+function wikiLinkCell(notePath: string): string {
+  const target = notePath.replace(/\.md$/, '');
+  const display = target.split('/').pop() ?? target;
+  return `[[${escapeTableCell(target)}\\|${escapeTableCell(display)}]]`;
+}
+
+/** Render a related-notes cell: capped links plus an explicit overflow */
+function relatedCell(related: RelatedNotes | undefined): string {
+  if (related == null || related.paths.length === 0) return '—';
+  const links = related.paths.map(wikiLinkCell).join(', ');
+  return related.overflow > 0 ? `${links} +${related.overflow} more` : links;
+}
+
 /**
  * Render the note's full markdown content for the current results.
  * Pure — content equality doubles as the change detector.
+ * @param related - Per-result related notes (keyed by note path); when
+ *                  provided, the table gains a Related column
  */
 function buildPartyNoteContent(
   pin: PartyPin,
   results: PartyRangeResults,
-  context: PartyNoteContext
+  context: PartyNoteContext,
+  related?: Map<string, RelatedNotes>
 ): string {
   const lines: string[] = [];
   lines.push('---');
@@ -95,22 +113,26 @@ function buildPartyNoteContent(
 
   if (results.linked.length > 0) {
     const hasDeepLinks = context.mapNotePath !== '';
-    lines.push(hasDeepLinks ? '| Note | Distance | Map |' : '| Note | Distance |');
-    lines.push(hasDeepLinks ? '| --- | --- | --- |' : '| --- | --- |');
+    const hasRelated = related != null;
+    const header = ['Note', 'Distance', ...(hasRelated ? ['Related'] : []), ...(hasDeepLinks ? ['Map'] : [])];
+    lines.push(`| ${header.join(' | ')} |`);
+    lines.push(`|${header.map(() => ' --- ').join('|')}|`);
     for (const result of results.linked) {
       const linkTarget = result.notePath.replace(/\.md$/, '');
       const link = `[[${escapeTableCell(linkTarget)}\\|${escapeTableCell(result.displayName)}]]`;
-      const distance = escapeTableCell(result.distanceLabel);
+      const cells = [link, escapeTableCell(result.distanceLabel)];
+      if (hasRelated) {
+        cells.push(relatedCell(related.get(result.notePath)));
+      }
       if (hasDeepLinks) {
         const url = generateDeepLink(
           context.mapNotePath, context.mapId,
           result.position.x, result.position.y,
           NOTE_DEEP_LINK_ZOOM, ''
         );
-        lines.push(`| ${link} | ${distance} | [show](${url}) |`);
-      } else {
-        lines.push(`| ${link} | ${distance} |`);
+        cells.push(`[show](${url})`);
       }
+      lines.push(`| ${cells.join(' | ')} |`);
     }
     lines.push('');
   }
