@@ -12,12 +12,21 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { RefObject, VNode } from 'preact';
 import type { IGeometry, Point } from '#types/core/geometry.types';
-import type { MapData, PartyPin, PartyRangeStyle } from '#types/core/map.types';
+import type { MapData, PartyPin, PartyRangeStyle, PartyRelatedMode } from '#types/core/map.types';
 
 import type { PartyRangeResults } from '../../objects/partyRangeQuery';
 
 import { cellToScreen } from '../../drawing/cellToScreenConverter';
-import { isValidRange, removePartyPin, updatePartyPin, PARTY_PIN_DEFAULTS } from '../../objects/partyPinOperations';
+import {
+  isValidRange,
+  removePartyPin,
+  updatePartyPin,
+  parseTagFilters,
+  formatTagFilters,
+  parsePropertyFilters,
+  formatPropertyFilters,
+  PARTY_PIN_DEFAULTS
+} from '../../objects/partyPinOperations';
 import { openNoteInNewTab } from '../../persistence/noteOperations';
 import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition';
 import { ColorPicker } from '../shared/ColorPicker';
@@ -68,6 +77,9 @@ const PartyPinControls = ({
   const [rangeDraft, setRangeDraft] = useState(String(pin.range));
   const [rangeInvalid, setRangeInvalid] = useState(false);
   const [noteFolderDraft, setNoteFolderDraft] = useState('');
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [tagsDraft, setTagsDraft] = useState(formatTagFilters(pin.filters?.tags));
+  const [propsDraft, setPropsDraft] = useState(formatPropertyFilters(pin.filters?.properties));
   const [showColorPicker, setShowColorPicker] = useState(false);
   const colorButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -76,7 +88,9 @@ const PartyPinControls = ({
     setLabelDraft(pin.label);
     setRangeDraft(String(pin.range));
     setRangeInvalid(false);
-  }, [pin.id, pin.label, pin.range]);
+    setTagsDraft(formatTagFilters(pin.filters?.tags));
+    setPropsDraft(formatPropertyFilters(pin.filters?.properties));
+  }, [pin.id, pin.label, pin.range, pin.filters]);
 
   // Resolve anchor geometry up front so the positioning hook runs
   // unconditionally (bounds stay null until everything is available)
@@ -156,6 +170,38 @@ const PartyPinControls = ({
   const setNoteEnabled = (enabled: boolean): void => {
     if (!pin.partyNote) return;
     onPartyPinsChange(updatePartyPin(partyPins, pin.id, { partyNote: { ...pin.partyNote, enabled } }));
+  };
+
+  const commitTagFilters = (): void => {
+    const tags = parseTagFilters(tagsDraft);
+    onPartyPinsChange(updatePartyPin(partyPins, pin.id, {
+      filters: { ...pin.filters, tags: tags.length > 0 ? tags : undefined }
+    }));
+  };
+
+  const commitPropertyFilters = (): void => {
+    const properties = parsePropertyFilters(propsDraft);
+    onPartyPinsChange(updatePartyPin(partyPins, pin.id, {
+      filters: { ...pin.filters, properties: Object.keys(properties).length > 0 ? properties : undefined }
+    }));
+  };
+
+  const setScopeMode = (mode: 'all' | 'selected'): void => {
+    onPartyPinsChange(updatePartyPin(partyPins, pin.id, {
+      layerScope: { mode, layerIds: pin.layerScope?.layerIds ?? [] }
+    }));
+  };
+
+  const toggleScopedLayer = (layerId: string, included: boolean): void => {
+    const current = pin.layerScope?.layerIds ?? [];
+    const layerIds = included ? [...current, layerId] : current.filter(id => id !== layerId);
+    onPartyPinsChange(updatePartyPin(partyPins, pin.id, {
+      layerScope: { mode: 'selected', layerIds }
+    }));
+  };
+
+  const setRelatedMode = (relatedMode: PartyRelatedMode): void => {
+    onPartyPinsChange(updatePartyPin(partyPins, pin.id, { relatedMode }));
   };
 
   const commitOnEnter = (e: KeyboardEvent, commit: () => void): void => {
@@ -271,6 +317,82 @@ const PartyPinControls = ({
             <Icon icon="lucide-layout-grid" size={14} />
             <span>Cells</span>
           </button>
+        </div>
+
+        <div className="windrose-party-controls-filters">
+          <button
+            className={`windrose-party-controls-filters-toggle ${filtersExpanded ? 'expanded' : ''}`}
+            onClick={() => setFiltersExpanded(open => !open)}
+          >
+            <Icon icon="lucide-filter" size={12} />
+            <span>Filters &amp; related</span>
+            <Icon icon={filtersExpanded ? 'lucide-chevron-up' : 'lucide-chevron-down'} size={12} />
+          </button>
+
+          {filtersExpanded && (
+            <>
+              <label className="windrose-party-controls-field">
+                <span>Layers</span>
+                <select
+                  value={pin.layerScope?.mode ?? 'all'}
+                  onChange={(e) => setScopeMode((e.target as HTMLSelectElement).value as 'all' | 'selected')}
+                >
+                  <option value="all">All layers</option>
+                  <option value="selected">Selected layers</option>
+                </select>
+              </label>
+              {pin.layerScope?.mode === 'selected' && (
+                <div className="windrose-party-controls-layer-list">
+                  {(mapData?.layers ?? []).map(layer => (
+                    <label key={layer.id} className="windrose-party-controls-layer-item">
+                      <input
+                        type="checkbox"
+                        checked={(pin.layerScope?.layerIds ?? []).includes(layer.id)}
+                        onChange={(e) => toggleScopedLayer(layer.id, (e.target as HTMLInputElement).checked)}
+                      />
+                      <span>{layer.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              <label className="windrose-party-controls-field">
+                <span>Tags</span>
+                <input
+                  type="text"
+                  placeholder="settlement, visited"
+                  value={tagsDraft}
+                  onInput={(e) => setTagsDraft((e.target as HTMLInputElement).value)}
+                  onBlur={commitTagFilters}
+                  onKeyDown={(e) => commitOnEnter(e, commitTagFilters)}
+                />
+              </label>
+
+              <label className="windrose-party-controls-field">
+                <span>Props</span>
+                <input
+                  type="text"
+                  placeholder="status: active, rumored"
+                  value={propsDraft}
+                  onInput={(e) => setPropsDraft((e.target as HTMLInputElement).value)}
+                  onBlur={commitPropertyFilters}
+                  onKeyDown={(e) => commitOnEnter(e, commitPropertyFilters)}
+                />
+              </label>
+
+              <label className="windrose-party-controls-field">
+                <span>Related</span>
+                <select
+                  value={pin.relatedMode ?? 'off'}
+                  onChange={(e) => setRelatedMode((e.target as HTMLSelectElement).value as PartyRelatedMode)}
+                >
+                  <option value="off">Off</option>
+                  <option value="tags">By tags</option>
+                  <option value="backlinks">By backlinks</option>
+                </select>
+              </label>
+            </>
+          )}
         </div>
 
         <div className="windrose-party-controls-note">

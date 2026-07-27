@@ -13,6 +13,10 @@ import {
   movePartyPin,
   updatePartyPin,
   removePartyPin,
+  parseTagFilters,
+  formatTagFilters,
+  parsePropertyFilters,
+  formatPropertyFilters,
 } from '../../../src/objects/partyPinOperations';
 
 describe('isValidRange', () => {
@@ -118,6 +122,35 @@ describe('updatePartyPin', () => {
     const result = updatePartyPin([pin], pin.id, { range: 0, label: 'Rearguard' });
     expect(result[0].range).toBe(pin.range);
     expect(result[0].label).toBe('Rearguard');
+  });
+});
+
+describe('filter parsing round-trips', () => {
+  it('parses comma-separated tags, tolerating # and blanks', () => {
+    expect(parseTagFilters(' #settlement, visited,, ')).toEqual(['settlement', 'visited']);
+    expect(parseTagFilters('')).toEqual([]);
+  });
+
+  it('round-trips tags through format', () => {
+    expect(formatTagFilters(parseTagFilters('a, b'))).toBe('a, b');
+    expect(formatTagFilters(undefined)).toBe('');
+  });
+
+  it('parses semicolon-separated property clauses', () => {
+    expect(parsePropertyFilters('status: active, rumored; region: north')).toEqual({
+      status: ['active', 'rumored'],
+      region: ['north'],
+    });
+  });
+
+  it('drops malformed property clauses', () => {
+    expect(parsePropertyFilters('no-colon-here; : orphan; empty:')).toEqual({});
+  });
+
+  it('round-trips properties through format', () => {
+    const text = 'status: active, rumored; region: north';
+    expect(formatPropertyFilters(parsePropertyFilters(text))).toBe(text);
+    expect(formatPropertyFilters(undefined)).toBe('');
   });
 });
 

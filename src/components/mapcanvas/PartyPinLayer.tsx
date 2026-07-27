@@ -14,12 +14,15 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { MapDistanceOverrides } from '../../drawing/distanceOperations';
 import type { PartyRangeResults } from '../../objects/partyRangeQuery';
 
-import { Notice } from 'obsidian';
+import { Notice, TFile } from 'obsidian';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
 import { rangeUnitsToCells } from '../../drawing/rangeOperations';
 import { getPartyPin, removePartyPin, upsertPartyPin } from '../../objects/partyPinOperations';
 import { queryPartyRange } from '../../objects/partyRangeQuery';
+import type { NoteMetadataAccessor } from '../../objects/partyRangeQuery';
+import type { RelatedNotes, RelatedNotesSource } from '../../objects/partyRelatedNotes';
+import { extractCacheTags, getRelatedByBacklinks, getRelatedByTags } from '../../objects/partyRelatedNotes';
 import {
   buildPartyNoteContent,
   buildPartyNotePath,
@@ -48,6 +51,8 @@ export interface PartyPinLayerProps {
 const FLASH_DURATION_MS = 1800;
 /** Note writes coalesce bursts of edits into one file operation */
 const PARTY_NOTE_SAVE_DELAY_MS = 2000;
+/** Related notes shown per result before the "+N more" overflow */
+const PARTY_RELATED_CAP = 5;
 
 const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): VNode | null => {
   const app = useApp();
@@ -77,6 +82,16 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
 
   const pin = getPartyPin(mapData?.partyPins);
 
+  // Tags/frontmatter for filter checks, straight from Obsidian's in-memory
+  // metadata cache — no file reads per query
+  const noteMetadataAccessor = useCallback<NoteMetadataAccessor>((targetPath: string) => {
+    const file = app.vault.getAbstractFileByPath(targetPath);
+    if (!(file instanceof TFile)) return null;
+    const cache = app.metadataCache.getFileCache(file);
+    if (cache == null) return null;
+    return { tags: extractCacheTags(cache), frontmatter: cache.frontmatter ?? {} };
+  }, [app]);
+
   const results = useMemo((): PartyRangeResults => {
     if (!pin || !mapData || !geometry) return EMPTY_RESULTS;
     const distanceSettings = getEffectiveDistanceSettings(
@@ -89,9 +104,32 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
       distancePerCell: distanceSettings.distancePerCell,
       distanceUnit: distanceSettings.distanceUnit,
       diagonalRule: distanceSettings.gridDiagonalRule,
-      displayFormat: distanceSettings.displayFormat
+      displayFormat: distanceSettings.displayFormat,
+      noteMetadata: noteMetadataAccessor
     });
-  }, [pin, mapData, geometry]);
+  }, [pin, mapData, geometry, noteMetadataAccessor]);
+
+  // Related notes per result (tags or backlinks), for the party note table
+  const relatedMap = useMemo((): Map<string, RelatedNotes> | undefined => {
+    const mode = pin?.relatedMode ?? 'off';
+    if (mode === 'off' || pin == null || results.linked.length === 0) return undefined;
+    const source: RelatedNotesSource = {
+      noteTags: function* (): Generator<[string, string[]]> {
+        for (const file of app.vault.getMarkdownFiles()) {
+          yield [file.path, extractCacheTags(app.metadataCache.getFileCache(file))];
+        }
+      },
+      resolvedLinks: () => app.metadataCache.resolvedLinks
+    };
+    const excludePaths = pin.partyNote?.path != null && pin.partyNote.path !== '' ? [pin.partyNote.path] : [];
+    const map = new Map<string, RelatedNotes>();
+    for (const result of results.linked) {
+      map.set(result.notePath, mode === 'tags'
+        ? getRelatedByTags(source, result.notePath, { cap: PARTY_RELATED_CAP, excludeTags: pin.filters?.tags, excludePaths })
+        : getRelatedByBacklinks(source, result.notePath, { cap: PARTY_RELATED_CAP, excludePaths }));
+    }
+    return map;
+  }, [pin, results, app]);
 
   const inRangeMarkers = useMemo(
     () => [...results.linked, ...results.unlinked].map(r => r.position),
@@ -108,8 +146,8 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
   // only re-arms when the rendered content actually differs
   const noteContent = useMemo(() => {
     if (pin?.partyNote?.enabled !== true) return null;
-    return buildPartyNoteContent(pin, results, noteContext);
-  }, [pin, results, noteContext]);
+    return buildPartyNoteContent(pin, results, noteContext, relatedMap);
+  }, [pin, results, noteContext, relatedMap]);
 
   useEffect(() => {
     if (noteContent == null || pin?.partyNote == null) return undefined;
@@ -125,22 +163,22 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     if (!currentPin || !mapData) return;
     const path = buildPartyNotePath(folder, currentPin.label);
     const updatedPin: PartyPin = { ...currentPin, partyNote: { enabled: true, path } };
-    const outcome = await upsertPartyNote(app, updatedPin, buildPartyNoteContent(updatedPin, results, noteContext));
+    const outcome = await upsertPartyNote(app, updatedPin, buildPartyNoteContent(updatedPin, results, noteContext, relatedMap));
     if (outcome === 'blocked') {
       new Notice(`A note already exists at ${path} — choose another folder or rename the pin.`);
       return;
     }
     onPartyPinsChange(upsertPartyPin(mapData.partyPins ?? [], updatedPin));
-  }, [mapData, results, noteContext, app, onPartyPinsChange]);
+  }, [mapData, results, noteContext, relatedMap, app, onPartyPinsChange]);
 
   const handleRecalculate = useCallback((): void => {
     const currentPin = getPartyPin(mapData?.partyPins);
     if (currentPin?.partyNote?.enabled !== true || !mapData || !geometry) return;
-    void upsertPartyNote(app, currentPin, buildPartyNoteContent(currentPin, results, noteContext))
+    void upsertPartyNote(app, currentPin, buildPartyNoteContent(currentPin, results, noteContext, relatedMap))
       .then(outcome => {
         if (outcome === 'blocked') new Notice('Party note is blocked by an unrelated file at its path.');
       });
-  }, [mapData, geometry, results, noteContext, app]);
+  }, [mapData, geometry, results, noteContext, relatedMap, app]);
 
   const handleRemovePin = useCallback(async (): Promise<void> => {
     const currentPin = getPartyPin(mapData?.partyPins);

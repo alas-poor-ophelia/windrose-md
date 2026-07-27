@@ -106,6 +106,49 @@ function removePartyPin(partyPins: PartyPin[], pinId: string): PartyPin[] {
   return partyPins.filter(p => p.id !== pinId);
 }
 
+/**
+ * Parse a comma-separated tag list ("settlement, visited") into filter tags.
+ * Leading #s are tolerated; empty entries dropped.
+ */
+function parseTagFilters(text: string): string[] {
+  return text
+    .split(',')
+    .map(t => t.trim().replace(/^#/, ''))
+    .filter(t => t !== '');
+}
+
+/** Format filter tags back into the input's comma-separated form */
+function formatTagFilters(tags: string[] | undefined): string {
+  return (tags ?? []).join(', ');
+}
+
+/**
+ * Parse property filters from "status: active, rumored; region: north"
+ * into a property → accepted-values record. Entries without a name or
+ * any values are dropped.
+ */
+function parsePropertyFilters(text: string): Record<string, string[]> {
+  const properties: Record<string, string[]> = {};
+  for (const clause of text.split(';')) {
+    const colon = clause.indexOf(':');
+    if (colon === -1) continue;
+    const name = clause.slice(0, colon).trim();
+    const values = clause.slice(colon + 1)
+      .split(',')
+      .map(v => v.trim())
+      .filter(v => v !== '');
+    if (name !== '' && values.length > 0) properties[name] = values;
+  }
+  return properties;
+}
+
+/** Format property filters back into the input's "name: v1, v2; ..." form */
+function formatPropertyFilters(properties: Record<string, string[]> | undefined): string {
+  return Object.entries(properties ?? {})
+    .map(([name, values]) => `${name}: ${values.join(', ')}`)
+    .join('; ');
+}
+
 export {
   PARTY_PIN_DEFAULTS,
   isValidRange,
@@ -115,4 +158,8 @@ export {
   movePartyPin,
   updatePartyPin,
   removePartyPin,
+  parseTagFilters,
+  formatTagFilters,
+  parsePropertyFilters,
+  formatPropertyFilters,
 };
