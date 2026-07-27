@@ -9,11 +9,12 @@
 
 import type { VNode } from 'preact';
 import type { PartyPin } from '#types/core/map.types';
+import type { Point } from '#types/core/geometry.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { MapDistanceOverrides } from '../../drawing/distanceOperations';
 import type { PartyRangeResults } from '../../objects/partyRangeQuery';
 
-import { useMemo } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
 import { rangeUnitsToCells } from '../../drawing/rangeOperations';
 import { getPartyPin } from '../../objects/partyPinOperations';
@@ -35,8 +36,27 @@ export interface PartyPinLayerProps {
   onPartyPinsChange: (partyPins: PartyPin[], suppressHistory?: boolean) => void;
 }
 
+const FLASH_DURATION_MS = 1800;
+
 const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): VNode | null => {
-  const { mapData, geometry, canvasRef } = useMapState();
+  const { mapData, geometry, canvasRef, mapId } = useMapState();
+
+  // Transient highlight for "show on map" — cleared after the pulse finishes
+  const [flashMarker, setFlashMarker] = useState<Point | null>(null);
+  const flashTimerRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (flashTimerRef.current != null) window.clearTimeout(flashTimerRef.current);
+  }, []);
+
+  const zoom = mapData?.viewState?.zoom;
+  const handleShowOnMap = useCallback((position: Point): void => {
+    window.dispatchEvent(new CustomEvent('windrose-navigate-to', {
+      detail: { mapId, x: position.x, y: position.y, zoom }
+    }));
+    setFlashMarker({ ...position });
+    if (flashTimerRef.current != null) window.clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = window.setTimeout(() => setFlashMarker(null), FLASH_DURATION_MS);
+  }, [mapId, zoom]);
 
   const { handlePartyPinPointerDown, handlePartyPinMove, stopPartyPinDrag } =
     usePartyPinInteraction(mapData?.partyPins, onPartyPinsChange);
@@ -84,6 +104,7 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
         rangeInCells={rangeInCells}
         diagonalRule={distanceSettings.gridDiagonalRule}
         inRangeMarkers={inRangeMarkers}
+        flashMarker={flashMarker}
         geometry={geometry}
         mapData={mapData}
         canvasRef={canvasRef}
@@ -98,6 +119,7 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
           mapData={mapData}
           canvasRef={canvasRef}
           onPartyPinsChange={onPartyPinsChange}
+          onShowOnMap={handleShowOnMap}
         />
       )}
     </>

@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from 'preact/hooks';
 import type { RefObject, VNode } from 'preact';
-import type { IGeometry } from '#types/core/geometry.types';
+import type { IGeometry, Point } from '#types/core/geometry.types';
 import type { MapData, PartyPin, PartyRangeStyle } from '#types/core/map.types';
 
 import type { PartyRangeResults } from '../../objects/partyRangeQuery';
@@ -38,6 +38,8 @@ interface PartyPinControlsProps {
   mapData: MapData | null;
   canvasRef: RefObject<HTMLCanvasElement> | null;
   onPartyPinsChange: (partyPins: PartyPin[], suppressHistory?: boolean) => void;
+  /** Navigate/flash a result's source marker on the map */
+  onShowOnMap?: (position: Point) => void;
 }
 
 const PartyPinControls = ({
@@ -48,7 +50,8 @@ const PartyPinControls = ({
   geometry,
   mapData,
   canvasRef,
-  onPartyPinsChange
+  onPartyPinsChange,
+  onShowOnMap
 }: PartyPinControlsProps): VNode | null => {
   const [labelDraft, setLabelDraft] = useState(pin.label);
   const [rangeDraft, setRangeDraft] = useState(String(pin.range));
@@ -248,6 +251,16 @@ const PartyPinControls = ({
                     {result.displayName}
                   </InternalLink>
                   <span className="windrose-party-controls-nearby-distance">{result.distanceLabel}</span>
+                  {onShowOnMap && (
+                    <button
+                      className="windrose-party-controls-locate"
+                      title="Show on map"
+                      aria-label={`Show ${result.displayName} on map`}
+                      onClick={() => onShowOnMap(result.position)}
+                    >
+                      <Icon icon="lucide-crosshair" size={12} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -261,6 +274,16 @@ const PartyPinControls = ({
                   <div key={result.objectId} className="windrose-party-controls-nearby-row is-static">
                     <span>{result.label}</span>
                     <span className="windrose-party-controls-nearby-distance">{result.distanceLabel}</span>
+                    {onShowOnMap && (
+                      <button
+                        className="windrose-party-controls-locate"
+                        title="Show on map"
+                        aria-label={`Show ${result.label} on map`}
+                        onClick={() => onShowOnMap(result.position)}
+                      >
+                        <Icon icon="lucide-crosshair" size={12} />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

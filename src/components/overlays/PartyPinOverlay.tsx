@@ -33,6 +33,8 @@ interface PartyPinOverlayProps {
   diagonalRule: DiagonalRule;
   /** Cell positions of markers currently within range (rendered with a glow) */
   inRangeMarkers?: Point[];
+  /** Cell to pulse-highlight (transient, from "show on map") */
+  flashMarker?: Point | null;
   geometry: IGeometry | null;
   mapData: MapData | null;
   canvasRef: RefObject<HTMLCanvasElement> | null;
@@ -59,6 +61,7 @@ const PartyPinOverlay = ({
   rangeInCells,
   diagonalRule,
   inRangeMarkers = [],
+  flashMarker = null,
   geometry,
   mapData,
   canvasRef
@@ -202,6 +205,24 @@ const PartyPinOverlay = ({
             </g>
           );
         })}
+
+        {/* Show-on-map flash pulse */}
+        {flashMarker && (() => {
+          const center = geo.getCellCenter(flashMarker.x, flashMarker.y);
+          return (
+            <circle
+              key={`flash-${flashMarker.x},${flashMarker.y}`}
+              className="windrose-party-pin-flash"
+              cx={center.worldX}
+              cy={center.worldY}
+              r={geo.cellSize * 0.6}
+              fill="none"
+              stroke={pin.color}
+              strokeWidth={3}
+              vector-effect="non-scaling-stroke"
+            />
+          );
+        })()}
 
         {/* Pin marker */}
         <g transform={`translate(${pinCenter.worldX} ${pinCenter.worldY}) scale(${pinScale})`}>
