@@ -10,12 +10,16 @@
 
 import { describe, it, expect } from "vitest";
 import type { TileAssignment } from "../../../types/tiles/tile.types";
+import type { WallPath } from "../../../types/core/wallpath.types";
 import {
   getBrushCells,
   bresenhamLine,
   floodFillCells,
-  FLOOD_FILL_MAX,
+  buildWallBarrier,
+  segmentsIntersect,
+  FLOOD_FILL_LIMIT,
 } from "../../../src/drawing/tilePlacementOps";
+import { flattenWallPath, solidWallPolylines } from "../../../src/geometry/renderers/wallPathRenderer";
 
 // =============================================================================
 // Pure helper functions extracted from TilePlacementLayer logic
@@ -192,8 +196,9 @@ describe("tilePlacementOps", () => {
   describe("floodFillCells", () => {
     it("clicking empty fills the connected empty area within 3x map bounds", () => {
       // mapWidth/Height 2 -> cols/rows range -2..4 = 7x7 = 49 cells
-      const cells = floodFillCells([], 0, 0, 2, 2);
+      const { cells, aborted } = floodFillCells([], 0, 0, 2, 2);
       expect(cells).toHaveLength(49);
+      expect(aborted).toBe(false);
     });
 
     it("clicking a tile fills only the contiguous same-tile region", () => {
@@ -203,7 +208,7 @@ describe("tilePlacementOps", () => {
         { col: 2, row: 0, tilesetId: "ts", tileId: "water" },
         { col: 4, row: 0, tilesetId: "ts", tileId: "grass" }, // disconnected
       ];
-      const cells = floodFillCells(tiles, 0, 0, 10, 10);
+      const { cells } = floodFillCells(tiles, 0, 0, 10, 10);
       expect(cells).toHaveLength(2);
       expect(cells).toContainEqual({ col: 0, row: 0 });
       expect(cells).toContainEqual({ col: 1, row: 0 });
@@ -215,7 +220,7 @@ describe("tilePlacementOps", () => {
       const wall: TileAssignment[] = [
         { col: 1, row: -2, tilesetId: "ts", tileId: "wall", spanW: 1, spanH: 5 },
       ];
-      const cells = floodFillCells(wall, 0, 0, 1, 1);
+      const { cells } = floodFillCells(wall, 0, 0, 1, 1);
       // Bounds: cols -1..2, rows -1..2 (4x4=16). The span covers (1,-2)..(1,2),
       // blocking column 1 for all in-bounds rows -1..2 => right column (2,*)
       // is unreachable. Left region = cols -1..0 x rows -1..2 = 8 cells.
@@ -227,14 +232,26 @@ describe("tilePlacementOps", () => {
       const tiles: TileAssignment[] = [
         { col: 0, row: 0, tilesetId: "ts", tileId: "tree", freeform: true, worldX: 10, worldY: 10 },
       ];
-      const cells = floodFillCells(tiles, 0, 0, 2, 2);
+      const { cells } = floodFillCells(tiles, 0, 0, 2, 2);
       expect(cells).toHaveLength(49);
     });
 
-    it("respects the FLOOD_FILL_MAX cap on huge empty areas", () => {
-      const cells = floodFillCells([], 0, 0, 100, 100);
-      expect(cells.length).toBeLessThanOrEqual(FLOOD_FILL_MAX);
-      expect(cells.length).toBe(FLOOD_FILL_MAX);
+    it("an unbounded region hits the limit and reports aborted", () => {
+      const { cells, aborted } = floodFillCells([], 0, 0, 100, 100);
+      expect(aborted).toBe(true);
+      // Contract: aborted => the caller (TilePlacementLayer) discards `cells`
+      // and places nothing. The accumulated count stops at the limit.
+      expect(cells.length).toBe(FLOOD_FILL_LIMIT);
+    });
+
+    it("a region exactly the size of the limit is NOT aborted", () => {
+      // inBounds carves a square of exactly FLOOD_FILL_LIMIT cells (col 0..X).
+      const side = Math.floor(Math.sqrt(FLOOD_FILL_LIMIT)); // 31 -> 961 cells
+      const { cells, aborted } = floodFillCells([], 0, 0, 1000, 1000, {
+        inBounds: (c, r) => c >= 0 && c < side && r >= 0 && r < side,
+      });
+      expect(aborted).toBe(false);
+      expect(cells).toHaveLength(side * side);
     });
 
     it("blockedCells stop expansion like walls, even on empty ground", () => {
@@ -242,24 +259,270 @@ describe("tilePlacementOps", () => {
       // splits the empty area; fill from the left never reaches col > 1.
       const blocked = new Set<string>();
       for (let r = -2; r <= 4; r++) blocked.add(`1,${r}`);
-      const cells = floodFillCells([], 0, 0, 2, 2, { blockedCells: blocked });
+      const { cells } = floodFillCells([], 0, 0, 2, 2, { blockedCells: blocked });
       expect(cells.length).toBeGreaterThan(0);
       expect(cells.every(c => c.col < 1)).toBe(true);
     });
 
     it("a blocked start cell fills nothing", () => {
-      const cells = floodFillCells([], 0, 0, 2, 2, { blockedCells: new Set(["0,0"]) });
+      const { cells } = floodFillCells([], 0, 0, 2, 2, { blockedCells: new Set(["0,0"]) });
       expect(cells).toHaveLength(0);
     });
 
     it("inBounds predicate clamps the fill tighter than the rect bounds", () => {
       // Diamond |col|+|row| <= 2 inside generous rect bounds.
-      const cells = floodFillCells([], 0, 0, 50, 50, {
+      const { cells } = floodFillCells([], 0, 0, 50, 50, {
         inBounds: (c, r) => Math.abs(c) + Math.abs(r) <= 2,
       });
       expect(cells).toHaveLength(13); // 1 + 4 + 8 cells of the diamond
       expect(cells.every(c => Math.abs(c.col) + Math.abs(c.row) <= 2)).toBe(true);
     });
+
+    it("a canCross predicate that rejects a step blocks that neighbour", () => {
+      // Refuse to cross from col 0 to col 1 anywhere; fill stays col <= 0.
+      const { cells } = floodFillCells([], 0, 0, 1, 1, {
+        canCross: (from, to) => !(from.col === 0 && to.col === 1),
+      });
+      expect(cells.length).toBeGreaterThan(0);
+      expect(cells.every(c => c.col <= 0)).toBe(true);
+    });
+  });
+
+  // ===========================================================================
+  // buildWallBarrier — wall-aware flood fill
+  // ===========================================================================
+
+  describe("buildWallBarrier", () => {
+    // Square-grid adapters: cellSize 10, center at (col+0.5, row+0.5)*10.
+    const CS = 10;
+    const gridCenter = (col: number, row: number): { x: number; y: number } => ({
+      x: (col + 0.5) * CS,
+      y: (row + 0.5) * CS,
+    });
+    const gridWorldToCell = (wx: number, wy: number): { col: number; row: number } => ({
+      col: Math.floor(wx / CS),
+      row: Math.floor(wy / CS),
+    });
+
+    /** Straight wall centerline as a two-point polyline in world coords. */
+    const line = (x1: number, y1: number, x2: number, y2: number): [number, number][] => [
+      [x1, y1],
+      [x2, y2],
+    ];
+
+    it("a straight wall blocks crossing between the cells it divides", () => {
+      // Vertical wall at world x=10 (the col0|col1 boundary), spanning rows.
+      const barrier = buildWallBarrier([line(10, -100, 10, 100)], gridCenter, gridWorldToCell);
+      // Horizontal step col0 -> col1 crosses x=10 -> blocked.
+      expect(barrier.canCross({ col: 0, row: 0 }, { col: 1, row: 0 })).toBe(false);
+      // Vertical step within col0 never crosses the wall -> allowed.
+      expect(barrier.canCross({ col: 0, row: 0 }, { col: 0, row: 1 })).toBe(true);
+    });
+
+    it("a fully-walled room fills exactly its interior", () => {
+      // Closed square wall along boundaries x=0,x=30,y=0,y=30 encloses the 3x3
+      // interior of cells col 0..2 x row 0..2.
+      const room: [number, number][] = [
+        [0, 0], [30, 0], [30, 30], [0, 30], [0, 0],
+      ];
+      const barrier = buildWallBarrier([room], gridCenter, gridWorldToCell);
+      const { cells, aborted } = floodFillCells([], 1, 1, 10, 10, { canCross: barrier.canCross });
+      expect(aborted).toBe(false);
+      expect(cells).toHaveLength(9);
+      expect(cells.every(c => c.col >= 0 && c.col <= 2 && c.row >= 0 && c.row <= 2)).toBe(true);
+    });
+
+    it("path strips are excluded by the caller's kind filter (paths do not block)", () => {
+      // Mirror the layer's collection: only kind === 'wall' becomes a barrier.
+      const wall: WallPath = {
+        id: "w", kind: "wall", closed: false, tilesetId: "ts", tileId: "brick", widthScale: 1,
+        vertices: [{ x: 10, y: -100 }, { x: 10, y: 100 }],
+      };
+      const path: WallPath = {
+        id: "p", kind: "path", closed: false, tilesetId: "ts", tileId: "road", widthScale: 1,
+        vertices: [{ x: 20, y: -100 }, { x: 20, y: 100 }],
+      };
+      const polylines = [wall, path]
+        .filter(w => w.kind === "wall")
+        .map(w => flattenWallPath(w).points);
+      const barrier = buildWallBarrier(polylines, gridCenter, gridWorldToCell);
+      // Wall at x=10 blocks col0 -> col1.
+      expect(barrier.canCross({ col: 0, row: 0 }, { col: 1, row: 0 })).toBe(false);
+      // Path at x=20 (col1 -> col2 boundary) was filtered out -> not blocked.
+      expect(barrier.canCross({ col: 1, row: 0 }, { col: 2, row: 0 })).toBe(true);
+    });
+
+    it("a curved (arc) wall blocks after flattening", () => {
+      // Endpoints sit on the col0|col1 boundary (x=10); the arc control bows the
+      // segment far right (peak x~30 at y~20). flattenWallPath subdivides it, so
+      // the bowed body crosses the x=20 (col1|col2) boundary that the straight
+      // endpoints never reach.
+      const curved: WallPath = {
+        id: "c", kind: "wall", closed: false, tilesetId: "ts", tileId: "brick", widthScale: 1,
+        vertices: [{ x: 10, y: 0, arc: [50, 10] }, { x: 10, y: 40 }],
+      };
+      const flat = flattenWallPath(curved);
+      expect(flat.points.length).toBeGreaterThan(2); // arc actually subdivided
+      const barrier = buildWallBarrier([flat.points], gridCenter, gridWorldToCell);
+      // The flattened arc crosses x=20 near y~6 (row 0); crossing col1 -> col2
+      // there hits the curve body, not the endpoints.
+      expect(barrier.canCross({ col: 1, row: 0 }, { col: 2, row: 0 })).toBe(false);
+      // A straight wall between the same endpoints (x=10) would NOT block this.
+      const straight = buildWallBarrier([line(10, 0, 10, 40)], gridCenter, gridWorldToCell);
+      expect(straight.canCross({ col: 1, row: 0 }, { col: 2, row: 0 })).toBe(true);
+    });
+
+    it("the spatial hash matches brute force on random small cases", () => {
+      // Deterministic PRNG so failures reproduce.
+      let seed = 1234567;
+      const rand = (): number => {
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+        return seed / 0x7fffffff;
+      };
+      const bruteCanCross = (
+        polylines: [number, number][][],
+        from: { col: number; row: number },
+        to: { col: number; row: number }
+      ): boolean => {
+        const p0 = gridCenter(from.col, from.row);
+        const p1 = gridCenter(to.col, to.row);
+        for (const poly of polylines) {
+          for (let i = 1; i < poly.length; i++) {
+            if (segmentsIntersect(p0.x, p0.y, p1.x, p1.y, poly[i - 1][0], poly[i - 1][1], poly[i][0], poly[i][1])) {
+              return false;
+            }
+          }
+        }
+        return true;
+      };
+
+      for (let trial = 0; trial < 40; trial++) {
+        // 1-3 random polylines within a 6x6-cell world (0..60).
+        const polylines: [number, number][][] = [];
+        const nLines = 1 + Math.floor(rand() * 3);
+        for (let l = 0; l < nLines; l++) {
+          const nPts = 2 + Math.floor(rand() * 3);
+          const poly: [number, number][] = [];
+          for (let p = 0; p < nPts; p++) poly.push([rand() * 60, rand() * 60]);
+          polylines.push(poly);
+        }
+        const barrier = buildWallBarrier(polylines, gridCenter, gridWorldToCell);
+        // Compare over every adjacent-cell step in the 6x6 grid (the only
+        // query shape floodFillCells ever issues).
+        for (let col = 0; col < 6; col++) {
+          for (let row = 0; row < 6; row++) {
+            const from = { col, row };
+            for (const to of [
+              { col: col + 1, row }, { col: col - 1, row },
+              { col, row: row + 1 }, { col, row: row - 1 },
+            ]) {
+              expect(barrier.canCross(from, to)).toBe(bruteCanCross(polylines, from, to));
+            }
+          }
+        }
+      }
+    });
+  });
+});
+
+// =============================================================================
+// Gap-aware fill barrier (openings, §9 / Guildmaster ruling D7): a doorway is
+// a hole in the barrier, regardless of seated art — fill leaks through it,
+// while ungapped wall runs (and gaps clamped down to nothing by invariant 3)
+// still block.
+// =============================================================================
+
+describe("gap-aware wall barrier (solidWallPolylines + buildWallBarrier)", () => {
+  const CS = 10;
+  const gridCenter = (col: number, row: number): { x: number; y: number } => ({
+    x: (col + 0.5) * CS,
+    y: (row + 0.5) * CS,
+  });
+  const gridWorldToCell = (wx: number, wy: number): { col: number; row: number } => ({
+    col: Math.floor(wx / CS),
+    row: Math.floor(wy / CS),
+  });
+
+  function barrierFor(walls: WallPath[]): ReturnType<typeof buildWallBarrier> {
+    const polylines = walls
+      .filter((w) => w.kind === "wall")
+      .flatMap((w) => solidWallPolylines(w, CS));
+    return buildWallBarrier(polylines, gridCenter, gridWorldToCell);
+  }
+
+  it("fill passes through a doorway gap into the next room", () => {
+    // Vertical wall at world x=20 (col1|col2 boundary), spanning y 0..90, with a
+    // 3-cell-wide gap (30 world units) centered at y=45 -> span y=[30,60], which
+    // strictly contains rows 3/4/5's cell-center probe lines (y=35/45/55) without
+    // touching a span edge (avoids the boundary-touching case tested separately).
+    const wall: WallPath = {
+      id: "w", kind: "wall", closed: false, tilesetId: "ts", tileId: "brick", widthScale: 1,
+      vertices: [{ x: 20, y: 0 }, { x: 20, y: 90 }],
+      gaps: [{ id: "g", seg: 0, t: 0.5, widthCells: 3 }],
+    };
+    const barrier = barrierFor([wall]);
+    expect(barrier.canCross({ col: 1, row: 3 }, { col: 2, row: 3 })).toBe(true);
+    expect(barrier.canCross({ col: 1, row: 4 }, { col: 2, row: 4 })).toBe(true);
+    expect(barrier.canCross({ col: 1, row: 5 }, { col: 2, row: 5 })).toBe(true);
+    // Rows away from the gap still hit solid wall.
+    expect(barrier.canCross({ col: 1, row: 0 }, { col: 2, row: 0 })).toBe(false);
+    expect(barrier.canCross({ col: 1, row: 8 }, { col: 2, row: 8 })).toBe(false);
+  });
+
+  it("still blocked by ungapped wall runs on the same wall", () => {
+    const wall: WallPath = {
+      id: "w", kind: "wall", closed: false, tilesetId: "ts", tileId: "brick", widthScale: 1,
+      vertices: [{ x: 20, y: 0 }, { x: 20, y: 60 }],
+      gaps: [{ id: "g", seg: 0, t: 0.5, widthCells: 1 }],
+    };
+    const gapless: WallPath = {
+      id: "w2", kind: "wall", closed: false, tilesetId: "ts", tileId: "brick", widthScale: 1,
+      vertices: [{ x: 40, y: 0 }, { x: 40, y: 60 }],
+    };
+    const barrier = barrierFor([wall, gapless]);
+    // The second wall has no gap at all -> every row blocks.
+    for (let row = 0; row < 6; row++) {
+      expect(barrier.canCross({ col: 3, row }, { col: 4, row })).toBe(false);
+    }
+  });
+
+  it("a full room with a single doorway fills the interior plus the room beyond it", () => {
+    // 3x3 interior room (cols 0-2, rows 0-2) with a door in its east wall
+    // (x=30, the col2|col3 boundary) opening into another 3x3 room (cols 3-5).
+    const room: WallPath = {
+      id: "room", kind: "wall", closed: true, tilesetId: "ts", tileId: "brick", widthScale: 1,
+      vertices: [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 30 }, { x: 0, y: 30 }],
+      gaps: [{ id: "door", seg: 1, t: 0.5, widthCells: 1 }], // seg 1: (30,0)->(30,30)
+    };
+    const neighbor: WallPath = {
+      id: "neighbor", kind: "wall", closed: true, tilesetId: "ts", tileId: "brick", widthScale: 1,
+      vertices: [{ x: 30, y: 0 }, { x: 60, y: 0 }, { x: 60, y: 30 }, { x: 30, y: 30 }],
+      gaps: [{ id: "door", seg: 3, t: 0.5, widthCells: 1 }], // seg 3: (30,30)->(30,0), shares the doorway
+    };
+    const barrier = barrierFor([room, neighbor]);
+    const { cells, aborted } = floodFillCells([], 1, 1, 10, 10, { canCross: barrier.canCross });
+    expect(aborted).toBe(false);
+    // Both 3x3 interiors (cols 0-2 and 3-5, rows 0-2) are reachable through the door.
+    expect(cells).toHaveLength(18);
+    expect(cells.every((c) => c.col >= 0 && c.col <= 5 && c.row >= 0 && c.row <= 2)).toBe(true);
+  });
+
+  it("respects clamp-at-derive gap widths: an over-wide gap opens the whole wall", () => {
+    // widthCells 10 -> world 100 > the 60-long segment; invariant 3 clamps the
+    // derived span to the whole segment, so the wall carries no solid polyline
+    // at all and blocks nothing.
+    const gap: WallPath["gaps"] = [{ id: "g", seg: 0, t: 0.5, widthCells: 10 }];
+    const wall: WallPath = {
+      id: "w", kind: "wall", closed: false, tilesetId: "ts", tileId: "brick", widthScale: 1,
+      vertices: [{ x: 20, y: 0 }, { x: 20, y: 60 }],
+      gaps: gap,
+    };
+    expect(solidWallPolylines(wall, CS)).toEqual([]);
+    const barrier = barrierFor([wall]);
+    for (let row = 0; row < 6; row++) {
+      expect(barrier.canCross({ col: 1, row }, { col: 2, row })).toBe(true);
+    }
+    expect(gap![0].widthCells).toBe(10); // stored value untouched
   });
 });
 

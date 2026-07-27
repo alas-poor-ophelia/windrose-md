@@ -13,6 +13,7 @@ import type { VNode } from 'preact';
 import type { TileAssignment, TileRotation, TileLayerRole, TilesetDef } from '#types/tiles/tile.types';
 import type { TileSubtoolId } from '../../assets/tileForm';
 
+import { Notice } from 'obsidian';
 import { useCallback, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
@@ -24,8 +25,9 @@ import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import type { ResolvedTileRender } from '../../assets/tileRenderResolution';
 import { resolveTileRender, EDGE_BLEND_FEATHER } from '../../assets/tileRenderResolution';
 import { cellsCoveredByAssignment, assignmentsOverlap } from '../../assets/tileFootprint';
-import { getBrushCells, bresenhamLine, floodFillCells } from '../../drawing/tilePlacementOps';
+import { getBrushCells, bresenhamLine, floodFillCells, buildWallBarrier, FLOOD_FILL_LIMIT } from '../../drawing/tilePlacementOps';
 import { scatterSpacing, makeScatterDrop } from '../../drawing/scatterBrush';
+import { solidWallPolylines } from '../../geometry/renderers/wallPathRenderer';
 
 /**
  * Grid-only paint-time render resolution for the selected tile. The blend
@@ -89,6 +91,17 @@ const TilePlacementLayer = ({
 
   const isTileTool = currentTool === 'tilePaint';
   const hasTileSelected = selectedTilesetId != null && selectedTilesetId !== '' && selectedTileId != null && selectedTileId !== '';
+  // An armed DD portal is an opening — wall furniture the wall tool owns. The
+  // side-channel routes it to currentTool 'wall' (so isTileTool is already
+  // false here), but guard explicitly too, mirroring the 'line' subtool no-op.
+  // Detected via metadata, not the 'opening' subtool literal (not a
+  // TileSubtoolId until P3 lands — see GOTCHAS).
+  const isOpeningAsset = (() => {
+    if (!hasTileSelected || mapData?.tilesets == null) return false;
+    const ts = mapData.tilesets.find(t => t.id === selectedTilesetId);
+    const entry = ts != null ? resolveTileEntry(ts, selectedTileId ?? '') : null;
+    return entry?.vaultPath != null && getTileMetadataForRender()[entry.vaultPath]?.ddSourceType === 'portals';
+  })();
 
   const paintedInStrokeRef = useRef<Set<string>>(new Set());
   const isDraggingRef = useRef(false);
@@ -218,16 +231,47 @@ const TilePlacementLayer = ({
       }
     }
 
+    // Wall strips (kind 'wall' only — paths/roads never block) bound the fill.
+    // Collected from every active-board layer so a room's own walls bound its
+    // floor fill; centerline only (widthScale ignored). Each gap span is cut
+    // out of its wall's polyline first — a doorway is a hole in the barrier,
+    // fill leaks through it regardless of seated art (Guildmaster ruling D7,
+    // §9) — so a wall is contributed as one or more solid sub-polylines.
+    // Indexed once per gesture.
+    const wallPolylines: Array<ReadonlyArray<readonly [number, number]>> = [];
+    if (geometry != null) {
+      for (const layer of getActiveBoardLayers(mapData)) {
+        for (const wp of layer.wallPaths ?? []) {
+          if (wp.kind !== 'wall') continue;
+          for (const poly of solidWallPolylines(wp, geometry.cellSize)) {
+            if (poly.length >= 2) wallPolylines.push(poly);
+          }
+        }
+      }
+    }
+    const barrier = geometry != null && wallPolylines.length > 0
+      ? buildWallBarrier(
+          wallPolylines,
+          (c, r) => { const w = geometry.getCellCenter(c, r); return { x: w.worldX, y: w.worldY }; },
+          (wx, wy) => { const g = geometry.worldToGrid(wx, wy); return { col: Math.round(g.x), row: Math.round(g.y) }; }
+        )
+      : null;
+
     const mapWidth = mapData.dimensions?.width ?? 50;
     const mapHeight = mapData.dimensions?.height ?? 50;
-    const fillCells = floodFillCells(currentTiles, col, row, mapWidth, mapHeight, {
+    const { cells: fillCells, aborted } = floodFillCells(currentTiles, col, row, mapWidth, mapHeight, {
       blockedCells,
       // Bounded geometries (hex) clamp the fill to their real bounds, which
       // the rectangular width/height margin cannot express.
       inBounds: geometry != null && geometry.isBounded()
         ? (c, r) => geometry.isWithinBounds(c, r)
         : undefined,
+      ...(barrier != null ? { canCross: barrier.canCross } : {}),
     });
+    if (aborted) {
+      new Notice(`Fill region is unbounded or too large (over ${FLOOD_FILL_LIMIT} cells) — nothing placed. Enclose it with walls first.`);
+      return;
+    }
     if (fillCells.length === 0) return;
 
     const targetPlacement = tileLayer === 'base' ? 'fill' : 'overlay';
@@ -320,6 +364,9 @@ const TilePlacementLayer = ({
 
   const handlePointerDown = useCallback((e: PointerEvent) => {
     if (!isTileTool || !geometry) return;
+    // Openings are seated by the wall tool; tilePaint never places them (mirrors
+    // the 'line'/'brush' subtool no-ops below).
+    if (isOpeningAsset) return;
 
     const coords = screenToGrid(e.clientX, e.clientY);
     if (!coords) return;
@@ -377,7 +424,7 @@ const TilePlacementLayer = ({
     } else {
       eraseTilesInBrush(coords.x, coords.y);
     }
-  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, activeSubtool, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, scatterAdvance, floodFillAtCell, mapData]);
+  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, isOpeningAsset, activeSubtool, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, scatterAdvance, floodFillAtCell, mapData]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     // Only the paint/erase grid stroke sets isDraggingRef; the click-only
