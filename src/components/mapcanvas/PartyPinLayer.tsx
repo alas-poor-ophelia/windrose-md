@@ -9,6 +9,7 @@
 
 import type { VNode } from 'preact';
 import type { PartyPin } from '#types/core/map.types';
+import type { ToolId } from '#types/tools/tool.types';
 import type { MapDistanceOverrides } from '../../drawing/distanceOperations';
 
 import { getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
@@ -16,17 +17,20 @@ import { rangeUnitsToCells } from '../../drawing/rangeOperations';
 import { getPartyPin } from '../../objects/partyPinOperations';
 import { getSettings } from '../../core/settingsAccessor';
 import { PartyPinOverlay } from '../overlays/PartyPinOverlay';
+import { PartyPinControls } from '../overlays/PartyPinControls';
 import { useMapState } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { usePartyPinInteraction } from '../../hooks/interactions/usePartyPinInteraction';
 
 /** Props for PartyPinLayer component */
 export interface PartyPinLayerProps {
+  /** Current active tool (controls card shows while the pin tool is active) */
+  currentTool: ToolId;
   /** Change handler for the map's party pins (history-aware) */
   onPartyPinsChange: (partyPins: PartyPin[], suppressHistory?: boolean) => void;
 }
 
-const PartyPinLayer = ({ onPartyPinsChange }: PartyPinLayerProps): VNode | null => {
+const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): VNode | null => {
   const { mapData, geometry, canvasRef } = useMapState();
 
   const { handlePartyPinPointerDown, handlePartyPinMove, stopPartyPinDrag } =
@@ -47,14 +51,27 @@ const PartyPinLayer = ({ onPartyPinsChange }: PartyPinLayerProps): VNode | null 
   const rangeInCells = rangeUnitsToCells(pin.range, distanceSettings.distancePerCell);
 
   return (
-    <PartyPinOverlay
-      pin={pin}
-      rangeInCells={rangeInCells}
-      diagonalRule={distanceSettings.gridDiagonalRule}
-      geometry={geometry}
-      mapData={mapData}
-      canvasRef={canvasRef}
-    />
+    <>
+      <PartyPinOverlay
+        pin={pin}
+        rangeInCells={rangeInCells}
+        diagonalRule={distanceSettings.gridDiagonalRule}
+        geometry={geometry}
+        mapData={mapData}
+        canvasRef={canvasRef}
+      />
+      {currentTool === 'partyPin' && (
+        <PartyPinControls
+          pin={pin}
+          partyPins={mapData.partyPins ?? []}
+          distanceUnit={distanceSettings.distanceUnit}
+          geometry={geometry}
+          mapData={mapData}
+          canvasRef={canvasRef}
+          onPartyPinsChange={onPartyPinsChange}
+        />
+      )}
+    </>
   );
 };
 

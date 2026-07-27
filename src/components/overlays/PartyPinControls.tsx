@@ -1,0 +1,221 @@
+/**
+ * PartyPinControls.tsx
+ *
+ * Floating controls card for the party pin, shown while the party pin tool
+ * is active. Anchors near the pin using the shared toolbar positioning
+ * (flip above/below, edge clamping) and the selection-card visual language.
+ *
+ * Range input validates at commit time: zero, negative, or non-numeric
+ * values are rejected with visible feedback and never reach map data.
+ */
+
+import { useEffect, useState } from 'preact/hooks';
+import type { RefObject, VNode } from 'preact';
+import type { IGeometry } from '#types/core/geometry.types';
+import type { MapData, PartyPin, PartyRangeStyle } from '#types/core/map.types';
+
+import { cellToScreen } from '../../drawing/cellToScreenConverter';
+import { isValidRange, removePartyPin, updatePartyPin } from '../../objects/partyPinOperations';
+import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition';
+import { CornerBrackets } from '../shared/CornerBrackets';
+import { Icon } from '../shared/Icon';
+import { Z_INDEX } from '../../core/dmtConstants';
+
+const CARD_WIDTH = 232;
+const CARD_HEIGHT = 148;
+
+interface PartyPinControlsProps {
+  pin: PartyPin;
+  partyPins: PartyPin[];
+  /** Display unit for the range input (e.g. 'ft', 'mi') */
+  distanceUnit: string;
+  geometry: IGeometry | null;
+  mapData: MapData | null;
+  canvasRef: RefObject<HTMLCanvasElement> | null;
+  onPartyPinsChange: (partyPins: PartyPin[], suppressHistory?: boolean) => void;
+}
+
+const PartyPinControls = ({
+  pin,
+  partyPins,
+  distanceUnit,
+  geometry,
+  mapData,
+  canvasRef,
+  onPartyPinsChange
+}: PartyPinControlsProps): VNode | null => {
+  const [labelDraft, setLabelDraft] = useState(pin.label);
+  const [rangeDraft, setRangeDraft] = useState(String(pin.range));
+  const [rangeInvalid, setRangeInvalid] = useState(false);
+
+  // Re-seed drafts when the pin itself changes (placement, undo/redo)
+  useEffect(() => {
+    setLabelDraft(pin.label);
+    setRangeDraft(String(pin.range));
+    setRangeInvalid(false);
+  }, [pin.id, pin.label, pin.range]);
+
+  // Resolve anchor geometry up front so the positioning hook runs
+  // unconditionally (bounds stay null until everything is available)
+  let container: HTMLElement | null = null;
+  let bounds: { screenX: number; screenY: number; width: number; height: number } | null = null;
+
+  const canvas = canvasRef?.current ?? null;
+  if (geometry && mapData?.viewState && canvas) {
+    const { width: canvasWidth, height: canvasHeight } = canvas;
+    const canvasRect = canvas.getBoundingClientRect();
+    const displayScale = canvasRect.width / canvasWidth;
+
+    container = canvas.parentElement;
+    let traversalCount = 0;
+    while (container?.classList && !container.classList.contains('windrose-canvas-container')) {
+      container = container.parentElement;
+      traversalCount++;
+      if (traversalCount > 10) break;
+    }
+
+    if (container) {
+      const containerRect = container.getBoundingClientRect();
+      const pinScreen = cellToScreen(
+        pin.position.x, pin.position.y,
+        geometry as Parameters<typeof cellToScreen>[2],
+        mapData as Parameters<typeof cellToScreen>[3],
+        canvasWidth, canvasHeight
+      );
+      const cellScreenSize = geometry.getScaledCellSize(mapData.viewState.zoom) * displayScale;
+      bounds = {
+        screenX: pinScreen.x * displayScale + (canvasRect.left - containerRect.left),
+        screenY: pinScreen.y * displayScale + (canvasRect.top - containerRect.top),
+        width: cellScreenSize,
+        height: cellScreenSize * 2
+      };
+    }
+  }
+
+  const toolbarPos = useToolbarPosition({
+    bounds,
+    containerRef: { current: container },
+    toolbarWidth: CARD_WIDTH,
+    toolbarHeight: CARD_HEIGHT
+  });
+  if (!toolbarPos) return null;
+
+  const commitLabel = (): void => {
+    if (labelDraft === pin.label) return;
+    onPartyPinsChange(updatePartyPin(partyPins, pin.id, { label: labelDraft }));
+  };
+
+  const commitRange = (): void => {
+    const parsed = Number(rangeDraft);
+    if (!isValidRange(parsed)) {
+      setRangeInvalid(true);
+      return;
+    }
+    setRangeInvalid(false);
+    if (parsed === pin.range) return;
+    onPartyPinsChange(updatePartyPin(partyPins, pin.id, { range: parsed }));
+  };
+
+  const setRangeStyle = (rangeStyle: PartyRangeStyle): void => {
+    if (rangeStyle === pin.rangeStyle) return;
+    onPartyPinsChange(updatePartyPin(partyPins, pin.id, { rangeStyle }));
+  };
+
+  const handleRemove = (): void => {
+    onPartyPinsChange(removePartyPin(partyPins, pin.id));
+  };
+
+  const commitOnEnter = (e: KeyboardEvent, commit: () => void): void => {
+    if (e.key === 'Enter') {
+      commit();
+      (e.target as HTMLElement).blur();
+    }
+  };
+
+  return (
+    <div
+      className="windrose-selection-card windrose-party-controls"
+      style={{
+        position: 'absolute',
+        left: `${toolbarPos.toolbarX}px`,
+        top: `${toolbarPos.toolbarY}px`,
+        width: `${CARD_WIDTH}px`,
+        pointerEvents: 'auto',
+        zIndex: Z_INDEX.TOOLBAR
+      }}
+    >
+      <CornerBrackets classPrefix="windrose-selection-card-bracket" variant="minimal" filterId="party-pin-bracket" />
+
+      <div className="windrose-selection-card-content">
+        <div className="windrose-party-controls-header">
+          <Icon icon="lucide-users" size={14} />
+          <span>Party Pin</span>
+          <button
+            className="windrose-party-controls-remove"
+            title="Remove Party Pin"
+            aria-label="Remove Party Pin"
+            onClick={handleRemove}
+          >
+            <Icon icon="lucide-trash-2" size={14} />
+          </button>
+        </div>
+
+        <label className="windrose-party-controls-field">
+          <span>Label</span>
+          <input
+            type="text"
+            value={labelDraft}
+            onInput={(e) => setLabelDraft((e.target as HTMLInputElement).value)}
+            onBlur={commitLabel}
+            onKeyDown={(e) => commitOnEnter(e, commitLabel)}
+          />
+        </label>
+
+        <label className={`windrose-party-controls-field ${rangeInvalid ? 'is-invalid' : ''}`}>
+          <span>Range</span>
+          <div className="windrose-party-controls-range">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={rangeDraft}
+              onInput={(e) => {
+                setRangeDraft((e.target as HTMLInputElement).value);
+                setRangeInvalid(false);
+              }}
+              onBlur={commitRange}
+              onKeyDown={(e) => commitOnEnter(e, commitRange)}
+            />
+            <span className="windrose-party-controls-unit">{distanceUnit}</span>
+          </div>
+        </label>
+        {rangeInvalid && (
+          <div className="windrose-party-controls-error">Range must be a number greater than zero</div>
+        )}
+
+        <div className="windrose-party-controls-styles">
+          <button
+            className={pin.rangeStyle === 'circle' ? 'is-active' : ''}
+            title="Circle ring"
+            aria-label="Circle ring"
+            onClick={() => setRangeStyle('circle')}
+          >
+            <Icon icon="lucide-circle-dashed" size={14} />
+            <span>Circle</span>
+          </button>
+          <button
+            className={pin.rangeStyle === 'cells' ? 'is-active' : ''}
+            title="Highlight cells in range"
+            aria-label="Highlight cells in range"
+            onClick={() => setRangeStyle('cells')}
+          >
+            <Icon icon="lucide-layout-grid" size={14} />
+            <span>Cells</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export { PartyPinControls };

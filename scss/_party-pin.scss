@@ -1,0 +1,157 @@
+/* ==========================================================================
+   Party Pin Controls (floating card shown with the party pin tool)
+   Card shell/brackets come from .windrose-selection-card; this partial
+   styles the pin-specific content.
+   ========================================================================== */
+.windrose-party-controls {
+  $ctl: &;
+
+  &-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 2px 4px;
+    color: var(--windrose-text-primary);
+    font-size: 12px;
+    font-weight: 600;
+
+    > span {
+      flex: 1;
+    }
+  }
+
+  @at-root {
+    .is-tablet button#{$ctl}-remove,
+    button#{$ctl}-remove,
+    #{$ctl}-remove {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      min-width: unset;
+      min-height: unset;
+      padding: 0;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 3px;
+      color: var(--windrose-text-primary);
+      opacity: 0.65;
+      cursor: pointer;
+      transition: var(--windrose-transition);
+
+      &:hover {
+        opacity: 1;
+        color: oklch(65% 0.18 25deg);
+        border-color: oklch(65% 0.18 25deg / 0.4);
+      }
+    }
+  }
+
+  &-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px;
+    font-size: 11px;
+    color: var(--windrose-text-primary);
+
+    > span {
+      width: 40px;
+      opacity: 0.7;
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      height: 26px;
+      padding: 2px 6px;
+      background: oklch(25% 0 0deg / 0.4);
+      border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.35);
+      border-radius: 3px;
+      color: var(--windrose-text-primary);
+      font-size: 12px;
+    }
+
+    &.is-invalid input {
+      border-color: oklch(60% 0.19 25deg);
+    }
+  }
+
+  &-range {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &-unit {
+    flex-shrink: 0;
+    font-size: 11px;
+    opacity: 0.7;
+  }
+
+  &-error {
+    padding: 0 2px 2px 48px;
+    color: oklch(70% 0.17 25deg);
+    font-size: 10px;
+  }
+
+  &-styles {
+    display: flex;
+    gap: 2px;
+    padding: 4px 2px 2px;
+
+    @at-root {
+      .is-tablet button#{$ctl}-styles button,
+      #{$ctl}-styles button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        flex: 1;
+        height: 28px;
+        min-height: 28px;
+        padding: 4px 8px;
+        min-width: unset;
+        background: oklch(25% 0 0deg / 0.25);
+        border: 1px solid transparent;
+        border-radius: 3px;
+        color: var(--windrose-text-primary);
+        cursor: pointer;
+        font-size: 12px;
+        transition: var(--windrose-transition);
+
+        &:hover {
+          background: oklch(30% 0 0deg / 0.4);
+        }
+
+        &.is-active {
+          background: oklch(from var(--windrose-border-primary) l c h/0.2);
+          border-color: oklch(from var(--windrose-border-primary) l c h/0.6);
+        }
+      }
+    }
+  }
+}
+
+/* Touch: comfortable targets without inflating the desktop card */
+@media (pointer: coarse) {
+  .windrose-party-controls {
+    &-field input {
+      height: 36px;
+      font-size: 14px;
+    }
+
+    &-styles button {
+      height: 40px;
+      min-height: 40px;
+    }
+
+    button.windrose-party-controls-remove {
+      width: 36px;
+      height: 36px;
+    }
+  }
+}

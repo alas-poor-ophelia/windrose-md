@@ -1535,7 +1535,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               <MapCanvas.HexCoordinateLayer />
 
               {/* PartyPinLayer - party pin marker and range ring */}
-              <MapCanvas.PartyPinLayer onPartyPinsChange={handlePartyPinsChange} />
+              <MapCanvas.PartyPinLayer currentTool={currentTool} onPartyPinsChange={handlePartyPinsChange} />
 
               {/* MeasurementLayer - distance measurement tool overlay */}
               <MapCanvas.MeasurementLayer
