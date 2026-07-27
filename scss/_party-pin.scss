@@ -136,6 +136,124 @@
   }
 }
 
+.windrose-party-controls {
+  $ctl: &;
+
+  &-nearby {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid oklch(from var(--windrose-border-primary) l c h/0.25);
+  }
+
+  &-nearby-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px;
+    color: var(--windrose-text-primary);
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.85;
+
+    > span:first-of-type {
+      flex: 1;
+    }
+  }
+
+  &-nearby-count {
+    padding: 0 6px;
+    background: oklch(from var(--windrose-border-primary) l c h/0.2);
+    border-radius: 8px;
+    font-size: 10px;
+  }
+
+  &-nearby-subheader {
+    padding: 4px 2px 0;
+    color: var(--windrose-text-primary);
+    font-size: 10px;
+    opacity: 0.55;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  &-nearby-empty {
+    padding: 4px 2px 2px;
+    color: var(--windrose-text-primary);
+    font-size: 11px;
+    font-style: italic;
+    opacity: 0.55;
+  }
+
+  &-nearby-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    max-height: 168px;
+    overflow-y: auto;
+  }
+
+  @at-root {
+    .is-tablet button#{$ctl}-nearby-row,
+    button#{$ctl}-nearby-row,
+    #{$ctl}-nearby-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      width: 100%;
+      height: 26px;
+      min-height: 26px;
+      padding: 2px 6px;
+      min-width: unset;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 3px;
+      color: var(--windrose-text-primary);
+      cursor: pointer;
+      font-size: 12px;
+      text-align: left;
+      transition: var(--windrose-transition);
+
+      a {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: inherit;
+        text-decoration: none;
+      }
+
+      > span:first-child {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      &:hover {
+        background: oklch(30% 0 0deg / 0.4);
+      }
+
+      &.is-static {
+        cursor: default;
+
+        &:hover {
+          background: transparent;
+        }
+      }
+    }
+  }
+
+  &-nearby-distance {
+    flex-shrink: 0;
+    font-size: 11px;
+    opacity: 0.65;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
 /* Touch: comfortable targets without inflating the desktop card */
 @media (pointer: coarse) {
   .windrose-party-controls {
@@ -152,6 +270,15 @@
     button.windrose-party-controls-remove {
       width: 36px;
       height: 36px;
+    }
+
+    &-nearby-row {
+      height: 44px;
+      min-height: 44px;
+    }
+
+    &-nearby-list {
+      max-height: 264px;
     }
   }
 }

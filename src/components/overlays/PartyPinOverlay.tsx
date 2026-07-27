@@ -31,6 +31,8 @@ interface PartyPinOverlayProps {
   /** Pin range converted to cells via the map's distance-per-cell */
   rangeInCells: number;
   diagonalRule: DiagonalRule;
+  /** Cell positions of markers currently within range (rendered with a glow) */
+  inRangeMarkers?: Point[];
   geometry: IGeometry | null;
   mapData: MapData | null;
   canvasRef: RefObject<HTMLCanvasElement> | null;
@@ -56,6 +58,7 @@ const PartyPinOverlay = ({
   pin,
   rangeInCells,
   diagonalRule,
+  inRangeMarkers = [],
   geometry,
   mapData,
   canvasRef
@@ -173,6 +176,32 @@ const PartyPinOverlay = ({
             />
           )
         ))}
+
+        {/* In-range marker glow ticks */}
+        {inRangeMarkers.map((marker, index) => {
+          const center = geo.getCellCenter(marker.x, marker.y);
+          return (
+            <g key={`${marker.x},${marker.y},${index}`} className="windrose-party-pin-marker-glow">
+              <circle
+                cx={center.worldX}
+                cy={center.worldY}
+                r={geo.cellSize * 0.45}
+                fill={pin.color}
+                fillOpacity={0.18}
+              />
+              <circle
+                cx={center.worldX}
+                cy={center.worldY}
+                r={geo.cellSize * 0.45}
+                fill="none"
+                stroke={pin.color}
+                strokeOpacity={0.6}
+                strokeWidth={1.5}
+                vector-effect="non-scaling-stroke"
+              />
+            </g>
+          );
+        })}
 
         {/* Pin marker */}
         <g transform={`translate(${pinCenter.worldX} ${pinCenter.worldY}) scale(${pinScale})`}>

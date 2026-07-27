@@ -14,11 +14,14 @@ import type { RefObject, VNode } from 'preact';
 import type { IGeometry } from '#types/core/geometry.types';
 import type { MapData, PartyPin, PartyRangeStyle } from '#types/core/map.types';
 
+import type { PartyRangeResults } from '../../objects/partyRangeQuery';
+
 import { cellToScreen } from '../../drawing/cellToScreenConverter';
 import { isValidRange, removePartyPin, updatePartyPin } from '../../objects/partyPinOperations';
 import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition';
 import { CornerBrackets } from '../shared/CornerBrackets';
 import { Icon } from '../shared/Icon';
+import { InternalLink } from '../shared/InternalLink';
 import { Z_INDEX } from '../../core/dmtConstants';
 
 const CARD_WIDTH = 232;
@@ -29,6 +32,8 @@ interface PartyPinControlsProps {
   partyPins: PartyPin[];
   /** Display unit for the range input (e.g. 'ft', 'mi') */
   distanceUnit: string;
+  /** Markers currently within range, from the party range query */
+  results: PartyRangeResults;
   geometry: IGeometry | null;
   mapData: MapData | null;
   canvasRef: RefObject<HTMLCanvasElement> | null;
@@ -39,6 +44,7 @@ const PartyPinControls = ({
   pin,
   partyPins,
   distanceUnit,
+  results,
   geometry,
   mapData,
   canvasRef,
@@ -92,11 +98,12 @@ const PartyPinControls = ({
     }
   }
 
+  const resultCount = results.linked.length + results.unlinked.length;
   const toolbarPos = useToolbarPosition({
     bounds,
     containerRef: { current: container },
     toolbarWidth: CARD_WIDTH,
-    toolbarHeight: CARD_HEIGHT
+    toolbarHeight: CARD_HEIGHT + Math.min(resultCount, 6) * 26 + 30
   });
   if (!toolbarPos) return null;
 
@@ -212,6 +219,53 @@ const PartyPinControls = ({
             <Icon icon="lucide-layout-grid" size={14} />
             <span>Cells</span>
           </button>
+        </div>
+
+        <div className="windrose-party-controls-nearby">
+          <div className="windrose-party-controls-nearby-header">
+            <Icon icon="lucide-locate" size={12} />
+            <span>Nearby</span>
+            {results.linked.length + results.unlinked.length > 0 && (
+              <span className="windrose-party-controls-nearby-count">
+                {results.linked.length + results.unlinked.length}
+              </span>
+            )}
+          </div>
+
+          {results.linked.length === 0 && results.unlinked.length === 0 && (
+            <div className="windrose-party-controls-nearby-empty">Nothing in range</div>
+          )}
+
+          {results.linked.length > 0 && (
+            <div className="windrose-party-controls-nearby-list">
+              {results.linked.map(result => (
+                <div
+                  key={result.notePath}
+                  className="windrose-party-controls-nearby-row"
+                  title={result.notePath}
+                >
+                  <InternalLink link={result.notePath.replace(/\.md$/, '')}>
+                    {result.displayName}
+                  </InternalLink>
+                  <span className="windrose-party-controls-nearby-distance">{result.distanceLabel}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {results.unlinked.length > 0 && (
+            <>
+              <div className="windrose-party-controls-nearby-subheader">Unlinked</div>
+              <div className="windrose-party-controls-nearby-list">
+                {results.unlinked.map(result => (
+                  <div key={result.objectId} className="windrose-party-controls-nearby-row is-static">
+                    <span>{result.label}</span>
+                    <span className="windrose-party-controls-nearby-distance">{result.distanceLabel}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
