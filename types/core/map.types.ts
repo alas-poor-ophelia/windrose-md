@@ -368,11 +368,15 @@ export interface MapData {
   // Party pins (global, not per-layer; UI exposes a single pin per map)
   partyPins?: PartyPin[];
 
-  // In-progress measure-tool route (one per map; survives close/reopen)
-  measurementRoute?: Point[];
+  // In-progress measure-tool route (one per map; survives close/reopen).
+  // Legacy shape (bare Point[]) is migrated at load.
+  measurementRoute?: MeasurementRoute;
 
   // Saved routes from "save as route" (global, both grid and hex maps)
   savedRoutes?: SavedRoute[];
+
+  // Travel display selection (modes/allowance from enabled travel packs)
+  travelSettings?: MapTravelSettings;
 
   // Regions (hex maps only, global not per-layer)
   regions?: Region[];
@@ -525,6 +529,26 @@ export interface PartyPin {
 // ===========================================
 // Measurement Routes
 // ===========================================
+
+/**
+ * The in-progress measure-tool route: waypoints plus per-segment terrain
+ * assignments (index i = points[i] → points[i+1]; null = unassigned,
+ * which travel math treats as multiplier 1).
+ */
+export interface MeasurementRoute {
+  points: Point[];
+  segmentTerrains: (string | null)[];
+}
+
+/**
+ * Per-map travel display selection: which enabled-pack travel modes appear
+ * in the measurement readout, and which per-day allowance applies.
+ * Ids resolve against enabled travel packs; vanished ids are ignored.
+ */
+export interface MapTravelSettings {
+  modeIds: string[];
+  allowanceId?: string | null;
+}
 
 /**
  * A permanent, styled route created from a measured path ("save as route").

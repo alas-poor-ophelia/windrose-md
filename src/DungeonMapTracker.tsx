@@ -724,7 +724,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleShapeOverlaysChange,
     handlePartyPinsChange,
     handleMeasurementRouteChange,
-    handleSavedRoutesChange
+    handleSavedRoutesChange,
+    handleTravelSettingsChange
   } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
 
   const wrappedHandleNameChange = useCallback((newName: string) => {
@@ -1552,6 +1553,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 mapDistanceOverrides={mapData?.settings?.distanceSettings}
                 onMeasurementRouteChange={handleMeasurementRouteChange}
                 onSavedRoutesChange={handleSavedRoutesChange}
+                onTravelSettingsChange={handleTravelSettingsChange}
               />
 
               {/* DiagonalFillOverlay - diagonal fill tool preview */}

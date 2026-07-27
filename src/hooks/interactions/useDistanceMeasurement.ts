@@ -4,7 +4,9 @@
  * Hook for the multi-waypoint distance measurement tool.
  * Each click/tap appends a waypoint; a live preview segment follows the
  * cursor from the last waypoint (mouse) and is included in the running
- * total. Supports remove-last and clear-all editing.
+ * total. Supports remove-last, clear-all, and per-segment terrain
+ * assignment (new segments inherit the previous segment's terrain; the
+ * first segment takes the caller-provided default).
  *
  * The committed route is reported to the caller via onRouteChange so it can
  * persist with the map (one current route per map); when the tool activates,
@@ -12,8 +14,8 @@
  */
 
 // Type-only imports
-import type { MapType } from '#types/core/map.types';
-import type { IGeometry, Point } from '#types/core/geometry.types';
+import type { MapType, MeasurementRoute } from '#types/core/map.types';
+import type { IGeometry } from '#types/core/geometry.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type {
@@ -26,12 +28,21 @@ import type {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { formatDistance, getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
 import {
-  appendWaypoint,
+  appendRouteWaypoint,
   computeSegmentDistances,
-  removeLastWaypoint as removeLastFromRoute,
+  removeLastRouteWaypoint,
+  setSegmentTerrain,
   sumDistances,
 } from '../../drawing/routeOperations';
 
+const EMPTY_ROUTE: MeasurementRoute = { points: [], segmentTerrains: [] };
+
+/** Accept the legacy bare-array persisted shape defensively */
+function normalizeRoute(route: MeasurementRoute | MeasurementPoint[] | undefined): MeasurementRoute | undefined {
+  if (route == null) return undefined;
+  if (Array.isArray(route)) return { points: route, segmentTerrains: [] };
+  return route;
+}
 
 /**
  * Hook for managing multi-waypoint distance measurement state
@@ -42,11 +53,15 @@ const useDistanceMeasurement = (
   mapType: MapType,
   globalSettings: PluginSettings,
   mapDistanceOverrides: MapDistanceOverrides | null,
-  persistedRoute?: Point[],
-  onRouteChange?: (points: Point[]) => void
+  persistedRoute?: MeasurementRoute,
+  onRouteChange?: (route: MeasurementRoute) => void,
+  /** Terrain the route's FIRST segment defaults to (TM-21); null = unassigned */
+  firstSegmentTerrainId: string | null = null
 ): UseDistanceMeasurementResult => {
-  const [waypoints, setWaypoints] = useState<MeasurementPoint[]>([]);
+  const [route, setRoute] = useState<MeasurementRoute>(EMPTY_ROUTE);
   const [previewTarget, setPreviewTarget] = useState<MeasurementPoint | null>(null);
+
+  const waypoints = route.points;
 
   const distanceSettings = useMemo((): EffectiveDistanceSettings => {
     return getEffectiveDistanceSettings(mapType, globalSettings, mapDistanceOverrides);
@@ -62,20 +77,24 @@ const useDistanceMeasurement = (
 
   useEffect(() => {
     if (currentTool === 'measure') {
-      if (!didRestoreRef.current && persistedRoute && persistedRoute.length > 0) {
+      const restored = normalizeRoute(persistedRoute);
+      if (!didRestoreRef.current && restored != null && restored.points.length > 0) {
         didRestoreRef.current = true;
-        setWaypoints(persistedRoute.map(p => ({ x: p.x, y: p.y })));
+        setRoute({
+          points: restored.points.map(p => ({ x: p.x, y: p.y })),
+          segmentTerrains: [...restored.segmentTerrains],
+        });
       }
     } else {
       didRestoreRef.current = false;
-      setWaypoints([]);
+      setRoute(EMPTY_ROUTE);
       setPreviewTarget(null);
     }
   }, [currentTool, persistedRoute]);
 
-  /** Commit a waypoint change to local state and the persisted route */
-  const commitWaypoints = useCallback((next: MeasurementPoint[]): void => {
-    setWaypoints(next);
+  /** Commit a route change to local state and the persisted route */
+  const commitRoute = useCallback((next: MeasurementRoute): void => {
+    setRoute(next);
     onRouteChange?.(next);
   }, [onRouteChange]);
 
@@ -84,10 +103,10 @@ const useDistanceMeasurement = (
    */
   const handleMeasureClick = useCallback(
     (cellX: number, cellY: number, _isTouch: boolean = false): void => {
-      const next = appendWaypoint(waypoints, { x: cellX, y: cellY });
-      if (next !== waypoints) commitWaypoints(next);
+      const next = appendRouteWaypoint(route, { x: cellX, y: cellY }, firstSegmentTerrainId);
+      if (next !== route) commitRoute(next);
     },
-    [waypoints, commitWaypoints]
+    [route, firstSegmentTerrainId, commitRoute]
   );
 
   /**
@@ -102,20 +121,28 @@ const useDistanceMeasurement = (
   );
 
   /**
-   * Remove the last committed waypoint
+   * Remove the last committed waypoint (and its segment's terrain)
    */
   const removeLastWaypoint = useCallback((): void => {
     if (waypoints.length === 0) return;
-    commitWaypoints(removeLastFromRoute(waypoints));
-  }, [waypoints, commitWaypoints]);
+    commitRoute(removeLastRouteWaypoint(route));
+  }, [route, waypoints.length, commitRoute]);
 
   /**
    * Clear the whole measurement
    */
   const clearMeasurement = useCallback((): void => {
     setPreviewTarget(null);
-    commitWaypoints([]);
-  }, [commitWaypoints]);
+    commitRoute(EMPTY_ROUTE);
+  }, [commitRoute]);
+
+  /**
+   * Assign a terrain to a committed segment (null = unassigned)
+   */
+  const assignSegmentTerrain = useCallback((segmentIndex: number, terrainId: string | null): void => {
+    const next = setSegmentTerrain(route, segmentIndex, terrainId);
+    if (next !== route) commitRoute(next);
+  }, [route, commitRoute]);
 
   /** Per-committed-segment distances in cells */
   const segmentDistances = useMemo((): number[] => {
@@ -161,6 +188,7 @@ const useDistanceMeasurement = (
 
   return {
     waypoints,
+    segmentTerrains: route.segmentTerrains,
     previewTarget,
     segmentDistances,
     previewDistance,
@@ -171,7 +199,8 @@ const useDistanceMeasurement = (
     handleMeasureClick,
     handleMeasureMove,
     removeLastWaypoint,
-    clearMeasurement
+    clearMeasurement,
+    assignSegmentTerrain
   };
 };
 

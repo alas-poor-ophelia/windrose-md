@@ -22,10 +22,16 @@ interface MeasurementOverlayProps {
   previewTarget: MeasurementPoint | null;
   formattedTotal: string | null;
   formattedSegments: string[];
+  /** Resolved terrain color per segment (null = default measure color) */
+  segmentColors?: (string | null)[];
+  /** When set, segments are clickable (terrain assignment); coords are container-relative */
+  onSegmentClick?: (segmentIndex: number, x: number, y: number) => void;
   geometry: IGeometry | null;
   mapData: MapData | null;
   canvasRef: RefObject<HTMLCanvasElement> | null;
 }
+
+const MEASURE_COLOR = '#c4a57b';
 
 interface ScreenPoint {
   x: number;
@@ -37,6 +43,8 @@ const MeasurementOverlay = ({
   previewTarget,
   formattedTotal,
   formattedSegments,
+  segmentColors,
+  onSegmentClick,
   geometry,
   mapData,
   canvasRef
@@ -110,8 +118,6 @@ const MeasurementOverlay = ({
   const showSegmentLabels = formattedSegments.length >= 2
     || (formattedSegments.length >= 1 && previewScreen != null);
 
-  const polylinePoints = screenPoints.map(p => `${p.x},${p.y}`).join(' ');
-
   return (
     <svg
       className="windrose-measurement-overlay"
@@ -126,17 +132,46 @@ const MeasurementOverlay = ({
         overflow: 'visible'
       }}
     >
-      {/* Committed route - solid polyline */}
-      {screenPoints.length >= 2 && (
-        <polyline
-          points={polylinePoints}
-          fill="none"
-          stroke="#c4a57b"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      )}
+      {/* Committed route - one line per segment so terrains can color them.
+          A polyline would be simpler but cannot vary stroke per segment. */}
+      {screenPoints.slice(0, -1).map((a, i) => {
+        const b = screenPoints[i + 1];
+        return (
+          <line
+            key={`route-${i}`}
+            x1={a.x}
+            y1={a.y}
+            x2={b.x}
+            y2={b.y}
+            stroke={segmentColors?.[i] ?? MEASURE_COLOR}
+            strokeWidth={2}
+            strokeLinecap="round"
+          />
+        );
+      })}
+
+      {/* Wide transparent hit targets for terrain assignment (touch-friendly).
+          Sitting above the canvas, a click here never reaches the waypoint
+          handler — assigning terrain does not extend the route. */}
+      {onSegmentClick != null && screenPoints.slice(0, -1).map((a, i) => {
+        const b = screenPoints[i + 1];
+        return (
+          <line
+            key={`hit-${i}`}
+            x1={a.x}
+            y1={a.y}
+            x2={b.x}
+            y2={b.y}
+            stroke="transparent"
+            strokeWidth={14}
+            style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSegmentClick(i, (a.x + b.x) / 2, (a.y + b.y) / 2);
+            }}
+          />
+        );
+      })}
 
       {/* Preview segment - dashed from last waypoint to cursor */}
       {previewScreen && (

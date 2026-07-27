@@ -101,6 +101,10 @@ function migrateMapData(mapData: MapData): MapData {
   mapData.shapeOverlays ??= [];
   mapData.partyPins ??= [];
   mapData.savedRoutes ??= [];
+  // Legacy measurement route shape (bare waypoint array, pre-terrain)
+  if (Array.isArray(mapData.measurementRoute)) {
+    mapData.measurementRoute = { points: mapData.measurementRoute, segmentTerrains: [] };
+  }
   if (!mapData.mapType) mapData.mapType = 'grid';
   mapData.settings ??= { useGlobalSettings: true, overrides: {} };
   mapData.uiPreferences ??= {

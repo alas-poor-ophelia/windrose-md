@@ -47,6 +47,8 @@ export interface UseDistanceMeasurementResult {
   // State
   /** Committed route waypoints in click order */
   waypoints: MeasurementPoint[];
+  /** Per-segment terrain ids (index i = waypoint i → i+1; null = unassigned) */
+  segmentTerrains: (string | null)[];
   /** Live cursor cell for the preview segment (mouse); null when idle */
   previewTarget: MeasurementPoint | null;
   /** Per-committed-segment distances in cells (length = waypoints.length - 1) */
@@ -66,4 +68,6 @@ export interface UseDistanceMeasurementResult {
   handleMeasureMove: (cellX: number, cellY: number) => void;
   removeLastWaypoint: () => void;
   clearMeasurement: () => void;
+  /** Assign a terrain (null = unassigned) to a committed segment */
+  assignSegmentTerrain: (segmentIndex: number, terrainId: string | null) => void;
 }

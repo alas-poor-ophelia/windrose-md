@@ -10,8 +10,7 @@
  */
 
 // Type-only imports
-import type { MapLayer, StoredViewState, TextLabelSettings, Region, Outline, ShapeOverlay, FogOfWar, PartyPin, SavedRoute } from '#types/core/map.types';
-import type { Point } from '#types/core/geometry.types';
+import type { MapLayer, StoredViewState, TextLabelSettings, Region, Outline, ShapeOverlay, FogOfWar, PartyPin, SavedRoute, MeasurementRoute, MapTravelSettings } from '#types/core/map.types';
 import type { CustomColor } from '#types/core/common.types';
 import type { Cell } from '#types/core/cell.types';
 import type { Curve } from '#types/core/curve.types';
@@ -348,10 +347,18 @@ function useDataHandlers({
   // Handle the in-progress measurement route change - NOT tracked in history.
   // This is measure-tool working state that persists with the map so a
   // measurement survives closing and reopening the view.
-  const handleMeasurementRouteChange = useCallback((measurementRoute: Point[]): void => {
+  const handleMeasurementRouteChange = useCallback((measurementRoute: MeasurementRoute): void => {
     updateMapData((currentMapData) => {
       if (currentMapData == null) return currentMapData;
       return { ...currentMapData, measurementRoute };
+    });
+  }, [updateMapData]);
+
+  // Handle per-map travel display selection - NOT tracked in history
+  const handleTravelSettingsChange = useCallback((travelSettings: MapTravelSettings): void => {
+    updateMapData((currentMapData) => {
+      if (currentMapData == null) return currentMapData;
+      return { ...currentMapData, travelSettings };
     });
   }, [updateMapData]);
 
@@ -394,7 +401,8 @@ function useDataHandlers({
     handleShapeOverlaysChange,
     handlePartyPinsChange,
     handleMeasurementRouteChange,
-    handleSavedRoutesChange
+    handleSavedRoutesChange,
+    handleTravelSettingsChange
   };
 
   return {
@@ -424,7 +432,8 @@ function useDataHandlers({
     handleShapeOverlaysChange,
     handlePartyPinsChange,
     handleMeasurementRouteChange,
-    handleSavedRoutesChange
+    handleSavedRoutesChange,
+    handleTravelSettingsChange
   };
 }
 

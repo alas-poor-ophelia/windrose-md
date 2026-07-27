@@ -16,6 +16,8 @@ import type { MapDistanceOverrides } from '../../drawing/distanceOperations';
 
 import { formatDistance, getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
 import { computeSegmentDistances, removeSavedRoute, sumDistances } from '../../drawing/routeOperations';
+import { getEnabledTravelPacks } from '../../travel/travelPackOperations';
+import { findTerrainById } from '../../travel/travelTimeOperations';
 import { cellToScreen } from '../../drawing/cellToScreenConverter';
 import { getSettings } from '../../core/settingsAccessor';
 import { ConfirmModal } from '../../settings/modals/ConfirmModal';
@@ -74,6 +76,10 @@ const RouteLayer = ({ currentTool, onSavedRoutesChange }: RouteLayerProps): VNod
     getSettings(),
     (mapData.settings?.distanceSettings ?? null) as MapDistanceOverrides | null
   );
+
+  // Terrain colors resolve against enabled packs; a vanished terrain simply
+  // falls back to the route's own color
+  const enabledPacks = getEnabledTravelPacks(getSettings().travelPacks);
 
   const deletable = currentTool === 'measure';
 
@@ -136,15 +142,37 @@ const RouteLayer = ({ currentTool, onSavedRoutesChange }: RouteLayerProps): VNod
                 onClick={() => handleRouteClick(route)}
               />
             )}
-            <polyline
-              points={polylinePoints}
-              fill="none"
-              stroke={route.color}
-              strokeWidth={route.width}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity={0.85}
-            />
+            {/* Per-segment lines when terrain assignments exist (colors
+                preserve the terrain-aware meaning); plain polyline otherwise */}
+            {route.segmentTerrains?.some(t => t != null) === true
+              ? screenPoints.slice(0, -1).map((a, i) => {
+                const b = screenPoints[i + 1];
+                const terrain = findTerrainById(enabledPacks, route.segmentTerrains?.[i]);
+                return (
+                  <line
+                    key={`${route.id}-seg-${i}`}
+                    x1={a.x}
+                    y1={a.y}
+                    x2={b.x}
+                    y2={b.y}
+                    stroke={terrain?.color ?? route.color}
+                    strokeWidth={route.width}
+                    strokeLinecap="round"
+                    opacity={0.85}
+                  />
+                );
+              })
+              : (
+                <polyline
+                  points={polylinePoints}
+                  fill="none"
+                  stroke={route.color}
+                  strokeWidth={route.width}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity={0.85}
+                />
+              )}
             {label !== '' && labelAnchor != null && (
               <text
                 x={labelAnchor.x}

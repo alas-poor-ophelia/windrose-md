@@ -11,6 +11,9 @@ import {
   SAVED_ROUTE_DEFAULTS,
   appendWaypoint,
   removeLastWaypoint,
+  appendRouteWaypoint,
+  removeLastRouteWaypoint,
+  setSegmentTerrain,
   computeSegmentDistances,
   sumDistances,
   createSavedRoute,
@@ -85,6 +88,81 @@ describe("routeOperations", () => {
       const route = [{ x: 0, y: 0 }, { x: 5, y: 0 }];
       removeLastWaypoint(route);
       expect(route).toHaveLength(2);
+    });
+  });
+
+  // ===========================================================================
+  // Terrain-aware route editing
+  // ===========================================================================
+
+  describe("appendRouteWaypoint", () => {
+    it("creates no terrain entry for the first waypoint", () => {
+      const route = appendRouteWaypoint({ points: [], segmentTerrains: [] }, { x: 0, y: 0 }, "t-plains");
+      expect(route.points).toHaveLength(1);
+      expect(route.segmentTerrains).toEqual([]);
+    });
+
+    it("defaults the first segment to the provided terrain (TM-21)", () => {
+      let route = appendRouteWaypoint({ points: [], segmentTerrains: [] }, { x: 0, y: 0 }, "t-plains");
+      route = appendRouteWaypoint(route, { x: 3, y: 0 }, "t-plains");
+      expect(route.segmentTerrains).toEqual(["t-plains"]);
+    });
+
+    it("inherits the previous segment's terrain for later segments (TM-21)", () => {
+      let route = { points: [{ x: 0, y: 0 }, { x: 3, y: 0 }], segmentTerrains: ["t-forest" as string | null] };
+      route = appendRouteWaypoint(route, { x: 6, y: 0 }, "t-plains");
+      expect(route.segmentTerrains).toEqual(["t-forest", "t-forest"]);
+    });
+
+    it("inherits an explicit unassigned (null) rather than re-defaulting", () => {
+      let route = { points: [{ x: 0, y: 0 }, { x: 3, y: 0 }], segmentTerrains: [null as string | null] };
+      route = appendRouteWaypoint(route, { x: 6, y: 0 }, "t-plains");
+      expect(route.segmentTerrains).toEqual([null, null]);
+    });
+
+    it("uses null for the first segment when no default terrain exists", () => {
+      let route = appendRouteWaypoint({ points: [], segmentTerrains: [] }, { x: 0, y: 0 }, null);
+      route = appendRouteWaypoint(route, { x: 3, y: 0 }, null);
+      expect(route.segmentTerrains).toEqual([null]);
+    });
+
+    it("is a no-op for a repeat click on the last waypoint", () => {
+      const route = { points: [{ x: 0, y: 0 }], segmentTerrains: [] };
+      expect(appendRouteWaypoint(route, { x: 0, y: 0 }, "t-plains")).toBe(route);
+    });
+  });
+
+  describe("removeLastRouteWaypoint", () => {
+    it("drops the last waypoint and its segment terrain together", () => {
+      const route = {
+        points: [{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 6, y: 0 }],
+        segmentTerrains: ["t-forest", "t-road"] as (string | null)[],
+      };
+      const result = removeLastRouteWaypoint(route);
+      expect(result.points).toHaveLength(2);
+      expect(result.segmentTerrains).toEqual(["t-forest"]);
+    });
+  });
+
+  describe("setSegmentTerrain", () => {
+    const route = {
+      points: [{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 6, y: 0 }],
+      segmentTerrains: ["t-forest", "t-road"] as (string | null)[],
+    };
+
+    it("assigns a terrain to one segment", () => {
+      const result = setSegmentTerrain(route, 1, "t-swamp");
+      expect(result.segmentTerrains).toEqual(["t-forest", "t-swamp"]);
+    });
+
+    it("assigns null to mark a segment unassigned (TM-22)", () => {
+      const result = setSegmentTerrain(route, 0, null);
+      expect(result.segmentTerrains).toEqual([null, "t-road"]);
+    });
+
+    it("ignores out-of-range indices", () => {
+      expect(setSegmentTerrain(route, 5, "t-swamp")).toBe(route);
+      expect(setSegmentTerrain(route, -1, "t-swamp")).toBe(route);
     });
   });
 

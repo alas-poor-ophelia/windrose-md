@@ -60,3 +60,178 @@
     }
   }
 }
+
+/* Travel times block inside the measure controls card */
+.windrose-measure-controls-travel {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 200px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid oklch(from var(--windrose-border-primary) l c h/0.25);
+  font-size: 11px;
+  color: var(--windrose-text-primary);
+
+  &-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 2px;
+
+    &.is-error {
+      color: oklch(70% 0.14 75deg);
+    }
+  }
+
+  &-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    opacity: 0.8;
+  }
+
+  &-time {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  &-hint {
+    padding: 0 2px;
+    font-size: 10px;
+    line-height: 1.35;
+    color: oklch(70% 0.14 75deg / 0.9);
+  }
+
+  @at-root {
+    .is-tablet button#{&}-toggle,
+    button#{&}-toggle,
+    #{&}-toggle {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-height: unset;
+      padding: 3px 2px;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      color: var(--windrose-text-primary);
+      font-size: 11px;
+      opacity: 0.7;
+      cursor: pointer;
+
+      &:hover {
+        opacity: 1;
+      }
+
+      > span {
+        flex: 1;
+        text-align: left;
+      }
+    }
+  }
+
+  &-config {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 2px;
+  }
+
+  &-mode {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    cursor: pointer;
+
+    input {
+      margin: 0;
+    }
+  }
+
+  &-allowance {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+    font-size: 11px;
+
+    > span {
+      opacity: 0.7;
+    }
+
+    select {
+      flex: 1;
+      height: 24px;
+      font-size: 11px;
+    }
+  }
+}
+
+/* Terrain picker popup (anchored at a route segment midpoint) */
+.windrose-terrain-picker {
+  $picker: &;
+
+  position: absolute;
+  min-width: 150px;
+  transform: translateX(-50%);
+
+  &-title {
+    padding: 2px 4px 4px;
+    color: var(--windrose-text-primary);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  @at-root {
+    .is-tablet button#{$picker}-item,
+    button#{$picker}-item,
+    #{$picker}-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      width: 100%;
+      min-height: unset;
+      padding: 4px 6px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 3px;
+      color: var(--windrose-text-primary);
+      font-size: 11px;
+      text-align: left;
+      cursor: pointer;
+      transition: var(--windrose-transition);
+
+      &:hover {
+        border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
+      }
+
+      &.is-active {
+        border-color: oklch(from var(--windrose-border-primary) l c h/0.8);
+        background: oklch(from var(--windrose-border-primary) l c h/0.12);
+      }
+
+      > span:nth-child(2) {
+        flex: 1;
+      }
+    }
+  }
+
+  &-swatch {
+    display: block;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+
+    &-none {
+      border: 1px dashed oklch(from var(--windrose-border-primary) l c h/0.6);
+    }
+  }
+
+  &-mult {
+    font-size: 10px;
+    opacity: 0.6;
+  }
+}
