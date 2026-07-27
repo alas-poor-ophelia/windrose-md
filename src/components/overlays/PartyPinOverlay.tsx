@@ -18,6 +18,7 @@ import type { IGeometry, Point, WorldCoords } from '#types/core/geometry.types';
 import type { MapData, PartyPin } from '#types/core/map.types';
 import type { DiagonalRule } from '#types/settings/settings.types';
 import { getCellsWithinRange } from '../../drawing/rangeOperations';
+import { resolvePinIconGlyph } from '../../objects/partyPinOperations';
 import { Z_INDEX } from '../../core/dmtConstants';
 
 /** Concrete geometry surface used for world-space rendering */
@@ -224,7 +225,7 @@ const PartyPinOverlay = ({
           );
         })()}
 
-        {/* Pin marker */}
+        {/* Pin marker; an icon glyph replaces the head dot when set (PP-2) */}
         <g transform={`translate(${pinCenter.worldX} ${pinCenter.worldY}) scale(${pinScale})`}>
           <path
             d={PIN_PATH}
@@ -232,7 +233,30 @@ const PartyPinOverlay = ({
             stroke="rgba(26, 26, 26, 0.85)"
             strokeWidth={2}
           />
-          <circle cx={0} cy={-19} r={4.5} fill="rgba(26, 26, 26, 0.85)" />
+          {(() => {
+            const iconGlyph = resolvePinIconGlyph(pin.icon);
+            if (iconGlyph == null) {
+              return <circle cx={0} cy={-19} r={4.5} fill="rgba(26, 26, 26, 0.85)" />;
+            }
+            return (
+              <text
+                x={0}
+                y={-19}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={13}
+                fontFamily={iconGlyph.isRaIcon
+                  ? 'rpgawesome'
+                  : 'var(--font-interface, -apple-system, BlinkMacSystemFont, sans-serif)'}
+                fill="#ffffff"
+                stroke="rgba(26, 26, 26, 0.85)"
+                strokeWidth={0.75}
+                paintOrder="stroke"
+              >
+                {iconGlyph.glyph}
+              </text>
+            );
+          })()}
         </g>
 
         {/* Label */}

@@ -1,0 +1,177 @@
+/* ==========================================================================
+   Icon Picker Popup (shared; used by the party pin controls)
+   Mirrors the color picker popup chrome: fixed-position panel over a
+   transparent click-catcher overlay.
+   ========================================================================== */
+.windrose-icon-picker {
+  z-index: 2100;
+  width: 252px;
+  padding: 12px;
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px oklch(0% 0 0deg / 0.5);
+  animation: slideDown 0.15s ease;
+
+  &-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2099;
+    background-color: transparent;
+    pointer-events: auto;
+  }
+
+  &-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  &-title {
+    color: var(--windrose-text-primary);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  @at-root {
+    .is-tablet button#{&}-clear,
+    button#{&}-clear,
+    #{&}-clear {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      min-width: unset;
+      min-height: unset;
+      padding: 0;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 3px;
+      color: var(--windrose-text-primary);
+      opacity: 0.65;
+      cursor: pointer;
+      transition: var(--windrose-transition);
+
+      &:hover {
+        opacity: 1;
+        border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
+      }
+    }
+  }
+
+  input[type="text"]#{&}-search {
+    width: 100%;
+    height: 26px;
+    margin-bottom: 8px;
+    padding: 0 8px;
+    background-color: var(--windrose-bg-primary);
+    border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.35);
+    border-radius: 4px;
+    color: var(--windrose-text-primary);
+    font-size: 12px;
+  }
+
+  @at-root {
+    .is-tablet button#{&}-symbol,
+    button#{&}-symbol,
+    #{&}-symbol {
+      width: 100%;
+      margin-bottom: 8px;
+      padding: 4px 8px;
+      background: transparent;
+      border: 1px dashed oklch(from var(--windrose-border-primary) l c h/0.5);
+      border-radius: 4px;
+      color: var(--windrose-text-primary);
+      font-size: 12px;
+      cursor: pointer;
+      transition: var(--windrose-transition);
+
+      &:hover {
+        border-color: oklch(from var(--windrose-border-primary) l c h/0.9);
+      }
+    }
+  }
+
+  &-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
+    gap: 4px;
+    max-height: 208px;
+    overflow-y: auto;
+  }
+
+  @at-root {
+    .is-tablet button#{&}-cell,
+    button#{&}-cell,
+    #{&}-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 28px;
+      min-width: unset;
+      min-height: unset;
+      padding: 0;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: var(--windrose-transition);
+
+      &:hover {
+        background-color: oklch(from var(--windrose-bg-primary) l c h/0.8);
+        border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
+      }
+
+      &.is-selected {
+        background-color: oklch(from var(--windrose-accent-gold, #c4a57b) l c h/0.25);
+        border-color: var(--windrose-accent-gold, #c4a57b);
+      }
+    }
+  }
+
+  &-glyph {
+    color: var(--windrose-text-primary);
+    font-family: "rpgawesome";
+    font-size: 15px;
+    line-height: 1;
+  }
+
+  &-empty {
+    grid-column: 1 / -1;
+    padding: 12px 0;
+    color: var(--windrose-text-muted, var(--windrose-text-disabled));
+    font-size: 12px;
+    text-align: center;
+  }
+}
+
+/* Touch: 44px targets per PP-20 */
+@media (pointer: coarse) {
+  .windrose-icon-picker {
+    width: 300px;
+
+    input[type="text"].windrose-icon-picker-search {
+      height: 36px;
+    }
+
+    .windrose-icon-picker-grid {
+      grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+      max-height: 264px;
+    }
+
+    button.windrose-icon-picker-cell {
+      height: 44px;
+    }
+
+    button.windrose-icon-picker-clear {
+      width: 36px;
+      height: 36px;
+    }
+
+    button.windrose-icon-picker-symbol {
+      min-height: 36px;
+    }
+  }
+}

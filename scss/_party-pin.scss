@@ -21,6 +21,9 @@
   }
 
   @at-root {
+    .is-tablet button#{$ctl}-icon,
+    button#{$ctl}-icon,
+    #{$ctl}-icon,
     .is-tablet button#{$ctl}-color,
     button#{$ctl}-color,
     #{$ctl}-color {
@@ -49,6 +52,16 @@
     width: 14px;
     height: 14px;
     border-radius: 2px;
+  }
+
+  &-icon-glyph {
+    color: var(--windrose-text-primary);
+    font-size: 13px;
+    line-height: 1;
+
+    &.is-ra {
+      font-family: "rpgawesome";
+    }
   }
 
   @at-root {

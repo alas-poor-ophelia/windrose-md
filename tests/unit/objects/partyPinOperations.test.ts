@@ -13,6 +13,7 @@ import {
   movePartyPin,
   updatePartyPin,
   removePartyPin,
+  resolvePinIconGlyph,
   parseTagFilters,
   formatTagFilters,
   parsePropertyFilters,
@@ -122,6 +123,38 @@ describe('updatePartyPin', () => {
     const result = updatePartyPin([pin], pin.id, { range: 0, label: 'Rearguard' });
     expect(result[0].range).toBe(pin.range);
     expect(result[0].label).toBe('Rearguard');
+  });
+
+  it('sets an icon and removes it on empty string', () => {
+    const pin = createPartyPin({ x: 0, y: 0 });
+    const withIcon = updatePartyPin([pin], pin.id, { icon: 'ra-axe' });
+    expect(withIcon[0].icon).toBe('ra-axe');
+    const cleared = updatePartyPin(withIcon, pin.id, { icon: '' });
+    expect(cleared[0].icon).toBeUndefined();
+  });
+});
+
+describe('resolvePinIconGlyph', () => {
+  it('returns null for undefined or blank icons', () => {
+    expect(resolvePinIconGlyph(undefined)).toBeNull();
+    expect(resolvePinIconGlyph('')).toBeNull();
+    expect(resolvePinIconGlyph('   ')).toBeNull();
+  });
+
+  it('resolves an ra-* class to its RPGAwesome char', () => {
+    const glyph = resolvePinIconGlyph('ra-axe');
+    expect(glyph).not.toBeNull();
+    expect(glyph?.isRaIcon).toBe(true);
+    expect(glyph?.glyph).toBe('');
+  });
+
+  it('returns null for an unknown ra-* class instead of a broken glyph', () => {
+    expect(resolvePinIconGlyph('ra-not-a-real-icon')).toBeNull();
+  });
+
+  it('treats any other string as a literal symbol', () => {
+    expect(resolvePinIconGlyph('★')).toEqual({ glyph: '★', isRaIcon: false });
+    expect(resolvePinIconGlyph('🐉')).toEqual({ glyph: '🐉', isRaIcon: false });
   });
 });
 

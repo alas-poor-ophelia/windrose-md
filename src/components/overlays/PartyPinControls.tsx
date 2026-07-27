@@ -21,6 +21,7 @@ import {
   isValidRange,
   removePartyPin,
   updatePartyPin,
+  resolvePinIconGlyph,
   parseTagFilters,
   formatTagFilters,
   parsePropertyFilters,
@@ -30,6 +31,7 @@ import {
 import { openNoteInNewTab } from '../../persistence/noteOperations';
 import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition';
 import { ColorPicker } from '../shared/ColorPicker';
+import { IconPickerPopup } from '../shared/IconPickerPopup';
 import { CornerBrackets } from '../shared/CornerBrackets';
 import { Icon } from '../shared/Icon';
 import { InternalLink } from '../shared/InternalLink';
@@ -88,6 +90,8 @@ const PartyPinControls = ({
   const [propsDraft, setPropsDraft] = useState(formatPropertyFilters(pin.filters?.properties));
   const [showColorPicker, setShowColorPicker] = useState(false);
   const colorButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [showIconPicker, setShowIconPicker] = useState(false);
+  const iconButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Re-seed drafts when the pin itself changes (placement, undo/redo)
   useEffect(() => {
@@ -236,6 +240,20 @@ const PartyPinControls = ({
           <Icon icon="lucide-users" size={14} />
           <span>Party Pin</span>
           <button
+            ref={iconButtonRef}
+            className="windrose-party-controls-icon"
+            title="Pin Icon"
+            aria-label="Pin Icon"
+            onClick={() => setShowIconPicker(open => !open)}
+          >
+            {(() => {
+              const glyph = resolvePinIconGlyph(pin.icon);
+              return glyph != null
+                ? <span className={`windrose-party-controls-icon-glyph${glyph.isRaIcon ? ' is-ra' : ''}`}>{glyph.glyph}</span>
+                : <Icon icon="lucide-shapes" size={14} />;
+            })()}
+          </button>
+          <button
             ref={colorButtonRef}
             className="windrose-party-controls-color"
             title="Pin Color"
@@ -253,6 +271,25 @@ const PartyPinControls = ({
             <Icon icon="lucide-trash-2" size={14} />
           </button>
         </div>
+        {showIconPicker && (
+          <IconPickerPopup
+            isOpen={showIconPicker}
+            selectedIcon={pin.icon ?? null}
+            onIconSelect={(icon: string) => {
+              onPartyPinsChange(updatePartyPin(partyPins, pin.id, { icon }));
+              setShowIconPicker(false);
+            }}
+            onClear={() => {
+              onPartyPinsChange(updatePartyPin(partyPins, pin.id, { icon: '' }));
+              setShowIconPicker(false);
+            }}
+            onClose={() => setShowIconPicker(false)}
+            title="Pin Icon"
+            position="above"
+            portalled
+            anchorRef={iconButtonRef}
+          />
+        )}
         {showColorPicker && (
           <ColorPicker
             isOpen={showColorPicker}

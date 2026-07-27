@@ -4755,6 +4755,9 @@ button.windrose-sel-icon-btn,
 .windrose-party-controls-header > span {
   flex: 1;
 }
+.is-tablet button.windrose-party-controls-icon,
+button.windrose-party-controls-icon,
+.windrose-party-controls-icon,
 .is-tablet button.windrose-party-controls-color,
 button.windrose-party-controls-color,
 .windrose-party-controls-color {
@@ -4772,6 +4775,9 @@ button.windrose-party-controls-color,
   cursor: pointer;
   transition: var(--windrose-transition);
 }
+.is-tablet button.windrose-party-controls-icon:hover,
+button.windrose-party-controls-icon:hover,
+.windrose-party-controls-icon:hover,
 .is-tablet button.windrose-party-controls-color:hover,
 button.windrose-party-controls-color:hover,
 .windrose-party-controls-color:hover {
@@ -4783,6 +4789,14 @@ button.windrose-party-controls-color:hover,
   width: 14px;
   height: 14px;
   border-radius: 2px;
+}
+.windrose-party-controls-icon-glyph {
+  color: var(--windrose-text-primary);
+  font-size: 13px;
+  line-height: 1;
+}
+.windrose-party-controls-icon-glyph.is-ra {
+  font-family: "rpgawesome";
 }
 .is-tablet button.windrose-party-controls-remove,
 button.windrose-party-controls-remove,
@@ -6268,6 +6282,169 @@ input.windrose-color-input-as-button {
   transform: scale(1.15);
 }
 
+/* ==========================================================================
+   Icon Picker Popup (shared; used by the party pin controls)
+   Mirrors the color picker popup chrome: fixed-position panel over a
+   transparent click-catcher overlay.
+   ========================================================================== */
+.windrose-icon-picker {
+  z-index: 2100;
+  width: 252px;
+  padding: 12px;
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px oklch(0% 0 0deg / 0.5);
+  animation: slideDown 0.15s ease;
+}
+.windrose-icon-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2099;
+  background-color: transparent;
+  pointer-events: auto;
+}
+.windrose-icon-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.windrose-icon-picker-title {
+  color: var(--windrose-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.is-tablet button.windrose-icon-picker-clear,
+button.windrose-icon-picker-clear,
+.windrose-icon-picker-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  min-width: unset;
+  min-height: unset;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  opacity: 0.65;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+}
+.is-tablet button.windrose-icon-picker-clear:hover,
+button.windrose-icon-picker-clear:hover,
+.windrose-icon-picker-clear:hover {
+  opacity: 1;
+  border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
+}
+
+.windrose-icon-picker input[type=text].windrose-icon-picker-search {
+  width: 100%;
+  height: 26px;
+  margin-bottom: 8px;
+  padding: 0 8px;
+  background-color: var(--windrose-bg-primary);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.35);
+  border-radius: 4px;
+  color: var(--windrose-text-primary);
+  font-size: 12px;
+}
+.is-tablet button.windrose-icon-picker-symbol,
+button.windrose-icon-picker-symbol,
+.windrose-icon-picker-symbol {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px dashed oklch(from var(--windrose-border-primary) l c h/0.5);
+  border-radius: 4px;
+  color: var(--windrose-text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+}
+.is-tablet button.windrose-icon-picker-symbol:hover,
+button.windrose-icon-picker-symbol:hover,
+.windrose-icon-picker-symbol:hover {
+  border-color: oklch(from var(--windrose-border-primary) l c h/0.9);
+}
+
+.windrose-icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
+  gap: 4px;
+  max-height: 208px;
+  overflow-y: auto;
+}
+.is-tablet button.windrose-icon-picker-cell,
+button.windrose-icon-picker-cell,
+.windrose-icon-picker-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  min-width: unset;
+  min-height: unset;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+}
+.is-tablet button.windrose-icon-picker-cell:hover,
+button.windrose-icon-picker-cell:hover,
+.windrose-icon-picker-cell:hover {
+  background-color: oklch(from var(--windrose-bg-primary) l c h/0.8);
+  border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
+}
+.is-tablet button.windrose-icon-picker-cell.is-selected,
+button.windrose-icon-picker-cell.is-selected,
+.windrose-icon-picker-cell.is-selected {
+  background-color: oklch(from var(--windrose-accent-gold, #c4a57b) l c h/0.25);
+  border-color: var(--windrose-accent-gold, #c4a57b);
+}
+
+.windrose-icon-picker-glyph {
+  color: var(--windrose-text-primary);
+  font-family: "rpgawesome";
+  font-size: 15px;
+  line-height: 1;
+}
+.windrose-icon-picker-empty {
+  grid-column: 1/-1;
+  padding: 12px 0;
+  color: var(--windrose-text-muted, var(--windrose-text-disabled));
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Touch: 44px targets per PP-20 */
+@media (pointer: coarse) {
+  .windrose-icon-picker {
+    width: 300px;
+  }
+  .windrose-icon-picker input[type=text].windrose-icon-picker-search {
+    height: 36px;
+  }
+  .windrose-icon-picker .windrose-icon-picker-grid {
+    grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+    max-height: 264px;
+  }
+  .windrose-icon-picker button.windrose-icon-picker-cell {
+    height: 44px;
+  }
+  .windrose-icon-picker button.windrose-icon-picker-clear {
+    width: 36px;
+    height: 36px;
+  }
+  .windrose-icon-picker button.windrose-icon-picker-symbol {
+    min-height: 36px;
+  }
+}
 /* ============================================
    TOUCH/TABLET RESPONSIVE ADJUSTMENTS
    ============================================ */

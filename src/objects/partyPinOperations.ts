@@ -13,6 +13,8 @@
 import type { PartyPin, PartyRangeStyle } from '#types/core/map.types';
 import type { Point } from '#types/core/geometry.types';
 
+import { getIconInfo } from '../assets/rpgAwesomeIcons';
+
 /** Defaults for a freshly placed party pin */
 const PARTY_PIN_DEFAULTS = {
   label: 'The Party',
@@ -96,7 +98,37 @@ function updatePartyPin(
   if (safeUpdates.range !== undefined && !isValidRange(safeUpdates.range)) {
     delete safeUpdates.range;
   }
-  return partyPins.map(p => (p.id === pinId ? { ...p, ...safeUpdates } : p));
+  return partyPins.map(p => {
+    if (p.id !== pinId) return p;
+    const next: PartyPin = { ...p, ...safeUpdates };
+    if (safeUpdates.icon !== undefined && safeUpdates.icon === '') {
+      delete next.icon;
+    }
+    return next;
+  });
+}
+
+/** A pin icon resolved to a renderable glyph */
+interface PinIconGlyph {
+  /** The character(s) to draw */
+  glyph: string;
+  /** True when the glyph is an RPGAwesome char (needs the rpgawesome font) */
+  isRaIcon: boolean;
+}
+
+/**
+ * Resolve a pin's stored icon to a renderable glyph. An `ra-*` class maps
+ * to its RPGAwesome character (null if the class is unknown — e.g. from a
+ * newer plugin version); any other non-empty string is a literal symbol
+ * (emoji or unicode) drawn in the interface font.
+ */
+function resolvePinIconGlyph(icon: string | undefined): PinIconGlyph | null {
+  if (icon == null || icon.trim() === '') return null;
+  if (icon.startsWith('ra-')) {
+    const info = getIconInfo(icon);
+    return info != null ? { glyph: info.char, isRaIcon: true } : null;
+  }
+  return { glyph: icon, isRaIcon: false };
 }
 
 /**
@@ -158,6 +190,7 @@ export {
   movePartyPin,
   updatePartyPin,
   removePartyPin,
+  resolvePinIconGlyph,
   parseTagFilters,
   formatTagFilters,
   parsePropertyFilters,
