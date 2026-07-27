@@ -9,7 +9,7 @@
  * values are rejected with visible feedback and never reach map data.
  */
 
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { RefObject, VNode } from 'preact';
 import type { IGeometry, Point } from '#types/core/geometry.types';
 import type { MapData, PartyPin, PartyRangeStyle } from '#types/core/map.types';
@@ -17,8 +17,9 @@ import type { MapData, PartyPin, PartyRangeStyle } from '#types/core/map.types';
 import type { PartyRangeResults } from '../../objects/partyRangeQuery';
 
 import { cellToScreen } from '../../drawing/cellToScreenConverter';
-import { isValidRange, removePartyPin, updatePartyPin } from '../../objects/partyPinOperations';
+import { isValidRange, removePartyPin, updatePartyPin, PARTY_PIN_DEFAULTS } from '../../objects/partyPinOperations';
 import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition';
+import { ColorPicker } from '../shared/ColorPicker';
 import { CornerBrackets } from '../shared/CornerBrackets';
 import { Icon } from '../shared/Icon';
 import { InternalLink } from '../shared/InternalLink';
@@ -56,6 +57,8 @@ const PartyPinControls = ({
   const [labelDraft, setLabelDraft] = useState(pin.label);
   const [rangeDraft, setRangeDraft] = useState(String(pin.range));
   const [rangeInvalid, setRangeInvalid] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const colorButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Re-seed drafts when the pin itself changes (placement, undo/redo)
   useEffect(() => {
@@ -161,6 +164,15 @@ const PartyPinControls = ({
           <Icon icon="lucide-users" size={14} />
           <span>Party Pin</span>
           <button
+            ref={colorButtonRef}
+            className="windrose-party-controls-color"
+            title="Pin Color"
+            aria-label="Pin Color"
+            onClick={() => setShowColorPicker(open => !open)}
+          >
+            <span className="windrose-party-controls-color-swatch" style={{ backgroundColor: pin.color }} />
+          </button>
+          <button
             className="windrose-party-controls-remove"
             title="Remove Party Pin"
             aria-label="Remove Party Pin"
@@ -169,6 +181,23 @@ const PartyPinControls = ({
             <Icon icon="lucide-trash-2" size={14} />
           </button>
         </div>
+        {showColorPicker && (
+          <ColorPicker
+            isOpen={showColorPicker}
+            selectedColor={pin.color}
+            onColorSelect={(color: string) => {
+              onPartyPinsChange(updatePartyPin(partyPins, pin.id, { color }));
+            }}
+            onClose={() => setShowColorPicker(false)}
+            onReset={() => {
+              onPartyPinsChange(updatePartyPin(partyPins, pin.id, { color: PARTY_PIN_DEFAULTS.color }));
+            }}
+            title="Pin Color"
+            position="above"
+            portalled
+            anchorRef={colorButtonRef}
+          />
+        )}
 
         <label className="windrose-party-controls-field">
           <span>Label</span>
