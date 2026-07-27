@@ -79,6 +79,7 @@ export type {
   Edge,
   PartyPin,
   PartyRangeStyle,
+  PartyNoteSettings,
 } from './core/map.types';
 
 export type {

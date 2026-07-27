@@ -464,6 +464,14 @@ export interface ShapeOverlay {
 /** How a party pin's range is drawn on the canvas. */
 export type PartyRangeStyle = 'circle' | 'cells';
 
+/** Party note generation settings for a pin. */
+export interface PartyNoteSettings {
+  /** When true, in-range results are written to the note on change */
+  enabled: boolean;
+  /** Vault path of the generated note, fixed at creation time */
+  path: string;
+}
+
 /**
  * Marks the adventuring party's current location. Position is cell-aligned:
  * {x: col, y: row} on grid maps, {x: q, y: r} axial on hex maps.
@@ -480,6 +488,8 @@ export interface PartyPin {
   /** Range radius in map distance units; always > 0 */
   range: number;
   rangeStyle: PartyRangeStyle;
+  /** Generated note settings; absent means no note was ever created */
+  partyNote?: PartyNoteSettings;
 }
 
 // ===========================================
