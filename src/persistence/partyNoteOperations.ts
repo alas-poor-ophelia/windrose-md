@@ -113,7 +113,7 @@ function buildPartyNoteContent(
   lines.push('');
   lines.push(`# ${pin.label} - Nearby`);
   lines.push('');
-  lines.push(`Within **${pin.range}** of the party on **${context.mapName}**.`);
+  lines.push(`Within **${pin.range}** of the beacon on **${context.mapName}**.`);
   lines.push('');
 
   if (results.linked.length === 0 && results.unlinked.length === 0) {

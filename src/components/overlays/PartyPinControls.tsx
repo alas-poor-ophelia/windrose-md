@@ -238,12 +238,12 @@ const PartyPinControls = ({
       <div className="windrose-selection-card-content">
         <div className="windrose-party-controls-header">
           <Icon icon="lucide-users" size={14} />
-          <span>Party Pin</span>
+          <span>Beacon</span>
           <button
             ref={iconButtonRef}
             className="windrose-party-controls-icon"
-            title="Pin Icon"
-            aria-label="Pin Icon"
+            title="Beacon Icon"
+            aria-label="Beacon Icon"
             onClick={() => setShowIconPicker(open => !open)}
           >
             {(() => {
@@ -256,16 +256,16 @@ const PartyPinControls = ({
           <button
             ref={colorButtonRef}
             className="windrose-party-controls-color"
-            title="Pin Color"
-            aria-label="Pin Color"
+            title="Beacon Color"
+            aria-label="Beacon Color"
             onClick={() => setShowColorPicker(open => !open)}
           >
             <span className="windrose-party-controls-color-swatch" style={{ backgroundColor: pin.color }} />
           </button>
           <button
             className="windrose-party-controls-remove"
-            title="Remove Party Pin"
-            aria-label="Remove Party Pin"
+            title="Remove Beacon"
+            aria-label="Remove Beacon"
             onClick={handleRemove}
           >
             <Icon icon="lucide-trash-2" size={14} />
@@ -284,7 +284,7 @@ const PartyPinControls = ({
               setShowIconPicker(false);
             }}
             onClose={() => setShowIconPicker(false)}
-            title="Pin Icon"
+            title="Beacon Icon"
             position="above"
             portalled
             anchorRef={iconButtonRef}
@@ -301,7 +301,7 @@ const PartyPinControls = ({
             onReset={() => {
               onPartyPinsChange(updatePartyPin(partyPins, pin.id, { color: PARTY_PIN_DEFAULTS.color }));
             }}
-            title="Pin Color"
+            title="Beacon Color"
             position="above"
             portalled
             anchorRef={colorButtonRef}
@@ -441,7 +441,7 @@ const PartyPinControls = ({
         <div className="windrose-party-controls-note">
           <div className="windrose-party-controls-note-header">
             <Icon icon="lucide-file-text" size={12} />
-            <span>Party note</span>
+            <span>Beacon note</span>
             {pin.partyNote && (
               <>
                 <label className="windrose-party-controls-note-toggle" title="Keep the note updated">

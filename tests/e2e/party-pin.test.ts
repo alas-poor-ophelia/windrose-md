@@ -21,7 +21,7 @@ import {
  * initially shows Note Pin) and place a pin at the canvas center
  */
 async function placePartyPin(page: any): Promise<{ x: number; y: number }> {
-  await selectSubTool(page, "Note Pin", "Party Pin");
+  await selectSubTool(page, "Note Pin", "Beacon");
   const center = await getCanvasCenter(page);
   await page.mouse.click(center.x, center.y);
   await page.waitForTimeout(300);
@@ -34,10 +34,10 @@ test("Party pin tool activates as a Pin group subtool", async ({ page }) => {
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  await selectSubTool(page, "Note Pin", "Party Pin");
+  await selectSubTool(page, "Note Pin", "Beacon");
 
   // The group button now carries the party pin identity and active state
-  const toolBtn = page.locator('.windrose-tool-btn[title*="Party Pin"]');
+  const toolBtn = page.locator('.windrose-tool-btn[title*="Beacon"]');
   const classes = await toolBtn.getAttribute("class");
   expect(classes).toContain("windrose-tool-btn-active");
 
@@ -151,7 +151,7 @@ test("Removing the pin clears the overlay and undo restores it", async ({ page }
   await placePartyPin(page);
   expect(await page.locator(".windrose-party-pin-overlay").isVisible()).toBe(true);
 
-  const removeBtn = page.locator('.windrose-party-controls button[aria-label="Remove Party Pin"]');
+  const removeBtn = page.locator('.windrose-party-controls button[aria-label="Remove Beacon"]');
   await removeBtn.click();
   await page.waitForTimeout(300);
 
@@ -177,7 +177,7 @@ test("Icon picker assigns a glyph to the pin head and clear restores the dot", a
   await placePartyPin(page);
 
   const card = page.locator(".windrose-party-controls");
-  await card.locator('button[aria-label="Pin Icon"]').click();
+  await card.locator('button[aria-label="Beacon Icon"]').click();
   await page.waitForTimeout(300);
 
   const picker = page.locator(".windrose-icon-picker");
@@ -195,7 +195,7 @@ test("Icon picker assigns a glyph to the pin head and clear restores the dot", a
   expect(await glyph.count()).toBe(1);
 
   // Clear restores the dot
-  await card.locator('button[aria-label="Pin Icon"]').click();
+  await card.locator('button[aria-label="Beacon Icon"]').click();
   await page.waitForTimeout(300);
   await page.locator(".windrose-icon-picker-clear").click();
   await page.waitForTimeout(400);
@@ -242,7 +242,7 @@ test("Party note is created in the vault and pin removal offers guarded deletion
   expect(await page.locator('.windrose-party-controls button[aria-label="Open party note"]').isVisible()).toBe(true);
 
   // Removing the pin offers note deletion (never silent) — accept it
-  await page.locator('.windrose-party-controls button[aria-label="Remove Party Pin"]').click();
+  await page.locator('.windrose-party-controls button[aria-label="Remove Beacon"]').click();
   await page.waitForTimeout(400);
 
   const confirm = page.locator(".modal").last();
