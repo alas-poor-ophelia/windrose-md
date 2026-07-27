@@ -113,6 +113,7 @@ src/
 │   └── ...
 ├── drawing/               # Cell painting & interaction math
 ├── text/                  # Text label domain
+├── travel/                # Travel packs (units, terrains, modes, allowances)
 ├── assets/                # Icons & tileset operations
 ├── persistence/           # Data I/O & vault interaction
 │   ├── fileOperations.ts

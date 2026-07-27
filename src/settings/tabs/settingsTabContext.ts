@@ -73,6 +73,10 @@ interface SettingsTabThis {
   // Tilesets mixin
   renderTilesetFoldersContent(el: HTMLElement): void;
 
+  // Travel packs mixin
+  renderTravelPacksContent(el: HTMLElement): void;
+  importTravelPackFile(file: File): Promise<void>;
+
   // Keyboard shortcuts mixin
   renderKeyboardShortcutsContent(el: HTMLElement): void;
 }

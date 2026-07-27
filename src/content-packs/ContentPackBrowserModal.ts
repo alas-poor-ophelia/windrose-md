@@ -15,6 +15,7 @@ interface PluginLike {
 const TAB_CONFIG: { type: PackType; label: string }[] = [
   { type: 'object-pack', label: 'Object Packs' },
   { type: 'fog-pack', label: 'Fog of War' },
+  { type: 'travel-pack', label: 'Travel Packs' },
 ];
 
 class ContentPackBrowserModal extends Modal {
@@ -83,6 +84,17 @@ class ContentPackBrowserModal extends Modal {
     let changed = false;
     const valid = [];
     for (const pack of packs) {
+      // Travel packs live in settings, not vault folders — validate there
+      if (pack.type === 'travel-pack') {
+        const stillPresent = (this.plugin.settings.travelPacks ?? []).some(p => p.id === pack.id);
+        if (!stillPresent) {
+          changed = true;
+          continue;
+        }
+        valid.push(pack);
+        continue;
+      }
+
       const filesExist = await this.app.vault.adapter.exists(pack.vaultPath);
       if (!filesExist) {
         changed = true;

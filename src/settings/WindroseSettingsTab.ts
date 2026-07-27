@@ -7,6 +7,7 @@ import { TabRenderSettingsMethods } from './tabs/TabRenderSettings';
 import { TabRenderColorsMethods } from './tabs/TabRenderColors';
 import { TabRenderObjectsMethods } from './tabs/TabRenderObjects';
 import { TabRenderTilesetsMethods } from './tabs/TabRenderTilesets';
+import { TabRenderTravelPacksMethods } from './tabs/TabRenderTravelPacks';
 import { TabRenderKeyboardShortcutsMethods } from './tabs/TabRenderKeyboardShortcuts';
 import { TabRenderFeaturesMethods } from './tabs/TabRenderFeatures';
 import { isFeatureEnabled } from '../core/featureFlags';
@@ -42,6 +43,8 @@ interface WindroseMDSettingsTab {
   renderTilesetFoldersContent(el: HTMLElement): void;
   renderKeyboardShortcutsContent(el: HTMLElement): void;
   renderFeaturesContent(el: HTMLElement): void;
+  renderTravelPacksContent(el: HTMLElement): void;
+  importTravelPackFile(file: File): Promise<void>;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see interface note above (deferred to Settings API migration)
@@ -190,6 +193,9 @@ class WindroseMDSettingsTab extends PluginSettingTab {
       this.createCollapsibleSection(containerEl, 'Distance Measurement',
         (el) => this.renderDistanceMeasurementSettingsContent(el),
         { open: openSections.has('Distance Measurement') });
+      this.createCollapsibleSection(containerEl, 'Travel Packs',
+        (el) => this.renderTravelPacksContent(el),
+        { open: openSections.has('Travel Packs') });
     }
     if (isFeatureEnabled('tiles')) {
       this.createCollapsibleSection(containerEl, 'Tile Sets',
@@ -219,6 +225,7 @@ Object.assign(WindroseMDSettingsTab.prototype, TabRenderSettingsMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderColorsMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderObjectsMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderTilesetsMethods);
+Object.assign(WindroseMDSettingsTab.prototype, TabRenderTravelPacksMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderKeyboardShortcutsMethods);
 Object.assign(WindroseMDSettingsTab.prototype, TabRenderFeaturesMethods);
 

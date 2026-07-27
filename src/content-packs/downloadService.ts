@@ -6,6 +6,7 @@ import type { RegistryPack, InstalledPack } from '#types/content-packs/contentPa
 import type { PluginSettings } from '#types/settings/settings.types';
 import { CONTENT_PACKS_FOLDER } from './contentPackConstants';
 import { ObjectSetHelpers } from '../settings/helpers/objectSetHelpers';
+import { upsertTravelPack, validateTravelPackImport } from '../travel/travelPackOperations';
 
 interface PluginLike {
   app: App;
@@ -40,6 +41,50 @@ async function ensureFolder(app: App, path: string): Promise<void> {
   }
 }
 
+/**
+ * Travel packs install into plugin settings, not vault folders. The payload
+ * may be raw JSON or a zip containing a single .json file.
+ */
+async function installTravelPack(plugin: PluginLike, pack: RegistryPack, payload: Uint8Array): Promise<InstalledPack> {
+  let text: string;
+  try {
+    text = new TextDecoder().decode(payload);
+    JSON.parse(text);
+  } catch {
+    const extracted = unzipSync(payload);
+    const jsonEntry = Object.entries(extracted).find(([name]) => name.endsWith('.json'));
+    if (jsonEntry == null) throw new Error('Travel pack download contains no JSON file');
+    text = new TextDecoder().decode(jsonEntry[1]);
+  }
+
+  const result = validateTravelPackImport(JSON.parse(text));
+  if (!result.valid || result.pack == null) {
+    throw new Error('Invalid travel pack: ' + result.errors.slice(0, 3).join('; '));
+  }
+
+  plugin.settings.travelPacks = upsertTravelPack(plugin.settings.travelPacks ?? [], result.pack);
+
+  const installed: InstalledPack = {
+    id: pack.id,
+    name: pack.name,
+    type: pack.type,
+    version: pack.version,
+    installedAt: Date.now(),
+    vaultPath: '',
+  };
+  plugin.settings.installedContentPacks ??= [];
+  const idx = plugin.settings.installedContentPacks.findIndex((p: InstalledPack) => p.id === pack.id);
+  if (idx >= 0) {
+    plugin.settings.installedContentPacks[idx] = installed;
+  } else {
+    plugin.settings.installedContentPacks.push(installed);
+  }
+  await plugin.saveSettings();
+
+  new Notice(pack.name + ' installed successfully.');
+  return installed;
+}
+
 async function downloadAndInstallPack(
   plugin: PluginLike,
   pack: RegistryPack
@@ -48,6 +93,11 @@ async function downloadAndInstallPack(
 
   const response = await requestUrl({ url: pack.downloadUrl });
   const zipData = new Uint8Array(response.arrayBuffer);
+
+  if (pack.type === 'travel-pack') {
+    return installTravelPack(plugin, pack, zipData);
+  }
+
   const extracted = unzipSync(zipData);
 
   const basePath = getExtractPath(pack, plugin.settings);

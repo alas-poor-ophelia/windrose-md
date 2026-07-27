@@ -7,6 +7,7 @@
 
 import type { HexColor } from '../core/common.types';
 import type { InstalledPack } from '../content-packs/contentPack.types';
+import type { TravelPack } from './travelPack.types';
 
 /** Hex orientation options */
 export type HexOrientation = 'flat' | 'pointy';
@@ -183,6 +184,9 @@ export interface PluginSettings {
 
   // Content packs (downloaded supplementary content)
   installedContentPacks?: InstalledPack[];
+
+  // Travel packs (rule bundles: units, terrains, modes, allowances)
+  travelPacks?: TravelPack[];
 
   // Feature gating (absent key or absent record = feature enabled)
   features?: Partial<Record<WindroseFeature, boolean>>;

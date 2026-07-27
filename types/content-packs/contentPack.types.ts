@@ -1,4 +1,4 @@
-export type PackType = 'object-pack' | 'fog-pack' | 'font-pack';
+export type PackType = 'object-pack' | 'fog-pack' | 'font-pack' | 'travel-pack';
 
 export interface RegistryPack {
   id: string;

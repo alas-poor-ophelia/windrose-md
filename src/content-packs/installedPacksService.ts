@@ -29,9 +29,14 @@ async function uninstallPack(plugin: PluginLike, packId: string): Promise<void> 
   const pack = packs.find(p => p.id === packId);
   if (pack == null) return;
 
-  const folder = plugin.app.vault.getAbstractFileByPath(pack.vaultPath);
-  if (folder != null) {
-    await plugin.app.fileManager.trashFile(folder);
+  if (pack.type === 'travel-pack') {
+    // Travel packs live in settings, not vault folders
+    plugin.settings.travelPacks = (plugin.settings.travelPacks ?? []).filter(p => p.id !== packId);
+  } else if (pack.vaultPath !== '') {
+    const folder = plugin.app.vault.getAbstractFileByPath(pack.vaultPath);
+    if (folder != null) {
+      await plugin.app.fileManager.trashFile(folder);
+    }
   }
 
   plugin.settings.installedContentPacks = packs.filter(p => p.id !== packId);

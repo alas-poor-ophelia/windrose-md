@@ -9227,6 +9227,28 @@ button.windrose-breadcrumb-link {
   border-color: var(--text-warning);
 }
 
+/* ==========================================================================
+   Travel Pack Edit Modal
+   ========================================================================== */
+.windrose-travel-pack-modal {
+  width: min(720px, 90vw);
+}
+.windrose-travel-pack-modal .windrose-travel-pack-row .setting-item-info {
+  display: none;
+}
+.windrose-travel-pack-modal .windrose-travel-pack-row .setting-item-control {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.windrose-travel-pack-modal .windrose-travel-pack-row .setting-item-control input[type=text] {
+  flex: 1 1 120px;
+  min-width: 90px;
+}
+.windrose-travel-pack-modal .windrose-travel-pack-row .setting-item-control input.windrose-travel-pack-input-small {
+  flex: 0 1 80px;
+  min-width: 60px;
+}
+
 .windrose-content-pack-modal .windrose-content-pack-tabs {
   display: flex;
   gap: 8px;
