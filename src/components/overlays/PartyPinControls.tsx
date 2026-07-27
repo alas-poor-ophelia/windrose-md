@@ -18,6 +18,7 @@ import type { PartyRangeResults } from '../../objects/partyRangeQuery';
 
 import { cellToScreen } from '../../drawing/cellToScreenConverter';
 import { isValidRange, removePartyPin, updatePartyPin, PARTY_PIN_DEFAULTS } from '../../objects/partyPinOperations';
+import { openNoteInNewTab } from '../../persistence/noteOperations';
 import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition';
 import { ColorPicker } from '../shared/ColorPicker';
 import { CornerBrackets } from '../shared/CornerBrackets';
@@ -26,7 +27,7 @@ import { InternalLink } from '../shared/InternalLink';
 import { Z_INDEX } from '../../core/dmtConstants';
 
 const CARD_WIDTH = 232;
-const CARD_HEIGHT = 148;
+const CARD_HEIGHT = 200;
 
 interface PartyPinControlsProps {
   pin: PartyPin;
@@ -41,6 +42,12 @@ interface PartyPinControlsProps {
   onPartyPinsChange: (partyPins: PartyPin[], suppressHistory?: boolean) => void;
   /** Navigate/flash a result's source marker on the map */
   onShowOnMap?: (position: Point) => void;
+  /** Create the pin's party note in the given vault folder */
+  onCreatePartyNote?: (folder: string) => Promise<void> | void;
+  /** Force an immediate recalculation/note flush */
+  onRecalculate?: () => void;
+  /** Remove the pin (offers party-note deletion when one exists) */
+  onRemovePin?: () => void;
 }
 
 const PartyPinControls = ({
@@ -52,11 +59,15 @@ const PartyPinControls = ({
   mapData,
   canvasRef,
   onPartyPinsChange,
-  onShowOnMap
+  onShowOnMap,
+  onCreatePartyNote,
+  onRecalculate,
+  onRemovePin
 }: PartyPinControlsProps): VNode | null => {
   const [labelDraft, setLabelDraft] = useState(pin.label);
   const [rangeDraft, setRangeDraft] = useState(String(pin.range));
   const [rangeInvalid, setRangeInvalid] = useState(false);
+  const [noteFolderDraft, setNoteFolderDraft] = useState('');
   const [showColorPicker, setShowColorPicker] = useState(false);
   const colorButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -135,7 +146,16 @@ const PartyPinControls = ({
   };
 
   const handleRemove = (): void => {
+    if (onRemovePin) {
+      onRemovePin();
+      return;
+    }
     onPartyPinsChange(removePartyPin(partyPins, pin.id));
+  };
+
+  const setNoteEnabled = (enabled: boolean): void => {
+    if (!pin.partyNote) return;
+    onPartyPinsChange(updatePartyPin(partyPins, pin.id, { partyNote: { ...pin.partyNote, enabled } }));
   };
 
   const commitOnEnter = (e: KeyboardEvent, commit: () => void): void => {
@@ -253,6 +273,44 @@ const PartyPinControls = ({
           </button>
         </div>
 
+        <div className="windrose-party-controls-note">
+          <div className="windrose-party-controls-note-header">
+            <Icon icon="lucide-file-text" size={12} />
+            <span>Party note</span>
+            {pin.partyNote && (
+              <>
+                <label className="windrose-party-controls-note-toggle" title="Keep the note updated">
+                  <input
+                    type="checkbox"
+                    checked={pin.partyNote.enabled}
+                    onChange={(e) => setNoteEnabled((e.target as HTMLInputElement).checked)}
+                  />
+                  <span>Live</span>
+                </label>
+                <button
+                  className="windrose-party-controls-note-open"
+                  title={pin.partyNote.path}
+                  aria-label="Open party note"
+                  onClick={() => { void openNoteInNewTab(pin.partyNote?.path); }}
+                >
+                  <Icon icon="lucide-external-link" size={12} />
+                </button>
+              </>
+            )}
+          </div>
+          {!pin.partyNote && (
+            <div className="windrose-party-controls-note-create">
+              <input
+                type="text"
+                placeholder="Folder (optional)"
+                value={noteFolderDraft}
+                onInput={(e) => setNoteFolderDraft((e.target as HTMLInputElement).value)}
+              />
+              <button onClick={() => { void onCreatePartyNote?.(noteFolderDraft); }}>Create</button>
+            </div>
+          )}
+        </div>
+
         <div className="windrose-party-controls-nearby">
           <div className="windrose-party-controls-nearby-header">
             <Icon icon="lucide-locate" size={12} />
@@ -262,6 +320,14 @@ const PartyPinControls = ({
                 {results.linked.length + results.unlinked.length}
               </span>
             )}
+            <button
+              className="windrose-party-controls-locate"
+              title="Recalculate now"
+              aria-label="Recalculate now"
+              onClick={() => onRecalculate?.()}
+            >
+              <Icon icon="lucide-refresh-cw" size={12} />
+            </button>
           </div>
 
           {results.linked.length === 0 && results.unlinked.length === 0 && (

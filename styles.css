@@ -4888,6 +4888,97 @@ button.windrose-party-controls-remove:hover,
   border-color: oklch(from var(--windrose-border-primary) l c h/0.6);
 }
 
+.windrose-party-controls-note {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid oklch(from var(--windrose-border-primary) l c h/0.25);
+}
+.windrose-party-controls-note-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px;
+  color: var(--windrose-text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.windrose-party-controls-note-header > span:first-of-type {
+  flex: 1;
+}
+.windrose-party-controls-note-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 400;
+  cursor: pointer;
+}
+.windrose-party-controls-note-toggle input[type=checkbox] {
+  margin: 0;
+}
+.is-tablet button.windrose-party-controls-note-open,
+button.windrose-party-controls-note-open,
+.windrose-party-controls-note-open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  min-width: unset;
+  min-height: unset;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  opacity: 0.65;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+}
+.is-tablet button.windrose-party-controls-note-open:hover,
+button.windrose-party-controls-note-open:hover,
+.windrose-party-controls-note-open:hover {
+  opacity: 1;
+  border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
+}
+
+.windrose-party-controls-note-create {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px;
+}
+.windrose-party-controls-note-create input {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 2px 6px;
+  background: oklch(25% 0 0deg / 0.4);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.35);
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  font-size: 12px;
+}
+.is-tablet button.windrose-party-controls-note-create button,
+.windrose-party-controls-note-create button {
+  height: 26px;
+  min-height: 26px;
+  padding: 2px 10px;
+  min-width: unset;
+  background: oklch(from var(--windrose-border-primary) l c h/0.2);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.5);
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  transition: var(--windrose-transition);
+}
+.is-tablet button.windrose-party-controls-note-create button:hover,
+.windrose-party-controls-note-create button:hover {
+  background: oklch(from var(--windrose-border-primary) l c h/0.35);
+}
+
 .windrose-party-controls-nearby {
   margin-top: 4px;
   padding-top: 4px;

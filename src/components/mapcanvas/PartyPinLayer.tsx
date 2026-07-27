@@ -14,14 +14,23 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { MapDistanceOverrides } from '../../drawing/distanceOperations';
 import type { PartyRangeResults } from '../../objects/partyRangeQuery';
 
+import { Notice } from 'obsidian';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
 import { rangeUnitsToCells } from '../../drawing/rangeOperations';
-import { getPartyPin } from '../../objects/partyPinOperations';
+import { getPartyPin, removePartyPin, upsertPartyPin } from '../../objects/partyPinOperations';
 import { queryPartyRange } from '../../objects/partyRangeQuery';
+import {
+  buildPartyNoteContent,
+  buildPartyNotePath,
+  deletePartyNote,
+  upsertPartyNote
+} from '../../persistence/partyNoteOperations';
 import { getSettings } from '../../core/settingsAccessor';
+import { ConfirmModal } from '../../settings/modals/ConfirmModal';
 import { PartyPinOverlay } from '../overlays/PartyPinOverlay';
 import { PartyPinControls } from '../overlays/PartyPinControls';
+import { useApp } from '../../context/AppContext';
 import { useMapState } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { usePartyPinInteraction } from '../../hooks/interactions/usePartyPinInteraction';
@@ -37,9 +46,12 @@ export interface PartyPinLayerProps {
 }
 
 const FLASH_DURATION_MS = 1800;
+/** Note writes coalesce bursts of edits into one file operation */
+const PARTY_NOTE_SAVE_DELAY_MS = 2000;
 
 const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): VNode | null => {
-  const { mapData, geometry, canvasRef, mapId } = useMapState();
+  const app = useApp();
+  const { mapData, geometry, canvasRef, mapId, notePath } = useMapState();
 
   // Transient highlight for "show on map" — cleared after the pulse finishes
   const [flashMarker, setFlashMarker] = useState<Point | null>(null);
@@ -86,6 +98,70 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     [results]
   );
 
+  const mapName = mapData?.name ?? '';
+  const noteContext = useMemo(
+    () => ({ mapId: mapId ?? '', mapName, mapNotePath: notePath ?? '' }),
+    [mapId, mapName, notePath]
+  );
+
+  // Note content doubles as the change signal: the debounced write below
+  // only re-arms when the rendered content actually differs
+  const noteContent = useMemo(() => {
+    if (pin?.partyNote?.enabled !== true) return null;
+    return buildPartyNoteContent(pin, results, noteContext);
+  }, [pin, results, noteContext]);
+
+  useEffect(() => {
+    if (noteContent == null || pin?.partyNote == null) return undefined;
+    const pinForWrite = pin;
+    const timer = window.setTimeout(() => {
+      void upsertPartyNote(app, pinForWrite, noteContent);
+    }, PARTY_NOTE_SAVE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [noteContent, pin, app]);
+
+  const handleCreatePartyNote = useCallback(async (folder: string): Promise<void> => {
+    const currentPin = getPartyPin(mapData?.partyPins);
+    if (!currentPin || !mapData) return;
+    const path = buildPartyNotePath(folder, currentPin.label);
+    const updatedPin: PartyPin = { ...currentPin, partyNote: { enabled: true, path } };
+    const outcome = await upsertPartyNote(app, updatedPin, buildPartyNoteContent(updatedPin, results, noteContext));
+    if (outcome === 'blocked') {
+      new Notice(`A note already exists at ${path} — choose another folder or rename the pin.`);
+      return;
+    }
+    onPartyPinsChange(upsertPartyPin(mapData.partyPins ?? [], updatedPin));
+  }, [mapData, results, noteContext, app, onPartyPinsChange]);
+
+  const handleRecalculate = useCallback((): void => {
+    const currentPin = getPartyPin(mapData?.partyPins);
+    if (currentPin?.partyNote?.enabled !== true || !mapData || !geometry) return;
+    void upsertPartyNote(app, currentPin, buildPartyNoteContent(currentPin, results, noteContext))
+      .then(outcome => {
+        if (outcome === 'blocked') new Notice('Party note is blocked by an unrelated file at its path.');
+      });
+  }, [mapData, geometry, results, noteContext, app]);
+
+  const handleRemovePin = useCallback(async (): Promise<void> => {
+    const currentPin = getPartyPin(mapData?.partyPins);
+    if (!currentPin || !mapData) return;
+    if (currentPin.partyNote?.path != null && currentPin.partyNote.path !== '') {
+      const alsoDeleteNote = await new ConfirmModal(app, {
+        message: `Also delete the party note at "${currentPin.partyNote.path}"?\nThe pin is removed either way.`,
+        confirmText: 'Delete note',
+        cancelText: 'Keep note',
+        isDestructive: true
+      }).openAndGetValue();
+      if (alsoDeleteNote) {
+        const outcome = await deletePartyNote(app, currentPin);
+        if (outcome === 'not-owned') {
+          new Notice('The file at the note path was not generated by this pin — leaving it untouched.');
+        }
+      }
+    }
+    onPartyPinsChange(removePartyPin(mapData.partyPins ?? [], currentPin.id));
+  }, [mapData, app, onPartyPinsChange]);
+
   if (!pin || !mapData || !geometry) {
     return null;
   }
@@ -120,6 +196,9 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
           canvasRef={canvasRef}
           onPartyPinsChange={onPartyPinsChange}
           onShowOnMap={handleShowOnMap}
+          onCreatePartyNote={handleCreatePartyNote}
+          onRecalculate={handleRecalculate}
+          onRemovePin={() => { void handleRemovePin(); }}
         />
       )}
     </>
