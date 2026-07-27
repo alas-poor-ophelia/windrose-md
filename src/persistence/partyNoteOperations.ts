@@ -14,7 +14,7 @@
  * - A manually deleted note is recreated on the next update.
  */
 
-import type { App, TFile } from 'obsidian';
+import type { App } from 'obsidian';
 import type { PartyPin } from '#types/core/map.types';
 import type { PartyRangeResults } from '../objects/partyRangeQuery';
 
@@ -193,7 +193,7 @@ async function deletePartyNote(app: App, pin: PartyPin): Promise<PartyNoteDelete
   const content = await app.vault.read(existing);
   if (!isOwnedPartyNoteContent(content, pin.id)) return 'not-owned';
 
-  await app.fileManager.trashFile(existing as TFile);
+  await app.fileManager.trashFile(existing);
   return 'deleted';
 }
 
