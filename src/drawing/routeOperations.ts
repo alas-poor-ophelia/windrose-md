@@ -146,6 +146,25 @@ function createSavedRoute(
 }
 
 /**
+ * Update a saved route's style/name by id (points are immutable after save).
+ * An explicit empty-string name removes the name. Unknown ids are a no-op.
+ */
+function updateSavedRoute(
+  routes: SavedRoute[],
+  routeId: string,
+  updates: Partial<Omit<SavedRoute, 'id' | 'points'>>
+): SavedRoute[] {
+  return routes.map(r => {
+    if (r.id !== routeId) return r;
+    const next: SavedRoute = { ...r, ...updates };
+    if (updates.name !== undefined && updates.name === '') {
+      delete next.name;
+    }
+    return next;
+  });
+}
+
+/**
  * Remove a saved route by id. Returns a new array; the original is not modified.
  */
 function removeSavedRoute(routes: SavedRoute[], routeId: string): SavedRoute[] {
@@ -162,5 +181,6 @@ export {
   computeSegmentDistances,
   sumDistances,
   createSavedRoute,
+  updateSavedRoute,
   removeSavedRoute,
 };

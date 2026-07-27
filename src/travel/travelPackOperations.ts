@@ -151,6 +151,33 @@ function resolvePackUnit(pack: TravelPack, unitId: string): TravelUnit | null {
   return pack.units.find(u => u.id === unitId) ?? null;
 }
 
+/**
+ * Dropdown options for pack-defined custom units, so a map's distance unit
+ * can be a pack unit (TM-24). The option value is the string stored as the
+ * map's distanceUnit — abbreviation preferred, name as fallback — which is
+ * exactly what travel-time unit resolution matches against (name or
+ * abbreviation, case-insensitive). Only enabled packs contribute; duplicate
+ * values (within packs or against `exclude`, e.g. the standard unit list)
+ * are dropped first-wins.
+ */
+function getPackUnitOptions(
+  packs: TravelPack[] | undefined,
+  exclude: string[] = []
+): { value: string; label: string }[] {
+  const seen = new Set(exclude.map(v => v.trim().toLowerCase()));
+  const options: { value: string; label: string }[] = [];
+  for (const pack of getEnabledTravelPacks(packs)) {
+    for (const unit of pack.units) {
+      const value = unit.abbreviation.trim() !== '' ? unit.abbreviation : unit.name;
+      const key = value.trim().toLowerCase();
+      if (key === '' || seen.has(key)) continue;
+      seen.add(key);
+      options.push({ value, label: `${unit.name} (${pack.name})` });
+    }
+  }
+  return options;
+}
+
 // ===========================================
 // Export
 // ===========================================
@@ -351,6 +378,7 @@ export {
   removePackItem,
   findModesReferencingUnit,
   resolvePackUnit,
+  getPackUnitOptions,
   exportTravelPack,
   serializeTravelPack,
   validateTravelPackImport,

@@ -9,8 +9,19 @@ import type { DiagonalRule, DistanceDisplayFormat } from '#types/settings/settin
 import type { VNode } from 'preact';
 
 import { useModalShell } from '../../context/MapSettingsContext';
+import { getSettings } from '../../core/settingsAccessor';
+import { getPackUnitOptions } from '../../travel/travelPackOperations';
 import { SettingItem } from './SettingItem';
 import { NativeToggle, NativeDropdown } from './NativeControls';
+
+/** Built-in distance units offered on every map */
+const STANDARD_UNIT_OPTIONS = [
+  { value: 'ft', label: 'feet' },
+  { value: 'm', label: 'meters' },
+  { value: 'mi', label: 'miles' },
+  { value: 'km', label: 'kilometers' },
+  { value: 'yd', label: 'yards' }
+];
 
 
 
@@ -44,6 +55,20 @@ function MeasurementTab(): VNode {
 
   const isDisabled = distanceSettings.useGlobalDistance;
 
+  // Standard units plus custom units from enabled travel packs (TM-24).
+  // If the current unit came from a since-disabled pack, keep it listed so
+  // the dropdown never silently switches the map's unit.
+  const unitOptions = [
+    ...STANDARD_UNIT_OPTIONS,
+    ...getPackUnitOptions(getSettings().travelPacks, STANDARD_UNIT_OPTIONS.map(o => o.value))
+  ];
+  if (!unitOptions.some(o => o.value === distanceSettings.distanceUnit)) {
+    unitOptions.push({
+      value: distanceSettings.distanceUnit,
+      label: `${distanceSettings.distanceUnit} (pack disabled)`
+    });
+  }
+
   return (
     <div class="windrose-settings-tab-content">
       <SettingItem
@@ -69,13 +94,7 @@ function MeasurementTab(): VNode {
           />
           <NativeDropdown
             value={distanceSettings.distanceUnit}
-            options={[
-              { value: 'ft', label: 'feet' },
-              { value: 'm', label: 'meters' },
-              { value: 'mi', label: 'miles' },
-              { value: 'km', label: 'kilometers' },
-              { value: 'yd', label: 'yards' }
-            ]}
+            options={unitOptions}
             onChange={(val: string) => setDistanceSettings({ distanceUnit: val })}
             disabled={isDisabled}
           />

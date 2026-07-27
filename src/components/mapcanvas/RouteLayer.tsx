@@ -4,8 +4,8 @@
  * Layer component for saved measurement routes. Renders every saved route
  * as a styled polyline with an optional name/distance label, on every tool
  * (saved routes are permanent map elements). While the measure tool is
- * active, routes accept clicks for deletion (confirm-guarded — saved-route
- * changes are not undoable).
+ * active, clicking a route opens a menu to edit its name/style or delete
+ * it; both changes participate in undo history.
  */
 
 import type { VNode } from 'preact';
@@ -14,8 +14,10 @@ import type { SavedRoute } from '#types/core/map.types';
 import type { Point } from '#types/core/geometry.types';
 import type { MapDistanceOverrides } from '../../drawing/distanceOperations';
 
+import { Menu } from 'obsidian';
 import { formatDistance, getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
-import { computeSegmentDistances, removeSavedRoute, sumDistances } from '../../drawing/routeOperations';
+import { computeSegmentDistances, removeSavedRoute, sumDistances, updateSavedRoute } from '../../drawing/routeOperations';
+import { SaveRouteModal } from '../modals/SaveRouteModal';
 import { getEnabledTravelPacks } from '../../travel/travelPackOperations';
 import { findTerrainById } from '../../travel/travelTimeOperations';
 import { cellToScreen } from '../../drawing/cellToScreenConverter';
@@ -27,9 +29,9 @@ import { useMapState } from '../../context/MapContext';
 
 /** Props for RouteLayer component */
 export interface RouteLayerProps {
-  /** Current active tool (routes are clickable for deletion while measuring) */
+  /** Current active tool (routes are clickable for edit/delete while measuring) */
   currentTool: ToolId;
-  /** Persists saved-route changes (deletion) */
+  /** Persists saved-route changes (edit and deletion) */
   onSavedRoutesChange?: (routes: SavedRoute[]) => void;
 }
 
@@ -81,9 +83,25 @@ const RouteLayer = ({ currentTool, onSavedRoutesChange }: RouteLayerProps): VNod
   // falls back to the route's own color
   const enabledPacks = getEnabledTravelPacks(getSettings().travelPacks);
 
-  const deletable = currentTool === 'measure';
+  const interactive = currentTool === 'measure';
 
-  const handleRouteClick = (route: SavedRoute): void => {
+  const handleEditRoute = (route: SavedRoute): void => {
+    void new SaveRouteModal(app, {
+      initial: {
+        name: route.name ?? '',
+        color: route.color,
+        width: route.width,
+        showLabel: route.showLabel
+      },
+      title: 'Edit route',
+      submitText: 'Save changes'
+    }).openAndGetValue().then(options => {
+      if (options == null) return;
+      onSavedRoutesChange?.(updateSavedRoute(mapData.savedRoutes ?? [], route.id, options));
+    });
+  };
+
+  const handleDeleteRoute = (route: SavedRoute): void => {
     const label = route.name != null && route.name !== '' ? `"${route.name}"` : 'this route';
     void new ConfirmModal(app, {
       message: `Delete ${label} from the map?`,
@@ -93,6 +111,19 @@ const RouteLayer = ({ currentTool, onSavedRoutesChange }: RouteLayerProps): VNod
       if (!confirmed) return;
       onSavedRoutesChange?.(removeSavedRoute(mapData.savedRoutes ?? [], route.id));
     });
+  };
+
+  const handleRouteClick = (route: SavedRoute, event: MouseEvent): void => {
+    const menu = new Menu();
+    menu.addItem(item => item
+      .setTitle('Edit route…')
+      .setIcon('pencil')
+      .onClick(() => handleEditRoute(route)));
+    menu.addItem(item => item
+      .setTitle('Delete route')
+      .setIcon('trash')
+      .onClick(() => handleDeleteRoute(route)));
+    menu.showAtMouseEvent(event);
   };
 
   return (
@@ -131,15 +162,15 @@ const RouteLayer = ({ currentTool, onSavedRoutesChange }: RouteLayerProps): VNod
 
         return (
           <g key={route.id}>
-            {/* Wide transparent hit target for deletion (touch-friendly) */}
-            {deletable && (
+            {/* Wide transparent hit target for the edit/delete menu (touch-friendly) */}
+            {interactive && (
               <polyline
                 points={polylinePoints}
                 fill="none"
                 stroke="transparent"
                 strokeWidth={Math.max(route.width, 14)}
                 style={{ pointerEvents: 'visibleStroke', cursor: 'pointer' }}
-                onClick={() => handleRouteClick(route)}
+                onClick={(e: MouseEvent) => handleRouteClick(route, e)}
               />
             )}
             {/* Per-segment lines when terrain assignments exist (colors

@@ -17,6 +17,7 @@ import {
   computeSegmentDistances,
   sumDistances,
   createSavedRoute,
+  updateSavedRoute,
   removeSavedRoute,
 } from "../../../src/drawing/routeOperations";
 import { GridGeometry } from "../../../src/geometry/core/GridGeometry";
@@ -304,6 +305,59 @@ describe("routeOperations", () => {
     it("throws with fewer than 2 points", () => {
       expect(() => createSavedRoute([{ x: 0, y: 0 }])).toThrow();
       expect(() => createSavedRoute([])).toThrow();
+    });
+  });
+
+  // ===========================================================================
+  // updateSavedRoute
+  // ===========================================================================
+
+  describe("updateSavedRoute", () => {
+    const makeRoutes = () => [
+      createSavedRoute([{ x: 0, y: 0 }, { x: 1, y: 0 }], { name: "Old Road" }),
+      createSavedRoute([{ x: 0, y: 0 }, { x: 0, y: 1 }]),
+    ];
+
+    it("updates style fields on the matching route only", () => {
+      const routes = makeRoutes();
+      const result = updateSavedRoute(routes, routes[0].id, { color: "#123456", width: 7, showLabel: false });
+      expect(result[0].color).toBe("#123456");
+      expect(result[0].width).toBe(7);
+      expect(result[0].showLabel).toBe(false);
+      expect(result[1]).toBe(routes[1]);
+    });
+
+    it("renames a route", () => {
+      const routes = makeRoutes();
+      const result = updateSavedRoute(routes, routes[0].id, { name: "Karst Pass Cutoff" });
+      expect(result[0].name).toBe("Karst Pass Cutoff");
+    });
+
+    it("removes the name when set to an empty string", () => {
+      const routes = makeRoutes();
+      const result = updateSavedRoute(routes, routes[0].id, { name: "" });
+      expect(result[0].name).toBeUndefined();
+    });
+
+    it("preserves id, points, and terrain assignments", () => {
+      const routes = [createSavedRoute([{ x: 0, y: 0 }, { x: 1, y: 0 }], { segmentTerrains: ["forest"] })];
+      const result = updateSavedRoute(routes, routes[0].id, { color: "#000000" });
+      expect(result[0].id).toBe(routes[0].id);
+      expect(result[0].points).toEqual(routes[0].points);
+      expect(result[0].segmentTerrains).toEqual(["forest"]);
+    });
+
+    it("is a no-op for an unknown id", () => {
+      const routes = makeRoutes();
+      const result = updateSavedRoute(routes, "route-nope", { color: "#ffffff" });
+      expect(result).toEqual(routes);
+    });
+
+    it("does not mutate the input array or route", () => {
+      const routes = makeRoutes();
+      const originalColor = routes[0].color;
+      updateSavedRoute(routes, routes[0].id, { color: "#abcdef" });
+      expect(routes[0].color).toBe(originalColor);
     });
   });
 

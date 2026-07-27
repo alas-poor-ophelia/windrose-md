@@ -23,6 +23,7 @@ import {
   removePackItem,
   findModesReferencingUnit,
   resolvePackUnit,
+  getPackUnitOptions,
   exportTravelPack,
   serializeTravelPack,
   validateTravelPackImport,
@@ -146,6 +147,56 @@ describe("travelPackOperations", () => {
       const pack = buildSamplePack();
       expect(resolvePackUnit(pack, pack.units[0].id)?.name).toBe("Hex");
       expect(resolvePackUnit(pack, "unit-nope")).toBeNull();
+    });
+  });
+
+  // ===========================================================================
+  // getPackUnitOptions (TM-24)
+  // ===========================================================================
+
+  describe("getPackUnitOptions", () => {
+    it("offers enabled packs' units with abbreviation as value and pack-qualified label", () => {
+      const options = getPackUnitOptions([buildSamplePack()]);
+      expect(options).toEqual([{ value: "hex", label: "Hex (D&D 5e)" }]);
+    });
+
+    it("falls back to the unit name when the abbreviation is empty", () => {
+      const pack = upsertPackItem(
+        createTravelPack("Leagues & Lore"),
+        "units",
+        createTravelUnit({ name: "League", abbreviation: "", factor: 3, baseUnit: "mi" })
+      );
+      const options = getPackUnitOptions([pack]);
+      expect(options).toEqual([{ value: "League", label: "League (Leagues & Lore)" }]);
+    });
+
+    it("excludes disabled packs", () => {
+      const pack = { ...buildSamplePack(), enabled: false };
+      expect(getPackUnitOptions([pack])).toEqual([]);
+    });
+
+    it("drops duplicates across packs and against the exclude list, first wins", () => {
+      const a = upsertPackItem(
+        createTravelPack("Pack A"),
+        "units",
+        createTravelUnit({ name: "Hex", abbreviation: "hex", factor: 6, baseUnit: "mi" })
+      );
+      const b = upsertPackItem(
+        upsertPackItem(
+          createTravelPack("Pack B"),
+          "units",
+          createTravelUnit({ name: "Hexagon", abbreviation: "HEX", factor: 5, baseUnit: "mi" })
+        ),
+        "units",
+        createTravelUnit({ name: "Mile", abbreviation: "mi", factor: 1, baseUnit: "mi" })
+      );
+      const options = getPackUnitOptions([a, b], ["ft", "m", "mi", "km", "yd"]);
+      expect(options).toEqual([{ value: "hex", label: "Hex (Pack A)" }]);
+    });
+
+    it("returns empty for undefined or empty pack lists", () => {
+      expect(getPackUnitOptions(undefined)).toEqual([]);
+      expect(getPackUnitOptions([])).toEqual([]);
     });
   });
 

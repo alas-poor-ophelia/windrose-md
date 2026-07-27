@@ -10,7 +10,7 @@ import type { Cell } from '../core/cell.types';
 import type { Curve } from '../core/curve.types';
 import type { WallPath } from '../core/wallpath.types';
 import type { TerrainStroke } from '../core/terrainstroke.types';
-import type { Edge, TextLabel, MapData, LayerId, Region, ShapeOverlay, Outline, FogOfWar, PartyPin } from '../core/map.types';
+import type { Edge, TextLabel, MapData, LayerId, Region, ShapeOverlay, Outline, FogOfWar, PartyPin, SavedRoute } from '../core/map.types';
 import type { MapObject } from '../objects/object.types';
 import type { TileAssignment } from '../tiles/tile.types';
 import type { HistoryState } from './history.types';
@@ -50,6 +50,8 @@ export interface LayerHistorySnapshot {
   shapeOverlays?: ShapeOverlay[];
   /** Party pins (map-level, tracked for undo) */
   partyPins?: PartyPin[];
+  /** Saved measurement routes (map-level, tracked for undo) */
+  savedRoutes?: SavedRoute[];
   /** Fog of war state (layer-level, tracked for compound undo with player moves) */
   fogOfWar?: FogOfWar | null;
 }

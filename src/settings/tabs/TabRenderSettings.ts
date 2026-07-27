@@ -4,6 +4,7 @@ import type { SettingsTabThis } from './settingsTabContext';
 import { ContentPackBrowserModal } from '../../content-packs/ContentPackBrowserModal';
 import { getInstalledPacks } from '../../content-packs/installedPacksService';
 import { fogPackImagePath } from '../../content-packs/contentPackConstants';
+import { getPackUnitOptions } from '../../travel/travelPackOperations';
 
 const SETTING_DEFAULTS = {
   DEFAULT_HEX_ORIENTATION: DEFAULTS.hexOrientation,
@@ -97,6 +98,20 @@ function addDistancePerCellSetting(
     .addDropdown(dropdown => {
       for (const [value, label] of opts.units) {
         dropdown.addOption(value, label);
+      }
+      // Custom units from enabled travel packs (TM-24)
+      const packUnits = getPackUnitOptions(
+        tab.plugin.settings.travelPacks,
+        opts.units.map(([value]) => value)
+      );
+      for (const option of packUnits) {
+        dropdown.addOption(option.value, option.label);
+      }
+      // Keep a unit from a since-disabled pack listed so the dropdown never
+      // silently switches the setting
+      const current = strings[opts.unitKey];
+      if (current !== '' && !opts.units.some(([value]) => value === current) && !packUnits.some(o => o.value === current)) {
+        dropdown.addOption(current, `${current} (pack disabled)`);
       }
       dropdown
         .setValue(strings[opts.unitKey])

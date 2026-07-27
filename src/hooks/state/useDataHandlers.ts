@@ -54,7 +54,8 @@ function useDataHandlers({
     outlines: Outline[] = [],
     shapeOverlays: ShapeOverlay[] = [],
     fogOfWar: FogOfWar | null = null,
-    partyPins: PartyPin[] = []
+    partyPins: PartyPin[] = [],
+    savedRoutes: SavedRoute[] = []
   ): LayerHistorySnapshot => ({
     cells: overrides.cells ?? layer.cells ?? [],
     curves: overrides.curves ?? layer.curves ?? [],
@@ -69,7 +70,8 @@ function useDataHandlers({
     outlines: overrides.outlines ?? outlines,
     shapeOverlays: overrides.shapeOverlays ?? shapeOverlays,
     fogOfWar: overrides.fogOfWar ?? fogOfWar,
-    partyPins: overrides.partyPins ?? partyPins
+    partyPins: overrides.partyPins ?? partyPins,
+    savedRoutes: overrides.savedRoutes ?? savedRoutes
   }), []);
 
   // =========================================================================
@@ -89,7 +91,7 @@ function useDataHandlers({
 
         if (!suppressHistory) {
           const activeLayer = getActiveLayer(currentMapData);
-          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? []));
+          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []));
         }
 
         return newMapData;
@@ -139,7 +141,7 @@ function useDataHandlers({
 
         const activeLayer = getActiveLayer(currentMapData);
         if (!suppressHistory) {
-          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { tiles: newValue }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? []));
+          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { tiles: newValue }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []));
         }
 
         let nextMapData = updateActiveLayer(currentMapData, { tiles: newValue });
@@ -187,7 +189,7 @@ function useDataHandlers({
       if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildLayerHistorySnapshot(activeLayer, newName, {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? []));
+      addToHistory(buildLayerHistorySnapshot(activeLayer, newName, {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []));
 
       return { ...currentMapData, name: newName };
     });
@@ -293,7 +295,7 @@ function useDataHandlers({
       if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, regions, currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? []));
+      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, regions, currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []));
 
       return { ...currentMapData, regions };
     });
@@ -307,7 +309,7 @@ function useDataHandlers({
       if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], outlines, currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? []));
+      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], outlines, currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []));
 
       return { ...currentMapData, outlines };
     });
@@ -321,7 +323,7 @@ function useDataHandlers({
       if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], shapeOverlays, activeLayer.fogOfWar, currentMapData.partyPins ?? []));
+      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], shapeOverlays, activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []));
 
       return { ...currentMapData, shapeOverlays };
     });
@@ -337,7 +339,7 @@ function useDataHandlers({
 
       if (!suppressHistory) {
         const activeLayer = getActiveLayer(currentMapData);
-        addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, partyPins));
+        addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, partyPins, currentMapData.savedRoutes ?? []));
       }
 
       return { ...currentMapData, partyPins };
@@ -362,15 +364,20 @@ function useDataHandlers({
     });
   }, [updateMapData]);
 
-  // Handle saved routes change - NOT tracked in history. Creation goes
-  // through the save-route modal and deletion through a confirm, so both are
-  // deliberate; undo integration is deferred to save-as-route polish.
+  // Handle saved routes change - tracked in history so save-as-route,
+  // edits, and deletions all undo/redo like other map elements
   const handleSavedRoutesChange = useCallback((savedRoutes: SavedRoute[]): void => {
+    if (isApplyingHistory()) return;
+
     updateMapData((currentMapData) => {
       if (currentMapData == null) return currentMapData;
+
+      const activeLayer = getActiveLayer(currentMapData);
+      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], savedRoutes));
+
       return { ...currentMapData, savedRoutes };
     });
-  }, [updateMapData]);
+  }, [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot]);
 
   // =========================================================================
   // Return Value
