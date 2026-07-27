@@ -83,10 +83,17 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     flashTimerRef.current = window.setTimeout(() => setFlashMarker(null), FLASH_DURATION_MS);
   }, [mapId, zoom]);
 
-  const { handlePartyPinPointerDown, handlePartyPinMove, stopPartyPinDrag } =
-    usePartyPinInteraction(mapData?.partyPins, onPartyPinsChange);
+  // Pin selected via the select tool (shows the controls card without
+  // switching to the party pin tool); cleared on any select-tool miss
+  const [selectedViaSelect, setSelectedViaSelect] = useState(false);
+  useEffect(() => {
+    if (currentTool !== 'select') setSelectedViaSelect(false);
+  }, [currentTool]);
 
-  useLayerHandlers('partyPin', { handlePartyPinPointerDown, handlePartyPinMove, stopPartyPinDrag });
+  const { handlePartyPinPointerDown, handlePartyPinSelectPointerDown, handlePartyPinMove, stopPartyPinDrag, isPartyPinDragging } =
+    usePartyPinInteraction(mapData?.partyPins, onPartyPinsChange, setSelectedViaSelect);
+
+  useLayerHandlers('partyPin', { handlePartyPinPointerDown, handlePartyPinSelectPointerDown, handlePartyPinMove, stopPartyPinDrag, isPartyPinDragging });
 
   const pin = getPartyPin(mapData?.partyPins);
 
@@ -300,7 +307,7 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
         mapData={mapData}
         canvasRef={canvasRef}
       />
-      {currentTool === 'partyPin' && (
+      {(currentTool === 'partyPin' || (currentTool === 'select' && selectedViaSelect)) && (
         <PartyPinControls
           pin={pin}
           partyPins={mapData.partyPins ?? []}

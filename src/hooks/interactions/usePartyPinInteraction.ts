@@ -18,13 +18,16 @@ type PartyPinsChangeHandler = (partyPins: PartyPin[], suppressHistory?: boolean)
 
 interface UsePartyPinInteractionResult {
   handlePartyPinPointerDown: (gridX: number, gridY: number) => void;
+  handlePartyPinSelectPointerDown: (gridX: number, gridY: number) => boolean;
   handlePartyPinMove: (gridX: number, gridY: number) => void;
   stopPartyPinDrag: () => void;
+  isPartyPinDragging: () => boolean;
 }
 
 function usePartyPinInteraction(
   partyPins: PartyPin[] | undefined,
-  onPartyPinsChange: PartyPinsChangeHandler
+  onPartyPinsChange: PartyPinsChangeHandler,
+  onSelectedChange?: (selected: boolean) => void
 ): UsePartyPinInteractionResult {
   // Latest pins without re-registering handlers each render
   const pinsRef = useRef<PartyPin[]>([]);
@@ -48,6 +51,22 @@ function usePartyPinInteraction(
     dragPositionRef.current = { x: gridX, y: gridY };
     onPartyPinsChange(movePartyPin(pins, pin.id, { x: gridX, y: gridY }), true);
   }, [onPartyPinsChange]);
+
+  // Select-tool grab: only a press on the pin's own cell counts (the party
+  // pin tool's pointer-down moves the pin to ANY pressed cell — reusing it
+  // for select would teleport the pin on every canvas click). A hit selects
+  // the pin and starts a drag from its current cell; a miss deselects.
+  const handlePartyPinSelectPointerDown = useCallback((gridX: number, gridY: number): boolean => {
+    const pin = getPartyPin(pinsRef.current);
+    if (!pin || pin.position.x !== gridX || pin.position.y !== gridY) {
+      onSelectedChange?.(false);
+      return false;
+    }
+    isDraggingRef.current = true;
+    dragPositionRef.current = { x: gridX, y: gridY };
+    onSelectedChange?.(true);
+    return true;
+  }, [onSelectedChange]);
 
   const handlePartyPinMove = useCallback((gridX: number, gridY: number): void => {
     if (!isDraggingRef.current) return;
@@ -78,7 +97,9 @@ function usePartyPinInteraction(
     onPartyPinsChange(movePartyPin(pins, pin.id, finalPosition), false);
   }, [onPartyPinsChange]);
 
-  return { handlePartyPinPointerDown, handlePartyPinMove, stopPartyPinDrag };
+  const isPartyPinDragging = useCallback((): boolean => isDraggingRef.current, []);
+
+  return { handlePartyPinPointerDown, handlePartyPinSelectPointerDown, handlePartyPinMove, stopPartyPinDrag, isPartyPinDragging };
 }
 
 export { usePartyPinInteraction };

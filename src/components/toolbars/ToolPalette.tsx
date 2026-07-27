@@ -65,6 +65,7 @@ interface SubToolSelections {
   fill: ToolId;
   erase: ToolId;
   region: ToolId;
+  pin: ToolId;
 }
 
 /** Props for SubMenuFlyout */
@@ -335,13 +336,18 @@ const toolGroups: ToolGroup[] = [
       { id: 'regionBoundary', label: 'Draw Boundary', title: 'Draw region boundary polygon', icon: 'lucide-pentagon' }
     ]
   },
+  {
+    id: 'pin',
+    subTools: [
+      { id: 'addNote', label: 'Note Pin', title: 'Place Note Pin', icon: 'lucide-pin', shortcut: 'n', actionId: 'notePinTool', feature: 'notePins' },
+      { id: 'partyPin', label: 'Party Pin', title: 'Place Party Pin', icon: 'lucide-users' }
+    ]
+  },
 ];
 
 const simpleTools: SimpleTool[] = [
   { id: 'edgeLine', title: 'Paint Line (click two points)', icon: 'lucide-git-commit-horizontal', gridOnly: true },
   { id: 'addObject', title: 'Add Object (select from sidebar)', icon: 'lucide-map-pin-plus' },
-  { id: 'addNote', title: 'Place Note Pin', icon: 'lucide-pin', shortcut: 'n', actionId: 'notePinTool', feature: 'notePins' },
-  { id: 'partyPin', title: 'Place Party Pin', icon: 'lucide-users' },
   { id: 'addText', title: 'Add Text Label', icon: 'lucide-type' },
   { id: 'outline', title: 'Draw Outline', icon: 'lucide-spline', hexOnly: true, feature: 'outlines' },
   { id: 'shape', title: 'Place Shape Overlay', icon: 'lucide-shapes', feature: 'shapeOverlays' },
@@ -404,6 +410,7 @@ const INITIAL_SUB_TOOL_SELECTIONS: SubToolSelections = {
   fill: 'rectangle',
   erase: 'erase',
   region: 'regionPaint',
+  pin: 'addNote',
 };
 
 // ============================================================================

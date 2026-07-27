@@ -140,8 +140,11 @@ export interface NotePinHandlers {
 /** Party pin handlers */
 export interface PartyPinHandlers {
   handlePartyPinPointerDown?: (gridX: number, gridY: number) => void;
+  /** Select-tool grab: true when the press hit the pin's cell (handled) */
+  handlePartyPinSelectPointerDown?: (gridX: number, gridY: number) => boolean;
   handlePartyPinMove?: (gridX: number, gridY: number) => void;
   stopPartyPinDrag?: () => void;
+  isPartyPinDragging?: () => boolean;
 }
 
 /** Pan/zoom handlers */

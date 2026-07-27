@@ -200,6 +200,14 @@ const useEventCoordinator = ({
 
         const touchEnded = isTouchEvent && !touchActiveRef.current;
 
+        // Party pin renders above objects — a press on its cell grabs it
+        // (and starts a drag); a miss deselects and falls through
+        const partyPinSelectHandlers = getHandlers('partyPin');
+        if (partyPinSelectHandlers?.handlePartyPinSelectPointerDown) {
+          const pinHandled = partyPinSelectHandlers.handlePartyPinSelectPointerDown(gridX, gridY);
+          if (pinHandled) return;
+        }
+
         if (layerVisibility.objects && objectHandlers?.handleObjectSelection) {
           const objectHandled = objectHandlers.handleObjectSelection(clientX, clientY, gridX, gridY, touchEnded ? false : undefined);
           if (objectHandled) return;
@@ -562,7 +570,7 @@ const useEventCoordinator = ({
       return;
     }
 
-    if (currentTool === 'partyPin') {
+    if (currentTool === 'partyPin' || (currentTool === 'select' && getHandlers('partyPin')?.isPartyPinDragging?.() === true)) {
       const partyPinHandlers = getHandlers('partyPin');
       if (partyPinHandlers?.handlePartyPinMove && toGrid != null) {
         const coords = toGrid(clientX, clientY);

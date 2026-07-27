@@ -6,6 +6,7 @@ import {
   waitForContainer,
   getCanvasCenter,
   selectToolByTitle,
+  selectSubTool,
   getHistoryButtons,
   doWithApp,
   TEST_MAPS
@@ -15,23 +16,27 @@ import {
 // Party Pin Tests
 // ===========================================
 
-/** Activate the party pin tool and place a pin at the canvas center */
+/**
+ * Activate the party pin tool (a subtool of the Pin group, whose button
+ * initially shows Note Pin) and place a pin at the canvas center
+ */
 async function placePartyPin(page: any): Promise<{ x: number; y: number }> {
-  await selectToolByTitle(page, "Party Pin");
+  await selectSubTool(page, "Note Pin", "Party Pin");
   const center = await getCanvasCenter(page);
   await page.mouse.click(center.x, center.y);
   await page.waitForTimeout(300);
   return center;
 }
 
-test("Party pin tool can be activated", async ({ page }) => {
+test("Party pin tool activates as a Pin group subtool", async ({ page }) => {
   const errors = setupErrorTracking(page);
 
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  await selectToolByTitle(page, "Party Pin");
+  await selectSubTool(page, "Note Pin", "Party Pin");
 
+  // The group button now carries the party pin identity and active state
   const toolBtn = page.locator('.windrose-tool-btn[title*="Party Pin"]');
   const classes = await toolBtn.getAttribute("class");
   expect(classes).toContain("windrose-tool-btn-active");
@@ -250,6 +255,48 @@ test("Party note is created in the vault and pin removal offers guarded deletion
   }, { notePath });
   expect(stillThere).toBe(false);
   expect(await page.locator(".windrose-party-pin-overlay").count()).toBe(0);
+
+  expect(errors).toHaveLength(0);
+});
+
+test("Select tool selects the party pin and shows its controls", async ({ page }) => {
+  const errors = setupErrorTracking(page);
+
+  await navigateToMap(page, TEST_MAPS.grid);
+  await waitForContainer(page);
+
+  const center = await placePartyPin(page);
+
+  // Switching to select hides the card until the pin is actually selected
+  await selectToolByTitle(page, "Select/Move");
+  await page.waitForTimeout(200);
+  expect(await page.locator(".windrose-party-controls").count()).toBe(0);
+
+  // Clicking the pin's cell selects it — the controls card appears
+  await page.mouse.click(center.x, center.y);
+  await page.waitForTimeout(300);
+  expect(await page.locator(".windrose-party-controls").isVisible()).toBe(true);
+
+  // Clicking empty ground deselects. The canvas is crowded in the E2E
+  // viewport — the controls card flips above/below the pin, the EdgeRail
+  // overlay covers the left band, the drawer dock the right — so ask the
+  // DOM directly: use the first candidate point where the topmost element
+  // is actually the canvas (a click on chrome is not a canvas miss).
+  const missPoint = await page.evaluate((c: any) => {
+    const candidates = [
+      { x: c.x - 150, y: c.y - 150 },
+      { x: c.x + 150, y: c.y - 150 },
+      { x: c.x - 150, y: c.y + 150 },
+      { x: c.x + 150, y: c.y + 150 },
+      { x: c.x + 100, y: c.y - 100 },
+      { x: c.x - 100, y: c.y + 100 }
+    ];
+    return candidates.find(p => document.elementFromPoint(p.x, p.y)?.tagName === "CANVAS") ?? null;
+  }, { x: center.x, y: center.y });
+  expect(missPoint).not.toBeNull();
+  await page.mouse.click(missPoint!.x, missPoint!.y);
+  await page.waitForTimeout(300);
+  expect(await page.locator(".windrose-party-controls").count()).toBe(0);
 
   expect(errors).toHaveLength(0);
 });
