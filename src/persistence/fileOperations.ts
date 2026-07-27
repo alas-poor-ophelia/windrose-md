@@ -100,6 +100,7 @@ function migrateMapData(mapData: MapData): MapData {
   mapData.outlines ??= [];
   mapData.shapeOverlays ??= [];
   mapData.partyPins ??= [];
+  mapData.savedRoutes ??= [];
   if (!mapData.mapType) mapData.mapType = 'grid';
   mapData.settings ??= { useGlobalSettings: true, overrides: {} };
   mapData.uiPreferences ??= {

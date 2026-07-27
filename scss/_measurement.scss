@@ -1,0 +1,62 @@
+/* ==========================================================================
+   Measurement Controls (floating card shown while measuring a route)
+   Card shell/brackets come from .windrose-selection-card; this partial
+   positions the card and styles the measure-specific content.
+   ========================================================================== */
+.windrose-measure-controls {
+  $ctl: &;
+
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+
+  &-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px;
+    color: var(--windrose-text-primary);
+    font-size: 12px;
+  }
+
+  &-total {
+    max-width: 180px;
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @at-root {
+    .is-tablet button#{$ctl}-btn,
+    button#{$ctl}-btn,
+    #{$ctl}-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      min-width: unset;
+      min-height: unset;
+      padding: 0;
+      background: transparent;
+      border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.35);
+      border-radius: 3px;
+      color: var(--windrose-text-primary);
+      opacity: 0.8;
+      cursor: pointer;
+      transition: var(--windrose-transition);
+
+      &:hover:not(:disabled) {
+        opacity: 1;
+        border-color: oklch(from var(--windrose-border-primary) l c h/0.7);
+      }
+
+      &:disabled {
+        opacity: 0.35;
+        cursor: default;
+      }
+    }
+  }
+}

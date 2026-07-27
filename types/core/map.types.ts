@@ -368,6 +368,12 @@ export interface MapData {
   // Party pins (global, not per-layer; UI exposes a single pin per map)
   partyPins?: PartyPin[];
 
+  // In-progress measure-tool route (one per map; survives close/reopen)
+  measurementRoute?: Point[];
+
+  // Saved routes from "save as route" (global, both grid and hex maps)
+  savedRoutes?: SavedRoute[];
+
   // Regions (hex maps only, global not per-layer)
   regions?: Region[];
 
@@ -514,6 +520,30 @@ export interface PartyPin {
   filters?: PartyQueryFilters;
   /** Related-notes expansion; absent means off */
   relatedMode?: PartyRelatedMode;
+}
+
+// ===========================================
+// Measurement Routes
+// ===========================================
+
+/**
+ * A permanent, styled route created from a measured path ("save as route").
+ * Points are cell-aligned like PartyPin.position: {x: col, y: row} on grid
+ * maps, {x: q, y: r} axial on hex maps. Distances follow the map's distance
+ * semantics (per-cell distance, unit, diagonal rule / hex distance).
+ */
+export interface SavedRoute {
+  id: string;
+  name?: string;
+  /** Waypoints in cell coordinates; always >= 2 points */
+  points: Point[];
+  color: string;
+  /** Stroke width in canvas pixels */
+  width: number;
+  /** Show the route's total distance as a label on the map */
+  showLabel: boolean;
+  /** Terrain id per segment (index i = points[i] → points[i+1]); reserved for travel packs */
+  segmentTerrains?: (string | null)[];
 }
 
 // ===========================================

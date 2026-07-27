@@ -122,6 +122,8 @@ export interface MapDataHandlers {
   handleOutlinesChange: (outlines: import('../core/map.types').Outline[]) => void;
   handleShapeOverlaysChange: (overlays: import('../core/map.types').ShapeOverlay[]) => void;
   handlePartyPinsChange: (partyPins: import('../core/map.types').PartyPin[], suppressHistory?: boolean) => void;
+  handleMeasurementRouteChange: (measurementRoute: import('../core/geometry.types').Point[]) => void;
+  handleSavedRoutesChange: (savedRoutes: import('../core/map.types').SavedRoute[]) => void;
 }
 
 // ===========================================
@@ -155,5 +157,7 @@ export interface UseDataHandlersResult {
   handleOutlinesChange: (outlines: import('../core/map.types').Outline[]) => void;
   handleShapeOverlaysChange: (overlays: import('../core/map.types').ShapeOverlay[]) => void;
   handlePartyPinsChange: (partyPins: import('../core/map.types').PartyPin[], suppressHistory?: boolean) => void;
+  handleMeasurementRouteChange: (measurementRoute: import('../core/geometry.types').Point[]) => void;
+  handleSavedRoutesChange: (savedRoutes: import('../core/map.types').SavedRoute[]) => void;
 }
 

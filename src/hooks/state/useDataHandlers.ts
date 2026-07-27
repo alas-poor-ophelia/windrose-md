@@ -10,7 +10,8 @@
  */
 
 // Type-only imports
-import type { MapLayer, StoredViewState, TextLabelSettings, Region, Outline, ShapeOverlay, FogOfWar, PartyPin } from '#types/core/map.types';
+import type { MapLayer, StoredViewState, TextLabelSettings, Region, Outline, ShapeOverlay, FogOfWar, PartyPin, SavedRoute } from '#types/core/map.types';
+import type { Point } from '#types/core/geometry.types';
 import type { CustomColor } from '#types/core/common.types';
 import type { Cell } from '#types/core/cell.types';
 import type { Curve } from '#types/core/curve.types';
@@ -344,6 +345,26 @@ function useDataHandlers({
     });
   }, [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot]);
 
+  // Handle the in-progress measurement route change - NOT tracked in history.
+  // This is measure-tool working state that persists with the map so a
+  // measurement survives closing and reopening the view.
+  const handleMeasurementRouteChange = useCallback((measurementRoute: Point[]): void => {
+    updateMapData((currentMapData) => {
+      if (currentMapData == null) return currentMapData;
+      return { ...currentMapData, measurementRoute };
+    });
+  }, [updateMapData]);
+
+  // Handle saved routes change - NOT tracked in history. Creation goes
+  // through the save-route modal and deletion through a confirm, so both are
+  // deliberate; undo integration is deferred to save-as-route polish.
+  const handleSavedRoutesChange = useCallback((savedRoutes: SavedRoute[]): void => {
+    updateMapData((currentMapData) => {
+      if (currentMapData == null) return currentMapData;
+      return { ...currentMapData, savedRoutes };
+    });
+  }, [updateMapData]);
+
   // =========================================================================
   // Return Value
   // =========================================================================
@@ -371,7 +392,9 @@ function useDataHandlers({
     handleRegionsChange,
     handleOutlinesChange,
     handleShapeOverlaysChange,
-    handlePartyPinsChange
+    handlePartyPinsChange,
+    handleMeasurementRouteChange,
+    handleSavedRoutesChange
   };
 
   return {
@@ -399,7 +422,9 @@ function useDataHandlers({
     handleRegionsChange,
     handleOutlinesChange,
     handleShapeOverlaysChange,
-    handlePartyPinsChange
+    handlePartyPinsChange,
+    handleMeasurementRouteChange,
+    handleSavedRoutesChange
   };
 }
 

@@ -17,7 +17,8 @@ MapCanvas.tsx (orchestrator)
 ├── FreehandLayer.tsx         # Freehand curve drawing
 ├── RegionLayer.tsx           # Named regions
 ├── NotePinLayer.tsx          # Note link indicators
-├── MeasurementLayer.tsx      # Distance measurement display
+├── MeasurementLayer.tsx      # Multi-waypoint distance measurement tool
+├── RouteLayer.tsx            # Saved measurement routes (always visible)
 ├── AreaSelectLayer.tsx       # Multi-select rectangle
 ├── HexCoordinateLayer.tsx    # Hex coordinate display
 ├── TilePlacementLayer.tsx    # Tile placement tool

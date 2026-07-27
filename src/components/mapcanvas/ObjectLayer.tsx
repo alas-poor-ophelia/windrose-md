@@ -779,10 +779,10 @@ const ObjectLayer = ({
 
       {measureOriginRef.current && measureTarget && formattedMeasureDistance != null && formattedMeasureDistance !== '' && (
         <MeasurementOverlay
-          measureOrigin={measureOriginRef.current}
-          currentTarget={measureTarget}
-          formattedDistance={formattedMeasureDistance}
-          isTargetLocked={false}
+          waypoints={[measureOriginRef.current]}
+          previewTarget={measureTarget}
+          formattedTotal={formattedMeasureDistance}
+          formattedSegments={[]}
           geometry={geometry}
           mapData={mapData}
           canvasRef={canvasRef}

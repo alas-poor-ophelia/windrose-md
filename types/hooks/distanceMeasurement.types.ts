@@ -45,15 +45,25 @@ export interface MapDistanceOverrides {
 /** Return type for useDistanceMeasurement hook */
 export interface UseDistanceMeasurementResult {
   // State
-  measureOrigin: MeasurementPoint | null;
-  currentTarget: MeasurementPoint | null;
-  currentDistance: number | null;
-  formattedDistance: string | null;
+  /** Committed route waypoints in click order */
+  waypoints: MeasurementPoint[];
+  /** Live cursor cell for the preview segment (mouse); null when idle */
+  previewTarget: MeasurementPoint | null;
+  /** Per-committed-segment distances in cells (length = waypoints.length - 1) */
+  segmentDistances: number[];
+  /** Distance in cells of the preview segment (0 when no preview) */
+  previewDistance: number;
+  /** Running total in cells including the preview segment; null with no waypoints */
+  totalDistance: number | null;
+  /** Formatted running total for display */
+  formattedTotal: string | null;
+  /** Formatted label per committed segment */
+  formattedSegments: string[];
   distanceSettings: EffectiveDistanceSettings;
-  isTargetLocked: boolean;
 
   // Handlers
   handleMeasureClick: (cellX: number, cellY: number, isTouch?: boolean) => void;
   handleMeasureMove: (cellX: number, cellY: number) => void;
+  removeLastWaypoint: () => void;
   clearMeasurement: () => void;
 }

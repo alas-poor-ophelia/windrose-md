@@ -5233,6 +5233,64 @@ button.windrose-party-controls-locate:hover,
     height: 38px;
   }
 }
+/* ==========================================================================
+   Measurement Controls (floating card shown while measuring a route)
+   Card shell/brackets come from .windrose-selection-card; this partial
+   positions the card and styles the measure-specific content.
+   ========================================================================== */
+.windrose-measure-controls {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.windrose-measure-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px;
+  color: var(--windrose-text-primary);
+  font-size: 12px;
+}
+.windrose-measure-controls-total {
+  max-width: 180px;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.is-tablet button.windrose-measure-controls-btn,
+button.windrose-measure-controls-btn,
+.windrose-measure-controls-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  min-width: unset;
+  min-height: unset;
+  padding: 0;
+  background: transparent;
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.35);
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  opacity: 0.8;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+}
+.is-tablet button.windrose-measure-controls-btn:hover:not(:disabled),
+button.windrose-measure-controls-btn:hover:not(:disabled),
+.windrose-measure-controls-btn:hover:not(:disabled) {
+  opacity: 1;
+  border-color: oklch(from var(--windrose-border-primary) l c h/0.7);
+}
+.is-tablet button.windrose-measure-controls-btn:disabled,
+button.windrose-measure-controls-btn:disabled,
+.windrose-measure-controls-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 /* ============================================
    TEXT LABEL/MODAL SYSTEM
    ============================================ */
