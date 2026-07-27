@@ -13,7 +13,7 @@
  */
 
 // Type-only imports
-import type { MapData, MapLayer, LayerId, Region, Outline, ShapeOverlay, FogOfWar } from '#types/core/map.types';
+import type { MapData, MapLayer, LayerId, Region, Outline, ShapeOverlay, FogOfWar, PartyPin } from '#types/core/map.types';
 import type {
   LayerHistorySnapshot,
   LayerHistoryCache,
@@ -125,7 +125,7 @@ function useLayerHistory({
    * Build a history state snapshot from layer data
    */
   const buildHistoryState = useCallback(
-    (layer: MapLayer, name: string, regions: Region[] = [], outlines: Outline[] = [], shapeOverlays: ShapeOverlay[] = [], fogOfWar: FogOfWar | null = null): LayerHistorySnapshot => ({
+    (layer: MapLayer, name: string, regions: Region[] = [], outlines: Outline[] = [], shapeOverlays: ShapeOverlay[] = [], fogOfWar: FogOfWar | null = null, partyPins: PartyPin[] = []): LayerHistorySnapshot => ({
       cells: layer.cells,
       curves: layer.curves,
       name: name,
@@ -138,7 +138,8 @@ function useLayerHistory({
       shapeOverlays: shapeOverlays,
       fogOfWar: fogOfWar ?? layer.fogOfWar,
       regions: regions,
-      outlines: outlines
+      outlines: outlines,
+      partyPins: partyPins
     }),
     []
   );
@@ -164,7 +165,7 @@ function useLayerHistory({
         // No cached history for this layer - initialize fresh
         const layer = getActiveLayer(newMapData);
         historyInitialized.current = false;
-        resetHistory(buildHistoryState(layer, newMapData.name ?? '', newMapData.regions ?? [], newMapData.outlines ?? [], newMapData.shapeOverlays ?? [], layer.fogOfWar));
+        resetHistory(buildHistoryState(layer, newMapData.name ?? '', newMapData.regions ?? [], newMapData.outlines ?? [], newMapData.shapeOverlays ?? [], layer.fogOfWar, newMapData.partyPins ?? []));
         historyInitialized.current = true;
       }
     },
@@ -204,7 +205,7 @@ function useLayerHistory({
     // New layer always starts with fresh history
     const newActiveLayer = getActiveLayer(newMapData);
     historyInitialized.current = false;
-    resetHistory(buildHistoryState(newActiveLayer, newMapData.name ?? '', newMapData.regions ?? [], newMapData.outlines ?? []));
+    resetHistory(buildHistoryState(newActiveLayer, newMapData.name ?? '', newMapData.regions ?? [], newMapData.outlines ?? [], newMapData.shapeOverlays ?? [], newActiveLayer.fogOfWar, newMapData.partyPins ?? []));
     historyInitialized.current = true;
   }, [mapData, updateMapData, saveCurrentLayerHistory, resetHistory, buildHistoryState]);
 
@@ -221,7 +222,7 @@ function useLayerHistory({
 
       const clonedLayer = getActiveLayer(newMapData);
       historyInitialized.current = false;
-      resetHistory(buildHistoryState(clonedLayer, newMapData.name ?? '', newMapData.regions ?? [], newMapData.outlines ?? []));
+      resetHistory(buildHistoryState(clonedLayer, newMapData.name ?? '', newMapData.regions ?? [], newMapData.outlines ?? [], newMapData.shapeOverlays ?? [], clonedLayer.fogOfWar, newMapData.partyPins ?? []));
       historyInitialized.current = true;
     },
     [mapData, updateMapData, saveCurrentLayerHistory, resetHistory, buildHistoryState]
@@ -321,7 +322,7 @@ function useLayerHistory({
       isApplyingHistoryRef.current = true;
       // Apply layer-specific data to active layer, name/regions/outlines at root
       const newMapData = updateActiveLayer(
-        { ...mapData, name: previousState.name, regions: previousState.regions ?? mapData.regions, outlines: previousState.outlines ?? mapData.outlines, shapeOverlays: previousState.shapeOverlays ?? mapData.shapeOverlays },
+        { ...mapData, name: previousState.name, regions: previousState.regions ?? mapData.regions, outlines: previousState.outlines ?? mapData.outlines, shapeOverlays: previousState.shapeOverlays ?? mapData.shapeOverlays, partyPins: previousState.partyPins ?? mapData.partyPins },
         {
           cells: previousState.cells,
           curves: previousState.curves,
@@ -348,7 +349,7 @@ function useLayerHistory({
       isApplyingHistoryRef.current = true;
       // Apply layer-specific data to active layer, name/regions/outlines at root
       const newMapData = updateActiveLayer(
-        { ...mapData, name: nextState.name, regions: nextState.regions ?? mapData.regions, outlines: nextState.outlines ?? mapData.outlines, shapeOverlays: nextState.shapeOverlays ?? mapData.shapeOverlays },
+        { ...mapData, name: nextState.name, regions: nextState.regions ?? mapData.regions, outlines: nextState.outlines ?? mapData.outlines, shapeOverlays: nextState.shapeOverlays ?? mapData.shapeOverlays, partyPins: nextState.partyPins ?? mapData.partyPins },
         {
           cells: nextState.cells,
           curves: nextState.curves,

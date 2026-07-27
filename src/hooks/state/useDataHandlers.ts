@@ -10,7 +10,7 @@
  */
 
 // Type-only imports
-import type { MapLayer, StoredViewState, TextLabelSettings, Region, Outline, ShapeOverlay, FogOfWar } from '#types/core/map.types';
+import type { MapLayer, StoredViewState, TextLabelSettings, Region, Outline, ShapeOverlay, FogOfWar, PartyPin } from '#types/core/map.types';
 import type { CustomColor } from '#types/core/common.types';
 import type { Cell } from '#types/core/cell.types';
 import type { Curve } from '#types/core/curve.types';
@@ -53,7 +53,8 @@ function useDataHandlers({
     regions: Region[] = [],
     outlines: Outline[] = [],
     shapeOverlays: ShapeOverlay[] = [],
-    fogOfWar: FogOfWar | null = null
+    fogOfWar: FogOfWar | null = null,
+    partyPins: PartyPin[] = []
   ): LayerHistorySnapshot => ({
     cells: overrides.cells ?? layer.cells ?? [],
     curves: overrides.curves ?? layer.curves ?? [],
@@ -67,7 +68,8 @@ function useDataHandlers({
     regions: overrides.regions ?? regions,
     outlines: overrides.outlines ?? outlines,
     shapeOverlays: overrides.shapeOverlays ?? shapeOverlays,
-    fogOfWar: overrides.fogOfWar ?? fogOfWar
+    fogOfWar: overrides.fogOfWar ?? fogOfWar,
+    partyPins: overrides.partyPins ?? partyPins
   }), []);
 
   // =========================================================================
@@ -87,7 +89,7 @@ function useDataHandlers({
 
         if (!suppressHistory) {
           const activeLayer = getActiveLayer(currentMapData);
-          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar));
+          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? []));
         }
 
         return newMapData;
@@ -137,7 +139,7 @@ function useDataHandlers({
 
         const activeLayer = getActiveLayer(currentMapData);
         if (!suppressHistory) {
-          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { tiles: newValue }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar));
+          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { tiles: newValue }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? []));
         }
 
         let nextMapData = updateActiveLayer(currentMapData, { tiles: newValue });
@@ -185,7 +187,7 @@ function useDataHandlers({
       if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildLayerHistorySnapshot(activeLayer, newName, {}, currentMapData.regions ?? []));
+      addToHistory(buildLayerHistorySnapshot(activeLayer, newName, {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? []));
 
       return { ...currentMapData, name: newName };
     });
@@ -291,7 +293,7 @@ function useDataHandlers({
       if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, regions));
+      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, regions, currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? []));
 
       return { ...currentMapData, regions };
     });
@@ -305,7 +307,7 @@ function useDataHandlers({
       if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], outlines));
+      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], outlines, currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? []));
 
       return { ...currentMapData, outlines };
     });
@@ -319,9 +321,26 @@ function useDataHandlers({
       if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], shapeOverlays));
+      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], shapeOverlays, activeLayer.fogOfWar, currentMapData.partyPins ?? []));
 
       return { ...currentMapData, shapeOverlays };
+    });
+  }, [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot]);
+
+  // Handle party pins change - tracked in history; suppressHistory skips the
+  // snapshot during live drag so the whole drag undoes as one step
+  const handlePartyPinsChange = useCallback((partyPins: PartyPin[], suppressHistory = false): void => {
+    if (isApplyingHistory()) return;
+
+    updateMapData((currentMapData) => {
+      if (currentMapData == null) return currentMapData;
+
+      if (!suppressHistory) {
+        const activeLayer = getActiveLayer(currentMapData);
+        addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, partyPins));
+      }
+
+      return { ...currentMapData, partyPins };
     });
   }, [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot]);
 
@@ -351,7 +370,8 @@ function useDataHandlers({
     handleTextLabelSettingsChange,
     handleRegionsChange,
     handleOutlinesChange,
-    handleShapeOverlaysChange
+    handleShapeOverlaysChange,
+    handlePartyPinsChange
   };
 
   return {
@@ -378,7 +398,8 @@ function useDataHandlers({
     handleTextLabelSettingsChange,
     handleRegionsChange,
     handleOutlinesChange,
-    handleShapeOverlaysChange
+    handleShapeOverlaysChange,
+    handlePartyPinsChange
   };
 }
 

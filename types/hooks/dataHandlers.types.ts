@@ -121,6 +121,7 @@ export interface MapDataHandlers {
   handleRegionsChange: HandleRegionsChange;
   handleOutlinesChange: (outlines: import('../core/map.types').Outline[]) => void;
   handleShapeOverlaysChange: (overlays: import('../core/map.types').ShapeOverlay[]) => void;
+  handlePartyPinsChange: (partyPins: import('../core/map.types').PartyPin[], suppressHistory?: boolean) => void;
 }
 
 // ===========================================
@@ -153,5 +154,6 @@ export interface UseDataHandlersResult {
   handleRegionsChange: HandleRegionsChange;
   handleOutlinesChange: (outlines: import('../core/map.types').Outline[]) => void;
   handleShapeOverlaysChange: (overlays: import('../core/map.types').ShapeOverlay[]) => void;
+  handlePartyPinsChange: (partyPins: import('../core/map.types').PartyPin[], suppressHistory?: boolean) => void;
 }
 
