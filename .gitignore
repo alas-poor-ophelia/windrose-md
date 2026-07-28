@@ -34,6 +34,7 @@ test-results/
 test-results.json
 test-output.log
 tests/e2e/screenshots/
+e2e-*.log
 
 # MCP server
 mcp/node_modules/
@@ -59,12 +60,14 @@ memory/
 .claude/scheduled_tasks.lock
 .claude/tile-metadata-backup-*.json
 .claude/worktrees/
+.claude/obsidian-review/
 
 # Agent worktrees
 .wt/
 
 # Test vault plugin artifacts
 tests/fixtures/test-vault/.obsidian/plugins/windrose-md/
+tests/fixtures/test-vault/Projects/dungeon-map-tracker
 
 # Beads / Dolt files (added by bd init)
 .dolt/
