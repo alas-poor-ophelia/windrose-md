@@ -272,6 +272,8 @@ interface DdImportResult {
 	failed: number;
 	total: number;
 	packName: string;
+	/** True when the caller's isCancelled() stopped extraction early. */
+	cancelled: boolean;
 }
 
 type DdProgressFn = (done: number, total: number, stage: string) => void;
@@ -289,6 +291,13 @@ async function runDdImport(
 	meta: DungeondraftPackMeta,
 	onProgress?: DdProgressFn,
 	wizard?: DdWizardDecisions,
+	/**
+	 * Polled before each file extraction; returning true stops the loop
+	 * cleanly. Files already extracted keep their metadata passes below, so
+	 * a cancelled import leaves a coherent partial install (re-importing the
+	 * pack later overwrites in place and completes it).
+	 */
+	isCancelled?: () => boolean,
 ): Promise<DdImportResult> {
 	const basePath = CONTENT_PACKS_FOLDER + '/dungeondraft-packs/' + meta.id;
 	await ensureFolder(app, basePath);
@@ -323,8 +332,13 @@ async function runDdImport(
 	// destination folder -> extracted cell-tile vault paths (wizard tier application)
 	const cellDestsByFolder = new Map<string, string[]>();
 	let failedCount = 0;
+	let cancelled = false;
 
 	for (let i = 0; i < textures.length; i++) {
+		if (isCancelled?.() === true) {
+			cancelled = true;
+			break;
+		}
 		const entry = textures[i];
 		const relativePath = toRelativeTexturePath(entry.path);
 		const filename = entry.path.split('/').pop() ?? 'unknown';
@@ -484,10 +498,11 @@ async function runDdImport(
 	window.dispatchEvent(new Event('windrose-settings-changed'));
 
 	return {
-		imported: textures.length - failedCount,
+		imported: relToDest.size,
 		failed: failedCount,
 		total: textures.length,
 		packName: meta.name,
+		cancelled,
 	};
 }
 

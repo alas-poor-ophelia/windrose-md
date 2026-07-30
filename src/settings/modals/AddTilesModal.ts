@@ -16,6 +16,7 @@
 
 import { Modal, Notice } from 'obsidian';
 import type { App } from 'obsidian';
+import { ConfirmModal } from './ConfirmModal';
 import type { TileEntry, TileLayerRole } from '#types/tiles/tile.types';
 import type { InstalledPack } from '#types/content-packs/contentPack.types';
 import type { PluginLike, PckWizardAnalysis, DdWizardDecisions } from '../../content-packs/ddImportCore';
@@ -80,11 +81,42 @@ class AddTilesModal extends Modal {
   private manualTags: string[] = [];
 
   private finished = false;
+  /** True while an import is writing files — close() speedbumps until done. */
+  private importing = false;
+  /** Set via the speedbump confirm; polled by the extraction loop. */
+  private cancelRequested = false;
+  private cancelPromptOpen = false;
 
   constructor(app: App, plugin: PluginLike, onImported?: () => void) {
     super(app);
     this.plugin = plugin;
     this.onImported = onImported;
+  }
+
+  /**
+   * Backdrop clicks and Escape both route through close(). A large pack can
+   * take many minutes to extract — a stray outside click must not dismiss
+   * the progress view mid-import. Instead of a hard block, offer a real
+   * cancel: confirm → the extraction loop stops cleanly and the modal
+   * closes itself (already-extracted files stay; re-import resumes safely).
+   */
+  close(): void {
+    if (this.importing) {
+      if (!this.cancelPromptOpen && !this.cancelRequested) {
+        this.cancelPromptOpen = true;
+        void new ConfirmModal(this.app, {
+          message: 'An import is still running. Cancel it?\nFiles already extracted stay in the vault — re-importing this pack later resumes safely (files update in place).',
+          confirmText: 'Cancel import',
+          cancelText: 'Keep importing',
+          isDestructive: true,
+        }).openAndGetValue().then(confirmed => {
+          this.cancelPromptOpen = false;
+          if (confirmed) this.cancelRequested = true;
+        });
+      }
+      return;
+    }
+    super.close();
   }
 
   onOpen(): void {
@@ -616,6 +648,10 @@ class AddTilesModal extends Modal {
         this.packArchive,
         this.packMeta,
         (done, total, stage) => {
+          if (this.cancelRequested) {
+            status.setText('Cancelling…');
+            return;
+          }
           if (stage === 'extract') {
             progressBar.value = Math.round((done / total) * 90);
             status.setText(`Extracting: ${done}/${total}`);
@@ -626,7 +662,14 @@ class AddTilesModal extends Modal {
           }
         },
         this.buildWizardDecisions(),
+        () => this.cancelRequested,
       );
+
+      if (result.cancelled) {
+        new Notice(`${result.packName} import cancelled — ${result.imported} of ${result.total} textures extracted. Re-importing later resumes safely.`);
+        this.finished = result.imported > 0;
+        return;
+      }
 
       progressBar.value = 100;
       progress.empty();
@@ -654,6 +697,21 @@ class AddTilesModal extends Modal {
   }
 
   private async finishImport(
+    body: HTMLElement,
+    foot: HTMLElement,
+    finishBtn: HTMLButtonElement,
+  ): Promise<void> {
+    this.importing = true;
+    try {
+      await this.runFinishImport(body, foot, finishBtn);
+    } finally {
+      this.importing = false;
+    }
+    // A confirmed cancel means "I want out" — close once the loop unwinds
+    if (this.cancelRequested) this.close();
+  }
+
+  private async runFinishImport(
     body: HTMLElement,
     foot: HTMLElement,
     finishBtn: HTMLButtonElement,
