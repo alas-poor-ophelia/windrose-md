@@ -1,4 +1,4 @@
-# Smoke Test Map
+are # Smoke Test Map
 
 This map is used for automated E2E testing of Windrose. Do not delete.
 
