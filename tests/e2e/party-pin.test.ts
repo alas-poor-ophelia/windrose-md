@@ -225,6 +225,13 @@ test("Party note is created in the vault and pin removal offers guarded deletion
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
+  // A leftover note from an aborted earlier run carries a foreign pin id and
+  // would block Create — clear it so the test is self-healing
+  await doWithApp(page, async (app: any) => {
+    const stale = app.vault.getAbstractFileByPath("The Party - Nearby.md");
+    if (stale != null) await app.vault.delete(stale);
+  }, {});
+
   await placePartyPin(page);
 
   // Create the note (default folder = vault root; label 'The Party')
@@ -239,7 +246,7 @@ test("Party note is created in the vault and pin removal offers guarded deletion
   expect(created).toBe(true);
 
   // The card now offers open + live-update controls instead of Create
-  expect(await page.locator('.windrose-party-controls button[aria-label="Open party note"]').isVisible()).toBe(true);
+  expect(await page.locator('.windrose-party-controls button[aria-label="Open beacon note"]').isVisible()).toBe(true);
 
   // Removing the pin offers note deletion (never silent) — accept it
   await page.locator('.windrose-party-controls button[aria-label="Remove Beacon"]').click();

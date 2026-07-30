@@ -47,7 +47,7 @@ export const TabRenderTravelPacksMethods = {
     const packs = this.plugin.settings.travelPacks ?? [];
 
     containerEl.createEl('p', {
-      text: 'Travel packs bundle the travel rules of an RPG system — custom units, terrain speed multipliers, travel modes, and per-day allowances. Enabled packs power travel times in the measure tool and party pin.',
+      text: 'Travel packs bundle the travel rules of an RPG system — custom units, terrain speed multipliers, travel modes, and per-day allowances. Enabled packs power travel times in the measure tool and the beacon.',
       cls: 'setting-item-description'
     });
 

@@ -115,6 +115,18 @@ describe('buildPartyNoteContent', () => {
     expect(content).not.toContain('| Note |');
   });
 
+  it('omits the duplicate H1 and shows the range with its unit', () => {
+    const content = buildPartyNoteContent(makePin(), makeResults(), { ...context, distanceUnit: 'mi' });
+    expect(content).not.toContain('# The Party - Nearby');
+    expect(content).toContain('Within **30 mi** of the beacon on **Overworld**.');
+  });
+
+  it('drops the map clause for unnamed maps', () => {
+    const content = buildPartyNoteContent(makePin(), makeResults(), { ...context, mapName: '' });
+    expect(content).toContain('Within **30** of the beacon.');
+    expect(content).not.toContain(' on **');
+  });
+
   it('renders linked results as a wiki-link table with deeplinks', () => {
     const results = makeResults({
       linked: [{

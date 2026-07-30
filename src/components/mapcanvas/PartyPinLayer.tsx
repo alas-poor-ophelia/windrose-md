@@ -30,6 +30,7 @@ import {
   deletePartyNote,
   upsertPartyNote
 } from '../../persistence/partyNoteOperations';
+import { openNoteInNewTab } from '../../persistence/noteOperations';
 import { getEnabledTravelPacks } from '../../travel/travelPackOperations';
 import {
   findTravelMismatch,
@@ -64,7 +65,7 @@ const PARTY_RELATED_CAP = 5;
 
 const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): VNode | null => {
   const app = useApp();
-  const { mapData, geometry, canvasRef, mapId, notePath } = useMapState();
+  const { mapData, geometry, canvasRef, mapId, notePath, viewController } = useMapState();
 
   // Transient highlight for "show on map" — cleared after the pulse finishes
   const [flashMarker, setFlashMarker] = useState<Point | null>(null);
@@ -221,9 +222,17 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
   );
 
   const mapName = mapData?.name ?? '';
+  const noteDistanceUnit = useMemo(() => {
+    if (!mapData) return '';
+    return getEffectiveDistanceSettings(
+      mapData.mapType,
+      getSettings(),
+      (mapData.settings?.distanceSettings ?? null) as MapDistanceOverrides | null
+    ).distanceUnit;
+  }, [mapData]);
   const noteContext = useMemo(
-    () => ({ mapId: mapId ?? '', mapName, mapNotePath: notePath ?? '' }),
-    [mapId, mapName, notePath]
+    () => ({ mapId: mapId ?? '', mapName, mapNotePath: notePath ?? '', distanceUnit: noteDistanceUnit }),
+    [mapId, mapName, notePath, noteDistanceUnit]
   );
 
   // Note content doubles as the change signal: the debounced write below
@@ -233,10 +242,19 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     return buildPartyNoteContent(pin, results, noteContext, relatedMap, travelLabels);
   }, [pin, results, noteContext, relatedMap, travelLabels]);
 
+  // Pin removal must not race the debounced writer: a timer firing between
+  // the note's trashing and the removal commit would resurrect the file via
+  // upsert's recreate-on-manual-delete path. The flag suppresses in-flight
+  // writes during removal and resets whenever a live pin re-arms the writer
+  // (undo of a removal included).
+  const suppressNoteWritesRef = useRef(false);
+
   useEffect(() => {
     if (noteContent == null || pin?.partyNote == null) return undefined;
+    suppressNoteWritesRef.current = false;
     const pinForWrite = pin;
     const timer = window.setTimeout(() => {
+      if (suppressNoteWritesRef.current) return;
       void upsertPartyNote(app, pinForWrite, noteContent);
     }, PARTY_NOTE_SAVE_DELAY_MS);
     return () => window.clearTimeout(timer);
@@ -255,6 +273,18 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     onPartyPinsChange(upsertPartyPin(mapData.partyPins ?? [], updatedPin));
   }, [mapData, results, noteContext, relatedMap, travelLabels, app, onPartyPinsChange]);
 
+  const handleOpenPartyNote = useCallback(async (): Promise<void> => {
+    const currentPin = getPartyPin(mapData?.partyPins);
+    const path = currentPin?.partyNote?.path;
+    if (currentPin == null || path == null || path === '') return;
+    // Flush the pending debounced write first, so the tab never opens a
+    // missing or stale file (upsert is change-detected — no churn)
+    if (currentPin.partyNote?.enabled === true) {
+      await upsertPartyNote(app, currentPin, buildPartyNoteContent(currentPin, results, noteContext, relatedMap, travelLabels));
+    }
+    await openNoteInNewTab(path);
+  }, [mapData, results, noteContext, relatedMap, travelLabels, app]);
+
   const handleRecalculate = useCallback((): void => {
     const currentPin = getPartyPin(mapData?.partyPins);
     if (currentPin?.partyNote?.enabled !== true || !mapData || !geometry) return;
@@ -267,6 +297,7 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
   const handleRemovePin = useCallback(async (): Promise<void> => {
     const currentPin = getPartyPin(mapData?.partyPins);
     if (!currentPin || !mapData) return;
+    suppressNoteWritesRef.current = true;
     if (currentPin.partyNote?.path != null && currentPin.partyNote.path !== '') {
       const alsoDeleteNote = await new ConfirmModal(app, {
         message: `Also delete the beacon note at "${currentPin.partyNote.path}"?\nThe beacon is removed either way.`,
@@ -306,6 +337,7 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
         geometry={geometry}
         mapData={mapData}
         canvasRef={canvasRef}
+        viewController={viewController}
       />
       {(currentTool === 'partyPin' || (currentTool === 'select' && selectedViaSelect)) && (
         <PartyPinControls
@@ -318,9 +350,11 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
           geometry={geometry}
           mapData={mapData}
           canvasRef={canvasRef}
+          viewController={viewController}
           onPartyPinsChange={onPartyPinsChange}
           onShowOnMap={handleShowOnMap}
           onCreatePartyNote={handleCreatePartyNote}
+          onOpenPartyNote={() => { void handleOpenPartyNote(); }}
           onRecalculate={handleRecalculate}
           onRemovePin={() => { void handleRemovePin(); }}
         />

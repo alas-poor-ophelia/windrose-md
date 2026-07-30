@@ -34,6 +34,8 @@ export interface PartyNoteContext {
   mapName: string;
   /** Path of the note hosting the map; '' when the map lives in a full-pane view */
   mapNotePath: string;
+  /** Display unit for the pin's range (e.g. 'ft', 'mi'); omitted → bare number */
+  distanceUnit?: string;
 }
 
 /** Outcome of an upsert, for caller feedback */
@@ -111,9 +113,12 @@ function buildPartyNoteContent(
   lines.push(`${PARTY_NOTE_MARKER_KEY}: ${pin.id}`);
   lines.push('---');
   lines.push('');
-  lines.push(`# ${pin.label} - Nearby`);
-  lines.push('');
-  lines.push(`Within **${pin.range}** of the beacon on **${context.mapName}**.`);
+  // No H1 — the note title already carries "<label> - Nearby"
+  const rangeLabel = context.distanceUnit != null && context.distanceUnit !== ''
+    ? `${pin.range} ${context.distanceUnit}`
+    : `${pin.range}`;
+  const mapClause = context.mapName !== '' ? ` on **${context.mapName}**` : '';
+  lines.push(`Within **${rangeLabel}** of the beacon${mapClause}.`);
   lines.push('');
 
   if (results.linked.length === 0 && results.unlinked.length === 0) {

@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { RefObject, VNode } from 'preact';
 import type { IGeometry, Point } from '#types/core/geometry.types';
 import type { MapData, PartyPin, PartyRangeStyle, PartyRelatedMode } from '#types/core/map.types';
+import type { ViewController } from '#types/hooks/viewController.types';
 
 import type { PartyRangeResults } from '../../objects/partyRangeQuery';
 
@@ -54,11 +55,15 @@ interface PartyPinControlsProps {
   geometry: IGeometry | null;
   mapData: MapData | null;
   canvasRef: RefObject<HTMLCanvasElement> | null;
+  /** Live pan/zoom controller — the card hides mid-gesture and reanchors on commit */
+  viewController?: ViewController;
   onPartyPinsChange: (partyPins: PartyPin[], suppressHistory?: boolean) => void;
   /** Navigate/flash a result's source marker on the map */
   onShowOnMap?: (position: Point) => void;
   /** Create the pin's party note in the given vault folder */
   onCreatePartyNote?: (folder: string) => Promise<void> | void;
+  /** Open the pin's party note (flushes any pending note write first) */
+  onOpenPartyNote?: () => void;
   /** Force an immediate recalculation/note flush */
   onRecalculate?: () => void;
   /** Remove the pin (offers party-note deletion when one exists) */
@@ -75,9 +80,11 @@ const PartyPinControls = ({
   geometry,
   mapData,
   canvasRef,
+  viewController,
   onPartyPinsChange,
   onShowOnMap,
   onCreatePartyNote,
+  onOpenPartyNote,
   onRecalculate,
   onRemovePin
 }: PartyPinControlsProps): VNode | null => {
@@ -101,6 +108,16 @@ const PartyPinControls = ({
     setTagsDraft(formatTagFilters(pin.filters?.tags));
     setPropsDraft(formatPropertyFilters(pin.filters?.properties));
   }, [pin.id, pin.label, pin.range, pin.filters]);
+
+  // Hide mid pan/zoom gesture (the card anchors to committed coordinates, so
+  // tracking the gesture would lag); it reanchors on commit
+  const [isViewGesturing, setIsViewGesturing] = useState(false);
+  useEffect(() => {
+    if (!viewController) return undefined;
+    return viewController.subscribeLive(() => {
+      setIsViewGesturing(viewController.isGesturing());
+    });
+  }, [viewController]);
 
   // Resolve anchor geometry up front so the positioning hook runs
   // unconditionally (bounds stay null until everything is available)
@@ -144,7 +161,8 @@ const PartyPinControls = ({
     bounds,
     containerRef: { current: container },
     toolbarWidth: CARD_WIDTH,
-    toolbarHeight: CARD_HEIGHT + Math.min(resultCount, 6) * 26 + 30
+    toolbarHeight: CARD_HEIGHT + Math.min(resultCount, 6) * 26 + 30,
+    avoidAnchorOverlap: true
   });
   if (!toolbarPos) return null;
 
@@ -227,10 +245,15 @@ const PartyPinControls = ({
       style={{
         position: 'absolute',
         left: `${toolbarPos.toolbarX}px`,
-        top: `${toolbarPos.toolbarY}px`,
+        // Bottom-anchored above the pin when set: the card grows upward and
+        // clips at the container top — it can never bleed down over the pin
+        ...(toolbarPos.anchorBottom != null
+          ? { bottom: `${toolbarPos.anchorBottom}px` }
+          : { top: `${toolbarPos.toolbarY}px` }),
         width: `${CARD_WIDTH}px`,
         pointerEvents: 'auto',
-        zIndex: Z_INDEX.TOOLBAR
+        zIndex: Z_INDEX.TOOLBAR,
+        visibility: isViewGesturing ? 'hidden' : 'visible'
       }}
     >
       <CornerBrackets classPrefix="windrose-selection-card-bracket" variant="minimal" filterId="party-pin-bracket" />
@@ -455,8 +478,11 @@ const PartyPinControls = ({
                 <button
                   className="windrose-party-controls-note-open"
                   title={pin.partyNote.path}
-                  aria-label="Open party note"
-                  onClick={() => { void openNoteInNewTab(pin.partyNote?.path); }}
+                  aria-label="Open beacon note"
+                  onClick={() => {
+                    if (onOpenPartyNote) onOpenPartyNote();
+                    else void openNoteInNewTab(pin.partyNote?.path);
+                  }}
                 >
                   <Icon icon="lucide-external-link" size={12} />
                 </button>

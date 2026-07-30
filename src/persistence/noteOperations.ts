@@ -9,6 +9,7 @@
 import type { NoteIndexEntry } from '#types/objects/note.types';
 import type { App } from 'obsidian';
 
+import { TFile } from 'obsidian';
 import { getApp } from '../core/settingsAccessor';
 
 
@@ -91,6 +92,10 @@ function getDisplayNameFromPath(fullPath: string | null | undefined): string {
 
 /**
  * Open a note in a new tab using Obsidian API.
+ *
+ * Prefers a direct file open (deterministic: the tab is titled and loaded
+ * immediately) and only falls back to link-text resolution when the path
+ * doesn't resolve to an existing file.
  */
 async function openNoteInNewTab(notePath: string | null | undefined): Promise<boolean> {
   if (notePath == null || notePath === '') {
@@ -100,6 +105,13 @@ async function openNoteInNewTab(notePath: string | null | undefined): Promise<bo
 
   try {
     const app = getApp();
+    const path = notePath.endsWith('.md') ? notePath : `${notePath}.md`;
+    const file = app.vault.getAbstractFileByPath(path);
+    if (file instanceof TFile) {
+      const leaf = app.workspace.getLeaf('tab');
+      await leaf.openFile(file, { active: true });
+      return true;
+    }
     await app.workspace.openLinkText(notePath.replace(/\.md$/, ''), '', true);
     return true;
   } catch (error) {
