@@ -3,7 +3,8 @@
  *
  * Layer component for the multi-waypoint distance measurement tool.
  * Combines the measurement hook, overlay rendering, editing controls,
- * keyboard affordances (Backspace = remove last, Escape = clear), route
+ * keyboard affordances (Backspace = remove last, Enter = save as route,
+ * Escape = clear), finish-by-double-click (double-tap on touch), route
  * persistence, the save-as-route flow, and — when enabled travel packs
  * exist — live travel times and on-map per-segment terrain assignment.
  */
@@ -15,7 +16,7 @@ import type { EffectiveDistanceSettings } from '#types/hooks/distanceMeasurement
 import type { PluginSettings } from '#types/settings/settings.types';
 import type { TravelTimeLine, TravelModeOption, TravelAllowanceOption } from '../overlays/MeasurementControls';
 
-import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useDistanceMeasurement } from '../../hooks/interactions/useDistanceMeasurement';
 import { getSettings } from '../../core/settingsAccessor';
 import { createSavedRoute } from '../../drawing/routeOperations';
@@ -122,7 +123,35 @@ const MeasurementLayer = ({
     firstSegmentTerrainId
   );
 
-  useLayerHandlers('measure', { handleMeasureClick, handleMeasureMove, clearMeasurement });
+  const handleSaveRoute = useCallback((): void => {
+    if (waypoints.length < 2 || !mapData) return;
+    void new SaveRouteModal(app).openAndGetValue().then(options => {
+      if (options == null) return;
+      const route = createSavedRoute(waypoints, { ...options, segmentTerrains });
+      onSavedRoutesChange?.([...(mapData.savedRoutes ?? []), route]);
+      clearMeasurement();
+    });
+  }, [waypoints, segmentTerrains, mapData, app, onSavedRoutesChange, clearMeasurement]);
+
+  // Double-click (double-tap on touch) on the end cell finishes the route:
+  // the first click commits the final waypoint, the repeat click on the same
+  // cell inside the window opens save-as-route instead of no-opping
+  const DOUBLE_CLICK_MS = 500;
+  const lastClickRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const handleMeasureClickOrFinish = useCallback((cellX: number, cellY: number, isTouch: boolean = false): void => {
+    const now = performance.now();
+    const prev = lastClickRef.current;
+    lastClickRef.current = { x: cellX, y: cellY, time: now };
+    if (prev != null && prev.x === cellX && prev.y === cellY &&
+        now - prev.time < DOUBLE_CLICK_MS && waypoints.length >= 2) {
+      lastClickRef.current = null;
+      handleSaveRoute();
+      return;
+    }
+    handleMeasureClick(cellX, cellY, isTouch);
+  }, [handleMeasureClick, handleSaveRoute, waypoints.length]);
+
+  useLayerHandlers('measure', { handleMeasureClick: handleMeasureClickOrFinish, handleMeasureMove, clearMeasurement });
 
   const [terrainPicker, setTerrainPicker] = useState<TerrainPickerState | null>(null);
 
@@ -137,6 +166,9 @@ const MeasurementLayer = ({
       if (e.key === 'Backspace') {
         removeLastWaypoint();
         e.preventDefault();
+      } else if (e.key === 'Enter') {
+        handleSaveRoute();
+        e.preventDefault();
       } else if (e.key === 'Escape') {
         if (terrainPicker != null) {
           setTerrainPicker(null);
@@ -148,22 +180,12 @@ const MeasurementLayer = ({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isMeasuring, removeLastWaypoint, clearMeasurement, terrainPicker]);
+  }, [isMeasuring, removeLastWaypoint, clearMeasurement, terrainPicker, handleSaveRoute]);
 
   // Route edits shift segment indices out from under an open picker
   useEffect(() => {
     setTerrainPicker(null);
   }, [waypoints.length]);
-
-  const handleSaveRoute = useCallback((): void => {
-    if (waypoints.length < 2 || !mapData) return;
-    void new SaveRouteModal(app).openAndGetValue().then(options => {
-      if (options == null) return;
-      const route = createSavedRoute(waypoints, { ...options, segmentTerrains });
-      onSavedRoutesChange?.([...(mapData.savedRoutes ?? []), route]);
-      clearMeasurement();
-    });
-  }, [waypoints, segmentTerrains, mapData, app, onSavedRoutesChange, clearMeasurement]);
 
   // ===========================================
   // Travel times (TM-14..18)
