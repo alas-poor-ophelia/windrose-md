@@ -1540,11 +1540,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               {/* PartyPinLayer - party pin marker and range ring */}
               <MapCanvas.PartyPinLayer currentTool={currentTool} onPartyPinsChange={handlePartyPinsChange} />
 
-              {/* RouteLayer - saved measurement routes (always visible) */}
-              <MapCanvas.RouteLayer
-                currentTool={currentTool}
-                onSavedRoutesChange={handleSavedRoutesChange}
-              />
+              {/* RouteLayer - saved measurement routes (gated by the visibility toolbar) */}
+              {layerVisibility.savedRoutes && (
+                <MapCanvas.RouteLayer
+                  currentTool={currentTool}
+                  onSavedRoutesChange={handleSavedRoutesChange}
+                />
+              )}
 
               {/* MeasurementLayer - distance measurement tool overlay */}
               <MapCanvas.MeasurementLayer

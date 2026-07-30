@@ -31,6 +31,7 @@ interface LayerVisibilityState {
   hexCoordinates: boolean;
   regions: boolean;
   outlines: boolean;
+  savedRoutes: boolean;
 }
 
 interface UseUILayoutResult {
@@ -73,7 +74,8 @@ function useUILayout({
     textLabels: true,
     hexCoordinates: false,
     regions: true,
-    outlines: true
+    outlines: true,
+    savedRoutes: true
   });
 
   const handleToggleLayerVisibility = useCallback((layerId: keyof LayerVisibilityState) => {

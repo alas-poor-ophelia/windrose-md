@@ -29,6 +29,7 @@ export interface LayerVisibility {
   hexCoordinates?: boolean;
   regions?: boolean;
   outlines?: boolean;
+  savedRoutes?: boolean;
 }
 
 /** Layer definition for visibility toggles */
@@ -73,6 +74,11 @@ const VisibilityToolbar = ({
       id: 'textLabels',
       icon: 'lucide-type',
       tooltip: 'Toggle text label visibility'
+    },
+    {
+      id: 'savedRoutes',
+      icon: 'lucide-route',
+      tooltip: 'Toggle route visibility'
     },
     {
       id: 'hexCoordinates',
