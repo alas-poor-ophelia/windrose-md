@@ -285,6 +285,9 @@ const DATA_FILE_PATH = 'windrose-md-data.json';
 // =============================================================================
 
 const Z_INDEX = {
+  /** Map-content overlays (routes, party pin ring): above the canvas, BELOW
+      all floating chrome (panels 4, compass 10, drawers 15, map controls 99) */
+  CANVAS_OVERLAY: 2,
   HOVER_PREVIEW: 10,
   DRAWING_LAYER: 100,
   TOOLBAR: 150,

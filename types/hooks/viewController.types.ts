@@ -27,4 +27,10 @@ export interface ViewController {
   syncCommitted: (vs: StoredViewState) => void;
   /** The renderer registers its rAF-coalesced draw here. */
   setRenderCallback: (cb: () => void) => void;
+  /**
+   * Subscribe to every live viewState change (mid-gesture ticks, external
+   * syncs, and commits). For DOM/SVG overlays that must track the gesture
+   * imperatively without a React re-render. Returns an unsubscribe.
+   */
+  subscribeLive: (cb: (vs: StoredViewState) => void) => () => void;
 }

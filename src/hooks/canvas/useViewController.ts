@@ -49,6 +49,10 @@ function useViewController(
       gestureId: null as number | null,
       nextId: 1,
       renderCb: (): void => {},
+      liveListeners: new Set<(vs: StoredViewState) => void>(),
+    };
+    const notifyLive = (): void => {
+      for (const cb of s.liveListeners) cb(s.live);
     };
     ref.current = {
       getLive: () => s.live,
@@ -56,6 +60,7 @@ function useViewController(
       setLive: (vs) => {
         s.live = vs;
         s.renderCb();
+        notifyLive();
       },
       beginGesture: () => {
         s.gestureId = s.nextId;
@@ -67,6 +72,7 @@ function useViewController(
         s.live = vs;
         s.gestureId = null;
         commitRef.current(vs);
+        notifyLive();
       },
       cancelIfCurrent: (gestureId) => {
         if (gestureId === s.gestureId) s.gestureId = null;
@@ -75,10 +81,15 @@ function useViewController(
         if (s.gestureId == null) {
           s.live = vs;
           s.renderCb();
+          notifyLive();
         }
       },
       setRenderCallback: (cb) => {
         s.renderCb = cb;
+      },
+      subscribeLive: (cb) => {
+        s.liveListeners.add(cb);
+        return () => s.liveListeners.delete(cb);
       },
     };
   }

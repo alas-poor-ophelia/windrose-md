@@ -416,13 +416,14 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     screenToGrid,
     screenToWorld,
     getClientCoords,
+    viewController,
     GridGeometry,
     HexGeometry,
     // State change callbacks for layers
     onDrawingStateChange: handleDrawingStateChange,
     onPanZoomStateChange: handlePanZoomStateChange
   } as MapStateContextValue), [mapData, mapId, notePath, geometry, currentTool, selectedColor,
-    selectedObjectType, screenToGrid, screenToWorld, getClientCoords,
+    selectedObjectType, screenToGrid, screenToWorld, getClientCoords, viewController,
     handleDrawingStateChange, handlePanZoomStateChange]);
 
   const mapOperationsValue = useMemo(() => ({

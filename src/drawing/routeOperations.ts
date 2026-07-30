@@ -124,6 +124,20 @@ function sumDistances(segments: number[]): number {
 }
 
 /**
+ * Distance from a point to a line segment (both in the same coordinate
+ * space). Used for route hover/tap hit-testing.
+ */
+function distanceToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+  let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+/**
  * Create a permanent saved route from a measured waypoint sequence.
  * Requires at least 2 points; throws otherwise (callers gate on length).
  */
@@ -180,6 +194,7 @@ export {
   setSegmentTerrain,
   computeSegmentDistances,
   sumDistances,
+  distanceToSegment,
   createSavedRoute,
   updateSavedRoute,
   removeSavedRoute,

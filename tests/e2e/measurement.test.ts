@@ -137,10 +137,12 @@ test("Save as route creates a styled route and undo/redo round-trips it", async 
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
+  // Collinear waypoints: the hit polyline's bounding-box center then lies ON
+  // the line, so hover-to-reveal can aim at it directly
   await measureWaypoints(page, [
     { dx: -80, dy: -40 },
-    { dx: 60, dy: -40 },
-    { dx: 60, dy: 60 }
+    { dx: 0, dy: -40 },
+    { dx: 60, dy: -40 }
   ]);
 
   await page.locator('.windrose-measure-controls button[aria-label="Save as route"]').click();
@@ -153,8 +155,18 @@ test("Save as route creates a styled route and undo/redo round-trips it", async 
   await modal.locator("button", { hasText: "Save route" }).click();
   await page.waitForTimeout(400);
 
+  // Labels are hover-revealed: move onto the route before reading it
+  const hoverRoute = async (): Promise<void> => {
+    const hit = page.locator('svg.windrose-route-layer polyline[stroke="transparent"]').first();
+    const box = await hit.boundingBox();
+    expect(box).not.toBeNull();
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await page.waitForTimeout(250);
+  };
+
   const routeLayer = page.locator("svg.windrose-route-layer");
   expect(await routeLayer.isVisible()).toBe(true);
+  await hoverRoute();
   expect(await routeLayer.textContent()).toContain("Proving Route");
 
   // Saved routes participate in undo history
@@ -165,6 +177,7 @@ test("Save as route creates a styled route and undo/redo round-trips it", async 
 
   await redoBtn.click();
   await page.waitForTimeout(300);
+  await hoverRoute();
   expect(await page.locator("svg.windrose-route-layer").textContent()).toContain("Proving Route");
 
   expect(errors).toHaveLength(0);
@@ -208,6 +221,10 @@ test("Clicking a saved route opens the edit menu and rename updates the label", 
   await nameInput.fill("New Name");
   await editModal.locator("button", { hasText: "Save changes" }).click();
   await page.waitForTimeout(400);
+
+  // Labels are hover-revealed: move back onto the route before reading it
+  await page.mouse.move(routeBox!.x + routeBox!.width / 2, routeBox!.y + routeBox!.height / 2);
+  await page.waitForTimeout(250);
 
   const label = await page.locator("svg.windrose-route-layer").textContent();
   expect(label).toContain("New Name");

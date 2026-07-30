@@ -17,6 +17,7 @@ import type { TileAssignment } from '../tiles/tile.types';
 import type { WallPath } from '../core/wallpath.types';
 import type { TerrainStroke } from '../core/terrainstroke.types';
 import type { ToolId } from '../tools/tool.types';
+import type { ViewController } from '../hooks/viewController.types';
 
 // ===========================================
 // Shared Helper Types
@@ -110,6 +111,8 @@ export interface MapStateContextValue {
   currentTool?: ToolId;
   selectedColor?: string;
   selectedObjectType?: string;
+  /** Shared live pan/zoom controller — overlays subscribe to track gestures. */
+  viewController?: ViewController;
   GridGeometry?: new (...args: unknown[]) => ExtendedGeometry;
   HexGeometry?: new (...args: unknown[]) => IGeometry;
   onDrawingStateChange?: (state: DrawingLayerState) => void;

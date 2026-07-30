@@ -12,13 +12,21 @@
  * canvas display scale), so per-vertex conversion is unnecessary.
  */
 
-import { useMemo } from 'preact/hooks';
+import { useMemo, useRef } from 'preact/hooks';
 import type { RefObject, VNode } from 'preact';
 import type { IGeometry, Point, WorldCoords } from '#types/core/geometry.types';
 import type { MapData, PartyPin } from '#types/core/map.types';
 import type { DiagonalRule } from '#types/settings/settings.types';
+import type { ViewController } from '#types/hooks/viewController.types';
 import { getCellsWithinRange } from '../../drawing/rangeOperations';
 import { resolvePinIconGlyph } from '../../objects/partyPinOperations';
+import {
+  computeCounterScale,
+  computeOverlayMetrics,
+  computeWorldTransform,
+  counterScaleTransform,
+  useLiveOverlayTransform
+} from '../../hooks/canvas/useLiveOverlayTransform';
 import { Z_INDEX } from '../../core/dmtConstants';
 
 /** Concrete geometry surface used for world-space rendering */
@@ -39,6 +47,8 @@ interface PartyPinOverlayProps {
   geometry: IGeometry | null;
   mapData: MapData | null;
   canvasRef: RefObject<HTMLCanvasElement> | null;
+  /** Live pan/zoom controller — the ring tracks gestures via imperative transform updates */
+  viewController?: ViewController;
 }
 
 /** Classic map-pin silhouette: tip at the origin, head circle above */
@@ -65,55 +75,35 @@ const PartyPinOverlay = ({
   flashMarker = null,
   geometry,
   mapData,
-  canvasRef
+  canvasRef,
+  viewController
 }: PartyPinOverlayProps): VNode | null => {
   const geo = geometry as PartyPinGeometry | null;
   const { x: pinX, y: pinY } = pin.position;
+  const worldGroupRef = useRef<SVGGElement | null>(null);
+  const northDirection = mapData?.northDirection ?? 0;
 
   const rangeCells = useMemo(() => {
     if (!geo || pin.rangeStyle !== 'cells' || rangeInCells <= 0) return [];
     return getCellsWithinRange(geo, { x: pinX, y: pinY }, rangeInCells, { diagonalRule });
   }, [geo, pin.rangeStyle, pinX, pinY, rangeInCells, diagonalRule]);
 
+  // Mid-gesture pan/zoom ticks rewrite the group transform imperatively
+  useLiveOverlayTransform({ groupRef: worldGroupRef, canvasRef, geometry: geo, northDirection, viewController });
+
   if (!geo || !mapData?.viewState || !canvasRef?.current) {
     return null;
   }
 
-  const canvas = canvasRef.current;
-  const { width: canvasWidth, height: canvasHeight } = canvas;
-  const canvasRect = canvas.getBoundingClientRect();
-  const displayScale = canvasRect.width / canvasWidth;
+  const metrics = computeOverlayMetrics(canvasRef.current);
+  if (!metrics) return null;
 
-  // Find the container the SVG is positioned relative to (canvas may be
-  // nested inside wrapper divs)
-  let container = canvas.parentElement;
-  let traversalCount = 0;
-  while (container?.classList && !container.classList.contains('windrose-canvas-container')) {
-    container = container.parentElement;
-    traversalCount++;
-    if (traversalCount > 10) break;
-  }
-  const containerRect = container?.getBoundingClientRect();
-  const canvasOffsetX = containerRect ? canvasRect.left - containerRect.left : 0;
-  const canvasOffsetY = containerRect ? canvasRect.top - containerRect.top : 0;
-
-  // World→screen transform, matching cellToScreen: pan offset + zoom, rotated
-  // about the canvas center, then scaled to CSS pixels and container offset
-  const { zoom, center } = mapData.viewState;
-  const northDirection = mapData.northDirection ?? 0;
-  const panOffsetX = geo.type === 'grid'
-    ? canvasWidth / 2 - center.x * geo.getScaledCellSize(zoom)
-    : canvasWidth / 2 - center.x * zoom;
-  const panOffsetY = geo.type === 'grid'
-    ? canvasHeight / 2 - center.y * geo.getScaledCellSize(zoom)
-    : canvasHeight / 2 - center.y * zoom;
-
-  const worldTransform =
-    `translate(${canvasOffsetX} ${canvasOffsetY}) ` +
-    `scale(${displayScale}) ` +
-    (northDirection !== 0 ? `rotate(${northDirection} ${canvasWidth / 2} ${canvasHeight / 2}) ` : '') +
-    `translate(${panOffsetX} ${panOffsetY}) ` +
-    `scale(${zoom})`;
+  // Render from the LIVE viewState (matches the canvas mid-gesture; equals the
+  // committed mapData.viewState otherwise)
+  const viewState = viewController?.getLive() ?? mapData.viewState;
+  const { zoom } = viewState;
+  const worldTransform = computeWorldTransform(viewState, geo, northDirection, metrics);
+  const counterScale = computeCounterScale(zoom, metrics.displayScale);
 
   const pinCenter = geo.getCellCenter(pin.position.x, pin.position.y);
   const cellSpacing = getCellSpacing(geo, pin.position);
@@ -130,11 +120,10 @@ const PartyPinOverlay = ({
         width: '100%',
         height: '100%',
         pointerEvents: 'none',
-        zIndex: Z_INDEX.DRAWING_LAYER,
-        overflow: 'visible'
+        zIndex: Z_INDEX.CANVAS_OVERLAY
       }}
     >
-      <g transform={worldTransform}>
+      <g ref={worldGroupRef} transform={worldTransform}>
         {/* Range ring */}
         {pin.rangeStyle === 'circle' && circleRadius > 0 && (
           <circle
@@ -259,24 +248,31 @@ const PartyPinOverlay = ({
           })()}
         </g>
 
-        {/* Label */}
+        {/* Label — counter-scaled so it holds a constant on-screen size at
+            every zoom (the ring strokes get the same via non-scaling-stroke) */}
         {pin.label !== '' && (
-          <text
-            className="windrose-party-pin-label"
-            x={pinCenter.worldX}
-            y={pinCenter.worldY + geo.cellSize * 0.42}
-            textAnchor="middle"
-            dominantBaseline="hanging"
-            fill="#ffffff"
-            stroke="rgba(26, 26, 26, 0.9)"
-            strokeWidth={geo.cellSize * 0.02}
-            paintOrder="stroke"
-            fontSize={geo.cellSize * 0.26}
-            fontFamily="var(--font-interface, -apple-system, BlinkMacSystemFont, sans-serif)"
-            fontWeight="600"
+          <g
+            data-counter-scale-x={pinCenter.worldX}
+            data-counter-scale-y={pinCenter.worldY + geo.cellSize * 0.42}
+            transform={counterScaleTransform(pinCenter.worldX, pinCenter.worldY + geo.cellSize * 0.42, counterScale)}
           >
-            {pin.label}
-          </text>
+            <text
+              className="windrose-party-pin-label"
+              x={0}
+              y={0}
+              textAnchor="middle"
+              dominantBaseline="hanging"
+              fill="#ffffff"
+              stroke="rgba(26, 26, 26, 0.9)"
+              strokeWidth={3}
+              paintOrder="stroke"
+              fontSize={12.5}
+              fontFamily="var(--font-interface, -apple-system, BlinkMacSystemFont, sans-serif)"
+              fontWeight="600"
+            >
+              {pin.label}
+            </text>
+          </g>
         )}
       </g>
     </svg>
