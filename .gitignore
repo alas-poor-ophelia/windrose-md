@@ -61,6 +61,10 @@ memory/
 .claude/tile-metadata-backup-*.json
 .claude/worktrees/
 .claude/obsidian-review/
+# Session-continuity scratch (plans, handoffs, findings) stays local-only
+.claude/*.md
+.claude/cleanroom/
+.claude/settings.local.json
 
 # Agent worktrees
 .wt/
