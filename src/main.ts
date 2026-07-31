@@ -16,6 +16,15 @@ import { WindroseMDSettingsTab } from './settings/WindroseSettingsTab';
 import { VIEW_TYPE_WINDROSE_MAP, WindroseMapView } from './views/WindroseMapView';
 import { recordPerfTelemetry } from './utils/perfTelemetry';
 import { writeCanvasCapabilityReport } from './utils/canvasCapabilityReport';
+import { scanTilesetFolder } from './assets/tilesetOperations';
+import { runImportDetectionPass } from './assets/importDetectionPass';
+import {
+  loadTileMetadata,
+  saveTileMetadata,
+  bulkSetDdSourceType,
+  setTileMetadataForRender,
+} from './persistence/tileMetadata';
+import type { TileEntry } from '#types/tiles/tile.types';
 
 /** View center used when a generated dungeon has no cells to derive bounds from. */
 const DUNGEON_FALLBACK_CENTER = { x: 5, y: 5 };
@@ -164,6 +173,79 @@ export default class WindrosePlugin extends Plugin {
         return true;
       }
     });
+
+    this.addCommand({
+      id: 'rescan-tile-classification',
+      name: 'Rescan tile classification (fill missing)',
+      callback: () => { void this.rescanTileClassification(); },
+    });
+  }
+
+  /**
+   * Fill-missing reclassification over every registered tileset folder — the
+   * recovery path when an import's classification phase failed or the metadata
+   * store was lost. Every write is fill-missing-only (idempotent), and render-
+   * mode predictions are never applied here (RCA 2026-06-09: bulk render-mode
+   * writes retroactively re-render already-placed tiles).
+   */
+  async rescanTileClassification(): Promise<void> {
+    const folders = this.settings.tilesetFolders ?? [];
+    if (folders.length === 0) {
+      new Notice('Windrose: no tileset folders registered.');
+      return;
+    }
+    new Notice('Windrose: rescanning tile classification…');
+    try {
+      const allTiles: TileEntry[] = [];
+      for (const folder of folders) {
+        allTiles.push(...await scanTilesetFolder(this.app, folder));
+      }
+      let metadata = await loadTileMetadata(this.app);
+
+      // DD extraction names strip folders by their source type ("strips →
+      // source dir"), so a lost ddSourceType is recoverable from the folder
+      // name for pack tiles. Restoring it re-arms the walls pane and the
+      // opening form (portals) after a metadata loss.
+      const DD_SOURCE_FOLDERS = new Set(['walls', 'paths', 'portals', 'terrain', 'patterns']);
+      const ddEntries: Array<{ vaultPath: string; sourceType: string }> = [];
+      for (const t of allTiles) {
+        if (!t.vaultPath.includes('/dungeondraft-packs/')) continue;
+        if (metadata[t.vaultPath]?.ddSourceType != null) continue;
+        const top = (t.category ?? '').split('/')[0]?.toLowerCase();
+        if (top != null && DD_SOURCE_FOLDERS.has(top)) {
+          ddEntries.push({ vaultPath: t.vaultPath, sourceType: top });
+        }
+      }
+      if (ddEntries.length > 0) metadata = bulkSetDdSourceType(metadata, ddEntries);
+
+      // Strips are line assets: scan them for signals but never predict
+      // depth/render/span for them (mirrors runDdImport's skipPredictions).
+      const skip = new Set<string>();
+      for (const t of allTiles) {
+        const src = metadata[t.vaultPath]?.ddSourceType?.toLowerCase();
+        if (src === 'walls' || src === 'paths') skip.add(t.vaultPath);
+      }
+
+      const { metadata: next, stats } = await runImportDetectionPass(this.app, allTiles, metadata, {
+        applyRenderMode: false,
+        skipPredictions: skip,
+      });
+      const saved = await saveTileMetadata(this.app, next);
+      if (!saved) {
+        new Notice('Windrose: rescan finished but the metadata save was refused — see console.');
+        return;
+      }
+      setTileMetadataForRender(next);
+      window.dispatchEvent(new Event('windrose-settings-changed'));
+      new Notice(
+        `Windrose: classification rescan done — ${stats.scanned} scanned, ` +
+        `${stats.depth} tiers, ${stats.spans} footprints, ${ddEntries.length} source types restored.`,
+        10_000
+      );
+    } catch (e) {
+      console.error('[Windrose] Tile classification rescan failed:', e);
+      new Notice('Windrose: tile classification rescan failed — see console for details.');
+    }
   }
 
   onunload(): void {

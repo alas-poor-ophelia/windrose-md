@@ -30,6 +30,7 @@ import { createWallPath, distanceToWallPath as distanceToWall } from '../../draw
 import {
   planGapInsert,
   gapHandleAnchors,
+  findGapOnWallAtPoint,
   resolveGapMove,
   resolveGapEdgeResize,
   remapGapsAfterInsertVertex,
@@ -68,6 +69,13 @@ export interface WallLayerProps {
   bareThresholdArmed?: boolean;
   /** Called on Escape while bare-threshold placement is armed, to disarm it. */
   onDisarmOpening?: () => void;
+  /**
+   * Tile-brush Scale slider value (1 = natural size). Multiplies the armed
+   * portal art's derived width at placement time — baked into the gap's
+   * `widthCells`, so the seated art (aspect-preserving) scales uniformly and
+   * later edge-handle resizes compose on top. Bare thresholds ignore it.
+   */
+  tileScale?: number;
 }
 
 /** Default gap width (grid cells) for a bare Threshold placement (§5.3). */
@@ -163,6 +171,7 @@ const WallLayer = ({
   onSurfaceChange,
   bareThresholdArmed,
   onDisarmOpening,
+  tileScale,
 }: WallLayerProps): VNode | null => {
   const app = useApp();
   const { mapData, geometry, screenToWorld, getClientCoords, canvasRef } = useMapState();
@@ -373,12 +382,14 @@ const WallLayer = ({
   }, [mapData, getViewTransform, selectedEntry, selectedTilesetId, selectedTileId, cellSize, snapDistance]);
 
   // ---- Edit-mode handles ----
-  const drawEditHandles = useCallback(() => {
+  // `append` skips the clear so opening mode can layer handles ON TOP of the
+  // insert ghost (each draw otherwise owns the whole overlay).
+  const drawEditHandles = useCallback((opts?: { append?: boolean }) => {
     const overlay = overlayRef.current;
     if (overlay == null) return;
     const ctx = overlay.getContext('2d');
     if (ctx == null) return;
-    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    if (opts?.append !== true) ctx.clearRect(0, 0, overlay.width, overlay.height);
 
     // During a drag the working copy is the source of truth (mapData is untouched
     // and the wall is excluded from the static raster); otherwise read from mapData.
@@ -417,30 +428,35 @@ const WallLayer = ({
     }
 
     if (zoom >= MIN_HANDLE_ZOOM) {
-      // Bow diamonds at segment midpoints
-      const ds = 5 / zoom;
-      for (let i = 0; i < segmentCount(wall); i++) {
-        const m = segmentMidpoint(wall, i);
-        ctx.save();
-        ctx.translate(m.x, m.y);
-        ctx.rotate(Math.PI / 4);
-        ctx.fillStyle = wall.vertices[i].arc != null ? '#4a9eff' : '#ffffff';
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1 / zoom;
-        ctx.fillRect(-ds, -ds, ds * 2, ds * 2);
-        ctx.strokeRect(-ds, -ds, ds * 2, ds * 2);
-        ctx.restore();
-      }
+      // Opening mode edits doors only: no bow/vertex handles (their drags are
+      // not reachable from opening mode's pointer-down, so drawing them would
+      // advertise dead controls). Gap handles below stay.
+      if (!isOpeningMode) {
+        // Bow diamonds at segment midpoints
+        const ds = 5 / zoom;
+        for (let i = 0; i < segmentCount(wall); i++) {
+          const m = segmentMidpoint(wall, i);
+          ctx.save();
+          ctx.translate(m.x, m.y);
+          ctx.rotate(Math.PI / 4);
+          ctx.fillStyle = wall.vertices[i].arc != null ? '#4a9eff' : '#ffffff';
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 1 / zoom;
+          ctx.fillRect(-ds, -ds, ds * 2, ds * 2);
+          ctx.strokeRect(-ds, -ds, ds * 2, ds * 2);
+          ctx.restore();
+        }
 
-      // Vertex squares
-      const vsz = 4.5 / zoom;
-      for (let i = 0; i < wall.vertices.length; i++) {
-        const v = wall.vertices[i];
-        ctx.fillStyle = selectedVertexRef.current === i ? '#ffd700' : '#ffffff';
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1 / zoom;
-        ctx.fillRect(v.x - vsz, v.y - vsz, vsz * 2, vsz * 2);
-        ctx.strokeRect(v.x - vsz, v.y - vsz, vsz * 2, vsz * 2);
+        // Vertex squares
+        const vsz = 4.5 / zoom;
+        for (let i = 0; i < wall.vertices.length; i++) {
+          const v = wall.vertices[i];
+          ctx.fillStyle = selectedVertexRef.current === i ? '#ffd700' : '#ffffff';
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 1 / zoom;
+          ctx.fillRect(v.x - vsz, v.y - vsz, vsz * 2, vsz * 2);
+          ctx.strokeRect(v.x - vsz, v.y - vsz, vsz * 2, vsz * 2);
+        }
       }
 
       // Gap handles: two edge dots on the centerline + a center dot offset
@@ -479,14 +495,21 @@ const WallLayer = ({
     }
 
     ctx.restore();
-  }, [mapData, getViewTransform, cellSize]);
+  }, [mapData, getViewTransform, cellSize, isOpeningMode]);
 
   // Keep handles in sync with selection, data, and view changes.
   useEffect(() => {
     if (!isWallTool || isDrawing) return;
-    // Opening mode owns the ghost overlay via pointer-move; don't nuke it here.
+    // Opening mode: a selected wall shows its gap handles (click-to-edit);
+    // without one, the ghost overlay is pointer-move-owned — don't nuke it.
     // When isOpeningMode flips false this effect re-runs and cleans it up.
-    if (isOpeningMode) return;
+    if (isOpeningMode) {
+      if (selectedWallId != null) {
+        createOverlay();
+        drawEditHandles();
+      }
+      return;
+    }
     if (selectedWallId == null) {
       if (!isDrawing) removeOverlay();
       return;
@@ -517,16 +540,17 @@ const WallLayer = ({
 
   // ---- Opening mode (portal armed → seat a door/window in a wall gap) ----
   // Width from the armed art (§3.3): naturalWidth ÷ the tileset's authoring
-  // resolution; planGapInsert clamps it to the host segment. Falls back to 1
-  // cell (a spec 256-px portal) until the image decodes.
+  // resolution, × the brush Scale slider; planGapInsert clamps it to the host
+  // segment. Falls back to 1 cell (a spec 256-px portal) until the image decodes.
   const deriveOpeningWidthCells = useCallback((): number => {
     const vp = selectedEntry?.vaultPath;
     const img = vp != null ? getCachedImage(vp) : null;
     const ts = mapData?.tilesets?.find(t => t.id === selectedTilesetId);
     const ppc = ts?.pixelsPerCell ?? DEFAULT_PIXELS_PER_CELL;
     const natW = img?.naturalWidth ?? 0;
-    return natW > 0 ? natW / ppc : 1;
-  }, [selectedEntry?.vaultPath, mapData?.tilesets, selectedTilesetId]);
+    const scale = tileScale != null && tileScale > 0 ? tileScale : 1;
+    return (natW > 0 ? natW / ppc : 1) * scale;
+  }, [selectedEntry?.vaultPath, mapData?.tilesets, selectedTilesetId, tileScale]);
 
   // Nearest kind:'wall' strip whose corridor contains the point (paths are not
   // openable — §5.1). Reuses the edit-mode bbox pre-filter + distanceToWall.
@@ -557,6 +581,9 @@ const WallLayer = ({
     const corridor = Math.max(cellSize * 0.4, 22 / view.zoom);
     const wall = nearestOpeningWall(wx, wy, corridor);
     if (wall == null) return;
+    // Hovering an existing opening: no insert ghost — a click there selects it
+    // for editing (click-to-edit), so previewing an insert would lie.
+    if (findGapOnWallAtPoint(wall, wx, wy, cellSize, corridor) != null) return;
     // Bare Threshold: empty gap at a default 1-cell width, ignoring any armed art.
     const tile = isBareThreshold || selectedTilesetId == null || selectedTileId == null
       ? undefined
@@ -590,6 +617,11 @@ const WallLayer = ({
     // suppress=false → exactly one history entry; the wall stays in the static
     // raster (passing true would drop it AND write no undo entry — G-F2).
     updateWall(wall.id, w => ({ ...w, gaps: [...(w.gaps ?? []), plan.gap] }), false);
+    // Place-and-adjust: the fresh opening is immediately selected, so its
+    // move/resize handles and the footer door controls appear without a click.
+    setSelectedWallId(wall.id);
+    setSelectedGapId(plan.gap.id);
+    setSelectedVertexIndex(null);
   }, [mapData?.viewState?.zoom, cellSize, nearestOpeningWall, selectedTilesetId, selectedTileId, deriveOpeningWidthCells, updateWall, isBareThreshold]);
 
   // ---- Draw-mode actions ----
@@ -738,9 +770,62 @@ const WallLayer = ({
     const verts = verticesRef.current;
 
     // ---- OPENING MODE (portal armed) ----
-    // Owns the click before draw/edit: seat a gap in the nearest wall. Openings
-    // never draw or select a wall. Alt-click cuts a bare threshold (§5.2/§5.3).
+    // Place-and-adjust: gap handles on the selected wall win first (same
+    // precedence as edit mode: edge → center), then a click on an existing
+    // opening's footprint selects it, then a click on bare wall inserts.
+    // Alt-click cuts a bare threshold (§5.2/§5.3). Never draws a wall.
     if (isOpeningMode) {
+      const walls = getWalls();
+      const hitR = Math.max(8 / zoom, 22 / zoom);
+      const selWall = selectedWallIdRef.current != null ? walls.find(w => w.id === selectedWallIdRef.current) : null;
+      if (selWall != null && zoom >= MIN_HANDLE_ZOOM) {
+        const perpWorld = GAP_CENTER_PERP / zoom;
+        for (const g of selWall.gaps ?? []) {
+          const a = gapHandleAnchors(selWall, g, cellSize);
+          if (a == null) continue;
+          if (Math.hypot(coords.worldX - a.lo.x, coords.worldY - a.lo.y) < hitR) {
+            dragRef.current = { type: 'gapEdge', wallId: selWall.id, gapId: g.id, edge: 'lo' };
+            setSelectedGapId(g.id); setSelectedVertexIndex(null);
+            beginDrag(selWall);
+            return;
+          }
+          if (Math.hypot(coords.worldX - a.hi.x, coords.worldY - a.hi.y) < hitR) {
+            dragRef.current = { type: 'gapEdge', wallId: selWall.id, gapId: g.id, edge: 'hi' };
+            setSelectedGapId(g.id); setSelectedVertexIndex(null);
+            beginDrag(selWall);
+            return;
+          }
+        }
+        for (const g of selWall.gaps ?? []) {
+          const a = gapHandleAnchors(selWall, g, cellSize);
+          if (a == null) continue;
+          const cp = gapCenterHandlePos(a.center, perpWorld);
+          if (Math.hypot(coords.worldX - cp.x, coords.worldY - cp.y) < hitR) {
+            dragRef.current = { type: 'gapMove', wallId: selWall.id, gapId: g.id };
+            setSelectedGapId(g.id); setSelectedVertexIndex(null);
+            beginDrag(selWall);
+            return;
+          }
+        }
+      }
+      // Click on an existing opening → select it for editing, don't insert.
+      const corridor = Math.max(cellSize * 0.4, 22 / zoom);
+      const nearWall = nearestOpeningWall(coords.worldX, coords.worldY, corridor);
+      if (nearWall != null) {
+        const gapId = findGapOnWallAtPoint(nearWall, coords.worldX, coords.worldY, cellSize, corridor);
+        if (gapId != null) {
+          setSelectedWallId(nearWall.id);
+          setSelectedGapId(gapId);
+          setSelectedVertexIndex(null);
+          return;
+        }
+      } else if (selectedWallIdRef.current != null || selectedGapRef.current != null) {
+        // Off-wall click with a selection: click-away deselects (no Notice).
+        setSelectedWallId(null);
+        setSelectedGapId(null);
+        setSelectedVertexIndex(null);
+        return;
+      }
       commitOpeningInsert(coords.worldX, coords.worldY, (e as MouseEvent).altKey === true);
       return;
     }
@@ -857,7 +942,7 @@ const WallLayer = ({
     verticesRef.current = next;
     pressActiveRef.current = next.length >= 2;
     drawPreview();
-  }, [currentTool, mapData, getWalls, selectedEntry, isStripAsset, isOpeningMode, commitOpeningInsert, getClientCoords, screenToWorld, cellSize, snapDistance, snapWorld, angleSnap, createOverlay, commitWall, drawPreview, beginDrag]);
+  }, [currentTool, mapData, getWalls, selectedEntry, isStripAsset, isOpeningMode, commitOpeningInsert, nearestOpeningWall, getClientCoords, screenToWorld, cellSize, snapDistance, snapWorld, angleSnap, createOverlay, commitWall, drawPreview, beginDrag]);
 
   const handlePointerMove = useCallback((e: MouseEvent | TouchEvent | PointerEvent) => {
     if (currentTool !== 'wall') return;
@@ -866,17 +951,18 @@ const WallLayer = ({
     if (!coords) return;
     const zoom = mapData?.viewState?.zoom ?? 1;
 
-    // ---- OPENING MODE hover ghost ----
-    if (isOpeningMode) {
-      createOverlay();
-      drawOpeningGhost(coords.worldX, coords.worldY);
-      return;
-    }
-
-    // ---- EDIT DRAG ----
+    // ---- EDIT DRAG (checked before the opening ghost: opening mode's gap
+    // move/resize drags resolve through this same path) ----
     // Mutate the working copy only — mapData stays untouched for the whole gesture
     // (no per-frame state write, no static-cache bust, no context cascade).
     const drag = dragRef.current;
+    if (drag == null && isOpeningMode) {
+      // ---- OPENING MODE hover ghost + gap handles on the selected wall ----
+      createOverlay();
+      drawOpeningGhost(coords.worldX, coords.worldY);
+      if (selectedWallIdRef.current != null) drawEditHandles({ append: true });
+      return;
+    }
     if (drag != null) {
       const base = dragWorkingRef.current;
       if (base == null) return;
@@ -1057,8 +1143,11 @@ const WallLayer = ({
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
 
-      // Bare-threshold placement: Escape disarms the mode (nothing to draw/select).
-      if (isBareThreshold && e.key === 'Escape' && verticesRef.current.length === 0) {
+      // Bare-threshold placement: Escape disarms the mode — but a selected
+      // opening/wall deselects first (the Editing branch below), so Escape
+      // steps out gradually: gap → wall → disarm.
+      if (isBareThreshold && e.key === 'Escape' && verticesRef.current.length === 0
+          && selectedWallIdRef.current == null) {
         e.preventDefault();
         onDisarmOpening?.();
         return;
@@ -1101,6 +1190,10 @@ const WallLayer = ({
           setSelectedVertexIndex(null);
         }
       } else if (e.key === 'Backspace' || e.key === 'Delete') {
+        // Opening mode edits doors, not walls: without a selected gap, Delete
+        // is a no-op (deleting a whole wall from portal placement would be a
+        // destructive surprise).
+        if (isOpeningMode && selectedGapRef.current == null) return;
         e.preventDefault();
         const gapId = selectedGapRef.current;
         const vIdx = selectedVertexRef.current;
@@ -1133,7 +1226,7 @@ const WallLayer = ({
     };
     activeDocument.addEventListener('keydown', onKeyDown);
     return () => activeDocument.removeEventListener('keydown', onKeyDown);
-  }, [isWallTool, getWalls, updateWall, onWallPathsChange, cancelDrawing, commitWall, drawPreview, cellSize, isBareThreshold, onDisarmOpening]);
+  }, [isWallTool, getWalls, updateWall, onWallPathsChange, cancelDrawing, commitWall, drawPreview, cellSize, isBareThreshold, isOpeningMode, onDisarmOpening]);
 
   // Reset transient state when the tool changes away.
   useEffect(() => {
@@ -1145,6 +1238,19 @@ const WallLayer = ({
       removeOverlay();
     }
   }, [isWallTool, cancelDrawing, removeOverlay]);
+
+  // Opening-mode boundary: crossing into or out of portal placement clears any
+  // wall/gap selection. A gap auto-selected at placement must not survive an
+  // exit taken by arming a different tile — the footer would show no door
+  // controls while Delete stayed silently armed for the hidden selection.
+  const prevOpeningModeRef = useRef(isOpeningMode);
+  useEffect(() => {
+    if (prevOpeningModeRef.current === isOpeningMode) return;
+    prevOpeningModeRef.current = isOpeningMode;
+    setSelectedWallId(null);
+    setSelectedVertexIndex(null);
+    setSelectedGapId(null);
+  }, [isOpeningMode]);
   useEffect(() => () => removeOverlay(), [removeOverlay]);
 
   useLayerHandlers('wall', { handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick });

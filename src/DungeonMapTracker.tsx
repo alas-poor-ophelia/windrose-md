@@ -1508,6 +1508,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onSurfaceChange={setWallSurface}
                 bareThresholdArmed={bareThresholdArmed}
                 onDisarmOpening={() => setBareThresholdArmed(false)}
+                tileScale={tileScale}
               />
 
               {/* RegionLayer - hex region creation and editing */}

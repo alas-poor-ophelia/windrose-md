@@ -22,6 +22,7 @@ import {
   createWallGap,
   planGapInsert,
   gapHandleAnchors,
+  findGapOnWallAtPoint,
   resolveGapMove,
   resolveGapEdgeResize,
 } from '../../../src/drawing/wallGapOperations';
@@ -574,5 +575,50 @@ describe('snapInsertPointOutsideGaps', () => {
     const noGaps = wall([{ x: 0, y: 0 }, { x: 200, y: 0 }]);
     const p = snapInsertPointOutsideGaps(noGaps, 0, 100, 0, CELL);
     expect(p.x).toBeCloseTo(100, 6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findGapOnWallAtPoint (opening-mode click-to-edit hit-test)
+// ---------------------------------------------------------------------------
+
+describe('findGapOnWallAtPoint', () => {
+  // Straight wall 0,0 → 400,0; gap centered at world 200, 2 cells wide (span 150..250).
+  const g = gap(0, 0.5, 2);
+  const w = { vertices: [{ x: 0, y: 0 }, { x: 400, y: 0 }], closed: false, gaps: [g] };
+
+  it('hits a point inside the gap span within the perpendicular corridor', () => {
+    expect(findGapOnWallAtPoint(w, 200, 10, CELL, 20)).toBe(g.id);
+  });
+
+  it('misses a point on the wall but outside the gap span', () => {
+    expect(findGapOnWallAtPoint(w, 100, 0, CELL, 20)).toBeNull();
+  });
+
+  it('misses a point inside the span but beyond maxPerp', () => {
+    expect(findGapOnWallAtPoint(w, 200, 40, CELL, 20)).toBeNull();
+  });
+
+  it('hits exactly on the span edge (inclusive)', () => {
+    expect(findGapOnWallAtPoint(w, 150, 0, CELL, 20)).toBe(g.id);
+  });
+
+  it('returns the gap under the pointer when several share the wall', () => {
+    const gA = gap(0, 0.25, 1);
+    const gB = gap(0, 0.75, 1);
+    const multi = { vertices: [{ x: 0, y: 0 }, { x: 400, y: 0 }], closed: false, gaps: [gA, gB] };
+    expect(findGapOnWallAtPoint(multi, 300, 5, CELL, 20)).toBe(gB.id);
+    expect(findGapOnWallAtPoint(multi, 100, 5, CELL, 20)).toBe(gA.id);
+  });
+
+  it('returns null for a wall without gaps', () => {
+    expect(findGapOnWallAtPoint(wall([{ x: 0, y: 0 }, { x: 400, y: 0 }]), 200, 0, CELL, 20)).toBeNull();
+  });
+
+  it('finds a gap seated on an arc segment', () => {
+    // Bowed segment; the gap sits at the arc's parametric center.
+    const arcWall = { vertices: [{ x: 0, y: 0, arc: [200, 100] as [number, number] }, { x: 400, y: 0 }], closed: false, gaps: [gap(0, 0.5, 2)] };
+    // Apex of the quadratic at t=0.5 is (200, 50); the gap center sits there.
+    expect(findGapOnWallAtPoint(arcWall, 200, 55, CELL, 20)).not.toBeNull();
   });
 });

@@ -2053,7 +2053,10 @@ button.windrose-object-grid-item:hover,
 
 /* ---- Jump rail ---- */
 .windrose-tb-rail {
-  width: 128px;
+  /* Wide enough that common single-word categories ("Structures") fit on one
+     line beside the mosaic and a 4-digit count — break-word still guards the
+     genuinely long merged names. */
+  width: 156px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -2080,6 +2083,13 @@ button.windrose-object-grid-item:hover,
      below). Auto height + a comfortable floor lets the row expand instead. */
   height: auto;
   min-height: 30px;
+  /* The rail is a scrollable flex column: once the list overflows, flex compresses
+     every row toward min-height and multi-line labels paint over the row below.
+     Rows must keep their content height and let the rail scroll instead. The
+     overflow clip is the hedge .windrose-tb-card already carries for the same
+     host button-height fight. */
+  flex-shrink: 0;
+  overflow: hidden;
   background: transparent;
   color: var(--windrose-text-muted);
   cursor: pointer;
@@ -2125,7 +2135,10 @@ button.windrose-object-grid-item:hover,
   flex: 1;
   min-width: 0;
   white-space: normal;
-  overflow-wrap: anywhere;
+  /* Keep words whole: break-word only splits a word that can't fit on a line by
+     itself (unlike `anywhere`, which shattered names into orphan characters).
+     Path-style merged names get a <wbr> after each '/' so they break at the slash. */
+  overflow-wrap: break-word;
   line-height: 1.2;
   text-align: left;
   /* Full-pane rail has more vertical room than the block cards: allow up to three
@@ -2940,6 +2953,11 @@ input.windrose-tb-spanin:focus {
   align-items: center;
   gap: 7px;
   width: 100%;
+  /* Mirror the desktop height fight + anti-shrink guards at tablet specificity. */
+  height: auto;
+  min-height: 30px;
+  flex-shrink: 0;
+  overflow: hidden;
   padding: 7px 8px;
   background: transparent;
   color: var(--windrose-text-muted);

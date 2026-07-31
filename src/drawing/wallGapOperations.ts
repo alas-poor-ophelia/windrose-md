@@ -480,6 +480,33 @@ function gapHandleAnchors(
 }
 
 /**
+ * Hit-test a pointer against a wall's gap footprints: returns the id of the
+ * gap whose clamped span contains the pointer's arc-length projection, with
+ * the pointer within `maxPerp` world units of the centerline. Opening mode's
+ * click-to-edit — clicking a placed door selects it instead of inserting a
+ * new gap on top of it. Pure; mirrors gapHandleAnchors' clamped-span math.
+ */
+function findGapOnWallAtPoint(
+  wall: Pick<WallPath, 'vertices' | 'closed' | 'gaps'>,
+  wx: number,
+  wy: number,
+  cellSize: number,
+  maxPerp: number,
+): string | null {
+  const gaps = wall.gaps;
+  if (gaps == null || gaps.length === 0) return null;
+  const flat = buildGapFlatten(wall);
+  if (segmentCount(flat) === 0) return null;
+  const proj = projectPointOntoFlatten(flat, wx, wy);
+  if (proj == null || proj.dist > maxPerp) return null;
+  for (const g of gaps) {
+    const span = clampGapToSegment(g, flat, cellSize);
+    if (proj.lenAlong >= span.lo && proj.lenAlong <= span.hi) return g.id;
+  }
+  return null;
+}
+
+/**
  * gapMove: re-anchor a gap to the projected pointer (§6.1). Keeps `widthCells`;
  * a door can migrate across a corner into a neighbouring segment (re-homes
  * `seg`). The stored `t` is re-centered so the clamped span fits its segment.
@@ -715,6 +742,7 @@ export {
   clampWidthCells,
   clampGapToSegment,
   gapHandleAnchors,
+  findGapOnWallAtPoint,
   resolveGapMove,
   resolveGapEdgeResize,
   sweepGapInvariants,

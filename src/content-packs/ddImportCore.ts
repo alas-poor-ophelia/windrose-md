@@ -7,7 +7,7 @@
  */
 
 import type { App } from 'obsidian';
-import { TFile } from 'obsidian';
+import { Notice, TFile } from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type { InstalledPack } from '#types/content-packs/contentPack.types';
 import type { TileEntry, TileLayerRole } from '#types/tiles/tile.types';
@@ -392,6 +392,11 @@ async function runDdImport(
 		}
 	}
 
+	// Classification phase. Wrapped so a failure here can never skip the
+	// finalize below (folder registration + settings save + refresh event):
+	// the files are already in the vault, and an unregistered half-import is
+	// invisible until an app reload — worse than an unclassified-but-visible one.
+	try {
 	if (importTagEntries.length > 0 || ddSourceEntries.length > 0) {
 		onProgress?.(textures.length, textures.length, 'metadata');
 		let metadata = await loadTileMetadata(app);
@@ -463,10 +468,19 @@ async function runDdImport(
 			}
 		}
 
-		await saveTileMetadata(app, metadata);
+		const saved = await saveTileMetadata(app, metadata);
+		if (!saved) throw new Error('tile metadata save was refused or failed');
 		// Push the freshly-written store into the renderer's accessor so any
 		// open map resolves the new per-tile render modes without a full reload.
 		setTileMetadataForRender(metadata);
+	}
+	} catch (e) {
+		console.error('[Windrose] Pack classification phase failed:', e);
+		new Notice(
+			'Windrose: pack files imported, but tile classification could not be saved. ' +
+			'Re-import the pack to complete classification (files re-extract in place).',
+			12_000
+		);
 	}
 
 	const tilesetFolders = plugin.settings.tilesetFolders ?? [];

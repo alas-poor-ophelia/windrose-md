@@ -193,6 +193,11 @@ export interface PluginSettings {
 
   // First-run onboarding state (absent = not yet resolved)
   onboardingState?: OnboardingState;
+
+  // Settings-tab "import from previous installation" banner dismissed
+  // (set on dismiss or after a successful import; absent = show while
+  // the old plugin's data file exists)
+  oldImportBannerDismissed?: boolean;
 }
 
 // ===========================================

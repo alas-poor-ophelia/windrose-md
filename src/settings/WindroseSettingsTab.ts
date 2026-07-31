@@ -66,9 +66,14 @@ class WindroseMDSettingsTab extends PluginSettingTab {
   }
 
   private renderImportBanner(containerEl: HTMLElement): void {
+    if (this.plugin.settings.oldImportBannerDismissed === true) return;
     void this.plugin.hasOldPluginData().then(hasOld => {
       if (!hasOld) return;
-      new Setting(containerEl)
+      // display() may run again (emptying the container) while hasOldPluginData
+      // is still in flight; both resolved promises then append, doubling the
+      // banner. Remove any banner a prior resolution already placed.
+      containerEl.querySelector('.windrose-old-import-banner')?.remove();
+      const setting = new Setting(containerEl)
         .setName('Import settings from previous installation')
         .setDesc('Found settings from the old Windrose MapDesigner plugin. Import object sets, custom objects, and overrides.')
         .addButton(btn => btn
@@ -78,14 +83,23 @@ class WindroseMDSettingsTab extends PluginSettingTab {
             const { imported } = await this.plugin.mergeFromOldPlugin();
             if (imported.length > 0) {
               new Notice(`Windrose: Imported ${imported.join(', ')}`, 10000);
+              this.plugin.settings.oldImportBannerDismissed = true;
+              await this.plugin.saveSettings();
               this.settingsChanged = true;
               this.display();
             } else {
               new Notice('Windrose: Nothing new to import — all settings already present.', 5000);
             }
+          }))
+        .addButton(btn => btn
+          .setButtonText('Dismiss')
+          .onClick(async () => {
+            this.plugin.settings.oldImportBannerDismissed = true;
+            await this.plugin.saveSettings();
+            this.display();
           }));
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- lastElementChild was just appended by the new Setting() chain above
-      containerEl.prepend(containerEl.lastElementChild!);
+      setting.settingEl.addClass('windrose-old-import-banner');
+      containerEl.prepend(setting.settingEl);
     });
   }
 

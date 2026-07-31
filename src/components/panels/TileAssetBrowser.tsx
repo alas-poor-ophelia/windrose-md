@@ -477,8 +477,16 @@ const TileAssetBrowser = memo(({
   // ---- Tile metadata ----
 
   useEffect(() => {
-    void loadTileMetadata(app).then(setTileMetadata);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once metadata load; app is the immutable Obsidian singleton
+    // Load at mount AND whenever the settings-changed event fires: pack imports,
+    // the classification-rescan command, and the folder-add detection pass all
+    // rewrite the store outside this component and dispatch the event when done.
+    // A mount-once load left the browser rendering a frozen copy until a full
+    // app reload (stale strata/walls-pane/portal classification).
+    const reload = (): void => { void loadTileMetadata(app).then(setTileMetadata); };
+    reload();
+    window.addEventListener('windrose-settings-changed', reload);
+    return () => window.removeEventListener('windrose-settings-changed', reload);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- app is the immutable Obsidian singleton
   }, []);
 
   // Keep the renderer's global metadata accessor in sync with browser edits
@@ -530,9 +538,19 @@ const TileAssetBrowser = memo(({
       }
       if (missing.length > 0) {
         predictionRanRef.current = true;
-        const updated = bulkSetDepthAffinity(tileMetadata, missing);
-        setTileMetadata(updated);
-        saveTileMetadataDebounced(app, updated);
+        // Merge into a FRESH load, never the captured state: an import or
+        // rescan may have rewritten the store since this component mounted,
+        // and saving the stale copy replaces the whole file with it (the
+        // 2026-07-30 wipe: a mount over a corrupt load saved 2046 predicted
+        // rows over the entire library). Re-filter against the fresh store so
+        // fill-missing stays true.
+        void loadTileMetadata(app).then(fresh => {
+          const stillMissing = missing.filter(m => fresh[m.vaultPath]?.depthAffinity == null);
+          if (stillMissing.length === 0) return;
+          const updated = bulkSetDepthAffinity(fresh, stillMissing);
+          setTileMetadata(updated);
+          saveTileMetadataDebounced(app, updated);
+        });
       } else if (allTiles.some(t => tileMetadata[t.vaultPath]?.depthAffinity != null)) {
         predictionRanRef.current = true;
       }
@@ -683,7 +701,13 @@ const TileAssetBrowser = memo(({
     // Read-only use of depthAffinity (no persistence → no RCA risk).
     if (mapType === 'grid') {
       tiles = tiles.filter((t: TileEntry) => {
-        const affinity = tileMetadata[t.vaultPath]?.depthAffinity ?? 'ground';
+        const meta = tileMetadata[t.vaultPath];
+        // Wall strips never receive a depthAffinity (strips are excluded from
+        // depth prediction by design), but per the design IA a wall is a
+        // line-form tile in the Structure role — route them there instead of
+        // letting the unclassified fallback shelve them under Terrain.
+        const affinity = meta?.depthAffinity
+          ?? (meta?.ddSourceType?.toLowerCase() === 'walls' ? 'structure' : 'ground');
         return affinity === tileDepth;
       });
     }
@@ -1004,10 +1028,12 @@ const TileAssetBrowser = memo(({
   // Wall-tool footer controls (relocated from the old floating bar). Rendered in
   // the loaded-brush footer whenever the wall tool publishes a control surface.
   const renderWallBar = (surface: WallToolSurface): VNode => {
-    if (surface.assetForm === 'opening') {
-      return <span className="windrose-tb-cap">Click a wall to place a door · Alt-click for a bare opening</span>;
+    // A selected gap wins over the opening-mode placement hint: portal mode's
+    // click-to-edit selects doors, and the footer must edit the door it selects.
+    if (surface.assetForm === 'opening' && !(surface.mode === 'edit' && surface.edit?.gap != null)) {
+      return <span className="windrose-tb-cap">Click a wall to place a door · Click a placed door to edit it · Alt-click for a bare opening</span>;
     }
-    if (!surface.hasAsset) {
+    if (!surface.hasAsset && surface.assetForm !== 'opening') {
       return <span className="windrose-tb-cap">Pick a wall or path strip</span>;
     }
     if (surface.mode === 'edit' && surface.edit?.gap != null) {
@@ -1353,7 +1379,12 @@ const TileAssetBrowser = memo(({
                     </span>
                   ))}
                 </span>
-                <span className="windrose-tb-railname">{cat}</span>
+                {/* <wbr> after each '/' lets path-style merged names ("patterns/normal")
+                    break at the slash instead of mid-word (overflow-wrap: break-word). */}
+                <span className="windrose-tb-railname">
+                  {cat.split('/').map((seg, i, segs) =>
+                    i < segs.length - 1 ? [seg, '/', <wbr key={i} />] : seg)}
+                </span>
                 <span className="c">{tiles.length}</span>
               </button>
             ))}

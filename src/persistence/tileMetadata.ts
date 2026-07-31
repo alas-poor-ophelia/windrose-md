@@ -7,7 +7,7 @@
  */
 
 import type { App } from 'obsidian';
-import { TFile } from 'obsidian';
+import { Notice, TFile } from 'obsidian';
 import type { TileMetadataStore, TileMetadataEntry, TileEntry, TileLayerRole } from '#types/tiles/tile.types';
 
 const METADATA_FILE = 'windrose-tile-metadata.json';
@@ -38,30 +38,74 @@ function setTileMetadataForRender(store: TileMetadataStore): void {
   _renderStore = store;
 }
 
+// Throttle the corrupted-file notice so we don't spam the user with a toast
+// every time a debounced save fires while the file is broken. Mirrors the
+// saveMapData corruption guard in fileOperations.ts.
+let lastCorruptionNoticeAt = 0;
+const CORRUPTION_NOTICE_INTERVAL_MS = 30_000;
+function notifyCorruptedMetadataFile(): void {
+  const now = Date.now();
+  if (now - lastCorruptionNoticeAt < CORRUPTION_NOTICE_INTERVAL_MS) return;
+  lastCorruptionNoticeAt = now;
+  new Notice(
+    `Windrose: tile metadata file is corrupted and metadata saves are paused to protect your data.\n\n` +
+    `File: ${METADATA_FILE}\n\n` +
+    `Inspect or restore the file manually, then reload Obsidian to resume saving.`,
+    15_000
+  );
+}
+
 async function loadTileMetadata(app: App): Promise<TileMetadataStore> {
+  const file = app.vault.getAbstractFileByPath(METADATA_FILE);
+  if (!(file instanceof TFile)) return {};
   try {
-    const file = app.vault.getAbstractFileByPath(METADATA_FILE);
-    if (!(file instanceof TFile)) return {};
     const content = await app.vault.read(file);
     return JSON.parse(content) as TileMetadataStore;
-  } catch {
+  } catch (e) {
+    // An existing-but-unreadable store must be loud: silently treating it as
+    // empty makes every tile render unclassified (all "Terrain") AND primes the
+    // next load→mutate→full-replace save to wipe whatever the file still holds.
+    // Saves are refused separately in saveTileMetadata until the file is fixed.
+    console.error('[Windrose] Tile metadata file exists but is unreadable:', e);
+    notifyCorruptedMetadataFile();
     return {};
   }
 }
 
-async function saveTileMetadata(app: App, metadata: TileMetadataStore): Promise<void> {
+/** @returns true if the store was written; false if the save was refused or failed. */
+async function saveTileMetadata(app: App, metadata: TileMetadataStore): Promise<boolean> {
+  const existing = app.vault.getAbstractFileByPath(METADATA_FILE);
+  const file = existing instanceof TFile ? existing : null;
+
+  // Refuse-to-overwrite guard (mirrors saveMapData): every save is a whole-file
+  // replace, so writing over an unparseable store would silently destroy
+  // whatever classification it still contains.
+  if (file != null) {
+    try {
+      JSON.parse(await app.vault.read(file));
+    } catch (e) {
+      console.error(
+        '[Windrose] Existing tile metadata file is unparseable. Refusing to overwrite to avoid data loss.',
+        e
+      );
+      notifyCorruptedMetadataFile();
+      return false;
+    }
+  }
+
   const cleaned = pruneEmptyEntries(metadata);
   const json = JSON.stringify(cleaned, null, 2);
 
   try {
-    const file = app.vault.getAbstractFileByPath(METADATA_FILE);
-    if (file instanceof TFile) {
+    if (file != null) {
       await app.vault.modify(file, json);
     } else {
       await app.vault.create(METADATA_FILE, json);
     }
+    return true;
   } catch (e) {
     console.error('[Windrose] Failed to save tile metadata:', e);
+    return false;
   }
 }
 

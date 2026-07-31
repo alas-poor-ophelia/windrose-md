@@ -60,6 +60,9 @@
       "Bash(py:*)"
     ]
   },
+  "enabledMcpjsonServers": [
+    "windrose"
+  ],
   "hooks": {
     "PostToolUse": [
       {
@@ -72,5 +75,6 @@
         ]
       }
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true
 }
