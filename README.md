@@ -41,7 +41,7 @@ If you used the original Datacore-based Windrose: your maps migrate automaticall
 
 ## Quick start
 
-1. Enable Windrose. The first time, a short survey asks what kind of maps you make — it tailors which tools are visible so the interface starts at your speed. (Everything can be toggled later in settings; nothing is ever locked away.)
+1. Enable Windrose. The first time, a short survey asks what kind of maps you make and picks which tools start visible. (Everything can be toggled later in settings.)
 2. In any note, run **Windrose MapDesigner: Insert map** from the command palette, pick grid or hex, and name it. A map appears right in the note.
 3. Pick the paint tool and start filling in cells — click or drag, like graph paper. Grab objects from the sidebar to drop in doors, stairs, and monsters.
 4. Prefer a whole-tab canvas? Click the **compass ribbon icon** or run **Open map in full pane** to work on any map in a full workspace tab.
@@ -76,7 +76,7 @@ Painting is the core loop — think filling in squares on graph paper, but it ca
 New in 2.0, and the biggest thing Windrose has grown: paint your maps with **image tiles** instead of (or alongside) flat color, on both grid and hex maps.
 
 - **The tile drawer** — a browsable, searchable library of your tiles, organized by category and tag, with grid and list views, starred favorites, and recents.
-- **Six placement tools**, chosen from a ribbon in the drawer: **Paint** (per-cell), **Stamp** (single freeform placement), **Scatter** (freeform with jitter — forests in seconds), **Fill** (flood-fill an area), **Brush** (a soft, world-space terrain brush that blends seamless textures), and **Draw** (walls and paths — see below).
+- **Six placement tools**, chosen from a ribbon in the drawer: **Paint** (per-cell), **Stamp** (single freeform placement), **Scatter** (freeform with jitter), **Fill** (flood-fill an area), **Brush** (a soft, world-space terrain brush that blends seamless textures), and **Draw** (walls and paths — see below).
 - **Walls and paths** — draw wall segments and winding paths that follow your cursor, with curves (drag to bow a segment) and vertex editing. Wall and path tiles from Dungeondraft packs are detected and handled automatically.
 - **Dungeondraft import** — bring in a `.dungeondraft_pack` file via the **Add tiles** wizard (Settings → Tilesets) and its assets arrive already grouped and tagged. Plain image folders from your vault import through the same wizard, with automatic detection of how each tile should render.
 - **Rotation, flipping, and scaling** on placed tiles; per-tileset render settings for fine control.
@@ -92,7 +92,7 @@ The **Add tiles** wizard walks a Dungeondraft pack (or a plain folder of images)
 
 ### Content packs
 
-Want more variety? Browse and install **content packs** — curated object sets and fog-of-war textures — directly from the plugin (Settings → Objects → *Browse object packs*). Packs download into your vault and are ready to use immediately.
+**Content packs** — curated object sets, fog-of-war textures, and travel rule packs — can be browsed and installed directly from the plugin (Settings → Objects → *Browse content packs*, or Settings → Travel Packs → *Browse travel packs*). Object and fog packs download into your vault; travel packs install into settings.
 
 ![The object drawer showing an installed "Classic Dungeons by Bloated Blowfish" content pack, with Navigation, Hazards, and Features categories](docs/images/content-pack-docs-screenshot.png)
 
@@ -126,14 +126,14 @@ Want more variety? Browse and install **content packs** — curated object sets 
 
 ### Beacon & travel
 
-The **Beacon** marks where your party is and keeps answering "what's nearby?" so you don't have to:
+The **Beacon** is a party-position marker with a configurable range:
 
-- Place it from the pin tool, set a **range** in your map's real units, and get a live **range ring** — a clean circle, or a highlight of the actual cells in reach (the classic hex-crawl bloom).
-- Nearby linked notes and markers appear in a distance-sorted list — open the note, or jump the map to the marker. Optionally generate a **beacon note** in your vault that keeps the same results as a table of note links.
-- **Travel packs** — importable rule bundles of units, terrains, travel modes, and daily allowances (think "D&D 5e overland") — turn measured distance into **travel times**, on routes and in the Beacon's results alike.
-- Measurements are **multi-waypoint routes** you can **save** as permanent, styled paths on the map, with per-segment terrain for honest travel math.
+- Place it from the pin tool group and set a **range** in the map's measurement units. The range displays as a ring — a plain circle, or a highlight of the cells within range.
+- Notes and markers within range are listed sorted by distance; each entry can open the note or pan the map to the marker. Optionally, Windrose maintains a **beacon note** in the vault with the same results as note links.
+- **Travel packs** are importable rule bundles — units, terrain speed multipliers, travel modes, and per-day allowances — for a given system (D&D 5e overland travel, for example). With a pack enabled, measured routes and Beacon results also show **travel times**.
+- The measure tool draws **multi-waypoint routes**, which can be saved as persistent paths on the map with per-segment terrain assignments.
 
-The full details live in the [feature list](docs/FEATURES.md).
+Details in the [feature list](docs/FEATURES.md).
 
 ### Boards, Strata, and Layers
 
@@ -194,16 +194,16 @@ Windrose has a small set of solo play features that are more by emergence than p
 Maps don't have to live inline. Open any map in a **full workspace tab** — from the compass ribbon icon, the command palette, or a picker that lists every map in your vault. Panels like the tile drawer can **pop out into floating, dockable windows**, Photoshop-style, when you want the canvas to yourself.
 
 
-### An interface that scales with you
+### Feature toggles
 
-Windrose has grown a lot of tools, and not everyone wants all of them on day one. A **first-run survey** (four quick questions) sets up the interface for how you map — dungeon-crawler, worldbuilder, GM, or all three. Behind it are simple feature toggles in settings: hex maps, regions, sub-maps, fog of war, tiles, walls, the dungeon generator, and more can each be switched on or off at any time. Off means *hidden*, never *gone* — flip a toggle and the tool is back.
+Windrose has grown a lot of tools, and not everyone wants all of them on day one. A **first-run survey** (four questions) picks a starting set of visible tools. Behind it are plain feature toggles in settings: hex maps, regions, sub-maps, fog of war, tiles, walls, the dungeon generator, and more can each be switched on or off at any time. Disabled features are hidden, not removed — existing map content stays visible, and any toggle can be changed later.
 
 ### Navigation
 
 - **Pan**: drag with the select tool, hold Space and drag with any tool, hold the scroll wheel, or two-finger drag on touch.
 - **Zoom**: scroll wheel, pinch, or the zoom controls (10%–200%).
 - **Rotate** the whole map via the Windrose compass in the corner (grid maps rotate for real; on hex it's aesthetic — and it looks great).
-- **Measure** multi-waypoint routes in units you configure globally or per map — and save a measurement as a permanent, styled route on the map.
+- **Measure** distances as multi-waypoint routes, in units configured globally or per map; a measurement can be saved as a route on the map.
 
 ---
 
