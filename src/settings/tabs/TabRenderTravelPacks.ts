@@ -10,6 +10,7 @@
 
 import type { SettingsTabThis } from './settingsTabContext';
 import { Notice, Setting } from 'obsidian';
+import { ContentPackBrowserModal } from '../../content-packs/ContentPackBrowserModal';
 import { ConfirmModal } from '../modals/ConfirmModal';
 import { TravelPackEditModal } from '../modals/TravelPackEditModal';
 import {
@@ -134,6 +135,19 @@ export const TabRenderTravelPacksMethods = {
             void this.importTravelPackFile(file);
           });
           input.click();
+        }));
+
+    // Browse Content Packs (travel tab)
+    new Setting(containerEl)
+      .setName('Browse travel packs')
+      .setDesc('Download ready-made travel rule packs from the Windrose content library')
+      .addButton(btn => btn
+        .setButtonText('Browse')
+        .onClick(() => {
+          new ContentPackBrowserModal(this.app, this.plugin, 'travel-pack', () => {
+            this.settingsChanged = true;
+            this.display();
+          }).open();
         }));
   },
 
