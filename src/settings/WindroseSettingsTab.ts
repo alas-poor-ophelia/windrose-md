@@ -1,6 +1,6 @@
-import type { App, Plugin} from 'obsidian';
+import type { App, Plugin, SettingDefinitionItem } from 'obsidian';
 import { Notice, PluginSettingTab, Setting } from 'obsidian';
-import type { PluginSettings } from '#types/settings/settings.types';
+import type { PluginSettings, WindroseFeature } from '#types/settings/settings.types';
 import type { SectionRef, ObjectSettingsForMapType, ObjectSettingsUpdate } from './tabs/settingsTabContext';
 import { TabRenderCoreMethods } from './tabs/TabRenderCore';
 import { TabRenderSettingsMethods } from './tabs/TabRenderSettings';
@@ -10,7 +10,7 @@ import { TabRenderTilesetsMethods } from './tabs/TabRenderTilesets';
 import { TabRenderTravelPacksMethods } from './tabs/TabRenderTravelPacks';
 import { TabRenderKeyboardShortcutsMethods } from './tabs/TabRenderKeyboardShortcuts';
 import { TabRenderFeaturesMethods } from './tabs/TabRenderFeatures';
-import { isFeatureEnabled } from '../core/featureFlags';
+import { FEATURE_DEFINITIONS, isFeatureEnabled } from '../core/featureFlags';
 
 interface WindrosePlugin extends Plugin {
   settings: PluginSettings;
@@ -86,7 +86,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
               this.plugin.settings.oldImportBannerDismissed = true;
               await this.plugin.saveSettings();
               this.settingsChanged = true;
-              this.display();
+              this.renderImperativeTab();
             } else {
               new Notice('Windrose: Nothing new to import — all settings already present.', 5000);
             }
@@ -96,7 +96,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
           .onClick(async () => {
             this.plugin.settings.oldImportBannerDismissed = true;
             await this.plugin.saveSettings();
-            this.display();
+            this.renderImperativeTab();
           }));
       setting.settingEl.addClass('windrose-old-import-banner');
       containerEl.prepend(setting.settingEl);
@@ -162,7 +162,59 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     return details;
   }
 
+  // --- Declarative Settings API spike (Obsidian 1.13+) ---
+  // Gated behind a localStorage flag so shipped builds keep the imperative
+  // display() path until the full migration lands: a non-empty return here
+  // makes 1.13+ render ONLY these definitions and skip display() entirely.
+  // On app < 1.13 nothing calls this method at all.
+  // Enable:  localStorage.setItem('windrose-declarative-settings-spike', '1')
+
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    if (window.localStorage.getItem('windrose-declarative-settings-spike') !== '1') return [];
+    return [{
+      type: 'group',
+      heading: 'Features',
+      items: FEATURE_DEFINITIONS.map(def => ({
+        name: def.label,
+        desc: def.desc,
+        control: {
+          type: 'toggle' as const,
+          key: `features.${def.id}`,
+          defaultValue: true
+        }
+      }))
+    }];
+  }
+
+  getControlValue(key: string): unknown {
+    if (key.startsWith('features.')) {
+      const id = key.slice('features.'.length) as WindroseFeature;
+      return this.plugin.settings.features?.[id] ?? true;
+    }
+    // Spike only declares features.* keys; nothing else should reach here.
+    return undefined;
+  }
+
+  async setControlValue(key: string, value: unknown): Promise<void> {
+    if (!key.startsWith('features.')) return;
+    const id = key.slice('features.'.length) as WindroseFeature;
+    this.plugin.settings.features = {
+      ...this.plugin.settings.features,
+      [id]: value === true
+    };
+    // saveSettings() dispatches windrose-settings-changed itself, so open
+    // map views slim down live — same semantics as the imperative path.
+    await this.plugin.saveSettings();
+  }
+
   display(): void {
+    this.renderImperativeTab();
+  }
+
+  // Pre-1.13 imperative render path. Lives under an undeprecated name so
+  // internal re-render call sites don't trip the no-deprecated gate;
+  // display() above is the framework-facing fallback shell.
+  renderImperativeTab(): void {
     const { containerEl } = this;
 
     const openSections = new Set<string>();
