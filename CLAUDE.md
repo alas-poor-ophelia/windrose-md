@@ -29,14 +29,24 @@ windrose/                     # Dev root (this directory)
 ## Commands
 
 ```bash
-npm run build       # PRODUCTION build (minified) — must stay the release build: the Obsidian store scanner runs `npm run build` and hash-compares against the release asset
-npm run build:dev   # Dev build (unminified, inline sourcemap)
-npm run deploy      # Dev build + copy main.js/styles.css/manifest.json to vault
-npm run build:watch # Watch mode (rebuilds on file change)
+npm run build        # PRODUCTION build (minified) — must stay the release build: the store scanner rebuilds with the plain `build` script and compares against the release asset
+npm run build:dev    # Dev build (unminified, inline sourcemap)
+npm run deploy       # Dev build + copy main.js/styles.css/manifest.json to vault
+npm run build:watch  # Watch mode (rebuilds on file change)
+npm run lint:scanner # Store-scan replica lint (raw obsidianmd preset, NO local opt-outs) — must be 0 problems before every release
 npm run test:unit   # Unit tests (~4s)
 npm run test:e2e    # E2E tests (FULL SUITE ~15 MIN — see Test Output Capture below)
 npm run check       # Typecheck + lint
 ```
+
+## Store Scan Compliance (hard-won 2026-07-31, do not regress)
+
+- **Single lockfile: `bun.lock` only.** The store scanner detects the lockfile and rebuilds with the matching toolchain; `package-lock.json` was removed — do NOT recreate it. CI (`release.yml`) builds with `bun install --frozen-lockfile`.
+- **esbuild is pinned `^0.28.1`** (direct dep + `overrides`): the scanner rebuilds with a current, non-advisory esbuild (GHSA-gv7w-rqvm-qjhr covers <0.28.1), so shipping bundles from an older esbuild can never byte-match its rebuild.
+- **NO inline eslint-disable directives in `src/` for rules outside the obsidianmd preset** (e.g. `react-hooks/*`): under the scanner's config they error as "definition for rule not found" / "unused directive". Use the config-scoped blocks in `eslint.config.mjs` instead.
+- **UI strings must pass `npm run lint:scanner`** (sentence-case at DEFAULT options — no brand protections; avoid mid-sentence brand names in user-facing strings).
+- Releases are provenance-attested in CI (`actions/attest-build-provenance`).
+- The scorecard only rescans when a NEW release is published — never reuse a tag a scan has seen.
 
 ## Documentation
 

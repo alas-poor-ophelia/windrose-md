@@ -15,6 +15,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   build:
@@ -23,22 +25,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: "20"
+          bun-version: latest
 
       - name: Install dependencies
-        run: npm ci
-
-      - name: Build production
-        run: npm run build:prod
+        run: bun install --frozen-lockfile
 
       - name: Read version from manifest
         id: meta
         run: |
           VERSION=$(node -p "require('./manifest.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Verify tag matches manifest version
+        if: github.event_name == 'push'
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [ "$TAG" != "${{ steps.meta.outputs.version }}" ]; then
+            echo "::error::Tag '$TAG' does not match manifest.json version '${{ steps.meta.outputs.version }}'."
+            echo "Tag the commit with exactly the manifest version (no 'v' prefix)."
+            exit 1
+          fi
+
+      # The store's build-verification rebuilds with the plain `build` script
+      # and compares against the released main.js — this MUST stay the
+      # production build, installed from the committed bun.lock.
+      - name: Build production
+        run: bun run build
 
       - name: Verify artifacts exist
         run: |
@@ -47,6 +62,14 @@ jobs:
           test -f manifest.json || { echo "manifest.json not found"; exit 1; }
           echo "main.js: $(wc -c < main.js) bytes"
           echo "styles.css: $(wc -c < styles.css) bytes"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            main.js
+            styles.css
+            manifest.json
 
       - name: Determine tag
         id: tag
