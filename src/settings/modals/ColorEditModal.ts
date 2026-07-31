@@ -66,7 +66,7 @@ class ColorEditModal extends Modal {
       .addText(text => {
         text.inputEl.addClass('windrose-color-hex-input');
         hexInput = text.inputEl;
-        text.setPlaceholder('#RRGGBB')
+        text.setPlaceholder('Hex color, like #4a9eff')
           .setValue(colorValue)
           .onChange((value: string) => {
             const normalized = value.startsWith('#') ? value : '#' + value;
@@ -133,7 +133,7 @@ class ColorEditModal extends Modal {
         return;
       }
       if (!/^#[0-9A-Fa-f]{6}$/.test(colorValue)) {
-        new Notice('Please enter a valid hex color (e.g., #4A9EFF)');
+        new Notice('Please enter a valid hex color (e.g., #4a9eff)');
         return;
       }
 

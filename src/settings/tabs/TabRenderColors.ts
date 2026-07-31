@@ -33,7 +33,7 @@ export const TabRenderColorsMethods = {
       .setName('Add custom color')
       .setDesc('Create a new color for your palette')
       .addButton(btn => btn
-        .setButtonText('+ Add Color')
+        .setButtonText('Add color')
         .setCta()
         .onClick(() => {
           new ColorEditModal(this.app, this.plugin, null, () => {

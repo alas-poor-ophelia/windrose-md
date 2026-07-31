@@ -142,10 +142,10 @@ export const TabRenderSettingsMethods = {
     // Coordinate Key Mode
     new Setting(containerEl)
       .setName('Coordinate overlay mode')
-      .setDesc('How the C key activates coordinate labels: hold to show temporarily, or toggle on/off')
+      .setDesc('How the coordinate key activates labels: hold to show temporarily, or toggle on and off')
       .addDropdown(dropdown => dropdown
         .addOption('hold', 'Hold to show')
-        .addOption('toggle', 'Toggle On/Off')
+        .addOption('toggle', 'Toggle on/off')
         .setValue(this.plugin.settings.coordinateKeyMode || 'hold')
         .onChange(async (value: string) => {
           this.plugin.settings.coordinateKeyMode = value as 'hold' | 'toggle';
@@ -321,7 +321,7 @@ export const TabRenderSettingsMethods = {
     // Browse Fog Content Packs
     new Setting(containerEl)
       .setName('Browse fog textures')
-      .setDesc('Download tileable fog of war textures from the Windrose content library')
+      .setDesc('Download tileable fog of war textures from the content library')
       .addButton(btn => btn
         .setButtonText('Browse')
         .onClick(() => {
@@ -374,7 +374,7 @@ export const TabRenderSettingsMethods = {
 
     // Canvas Height (Mobile)
     new Setting(containerEl)
-      .setName('Canvas Height (Mobile/Touch)')
+      .setName('Canvas height (mobile/touch)')
       .setDesc('Default height in pixels for map canvas on mobile and touch devices')
       .addText(text => text
         .setPlaceholder('400')

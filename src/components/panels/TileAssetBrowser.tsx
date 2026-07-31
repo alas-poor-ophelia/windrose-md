@@ -420,7 +420,6 @@ const TileAssetBrowser = memo(({
     return loadVaultImage(app, hoveredTile.vaultPath, getCachedImage, (img) => {
       drawTileToCanvas(canvas, img, PREVIEW_SIZE, hoveredTile.vaultPath);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- app stable, getCachedImage low-churn; tileToTilesetId is a memo declared later (forward ref); exact-field hover effect
   }, [hoveredTile, rotation, flipH, selectedTilesetId, selectedTileId]);
 
   // Cleanup portal on unmount
@@ -486,7 +485,6 @@ const TileAssetBrowser = memo(({
     reload();
     window.addEventListener('windrose-settings-changed', reload);
     return () => window.removeEventListener('windrose-settings-changed', reload);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- app is the immutable Obsidian singleton
   }, []);
 
   // Keep the renderer's global metadata accessor in sync with browser edits

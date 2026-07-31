@@ -88,7 +88,6 @@ const MeasurementLayer = ({
 
   const enabledPacks = useMemo(
     () => getEnabledTravelPacks(getSettings().travelPacks),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- settingsVersion re-reads the plugin settings singleton
     [settingsVersion]
   );
 

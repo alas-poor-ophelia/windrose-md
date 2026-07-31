@@ -89,7 +89,7 @@ export const TabRenderTilesetsMethods = {
           new FolderSuggest(this.app, search.inputEl);
           let detectTimer: number | undefined;
           search
-            .setPlaceholder('e.g. Assets/Tiles/Baumgart')
+            .setPlaceholder('Assets/tiles/baumgart')
             .setValue(folderPath)
             .onChange(async (value: string) => {
               const updated = [...(s.tilesetFolders ?? [])];
@@ -123,7 +123,7 @@ export const TabRenderTilesetsMethods = {
     // filename tag mining for folders.
     new Setting(containerEl)
       .setName('Add tiles')
-      .setDesc('Import a Dungeondraft pack or a folder of images — with tier mapping and tag suggestions')
+      .setDesc('Import a .dungeondraft_pack or a folder of images — with tier mapping and tag suggestions')
       .addButton(btn => btn
         .setButtonText('Add tiles')
         .setCta()

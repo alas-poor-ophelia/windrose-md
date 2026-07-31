@@ -100,7 +100,6 @@ function floodFillCells(
   let aborted = false;
 
   while (stack.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- stack is non-empty: the while-loop condition guarantees stack.length > 0
     const current = stack.pop()!;
     const { col, row } = current;
     const key = `${col},${row}`;

@@ -46,11 +46,11 @@ class ObjectSetImportModal extends Modal {
 
     new Setting(contentEl)
       .setName('Folder path')
-      .setDesc('Vault-relative path (e.g. object-sets/my-set)')
+      .setDesc('Vault-relative path (e.g. Object-sets/my-set)')
       .addSearch(search => {
         new FolderSuggest(this.app, search.inputEl);
         search
-          .setPlaceholder('path/to/set-folder')
+          .setPlaceholder('Path/to/set-folder')
           .onChange((v: string) => { folderPath = v.trim(); });
       })
       .addButton(btn => btn
@@ -83,7 +83,7 @@ class ObjectSetImportModal extends Modal {
             const data = JSON.parse(content) as ObjectSetImportData;
 
             if (data.windroseMD_objectSet !== true) {
-              previewArea.createEl('p', { text: 'Not a valid Windrose object set.', cls: 'windrose-import-error' });
+              previewArea.createEl('p', { text: 'Not a valid object set.', cls: 'windrose-import-error' });
               previewArea.show();
               return;
             }

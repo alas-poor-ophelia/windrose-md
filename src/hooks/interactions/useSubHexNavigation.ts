@@ -223,7 +223,6 @@ function useSubHexNavigation({
     setNavStack(newStack);
     setSubHexMapData(subHex.mapData);
     setNavigationVersion(prev => prev + 1);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- propagateToRoot/rootUpdateMapData are stable but declared later; forward reference, safe to omit
   }, [rootMapData, subHexMapData, isInSubHex, navStack]);
 
   // Propagate sub-hex changes up the navigation stack to root for saving

@@ -75,7 +75,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
       containerEl.querySelector('.windrose-old-import-banner')?.remove();
       const setting = new Setting(containerEl)
         .setName('Import settings from previous installation')
-        .setDesc('Found settings from the old Windrose MapDesigner plugin. Import object sets, custom objects, and overrides.')
+        .setDesc('Found settings from the previous installation. Import object sets, custom objects, and overrides.')
         .addButton(btn => btn
           .setButtonText('Import')
           .setCta()

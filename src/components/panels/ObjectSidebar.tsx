@@ -47,7 +47,6 @@ const ObjectSidebar = memo(({ selectedObjectType, onObjectTypeSelect, onToolChan
   const objectSets = useMemo(() => {
     const plugin = app.plugins.plugins['windrose-md'] as { settings?: { objectSets?: ObjectSet[] } } | undefined;
     return plugin?.settings?.objectSets ?? [];
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once read of plugin settings; app.plugins.plugins is a stable mutable registry object
   }, []);
 
   // Validate that objectSetId references an existing set; fall back to Default if stale

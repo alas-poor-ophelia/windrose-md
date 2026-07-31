@@ -376,7 +376,7 @@ class TravelPackEditModal extends Modal {
 
   private renderAllowances(containerEl: HTMLElement, pack: TravelPack): void {
     new Setting(containerEl).setName('Per-day allowances').setHeading()
-      .setDesc('How much travel time counts as one day — e.g. 8 hours/day normal pace, 12 forced march.')
+      .setDesc('How much travel time counts as one day — a normal pace runs eight hours, a forced march twelve.')
       .addExtraButton(btn => btn
         .setIcon('plus')
         .setTooltip('Add allowance')
@@ -405,8 +405,8 @@ class TravelPackEditModal extends Modal {
         });
       });
       row.addDropdown(dropdown => {
-        dropdown.addOption('hours', 'hours/day');
-        dropdown.addOption('minutes', 'minutes/day');
+        dropdown.addOption('hours', 'Hours/day');
+        dropdown.addOption('minutes', 'Minutes/day');
         dropdown.setValue(allowance.timeUnit);
         dropdown.onChange(value => {
           this.patchItem('allowances', allowance.id, { timeUnit: value as 'minutes' | 'hours' });

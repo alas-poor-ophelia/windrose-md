@@ -76,7 +76,7 @@ class ImportModal extends Modal {
         if (data.windroseMD_objectExport !== true) {
           previewArea.empty();
           previewArea.createEl('p', {
-            text: 'This file is not a valid Windrose MD object export.',
+            text: 'This file is not a valid object export.',
             cls: 'windrose-import-error'
           });
           previewArea.show();
@@ -89,7 +89,7 @@ class ImportModal extends Modal {
 
         // Show preview
         previewArea.empty();
-        previewArea.createEl('p', { text: 'Valid Windrose MD export file' });
+        previewArea.createEl('p', { text: 'Valid object export file' });
         if (data.exportedAt != null && data.exportedAt !== '') {
           previewArea.createEl('p', {
             text: `Exported: ${new Date(data.exportedAt).toLocaleString()}`,

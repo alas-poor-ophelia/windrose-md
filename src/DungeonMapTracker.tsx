@@ -363,7 +363,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       }
       setMapListEntries(entries);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once list seed; mapId/mapName/mapType are fallbacks not triggers; re-running thrashes vault I/O
   }, [fullPane, app]);
 
   const handleMapSelect = useCallback((entry: MapListEntry) => {
@@ -562,7 +561,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const geometry = useMemo((): ExtendedGeometry | null => {
     if (!mapData) return null;
     return createGeometry(mapData);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional fine-grained deps: geometry rebuilds only on shape-param change, not every cell paint
   }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
 
   // Fog of War state and handlers (extracted to useFogOfWar hook)
@@ -1233,7 +1231,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 <button
                   className="windrose-tool-btn windrose-tool-palette-dock-btn interactive-child"
                   onClick={(e) => {
-                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- button is rendered inside .windrose-tool-palette, so closest() always finds it
                     const rect = (e.currentTarget as HTMLElement).closest('.windrose-tool-palette')!.getBoundingClientRect();
                     toggleFloat('toolPalette', { x: rect.left, y: rect.top });
                   }}

@@ -102,7 +102,7 @@ export const TabRenderObjectsMethods = {
       .setName('Add custom object')
       .setDesc('Create a new map object with your own symbol')
       .addButton(btn => btn
-        .setButtonText('+ Add Object')
+        .setButtonText('Add object')
         .setCta()
         .onClick(() => {
           new ObjectEditModal(this.app, this.plugin, null, () => {
@@ -117,7 +117,7 @@ export const TabRenderObjectsMethods = {
       .setName('Add custom category')
       .setDesc('Create a new category to organize objects')
       .addButton(btn => btn
-        .setButtonText('+ Add Category')
+        .setButtonText('Add category')
         .onClick(() => {
           new CategoryEditModal(this.app, this.plugin, null, () => {
             this.settingsChanged = true;
@@ -128,7 +128,7 @@ export const TabRenderObjectsMethods = {
 
     // Import/Export buttons
     new Setting(containerEl)
-      .setName('Import / Export')
+      .setName('Import / export')
       .setDesc('Share object configurations as JSON files')
       .addButton(btn => btn
         .setButtonText('Import')
@@ -782,7 +782,7 @@ export const TabRenderObjectsMethods = {
     // Browse Content Packs
     new Setting(containerEl)
       .setName('Browse content packs')
-      .setDesc('Download object packs from the Windrose content library')
+      .setDesc('Download object packs from the content library')
       .addButton(btn => btn
         .setButtonText('Browse')
         .onClick(() => {

@@ -62,7 +62,6 @@ function useNativeControl<C extends ValueComponent<V>, V>({ value, onChange, dis
       // Fallback will render
       return undefined;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- builds the native control once; value/disabled live-updated by the effects below
   }, []);
 
   // Update value without recreating

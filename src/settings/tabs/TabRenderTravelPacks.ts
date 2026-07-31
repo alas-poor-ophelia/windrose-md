@@ -48,7 +48,7 @@ export const TabRenderTravelPacksMethods = {
     const packs = this.plugin.settings.travelPacks ?? [];
 
     containerEl.createEl('p', {
-      text: 'Travel packs bundle the travel rules of an RPG system — custom units, terrain speed multipliers, travel modes, and per-day allowances. Enabled packs power travel times in the measure tool and the beacon.',
+      text: 'Travel packs bundle the travel rules of a game system — custom units, terrain speed multipliers, travel modes, and per-day allowances. Enabled packs power travel times in the measure tool and the beacon.',
       cls: 'setting-item-description'
     });
 
@@ -140,7 +140,7 @@ export const TabRenderTravelPacksMethods = {
     // Browse Content Packs (travel tab)
     new Setting(containerEl)
       .setName('Browse travel packs')
-      .setDesc('Download ready-made travel rule packs from the Windrose content library')
+      .setDesc('Download ready-made travel rule packs from the content library')
       .addButton(btn => btn
         .setButtonText('Browse')
         .onClick(() => {

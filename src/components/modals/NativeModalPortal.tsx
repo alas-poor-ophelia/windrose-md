@@ -232,7 +232,6 @@ function NativeModalPortal({
         modal.close();
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once modal construction; title/modalClass/draggable/resizable consumed in onOpen(); re-running destroys+reopens the dialog
   }, []);
 
   if (!renderTarget) return null;

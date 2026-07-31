@@ -110,7 +110,7 @@ class ObjectEditModal extends Modal {
     });
 
     const iconBtn = toggleContainer.createEl('button', {
-      text: 'RPGAwesome icon',
+      text: 'Icon library',
       cls: 'windrose-icon-type-btn' + (this.mode === 'icon' ? ' active' : ''),
       attr: { type: 'button' }
     });
@@ -230,7 +230,7 @@ class ObjectEditModal extends Modal {
     // Symbol input with preview
     const symbolSetting = new Setting(container)
       .setName('Symbol')
-      .setDesc('Paste any Unicode character or emoji');
+      .setDesc('Paste any character or emoji');
 
     const symbolInput = symbolSetting.controlEl.createEl('input', {
       type: 'text',
@@ -451,7 +451,7 @@ class ObjectEditModal extends Modal {
     // Clear button
     if (this.imagePath) {
       const clearBtn = searchContainer.createEl('button', {
-        text: 'x',
+        text: 'X',
         cls: 'windrose-image-clear-btn',
         attr: { type: 'button', title: 'Clear image' }
       });
@@ -606,7 +606,6 @@ class ObjectEditModal extends Modal {
 
       // Preserve order if it exists
       if (this.plugin.settings[overridesKey][objId]?.order !== undefined) {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- order presence confirmed by the !== undefined guard on the line above
         override.order = this.plugin.settings[overridesKey][objId].order!;
       }
 

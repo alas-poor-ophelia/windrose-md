@@ -467,7 +467,6 @@ function useCanvasInteraction(
       window.removeEventListener('keydown', handleSpaceDown);
       window.removeEventListener('keyup', handleSpaceUp);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- resubscribe on focus only; stopPan called with current-closure semantics via refs
   }, [focused]);
 
   // Safety nets for gestures that never see a normal pointerup: a window blur
@@ -491,7 +490,6 @@ function useCanvasInteraction(
       // warn), but still persist any in-flight gesture so it isn't lost.
       commitActiveGesture();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/unmount only; handlers read live state via refs/stable controller
   }, []);
 
   return {

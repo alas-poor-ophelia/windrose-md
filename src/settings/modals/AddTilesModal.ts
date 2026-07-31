@@ -196,7 +196,7 @@ class AddTilesModal extends Modal {
     const folderInputRow = folderCard.createDiv({ cls: 'windrose-wz-folderin' });
     const input = folderInputRow.createEl('input', {
       type: 'text',
-      attr: { placeholder: 'e.g. Assets/Tiles/FantasyCore', spellcheck: 'false' },
+      attr: { placeholder: 'Assets/tiles/fantasy-core', spellcheck: 'false' },
     });
     input.value = this.folderPath;
     new FolderSuggest(this.app, input);

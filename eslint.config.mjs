@@ -142,6 +142,68 @@ export default [
   },
 
   // ===========================================
+  // Config-scoped suppressions for shipped source.
+  //
+  // These were previously inline eslint-disable directives, but inline
+  // directives are FRAGILE under foreign configs: the Obsidian store scanner
+  // runs the raw obsidianmd recommended preset, where a directive naming an
+  // unregistered rule (react-hooks/*) errors as "Definition for rule not
+  // found" and a directive for a rule the preset doesn't enable errors as
+  // "Unused eslint-disable directive". Config-scoped rules are invisible to
+  // any other config. Do NOT reintroduce inline disables for these rules in
+  // src/ — add the file here instead. (2026-07-31, store scan CAUTION fix.)
+  //
+  // exhaustive-deps: every listed file had deliberate dependency omissions
+  // (mount-only effects, perf-sensitive layer redraws) documented at the old
+  // inline sites — see git history for the per-site reasoning.
+  {
+    files: [
+      "src/DungeonMapTracker.tsx",
+      "src/components/mapcanvas/DrawingLayer.tsx",
+      "src/components/mapcanvas/MapCanvas.tsx",
+      "src/components/mapcanvas/MeasurementLayer.tsx",
+      "src/components/mapcanvas/NotePinLayer.tsx",
+      "src/components/mapcanvas/ObjectLayer.tsx",
+      "src/components/mapcanvas/PartyPinLayer.tsx",
+      "src/components/mapcanvas/TextLayer.tsx",
+      "src/components/modals/NativeModalPortal.tsx",
+      "src/components/overlays/ImageAlignmentMode.tsx",
+      "src/components/panels/FloatingPanel.tsx",
+      "src/components/panels/LayerControls.tsx",
+      "src/components/panels/ObjectSidebar.tsx",
+      "src/components/panels/TileAssetBrowser.tsx",
+      "src/components/settings/NativeControls.tsx",
+      "src/components/settings/SettingItem.tsx",
+      "src/context/MapSettingsContext.tsx",
+      "src/hooks/canvas/useCanvasInteraction.ts",
+      "src/hooks/drawing/useDiagonalFill.ts",
+      "src/hooks/drawing/useDrawingTools.ts",
+      "src/hooks/interactions/useShapeOverlayTools.ts",
+      "src/hooks/interactions/useSubHexNavigation.ts",
+      "src/hooks/state/useImagePreloading.ts",
+      "src/hooks/state/useToolState.ts",
+      "src/hooks/state/useVirtualizer.ts"
+    ],
+    rules: {
+      "react-hooks/exhaustive-deps": "off"
+    }
+  },
+  // no-non-null-assertion: each old inline site carried a proof of non-null
+  // (pre-seeded maps, guarded lookups); see git history.
+  {
+    files: [
+      "src/DungeonMapTracker.tsx",
+      "src/components/toolbars/ObjectSelectionToolbar.tsx",
+      "src/drawing/tilePlacementOps.ts",
+      "src/geometry/renderers/tileRenderer.ts",
+      "src/settings/modals/ObjectEditModal.ts"
+    ],
+    rules: {
+      "@typescript-eslint/no-non-null-assertion": "off"
+    }
+  },
+
+  // ===========================================
   // Test files (E2E + unit) — not shipped; relax type-checked + style noise
   // ===========================================
   {

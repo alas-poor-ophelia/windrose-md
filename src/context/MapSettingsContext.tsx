@@ -490,7 +490,6 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
         }
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- modal init: runs once per open; depending on currentSettings/etc would reset in-progress user edits
   }, [isOpen]);
 
   // Close color picker on outside click
