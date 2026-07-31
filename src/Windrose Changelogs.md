@@ -608,6 +608,10 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.1.2
+
+A build-tooling patch, no user-facing changes: `npm run build` now produces the production bundle (the development build moved to `build:dev`), so the conventional build command reproduces the released `main.js` byte-for-byte from a clean checkout.
+
 ## Version 2.1.1
 
 The travel release. This one is headlined by the **Beacon** — a movable position marker that answers "what's nearby?" — plus travel packs that turn measured distance into travel times, saveable multi-waypoint routes, and doors and windows that seat directly into your walls.

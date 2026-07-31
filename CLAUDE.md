@@ -29,8 +29,9 @@ windrose/                     # Dev root (this directory)
 ## Commands
 
 ```bash
-npm run build       # Build main.js with esbuild
-npm run deploy      # Build + copy main.js/styles.css/manifest.json to vault
+npm run build       # PRODUCTION build (minified) — must stay the release build: the Obsidian store scanner runs `npm run build` and hash-compares against the release asset
+npm run build:dev   # Dev build (unminified, inline sourcemap)
+npm run deploy      # Dev build + copy main.js/styles.css/manifest.json to vault
 npm run build:watch # Watch mode (rebuilds on file change)
 npm run test:unit   # Unit tests (~4s)
 npm run test:e2e    # E2E tests (FULL SUITE ~15 MIN — see Test Output Capture below)
