@@ -126,7 +126,7 @@ The **Add tiles** wizard walks a Dungeondraft pack (or a plain folder of images)
 
 ### Beacon & travel
 
-The **Beacon** is a party-position marker with a configurable range:
+The **Beacon** is a movable position marker with a configurable range — track the party, a faction, an army on the march, or an approaching storm:
 
 - Place it from the pin tool group and set a **range** in the map's measurement units. The range displays as a ring — a plain circle, or a highlight of the cells within range.
 - Notes and markers within range are listed sorted by distance; each entry can open the note or pan the map to the marker. Optionally, Windrose maintains a **beacon note** in the vault with the same results as note links.

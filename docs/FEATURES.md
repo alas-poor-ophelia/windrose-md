@@ -349,7 +349,7 @@ Selecting a label with the Select tool lets you drag it to reposition, and:
 A **note pin** (requires the *Note pins* feature) links a spot on the map directly to a vault note and displays as a pin icon. It's a lighter-weight alternative to an object for when the note *is* the point of interest. Pin color and icon are configurable.
 
 ## The Beacon
-The **Beacon** marks where the adventuring party currently is. Give it a **range** and it continuously answers *"what's near the party?"* — visually on the canvas, interactively in a results list, and optionally as a generated note in your vault. One Beacon per map.
+The **Beacon** is a movable position marker with a **range**. It tracks anything that has a location and a reach — the party is the common case, but a rival faction, an advancing army, or a spreading storm work identically. Wherever it stands, it continuously answers *"what's within reach of this point?"* — visually on the canvas, interactively in a results list, and optionally as a generated note in your vault. One Beacon per map.
 
 ### Placing the Beacon
 The Beacon shares the pin tool group in the palette with note pins — long-press (or right-click) the pin button and choose **Beacon**. Click a cell to place it (it snaps to the grid, square or hex); drag it to move it, and the range ring follows live.
@@ -365,7 +365,7 @@ Markers currently in range get a subtle glow on the canvas, so "what's in reach"
 ### The Beacon Card
 Selecting the Beacon opens a floating controls card:
 
-- **Label** — a display name (your party's, presumably).
+- **Label** — a display name for whatever the Beacon is tracking.
 - **Range** — in map units; zero, negative, or non-numeric input is rejected with feedback.
 - **Ring style** — circle or cells.
 - **Icon and color** — an icon picker with searchable RPG Awesome icons (a short search string can also be applied as a literal symbol — emoji, ★, and friends), and the shared color picker.

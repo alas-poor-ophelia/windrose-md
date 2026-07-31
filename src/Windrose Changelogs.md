@@ -608,12 +608,14 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
-## Version 2.1.0
+## Version 2.1.1
 
-The travel release. This one is headlined by the **Beacon** — a party-position marker that answers "what's nearby?" — plus travel packs that turn measured distance into travel times, saveable multi-waypoint routes, and doors and windows that seat directly into your walls.
+The travel release. This one is headlined by the **Beacon** — a movable position marker that answers "what's nearby?" — plus travel packs that turn measured distance into travel times, saveable multi-waypoint routes, and doors and windows that seat directly into your walls.
+
+(If you're wondering about 2.1.0: it was tagged, caught two packaging problems within the hour, and was retired before anyone met it. This is the same release, done right.)
 
 ### New Features
-- **The Beacon.** A party-position marker with a configurable range:
+- **The Beacon.** A movable position marker with a configurable range — the party, a rival faction, an army, a storm front:
 	- Place it from the pin tool group, set a range in your map's real units, and get a live **range ring** — a clean circle, or a highlight of the actual cells in reach (the classic hex-crawl bloom).
 	- A floating Beacon card controls label, range, ring style, pin color, and icon (with RPGAwesome icon search).
 	- **Nearby results**: linked notes and labeled markers within range appear in a distance-sorted list — open the note, or jump the map to the marker with a flash pulse. Layer scoping and tag/property filters narrow what counts.
@@ -624,6 +626,7 @@ The travel release. This one is headlined by the **Beacon** — a party-position
 - **Openings.** Doors, windows, and thresholds that seat directly into wall gaps (Dungeondraft portal assets): scale-aware placement, click-to-edit mode for moving, resizing, and deleting seated openings, and Alt-click on a wall for a bare threshold. Openings stay anchored through wall edits.
 
 ### Improvements
+- The Travel Packs settings section has its own **Browse** button for the content-pack library (previously only reachable through the Objects section's browser).
 - Flood fill is now **wall-aware** — fills stop at walls, and a runaway fill aborts at a safety limit instead of flooding the map.
 - Clicking outside the tile import wizard mid-import now asks before discarding, instead of silently losing progress.
 - README and the feature docs have been brought fully up to date with all of the above.
