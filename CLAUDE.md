@@ -68,6 +68,11 @@ npm run check       # Typecheck + lint
 | Tool interactions | Optional | Required |
 | Before committing | Required | Required |
 
+## E2E Build & Fixture Rules
+
+- **E2E runs against the DEV build**: `npm run build:dev` (or `deploy`) before `test:e2e` — NOT `npm run build` (production). The minified bundle fails at least one openings test (windrose-fvh); the dev bundle is the harness's historical, intended target.
+- **Restore fixtures before judging failures**: repeated E2E runs churn `tests/fixtures/test-vault/` (workspace.json, smoke-test notes), which can deterministically fail specific tests (openings closing-segment resize). `git checkout -- tests/fixtures/` then re-run before believing a failure.
+
 ## Test Output Capture (E2E)
 
 The full E2E suite takes ~15 minutes. **NEVER truncate its live output** (`| Select-Object -Last N`, `| Select-String`, `| tail`) — a truncated failing run loses the failure list and costs a full re-run just to learn which tests failed. This has happened repeatedly.
