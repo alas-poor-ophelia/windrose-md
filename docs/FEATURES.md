@@ -103,7 +103,7 @@ Several tools are grouped: a group shows one button, and long-pressing (or right
 - **Add Text Label**: place a free-floating text label.
 - **Draw Outline** (**HEX ONLY**, requires the *Outlines* feature): draw a polygon shape point-to-point.
 - **Place Shape Overlay** (requires the *Shape overlays* feature): place a decorative shape on the map.
-- **Measure Distance** (requires the *Distance measurement* feature): measure point-to-point in configured units.
+- **Measure Distance** (requires the *Distance measurement* feature): measure multi-waypoint routes in configured units — see [Measurement, Routes, and Travel](#measurement-routes-and-travel).
 - **Place Tile** (requires the *Image tiles* feature): activate the tile system and paint image tiles. The placement sub-tool (paint, stamp, scatter, and so on) is chosen inside the tile drawer, not here — see [Image Tiles](#image-tiles).
 - **Undo / Redo**: up to 50 actions. Does not persist across an Obsidian restart.
 
@@ -144,7 +144,7 @@ Map Settings is a modal opened from the Map Controls. Its settings affect only t
 - Set a **background image** for this grid map.
 
 ### Measurement
-- Choose the units used by the measurement tool.
+- Choose the units used by the measurement tool — standard units, or a custom unit from an enabled [travel pack](#travel-packs), so a hex-crawl map can natively measure in "hexes."
 
 ### Preferences
 - Remember **pan and zoom** for this map.
@@ -163,6 +163,7 @@ The plugin's settings page is a single scrolling page of collapsible sections. S
 - **Fog of War** (requires *Fog of war*) — global fog color/image, and a **Browse** button for downloadable fog texture packs.
 - **Map Behavior** — general behavioral defaults.
 - **Distance Measurement** (requires *Distance measurement*) — default units.
+- **Travel Packs** (requires *Distance measurement*) — create, edit, enable/disable, export, and import [travel packs](#travel-packs).
 - **Tile Sets** (requires *Image tiles*) — the **Add tiles** wizard and your list of tileset folders.
 - **Object Types** — customize objects and categories, and a **Browse content packs** button for downloadable object sets.
 - **Keyboard Shortcuts** — view and rebind shortcuts.
@@ -229,7 +230,7 @@ With a tile selected, choose a placement sub-tool from the ribbon inside the dra
 - **Paint** — place the tile per grid cell (click, or drag to paint many).
 - **Stamp** — place a single freeform stamp at an arbitrary world-space position, not snapped to the grid.
 - **Scatter** — place freeform stamps with random jitter — forests, rubble, and scatter terrain in seconds.
-- **Fill** — flood-fill a connected area with the tile.
+- **Fill** — flood-fill a connected area with the tile. The fill is **wall-aware** — wall segments act as barriers, so a walled-off room fills without leaking — and if the region turns out to be unbounded, the fill aborts safely instead of flooding the whole map.
 - **Brush** — a soft, round, world-space **terrain brush** that blends seamless textures; works on hex as well as grid.
 - **Draw** — draw **walls and paths** that follow a curve (see below).
 
@@ -242,6 +243,15 @@ Using the **Draw** sub-tool, lay down **wall segments** and winding **paths** th
 - Drag a segment to **bow** it into a curve.
 - Edit **vertices** after the fact.
 - Wall and path tiles ("strips") from Dungeondraft packs are detected on import and handled as line assets automatically.
+
+#### Openings
+Walls can carry **openings** — doors, windows, and thresholds seated into gaps cut in the wall itself. These belong to the wall tool, not tile painting: with the **Draw** sub-tool active, select a door or window asset (a Dungeondraft pack's *portals* are detected as opening assets on import) and click a wall to seat it into place. Placement is **scale-aware** — the Scale slider multiplies the art's natural width, and the art seats into its gap preserving its aspect.
+
+- **Click an existing opening** to select it for editing — drag it along its wall, resize it from its edge handles, or delete it.
+- **Alt-click a wall** to cut a **bare threshold** — a capped gap with no art. A **Threshold** entry in the sub-tool ribbon does the same at a default one-cell width.
+- Openings are anchored to their wall segment, so they survive vertex edits, curve changes, and cell-size changes.
+
+Not to be confused with the **door objects** in the [object drawer](#objects): those are grid-placed markers that sit *on top of* the map, while an opening is structural — an actual gap in a wall, with the door art living in the gap.
 
 ### Rotation, Flipping, and Scaling
 Placed tiles support rotation, flipping, and scaling. Per-tileset render settings give finer control over how a tileset's images are placed and drawn.
@@ -338,8 +348,78 @@ Selecting a label with the Select tool lets you drag it to reposition, and:
 ## Note Pins
 A **note pin** (requires the *Note pins* feature) links a spot on the map directly to a vault note and displays as a pin icon. It's a lighter-weight alternative to an object for when the note *is* the point of interest. Pin color and icon are configurable.
 
+## The Beacon
+The **Beacon** marks where the adventuring party currently is. Give it a **range** and it continuously answers *"what's near the party?"* — visually on the canvas, interactively in a results list, and optionally as a generated note in your vault. One Beacon per map.
+
+### Placing the Beacon
+The Beacon shares the pin tool group in the palette with note pins — long-press (or right-click) the pin button and choose **Beacon**. Click a cell to place it (it snaps to the grid, square or hex); drag it to move it, and the range ring follows live.
+
+### The Range Ring
+The Beacon's range is set in the map's configured distance units — the same per-cell distance and unit the measure tool uses, so no calibration is ever needed. The ring renders whenever the Beacon exists, in either of two styles:
+
+- **Circle** — a clean geometric ring at the range radius.
+- **Cells** — a highlight of the actual cells within range under the map's distance rules (diagonal rule on square grids, true hex distance on hex maps). On a hex map this is the classic hex-crawl "range bloom."
+
+Markers currently in range get a subtle glow on the canvas, so "what's in reach" reads at a glance.
+
+### The Beacon Card
+Selecting the Beacon opens a floating controls card:
+
+- **Label** — a display name (your party's, presumably).
+- **Range** — in map units; zero, negative, or non-numeric input is rejected with feedback.
+- **Ring style** — circle or cells.
+- **Icon and color** — an icon picker with searchable RPG Awesome icons (a short search string can also be applied as a literal symbol — emoji, ★, and friends), and the shared color picker.
+- **Filters & related** — result scoping (below).
+- **Beacon note** — vault-note generation (below).
+- The **nearby results** list.
+
+### Nearby Results
+The Beacon's candidates are the map's linkable markers: note pins and objects with a linked note. Distances use the map's native distance semantics — the same rules as the measure tool — so results are map-rule-correct, not straight-line approximations. If several markers link the same note, the note appears once at its minimum distance. Markers with a display label but no link get their own separate "nearby" list.
+
+Results are sorted by distance and show the note name and formatted distance — plus a **travel time** per active travel mode, when [travel packs](#travel-packs) are configured for the map. Activating a row opens its note; a **show on map** button navigates to the source marker and flashes it. An empty result set says so explicitly ("Nothing in range").
+
+Results stay current as the Beacon moves, its range changes, or nearby markers are added, moved, or removed — including through undo/redo.
+
+Scoping and filters, per Beacon:
+- **Layers** — query all layers, or only selected ones.
+- **Tags** — a note qualifies if it bears at least one configured tag.
+- **Properties** — a note qualifies if a frontmatter property matches one of the configured values.
+
+### Related Notes
+Each Beacon can expand its results with **related notes**: **off**, **by tags** (other vault notes sharing an in-range note's tags), or **by backlinks** (notes that link to an in-range note). Related lists are capped per entry with an explicit "+N more" overflow.
+
+### The Beacon Note
+Optionally, the Beacon can generate a **beacon note** — a markdown note in a vault folder you choose, holding the current nearby results as a table of note links with distances (and travel times, when configured). Updates are debounced and change-detected: if the results didn't change, the file isn't rewritten. The note carries an ownership marker, so Windrose will never overwrite a note it didn't generate; a manually deleted beacon note is recreated on the next update; and removing the Beacon offers to delete its note (the Beacon is removed either way).
+
 ## Shape Overlays
 **Shape overlays** (requires the *Shape overlays* feature) place decorative shapes on the map for annotation and embellishment, independent of the painted grid.
+
+## Measurement, Routes, and Travel
+The **Measure Distance** tool (requires the *Distance measurement* feature) measures **multi-waypoint routes**, not just single segments — and with [travel packs](#travel-packs), it turns distance into travel time.
+
+### Measuring a Route
+Each click (or tap) adds a waypoint; the route renders as a connected path on the map, with a live preview segment from the last waypoint to the cursor included in the running total. Every segment uses the map's native distance semantics — per-cell distance, unit, diagonal rule on square grids, true hex distance on hex maps — and honors the cells/units/both display format.
+
+While measuring, **Backspace** removes the last waypoint and **Escape** clears the route. An in-progress route persists with the map, so a half-measured hex crawl survives closing and reopening the view. **Double-click** the end cell (double-tap on touch) or press **Enter** to finish the route by saving it.
+
+### Saved Routes
+Finishing a measurement (or its **Save as route** button) converts it into a permanent, styled path on the map, with a name, color, width, and an optional distance label — labels stay hidden until you hover (or tap, on touch). While the measure tool is active, clicking a saved route opens a menu to **edit** its name and style or **delete** it; saving, editing, and deleting all participate in undo history. A **saved routes** toggle in the Visibility controls shows or hides them all.
+
+### Travel Packs
+A **travel pack** is a named bundle of travel rules for an RPG system (say, D&D 5e overland travel). A pack can contain:
+
+- **Custom units** — name, abbreviation, and a conversion factor (a "league" defined in miles, a "hex" defined as six miles).
+- **Terrain types** — each with a speed multiplier (above 1 faster, below 1 slower).
+- **Travel modes** — each with a speed as distance per time (24 miles per 8 hours; 3 hexes per day).
+- **Per-day allowances** — how much travel time counts as one day (8 hours/day forced march vs. 6 hours/day normal).
+
+Packs are created and edited in the **Travel Packs** section of settings, individually enabled or disabled (only enabled packs surface in map UI), and exportable and importable as files. They're also distributed as [content packs](#content-packs) for one-click install. Custom units from enabled packs are selectable as a map's distance unit — globally or per map — so a hex-crawl map can display "hexes" everywhere.
+
+### Travel Times
+With an enabled pack, the measurement readout grows a **Travel** block: a live travel time for each of the map's selected travel modes, updating with the route as you measure. Which modes appear — and which per-day allowance applies — is chosen per map from a collapsible selector in the readout itself, so a world map and a dungeon map keep different clutter. With an allowance selected, times render as whole days plus a remainder (say, "3 days + 2.5 h"). If a mode's time base and the allowance don't line up, the readout says so explicitly rather than showing a wrong number.
+
+### Per-Segment Terrain
+With a pack enabled, each route segment can be assigned a **terrain**: click a segment and pick from a popup anchored right at the segment. A segment's effective speed is the travel mode's speed times the terrain's multiplier; unassigned segments travel at plain mode speed. Terrain assignments are preserved when the route is saved.
 
 ## Note Linking and Deeplinking
 ### Linking from Map to Notes
@@ -374,13 +454,14 @@ Sub-maps default to radial at 7 rings, adjustable per sub-map in Map Settings. E
 Inside a sub-map, a **breadcrumb** UI above the tool palette shows where you are in the hierarchy and lets you jump back up. A hex containing a sub-map shows a diamond icon in its center.
 
 # Content Packs
-**Content packs** are downloadable extras — curated **object sets** and **fog-of-war texture packs** — installed directly from within the plugin. (A font-pack type also exists in the format but is not yet surfaced in the browser.)
+**Content packs** are downloadable extras — curated **object sets**, **fog-of-war texture packs**, and **travel packs** — installed directly from within the plugin. (A font-pack type also exists in the format but is not yet surfaced in the browser.)
 
 Browse and install them from settings:
 - **Object packs**: Object Types section → **Browse content packs**.
 - **Fog packs**: Fog of War section → **Browse**.
+- **Travel packs**: the **Travel Packs** tab of the content-pack browser — importable [travel rule bundles](#travel-packs) (units, terrains, travel modes, allowances).
 
-Packs are fetched from a public registry (served over a CDN), extracted into a `windrose-content/` folder in your vault, and are ready to use immediately. Installed packs are tracked in the plugin's settings.
+Packs are fetched from a public registry (served over a CDN), extracted into a `windrose-content/` folder in your vault, and are ready to use immediately. (Travel packs are the exception: they're rules rather than files, so they install into the plugin's settings instead.) Installed packs are tracked in the plugin's settings.
 
 # Full-Pane View and Dockable Panels
 Maps don't have to live inline. Any map can open in a **full workspace tab** — from the compass ribbon icon, the **Open map in full pane** command, or a picker that lists every map in your vault. Deleting a map is also available from the full-pane picker.

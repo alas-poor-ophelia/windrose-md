@@ -124,6 +124,17 @@ Want more variety? Browse and install **content packs** — curated object sets 
 - **Text labels** go anywhere, free of the grid — drag, rotate, edit in place, with configurable font, size, color, and opacity, and optional note links.
 - **Note pins** link a spot on the map straight to a vault note and display as a pin icon — a lighter-weight alternative to objects when the note *is* the point.
 
+### Beacon & travel
+
+The **Beacon** marks where your party is and keeps answering "what's nearby?" so you don't have to:
+
+- Place it from the pin tool, set a **range** in your map's real units, and get a live **range ring** — a clean circle, or a highlight of the actual cells in reach (the classic hex-crawl bloom).
+- Nearby linked notes and markers appear in a distance-sorted list — open the note, or jump the map to the marker. Optionally generate a **beacon note** in your vault that keeps the same results as a table of note links.
+- **Travel packs** — importable rule bundles of units, terrains, travel modes, and daily allowances (think "D&D 5e overland") — turn measured distance into **travel times**, on routes and in the Beacon's results alike.
+- Measurements are **multi-waypoint routes** you can **save** as permanent, styled paths on the map, with per-segment terrain for honest travel math.
+
+The full details live in the [feature list](docs/FEATURES.md).
+
 ### Boards, Strata, and Layers
 
 Windrose is like an onion. It has layers. No but really. There's 3 layers of layers.
@@ -192,7 +203,7 @@ Windrose has grown a lot of tools, and not everyone wants all of them on day one
 - **Pan**: drag with the select tool, hold Space and drag with any tool, hold the scroll wheel, or two-finger drag on touch.
 - **Zoom**: scroll wheel, pinch, or the zoom controls (10%–200%).
 - **Rotate** the whole map via the Windrose compass in the corner (grid maps rotate for real; on hex it's aesthetic — and it looks great).
-- **Measure** point-to-point distances in units you configure globally or per map.
+- **Measure** multi-waypoint routes in units you configure globally or per map — and save a measurement as a permanent, styled route on the map.
 
 ---
 
