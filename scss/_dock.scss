@@ -732,8 +732,13 @@ button.windrose-dock-panel-collapse {
     border-top: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.2);
   }
 
+  /* Flex row (not display:contents — flagged by the store's CSS-compat lint
+     as partial in older Obsidian): [label · value] renders identically beside
+     the flex:1 slider since every gap in the section is the same 8px. */
   .windrose-color-opacity-header {
-    display: contents;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
   .windrose-color-opacity-label {

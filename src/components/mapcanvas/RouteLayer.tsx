@@ -15,7 +15,6 @@ import type { VNode } from 'preact';
 import type { ToolId } from '#types/tools/tool.types';
 import type { SavedRoute } from '#types/core/map.types';
 import type { IGeometry, Point } from '#types/core/geometry.types';
-import type { MapDistanceOverrides } from '../../drawing/distanceOperations';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Menu } from 'obsidian';
@@ -153,7 +152,7 @@ const RouteLayer = ({ currentTool, onSavedRoutesChange }: RouteLayerProps): VNod
   const distanceSettings = getEffectiveDistanceSettings(
     mapData.mapType,
     getSettings(),
-    (mapData.settings?.distanceSettings ?? null) as MapDistanceOverrides | null
+    (mapData.settings?.distanceSettings ?? null)
   );
 
   // Terrain colors resolve against enabled packs; a vanished terrain simply

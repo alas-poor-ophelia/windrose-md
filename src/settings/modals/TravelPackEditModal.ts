@@ -357,7 +357,7 @@ class TravelPackEditModal extends Modal {
         }
         dropdown.setValue(mode.timeUnit);
         dropdown.onChange(value => {
-          this.patchItem('modes', mode.id, { timeUnit: value as TravelTimeUnit });
+          this.patchItem('modes', mode.id, { timeUnit: value });
         });
       });
       row.addExtraButton(btn => btn
@@ -409,7 +409,7 @@ class TravelPackEditModal extends Modal {
         dropdown.addOption('minutes', 'Minutes/day');
         dropdown.setValue(allowance.timeUnit);
         dropdown.onChange(value => {
-          this.patchItem('allowances', allowance.id, { timeUnit: value as 'minutes' | 'hours' });
+          this.patchItem('allowances', allowance.id, { timeUnit: value });
         });
       });
       row.addExtraButton(btn => btn

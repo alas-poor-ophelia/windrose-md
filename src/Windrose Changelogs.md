@@ -608,6 +608,14 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.1.3
+
+The rest of the community directory's scan findings, hunted to zero this time. No feature changes.
+
+- Removed nine unnecessary type assertions the scan flagged in the Beacon, route, and travel-pack code (all provably redundant — the code typechecks identically without them).
+- Replaced the two `display: contents` usages the CSS compatibility lint flagged with plain flex/block equivalents that render identically.
+- Dependency audit cleaned out: every advisory the scan listed (ajv, brace-expansion, fast-uri, minimatch, picomatch, postcss, vite, vitest) is now resolved outside its vulnerable range, including a vitest 2→3 upgrade for the test harness. The one remaining advisory (electron) is a test-only dependency pinned by the E2E framework and never ships with the plugin.
+
 ## Version 2.1.2
 
 A store-compliance patch addressing the community directory's automated quality scan. No feature changes.

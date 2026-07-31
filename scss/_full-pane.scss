@@ -43,10 +43,12 @@
   border-bottom: 1.5px solid oklch(from var(--windrose-border-primary) l c h / 0.5);
 }
 
-/* Stage wraps [tool rail | canvas]. Layout-transparent everywhere except
-   full-pane, so block mode keeps its existing top-toolbar column flow. */
+/* Stage wraps [tool rail | canvas]. Plain block outside full-pane (NOT
+   display:contents — flagged by the store's CSS-compat lint as partial in
+   older Obsidian): the block container is normal-flow, so a block wrapper
+   stacks toolbar-above-canvas identically to a transparent one. */
 .windrose-stage {
-  display: contents;
+  display: block;
 }
 
 /* Full-pane: the tool palette is a full-height ribbon flush against the canvas's

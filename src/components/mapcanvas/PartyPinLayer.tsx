@@ -11,7 +11,6 @@ import type { VNode } from 'preact';
 import type { PartyPin } from '#types/core/map.types';
 import type { Point } from '#types/core/geometry.types';
 import type { ToolId } from '#types/tools/tool.types';
-import type { MapDistanceOverrides } from '../../drawing/distanceOperations';
 import type { PartyRangeResults } from '../../objects/partyRangeQuery';
 
 import { Notice, TFile } from 'obsidian';
@@ -113,7 +112,7 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     const distanceSettings = getEffectiveDistanceSettings(
       mapData.mapType,
       getSettings(),
-      (mapData.settings?.distanceSettings ?? null) as MapDistanceOverrides | null
+      (mapData.settings?.distanceSettings ?? null)
     );
     return queryPartyRange(mapData, geometry, pin, {
       rangeInCells: rangeUnitsToCells(pin.range, distanceSettings.distancePerCell),
@@ -156,7 +155,7 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     const distanceSettings = getEffectiveDistanceSettings(
       mapData.mapType,
       getSettings(),
-      (mapData.settings?.distanceSettings ?? null) as MapDistanceOverrides | null
+      (mapData.settings?.distanceSettings ?? null)
     );
     return formatTravelTimesLabel(
       distanceInCells * distanceSettings.distancePerCell,
@@ -172,7 +171,7 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     const distanceSettings = getEffectiveDistanceSettings(
       mapData.mapType,
       getSettings(),
-      (mapData.settings?.distanceSettings ?? null) as MapDistanceOverrides | null
+      (mapData.settings?.distanceSettings ?? null)
     );
     return findTravelMismatch(distanceSettings.distanceUnit, selectedTravelModes);
   }, [selectedTravelModes, mapData]);
@@ -226,7 +225,7 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     return getEffectiveDistanceSettings(
       mapData.mapType,
       getSettings(),
-      (mapData.settings?.distanceSettings ?? null) as MapDistanceOverrides | null
+      (mapData.settings?.distanceSettings ?? null)
     ).distanceUnit;
   }, [mapData]);
   const noteContext = useMemo(
@@ -321,7 +320,7 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
   const distanceSettings = getEffectiveDistanceSettings(
     mapData.mapType,
     getSettings(),
-    (mapData.settings?.distanceSettings ?? null) as MapDistanceOverrides | null
+    (mapData.settings?.distanceSettings ?? null)
   );
   const rangeInCells = rangeUnitsToCells(pin.range, distanceSettings.distancePerCell);
 

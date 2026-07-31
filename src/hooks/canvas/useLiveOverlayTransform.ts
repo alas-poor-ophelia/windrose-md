@@ -142,7 +142,7 @@ function useLiveOverlayTransform({
       if (!metrics) return;
       group.setAttribute(
         'transform',
-        computeWorldTransform(vs, geometry as OverlayGeometry, northDirection, metrics)
+        computeWorldTransform(vs, geometry, northDirection, metrics)
       );
       const counterScale = computeCounterScale(vs.zoom, metrics.displayScale);
       for (const node of Array.from(group.querySelectorAll(COUNTER_SCALE_SELECTOR))) {
