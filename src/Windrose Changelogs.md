@@ -608,6 +608,30 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.1.0
+
+The travel release. This one is headlined by the **Beacon** — a party-position marker that answers "what's nearby?" — plus travel packs that turn measured distance into travel times, saveable multi-waypoint routes, and doors and windows that seat directly into your walls.
+
+### New Features
+- **The Beacon.** Mark where your party is and keep the answers coming:
+	- Place it from the pin tool group, set a range in your map's real units, and get a live **range ring** — a clean circle, or a highlight of the actual cells in reach (the classic hex-crawl bloom).
+	- A floating Beacon card controls label, range, ring style, pin color, and icon (with RPGAwesome icon search).
+	- **Nearby results**: linked notes and labeled markers within range appear in a distance-sorted list — open the note, or jump the map to the marker with a flash pulse. Layer scoping and tag/property filters narrow what counts.
+	- **Related notes** surface by shared tags and backlinks.
+	- Optionally generate a **Beacon note** in your vault that keeps the same results as a table of note links — updated automatically as the Beacon moves, with a polite removal offer when the Beacon goes away.
+- **Multi-waypoint measurement routes.** The measure tool now builds full routes: click to add waypoints, double-click or Enter to finish, Backspace to step back. Save a measurement as a permanent, styled **route** on the map (name, color, width, label), edit or rename it later with full undo support, and show or hide all saved routes from the visibility toolbar.
+- **Travel packs & travel times.** Importable rule bundles of units, terrains, travel modes, and daily allowances. Manage them in settings (create, edit, export, import from file), or install curated packs — D&D 5e (2014 and 2024), Pathfinder 1e/2e, and Old-School Essentials — from the content-pack browser's new **Travel Packs** tab. With a pack active, measured routes and Beacon results show **travel times** (days and remainder), with **per-segment terrain** on routes for honest overland math.
+- **Openings.** Doors, windows, and thresholds that seat directly into wall gaps (Dungeondraft portal assets): scale-aware placement, click-to-edit mode for moving, resizing, and deleting seated openings, and Alt-click on a wall for a bare threshold. Openings stay anchored through wall edits.
+
+### Improvements
+- Flood fill is now **wall-aware** — fills stop at walls, and a runaway fill aborts at a safety limit instead of flooding the map.
+- Clicking outside the tile import wizard mid-import now asks before discarding, instead of silently losing progress.
+- README and the feature docs have been brought fully up to date with all of the above.
+
+### Bug Fixes
+- The Beacon card no longer covers the pin, overlays (routes, Beacon) track live pan/zoom instead of lagging a gesture, the Beacon label stays a constant size at any zoom, and route labels reveal on hover.
+- Dungeondraft import: hardened portal/metadata classification and made outside-click during import a real, safe cancel.
+
 ## Version 2.0.3
 
 A patch release focused on tile reliability and a long-requested eraser improvement.
