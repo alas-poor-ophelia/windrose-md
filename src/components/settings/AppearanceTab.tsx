@@ -416,6 +416,53 @@ function AppearanceTab(): VNode {
           </div>
         </div>
       </SettingItem>
+
+      <SettingItem
+        name="Picture Frame Size"
+        description="Height in pixels when this map is in picture frame mode (leave blank for global defaults)"
+        vertical
+      >
+        <div style={{ display: 'flex', gap: '12px', width: '100%', opacity: useGlobalSettings ? 0.5 : 1 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Desktop</label>
+            <input
+              type="number"
+              placeholder={String(globalSettings.pictureFrameHeight ?? 400)}
+              value={useGlobalSettings ? '' : (overrides.pictureFrameHeight ?? '')}
+              onChange={(e: Event) => !useGlobalSettings && handleColorChange('pictureFrameHeight', (e.target as HTMLInputElement).value === '' ? undefined : parseInt((e.target as HTMLInputElement).value, 10))}
+              disabled={useGlobalSettings}
+              style={{
+                width: '100%',
+                padding: '6px 10px',
+                borderRadius: '4px',
+                border: '1px solid var(--background-modifier-border)',
+                background: 'var(--background-primary)',
+                color: 'var(--text-normal)',
+                fontSize: '14px'
+              }}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Mobile</label>
+            <input
+              type="number"
+              placeholder={String(globalSettings.pictureFrameHeightMobile ?? 300)}
+              value={useGlobalSettings ? '' : (overrides.pictureFrameHeightMobile ?? '')}
+              onChange={(e: Event) => !useGlobalSettings && handleColorChange('pictureFrameHeightMobile', (e.target as HTMLInputElement).value === '' ? undefined : parseInt((e.target as HTMLInputElement).value, 10))}
+              disabled={useGlobalSettings}
+              style={{
+                width: '100%',
+                padding: '6px 10px',
+                borderRadius: '4px',
+                border: '1px solid var(--background-modifier-border)',
+                background: 'var(--background-primary)',
+                color: 'var(--text-normal)',
+                fontSize: '14px'
+              }}
+            />
+          </div>
+        </div>
+      </SettingItem>
     </div>
   );
 }

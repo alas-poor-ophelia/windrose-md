@@ -388,6 +388,38 @@ export const TabRenderSettingsMethods = {
           }
         }));
 
+    // Picture Frame Height (Desktop)
+    new Setting(containerEl)
+      .setName('Picture frame height (desktop)')
+      .setDesc('Height in pixels for embedded maps in picture frame mode on desktop devices')
+      .addText(text => text
+        .setPlaceholder('400')
+        .setValue(String(this.plugin.settings.pictureFrameHeight ?? 400))
+        .onChange(async (value: string) => {
+          const num = parseInt(value);
+          if (!isNaN(num)) {
+            this.plugin.settings.pictureFrameHeight = num;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }
+        }));
+
+    // Picture Frame Height (Mobile)
+    new Setting(containerEl)
+      .setName('Picture frame height (mobile/touch)')
+      .setDesc('Height in pixels for embedded maps in picture frame mode on mobile and touch devices')
+      .addText(text => text
+        .setPlaceholder('300')
+        .setValue(String(this.plugin.settings.pictureFrameHeightMobile ?? 300))
+        .onChange(async (value: string) => {
+          const num = parseInt(value);
+          if (!isNaN(num)) {
+            this.plugin.settings.pictureFrameHeightMobile = num;
+            this.settingsChanged = true;
+            await this.plugin.saveSettings();
+          }
+        }));
+
     // Hover Preview Size
     const previewScalePercent = Math.round((this.plugin.settings.hoverPreviewScale != null && this.plugin.settings.hoverPreviewScale !== 0 ? this.plugin.settings.hoverPreviewScale : 1.0) * 100);
     new Setting(containerEl)

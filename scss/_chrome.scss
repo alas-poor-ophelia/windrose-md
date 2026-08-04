@@ -310,3 +310,55 @@
     transform: scale(-1);
   }
 }
+
+/* ============================================
+   PICTURE FRAME MODE (locked embed view)
+   ============================================ */
+/* All chrome is unmounted in frame mode; the exit button is the one control
+   left, invisible until the frame is hovered (or always faintly visible on
+   touch devices, which have no hover). */
+.windrose-picture-frame .windrose-canvas-wrapper {
+  position: relative;
+}
+
+.windrose-frame-exit-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  background-color: var(--windrose-bg-secondary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms ease, background-color 150ms ease;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.windrose-picture-frame .windrose-canvas-wrapper:hover .windrose-frame-exit-btn,
+.windrose-frame-exit-btn:focus-visible {
+  opacity: 0.85;
+}
+
+.windrose-frame-exit-btn:hover {
+  opacity: 1;
+  background-color: var(--windrose-bg-tertiary);
+  border-color: var(--windrose-border-primary);
+}
+
+@media (hover: none) {
+  .windrose-frame-exit-btn {
+    opacity: 0.35;
+  }
+}

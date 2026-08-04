@@ -89,6 +89,7 @@ interface CoordinatorsProps {
   isFocused: boolean;
   isColorPickerOpen: boolean;
   isAlignmentMode: boolean;
+  interactionLocked: boolean;
   viewController: ViewController;
 }
 
@@ -120,6 +121,8 @@ interface MapCanvasContentProps {
   isAnimating: boolean;
   theme: ResolvedTheme;
   isAlignmentMode: boolean;
+  /** Picture frame mode: view-only canvas — tool actions become pans, menus/editors suppressed. */
+  interactionLocked?: boolean;
   /** Wall under active edit-drag; excluded from the static raster (live overlay owns it). */
   draggingWallId?: string | null;
   /** Resolved distance overrides for the active map (sub-hex-aware; null/undefined = use global). */
@@ -145,7 +148,7 @@ interface MapCanvasProps extends MapCanvasContentProps {
  * so the hooks have access to MapState, MapSelection, and EventHandler contexts.
  * Returns null (no visual rendering) - only manages behavioral coordination.
  */
-const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOpen, isAlignmentMode, viewController }: CoordinatorsProps): null => {
+const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOpen, isAlignmentMode, interactionLocked, viewController }: CoordinatorsProps): null => {
   // Coordinator hooks need to be called inside the provider tree
   usePanZoomCoordinator({
     canvasRef,
@@ -159,7 +162,8 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
     canvasRef,
     isColorPickerOpen,
     showObjectColorPicker: false,
-    isAlignmentMode
+    isAlignmentMode,
+    interactionLocked
   });
 
   return null; // No UI - coordinators only manage behavior
@@ -169,7 +173,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, draggingWallId, distanceOverrides, isInSubHex, children }: MapCanvasContentProps): VNode => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, children }: MapCanvasContentProps): VNode => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -472,6 +476,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
             isFocused={isFocused}
             isColorPickerOpen={isColorPickerOpen}
             isAlignmentMode={isAlignmentMode}
+            interactionLocked={interactionLocked}
             viewController={viewController}
           />
 

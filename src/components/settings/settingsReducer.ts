@@ -66,6 +66,8 @@ export interface SettingsOverrides {
   coordinateTextShadow: HexColor;
   canvasHeight?: number;
   canvasHeightMobile?: number;
+  pictureFrameHeight?: number;
+  pictureFrameHeightMobile?: number;
   fogOfWarColor: HexColor;
   fogOfWarOpacity: number;
   fogOfWarImage: string | null;
@@ -625,6 +627,8 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
       coordinateTextShadow: o.coordinateTextShadow ?? globalSettings.coordinateTextShadow ?? '#000000',
       canvasHeight: o.canvasHeight ?? globalSettings.canvasHeight ?? 600,
       canvasHeightMobile: o.canvasHeightMobile ?? globalSettings.canvasHeightMobile ?? 400,
+      pictureFrameHeight: o.pictureFrameHeight ?? globalSettings.pictureFrameHeight ?? 400,
+      pictureFrameHeightMobile: o.pictureFrameHeightMobile ?? globalSettings.pictureFrameHeightMobile ?? 300,
       fogOfWarColor: o.fogOfWarColor ?? globalSettings.fogOfWarColor ?? '#000000',
       fogOfWarOpacity: o.fogOfWarOpacity ?? globalSettings.fogOfWarOpacity ?? 0.9,
       fogOfWarImage: o.fogOfWarImage ?? globalSettings.fogOfWarImage ?? null,

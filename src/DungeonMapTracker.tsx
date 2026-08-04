@@ -140,6 +140,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // scale from the parent chain; the root map uses its own stored settings.
   const distanceOverrides = activeDistanceOverrides ?? mapData?.settings?.distanceSettings;
 
+  // Picture frame mode (locked embed view) is a property of the ROOT map — it
+  // must survive sub-hex dives and reloads. Block mode only.
+  const pictureFrameActive = !fullPane && rootMapData?.pictureFrame === true;
+
   // Populate the renderer's tile-metadata accessor on mount so terrain tiles
   // resolve to seamless region fills out-of-the-box, even if the tile browser
   // panel is never opened. Also refresh on import (windrose-settings-changed)
@@ -609,11 +613,15 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
   }, []);
 
-  const canvasHeight = fullPane ? null : (effectiveSettings
+  const canvasHeight = fullPane ? null : (pictureFrameActive
     ? (isTouchDevice
-        ? (effectiveSettings.canvasHeightMobile ?? 400)
-        : (effectiveSettings.canvasHeight ?? 600))
-    : (isTouchDevice ? 400 : 600));
+        ? (effectiveSettings?.pictureFrameHeightMobile ?? 300)
+        : (effectiveSettings?.pictureFrameHeight ?? 400))
+    : (effectiveSettings
+        ? (isTouchDevice
+            ? (effectiveSettings.canvasHeightMobile ?? 400)
+            : (effectiveSettings.canvasHeight ?? 600))
+        : (isTouchDevice ? 400 : 600)));
 
 
 
@@ -734,6 +742,25 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleTravelSettingsChange
   } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
 
+  // Picture frame handlers write through rootUpdateMapData, not the
+  // active-map funnel (see pictureFrameActive above).
+  const handleTogglePictureFrame = useCallback((): void => {
+    rootUpdateMapData((prev) => ({ ...prev, pictureFrame: prev.pictureFrame !== true }));
+  }, [rootUpdateMapData]);
+
+  // Lock/unlock the root viewport as the picture-frame default view.
+  // viewState commits at gesture end, so at click time it IS the current viewport.
+  const handleToggleViewLock = useCallback((): void => {
+    rootUpdateMapData((prev) => {
+      if (prev.lockedViewState != null) {
+        const { lockedViewState: _cleared, ...rest } = prev;
+        return rest;
+      }
+      if (prev.viewState == null) return prev;
+      return { ...prev, lockedViewState: { ...prev.viewState } };
+    });
+  }, [rootUpdateMapData]);
+
   const wrappedHandleNameChange = useCallback((newName: string) => {
     handleNameChange(newName);
     onNameChange?.(newName);
@@ -845,10 +872,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     mapData, updateMapData, handleViewStateChange
   });
 
-  // Global keyboard shortcuts: layer nav, undo/redo
+  // Global keyboard shortcuts: layer nav, undo/redo, picture frame toggle
   useKeyboardShortcuts({
     isFocused, mapData,
-    handleUndo: wrappedHandleUndo, handleRedo, handleLayerSelect
+    handleUndo: wrappedHandleUndo, handleRedo, handleLayerSelect,
+    pictureFrameLocked: pictureFrameActive,
+    onTogglePictureFrame: !fullPane ? handleTogglePictureFrame : undefined
   });
 
   // MCP bridge: each map instance registers its own state + operations.
@@ -1172,14 +1201,14 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     <>
       <div
         ref={containerRef}
-        className={`windrose-container interactive-child${fullPane ? '' : ' windrose-container-block'}`}
+        className={`windrose-container interactive-child${fullPane ? '' : ' windrose-container-block'}${pictureFrameActive ? ' windrose-picture-frame' : ''}`}
       >
         <CornerBrackets classPrefix="windrose-corner-bracket" variant="ornate" filterId="bracket" />
 
         {/* Map name + save status header — sits above the tool palette in both
             full-pane and block mode (the map-picker/new/copy controls inside are
-            full-pane only). */}
-        <MapHeader
+            full-pane only). Picture frame hides it with the rest of the chrome. */}
+        {!pictureFrameActive && <MapHeader
           mapData={mapData}
           onNameChange={wrappedHandleNameChange}
           saveStatus={saveStatus}
@@ -1192,12 +1221,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           onNewMap={fullPane ? handleNewMap : undefined}
           onDeleteMap={fullPane ? () => { void handleDeleteMap(); } : undefined}
           subHexPath={subHexPath}
-        />
+        />}
 
         {/* One-time upgrader notice pointing at the Features settings section. */}
-        {onboarding === 'whatsnew' && <WhatsNewNotice />}
+        {onboarding === 'whatsnew' && !pictureFrameActive && <WhatsNewNotice />}
 
-        {isInSubHex && (
+        {isInSubHex && !pictureFrameActive && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <SubHexBreadcrumb
               breadcrumbs={breadcrumbs}
@@ -1225,7 +1254,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         )}
 
         <div className="windrose-stage">
-        <div className="windrose-toolbar-anchor">
+        {!pictureFrameActive && <div className="windrose-toolbar-anchor">
           {!isFloating('toolPalette') && (
             <ToolPalette
               currentTool={currentTool}
@@ -1260,11 +1289,14 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               mapType={mapData.mapType}
               showFogTools={showFogTools}
               onFogToolsToggle={handleFogToolsToggle}
+              onTogglePictureFrame={handleTogglePictureFrame}
+              viewLocked={rootMapData?.lockedViewState != null}
+              onToggleViewLock={handleToggleViewLock}
             />
           )}
-        </div>
+        </div>}
 
-        {!fullPane && featureFlags.fogOfWar && (
+        {!fullPane && !pictureFrameActive && featureFlags.fogOfWar && (
           <FogOfWarToolbar
             isOpen={showFogTools && showVisibilityToolbar}
             fogOfWarState={currentFogState}
@@ -1281,9 +1313,21 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           onMouseEnter={() => setIsFocused(true)}
           onMouseLeave={() => setIsFocused(false)}
         >
+          {/* Picture frame: the one piece of chrome left — a subtle hover-reveal
+              exit button (CSS keeps it invisible until the frame is hovered). */}
+          {pictureFrameActive && (
+            <button
+              className="windrose-frame-exit-btn"
+              onClick={handleTogglePictureFrame}
+              title="Exit picture frame mode"
+            >
+              <Icon icon="lucide-frame" />
+            </button>
+          )}
+
           {/* Block-mode left icon rail — Layers / Colors / View (+ Regions on hex).
               42px rail, flyouts overlay the canvas. Replaces windrose-left-panels. */}
-          {!fullPane && (
+          {!fullPane && !pictureFrameActive && (
             <EdgeRail
               openId={railOpenId}
               onOpenChange={setRailOpenId}
@@ -1410,6 +1454,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onTextLabelSettingsChange={handleTextLabelSettingsChange}
               currentTool={currentTool}
               isAlignmentMode={isAlignmentMode}
+              interactionLocked={pictureFrameActive}
               selectedObjectType={selectedObjectType ?? undefined}
               selectedColor={selectedColor}
               isColorPickerOpen={isColorPickerOpen}
@@ -1578,7 +1623,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               {featureFlags.dungeonGenerator && <MapCanvas.RerollDungeonButton />}
             </MapCanvas>
 
-            {!fullPane && (
+            {!fullPane && !pictureFrameActive && (
               <MapControls
                 onZoomIn={handleZoomIn}
                 onZoomOut={handleZoomOut}
@@ -1616,7 +1661,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           </div>
 
           {/* Tile Asset Browser (right sidebar, block mode) */}
-          {showTilePanel && !fullPane && (
+          {showTilePanel && !fullPane && !pictureFrameActive && (
             <DrawerDock
               open={!tileBrowserCollapsed}
               onCollapse={collapseTileBrowser}
@@ -2042,7 +2087,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         </div>
         </div>
 
-        {showFooter && (
+        {showFooter && !pictureFrameActive && (
           <div className="windrose-footer">
             Map ID: {mapId} | Color: {getColorDisplayName()} | {
               currentTool === 'select' ? 'Click to select text/objects | Drag to move | Press R to rotate | Press Delete to remove' :

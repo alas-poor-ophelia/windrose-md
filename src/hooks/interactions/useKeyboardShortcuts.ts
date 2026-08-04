@@ -8,10 +8,15 @@ interface UseKeyboardShortcutsOptions {
   handleUndo: () => void;
   handleRedo: () => void;
   handleLayerSelect: (layerId: string) => void;
+  /** Picture frame mode: only the frame-toggle shortcut stays live. */
+  pictureFrameLocked?: boolean;
+  /** Toggle picture frame mode (block mode only; undefined in full-pane). */
+  onTogglePictureFrame?: () => void;
 }
 
 function useKeyboardShortcuts({
-  isFocused, mapData, handleUndo, handleRedo, handleLayerSelect
+  isFocused, mapData, handleUndo, handleRedo, handleLayerSelect,
+  pictureFrameLocked = false, onTogglePictureFrame
 }: UseKeyboardShortcutsOptions): void {
   useEffect((): (() => void) | undefined => {
     if (!isFocused || !mapData) return undefined;
@@ -23,6 +28,15 @@ function useKeyboardShortcuts({
 
       const shortcuts = getSettings().keyboardShortcuts ?? {};
       const bareKey = (s: string): string => { const parts = s.split('+'); return (parts[parts.length - 1] ?? s).toLowerCase(); };
+
+      // Picture frame toggle works in both directions — it's the only way
+      // back out of frame mode by keyboard.
+      if (onTogglePictureFrame && !mod && !e.altKey && key.toLowerCase() === bareKey(shortcuts.pictureFrame ?? 'p')) {
+        onTogglePictureFrame(); e.preventDefault(); return;
+      }
+
+      // Everything below edits map data; inert while the frame is locked.
+      if (pictureFrameLocked) return;
 
       if (mod && !e.shiftKey && key.toLowerCase() === bareKey(shortcuts.undo ?? 'z')) {
         handleUndo(); e.preventDefault(); return;
@@ -54,7 +68,7 @@ function useKeyboardShortcuts({
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isFocused, mapData, handleUndo, handleRedo, handleLayerSelect]);
+  }, [isFocused, mapData, handleUndo, handleRedo, handleLayerSelect, pictureFrameLocked, onTogglePictureFrame]);
 }
 
 export { useKeyboardShortcuts };

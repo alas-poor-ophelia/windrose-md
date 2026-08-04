@@ -25,13 +25,15 @@ export const TabRenderKeyboardShortcutsMethods = {
       { id: 'layerPrev', label: 'Previous Layer', scope: 'Map hover' },
       { id: 'layerNext', label: 'Next Layer', scope: 'Map hover' },
       { id: 'undo', label: 'Undo', scope: 'Map hover' },
-      { id: 'redo', label: 'Redo', scope: 'Map hover' }
+      { id: 'redo', label: 'Redo', scope: 'Map hover' },
+      { id: 'pictureFrame', label: 'Picture Frame Mode', scope: 'Map hover (embedded maps)' }
     ];
 
     const DEFAULT_SHORTCUTS: Record<string, string> = {
       selectTool: 's', drawTool: 'd', freehandTool: 'f', eraseTool: 'e',
       notePinTool: 'n', measureTool: 'm', panMode: 'Space', showCoordinates: 'c',
-      rotate: 'r', layerPrev: '[', layerNext: ']', undo: 'Mod+Z', redo: 'Mod+Y'
+      rotate: 'r', layerPrev: '[', layerNext: ']', undo: 'Mod+Z', redo: 'Mod+Y',
+      pictureFrame: 'p'
     };
 
     const isMac = Platform.isMacOS;

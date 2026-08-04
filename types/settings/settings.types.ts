@@ -130,7 +130,11 @@ export interface PluginSettings {
   // Canvas dimensions
   canvasHeight: number;
   canvasHeightMobile: number;
-  
+
+  // Canvas dimensions in picture frame mode (locked embed view)
+  pictureFrameHeight?: number;
+  pictureFrameHeightMobile?: number;
+
   // Distance measurement settings
   distancePerCellGrid: number;
   distancePerCellHex: number;

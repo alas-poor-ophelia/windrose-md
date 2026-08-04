@@ -48,6 +48,12 @@ export interface VisibilityToolbarProps {
   mapType: MapType;
   showFogTools?: boolean;
   onFogToolsToggle?: () => void;
+  /** Enter picture frame mode (locked embed view). Block mode only. */
+  onTogglePictureFrame?: () => void;
+  /** True when a locked default viewport is set for picture frame mode. */
+  viewLocked?: boolean;
+  /** Lock/unlock the current viewport as the picture-frame default view. */
+  onToggleViewLock?: () => void;
 }
 
 const VisibilityToolbar = ({
@@ -56,7 +62,10 @@ const VisibilityToolbar = ({
   onToggleLayer,
   mapType,
   showFogTools = false,
-  onFogToolsToggle
+  onFogToolsToggle,
+  onTogglePictureFrame,
+  viewLocked = false,
+  onToggleViewLock
 }: VisibilityToolbarProps): VNode => {
   const featureFlags = useFeatureFlags();
   const layers: LayerDef[] = [
@@ -148,6 +157,32 @@ const VisibilityToolbar = ({
               <span className="windrose-fow-label">Fog</span>
             </button>
           </div>
+        </>
+      )}
+
+      {onTogglePictureFrame && (
+        <>
+          <div className="windrose-visibility-separator" />
+
+          <button
+            className="windrose-visibility-btn"
+            onClick={onTogglePictureFrame}
+            title="Picture frame mode (hide all controls, view only)"
+          >
+            <Icon icon="lucide-frame" />
+          </button>
+
+          {onToggleViewLock && (
+            <button
+              className={`windrose-visibility-btn${viewLocked ? ' windrose-visibility-btn-active' : ''}`}
+              onClick={onToggleViewLock}
+              title={viewLocked
+                ? 'View locked: picture frame reopens here (click to unlock)'
+                : 'Lock current view as the picture frame default'}
+            >
+              <Icon icon={viewLocked ? 'lucide-lock' : 'lucide-lock-open'} />
+            </button>
+          )}
         </>
       )}
     </div>

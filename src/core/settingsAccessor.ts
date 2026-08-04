@@ -75,6 +75,10 @@ const FALLBACK_SETTINGS: PluginSettings = {
   // Canvas dimensions
   canvasHeight: 600,
   canvasHeightMobile: 400,
+
+  // Picture frame mode canvas dimensions (smaller: finished maps shown inline)
+  pictureFrameHeight: 400,
+  pictureFrameHeightMobile: 300,
   
   // Distance measurement settings
   distancePerCellGrid: DEFAULTS.distance.perCellGrid,

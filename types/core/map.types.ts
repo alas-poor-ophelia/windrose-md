@@ -320,6 +320,13 @@ export interface MapData {
   // View state (pan/zoom) - optional, defaults calculated based on map type
   viewState?: StoredViewState;
 
+  // Picture frame mode: locked embed view with all chrome hidden (block mode only)
+  pictureFrame?: boolean;
+
+  // Viewport the map reopens to when picture frame mode is active (set via the
+  // Lock view button; absent = reopen at last-left viewState as usual)
+  lockedViewState?: StoredViewState;
+
   // Tile drawer view: grid (thumbnail wall) vs list (dense rows). Persisted per map.
   tileViewMode?: 'grid' | 'list';
 

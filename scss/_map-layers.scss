@@ -100,6 +100,15 @@
   color: var(--windrose-text-muted);
 }
 
+/* Active state (view lock engaged) — mirrors the expand-btn active treatment */
+.windrose-visibility-btn.windrose-visibility-btn-active {
+  background-color: var(--windrose-border-primary);
+  border-color: var(--windrose-border-primary-dark);
+}
+.windrose-visibility-btn.windrose-visibility-btn-active svg {
+  color: var(--windrose-bg-primary);
+}
+
 /* Active state for toggle buttons in map controls */
 button.windrose-expand-btn.windrose-expand-btn-active,
 .is-tablet button.windrose-expand-btn.windrose-expand-btn-active {

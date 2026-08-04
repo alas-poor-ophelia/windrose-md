@@ -253,6 +253,19 @@ function migrateMapData(mapData: MapData): MapData {
   return mapData;
 }
 
+/**
+ * Picture frame mode reopens at the locked viewport (set via the Lock view
+ * button) instead of wherever the user last left the map. Applied at load
+ * time only — the live viewState keeps committing normally while open, so
+ * toggling frame mode off never loses the user's real position.
+ */
+function applyLockedViewState(mapData: MapData): MapData {
+  if (mapData.pictureFrame === true && mapData.lockedViewState != null) {
+    return { ...mapData, viewState: { ...mapData.lockedViewState } };
+  }
+  return mapData;
+}
+
 async function loadMapData(app: App, mapId: string, mapName: string = '', mapType: MapType = 'grid'): Promise<MapData> {
   const dataPath = getDataFilePath();
   try {
@@ -270,7 +283,7 @@ async function loadMapData(app: App, mapId: string, mapName: string = '', mapTyp
       if (data.maps[mapId].name == null && mapName) {
         data.maps[mapId].name = mapName;
       }
-      return data.maps[mapId];
+      return applyLockedViewState(data.maps[mapId]);
     }
 
     return createNewMap(mapName, mapType);
@@ -615,5 +628,5 @@ async function listMaps(app: App): Promise<MapListEntry[]> {
   }
 }
 
-export { loadMapData, saveMapData, deleteMapData, createNewMap, listMaps, migrateMapData, canonicalizeTileIds };
+export { loadMapData, saveMapData, deleteMapData, createNewMap, listMaps, migrateMapData, canonicalizeTileIds, applyLockedViewState };
 export type { MapListEntry };

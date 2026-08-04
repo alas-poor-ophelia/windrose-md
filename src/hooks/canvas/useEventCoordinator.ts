@@ -40,7 +40,8 @@ const DRAWING_TOOL_SET: Set<string> = new Set([
 const useEventCoordinator = ({
   isColorPickerOpen,
   showObjectColorPicker = false,
-  isAlignmentMode = false
+  isAlignmentMode = false,
+  interactionLocked = false
 }: UseEventCoordinatorOptions): void => {
   const { canvasRef, currentTool, screenToGrid, screenToWorld, geometry } = useMapState();
   const { selectedItem, setSelectedItem, isDraggingSelection, setIsDraggingSelection, dragStart, setDragStart, layerVisibility, hasMultiSelection, isGroupDragging, clearSelection } = useMapSelection();
@@ -175,6 +176,14 @@ const useEventCoordinator = ({
     };
 
     const executeToolAction = (): void => {
+      // Picture frame mode: the map is view-only. Any pointer-down becomes a
+      // pan start; pinch/wheel zoom are handled upstream and stay live.
+      if (interactionLocked) {
+        panStartPositionRef.current = { x: clientX, y: clientY };
+        startPan(clientX, clientY);
+        return;
+      }
+
       if (spaceKeyPressed && !isTouchEvent) {
         panStartPositionRef.current = { x: clientX, y: clientY };
         startPan(clientX, clientY);
@@ -399,7 +408,7 @@ const useEventCoordinator = ({
     } else {
       executeToolAction();
     }
-  }, [currentTool, isColorPickerOpen, showObjectColorPicker, recentMultiTouch, selectedItem, hasMultiSelection, clearSelection, screenToWorld, getClickedSelectedItem, startGroupDrag, getHandlers, layerVisibility, isAlignmentMode, setSelectedItem]);
+  }, [currentTool, isColorPickerOpen, showObjectColorPicker, recentMultiTouch, selectedItem, hasMultiSelection, clearSelection, screenToWorld, getClickedSelectedItem, startGroupDrag, getHandlers, layerVisibility, isAlignmentMode, setSelectedItem, interactionLocked]);
 
   const handlePointerMove = useCallback((e: MouseEvent | TouchEvent): void => {
     const drawingHandlers = getHandlers('drawing');
@@ -838,8 +847,9 @@ const useEventCoordinator = ({
   }, [getHandlers]);
 
   const handleCanvasDoubleClick = useCallback((e: MouseEvent): void => {
-    // Sub-hex entry: double-click on hex in select mode
-    if (currentTool === 'select' && geometry?.type === 'hex' && screenToGrid != null) {
+    // Sub-hex entry: double-click on hex in select mode (or any tool while the
+    // map is view-locked — picture frame allows navigation, never edits)
+    if ((currentTool === 'select' || interactionLocked) && geometry?.type === 'hex' && screenToGrid != null) {
       const coords = screenToGrid(e.clientX, e.clientY);
       if (coords) {
         activeDocument.dispatchEvent(new CustomEvent('windrose:enter-sub-hex', {
@@ -848,6 +858,9 @@ const useEventCoordinator = ({
         return;
       }
     }
+
+    // View-locked: no polygon closers, no text-label editing
+    if (interactionLocked) return;
 
     // Region boundary mode: double-click closes the polygon
     if (currentTool === 'regionBoundary') {
@@ -880,10 +893,13 @@ const useEventCoordinator = ({
     if (!textHandlers?.handleCanvasDoubleClick) return;
 
     textHandlers.handleCanvasDoubleClick(e);
-  }, [currentTool, getHandlers, geometry, screenToGrid]);
+  }, [currentTool, getHandlers, geometry, screenToGrid, interactionLocked]);
 
   const handleContextMenu = useCallback((e: MouseEvent): void => {
     e.preventDefault();
+
+    // View-locked: context menus are edit surfaces
+    if (interactionLocked) return;
 
     // Try object/text context menu first — dispatch event for handlers to claim
     const contextDetail = { screenX: e.clientX, screenY: e.clientY, clientX: e.clientX, clientY: e.clientY, handled: false };
@@ -912,7 +928,7 @@ const useEventCoordinator = ({
     if (drawingHandlers?.cancelShapePreview) {
       drawingHandlers.cancelShapePreview();
     }
-  }, [getHandlers, geometry, screenToGrid]);
+  }, [getHandlers, geometry, screenToGrid, interactionLocked]);
 
   // Long-press timer for touch context menu
   const longPressTimerRef = useRef<number | null>(null);

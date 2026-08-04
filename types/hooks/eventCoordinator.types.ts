@@ -18,6 +18,8 @@ export interface UseEventCoordinatorOptions {
   isColorPickerOpen: boolean;
   showObjectColorPicker?: boolean;
   isAlignmentMode?: boolean;
+  /** Picture frame mode: suppress all tool actions; every pointer-down pans instead. */
+  interactionLocked?: boolean;
 }
 
 // ===========================================
