@@ -10,6 +10,7 @@ import type { MapType } from '#types/core/map.types';
 import type { VNode } from 'preact';
 import { Icon } from '../shared/Icon';
 import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 /** Fog of War tool identifiers */
 export type FogTool = 'paint' | 'erase' | 'rectangle' | null;
@@ -121,7 +122,7 @@ const VisibilityToolbar = ({
             key={layer.id}
             className={`windrose-visibility-btn ${isVisible !== true ? 'windrose-visibility-btn-hidden' : ''}`}
             onClick={() => onToggleLayer(layer.id)}
-            title={`${layer.tooltip} (currently ${isVisible === true ? 'visible' : 'hidden'})`}
+            ref={tooltipRef(`${layer.tooltip} (currently ${isVisible === true ? 'visible' : 'hidden'})`)}
           >
             <Icon icon={layer.icon} />
             {isVisible !== true && (
@@ -151,7 +152,7 @@ const VisibilityToolbar = ({
             <button
               className={`windrose-fow-toggle-btn ${showFogTools ? 'expanded' : ''}`}
               onClick={onFogToolsToggle}
-              title="Fog of War tools"
+              ref={tooltipRef('Fog of War tools')}
             >
               <Icon icon="lucide-cloud-fog" />
               <span className="windrose-fow-label">Fog</span>
@@ -167,7 +168,7 @@ const VisibilityToolbar = ({
           <button
             className="windrose-visibility-btn"
             onClick={onTogglePictureFrame}
-            title="Picture frame mode (hide all controls, view only)"
+            ref={tooltipRef('Picture frame mode (hide all controls, view only)')}
           >
             <Icon icon="lucide-frame" />
           </button>
@@ -176,9 +177,9 @@ const VisibilityToolbar = ({
             <button
               className={`windrose-visibility-btn${viewLocked ? ' windrose-visibility-btn-active' : ''}`}
               onClick={onToggleViewLock}
-              title={viewLocked
+              ref={tooltipRef(viewLocked
                 ? 'View locked: picture frame reopens here (click to unlock)'
-                : 'Lock current view as the picture frame default'}
+                : 'Lock current view as the picture frame default')}
             >
               <Icon icon={viewLocked ? 'lucide-lock' : 'lucide-lock-open'} />
             </button>

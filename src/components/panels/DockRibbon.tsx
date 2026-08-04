@@ -12,6 +12,7 @@
 import type { VNode } from 'preact';
 
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 interface DockRibbonItem {
   id: string;
@@ -31,7 +32,7 @@ const DockRibbon = ({ items, onExpand }: DockRibbonProps): VNode => (
         key={item.id}
         className="windrose-dock-ribbon-btn interactive-child"
         onClick={() => onExpand(item.id)}
-        title={item.title}
+        ref={tooltipRef(item.title, { placement: 'left' })}
       >
         <Icon icon={item.icon} size={18} />
       </button>

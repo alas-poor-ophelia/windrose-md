@@ -18,6 +18,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
 import { FEATURE_DEFINITIONS } from '../../core/featureFlags';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 import {
   ONBOARDING_QUESTIONS,
   allFeaturesEnabled,
@@ -176,7 +177,7 @@ const OnboardingSurvey = (): VNode | null => {
             <Icon icon="lucide-compass" size={18} />
             <span>Welcome to Windrose</span>
           </div>
-          <button className="windrose-onb-skip" onClick={handleSkip} title="Skip — enable everything">
+          <button className="windrose-onb-skip" onClick={handleSkip} ref={tooltipRef('Skip — enable everything')}>
             Skip
           </button>
         </div>

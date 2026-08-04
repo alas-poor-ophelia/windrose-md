@@ -17,6 +17,7 @@ import { useMemo, useState } from 'preact/hooks';
 import { RA_ICONS, searchIcons } from '../../assets/rpgAwesomeIcons';
 import { ModalPortal } from '../modals/ModalPortal';
 import { Icon } from './Icon';
+import { tooltipRef } from './obsidianTooltip';
 
 /** Props for IconPickerPopup */
 export interface IconPickerPopupProps {
@@ -105,7 +106,7 @@ const IconPickerPopup = ({
         <span className="windrose-icon-picker-title">{title}</span>
         <button
           className="windrose-icon-picker-clear"
-          title="Clear icon"
+          ref={tooltipRef('Clear icon')}
           aria-label="Clear icon"
           onClick={onClear}
         >
@@ -135,7 +136,7 @@ const IconPickerPopup = ({
           <button
             key={icon.iconClass}
             className={`windrose-icon-picker-cell interactive-child ${selectedIcon === icon.iconClass ? 'is-selected' : ''}`}
-            title={icon.label}
+            ref={tooltipRef(icon.label)}
             aria-label={icon.label}
             onClick={() => onIconSelect(icon.iconClass)}
           >

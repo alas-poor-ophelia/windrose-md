@@ -24,7 +24,7 @@ beforeEach(() => resetDataFile());
 // The old floating fog toolbar was replaced by the "Fog of War" section of the
 // left EdgeRail "View" panel (DockViewPanel). Open the View panel to reach it.
 async function openViewPanel(page: any): Promise<void> {
-  const viewRailBtn = page.locator('.windrose-edge-rail-btn[title="View"]');
+  const viewRailBtn = page.locator('.windrose-edge-rail-btn[aria-label="View"]');
   await viewRailBtn.waitFor({ state: "visible", timeout: 5000 });
   await viewRailBtn.click();
   await page.waitForTimeout(500); // fold animation
@@ -46,7 +46,7 @@ async function openFogToolbar(page: any): Promise<void> {
 async function closeViewPanel(page: any): Promise<void> {
   const open = page.locator('.windrose-edge-rail-drawer.is-open');
   if (await open.count() > 0) {
-    await page.locator('.windrose-edge-rail-btn[title="View"]').click();
+    await page.locator('.windrose-edge-rail-btn[aria-label="View"]').click();
     await page.waitForTimeout(600); // fold animation
   }
 }
@@ -81,7 +81,7 @@ test("Fog of war toolbar opens from visibility panel", async ({ page }) => {
   const fow = fogSection(page);
   expect(await fow.isVisible()).toBe(true);
   // Paint / Erase / Rect fog tools should be present
-  expect(await fow.locator('.windrose-dock-view-toggle[title="Paint"]').count()).toBe(1);
+  expect(await fow.locator('.windrose-dock-view-toggle[aria-label="Paint"]').count()).toBe(1);
 
   expect(errors).toHaveLength(0);
 });
@@ -101,7 +101,7 @@ test("Fog of war paint tool creates fogged cells", async ({ page }) => {
   await openFogToolbar(page);
 
   // Select fog paint tool
-  const paintBtn = fogSection(page).locator('.windrose-dock-view-toggle[title="Paint"]');
+  const paintBtn = fogSection(page).locator('.windrose-dock-view-toggle[aria-label="Paint"]');
   await paintBtn.waitFor({ state: "visible", timeout: 3000 });
   await paintBtn.click();
   await page.waitForTimeout(300);
@@ -140,7 +140,7 @@ test("Fog of war erase tool removes fogged cells", async ({ page }) => {
   await openFogToolbar(page);
 
   // First paint some fog
-  const paintBtn = fogSection(page).locator('.windrose-dock-view-toggle[title="Paint"]');
+  const paintBtn = fogSection(page).locator('.windrose-dock-view-toggle[aria-label="Paint"]');
   await paintBtn.waitFor({ state: "visible", timeout: 3000 });
   await paintBtn.click();
   await page.waitForTimeout(300);
@@ -162,7 +162,7 @@ test("Fog of war erase tool removes fogged cells", async ({ page }) => {
 
   // Now erase fog at one position (re-open panel to switch tool, then fold)
   await openViewPanel(page);
-  const eraseBtn = fogSection(page).locator('.windrose-dock-view-toggle[title="Erase"]');
+  const eraseBtn = fogSection(page).locator('.windrose-dock-view-toggle[aria-label="Erase"]');
   await eraseBtn.waitFor({ state: "visible", timeout: 3000 });
   await eraseBtn.click();
   await page.waitForTimeout(300);
@@ -188,7 +188,7 @@ test("Fog of war tool becomes active when selected", async ({ page }) => {
 
   // Selecting the Paint fog tool marks it active (the old floating fow-toggle-btn
   // expanded-state concept is gone; the tool now carries an `active` class).
-  const paintBtn = fogSection(page).locator('.windrose-dock-view-toggle[title="Paint"]');
+  const paintBtn = fogSection(page).locator('.windrose-dock-view-toggle[aria-label="Paint"]');
   await paintBtn.waitFor({ state: "visible", timeout: 3000 });
 
   const before = await paintBtn.getAttribute("class") || "";

@@ -111,13 +111,13 @@ async function canvasClick(page: any, fx: number, fy: number, shift = false): Pr
  *  given filename. List view flattens every category into plain rows, so no
  *  category-card drill-down is needed. */
 async function selectTileByFilename(page: any, filename: string): Promise<void> {
-  const listBtn = page.locator('.windrose-cd-head button[title="List view"]:visible').first();
+  const listBtn = page.locator('.windrose-cd-head button[aria-label="List view"]:visible').first();
   await listBtn.waitFor({ state: "visible", timeout: 10000 });
   await listBtn.click();
   await page.waitForTimeout(300);
 
   // Row appears once the async tileset folder scan completes
-  const row = page.locator(`.windrose-tb-listrow[title="${filename}"]:visible`).first();
+  const row = page.locator(`.windrose-tb-listrow[aria-label="${filename}"]:visible`).first();
   await row.waitFor({ state: "visible", timeout: 15000 });
   await row.click();
   await page.waitForTimeout(400);
@@ -202,10 +202,10 @@ test("Stamp toggle places a freeform tile with world coordinates", async ({ page
   await selectTileByFilename(page, CELL_TILE_FILENAME);
 
   // The compact footer's stamp button mirrors the subtool: OFF (paint) -> ON (stamp)
-  const stampBtn = page.locator('.windrose-tb-footer button[title="Stamp: OFF"]:visible').first();
+  const stampBtn = page.locator('.windrose-tb-footer button[aria-label="Stamp: OFF"]:visible').first();
   await stampBtn.waitFor({ state: "visible", timeout: 5000 });
   await stampBtn.click();
-  const stampOn = page.locator('.windrose-tb-footer button[title="Stamp: ON"]:visible').first();
+  const stampOn = page.locator('.windrose-tb-footer button[aria-label="Stamp: ON"]:visible').first();
   await stampOn.waitFor({ state: "visible", timeout: 3000 });
 
   await canvasClick(page, 0.45, 0.55);
@@ -260,7 +260,7 @@ test("Selecting a wall strip switches the active tool to wall", async ({ page })
 
   // The wall strip fixture carries depthAffinity 'structure', so switch the
   // depth band off the default 'ground' role to surface it in the browser
-  const structureSeg = page.locator('.windrose-db-seg[title^="Structure"]:visible').first();
+  const structureSeg = page.locator('.windrose-db-seg[aria-label^="Structure"]:visible').first();
   await structureSeg.waitFor({ state: "visible", timeout: 10000 });
   await structureSeg.click();
   await page.waitForTimeout(300);
@@ -272,7 +272,7 @@ test("Selecting a wall strip switches the active tool to wall", async ({ page })
 
   const footer = page.locator(".windrose-tb-footer");
   await footer.waitFor({ state: "visible", timeout: 5000 });
-  const snap = footer.locator('button[title*="Grid snap"]');
+  const snap = footer.locator('button[aria-label*="Grid snap"]');
   await snap.waitFor({ state: "visible", timeout: 5000 });
   expect(await snap.isVisible()).toBe(true);
 

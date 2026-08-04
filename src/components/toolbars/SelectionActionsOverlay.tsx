@@ -28,6 +28,7 @@ import { Icon } from '../shared/Icon';
 import { InternalLink } from '../shared/InternalLink';
 import { Z_INDEX } from '../../core/dmtConstants';
 import type { SelectionContextMenuDetail } from '../../core/windroseEvents';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 
 
@@ -252,10 +253,9 @@ const SelectionActionsOverlay = ({
       return (
         <div key={action.id} className={`windrose-sel-action ${fullWidth ? 'windrose-sel-action-full' : ''}`}>
           <button
-            ref={colorButtonRef}
+            ref={(el) => { if (el != null && colorButtonRef != null) colorButtonRef.current = el; tooltipRef(action.label)(el); }}
             className="windrose-sel-action-btn windrose-sel-color-btn"
             onClick={(e) => action.invoke(e)}
-            title={action.label}
           >
             <span className="windrose-sel-color-swatch" style={{ backgroundColor: currentColor ?? '#ffffff' }} />
             <span className="windrose-sel-action-label">{action.label}</span>
@@ -293,7 +293,7 @@ const SelectionActionsOverlay = ({
         <button
           className={classes}
           onClick={(e) => action.disabled !== true && action.invoke(e)}
-          title={action.label}
+          ref={tooltipRef(action.label)}
           disabled={action.disabled}
         >
           <Icon icon={action.icon} />
@@ -398,7 +398,7 @@ const SelectionActionsOverlay = ({
                   min="25" max="130" step="5"
                   value={Math.round(currentScale * 100)}
                   onInput={(e: Event) => onScaleChange?.(parseInt((e.target as HTMLInputElement).value) / 100)}
-                  title={`Scale: ${Math.round(currentScale * 100)}%`}
+                  ref={tooltipRef(`Scale: ${Math.round(currentScale * 100)}%`)}
                 />
                 <span className="windrose-sel-resize-value">{Math.round(currentScale * 100)}%</span>
               </div>
@@ -434,10 +434,9 @@ const SelectionActionsOverlay = ({
                     />
                     <span className="windrose-sel-unit-label">{distanceUnit ?? 'ft'}</span>
                     <button
-                      ref={lightColorButtonRef}
+                      ref={(el) => { if (el != null && lightColorButtonRef != null) lightColorButtonRef.current = el; tooltipRef('Light Color')(el); }}
                       className="windrose-sel-light-color-swatch"
                       onClick={() => onLightColorSwatchClick?.()}
-                      title="Light Color"
                     >
                       <span className="windrose-sel-color-swatch" style={{ backgroundColor: lightColor ?? 'rgba(255, 255, 100, 1)' }} />
                     </button>
@@ -470,7 +469,7 @@ const SelectionActionsOverlay = ({
                     key={action.id}
                     className={`windrose-sel-icon-btn ${action.active === true ? 'windrose-sel-action-active' : ''}`}
                     onClick={(e) => action.invoke(e)}
-                    title={action.label}
+                    ref={tooltipRef(action.label)}
                   >
                     <Icon icon={action.icon} />
                   </button>

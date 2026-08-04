@@ -25,6 +25,7 @@ import { getActiveLayer } from '../../persistence/layerAccessor';
 import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition';
 import { Icon } from '../shared/Icon';
 import { Z_INDEX } from '../../core/dmtConstants';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 interface MultiSelectToolbarProps {
   selectedItems: SelectedItem[];
@@ -174,15 +175,15 @@ const MultiSelectToolbar = ({
         <span>{selectionCount ?? selectedItems.length} selected</span>
       </div>
 
-      <button className="windrose-toolbar-button" onClick={onRotateAll} title="Rotate All 90°">
+      <button className="windrose-toolbar-button" onClick={onRotateAll} ref={tooltipRef('Rotate All 90°')}>
         <Icon icon="lucide-rotate-cw" />
       </button>
 
-      <button className="windrose-toolbar-button" onClick={onDuplicateAll} title="Duplicate All">
+      <button className="windrose-toolbar-button" onClick={onDuplicateAll} ref={tooltipRef('Duplicate All')}>
         <Icon icon="lucide-copy" />
       </button>
 
-      <button className="windrose-toolbar-button windrose-toolbar-delete-button" onClick={onDeleteAll} title="Delete All">
+      <button className="windrose-toolbar-button windrose-toolbar-delete-button" onClick={onDeleteAll} ref={tooltipRef('Delete All')}>
         <Icon icon="lucide-trash-2" />
       </button>
     </div>

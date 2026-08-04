@@ -20,7 +20,7 @@ test("Settings button is accessible via the edge rail", async ({ page }) => {
   await waitForContainer(page);
 
   // Block mode: settings is a direct-action icon on the EdgeRail (windrose-5cx)
-  const settingsBtn = page.locator('.windrose-edge-rail-btn[title="Map settings"]');
+  const settingsBtn = page.locator('.windrose-edge-rail-btn[aria-label="Map settings"]');
   await settingsBtn.waitFor({ state: "visible", timeout: 5000 });
   expect(await settingsBtn.isVisible()).toBe(true);
 

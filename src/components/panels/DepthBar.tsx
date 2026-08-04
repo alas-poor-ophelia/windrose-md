@@ -5,6 +5,7 @@ import type { RoleMeta as DepthMeta } from '../../assets/tileRoles';
 import { useState, useCallback } from 'preact/hooks';
 import { Icon } from '../shared/Icon';
 import { ROLE_META as DEPTHS, roleMeta as depthMeta } from '../../assets/tileRoles';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 // ==========================================
 // EyeToggle
@@ -21,7 +22,7 @@ function EyeToggle({ on, onClick, size = 12 }: EyeToggleProps): VNode {
     <span
       className="windrose-db-eye"
       onClick={(e) => { e.stopPropagation(); onClick?.(); }}
-      title={on ? 'Layer visible — click to hide' : 'Layer hidden — click to show'}
+      ref={tooltipRef(on ? 'Layer visible — click to hide' : 'Layer hidden — click to show')}
     >
       <Icon icon={on ? 'eye' : 'eye-off'} size={size} />
     </span>
@@ -78,7 +79,7 @@ function DepthBar({ active, onPick, hidden, onToggleHide, tileCounts, compact = 
               key={d.id}
               className={cls}
               style={{ '--depth-color': `var(--windrose-depth-${d.id})` }}
-              title={`${d.label} · ${count} tiles${isOff ? ' · hidden' : ''}`}
+              ref={tooltipRef(`${d.label} · ${count} tiles${isOff ? ' · hidden' : ''}`)}
               onClick={() => handleSegmentClick(d.id)}
             >
               <span className="windrose-db-cap" style={{ '--depth-color': `var(--windrose-depth-${d.id})`, opacity: isOff ? 0.4 : isActive ? 1 : 0.65 }} />
@@ -174,7 +175,7 @@ function DepthRibbon({ active, onPick, hidden, onToggleHide, tileCounts }: Depth
             key={d.id}
             className={cls}
             onClick={() => onPick(d.id)}
-            title={`${d.label} · ${count} tiles${isOff ? ' · hidden' : ''}`}
+            ref={tooltipRef(`${d.label} · ${count} tiles${isOff ? ' · hidden' : ''}`)}
             style={{ opacity: isOff && !isActive ? 0.55 : 1 }}
           >
             <span className="windrose-dsr-bar" style={{ '--depth-color': `var(--windrose-depth-${d.id})`, opacity: isOff ? 0.3 : isActive ? 1 : 0.85 }} />

@@ -185,7 +185,7 @@ test("Icon picker assigns a glyph to the pin head and clear restores the dot", a
 
   await picker.locator(".windrose-icon-picker-search").fill("dragon");
   await page.waitForTimeout(250);
-  await picker.locator('.windrose-icon-picker-cell[title="Dragon"]').click();
+  await picker.locator('.windrose-icon-picker-cell[aria-label="Dragon"]').click();
   await page.waitForTimeout(400);
 
   // Picker closes on select; the glyph renders in the pin head in the

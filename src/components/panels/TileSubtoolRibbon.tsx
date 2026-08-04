@@ -14,6 +14,7 @@ import type { TileSubtoolId } from '../../assets/tileForm';
 
 import { SUBTOOL_META, THRESHOLD_ENTRY, formDef, ribbonSubtoolsForForm, subtoolGate } from '../../assets/tileForm';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 interface TileSubtoolRibbonProps {
   /** Selected tile's derived form, or null when nothing is selected. */
@@ -51,7 +52,7 @@ const TileSubtoolRibbon = ({ form, activeSubtool, onSubtoolChange, onThreshold, 
             key={id}
             className={`windrose-fd-subtool interactive-child ${activeSubtool === id ? 'on' : ''} ${gate === 'available' ? 'dim' : ''}`}
             disabled={gate === 'disabled'}
-            title={title}
+            ref={tooltipRef(title)}
             onClick={() => { if (gate !== 'disabled') onSubtoolChange(id); }}
           >
             <Icon icon={meta.icon} size={15} />
@@ -63,7 +64,7 @@ const TileSubtoolRibbon = ({ form, activeSubtool, onSubtoolChange, onThreshold, 
         <button
           key={THRESHOLD_ENTRY.id}
           className={`windrose-fd-subtool interactive-child ${thresholdActive === true ? 'on' : ''}`}
-          title={THRESHOLD_ENTRY.title}
+          ref={tooltipRef(THRESHOLD_ENTRY.title)}
           onClick={() => onThreshold?.()}
         >
           <Icon icon={THRESHOLD_ENTRY.icon} size={15} />

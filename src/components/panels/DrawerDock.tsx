@@ -4,6 +4,7 @@ import type { TileLayerRole } from '#types/tiles/tile.types';
 import { useCallback, useRef, useEffect, useState } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 import { DepthRibbon } from './DepthBar';
 
 interface FlyoutTile {
@@ -99,7 +100,7 @@ function FlyoutPanel({ tiles, onSelect, onClose, label }: {
             <div
               key={tile.vaultPath}
               className="windrose-spine-flyout-tile"
-              title={tile.filename}
+              ref={tooltipRef(tile.filename)}
               onClick={() => {
                 onSelect(tile.tilesetId, tile.tileId);
                 onClose();
@@ -159,7 +160,7 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
             {tilesEnabled && (
               <button
                 className={`windrose-tile-spine-panebtn ${pane === 'tiles' ? 'active' : ''}`}
-                title="Tiles — open"
+                ref={tooltipRef('Tiles — open', { placement: 'left' })}
                 onClick={() => { onPane('tiles'); onExpand(); }}
               >
                 <Icon icon="lucide-layout-dashboard" size={15} />
@@ -167,7 +168,7 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
             )}
             <button
               className={`windrose-tile-spine-panebtn ${pane === 'objects' ? 'active' : ''}`}
-              title="Objects — open"
+              ref={tooltipRef('Objects — open', { placement: 'left' })}
               onClick={() => { onPane('objects'); onExpand(); }}
             >
               <Icon icon="lucide-sofa" size={15} />
@@ -181,14 +182,14 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
           <div className="windrose-tile-spine-flyout-btns">
             <button
               className={`windrose-tile-spine-fbtn ${spineFlyout === 'starred' ? 'active' : ''}`}
-              title="Starred tiles"
+              ref={tooltipRef('Starred tiles', { placement: 'left' })}
               onClick={() => toggleFlyout('starred')}
             >
               <Icon icon="lucide-star" size={14} />
             </button>
             <button
               className={`windrose-tile-spine-fbtn ${spineFlyout === 'recent' ? 'active' : ''}`}
-              title="Recent tiles"
+              ref={tooltipRef('Recent tiles', { placement: 'left' })}
               onClick={() => toggleFlyout('recent')}
             >
               <Icon icon="lucide-clock" size={14} />
@@ -207,7 +208,7 @@ function SpineRibbon({ depth, onDepthChange, hidden, onToggleHide, tileCounts, o
       {tilesEnabled && selectedTileName != null && selectedTileName !== '' && (
         <div
           className="windrose-tile-spine-loaded"
-          title={`Loaded: ${selectedTileName}`}
+          ref={tooltipRef(`Loaded: ${selectedTileName}`, { placement: 'left' })}
         >
           <div
             ref={chipRef}

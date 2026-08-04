@@ -19,6 +19,7 @@ import { useState } from 'preact/hooks';
 import { CornerBrackets } from '../shared/CornerBrackets';
 import { Icon } from '../shared/Icon';
 import { Z_INDEX } from '../../core/dmtConstants';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 /** One computed travel-time line (or an explicit unit-guidance line) */
 interface TravelTimeLine {
@@ -97,7 +98,7 @@ const MeasurementControls = ({
           <button
             type="button"
             className="windrose-measure-controls-btn"
-            title="Remove last waypoint (Backspace)"
+            ref={tooltipRef('Remove last waypoint (Backspace)')}
             aria-label="Remove last waypoint"
             onClick={onRemoveLast}
           >
@@ -106,7 +107,7 @@ const MeasurementControls = ({
           <button
             type="button"
             className="windrose-measure-controls-btn"
-            title="Clear measurement (Escape)"
+            ref={tooltipRef('Clear measurement (Escape)')}
             aria-label="Clear measurement"
             onClick={onClear}
           >
@@ -115,7 +116,7 @@ const MeasurementControls = ({
           <button
             type="button"
             className="windrose-measure-controls-btn windrose-measure-controls-save"
-            title={canSave ? 'Save as route' : 'Add at least two waypoints to save'}
+            ref={tooltipRef(canSave ? 'Save as route' : 'Add at least two waypoints to save')}
             aria-label="Save as route"
             disabled={!canSave}
             onClick={onSaveRoute}
@@ -130,7 +131,7 @@ const MeasurementControls = ({
               <div
                 key={line.modeId}
                 className={`windrose-measure-controls-travel-line ${line.isError ? 'is-error' : ''}`}
-                title={line.isError ? line.text : undefined}
+                ref={line.isError ? tooltipRef(line.text) : undefined}
               >
                 {line.isError && <Icon icon="lucide-alert-triangle" size={11} />}
                 <span className="windrose-measure-controls-travel-name">{line.name}</span>

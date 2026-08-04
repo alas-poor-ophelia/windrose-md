@@ -1,4 +1,4 @@
-import { Notice, Setting } from 'obsidian';
+import { Notice, Setting, setTooltip } from 'obsidian';
 import { DragHelpers } from '../helpers/dragHelpers';
 import { IconHelpers } from '../helpers/iconHelpers';
 import { FolderSuggest } from '../helpers/FolderSuggest';
@@ -202,8 +202,9 @@ export const TabRenderObjectsMethods = {
     if (this.objectFilter) {
       const clearBtn = searchContainer.createEl('button', {
         cls: 'windrose-settings-search-clear',
-        attr: { 'aria-label': 'Clear filter', title: 'Clear filter' }
+        attr: { 'aria-label': 'Clear filter' }
       });
+      setTooltip(clearBtn, 'Clear filter');
       IconHelpers.set(clearBtn, 'x');
       clearBtn.onclick = () => {
         this.objectFilter = '';
@@ -266,7 +267,8 @@ export const TabRenderObjectsMethods = {
       if (category.isCustom === true) {
         const categoryActions = categoryHeader.createDiv({ cls: 'windrose-settings-category-actions' });
 
-        const editBtn = categoryActions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Edit category', title: 'Edit category' } });
+        const editBtn = categoryActions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Edit category' } });
+        setTooltip(editBtn, 'Edit category');
         IconHelpers.set(editBtn, 'pencil');
         editBtn.onclick = () => {
           new CategoryEditModal(this.app, this.plugin, category as CustomCategory, () => {
@@ -278,7 +280,8 @@ export const TabRenderObjectsMethods = {
 
         // Get unfiltered count for delete validation
         const allCategoryObjects = allObjects.filter((obj: ResolvedObject) => obj.category === category.id);
-        const deleteBtn = categoryActions.createEl('button', { cls: 'windrose-settings-icon-btn windrose-settings-icon-btn-danger', attr: { 'aria-label': 'Delete category', title: 'Delete category' } });
+        const deleteBtn = categoryActions.createEl('button', { cls: 'windrose-settings-icon-btn windrose-settings-icon-btn-danger', attr: { 'aria-label': 'Delete category' } });
+        setTooltip(deleteBtn, 'Delete category');
         IconHelpers.set(deleteBtn, 'trash-2');
         deleteBtn.onclick = async () => {
           if (allCategoryObjects.length > 0) {
@@ -477,7 +480,8 @@ export const TabRenderObjectsMethods = {
     const actions = row.createDiv({ cls: 'windrose-settings-object-actions' });
 
     // Edit button
-    const editBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Edit', title: 'Edit object' } });
+    const editBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Edit' } });
+    setTooltip(editBtn, 'Edit object');
     IconHelpers.set(editBtn, 'pencil');
     editBtn.onclick = () => {
       new ObjectEditModal(this.app, this.plugin, obj, () => {
@@ -490,7 +494,8 @@ export const TabRenderObjectsMethods = {
     if (obj.isBuiltIn) {
       if (isHiddenSection) {
         // Unhide button
-        const unhideBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Unhide', title: 'Show in palette' } });
+        const unhideBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Unhide' } });
+        setTooltip(unhideBtn, 'Show in palette');
         IconHelpers.set(unhideBtn, 'eye');
         unhideBtn.onclick = async () => {
           if (this.plugin.settings[overridesKey]?.[obj.id]) {
@@ -505,7 +510,8 @@ export const TabRenderObjectsMethods = {
         };
       } else {
         // Hide button
-        const hideBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Hide', title: 'Hide from palette' } });
+        const hideBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Hide' } });
+        setTooltip(hideBtn, 'Hide from palette');
         IconHelpers.set(hideBtn, 'eye-off');
         hideBtn.onclick = async () => {
           this.plugin.settings[overridesKey] ??= {};
@@ -519,7 +525,8 @@ export const TabRenderObjectsMethods = {
 
       // Reset button (only for modified)
       if (obj.isModified === true) {
-        const resetBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Reset to default', title: 'Reset to default' } });
+        const resetBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': 'Reset to default' } });
+        setTooltip(resetBtn, 'Reset to default');
         IconHelpers.set(resetBtn, 'rotate-ccw');
         resetBtn.onclick = async () => {
           if (await new ConfirmModal(this.app, {
@@ -540,7 +547,8 @@ export const TabRenderObjectsMethods = {
       // Copy to other map type button for custom objects
       const targetType = this.selectedMapType === 'hex' ? 'grid' : 'hex';
       const targetLabel = targetType === 'hex' ? 'Hex' : 'Grid';
-      const copyBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': `Copy to ${targetLabel}`, title: `Copy to ${targetLabel}` } });
+      const copyBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn', attr: { 'aria-label': `Copy to ${targetLabel}` } });
+      setTooltip(copyBtn, `Copy to ${targetLabel}`);
       IconHelpers.set(copyBtn, 'copy');
       copyBtn.onclick = async () => {
         const targetObjectsKey: CustomObjectsKey = targetType === 'hex' ? 'customHexObjects' : 'customGridObjects';
@@ -590,7 +598,8 @@ export const TabRenderObjectsMethods = {
       };
 
       // Delete button for custom objects
-      const deleteBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn windrose-settings-icon-btn-danger', attr: { 'aria-label': 'Delete', title: 'Delete object' } });
+      const deleteBtn = actions.createEl('button', { cls: 'windrose-settings-icon-btn windrose-settings-icon-btn-danger', attr: { 'aria-label': 'Delete' } });
+      setTooltip(deleteBtn, 'Delete object');
       IconHelpers.set(deleteBtn, 'trash-2');
       deleteBtn.onclick = async () => {
         if (await new ConfirmModal(this.app, {
@@ -712,8 +721,9 @@ export const TabRenderObjectsMethods = {
 
         const renameBtn = setActions.createEl('button', {
           cls: 'windrose-settings-icon-btn',
-          attr: { 'aria-label': 'Rename', title: 'Rename set' }
+          attr: { 'aria-label': 'Rename' }
         });
+        setTooltip(renameBtn, 'Rename set');
         IconHelpers.set(renameBtn, 'pencil');
         renameBtn.onclick = () => {
           new ObjectSetRenameModal(this.app, set.name, (newName: string) => {
@@ -725,8 +735,9 @@ export const TabRenderObjectsMethods = {
 
         const exportBtn = setActions.createEl('button', {
           cls: 'windrose-settings-icon-btn',
-          attr: { 'aria-label': 'Export', title: 'Export set to folder' }
+          attr: { 'aria-label': 'Export' }
         });
+        setTooltip(exportBtn, 'Export set to folder');
         IconHelpers.set(exportBtn, 'download');
         exportBtn.onclick = () => {
           new ObjectSetExportModal(this.app, this.plugin, set).open();
@@ -734,8 +745,9 @@ export const TabRenderObjectsMethods = {
 
         const deleteBtn = setActions.createEl('button', {
           cls: 'windrose-settings-icon-btn windrose-settings-icon-btn-danger',
-          attr: { 'aria-label': 'Delete', title: 'Delete set' }
+          attr: { 'aria-label': 'Delete' }
         });
+        setTooltip(deleteBtn, 'Delete set');
         IconHelpers.set(deleteBtn, 'trash-2');
         deleteBtn.onclick = async () => {
           if (await new ConfirmModal(this.app, {

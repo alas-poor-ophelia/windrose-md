@@ -21,6 +21,7 @@ import type { MenuItem } from 'obsidian';
 import { Modal, Menu } from 'obsidian';
 import { useApp } from '../../context/AppContext';
 import type { HexContextMenuDetail } from '../../core/windroseEvents';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 
 
@@ -333,14 +334,14 @@ const OutlineLayer = ({
             type="color"
             value={selectedColor}
             onInput={(e: Event) => onColorChange((e.target as HTMLInputElement).value)}
-            title="Outline color"
+            ref={tooltipRef('Outline color')}
             className="windrose-color-swatch-btn"
           />
 
           {/* Fill toggle */}
           <button
             onClick={() => setOutlineSettings({ filled: !outlineSettings.filled })}
-            title={outlineSettings.filled ? 'Filled' : 'Stroke only'}
+            ref={tooltipRef(outlineSettings.filled ? 'Filled' : 'Stroke only')}
             className={btnClass(outlineSettings.filled)}
           >
             {outlineSettings.filled ? 'Filled' : 'No Fill'}
@@ -352,7 +353,7 @@ const OutlineLayer = ({
               min="0.05" max="1" step="0.05"
               value={outlineSettings.fillOpacity}
               onInput={(e: Event) => setOutlineSettings({ fillOpacity: parseFloat((e.target as HTMLInputElement).value) })}
-              title={`Fill opacity: ${Math.round(outlineSettings.fillOpacity * 100)}%`}
+              ref={tooltipRef(`Fill opacity: ${Math.round(outlineSettings.fillOpacity * 100)}%`)}
               style={{ width: '60px', minHeight: '28px' }}
             />
           )}
@@ -360,7 +361,7 @@ const OutlineLayer = ({
           {/* Snap mode */}
           <button
             onClick={() => setOutlineSettings({ snapMode: outlineSettings.snapMode === 'straight' ? 'hex' : 'straight' })}
-            title={outlineSettings.snapMode === 'straight' ? 'Straight lines' : 'Snap to hex edges'}
+            ref={tooltipRef(outlineSettings.snapMode === 'straight' ? 'Straight lines' : 'Snap to hex edges')}
             className={btnClass(outlineSettings.snapMode === 'hex')}
           >
             {outlineSettings.snapMode === 'straight' ? 'Straight' : 'Hex Snap'}
@@ -376,7 +377,7 @@ const OutlineLayer = ({
               <button
                 onClick={() => showClearAllConfirm((mapData.outlines ?? []).length)}
                 className="windrose-floating-bar-btn is-danger"
-                title="Delete all outlines"
+                ref={tooltipRef('Delete all outlines')}
               >
                 Clear All ({mapData.outlines.length})
               </button>
@@ -407,14 +408,14 @@ const OutlineLayer = ({
               type="color"
               value={outline.color}
               onInput={(e: Event) => updateOutline(outline.id, { color: (e.target as HTMLInputElement).value })}
-              title="Outline color"
+              ref={tooltipRef('Outline color')}
               className="windrose-color-swatch-btn"
             />
 
             {/* Fill toggle */}
             <button
               onClick={() => updateOutline(outline.id, { filled: !outline.filled })}
-              title={outline.filled ? 'Filled' : 'Stroke only'}
+              ref={tooltipRef(outline.filled ? 'Filled' : 'Stroke only')}
               className={btnClass(outline.filled)}
             >
               {outline.filled ? 'Filled' : 'No Fill'}
@@ -426,7 +427,7 @@ const OutlineLayer = ({
                 min="0.05" max="1" step="0.05"
                 value={outline.fillOpacity}
                 onInput={(e: Event) => updateOutline(outline.id, { fillOpacity: parseFloat((e.target as HTMLInputElement).value) })}
-                title={`Fill opacity: ${Math.round(outline.fillOpacity * 100)}%`}
+                ref={tooltipRef(`Fill opacity: ${Math.round(outline.fillOpacity * 100)}%`)}
                 style={{ width: '60px', minHeight: '28px' }}
               />
             )}
@@ -434,7 +435,7 @@ const OutlineLayer = ({
             {/* Snap mode */}
             <button
               onClick={() => updateOutline(outline.id, { snapMode: outline.snapMode === 'straight' ? 'hex' : 'straight' })}
-              title={outline.snapMode === 'straight' ? 'Straight lines' : 'Snap to hex edges'}
+              ref={tooltipRef(outline.snapMode === 'straight' ? 'Straight lines' : 'Snap to hex edges')}
               className={btnClass(outline.snapMode === 'hex')}
             >
               {outline.snapMode === 'straight' ? 'Straight' : 'Hex Snap'}

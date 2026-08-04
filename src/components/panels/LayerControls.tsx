@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { getLayersOrdered } from '../../persistence/layerAccessor';
 import { getIconInfo } from '../../assets/rpgAwesomeIcons';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 
 
@@ -312,7 +313,7 @@ const LayerControls = ({
                     onTouchStart={() => handleTouchStart(layer.id)}
                     onTouchEnd={handleTouchEnd}
                     onTouchCancel={handleTouchEnd}
-                    title={`${layer.name}${isActive ? ' (active)' : ''} - Right-click for options`}
+                    ref={tooltipRef(`${layer.name}${isActive ? ' (active)' : ''} - Right-click for options`)}
                   >
                     {info.icon && (
                       <span className={`windrose-layer-icon ${info.icon.isRpgAwesome ? 'ra' : ''}`}>
@@ -328,14 +329,14 @@ const LayerControls = ({
                 <button
                   className="windrose-layer-option-btn edit"
                   onClick={(e) => handleEdit(layer.id, e)}
-                  title="Edit layer"
+                  ref={tooltipRef('Edit layer')}
                 >
                   <Icon icon="lucide-pencil" />
                 </button>
                 <button
                   className="windrose-layer-option-btn clone"
                   onClick={(e) => handleClone(layer.id, e)}
-                  title="Clone layer"
+                  ref={tooltipRef('Clone layer')}
                 >
                   <Icon icon="lucide-copy" />
                 </button>
@@ -343,7 +344,7 @@ const LayerControls = ({
                   <button
                     className="windrose-layer-option-btn delete"
                     onClick={(e) => handleDelete(layer.id, e)}
-                    title="Delete layer"
+                    ref={tooltipRef('Delete layer')}
                   >
                     <Icon icon="lucide-trash-2" />
                   </button>
@@ -356,7 +357,7 @@ const LayerControls = ({
                   <button
                     className={`windrose-layer-option-btn transparency ${layer.showLayerBelow === true ? 'active' : ''}`}
                     onClick={(e) => handleTransparencyToggle(layer.id, e)}
-                    title={layer.showLayerBelow === true ? 'Hide layer below' : 'Show layer below'}
+                    ref={tooltipRef(layer.showLayerBelow === true ? 'Hide layer below' : 'Show layer below')}
                   >
                     <Icon icon="lucide-layers" />
                   </button>
@@ -390,7 +391,7 @@ const LayerControls = ({
           <button
             className="windrose-layer-add-btn"
             onClick={onLayerAdd}
-            title="Add new layer"
+            ref={tooltipRef('Add new layer')}
           >
             <Icon icon="lucide-plus" />
           </button>

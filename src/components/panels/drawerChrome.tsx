@@ -5,6 +5,7 @@
 
 import type { ComponentChildren, VNode } from 'preact';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 export type DrawerViewMode = 'grid' | 'list';
 
@@ -26,7 +27,7 @@ const DrawerPaneHead = ({ title, viewMode, onViewModeChange, actions }: DrawerPa
       <div className="windrose-tb-viewtoggle" role="group" aria-label="View mode">
         <button
           className={`windrose-tb-iconbtn ${viewMode === 'grid' ? 'active' : 'ghost'}`}
-          title="Grid view"
+          ref={tooltipRef('Grid view')}
           aria-pressed={viewMode === 'grid'}
           onClick={() => onViewModeChange('grid')}
         >
@@ -34,7 +35,7 @@ const DrawerPaneHead = ({ title, viewMode, onViewModeChange, actions }: DrawerPa
         </button>
         <button
           className={`windrose-tb-iconbtn ${viewMode === 'list' ? 'active' : 'ghost'}`}
-          title="List view"
+          ref={tooltipRef('List view')}
           aria-pressed={viewMode === 'list'}
           onClick={() => onViewModeChange('list')}
         >

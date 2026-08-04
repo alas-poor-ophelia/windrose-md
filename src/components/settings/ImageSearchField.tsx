@@ -8,6 +8,7 @@
 import type { VNode } from 'preact';
 
 import { Z_INDEX } from '../../core/dmtConstants';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 interface ImageSearchFieldProps {
   value: string;
@@ -71,7 +72,7 @@ function ImageSearchField({
             fontSize: '16px',
             lineHeight: '1'
           }}
-          title="Clear image"
+          ref={tooltipRef('Clear image')}
         >
           {clearGlyph}
         </button>

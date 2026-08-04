@@ -5,6 +5,7 @@ import type { MapListEntry } from '../../persistence/fileOperations';
 
 import { useCallback } from 'preact/hooks';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 interface MapHeaderProps {
   mapData: MapData;
@@ -74,7 +75,7 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
               className="windrose-map-picker"
               value={mapId ?? ''}
               onChange={handleMapChange}
-              title="Switch map"
+              ref={tooltipRef('Switch map')}
             >
               {mapList.map(entry => (
                 <option key={entry.id} value={entry.id}>
@@ -87,7 +88,7 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
             <button
               className="windrose-header-action-btn interactive-child"
               onClick={onNewMap}
-              title="Create new map"
+              ref={tooltipRef('Create new map')}
             >
               <Icon icon="lucide-plus" />
             </button>
@@ -108,7 +109,7 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
           <button
             className="windrose-header-action-btn interactive-child"
             onClick={handleCopyBlock}
-            title="Copy as windrose-map code block"
+            ref={tooltipRef('Copy as windrose-map code block')}
           >
             <Icon icon="lucide-copy" />
           </button>
@@ -117,7 +118,7 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
           <button
             className="windrose-header-action-btn windrose-header-action-btn--danger interactive-child"
             onClick={onDeleteMap}
-            title="Delete map"
+            ref={tooltipRef('Delete map')}
           >
             <Icon icon="lucide-trash-2" />
           </button>
@@ -125,13 +126,13 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
         <button
           className={`windrose-info-toggle ${showFooter ? 'windrose-info-toggle-active' : ''}`}
           onClick={onToggleFooter}
-          title={showFooter ? 'Hide footer info' : 'Show footer info'}
+          ref={tooltipRef(showFooter ? 'Hide footer info' : 'Show footer info')}
         >
           <Icon icon="lucide-info" />
         </button>
         <span
           className={getStatusClass()}
-          title={getStatusTitle()}
+          ref={tooltipRef(getStatusTitle())}
         >
           {getStatusIcon()}
         </span>

@@ -22,6 +22,7 @@ import { SelectionActionsOverlay } from '../toolbars/SelectionActionsOverlay';
 import { ShapePreviewOverlay } from './ShapePreviewOverlay';
 import { Icon } from '../shared/Icon';
 import { Z_INDEX } from '../../core/dmtConstants';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 
 export interface ShapeOverlayLayerProps {
@@ -168,7 +169,7 @@ const ShapeOverlayLayer = ({
         <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Shape:</span>
         <button
           onClick={() => setActiveShape('square')}
-          title="Square"
+          ref={tooltipRef('Square')}
           style={{
             padding: '4px 12px',
             background: activeShape === 'square' ? 'var(--interactive-accent)' : 'transparent',
@@ -187,7 +188,7 @@ const ShapeOverlayLayer = ({
         </button>
         <button
           onClick={() => setActiveShape('circle')}
-          title="Circle"
+          ref={tooltipRef('Circle')}
           style={{
             padding: '4px 12px',
             background: activeShape === 'circle' ? 'var(--interactive-accent)' : 'transparent',

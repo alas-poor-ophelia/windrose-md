@@ -7,6 +7,7 @@ import { useCallback } from 'preact/hooks';
 import { Modal } from 'obsidian';
 import { useApp } from '../../context/AppContext';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
 
 interface LayerDef {
@@ -88,7 +89,7 @@ const DockViewPanel = ({
         <button
           className="windrose-dock-view-zoom-btn"
           onClick={onZoomOut}
-          title="Zoom out"
+          ref={tooltipRef('Zoom out')}
         >
           <Icon icon="lucide-minus" size={14} />
         </button>
@@ -98,7 +99,7 @@ const DockViewPanel = ({
         <button
           className="windrose-dock-view-zoom-btn"
           onClick={onZoomIn}
-          title="Zoom in"
+          ref={tooltipRef('Zoom in')}
         >
           <Icon icon="lucide-plus" size={14} />
         </button>
@@ -114,7 +115,7 @@ const DockViewPanel = ({
                 key={layer.id}
                 className={`windrose-dock-view-toggle${isVisible ? '' : ' off'}`}
                 onClick={() => onToggleLayer(layer.id)}
-                title={`${layer.label} (${isVisible ? 'visible' : 'hidden'})`}
+                ref={tooltipRef(`${layer.label} (${isVisible ? 'visible' : 'hidden'})`)}
               >
                 <Icon icon={layer.icon} size={14} />
                 <span>{layer.label}</span>
@@ -131,7 +132,7 @@ const DockViewPanel = ({
           <button
             className={`windrose-dock-view-toggle${fogOfWarState.enabled ? '' : ' off'}`}
             onClick={onFogVisibilityToggle}
-            title={fogOfWarState.enabled ? 'Hide fog overlay' : 'Show fog overlay'}
+            ref={tooltipRef(fogOfWarState.enabled ? 'Hide fog overlay' : 'Show fog overlay')}
             disabled={!fogOfWarState.initialized}
           >
             <Icon icon={fogOfWarState.enabled ? 'lucide-eye' : 'lucide-eye-off'} size={14} />
@@ -142,7 +143,7 @@ const DockViewPanel = ({
               key={tool.id}
               className={`windrose-dock-view-toggle${fogOfWarState.activeTool === tool.id ? ' active' : ''}`}
               onClick={() => onFogToolSelect(tool.id)}
-              title={tool.label}
+              ref={tooltipRef(tool.label)}
             >
               <Icon icon={tool.icon} size={14} />
               <span>{tool.label}</span>
@@ -153,7 +154,7 @@ const DockViewPanel = ({
           <button
             className="windrose-dock-view-toggle"
             onClick={onFogFillAll}
-            title="Fill all painted cells with fog"
+            ref={tooltipRef('Fill all painted cells with fog')}
           >
             <Icon icon="lucide-paint-bucket" size={14} />
             <span>Fill All</span>
@@ -161,7 +162,7 @@ const DockViewPanel = ({
           <button
             className="windrose-dock-view-toggle"
             onClick={handleClearAll}
-            title="Clear all fog from layer"
+            ref={tooltipRef('Clear all fog from layer')}
           >
             <Icon icon="lucide-x-square" size={14} />
             <span>Clear All</span>

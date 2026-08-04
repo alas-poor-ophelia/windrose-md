@@ -23,6 +23,7 @@ import { Icon } from '../shared/Icon';
 import { InternalLink } from '../shared/InternalLink';
 import { Z_INDEX } from '../../core/dmtConstants';
 import { isFeatureEnabled } from '../../core/featureFlags';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 type MouseClickEvent = TargetedMouseEvent<HTMLButtonElement>;
 
@@ -202,7 +203,7 @@ const ObjectSelectionToolbar = ({
               const newScale = parseInt((e.target as HTMLInputElement).value) / 100;
               onScaleChange?.(newScale);
             }}
-            title={`Scale: ${Math.round(currentScale * 100)}%`}
+            ref={tooltipRef(`Scale: ${Math.round(currentScale * 100)}%`)}
           />
           <span className="windrose-scale-value">{Math.round(currentScale * 100)}%</span>
         </div>
@@ -265,10 +266,13 @@ const ObjectSelectionToolbar = ({
             return (
               <div key={btn.id} style={{ position: 'relative', display: 'inline-block' }}>
                 <button
-                  ref={colorButtonRef}
+                  ref={(el) => {
+                    if (typeof colorButtonRef === 'function') colorButtonRef(el);
+                    else if (el != null && colorButtonRef != null) colorButtonRef.current = el;
+                    tooltipRef(btn.title)(el);
+                  }}
                   className="windrose-toolbar-button windrose-toolbar-color-button"
                   onClick={(e) => btn.onClick?.(e)}
-                  title={btn.title}
                   style={{ backgroundColor: currentColor ?? '#ffffff' }}
                 >
                   <Icon icon={btn.icon} />
@@ -303,7 +307,7 @@ const ObjectSelectionToolbar = ({
               key={btn.id}
               className={className}
               onClick={(e) => btn.onClick?.(e)}
-              title={btn.title}
+              ref={tooltipRef(btn.title)}
             >
               <Icon icon={btn.icon} />
             </button>

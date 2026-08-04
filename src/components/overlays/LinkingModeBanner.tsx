@@ -4,6 +4,7 @@ import { useEffect } from 'preact/hooks';
 import type { VNode } from 'preact';
 import { getObjectType } from '../../objects/objectTypeResolver';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 
 
@@ -38,7 +39,7 @@ const LinkingModeBanner = ({ linkingFrom, onCancel }: LinkingModeBannerProps): V
         <button
           className="windrose-linking-banner-cancel"
           onClick={onCancel}
-          title="Cancel (Esc)"
+          ref={tooltipRef('Cancel (Esc)')}
         >
           Cancel
         </button>

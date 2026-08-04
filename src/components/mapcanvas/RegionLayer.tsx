@@ -21,6 +21,7 @@ import { Menu } from 'obsidian';
 import { openNativeNoteLinkModal } from '../modals/NoteLinkModal';
 import { Icon } from '../shared/Icon';
 import type { RegionIdDetail } from '../../core/windroseEvents';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 
 
@@ -427,7 +428,7 @@ const RegionLayer = ({
             type="color"
             value={editingRegion.color}
             onInput={handleColorChange}
-            title="Change region color"
+            ref={tooltipRef('Change region color')}
             className="windrose-color-swatch-btn"
           />
           <span className="windrose-floating-bar-name">
@@ -452,7 +453,7 @@ const RegionLayer = ({
                 objectType: null
               });
             }}
-            title={editingRegion.linkedNote != null && editingRegion.linkedNote !== '' ? 'Change linked note' : 'Link note'}
+            ref={tooltipRef(editingRegion.linkedNote != null && editingRegion.linkedNote !== '' ? 'Change linked note' : 'Link note')}
             className={`windrose-floating-bar-btn${editingRegion.linkedNote != null && editingRegion.linkedNote !== '' ? ' is-accent' : ''}`}
             style={{ display: 'flex', alignItems: 'center' }}
           >

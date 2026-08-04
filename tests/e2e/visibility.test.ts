@@ -18,7 +18,7 @@ import {
 
 /** Open the EdgeRail "View" panel and return the Visibility toggle section locator. */
 async function openVisibilitySection(page: any): Promise<any> {
-  const viewRailBtn = page.locator('.windrose-edge-rail-btn[title="View"]');
+  const viewRailBtn = page.locator('.windrose-edge-rail-btn[aria-label="View"]');
   await viewRailBtn.waitFor({ state: "visible", timeout: 5000 });
   await viewRailBtn.click();
   await page.waitForTimeout(500); // fold animation
@@ -55,7 +55,7 @@ test("Grid visibility can be toggled off and on", async ({ page }) => {
 
   const section = await openVisibilitySection(page);
 
-  const gridToggle = section.locator('.windrose-dock-view-toggle[title*="Grid"]');
+  const gridToggle = section.locator('.windrose-dock-view-toggle[aria-label*="Grid"]');
   await gridToggle.waitFor({ state: "visible", timeout: 3000 });
 
   // Off state is the bare ` off` class.
@@ -84,7 +84,7 @@ test("Object visibility can be toggled", async ({ page }) => {
 
   const section = await openVisibilitySection(page);
 
-  const objectToggle = section.locator('.windrose-dock-view-toggle[title*="Objects"]');
+  const objectToggle = section.locator('.windrose-dock-view-toggle[aria-label*="Objects"]');
   await objectToggle.waitFor({ state: "visible", timeout: 3000 });
 
   const wasOff = /\boff\b/.test((await objectToggle.getAttribute("class")) || "");
@@ -107,7 +107,7 @@ test("Text label visibility can be toggled", async ({ page }) => {
   const section = await openVisibilitySection(page);
 
   // Text labels are labeled "Labels" in the View panel.
-  const textToggle = section.locator('.windrose-dock-view-toggle[title*="Labels"]');
+  const textToggle = section.locator('.windrose-dock-view-toggle[aria-label*="Labels"]');
   await textToggle.waitFor({ state: "visible", timeout: 3000 });
 
   const wasOff = /\boff\b/.test((await textToggle.getAttribute("class")) || "");
@@ -134,7 +134,7 @@ test("Visibility panel closes when the rail button is clicked again", async ({ p
   expect(await openDrawer.count()).toBe(1);
 
   // Click the View rail button again to fold the drawer closed.
-  const viewRailBtn = page.locator('.windrose-edge-rail-btn[title="View"]');
+  const viewRailBtn = page.locator('.windrose-edge-rail-btn[aria-label="View"]');
   await viewRailBtn.click();
   await page.waitForTimeout(600);
 

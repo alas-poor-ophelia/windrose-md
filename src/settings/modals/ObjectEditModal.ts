@@ -1,5 +1,5 @@
 import type { App} from 'obsidian';
-import { Modal, Setting, Notice } from 'obsidian';
+import { Modal, Setting, Notice, setTooltip } from 'obsidian';
 import type { PluginSettings, CustomObject } from '#types/settings/settings.types';
 import { ObjectHelpers } from '../helpers/objectHelpers';
 import { RPGAwesomeHelpers } from '../helpers/rpgAwesomeHelpers';
@@ -372,10 +372,10 @@ class ObjectEditModal extends Modal {
       const iconBtn = container.createEl('button', {
         cls: 'windrose-icon-picker-icon' + (this.iconClass === icon.iconClass ? ' selected' : ''),
         attr: {
-          type: 'button',
-          title: icon.label
+          type: 'button'
         }
       });
+      setTooltip(iconBtn, icon.label);
 
       // Create the icon span with the character
       const iconSpan = iconBtn.createSpan({ cls: 'ra' });
@@ -453,8 +453,9 @@ class ObjectEditModal extends Modal {
       const clearBtn = searchContainer.createEl('button', {
         text: 'X',
         cls: 'windrose-image-clear-btn',
-        attr: { type: 'button', title: 'Clear image' }
+        attr: { type: 'button' }
       });
+      setTooltip(clearBtn, 'Clear image');
       clearBtn.onclick = () => {
         this.imagePath = '';
         this.imageSearchQuery = '';

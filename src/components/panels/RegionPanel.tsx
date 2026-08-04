@@ -11,6 +11,7 @@ import type { VNode } from 'preact';
 
 import { useMemo } from 'preact/hooks';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 const REGION_NAME_MAX_LENGTH = 20;
 const REGION_NAME_TRUNCATE_AT = 17;
@@ -69,7 +70,7 @@ const RegionPanel = ({
           key={region.id}
           className={`windrose-region-item ${!region.visible ? 'windrose-region-item-hidden' : ''}`}
           onClick={() => handleRegionClick(region.id)}
-          title={`${region.name} (${region.hexes.length} hexes)`}
+          ref={tooltipRef(`${region.name} (${region.hexes.length} hexes)`)}
         >
           <span
             className="windrose-region-color-dot"
@@ -84,7 +85,7 @@ const RegionPanel = ({
           <button
             className="windrose-region-visibility-btn"
             onClick={(e: Event) => handleToggleVisibility(region.id, e)}
-            title={region.visible ? 'Hide region' : 'Show region'}
+            ref={tooltipRef(region.visible ? 'Hide region' : 'Show region')}
           >
             <Icon icon={region.visible ? 'lucide-eye' : 'lucide-eye-off'} size={12} />
           </button>

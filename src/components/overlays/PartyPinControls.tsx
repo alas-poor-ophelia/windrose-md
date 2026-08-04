@@ -37,6 +37,7 @@ import { CornerBrackets } from '../shared/CornerBrackets';
 import { Icon } from '../shared/Icon';
 import { InternalLink } from '../shared/InternalLink';
 import { Z_INDEX } from '../../core/dmtConstants';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 const CARD_WIDTH = 232;
 const CARD_HEIGHT = 200;
@@ -263,9 +264,8 @@ const PartyPinControls = ({
           <Icon icon="lucide-users" size={14} />
           <span>Beacon</span>
           <button
-            ref={iconButtonRef}
+            ref={(el) => { if (el != null) iconButtonRef.current = el; tooltipRef('Beacon Icon')(el); }}
             className="windrose-party-controls-icon"
-            title="Beacon Icon"
             aria-label="Beacon Icon"
             onClick={() => setShowIconPicker(open => !open)}
           >
@@ -277,9 +277,8 @@ const PartyPinControls = ({
             })()}
           </button>
           <button
-            ref={colorButtonRef}
+            ref={(el) => { if (el != null) colorButtonRef.current = el; tooltipRef('Beacon Color')(el); }}
             className="windrose-party-controls-color"
-            title="Beacon Color"
             aria-label="Beacon Color"
             onClick={() => setShowColorPicker(open => !open)}
           >
@@ -287,7 +286,7 @@ const PartyPinControls = ({
           </button>
           <button
             className="windrose-party-controls-remove"
-            title="Remove Beacon"
+            ref={tooltipRef('Remove Beacon')}
             aria-label="Remove Beacon"
             onClick={handleRemove}
           >
@@ -367,7 +366,7 @@ const PartyPinControls = ({
         <div className="windrose-party-controls-styles">
           <button
             className={pin.rangeStyle === 'circle' ? 'is-active' : ''}
-            title="Circle ring"
+            ref={tooltipRef('Circle ring')}
             aria-label="Circle ring"
             onClick={() => setRangeStyle('circle')}
           >
@@ -376,7 +375,7 @@ const PartyPinControls = ({
           </button>
           <button
             className={pin.rangeStyle === 'cells' ? 'is-active' : ''}
-            title="Highlight cells in range"
+            ref={tooltipRef('Highlight cells in range')}
             aria-label="Highlight cells in range"
             onClick={() => setRangeStyle('cells')}
           >
@@ -467,7 +466,7 @@ const PartyPinControls = ({
             <span>Beacon note</span>
             {pin.partyNote && (
               <>
-                <label className="windrose-party-controls-note-toggle" title="Keep the note updated">
+                <label className="windrose-party-controls-note-toggle" ref={tooltipRef('Keep the note updated')}>
                   <input
                     type="checkbox"
                     checked={pin.partyNote.enabled}
@@ -477,7 +476,7 @@ const PartyPinControls = ({
                 </label>
                 <button
                   className="windrose-party-controls-note-open"
-                  title={pin.partyNote.path}
+                  ref={tooltipRef(pin.partyNote.path)}
                   aria-label="Open beacon note"
                   onClick={() => {
                     if (onOpenPartyNote) onOpenPartyNote();
@@ -513,7 +512,7 @@ const PartyPinControls = ({
             )}
             <button
               className="windrose-party-controls-locate"
-              title="Recalculate now"
+              ref={tooltipRef('Recalculate now')}
               aria-label="Recalculate now"
               onClick={() => onRecalculate?.()}
             >
@@ -540,7 +539,7 @@ const PartyPinControls = ({
                   <div
                     key={result.notePath}
                     className="windrose-party-controls-nearby-item"
-                    title={result.notePath}
+                    ref={tooltipRef(result.notePath)}
                   >
                     <div className="windrose-party-controls-nearby-row">
                       <InternalLink link={result.notePath.replace(/\.md$/, '')}>
@@ -550,7 +549,7 @@ const PartyPinControls = ({
                       {onShowOnMap && (
                         <button
                           className="windrose-party-controls-locate"
-                          title="Show on map"
+                          ref={tooltipRef('Show on map')}
                           aria-label={`Show ${result.displayName} on map`}
                           onClick={() => onShowOnMap(result.position)}
                         >
@@ -581,7 +580,7 @@ const PartyPinControls = ({
                         {onShowOnMap && (
                           <button
                             className="windrose-party-controls-locate"
-                            title="Show on map"
+                            ref={tooltipRef('Show on map')}
                             aria-label={`Show ${result.label} on map`}
                             onClick={() => onShowOnMap(result.position)}
                           >

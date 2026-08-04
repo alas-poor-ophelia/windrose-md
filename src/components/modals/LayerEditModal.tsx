@@ -8,6 +8,7 @@ import type { IconWithClass } from '#types/objects/icon.types';
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { RA_CATEGORIES, RA_ICONS, getIconInfo, getIconsByCategory, searchIcons } from '../../assets/rpgAwesomeIcons';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 
 
@@ -244,7 +245,7 @@ const LayerEditModal = ({
                   type="button"
                   className={`windrose-icon-grid-btn ${iconClass === icon.iconClass ? 'selected' : ''}`}
                   onClick={() => setIconClass(icon.iconClass)}
-                  title={icon.label}
+                  ref={tooltipRef(icon.label)}
                 >
                   <span className="ra">{icon.char}</span>
                 </button>

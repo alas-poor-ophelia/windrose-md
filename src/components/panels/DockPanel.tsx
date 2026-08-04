@@ -2,6 +2,7 @@ import type { ComponentChildren, VNode } from 'preact';
 import { useCallback, useState } from 'preact/hooks';
 
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 interface DockPanelProps {
   title: string;
@@ -59,7 +60,7 @@ function DockPanel({
           <button
             className="windrose-dock-panel-undock"
             onClick={(e) => { e.stopPropagation(); handleUndock(e); }}
-            title="Pop out panel"
+            ref={tooltipRef('Pop out panel')}
           >
             <Icon icon="lucide-maximize-2" size={12} />
           </button>
@@ -68,7 +69,7 @@ function DockPanel({
           <button
             className="windrose-dock-panel-collapse"
             onClick={(e) => { e.stopPropagation(); onCollapseDock(); }}
-            title="Collapse panels to ribbon"
+            ref={tooltipRef('Collapse panels to ribbon')}
           >
             <Icon icon="lucide-panel-right-close" size={14} />
           </button>

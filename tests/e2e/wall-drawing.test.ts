@@ -49,7 +49,7 @@ async function canvasClick(page: any, fx: number, fy: number): Promise<void> {
  *  auto-arms the wall tool → the footer shows the wall controls. */
 async function armWallStrip(page: any): Promise<void> {
   // The fixture strip lives on the Structure tier; the drawer opens on Ground.
-  const structSeg = page.locator('.windrose-db-seg[title^="Structure"]');
+  const structSeg = page.locator('.windrose-db-seg[aria-label^="Structure"]');
   await structSeg.waitFor({ state: "visible", timeout: 10000 });
   await structSeg.click();
   await page.waitForTimeout(300);
@@ -62,7 +62,7 @@ async function armWallStrip(page: any): Promise<void> {
   // Card (grid) view groups tiles under category cards — the individual tile
   // isn't in the DOM until the category is drilled. If it isn't already
   // rendered (e.g. list view), click the category card to open it.
-  const strip = page.locator('[title="Test_Wall_01.png"]').first();
+  const strip = page.locator('[aria-label="Test_Wall_01.png"]').first();
   if ((await strip.count()) === 0) {
     const card = page.locator(".windrose-tb-card").first();
     await card.waitFor({ state: "visible", timeout: 5000 });
@@ -90,7 +90,7 @@ test("Selecting a wall strip arms the tool and shows footer controls", async ({ 
   // The relocated wall controls appear in the drawer footer (grid-snap toggle).
   const footer = page.locator(".windrose-tb-footer");
   await footer.waitFor({ state: "visible", timeout: 5000 });
-  const snap = footer.locator('button[title*="Grid snap"]');
+  const snap = footer.locator('button[aria-label*="Grid snap"]');
   await snap.waitFor({ state: "visible", timeout: 5000 });
   expect(await snap.isVisible()).toBe(true);
 

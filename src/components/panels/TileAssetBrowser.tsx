@@ -44,6 +44,7 @@ import { TileOrganizePane } from './TileOrganizePane';
 import { TileFilterScreen } from './TileFilterScreen';
 import type { FilterFacet } from './TileFilterScreen';
 import { TilesetConfigPanel } from './TilesetConfigPanel';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 // ===========================================
 // Horizontal scroller (wheel→sideways + drag)
@@ -1054,7 +1055,7 @@ const TileAssetBrowser = memo(({
           <span className="windrose-tb-cap" style={{ minWidth: 40, textAlign: 'right' }}>{g.widthCells} cell</span>
           <button
             className={`windrose-tb-iconbtn ${g.flip ? 'active' : ''}`}
-            title="Flip door (mirror across the wall)"
+            ref={tooltipRef('Flip door (mirror across the wall)')}
             disabled={!g.bound}
             onClick={g.toggleFlip}
           >
@@ -1062,16 +1063,16 @@ const TileAssetBrowser = memo(({
           </button>
           <button
             className="windrose-tb-iconbtn"
-            title="Remove door art (leave a bare opening)"
+            ref={tooltipRef('Remove door art (leave a bare opening)')}
             disabled={!g.bound}
             onClick={g.unbind}
           >
             <Icon icon="lucide-unlink" size={14} />
           </button>
-          <button className="windrose-tb-iconbtn" title="Delete opening (Delete)" onClick={g.deleteGap}>
+          <button className="windrose-tb-iconbtn" ref={tooltipRef('Delete opening (Delete)')} onClick={g.deleteGap}>
             <Icon icon="lucide-trash-2" size={14} />
           </button>
-          <button className="windrose-tb-iconbtn" title="Done editing opening (Escape)" onClick={g.deselectGap}>
+          <button className="windrose-tb-iconbtn" ref={tooltipRef('Done editing opening (Escape)')} onClick={g.deselectGap}>
             <Icon icon="lucide-x" size={14} />
           </button>
         </>
@@ -1096,15 +1097,15 @@ const TileAssetBrowser = memo(({
           <span className="windrose-tb-cap" style={{ minWidth: 24, textAlign: 'right' }}>{edit.widthScale}×</span>
           <button
             className={`windrose-tb-iconbtn ${edit.flip ? 'active' : ''}`}
-            title="Flip texture direction"
+            ref={tooltipRef('Flip texture direction')}
             onClick={edit.toggleFlip}
           >
             <Icon icon="lucide-flip-vertical" size={14} />
           </button>
-          <button className="windrose-tb-iconbtn" title="Delete wall (Delete)" onClick={edit.deleteWall}>
+          <button className="windrose-tb-iconbtn" ref={tooltipRef('Delete wall (Delete)')} onClick={edit.deleteWall}>
             <Icon icon="lucide-trash-2" size={14} />
           </button>
-          <button className="windrose-tb-iconbtn" title="Deselect (Escape)" onClick={edit.deselect}>
+          <button className="windrose-tb-iconbtn" ref={tooltipRef('Deselect (Escape)')} onClick={edit.deselect}>
             <Icon icon="lucide-x" size={14} />
           </button>
         </>
@@ -1116,14 +1117,14 @@ const TileAssetBrowser = memo(({
         <span className="windrose-tb-cap" style={{ minWidth: 34 }}>{surface.vertexCount} pts</span>
         <button
           className={`windrose-tb-iconbtn ${surface.snapEnabled ? 'active' : ''}`}
-          title={surface.snapEnabled ? 'Grid snap: ON' : 'Grid snap: OFF'}
+          ref={tooltipRef(surface.snapEnabled ? 'Grid snap: ON' : 'Grid snap: OFF')}
           onClick={surface.toggleSnap}
         >
           <Icon icon="lucide-magnet" size={14} />
         </button>
         <button
           className={`windrose-tb-iconbtn ${surface.angleSnapEnabled ? 'active' : ''}`}
-          title={surface.angleSnapEnabled ? '45° angle snap: ON (or hold Alt)' : '45° angle snap: OFF (or hold Alt)'}
+          ref={tooltipRef(surface.angleSnapEnabled ? '45° angle snap: ON (or hold Alt)' : '45° angle snap: OFF (or hold Alt)')}
           onClick={surface.toggleAngleSnap}
         >
           <Icon icon="lucide-triangle-right" size={14} />
@@ -1131,7 +1132,7 @@ const TileAssetBrowser = memo(({
         <span className="sep" />
         <button
           className="windrose-tb-iconbtn"
-          title="Undo last point (Backspace)"
+          ref={tooltipRef('Undo last point (Backspace)')}
           disabled={!surface.isDrawing}
           onClick={surface.undoLastPoint}
         >
@@ -1139,7 +1140,7 @@ const TileAssetBrowser = memo(({
         </button>
         <button
           className="windrose-tb-iconbtn"
-          title="Cancel (Escape)"
+          ref={tooltipRef('Cancel (Escape)')}
           disabled={!surface.isDrawing}
           onClick={surface.cancelDrawing}
         >
@@ -1147,7 +1148,7 @@ const TileAssetBrowser = memo(({
         </button>
         <button
           className="windrose-tb-iconbtn active"
-          title="Finish wall (Enter or double-click)"
+          ref={tooltipRef('Finish wall (Enter or double-click)')}
           disabled={!surface.canFinish}
           onClick={surface.finishWall}
         >
@@ -1185,7 +1186,7 @@ const TileAssetBrowser = memo(({
               {onTilesetOverrideChange != null && tilesets.length > 0 && (
                 <button
                   className="windrose-tb-iconbtn ghost"
-                  title="Tileset settings"
+                  ref={tooltipRef('Tileset settings')}
                   onClick={() => setShowTilesetConfig(!showTilesetConfig)}
                 >
                   <Icon icon="lucide-sliders-horizontal" size={15} />
@@ -1194,14 +1195,14 @@ const TileAssetBrowser = memo(({
               {!compact && (
                 <button
                   className="windrose-tb-iconbtn ghost"
-                  title="Organize tiles"
+                  ref={tooltipRef('Organize tiles')}
                   onClick={() => setOrganize(true)}
                 >
                   <Icon icon="lucide-check-square" size={15} />
                 </button>
               )}
               {onCollapse && (
-                <button className="windrose-tb-iconbtn ghost" title="Collapse to edge" onClick={onCollapse}>
+                <button className="windrose-tb-iconbtn ghost" ref={tooltipRef('Collapse to edge')} onClick={onCollapse}>
                   <Icon icon="lucide-panel-left-open" size={15} />
                 </button>
               )}
@@ -1256,7 +1257,7 @@ const TileAssetBrowser = memo(({
           />
           <button
             className={`windrose-tb-filtbtn ${compact ? 'icon' : ''} ${activeFilterCount > 0 ? 'on' : ''}`}
-            title="All filters"
+            ref={tooltipRef('All filters')}
             onClick={() => { setFilterView('types'); }}
           >
             <Icon icon="lucide-filter" size={13} />
@@ -1297,7 +1298,7 @@ const TileAssetBrowser = memo(({
               key={p.id}
               className={`windrose-tb-packchip ${packFilter.has(p.id) ? 'on' : ''}`}
               onClick={() => togglePack(p.id)}
-              title={p.name}
+              ref={tooltipRef(p.name)}
             >
               <span
                 className="dot"
@@ -1368,7 +1369,7 @@ const TileAssetBrowser = memo(({
                 key={cat}
                 className={`windrose-tb-railbtn windrose-tb-railbtn-cat ${railSel === cat ? 'on' : ''}`}
                 onClick={() => setRailSel(cat)}
-                title={cat}
+                ref={tooltipRef(cat)}
               >
                 <span className="windrose-tb-railmosaic">
                   {[0, 1, 2, 3].map(i => (
@@ -1406,7 +1407,7 @@ const TileAssetBrowser = memo(({
                           onClick={() => handleTileClick(tsId, tile.id)}
                           onMouseEnter={() => setHoveredTile(tile)}
                           onMouseLeave={() => setHoveredTile(null)}
-                          title={tile.filename}
+                          ref={tooltipRef(tile.filename)}
                         >
                           <span className="lthumb">
                             <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
@@ -1428,7 +1429,7 @@ const TileAssetBrowser = memo(({
                           onClick={() => handleTileClick(tsId, tile.id)}
                           onMouseEnter={() => setHoveredTile(tile)}
                           onMouseLeave={() => setHoveredTile(null)}
-                          title={tile.filename}
+                          ref={tooltipRef(tile.filename)}
                         >
                           <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
                           <span className="tname">{tile.filename}</span>
@@ -1461,7 +1462,7 @@ const TileAssetBrowser = memo(({
                           onClick={() => handleTileClick(tsId, tile.id)}
                           onMouseEnter={() => setHoveredTile(tile)}
                           onMouseLeave={() => setHoveredTile(null)}
-                          title={tile.filename}
+                          ref={tooltipRef(tile.filename)}
                         >
                           <span className="lthumb">
                             <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
@@ -1527,7 +1528,7 @@ const TileAssetBrowser = memo(({
                       <button
                         className="windrose-tb-seclabel"
                         onClick={() => handleToggleCategory(row.category)}
-                        title={row.category}
+                        ref={tooltipRef(row.category)}
                       >
                         <Icon
                           icon={row.collapsed ? 'lucide-chevron-right' : 'lucide-chevron-down'}
@@ -1549,7 +1550,7 @@ const TileAssetBrowser = memo(({
                               onClick={() => handleTileClick(tsId, tile.id)}
                               onMouseEnter={() => setHoveredTile(tile)}
                               onMouseLeave={() => setHoveredTile(null)}
-                              title={tile.filename}
+                              ref={tooltipRef(tile.filename)}
                             >
                               <span className="lthumb">
                                 <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
@@ -1572,7 +1573,7 @@ const TileAssetBrowser = memo(({
                               onClick={() => handleTileClick(tsId, tile.id)}
                               onMouseEnter={() => setHoveredTile(tile)}
                               onMouseLeave={() => setHoveredTile(null)}
-                              title={tile.filename}
+                              ref={tooltipRef(tile.filename)}
                             >
                               <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
                               <span className="tname">{tile.filename}</span>
@@ -1599,13 +1600,13 @@ const TileAssetBrowser = memo(({
             <div className="chip-tile compact">
               <LoadedChipThumb url={getThumbUrl(selectedTile.vaultPath)} />
             </div>
-            <button className="windrose-tb-iconbtn" title="Rotate" onClick={handleRotateCW}>
+            <button className="windrose-tb-iconbtn" ref={tooltipRef('Rotate')} onClick={handleRotateCW}>
               <Icon icon="lucide-rotate-cw" size={12} />
             </button>
             <button
               className={`windrose-tb-iconbtn ${activeSubtool === 'stamp' ? 'active' : ''}`}
               onClick={toggleStampSubtool}
-              title={activeSubtool === 'stamp' ? 'Stamp: ON' : 'Stamp: OFF'}
+              ref={tooltipRef(activeSubtool === 'stamp' ? 'Stamp: ON' : 'Stamp: OFF')}
             >
               <Icon icon="lucide-stamp" size={12} />
             </button>
@@ -1641,7 +1642,7 @@ const TileAssetBrowser = memo(({
             )}
             <button
               className="windrose-tb-iconbtn ghost"
-              title="Clear brush"
+              ref={tooltipRef('Clear brush')}
               onClick={onTileDeselect}
               style={{ width: 22, height: 22 }}
             >
@@ -1670,7 +1671,7 @@ const TileAssetBrowser = memo(({
             </div>
             <button
               className="windrose-tb-iconbtn ghost"
-              title="Clear brush"
+              ref={tooltipRef('Clear brush')}
               onClick={onTileDeselect}
             >
               <Icon icon="lucide-x" size={14} />
@@ -1712,17 +1713,17 @@ const TileAssetBrowser = memo(({
               </>
             ) : (
               <>
-                <button className="windrose-tb-iconbtn" title="Rotate counter-clockwise" onClick={handleRotateCCW}>
+                <button className="windrose-tb-iconbtn" ref={tooltipRef('Rotate counter-clockwise')} onClick={handleRotateCCW}>
                   <Icon icon="lucide-rotate-ccw" size={14} />
                 </button>
                 <span className="windrose-tb-cap" style={{ minWidth: 28, textAlign: 'center' }}>{rotation}°</span>
-                <button className="windrose-tb-iconbtn" title="Rotate clockwise" onClick={handleRotateCW}>
+                <button className="windrose-tb-iconbtn" ref={tooltipRef('Rotate clockwise')} onClick={handleRotateCW}>
                   <Icon icon="lucide-rotate-cw" size={14} />
                 </button>
                 <button
                   className={`windrose-tb-iconbtn ${flipH ? 'active' : ''}`}
                   onClick={() => onFlipChange(!flipH)}
-                  title="Flip horizontal"
+                  ref={tooltipRef('Flip horizontal')}
                 >
                   <Icon icon="lucide-flip-horizontal" size={14} />
                 </button>
@@ -1731,7 +1732,7 @@ const TileAssetBrowser = memo(({
                   <button
                     className={`windrose-tb-iconbtn ${paintEdgeBlend === true ? 'active' : ''}`}
                     onClick={() => onPaintEdgeBlendChange(paintEdgeBlend !== true)}
-                    title={paintEdgeBlend === true ? 'Edge blend: ON — new cells paint with soft edges' : 'Edge blend: OFF — new cells paint with hard edges'}
+                    ref={tooltipRef(paintEdgeBlend === true ? 'Edge blend: ON — new cells paint with soft edges' : 'Edge blend: OFF — new cells paint with hard edges')}
                   >
                     <Icon icon="lucide-droplet" size={14} />
                   </button>
@@ -1743,7 +1744,7 @@ const TileAssetBrowser = memo(({
                     const idx = modes.indexOf(tileFitMode);
                     onTileFitModeChange(modes[(idx + 1) % modes.length]);
                   }}
-                  title={`Fit: ${tileFitMode}`}
+                  ref={tooltipRef(`Fit: ${tileFitMode}`)}
                 >
                   <Icon icon={tileFitMode === 'contain' ? 'lucide-minimize-2' : tileFitMode === 'fill' ? 'lucide-maximize-2' : 'lucide-scan'} size={14} />
                 </button>

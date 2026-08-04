@@ -15,6 +15,7 @@ import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition'
 import { Icon } from '../shared/Icon';
 import { Z_INDEX } from '../../core/dmtConstants';
 import { isFeatureEnabled } from '../../core/featureFlags';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 type MouseClickEvent = TargetedMouseEvent<HTMLButtonElement>;
 
@@ -145,7 +146,7 @@ const TextSelectionToolbar = ({
           key={btn.id}
           className={`windrose-toolbar-button${btn.isDelete === true ? ' windrose-toolbar-delete-button' : ''}`}
           onClick={(e) => btn.onClick?.(e)}
-          title={btn.title}
+          ref={tooltipRef(btn.title)}
         >
           <Icon icon={btn.icon} />
         </button>

@@ -1,5 +1,5 @@
 import type { App, TextComponent } from 'obsidian';
-import { Modal, Setting, Notice } from 'obsidian';
+import { Modal, Setting, Notice, setTooltip } from 'obsidian';
 import { DungeonEssenceVisualizer } from '../DungeonEssenceVisualizer';
 import { resolveDungeonStyleColors } from '../../generation/dungeonStyleColors';
 
@@ -362,8 +362,9 @@ class InsertDungeonModal extends Modal {
       const btn = styleRow.createEl('button', {
         cls: 'windrose-dungeon-style-btn',
         text: info.label,
-        attr: { type: 'button', title: info.desc }
+        attr: { type: 'button' }
       });
+      setTooltip(btn, info.desc);
       const styleColors = resolveDungeonStyleColors(style);
       const swatches = btn.createDiv({ cls: 'windrose-dungeon-style-swatches' });
       for (const swatchColor of [styleColors.floor, styleColors.wall, styleColors.water]) {
@@ -405,8 +406,9 @@ class InsertDungeonModal extends Modal {
       const btn = buttonRow.createEl('button', {
         cls: 'windrose-dungeon-size-btn',
         text: info.label,
-        attr: { type: 'button', title: info.desc }
+        attr: { type: 'button' }
       });
+      setTooltip(btn, info.desc);
       buttons[preset] = btn;
 
       btn.onclick = () => {

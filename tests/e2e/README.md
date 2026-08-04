@@ -116,7 +116,7 @@ const totalCells = await getTotalCellCount(page, mapId);
 | Tool palette | `.windrose-tool-palette` |
 | Tool button | `.windrose-tool-palette .windrose-tool-btn` |
 | History controls | `.windrose-history-controls` |
-| Settings button | `.windrose-expand-btn[title="Map Settings"]` |
+| Settings button | `.windrose-edge-rail-btn[aria-label="Map settings"]` |
 | Layer panel | `.windrose-layer-panel` |
 | Object sidebar | `.windrose-object-sidebar` |
 

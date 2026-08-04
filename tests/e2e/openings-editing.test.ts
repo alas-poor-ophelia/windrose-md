@@ -185,7 +185,7 @@ test("Gap footer: delete removes the door (one undo entry, wall survives)", asyn
   expect(await footer.textContent()).toMatch(/Door|Opening|Width/);
 
   // Delete via the gap footer.
-  await page.locator('.windrose-tb-footer button[title^="Delete opening"]').click();
+  await page.locator('.windrose-tb-footer button[aria-label^="Delete opening"]').click();
   await page.waitForTimeout(300);
   expect(await readGaps(page)).toHaveLength(0);
 
@@ -231,12 +231,12 @@ test("Gap footer: flip toggles the seated art; unbind leaves a bare threshold", 
   await enterWallEdit(page);
   await selectDoorGap(page);
 
-  await page.locator('.windrose-tb-footer button[title^="Flip door"]').click();
+  await page.locator('.windrose-tb-footer button[aria-label^="Flip door"]').click();
   await page.waitForTimeout(300);
   expect((await readGaps(page))[0].flip).toBe(true);
 
   // Unbind → the gap stays but loses its seated art.
-  await page.locator('.windrose-tb-footer button[title^="Remove door art"]').click();
+  await page.locator('.windrose-tb-footer button[aria-label^="Remove door art"]').click();
   await page.waitForTimeout(300);
   const gaps = await readGaps(page);
   expect(gaps).toHaveLength(1);
@@ -395,7 +395,7 @@ test("Closed-loop wall: gap on the closing segment selects, moves, resizes, dele
   expect(gaps[0].widthLocked).toBe(true);
 
   // DELETE via the footer.
-  await page.locator('.windrose-tb-footer button[title^="Delete opening"]').click();
+  await page.locator('.windrose-tb-footer button[aria-label^="Delete opening"]').click();
   await page.waitForTimeout(300);
   expect(await readGaps(page)).toHaveLength(0);
 
@@ -412,7 +412,7 @@ test("Openings edit on a hex map (geometry-agnostic)", async ({ page }) => {
   await enterWallEdit(page);
   await selectDoorGap(page);
 
-  await page.locator('.windrose-tb-footer button[title^="Delete opening"]').click();
+  await page.locator('.windrose-tb-footer button[aria-label^="Delete opening"]').click();
   await page.waitForTimeout(300);
   expect(await readGaps(page)).toHaveLength(0);
 

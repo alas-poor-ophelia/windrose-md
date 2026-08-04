@@ -27,6 +27,7 @@ import type { RoomLike, CorridorResult } from '../../generation/objectPlacer';
 import { stockDungeon } from '../../generation/objectPlacer';
 import { ModalPortal } from '../modals/ModalPortal';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 const STRUCTURAL_TYPES = new Set([
   'door-horizontal', 'door-vertical', 'secret-door',
   'stairs-up', 'stairs-down'
@@ -143,7 +144,7 @@ const RerollDungeonButton = (): VNode | null => {
       <button
         className="windrose-tool-btn windrose-reroll-btn interactive-child"
         onClick={handleClick}
-        title={`Re-roll dungeon (${styleName} ${settings.preset})`}
+        ref={tooltipRef(`Re-roll dungeon (${styleName} ${settings.preset})`)}
       >
         <Icon icon="lucide-dices" />
       </button>
@@ -161,7 +162,7 @@ const RerollDungeonButton = (): VNode | null => {
                     <button className="windrose-btn windrose-btn-secondary" onClick={handleCancel}>
                       Cancel
                     </button>
-                    <button className="windrose-btn windrose-btn-tertiary" onClick={handleRerollObjectsOnly} title="Keep the map layout, only regenerate monsters, features, and traps">
+                    <button className="windrose-btn windrose-btn-tertiary" onClick={handleRerollObjectsOnly} ref={tooltipRef('Keep the map layout, only regenerate monsters, features, and traps')}>
                       Objects Only
                     </button>
                     <button className="windrose-btn windrose-btn-primary" onClick={handleRerollAll}>

@@ -6,6 +6,7 @@ import type { VNode } from 'preact';
 
 import { useState } from 'preact/hooks';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 export interface FilterFacet {
   id: string;
@@ -46,7 +47,7 @@ const TileFilterScreen = ({
       <div className="windrose-tb-fhead">
         <button
           className="windrose-tb-iconbtn"
-          title="Back"
+          ref={tooltipRef('Back')}
           onClick={() => { onViewChange(view === 'types' ? null : 'types'); }}
         >
           <Icon icon="lucide-arrow-left" size={15} />
@@ -65,7 +66,7 @@ const TileFilterScreen = ({
         <button
           className="windrose-tb-iconbtn ghost"
           style={{ marginLeft: 'auto' }}
-          title="Close"
+          ref={tooltipRef('Close')}
           onClick={() => { onViewChange(null); }}
         >
           <Icon icon="lucide-x" size={15} />
@@ -120,7 +121,7 @@ const TileFilterScreen = ({
                   <button
                     className="windrose-tb-iconbtn ghost"
                     style={{ width: 20, height: 20 }}
-                    title="Clear search"
+                    ref={tooltipRef('Clear search')}
                     onClick={() => { setFilterSearch(''); }}
                   >
                     <Icon icon="lucide-x" size={12} />

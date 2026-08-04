@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { getColorPalette, DEFAULT_COLOR } from '../../drawing/colorOperations';
 import { ModalPortal } from '../modals/ModalPortal';
 import { Icon } from './Icon';
+import { tooltipRef } from './obsidianTooltip';
 
 
 
@@ -330,7 +331,7 @@ const ColorPicker = ({
                 key={colorDef.id}
                 className="windrose-color-swatch windrose-color-swatch-reset"
                 onClick={handleReset}
-                title={colorDef.label}
+                ref={tooltipRef(colorDef.label)}
               >
                 <Icon icon="lucide-circle-x" />
               </button>
@@ -340,7 +341,7 @@ const ColorPicker = ({
               <div
                 key={colorDef.id}
                 className="windrose-color-swatch windrose-color-swatch-add"
-                title={colorDef.label}
+                ref={tooltipRef(colorDef.label)}
               >
                 <input
                   ref={colorInputRef}
@@ -372,7 +373,7 @@ const ColorPicker = ({
                   onTouchEnd={handleLongPressCancel}
                   onTouchMove={handleLongPressCancel}
                   onMouseDown={handleLongPressCancel}
-                  title={colorDef.label + (hasStoredOpacity ? ` (${Math.round((colorDef.opacity ?? 1) * 100)}%)` : '')}
+                  ref={tooltipRef(colorDef.label + (hasStoredOpacity ? ` (${Math.round((colorDef.opacity ?? 1) * 100)}%)` : ''))}
                 >
                   {selectedColor === colorDef.color && (
                     <span className="windrose-color-checkmark">
@@ -405,7 +406,7 @@ const ColorPicker = ({
                     <button
                       className="windrose-color-edit-delete"
                       onClick={(e) => handleDeleteClick(e, colorDef.id)}
-                      title="Delete custom color"
+                      ref={tooltipRef('Delete custom color')}
                     >
                       <Icon icon="lucide-trash-2" />
                     </button>

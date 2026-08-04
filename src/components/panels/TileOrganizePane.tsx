@@ -28,6 +28,7 @@ import { predictRenderMode } from '../../assets/renderModePredictor';
 import { DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
 import { MAX_TILE_SPAN } from '../../assets/tileRenderResolution';
 import { observeWidth, predictSpanFromMeta, TileThumbnail } from './tileBrowserCommon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 export interface TileOrganizePaneProps {
   tilesets: TilesetDef[];
@@ -262,7 +263,7 @@ const TileOrganizePane = ({
         <span className="windrose-tb-cap" style={{ marginRight: 'auto', marginLeft: 4 }}>
           tag & sort the library
         </span>
-        <button className="windrose-tb-iconbtn ghost" title="Done" onClick={onExit}>
+        <button className="windrose-tb-iconbtn ghost" ref={tooltipRef('Done')} onClick={onExit}>
           <Icon icon="lucide-check" size={16} />
         </button>
       </div>
@@ -322,7 +323,7 @@ const TileOrganizePane = ({
                         key={tile.vaultPath}
                         className={`windrose-tile-thumb ${on ? 'sel' : 'dim'}`}
                         onClick={() => toggleOrgSelect(tile.vaultPath)}
-                        title={tile.filename}
+                        ref={tooltipRef(tile.filename)}
                       >
                         <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
                         <div className={`windrose-tb-check ${on ? 'on' : ''}`}>
@@ -432,7 +433,7 @@ const TileOrganizePane = ({
             <button
               className="windrose-tb-act"
               onClick={() => handleBulkMove(undefined)}
-              title="Clear the override — restore each tile's folder-derived category"
+              ref={tooltipRef("Clear the override — restore each tile's folder-derived category")}
             >
               Reset to folder
             </button>
@@ -456,7 +457,7 @@ const TileOrganizePane = ({
             <button
               className={`windrose-tb-act ${orgModeInfo?.currentMode === 'auto' ? 'windrose-tb-act-apply' : ''}`}
               onClick={() => handleBulkRenderMode(undefined)}
-              title="Clear the override — detection decides at import/read time"
+              ref={tooltipRef('Clear the override — detection decides at import/read time')}
             >
               {orgModeInfo?.detectedModeLabel ?? 'Auto'}
             </button>
@@ -508,7 +509,7 @@ const TileOrganizePane = ({
             <button
               className="windrose-tb-act"
               onClick={handleBulkSpanAuto}
-              title="Clear the override — new placements re-detect from image size"
+              ref={tooltipRef('Clear the override — new placements re-detect from image size')}
             >
               {orgModeInfo?.detectedSpanLabel ?? 'Auto'}
             </button>
@@ -556,7 +557,7 @@ const TileOrganizePane = ({
           className="windrose-tb-act windrose-tb-act-star"
           disabled={orgSelection.size === 0}
           onClick={handleBulkStar}
-          title="Star selection"
+          ref={tooltipRef('Star selection')}
         >
           <Icon icon="lucide-star" size={14} />
         </button>

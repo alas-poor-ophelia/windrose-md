@@ -80,6 +80,7 @@ import type { FlyoutTile } from './components/panels/DrawerDock';
 import { useApp } from './context/AppContext';
 import { Icon } from './components/shared/Icon';
 import { CornerBrackets } from './components/shared/CornerBrackets';
+import { tooltipRef } from './components/shared/obsidianTooltip';
 import { listMaps, deleteMapData } from './persistence/fileOperations';
 import type { MapListEntry } from './persistence/fileOperations';
 import { ConfirmModal } from './settings/modals/ConfirmModal';
@@ -240,13 +241,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Vertical left ribbon: Tiles/Objects tabs + (on Tiles with a tile selected) placement subtools.
   const renderDrawerRibbon = (): VNode => (
     <div className="windrose-fd-subrib">
-      {featureFlags.tiles && <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'tiles' ? 'on' : ''}`} title="Tiles" onClick={() => selectPane('tiles')}><Icon icon="lucide-layout-dashboard" size={16} /></button>}
-      <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'objects' ? 'on' : ''}`} title="Objects" onClick={() => selectPane('objects')}><Icon icon="lucide-sofa" size={16} /></button>
+      {featureFlags.tiles && <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'tiles' ? 'on' : ''}`} ref={tooltipRef('Tiles')} onClick={() => selectPane('tiles')}><Icon icon="lucide-layout-dashboard" size={16} /></button>}
+      <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'objects' ? 'on' : ''}`} ref={tooltipRef('Objects')} onClick={() => selectPane('objects')}><Icon icon="lucide-sofa" size={16} /></button>
       {tilePane === 'tiles' && (
         <>
           <div className="windrose-fd-subrib-div" />
-          <button className={`windrose-fd-ribtab interactive-child ${tileRailSel === 'recent' ? 'on' : ''}`} title="Recent" onClick={() => setTileRailSel(tileRailSel === 'recent' ? 'all' : 'recent')}><Icon icon="lucide-clock" size={16} /></button>
-          <button className={`windrose-fd-ribtab interactive-child ${tileRailSel === 'starred' ? 'on' : ''}`} title="Starred" onClick={() => setTileRailSel(tileRailSel === 'starred' ? 'all' : 'starred')}><Icon icon="lucide-star" size={16} /></button>
+          <button className={`windrose-fd-ribtab interactive-child ${tileRailSel === 'recent' ? 'on' : ''}`} ref={tooltipRef('Recent')} onClick={() => setTileRailSel(tileRailSel === 'recent' ? 'all' : 'recent')}><Icon icon="lucide-clock" size={16} /></button>
+          <button className={`windrose-fd-ribtab interactive-child ${tileRailSel === 'starred' ? 'on' : ''}`} ref={tooltipRef('Starred')} onClick={() => setTileRailSel(tileRailSel === 'starred' ? 'all' : 'starred')}><Icon icon="lucide-star" size={16} /></button>
         </>
       )}
       {tilePane === 'tiles' && selectedTileForm != null && (
@@ -304,20 +305,20 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         <div className="windrose-cd-vtog interactive-child" role="group" aria-label="View mode">
           <button
             className={`windrose-tb-iconbtn ${paneViewMode === 'grid' ? 'active' : 'ghost'}`}
-            title="Grid view"
+            ref={tooltipRef('Grid view')}
             aria-pressed={paneViewMode === 'grid'}
             onClick={() => setPaneViewMode('grid')}
           ><Icon icon="lucide-layout-grid" size={14} /></button>
           <button
             className={`windrose-tb-iconbtn ${paneViewMode === 'list' ? 'active' : 'ghost'}`}
-            title="List view"
+            ref={tooltipRef('List view')}
             aria-pressed={paneViewMode === 'list'}
             onClick={() => setPaneViewMode('list')}
           ><Icon icon="lucide-list" size={14} /></button>
         </div>
         <button
           className="windrose-tb-iconbtn ghost interactive-child windrose-cd-collapse"
-          title="Collapse to edge"
+          ref={tooltipRef('Collapse to edge')}
           onClick={collapseTileBrowser}
         ><Icon icon="lucide-panel-left-open" size={15} /></button>
       </div>
@@ -1235,7 +1236,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             {adjacentSubHexes.length > 0 && (
               <button
                 onClick={() => setShowAdjacentSubMaps(!showAdjacentSubMaps)}
-                title={showAdjacentSubMaps ? 'Hide adjacent sub-maps' : 'Show adjacent sub-maps'}
+                ref={tooltipRef(showAdjacentSubMaps ? 'Hide adjacent sub-maps' : 'Show adjacent sub-maps')}
                 style={{
                   padding: '2px 8px',
                   fontSize: '11px',
@@ -1273,7 +1274,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     const rect = (e.currentTarget as HTMLElement).closest('.windrose-tool-palette')!.getBoundingClientRect();
                     toggleFloat('toolPalette', { x: rect.left, y: rect.top });
                   }}
-                  title="Pop out tools"
+                  ref={tooltipRef('Pop out tools')}
                 >
                   <Icon icon="lucide-maximize-2" />
                 </button>
@@ -1319,7 +1320,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             <button
               className="windrose-frame-exit-btn"
               onClick={handleTogglePictureFrame}
-              title="Exit picture frame mode"
+              ref={tooltipRef('Exit picture frame mode')}
             >
               <Icon icon="lucide-frame" />
             </button>
@@ -1655,7 +1656,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               <div
                 className="windrose-compass-standalone"
                 onClick={handleCompassClick}
-                title={`North: ${mapData.northDirection ?? 0}° — Click to rotate`}
+                ref={tooltipRef(`North: ${mapData.northDirection ?? 0}° — Click to rotate`)}
               >
                 <WindroseCompass rotation={mapData.northDirection ?? 0} className="windrose-compass-svg" />
               </div>
@@ -1766,7 +1767,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                   <button
                     className="windrose-tool-btn windrose-tool-palette-dock-btn interactive-child"
                     onClick={() => toggleFloat('toolPalette')}
-                    title="Dock tools"
+                    ref={tooltipRef('Dock tools')}
                   >
                     <Icon icon="lucide-pin" />
                   </button>
@@ -2086,7 +2087,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 <button
                   className="windrose-dock-settings-btn interactive-child"
                   onClick={handleSettingsClick}
-                  title="Map settings"
+                  ref={tooltipRef('Map settings')}
                 >
                   <Icon icon="lucide-settings" size={14} />
                   <span>Map settings</span>

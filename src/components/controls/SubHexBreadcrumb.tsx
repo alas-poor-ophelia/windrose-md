@@ -6,6 +6,7 @@
  */
 
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 import type { VNode } from 'preact';
 
 interface BreadcrumbSegment {
@@ -39,7 +40,7 @@ const SubHexBreadcrumb = ({
               <button
                 className="windrose-breadcrumb-link"
                 onClick={() => onNavigate(segment.depth)}
-                title={`Back to ${segment.label}`}
+                ref={tooltipRef(`Back to ${segment.label}`)}
               >
                 {segment.label}
               </button>

@@ -19,6 +19,7 @@ import { SettingItem } from './SettingItem';
 import { ImageSearchField } from './ImageSearchField';
 import { NativeToggle, NativeSlider } from './NativeControls';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 import { fogPackImageFilename } from '../../content-packs/contentPackConstants';
 import type { InstalledPack } from '#types/content-packs/contentPack.types';
 
@@ -69,7 +70,7 @@ function ColorPickerItem({ colorKey, label, defaultColor, align = 'left' }: Colo
           class="windrose-color-reset-btn"
           disabled={useGlobalSettings}
           onClick={() => !useGlobalSettings && handleColorChange(colorKey, defaultColor)}
-          title="Reset to default"
+          ref={tooltipRef('Reset to default')}
           style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
         >
           <Icon icon="lucide-rotate-ccw" />
@@ -151,7 +152,7 @@ function FogOfWarSection(): VNode {
               class="windrose-color-reset-btn"
               disabled={useGlobalSettings}
               onClick={() => !useGlobalSettings && handleColorChange('fogOfWarColor', THEME.fogOfWar.color)}
-              title="Reset to default"
+              ref={tooltipRef('Reset to default')}
               style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
             >
               <Icon icon="lucide-rotate-ccw" />
@@ -188,7 +189,7 @@ function FogOfWarSection(): VNode {
               class="windrose-color-reset-btn"
               disabled={useGlobalSettings}
               onClick={() => !useGlobalSettings && handleColorChange('fogOfWarOpacity', 0.9)}
-              title="Reset to default (90%)"
+              ref={tooltipRef('Reset to default (90%)')}
               style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
             >
               <Icon icon="lucide-rotate-ccw" />
@@ -250,7 +251,7 @@ function FogOfWarSection(): VNode {
                 class="windrose-color-reset-btn"
                 disabled={useGlobalSettings}
                 onClick={() => !useGlobalSettings && handleColorChange('fogOfWarBlurFactor', 0.20)}
-                title="Reset to default (20%)"
+                ref={tooltipRef('Reset to default (20%)')}
                 style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
               >
                 <Icon icon="lucide-rotate-ccw" />
@@ -360,7 +361,7 @@ function AppearanceTab(): VNode {
             class="windrose-color-reset-btn"
             disabled={useGlobalSettings}
             onClick={() => !useGlobalSettings && handleLineWidthChange(1)}
-            title="Reset to default (1px)"
+            ref={tooltipRef('Reset to default (1px)')}
             style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
           >
             <Icon icon="lucide-rotate-ccw" />

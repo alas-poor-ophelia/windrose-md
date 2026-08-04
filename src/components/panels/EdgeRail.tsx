@@ -13,6 +13,7 @@ import type { ComponentChildren, VNode } from 'preact';
 
 import { useRef } from 'preact/hooks';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 /** Folded-open panel width (px). Inner content is pinned to this in the SCSS. */
 const DRAWER_WIDTH = 198;
@@ -63,7 +64,7 @@ const EdgeRail = ({ panels, actions, openId, onOpenChange }: EdgeRailProps): VNo
             key={panel.id}
             className={`windrose-edge-rail-btn interactive-child ${openId === panel.id ? 'on' : ''}`}
             onClick={() => toggle(panel.id)}
-            title={panel.title}
+            ref={tooltipRef(panel.title, { placement: 'right' })}
           >
             <Icon icon={panel.icon} size={18} />
           </button>
@@ -76,7 +77,7 @@ const EdgeRail = ({ panels, actions, openId, onOpenChange }: EdgeRailProps): VNo
                 key={action.id}
                 className="windrose-edge-rail-btn interactive-child"
                 onClick={action.onClick}
-                title={action.title}
+                ref={tooltipRef(action.title, { placement: 'right' })}
               >
                 <Icon icon={action.icon} size={18} />
               </button>

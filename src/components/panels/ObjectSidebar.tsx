@@ -10,6 +10,7 @@ import { getResolvedObjectTypes, getResolvedCategories, hasIconClass, hasImagePa
 import { getIconChar } from '../../assets/rpgAwesomeIcons';
 import { Icon } from '../shared/Icon';
 import { DrawerPaneHead, DrawerSearch, type DrawerViewMode } from './drawerChrome';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 interface ObjectSidebarProps {
   selectedObjectType: string | null;
@@ -123,14 +124,14 @@ const ObjectSidebar = memo(({ selectedObjectType, onObjectTypeSelect, onToolChan
         <button
           className="windrose-sidebar-toggle interactive-child"
           onClick={handleToggleCollapse}
-          title="Show objects"
+          ref={tooltipRef('Show objects')}
         >
           <Icon icon="lucide-panel-left-open" size={14} />
         </button>
         {isFreeformMode && (
           <button
             className="windrose-freeform-collapsed-indicator interactive-child"
-            title="Freeform placement active (tap to disable)"
+            ref={tooltipRef('Freeform placement active (tap to disable)')}
             onClick={onFreeformToggle}
           >
             <Icon icon="lucide-diamond" size={12} />
@@ -149,7 +150,7 @@ const ObjectSidebar = memo(({ selectedObjectType, onObjectTypeSelect, onToolChan
           onViewModeChange={onViewModeChange}
           actions={
             onCollapse != null ? (
-              <button className="windrose-tb-iconbtn ghost" title="Collapse to edge" onClick={onCollapse}>
+              <button className="windrose-tb-iconbtn ghost" ref={tooltipRef('Collapse to edge')} onClick={onCollapse}>
                 <Icon icon="lucide-panel-left-open" size={15} />
               </button>
             ) : undefined
@@ -187,7 +188,7 @@ const ObjectSidebar = memo(({ selectedObjectType, onObjectTypeSelect, onToolChan
               <button
                 className="windrose-tb-seclabel"
                 onClick={() => handleToggleCategory(category.id)}
-                title={category.label}
+                ref={tooltipRef(category.label)}
               >
                 <Icon icon={collapsed ? 'lucide-chevron-right' : 'lucide-chevron-down'} size={10} />
                 <span className="catname">{category.label}</span>
@@ -201,7 +202,7 @@ const ObjectSidebar = memo(({ selectedObjectType, onObjectTypeSelect, onToolChan
                       key={objType.id}
                       className={`windrose-tb-listrow is-object ${selectedObjectType === objType.id ? 'sel' : ''}`}
                       onClick={() => handleObjectSelect(objType.id)}
-                      title={objType.label}
+                      ref={tooltipRef(objType.label)}
                     >
                       <div className="lthumb">{renderObjectVisual(objType)}</div>
                       <div className="lname">{objType.label}</div>
@@ -215,7 +216,7 @@ const ObjectSidebar = memo(({ selectedObjectType, onObjectTypeSelect, onToolChan
                       key={objType.id}
                       className={`windrose-object-grid-item ${selectedObjectType === objType.id ? 'windrose-object-grid-item-selected' : ''}`}
                       onClick={() => handleObjectSelect(objType.id)}
-                      title={objType.label}
+                      ref={tooltipRef(objType.label)}
                     >
                       <div className="windrose-object-grid-symbol">{renderObjectVisual(objType)}</div>
                       <div className="windrose-object-grid-label">{objType.label}</div>
@@ -239,7 +240,7 @@ const ObjectSidebar = memo(({ selectedObjectType, onObjectTypeSelect, onToolChan
         <button
           className={`windrose-object-sidebar-action-btn ${isFreeformMode ? 'windrose-object-sidebar-action-active' : ''}`}
           onClick={onFreeformToggle}
-          title={isFreeformMode ? 'Disable freeform placement' : 'Enable freeform placement'}
+          ref={tooltipRef(isFreeformMode ? 'Disable freeform placement' : 'Enable freeform placement')}
         >
           <Icon icon="lucide-diamond" size={14} />
         </button>
@@ -247,7 +248,7 @@ const ObjectSidebar = memo(({ selectedObjectType, onObjectTypeSelect, onToolChan
           <button
             className="windrose-object-sidebar-action-btn"
             onClick={() => onObjectTypeSelect(null)}
-            title="Clear selection"
+            ref={tooltipRef('Clear selection')}
           >
             <Icon icon="lucide-x" size={14} />
           </button>

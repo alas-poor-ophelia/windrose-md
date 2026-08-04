@@ -22,6 +22,7 @@ import { SegmentHoverOverlay } from './SegmentHoverOverlay';
 import { getSettings } from '../../core/settingsAccessor';
 import { Z_INDEX } from '../../core/dmtConstants';
 import { getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 
 
@@ -381,7 +382,7 @@ const DrawingLayer = ({
             step="1"
             value={edgeWidth ?? 3}
             onInput={(e) => setEdgeWidth(parseInt((e.target as HTMLInputElement).value, 10))}
-            title={edgeWidth != null ? `Thickness: ${edgeWidth}px` : 'Thickness: automatic'}
+            ref={tooltipRef(edgeWidth != null ? `Thickness: ${edgeWidth}px` : 'Thickness: automatic')}
             style={{ width: '80px', minHeight: '28px' }}
           />
           <span className="windrose-floating-bar-label-faint">
@@ -391,7 +392,7 @@ const DrawingLayer = ({
             <button
               className="windrose-floating-bar-btn"
               onClick={() => setEdgeWidth(null)}
-              title="Reset to automatic thickness"
+              ref={tooltipRef('Reset to automatic thickness')}
             >
               Auto
             </button>

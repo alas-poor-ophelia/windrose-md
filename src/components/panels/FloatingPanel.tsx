@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
 import { interact } from '../../core/interactjs';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 function getFloatingPortalContainer(): HTMLElement {
   let portal = activeDocument.getElementById('windrose-floating-portal');
@@ -137,7 +138,7 @@ function FloatingPanel({
             <button
               className="windrose-floating-panel-btn"
               onClick={onDock}
-              title="Dock panel"
+              ref={tooltipRef('Dock panel')}
             >
               <Icon icon="lucide-pin" size={14} />
             </button>
@@ -167,7 +168,7 @@ function PopoutButton({ onClick, className }: PopoutButtonProps): VNode {
         const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
         onClick({ x: rect.left, y: rect.top });
       }}
-      title="Pop out panel"
+      ref={tooltipRef('Pop out panel')}
     >
       <Icon icon="lucide-maximize-2" size={12} />
     </button>

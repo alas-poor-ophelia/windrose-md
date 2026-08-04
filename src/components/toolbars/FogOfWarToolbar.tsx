@@ -13,6 +13,7 @@ import { useCallback } from 'preact/hooks';
 import { Modal } from 'obsidian';
 import { useApp } from '../../context/AppContext';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 
 interface FogOfWarToolbarProps {
@@ -58,7 +59,7 @@ const FogOfWarToolbar = ({
       <button
         className={`windrose-fow-tool-btn ${!fogOfWarState.enabled ? 'disabled' : ''}`}
         onClick={onFogVisibilityToggle}
-        title={fogOfWarState.enabled ? "Hide fog overlay" : "Show fog overlay"}
+        ref={tooltipRef(fogOfWarState.enabled ? "Hide fog overlay" : "Show fog overlay")}
         disabled={!fogOfWarState.initialized}
       >
         <Icon icon={fogOfWarState.enabled ? "lucide-eye" : "lucide-eye-off"} />
@@ -69,7 +70,7 @@ const FogOfWarToolbar = ({
       <button
         className={`windrose-fow-tool-btn ${fogOfWarState.activeTool === 'paint' ? 'active' : ''}`}
         onClick={() => onFogToolSelect('paint')}
-        title="Paint fog onto cells"
+        ref={tooltipRef('Paint fog onto cells')}
       >
         <Icon icon="lucide-paintbrush" />
       </button>
@@ -77,7 +78,7 @@ const FogOfWarToolbar = ({
       <button
         className={`windrose-fow-tool-btn ${fogOfWarState.activeTool === 'erase' ? 'active' : ''}`}
         onClick={() => onFogToolSelect('erase')}
-        title="Erase fog (reveal cells)"
+        ref={tooltipRef('Erase fog (reveal cells)')}
       >
         <Icon icon="lucide-eraser" />
       </button>
@@ -85,7 +86,7 @@ const FogOfWarToolbar = ({
       <button
         className={`windrose-fow-tool-btn ${fogOfWarState.activeTool === 'rectangle' ? 'active' : ''}`}
         onClick={() => onFogToolSelect('rectangle')}
-        title="Rectangle tool - click two corners"
+        ref={tooltipRef('Rectangle tool - click two corners')}
       >
         <Icon icon="lucide-square" />
       </button>
@@ -95,7 +96,7 @@ const FogOfWarToolbar = ({
       <button
         className="windrose-fow-tool-btn"
         onClick={onFogFillAll}
-        title="Fill all painted cells with fog"
+        ref={tooltipRef('Fill all painted cells with fog')}
       >
         <Icon icon="lucide-paint-bucket" />
       </button>
@@ -103,7 +104,7 @@ const FogOfWarToolbar = ({
       <button
         className="windrose-fow-tool-btn"
         onClick={handleClearAll}
-        title="Clear all fog from layer"
+        ref={tooltipRef('Clear all fog from layer')}
       >
         <Icon icon="lucide-x-square" />
       </button>

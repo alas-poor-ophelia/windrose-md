@@ -417,7 +417,7 @@ export async function expandObjectSidebarIfNeeded(page: any): Promise<void> {
  * was removed when the button moved (windrose-5cx).
  */
 export async function openSettingsModal(page: any): Promise<void> {
-  const settingsBtn = page.locator('.windrose-edge-rail-btn[title="Map settings"]');
+  const settingsBtn = page.locator('.windrose-edge-rail-btn[aria-label="Map settings"]');
   await settingsBtn.waitFor({ state: "visible", timeout: 5000 });
   await settingsBtn.click();
   await page.waitForTimeout(300);
@@ -439,11 +439,11 @@ export async function closeSettingsModal(page: any): Promise<void> {
  * Toggle the layer panel via the block-mode EdgeRail.
  * In block/embed mode the old `.windrose-expand-btn[title="Toggle layer panel"]`
  * (rendered only in non-minimal MapControls) is not present — layers open from
- * the left EdgeRail icon (`title="Layers"`) into `.windrose-edge-rail-drawer`.
+ * the left EdgeRail icon (`aria-label="Layers"`) into `.windrose-edge-rail-drawer`.
  * This helper is a toggle: calling it again folds the drawer closed.
  */
 export async function openLayerPanel(page: any): Promise<void> {
-  const railBtn = page.locator('.windrose-edge-rail-btn[title="Layers"]');
+  const railBtn = page.locator('.windrose-edge-rail-btn[aria-label="Layers"]');
   await railBtn.waitFor({ state: "visible", timeout: 5000 });
   await railBtn.click();
   await page.waitForTimeout(500); // fold animation ~0.42s
@@ -576,7 +576,7 @@ export async function ensureStrataMode(page: any): Promise<void> {
   // Already showing layer rows (strata or flat list) → nothing to do.
   if (await page.locator('.windrose-dock-layer-row').count() > 0) return;
 
-  const toStrata = page.locator('.windrose-dock-board-btn.mode[title="Switch to Strata (layers)"]');
+  const toStrata = page.locator('.windrose-dock-board-btn.mode[aria-label="Switch to Strata (layers)"]');
   if (await toStrata.count() > 0) {
     await toStrata.first().click();
     await page.waitForTimeout(400);
@@ -654,12 +654,12 @@ export async function ensureTwoFloors(page: any): Promise<void> {
   const boardSelect = page.locator('.windrose-dock-board-select');
   if (await boardSelect.count() > 0) {
     if (await boardSelect.locator('option').count() >= 2) return;
-    await page.locator('.windrose-dock-board-btn[title="Add floor"]').click();
+    await page.locator('.windrose-dock-board-btn[aria-label="Add floor"]').click();
     await page.waitForTimeout(400);
     return;
   }
   if (await page.locator('.windrose-dock-floor-row').count() >= 2) return;
-  const addFloor = page.locator('.windrose-dock-layer-add[title="Add floor"]');
+  const addFloor = page.locator('.windrose-dock-layer-add[aria-label="Add floor"]');
   await addFloor.waitFor({ state: "visible", timeout: 5000 });
   await addFloor.click();
   await page.waitForTimeout(400);

@@ -7,6 +7,7 @@ import { getLayersOrdered, getActiveBoardId, getActiveBoardLayers, getBoardsOrde
 import { ROLE_META } from '../../assets/tileRoles';
 import { getIconInfo } from '../../assets/rpgAwesomeIcons';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
 
 interface DragState {
@@ -258,7 +259,7 @@ const DockLayerList = ({
             <button
               className={`windrose-dock-layer-action eye${isHidden ? '' : ' active'}`}
               onClick={(e) => handleVisibleToggle(layer.id, e)}
-              title={isHidden ? 'Show layer' : 'Hide layer'}
+              ref={tooltipRef(isHidden ? 'Show layer' : 'Hide layer')}
             >
               <Icon icon={isHidden ? 'lucide-eye-off' : 'lucide-eye'} size={14} />
             </button>
@@ -276,7 +277,7 @@ const DockLayerList = ({
             <button
               className={`windrose-dock-layer-action transparency${layer.showLayerBelow === true ? ' active' : ''}`}
               onClick={(e) => handleTransparencyToggle(layer.id, e)}
-              title={layer.showLayerBelow === true ? 'Hide layer below' : 'Show layer below'}
+              ref={tooltipRef(layer.showLayerBelow === true ? 'Hide layer below' : 'Show layer below')}
             >
               <Icon icon="lucide-layers" size={14} />
             </button>
@@ -285,7 +286,7 @@ const DockLayerList = ({
           <button
             className={`windrose-dock-layer-action more${isExpanded ? ' active' : ''}`}
             onClick={(e) => handleExpandToggle(layer.id, e)}
-            title="Layer actions"
+            ref={tooltipRef('Layer actions')}
           >
             <Icon icon="lucide-more-horizontal" size={14} />
           </button>
@@ -297,7 +298,7 @@ const DockLayerList = ({
               <button
                 className="windrose-dock-layer-action-btn"
                 onClick={(e) => handleEdit(layer.id, e)}
-                title="Edit layer"
+                ref={tooltipRef('Edit layer')}
               >
                 <Icon icon="lucide-pencil" size={12} />
                 <span>Edit</span>
@@ -305,7 +306,7 @@ const DockLayerList = ({
               <button
                 className="windrose-dock-layer-action-btn"
                 onClick={(e) => handleClone(layer.id, e)}
-                title="Clone layer"
+                ref={tooltipRef('Clone layer')}
               >
                 <Icon icon="lucide-copy" size={12} />
                 <span>Clone</span>
@@ -314,7 +315,7 @@ const DockLayerList = ({
                 <button
                   className="windrose-dock-layer-action-btn delete"
                   onClick={(e) => handleDelete(layer.id, e, canDelete)}
-                  title="Delete layer"
+                  ref={tooltipRef('Delete layer')}
                 >
                   <Icon icon="lucide-trash-2" size={12} />
                   <span>Delete</span>
@@ -360,7 +361,7 @@ const DockLayerList = ({
               const board = boards.find(b => b.id === id);
               if (board) onBoardSelect?.(board.id);
             }}
-            title="Switch floor"
+            ref={tooltipRef('Switch floor')}
           >
             {boards.map(board => (
               <option key={board.id} value={board.id}>{board.name}</option>
@@ -371,13 +372,13 @@ const DockLayerList = ({
               <button
                 className={`windrose-dock-board-btn ghost${activeBoard?.showBoardBelow === true ? ' active' : ''}`}
                 onClick={(e) => handleBoardGhostToggle(activeBoardId, e)}
-                title={activeBoard?.showBoardBelow === true ? 'Hide floor below' : 'Show floor below'}
+                ref={tooltipRef(activeBoard?.showBoardBelow === true ? 'Hide floor below' : 'Show floor below')}
               >
                 <Icon icon="lucide-layers" size={14} />
               </button>
             )}
             {onBoardAdd != null && (
-              <button className="windrose-dock-board-btn" onClick={onBoardAdd} title="Add floor">
+              <button className="windrose-dock-board-btn" onClick={onBoardAdd} ref={tooltipRef('Add floor')}>
                 <Icon icon="lucide-plus" size={14} />
               </button>
             )}
@@ -385,13 +386,13 @@ const DockLayerList = ({
               <button
                 className="windrose-dock-board-btn delete"
                 onClick={() => onBoardDelete(activeBoardId)}
-                title="Delete this floor"
+                ref={tooltipRef('Delete this floor')}
               >
                 <Icon icon="lucide-trash-2" size={14} />
               </button>
             )}
             {onToggleStrataMode != null && featureFlags.tiles && (
-              <button className="windrose-dock-board-btn mode active" onClick={onToggleStrataMode} title="Switch to Simple layers">
+              <button className="windrose-dock-board-btn mode active" onClick={onToggleStrataMode} ref={tooltipRef('Switch to Simple layers')}>
                 <Icon icon="lucide-list" size={14} />
               </button>
             )}
@@ -415,7 +416,7 @@ const DockLayerList = ({
                   <button
                     className="windrose-dock-stratum-add"
                     onClick={() => onAddLayerToStratum(role.id)}
-                    title={`Add a ${role.label} layer`}
+                    ref={tooltipRef(`Add a ${role.label} layer`)}
                   >
                     <Icon icon="lucide-plus" size={12} />
                   </button>
@@ -443,7 +444,7 @@ const DockLayerList = ({
         <div className="windrose-dock-board-bar simple">
           <span className="windrose-dock-mode-label">Floors</span>
           {onToggleStrataMode != null && featureFlags.tiles && (
-            <button className="windrose-dock-board-btn mode" onClick={onToggleStrataMode} title="Switch to Strata (layers)">
+            <button className="windrose-dock-board-btn mode" onClick={onToggleStrataMode} ref={tooltipRef('Switch to Strata (layers)')}>
               <Icon icon="lucide-layers-3" size={14} />
             </button>
           )}
@@ -455,7 +456,7 @@ const DockLayerList = ({
               key={board.id}
               className={`windrose-dock-floor-row ${board.id === activeBoardId ? 'active' : ''}`}
               onClick={() => onBoardSelect?.(board.id)}
-              title={board.name}
+              ref={tooltipRef(board.name)}
             >
               <Icon icon="lucide-square-stack" size={14} />
               <span className="windrose-dock-floor-name">{board.name}</span>
@@ -463,7 +464,7 @@ const DockLayerList = ({
                 <button
                   className={`windrose-dock-layer-action transparency${board.showBoardBelow === true ? ' active' : ''}`}
                   onClick={(e) => handleBoardGhostToggle(board.id, e)}
-                  title={board.showBoardBelow === true ? 'Hide floor below' : 'Show floor below'}
+                  ref={tooltipRef(board.showBoardBelow === true ? 'Hide floor below' : 'Show floor below')}
                 >
                   <Icon icon="lucide-layers" size={14} />
                 </button>
@@ -472,7 +473,7 @@ const DockLayerList = ({
                 <button
                   className="windrose-dock-floor-del"
                   onClick={(e) => { e.stopPropagation(); onBoardDelete(board.id); }}
-                  title="Delete this floor"
+                  ref={tooltipRef('Delete this floor')}
                 >
                   <Icon icon="lucide-trash-2" size={12} />
                 </button>
@@ -485,7 +486,7 @@ const DockLayerList = ({
 
         {onBoardAdd != null && (
           <div className="windrose-dock-layer-footer">
-            <button className="windrose-dock-layer-add" onClick={onBoardAdd} title="Add floor">
+            <button className="windrose-dock-layer-add" onClick={onBoardAdd} ref={tooltipRef('Add floor')}>
               <Icon icon="lucide-plus" size={14} />
               <span>Add Floor</span>
             </button>
@@ -504,7 +505,7 @@ const DockLayerList = ({
         <button
           className="windrose-dock-layer-add"
           onClick={onLayerAdd}
-          title="Add new layer"
+          ref={tooltipRef('Add new layer')}
         >
           <Icon icon="lucide-plus" size={14} />
           <span>Add Layer</span>

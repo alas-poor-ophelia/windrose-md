@@ -13,6 +13,7 @@ import type { VNode } from 'preact';
 
 import { useApp } from '../../context/AppContext';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 interface PluginWithSettings {
   settings: { onboardingState?: string };
@@ -56,7 +57,7 @@ const WhatsNewNotice = (): VNode => {
       <button className="windrose-whatsnew-btn" onClick={openSettings}>
         Open settings
       </button>
-      <button className="windrose-whatsnew-dismiss" onClick={markDone} title="Dismiss">
+      <button className="windrose-whatsnew-dismiss" onClick={markDone} ref={tooltipRef('Dismiss')}>
         <Icon icon="lucide-x" size={14} />
       </button>
     </div>

@@ -8,6 +8,7 @@ import type { VNode } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { WindroseCompass } from '../shared/WindroseCompass';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 const COLLAPSE_DELAY_DESKTOP_MS = 800;   // Desktop: time after mouse leaves
 const COLLAPSE_DELAY_TOUCH_MS = 3000;    // Touch: longer since no hover cue
 const ITEM_STAGGER_MS = 40;              // Delay between each item's animation start
@@ -201,7 +202,7 @@ const MapControls = ({
               className={`windrose-expand-btn windrose-drawer-item windrose-drawer-item-up ${controlsRevealed ? 'windrose-drawer-item-visible' : ''}`}
               style={getExpandStyle()}
               onClick={handleControlInteraction(onToggleExpand)}
-              title={isExpanded ? "Collapse to normal width" : "Expand to full width"}
+              ref={tooltipRef(isExpanded ? "Collapse to normal width" : "Expand to full width")}
             >
               <Icon icon={isExpanded ? "lucide-minimize" : "lucide-expand"} />
             </button>
@@ -211,7 +212,7 @@ const MapControls = ({
           <div 
             className={`windrose-compass windrose-compass-animated ${controlsRevealed ? 'windrose-compass-revealed' : ''}`}
             onClick={handleCompassClick}
-            title={getCompassTitle()}
+            ref={tooltipRef(getCompassTitle())}
           >
             <WindroseCompass rotation={northDirection} className="windrose-compass-svg" />
           </div>
@@ -226,17 +227,17 @@ const MapControls = ({
               <button
                 className="windrose-zoom-btn"
                 onClick={handleControlInteraction(onZoomIn)}
-                title="Zoom In"
+                ref={tooltipRef('Zoom In')}
               >
                 +
               </button>
-              <div className="windrose-zoom-level" title={`Zoom: ${Math.round(currentZoom * 100)}%`}>
+              <div className="windrose-zoom-level" ref={tooltipRef(`Zoom: ${Math.round(currentZoom * 100)}%`)}>
                 {Math.round(currentZoom * 100)}%
               </div>
-              <button 
+              <button
                 className="windrose-zoom-btn"
                 onClick={handleControlInteraction(onZoomOut)}
-                title="Zoom Out"
+                ref={tooltipRef('Zoom Out')}
               >
                 -
               </button>
@@ -248,7 +249,7 @@ const MapControls = ({
               className={`windrose-expand-btn windrose-drawer-item ${showLayerPanel ? 'windrose-expand-btn-active' : ''} ${controlsRevealed ? 'windrose-drawer-item-visible' : ''}`}
               style={getDrawerItemStyle(1)}
               onClick={handleControlInteraction(onToggleLayerPanel)}
-              title="Toggle layer panel"
+              ref={tooltipRef('Toggle layer panel')}
             >
               <Icon icon="lucide-layers" />
             </button>
@@ -259,7 +260,7 @@ const MapControls = ({
                 className={`windrose-expand-btn windrose-drawer-item ${showRegionPanel === true ? 'windrose-expand-btn-active' : ''} ${controlsRevealed ? 'windrose-drawer-item-visible' : ''}`}
                 style={getDrawerItemStyle(2)}
                 onClick={handleControlInteraction(onToggleRegionPanel)}
-                title="Toggle region panel"
+                ref={tooltipRef('Toggle region panel')}
               >
                 <Icon icon="lucide-map" />
               </button>
@@ -272,7 +273,7 @@ const MapControls = ({
                 2 + (mapType === 'hex' && onToggleRegionPanel ? 1 : 0)
               )}
               onClick={handleControlInteraction(onToggleVisibilityToolbar)}
-              title="Toggle layer visibility"
+              ref={tooltipRef('Toggle layer visibility')}
             >
               <Icon icon="lucide-eye" />
             </button>
@@ -284,7 +285,7 @@ const MapControls = ({
                 3 + (mapType === 'hex' && onToggleRegionPanel ? 1 : 0)
               )}
               onClick={handleControlInteraction(onSettingsClick)}
-              title="Map Settings"
+              ref={tooltipRef('Map Settings')}
             >
               <Icon icon="lucide-settings" />
             </button>

@@ -18,6 +18,7 @@ import { useHexGrid, useBackgroundImage } from '../../../context/MapSettingsCont
 import type { VNode } from 'preact';
 import { SettingItem } from '../SettingItem';
 import { NativeToggle } from '../NativeControls';
+import { tooltipRef } from '../../shared/obsidianTooltip';
 
 type BoundsShape = 'rectangular' | 'radial';
 
@@ -98,7 +99,7 @@ function BoundsSection(): VNode {
               value={hexBounds.maxRing ?? 5}
               onChange={(e: Event) => handleRadiusChange((e.target as HTMLInputElement).value)}
               disabled={isDisabled}
-              title="Number of hex rings from center"
+              ref={tooltipRef('Number of hex rings from center')}
               style={inputStyle}
             />
             <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>rings</span>

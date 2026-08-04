@@ -343,7 +343,7 @@ test("Object rotation via toolbar button rotates 45 degrees", async ({ page }) =
   await page.mouse.click(centerX, centerY);
   await page.waitForTimeout(300);
 
-  const rotateBtn = page.locator('.windrose-toolbar-button[title*="Rotate 45"]');
+  const rotateBtn = page.locator('.windrose-toolbar-button[aria-label*="Rotate 45"]');
   const rotateBtnExists = await rotateBtn.count() > 0;
 
   if (rotateBtnExists) {
