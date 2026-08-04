@@ -1,6 +1,7 @@
 import type { App, TextComponent } from 'obsidian';
 import { Modal, Setting, Notice } from 'obsidian';
 import { DungeonEssenceVisualizer } from '../DungeonEssenceVisualizer';
+import { resolveDungeonStyleColors } from '../../generation/dungeonStyleColors';
 
 type DungeonSize = 'small' | 'medium' | 'large';
 type DungeonStyleName = 'classic' | 'cavern' | 'fortress' | 'crypt';
@@ -227,6 +228,62 @@ class InsertDungeonModal extends Modal {
     }
   }
 
+  applyVisualizerTint(): void {
+    if (!this.visualizer) return;
+    const colors = resolveDungeonStyleColors(this.dungeonStyle);
+    this.visualizer.applyTint({ line: colors.floor, lineSolid: colors.floor, nodePulse: colors.water });
+  }
+
+  /**
+   * Non-null config overrides plus the effective generation colors for the
+   * selected style (per-style settings overrides over built-in defaults).
+   */
+  buildGenerationOverrides(): Record<string, unknown> {
+    const overrides: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(this.configOverrides)) {
+      if (val !== null) overrides[key] = val;
+    }
+    const colors = resolveDungeonStyleColors(this.dungeonStyle);
+    overrides.floorColor = colors.floor;
+    overrides.wallColor = colors.wall;
+    overrides.waterColor = colors.water;
+    return overrides;
+  }
+
+  async generateAndInsert(): Promise<void> {
+    if (!this.dungeonSize) return;
+    try {
+      const generator = await this.plugin.loadDungeonGenerator();
+      const overrides = this.buildGenerationOverrides();
+
+      const result = generator.generateDungeon(this.dungeonSize, undefined, overrides) as DungeonGenerationResult;
+      const stockResult = await stockGeneratedDungeon(this.plugin, result, overrides);
+      const allObjects = [...result.objects, ...stockResult.objects];
+
+      await this.onInsert(this.mapName, result.cells, allObjects, result.edges ?? [], {
+        distancePerCell: this.distancePerCell,
+        distanceUnit: this.distanceUnit,
+        preset: this.dungeonSize,
+        configOverrides: overrides,
+        roomCount: result.metadata.roomCount,
+        doorCount: result.metadata.doorCount,
+        stockingMetadata: {
+          rooms: result.metadata.rooms,
+          corridorResult: result.metadata.corridorResult,
+          doorPositions: result.metadata.doorPositions,
+          entryRoomId: result.metadata.entryRoomId,
+          exitRoomId: result.metadata.exitRoomId,
+          waterRoomIds: result.metadata.waterRoomIds,
+          style: result.metadata.style
+        }
+      });
+      this.close();
+    } catch (err: unknown) {
+      console.error('[Windrose] Dungeon generation failed:', err);
+      new Notice('Failed to generate dungeon: ' + (err as Error).message);
+    }
+  }
+
   syncSlidersToStyle(): void {
     const defaults = DUNGEON_STYLE_DEFAULTS[this.dungeonStyle] ?? DUNGEON_STYLE_DEFAULTS.classic;
 
@@ -267,6 +324,7 @@ class InsertDungeonModal extends Modal {
       height: 180,
       settings: this.getVisualizerSettings()
     });
+    this.applyVisualizerTint();
     this.visualizer.start();
 
     new Setting(contentEl)
@@ -306,6 +364,12 @@ class InsertDungeonModal extends Modal {
         text: info.label,
         attr: { type: 'button', title: info.desc }
       });
+      const styleColors = resolveDungeonStyleColors(style);
+      const swatches = btn.createDiv({ cls: 'windrose-dungeon-style-swatches' });
+      for (const swatchColor of [styleColors.floor, styleColors.wall, styleColors.water]) {
+        swatches.createSpan({ cls: 'windrose-dungeon-style-swatch' })
+          .setCssStyles({ backgroundColor: swatchColor });
+      }
       styleButtons[style] = btn;
 
       btn.onclick = () => {
@@ -314,6 +378,7 @@ class InsertDungeonModal extends Modal {
         Object.values(styleButtons).forEach((b: HTMLButtonElement) => b.removeClass('selected'));
         btn.addClass('selected');
         this.syncSlidersToStyle();
+        this.applyVisualizerTint();
       };
     }
 
@@ -529,79 +594,13 @@ class InsertDungeonModal extends Modal {
         return;
       }
 
-      try {
-        const generator = await this.plugin.loadDungeonGenerator();
-
-        const overrides: Record<string, unknown> = {};
-        for (const [key, val] of Object.entries(this.configOverrides)) {
-          if (val !== null) overrides[key] = val;
-        }
-
-        const result = generator.generateDungeon(this.dungeonSize, undefined, overrides) as DungeonGenerationResult;
-        const stockResult = await stockGeneratedDungeon(this.plugin, result, overrides);
-        const allObjects = [...result.objects, ...stockResult.objects];
-
-        await this.onInsert(this.mapName, result.cells, allObjects, result.edges ?? [], {
-          distancePerCell: this.distancePerCell,
-          distanceUnit: this.distanceUnit,
-          preset: this.dungeonSize,
-          configOverrides: overrides,
-          roomCount: result.metadata.roomCount,
-          doorCount: result.metadata.doorCount,
-          stockingMetadata: {
-            rooms: result.metadata.rooms,
-            corridorResult: result.metadata.corridorResult,
-            doorPositions: result.metadata.doorPositions,
-            entryRoomId: result.metadata.entryRoomId,
-            exitRoomId: result.metadata.exitRoomId,
-            waterRoomIds: result.metadata.waterRoomIds,
-            style: result.metadata.style
-          }
-        });
-        this.close();
-      } catch (err: unknown) {
-        console.error('[Windrose] Dungeon generation failed:', err);
-        new Notice('Failed to generate dungeon: ' + (err as Error).message);
-      }
+      await this.generateAndInsert();
     };
 
     contentEl.addEventListener('keydown', (e: KeyboardEvent) => { void (async () => {
       if (e.key === 'Enter' && this.dungeonSize) {
         e.preventDefault();
-        try {
-          const generator = await this.plugin.loadDungeonGenerator();
-
-          const overrides: Record<string, unknown> = {};
-          for (const [key, val] of Object.entries(this.configOverrides)) {
-            if (val !== null) overrides[key] = val;
-          }
-
-          const result = generator.generateDungeon(this.dungeonSize, undefined, overrides) as DungeonGenerationResult;
-          const stockResult = await stockGeneratedDungeon(this.plugin, result, overrides);
-          const allObjects = [...result.objects, ...stockResult.objects];
-
-          await this.onInsert(this.mapName, result.cells, allObjects, result.edges ?? [], {
-            distancePerCell: this.distancePerCell,
-            distanceUnit: this.distanceUnit,
-            preset: this.dungeonSize,
-            configOverrides: overrides,
-            roomCount: result.metadata.roomCount,
-            doorCount: result.metadata.doorCount,
-            stockingMetadata: {
-              rooms: result.metadata.rooms,
-              corridorResult: result.metadata.corridorResult,
-              doorPositions: result.metadata.doorPositions,
-              entryRoomId: result.metadata.entryRoomId,
-              exitRoomId: result.metadata.exitRoomId,
-              waterRoomIds: result.metadata.waterRoomIds,
-              style: result.metadata.style
-            }
-          });
-          this.close();
-        } catch (err: unknown) {
-          console.error('[Windrose] Dungeon generation failed:', err);
-          new Notice('Failed to generate dungeon: ' + (err as Error).message);
-        }
+        await this.generateAndInsert();
       }
     })(); });
   }

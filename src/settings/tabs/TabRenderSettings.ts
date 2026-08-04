@@ -1,5 +1,7 @@
 import { Setting } from 'obsidian';
+import type { DungeonStyleName, DungeonStyleColors } from '#types/core/map.types';
 import { THEME, DEFAULTS } from '../../core/dmtConstants';
+import { DUNGEON_STYLE_NAMES, DUNGEON_STYLE_COLOR_DEFAULTS } from '../../generation/dungeonStyleColors';
 import type { SettingsTabThis } from './settingsTabContext';
 import { ContentPackBrowserModal } from '../../content-packs/ContentPackBrowserModal';
 import { getInstalledPacks } from '../../content-packs/installedPacksService';
@@ -63,6 +65,51 @@ function addColorSetting(
       }));
 }
 
+const DUNGEON_STYLE_LABELS: Record<DungeonStyleName, string> = {
+  classic: 'Classic',
+  cavern: 'Cavern',
+  fortress: 'Fortress',
+  crypt: 'Crypt'
+};
+
+const DUNGEON_COLOR_CHANNELS: Array<keyof DungeonStyleColors> = ['floor', 'wall', 'water'];
+
+/**
+ * Attach the three per-style generation color pickers (floor, wall, water)
+ * plus a reset button to a Setting row. Shared between the imperative tab
+ * and the declarative definition's render callback.
+ */
+function addDungeonStyleColorPickers(
+  tab: SettingsTabThis,
+  setting: Setting,
+  style: DungeonStyleName,
+  onReset: () => void
+): void {
+  const defaults = DUNGEON_STYLE_COLOR_DEFAULTS[style];
+  for (const channel of DUNGEON_COLOR_CHANNELS) {
+    setting.addColorPicker(picker => picker
+      .setValue(tab.plugin.settings.dungeonStyleColors?.[style]?.[channel] ?? defaults[channel])
+      .onChange(async (value: string) => {
+        const overrides = tab.plugin.settings.dungeonStyleColors ?? {};
+        overrides[style] = { ...overrides[style], [channel]: value };
+        tab.plugin.settings.dungeonStyleColors = overrides;
+        tab.settingsChanged = true;
+        await tab.plugin.saveSettings();
+      }));
+  }
+  setting.addExtraButton(btn => btn
+    .setIcon('rotate-ccw')
+    .setTooltip('Reset to defaults')
+    .onClick(async () => {
+      if (tab.plugin.settings.dungeonStyleColors) {
+        delete tab.plugin.settings.dungeonStyleColors[style];
+      }
+      tab.settingsChanged = true;
+      await tab.plugin.saveSettings();
+      onReset();
+    }));
+}
+
 type NumberSettingKey = Exclude<{
   [K in keyof PluginSettingsShape]: PluginSettingsShape[K] extends number ? K : never;
 }[keyof PluginSettingsShape], undefined>;
@@ -122,6 +169,8 @@ function addDistancePerCellSetting(
         });
     });
 }
+
+export { DUNGEON_STYLE_LABELS, addDungeonStyleColorPickers };
 
 export const TabRenderSettingsMethods = {
   renderHexSettingsContent(this: SettingsTabThis, containerEl: HTMLElement): void {
@@ -229,6 +278,19 @@ export const TabRenderSettingsMethods = {
       key: 'coordinateKeyColor',
       default: SETTING_DEFAULTS.DEFAULT_COORDINATE_KEY_COLOR
     });
+  },
+  renderMapGenerationSettingsContent(this: SettingsTabThis, containerEl: HTMLElement): void {
+    containerEl.createEl('p', {
+      text: 'Default colors the random dungeon generator uses for each style. Pickers set the floor, wall, and water colors in that order.',
+      cls: 'setting-item-description'
+    });
+
+    for (const style of DUNGEON_STYLE_NAMES) {
+      const setting = new Setting(containerEl)
+        .setName(DUNGEON_STYLE_LABELS[style])
+        .setDesc('Floor, wall, and water colors');
+      addDungeonStyleColorPickers(this, setting, style, () => this.display());
+    }
   },
   renderFogOfWarSettingsContent(this: SettingsTabThis, containerEl: HTMLElement): void {
     containerEl.createEl('p', {

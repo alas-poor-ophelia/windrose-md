@@ -135,6 +135,7 @@ const DUNGEON_STYLES = {
 const DEFAULT_FLOOR_COLOR = '#c4a57b';
 const DEFAULT_WATER_COLOR = '#4a90d9';
 const DEFAULT_WATER_OPACITY = 0.6;
+const DEFAULT_WALL_COLOR = '#333333';
 
 // =============================================================================
 // UTILITY FUNCTIONS
@@ -1821,11 +1822,11 @@ function calculateRoomOpeningWidth(doorPos, room, carvedCellSet, alignment, corr
  * Creates edges on the room-facing side of corridor cells.
  * @param {Array<{x: number, y: number}>} cells - Cells to generate edges for
  * @param {string} alignment - Door alignment determining edge placement direction
+ * @param {string} [wallColor] - Edge color for the generated walls
  * @returns {Array<{x: number, y: number, side: string, color: string}>} Wall edge definitions
  */
-function generateWallEdgesForCells(cells, alignment) {
+function generateWallEdgesForCells(cells, alignment, wallColor = DEFAULT_WALL_COLOR) {
   const edges = [];
-  const wallColor = '#333333';
 
   for (const cell of cells) {
     if (alignment === 'north') {
@@ -1852,11 +1853,11 @@ function generateWallEdgesForCells(cells, alignment) {
  * @param {Array<Object>} rooms - All dungeon rooms
  * @param {Set<string>} corridorCellSet - Set of corridor cell keys ("x,y")
  * @param {Array<{x: number, y: number}>} doorPositions - Door positions to skip
+ * @param {string} [wallColor] - Edge color for the generated walls
  * @returns {Array<{x: number, y: number, side: string, color: string}>} Deduplicated wall edges
  */
-function generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions) {
+function generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions, wallColor = DEFAULT_WALL_COLOR) {
   const edges = [];
-  const wallColor = '#333333';
 
   const doorSet = new Set(doorPositions.map(d => `${d.x},${d.y}`));
 
@@ -2071,9 +2072,10 @@ function groupDoorCandidates(candidates) {
  * @param {Set<string>} [carvedCellSet] - Set of all carved cell keys for opening width
  * @param {Set<string>} [corridorCellSet] - Set of corridor cell keys for validation
  * @param {Set<string>} [segmentCellSet] - Set of diagonal segment cell keys to exclude
+ * @param {string} [wallColor] - Edge color for wide-opening wall edges
  * @returns {{doorPositions: Array<Object>, wallEdges: Array<Object>}} Door positions and wall edges
  */
-function findDoorPositions(corridorsByConnection, rooms, doorChance = 0.7, secretDoorChance = 0.05, carvedCellSet = null, corridorCellSet = null, segmentCellSet = null) {
+function findDoorPositions(corridorsByConnection, rooms, doorChance = 0.7, secretDoorChance = 0.05, carvedCellSet = null, corridorCellSet = null, segmentCellSet = null, wallColor = DEFAULT_WALL_COLOR) {
   const candidates = findDoorCandidates(corridorsByConnection, rooms, corridorCellSet, segmentCellSet);
   const groups = groupDoorCandidates(candidates);
 
@@ -2121,7 +2123,7 @@ function findDoorPositions(corridorsByConnection, rooms, doorChance = 0.7, secre
             ...opening.cells.slice(0, startIdx),
             ...opening.cells.slice(endIdx)
           ];
-          const edges = generateWallEdgesForCells(cellsForWalls, firstDoor.alignment);
+          const edges = generateWallEdgesForCells(cellsForWalls, firstDoor.alignment, wallColor);
           wallEdges.push(...edges);
 
           continue; // Skip normal group processing
@@ -2362,7 +2364,11 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
   // Merge: base preset <- style overrides <- user overrides
   // This allows user to tweak a style's defaults
   const config = { ...baseConfig, ...styleOverrides, ...configOverrides };
-  
+
+  // Generation colors: config overrides win over the positional color arg
+  const floorColor = config.floorColor ?? color;
+  const wallColor = config.wallColor ?? DEFAULT_WALL_COLOR;
+
   // Phase 1: Generate rooms
   const rooms = generateRooms(config);
   
@@ -2378,7 +2384,7 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
   // Use diagonal-aware carving if diagonal corridors are enabled
   let corridorResult;
   if (diagonalChance > 0 || corridorStyle === 'diagonal') {
-    corridorResult = carveCorridorsWithDiagonals(connections, corridorWidth, rooms, corridorStyle, diagonalChance, color);
+    corridorResult = carveCorridorsWithDiagonals(connections, corridorWidth, rooms, corridorStyle, diagonalChance, floorColor);
   } else {
     corridorResult = carveCorridors(connections, corridorWidth, rooms, corridorStyle);
   }
@@ -2413,13 +2419,14 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
     config.secretDoorChance ?? 0,
     carvedCellSet,
     corridorCellSet,
-    segmentCellSet
+    segmentCellSet,
+    wallColor
   );
   const doorPositions = doorResult.doorPositions;
   let doorObjects = generateDoorObjects(doorPositions);
 
   // Generate wall edges for ALL corridor cells adjacent to rooms (except where doors are)
-  let wallEdges = generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions);
+  let wallEdges = generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions, wallColor);
 
   // Add secret doors to any rooms that ended up with no doors (emergent generation)
   // Calculate remaining secret door quota based on user's secretDoorChance
@@ -2452,7 +2459,7 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
   const objects = [...doorObjects, ...stairObjects];
 
   // Phase 4: Generate cells (floor first, then overlay water)
-  const floorCells = generateCells(rooms, corridorCells, color);
+  const floorCells = generateCells(rooms, corridorCells, floorColor);
 
   // Merge water cells - water overlays floor cells
   const cellMap = new Map();
@@ -2496,7 +2503,7 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
 // EXPORTS
 // =============================================================================
 
-export { generateDungeon, DUNGEON_PRESETS, DUNGEON_STYLES, DEFAULT_FLOOR_COLOR, DEFAULT_WATER_COLOR, DEFAULT_WATER_OPACITY, DIAGONAL_SEGMENTS, // Individual phases
+export { generateDungeon, DUNGEON_PRESETS, DUNGEON_STYLES, DEFAULT_FLOOR_COLOR, DEFAULT_WATER_COLOR, DEFAULT_WATER_OPACITY, DEFAULT_WALL_COLOR, DIAGONAL_SEGMENTS, // Individual phases
   generateRooms, buildConnectionGraph, carveCorridors, carveCorridorsWithDiagonals, carveDiagonalCorridor, generateCells, selectWaterRooms, generateWaterCells, // Utilities
   getRoomCenter, getRoomCells, getRoomDistance, isCellInRoom, isCellInRoomRect, isCellAdjacentToRoom, carveCorridorBetween, canUseDiagonalCorridor, getDiagonalDirection, findDoorCandidates, findDoorPositions, generateDoorObjects, findEntryExitRooms, generateStairObjects, // Door/edge utilities (for testing)
   isAtCorridorIntersection, isCellAdjacentToRoomForOpening, calculateRoomOpeningWidth, generateWallEdgesForCells, generateAllRoomBoundaryEdges };

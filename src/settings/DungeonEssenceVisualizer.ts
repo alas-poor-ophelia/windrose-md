@@ -77,6 +77,7 @@ export class DungeonEssenceVisualizer {
   state: DungeonState | null;
   resizeObserver: ResizeObserver;
   colors: Record<string, string>;
+  tint: Partial<Record<'node' | 'nodePulse' | 'line' | 'lineSolid', string>> | null;
   settings: VisualizerSettings;
   width: number;
   stampSize: number;
@@ -89,6 +90,7 @@ export class DungeonEssenceVisualizer {
     this.stampSize = 0;
     this.lastTime = 0;
     this.colors = {};
+    this.tint = null;
     this.settings = {
       size: 'medium',
       circleChance: 0.3,
@@ -139,8 +141,18 @@ export class DungeonEssenceVisualizer {
       node: style.getPropertyValue('--text-muted').trim() || '#888',
       nodePulse: style.getPropertyValue('--interactive-accent').trim() || '#7c5cbf',
       line: style.getPropertyValue('--text-faint').trim() || '#666',
-      lineSolid: style.getPropertyValue('--text-muted').trim() || '#888'
+      lineSolid: style.getPropertyValue('--text-muted').trim() || '#888',
+      ...this.tint
     };
+  }
+
+  /**
+   * Overlay specific animation colors (e.g. a generation style's palette)
+   * on top of the theme-sampled ones. Pass null to clear back to theme colors.
+   */
+  applyTint(tint: Partial<Record<'node' | 'nodePulse' | 'line' | 'lineSolid', string>> | null): void {
+    this.tint = tint;
+    this.sampleColors();
   }
 
   getWindroseSVG(): string {

@@ -1,6 +1,6 @@
 import type { App, Plugin, SettingDefinitionItem } from 'obsidian';
 import { Notice, PluginSettingTab, Setting } from 'obsidian';
-import type { PluginSettings, WindroseFeature } from '#types/settings/settings.types';
+import type { PluginSettings } from '#types/settings/settings.types';
 import type { SectionRef, ObjectSettingsForMapType, ObjectSettingsUpdate } from './tabs/settingsTabContext';
 import { TabRenderCoreMethods } from './tabs/TabRenderCore';
 import { TabRenderSettingsMethods } from './tabs/TabRenderSettings';
@@ -10,7 +10,8 @@ import { TabRenderTilesetsMethods } from './tabs/TabRenderTilesets';
 import { TabRenderTravelPacksMethods } from './tabs/TabRenderTravelPacks';
 import { TabRenderKeyboardShortcutsMethods } from './tabs/TabRenderKeyboardShortcuts';
 import { TabRenderFeaturesMethods } from './tabs/TabRenderFeatures';
-import { FEATURE_DEFINITIONS, isFeatureEnabled } from '../core/featureFlags';
+import { isFeatureEnabled } from '../core/featureFlags';
+import { buildSettingDefinitions, getSettingControlValue, setSettingControlValue } from './settingDefinitions';
 
 interface WindrosePlugin extends Plugin {
   settings: PluginSettings;
@@ -29,6 +30,7 @@ interface WindroseMDSettingsTab {
   renderSearchBar(containerEl: HTMLElement): void;
   renderHexSettingsContent(el: HTMLElement): void;
   renderColorSettingsContent(el: HTMLElement): void;
+  renderMapGenerationSettingsContent(el: HTMLElement): void;
   renderFogOfWarSettingsContent(el: HTMLElement): void;
   renderMapBehaviorSettingsContent(el: HTMLElement): void;
   renderDistanceMeasurementSettingsContent(el: HTMLElement): void;
@@ -162,49 +164,26 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     return details;
   }
 
-  // --- Declarative Settings API spike (Obsidian 1.13+) ---
-  // Gated behind a localStorage flag so shipped builds keep the imperative
-  // display() path until the full migration lands: a non-empty return here
-  // makes 1.13+ render ONLY these definitions and skip display() entirely.
-  // On app < 1.13 nothing calls this method at all.
+  // --- Declarative Settings API (Obsidian 1.13+) ---
+  // Phase 1 (stock-control sections) lives in settingDefinitions.ts.
+  // Still gated behind the localStorage flag: a non-empty return here makes
+  // 1.13+ render ONLY these definitions and skip display() entirely, and the
+  // list sections (Color Palette, Object Types, Travel Packs, Tile Sets) plus
+  // Keyboard Shortcuts don't arrive until Phases 2-3. On app < 1.13 nothing
+  // calls this method at all.
   // Enable:  localStorage.setItem('windrose-declarative-settings-spike', '1')
 
   getSettingDefinitions(): SettingDefinitionItem[] {
     if (window.localStorage.getItem('windrose-declarative-settings-spike') !== '1') return [];
-    return [{
-      type: 'group',
-      heading: 'Features',
-      items: FEATURE_DEFINITIONS.map(def => ({
-        name: def.label,
-        desc: def.desc,
-        control: {
-          type: 'toggle' as const,
-          key: `features.${def.id}`,
-          defaultValue: true
-        }
-      }))
-    }];
+    return buildSettingDefinitions(this);
   }
 
   getControlValue(key: string): unknown {
-    if (key.startsWith('features.')) {
-      const id = key.slice('features.'.length) as WindroseFeature;
-      return this.plugin.settings.features?.[id] ?? true;
-    }
-    // Spike only declares features.* keys; nothing else should reach here.
-    return undefined;
+    return getSettingControlValue(this, key);
   }
 
   async setControlValue(key: string, value: unknown): Promise<void> {
-    if (!key.startsWith('features.')) return;
-    const id = key.slice('features.'.length) as WindroseFeature;
-    this.plugin.settings.features = {
-      ...this.plugin.settings.features,
-      [id]: value === true
-    };
-    // saveSettings() dispatches windrose-settings-changed itself, so open
-    // map views slim down live — same semantics as the imperative path.
-    await this.plugin.saveSettings();
+    await setSettingControlValue(this, key, value);
   }
 
   display(): void {
@@ -247,6 +226,11 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     this.createCollapsibleSection(containerEl, 'Color Palette',
       (el) => this.renderColorPaletteContent(el),
       { open: openSections.has('Color Palette') });
+    if (isFeatureEnabled('dungeonGenerator')) {
+      this.createCollapsibleSection(containerEl, 'Dungeon Generation',
+        (el) => this.renderMapGenerationSettingsContent(el),
+        { open: openSections.has('Dungeon Generation') });
+    }
     if (isFeatureEnabled('fogOfWar')) {
       this.createCollapsibleSection(containerEl, 'Fog of War',
         (el) => this.renderFogOfWarSettingsContent(el),

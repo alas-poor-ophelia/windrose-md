@@ -22,6 +22,7 @@ import type { VNode } from 'preact';
 import { useState } from 'preact/hooks';
 import { useMapState, useMapOperations } from '../../context/MapContext';
 import { generateDungeon } from '../../generation/dungeonGenerator';
+import { resolveDungeonStyleColors } from '../../generation/dungeonStyleColors';
 import type { RoomLike, CorridorResult } from '../../generation/objectPlacer';
 import { stockDungeon } from '../../generation/objectPlacer';
 import { ModalPortal } from '../modals/ModalPortal';
@@ -50,7 +51,16 @@ const RerollDungeonButton = (): VNode | null => {
   };
 
   const handleRerollAll = (): void => {
-    const result = generateDungeon(settings.preset, undefined, (settings.configOverrides ?? {}) as Record<string, unknown>);
+    // Colors stored in the map's recipe win; style-resolved settings colors
+    // fill the gap for maps generated before colors were recorded.
+    const styleColors = resolveDungeonStyleColors(settings.configOverrides?.style);
+    const overrides = {
+      floorColor: styleColors.floor,
+      wallColor: styleColors.wall,
+      waterColor: styleColors.water,
+      ...(settings.configOverrides ?? {})
+    };
+    const result = generateDungeon(settings.preset, undefined, overrides);
     const stockResult = stockDungeon(
       result.metadata.rooms,
       result.metadata.corridorResult,

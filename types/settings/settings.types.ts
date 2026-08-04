@@ -6,6 +6,7 @@
  */
 
 import type { HexColor } from '../core/common.types';
+import type { DungeonStyleName, DungeonStyleColors } from '../core/map.types';
 import type { InstalledPack } from '../content-packs/contentPack.types';
 import type { TravelPack } from './travelPack.types';
 
@@ -191,6 +192,10 @@ export interface PluginSettings {
 
   // Travel packs (rule bundles: units, terrains, modes, allowances)
   travelPacks?: TravelPack[];
+
+  // Dungeon generation default colors per style
+  // (absent style or channel = built-in style default)
+  dungeonStyleColors?: Partial<Record<DungeonStyleName, Partial<DungeonStyleColors>>>;
 
   // Feature gating (absent key or absent record = feature enabled)
   features?: Partial<Record<WindroseFeature, boolean>>;

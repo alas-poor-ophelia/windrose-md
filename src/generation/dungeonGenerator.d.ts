@@ -97,12 +97,14 @@ export function calculateRoomOpeningWidth(
 ): { width: number; cells: CellCoord[] };
 export function generateWallEdgesForCells(
   cells: CellCoord[],
-  alignment: string
+  alignment: string,
+  wallColor?: string
 ): WallEdge[];
 export function generateAllRoomBoundaryEdges(
   rooms: DungeonRoom[],
   corridorCellSet: Set<string>,
-  doorPositions: CellCoord[]
+  doorPositions: CellCoord[],
+  wallColor?: string
 ): WallEdge[];
 export function generateDungeon(
   presetName?: string,
@@ -115,4 +117,5 @@ export const DUNGEON_STYLES: Record<string, { name: string; overrides: Partial<D
 export const DEFAULT_FLOOR_COLOR: string;
 export const DEFAULT_WATER_COLOR: string;
 export const DEFAULT_WATER_OPACITY: number;
+export const DEFAULT_WALL_COLOR: string;
 export const DIAGONAL_SEGMENTS: Record<string, Record<string, boolean>>;

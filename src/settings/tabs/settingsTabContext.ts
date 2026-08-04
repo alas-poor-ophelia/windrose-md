@@ -39,6 +39,10 @@ interface SettingsTabThis {
   noResultsEl: HTMLElement;
   sections: SectionRef[];
 
+  // From SettingTab (Obsidian 1.13 declarative API; only invoked on 1.13+)
+  update(): void;
+  refreshDomState(): void;
+
   // Class methods
   display(): void;
   getObjectSettingsForMapType(): ObjectSettingsForMapType;
@@ -51,6 +55,7 @@ interface SettingsTabThis {
   // Settings mixin
   renderHexSettingsContent(el: HTMLElement): void;
   renderColorSettingsContent(el: HTMLElement): void;
+  renderMapGenerationSettingsContent(el: HTMLElement): void;
   renderFogOfWarSettingsContent(el: HTMLElement): void;
   renderMapBehaviorSettingsContent(el: HTMLElement): void;
   renderDistanceMeasurementSettingsContent(el: HTMLElement): void;

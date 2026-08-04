@@ -162,6 +162,19 @@ export type ColorOpacityOverrides = Record<string, number>;
 // Generation Settings (dungeon generator)
 // ===========================================
 
+/** Dungeon generation style identifiers (mirrors DUNGEON_STYLES in dungeonGenerator.js) */
+export type DungeonStyleName = 'classic' | 'cavern' | 'fortress' | 'crypt';
+
+/** Color channels a generation style can configure */
+export interface DungeonStyleColors {
+  /** Cell fill for floors and corridors */
+  floor: string;
+  /** Wall edge color (room boundaries, wide-opening walls) */
+  wall: string;
+  /** Water feature cell fill */
+  water: string;
+}
+
 export interface DungeonConfigOverrides {
   objectDensity?: number;
   monsterWeight?: number;
@@ -170,6 +183,10 @@ export interface DungeonConfigOverrides {
   trapWeight?: number;
   useTemplates?: boolean;
   style?: string;
+  floorColor?: string;
+  wallColor?: string;
+  waterColor?: string;
+  waterOpacity?: number;
 }
 
 export interface DungeonStockingMetadata {

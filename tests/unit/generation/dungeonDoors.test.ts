@@ -267,6 +267,13 @@ describe("dungeonDoors", () => {
 
       expect(edges[0].color).toBe("#333333");
     });
+
+    it("uses a custom wall color when provided", () => {
+      const cells = [{ x: 5, y: 4 }];
+      const edges = generateWallEdgesForCells(cells, "north", "#463a2b");
+
+      expect(edges[0].color).toBe("#463a2b");
+    });
   });
 
   describe("generateAllRoomBoundaryEdges", () => {
@@ -322,6 +329,17 @@ describe("dungeonDoors", () => {
       const edgeKeys = edges.map((e) => `${e.x},${e.y},${e.side}`);
       const uniqueKeys = new Set(edgeKeys);
       expect(edgeKeys.length).toBe(uniqueKeys.size);
+    });
+
+    it("uses a custom wall color when provided", () => {
+      const rooms = [createRoom("room1", 5, 5, 3, 3)];
+      const corridorCellSet = createCorridorSet([{ x: 6, y: 4 }]);
+      const doorPositions: CellCoord[] = [];
+
+      const edges = generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions, "#23272c");
+
+      expect(edges.length).toBeGreaterThan(0);
+      expect(edges.every((e) => e.color === "#23272c")).toBe(true);
     });
 
     it("returns empty array when no corridor cells adjacent to rooms", () => {

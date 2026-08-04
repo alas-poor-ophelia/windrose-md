@@ -1025,6 +1025,20 @@
   color: var(--text-on-accent);
 }
 
+.windrose-dungeon-style-swatches {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.windrose-dungeon-style-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid var(--background-modifier-border);
+}
+
 .windrose-dungeon-distance-row {
   display: flex;
   gap: 8px;
