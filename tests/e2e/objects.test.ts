@@ -32,7 +32,7 @@ test("Object can be placed on grid map", async ({ page }) => {
 
     // Activate the Add Object tool
     await waitForToolPalette(page);
-    const addObjectBtn = page.locator('.windrose-tool-btn[title*="Add Object"]');
+    const addObjectBtn = page.locator('.windrose-tool-btn[aria-label*="Add Object"]');
     const addBtnExists = await addObjectBtn.count() > 0;
 
     if (addBtnExists) {
@@ -140,7 +140,7 @@ test("Add Object tool activates correctly", async ({ page }) => {
   await waitForToolPalette(page);
 
   // Click the Add Object tool button
-  const addObjectBtn = page.locator('.windrose-tool-btn[title*="Add Object"]');
+  const addObjectBtn = page.locator('.windrose-tool-btn[aria-label*="Add Object"]');
   await addObjectBtn.click();
   await page.waitForTimeout(200);
 

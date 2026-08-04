@@ -45,7 +45,7 @@ test("Measure tool can be activated", async ({ page }) => {
   await selectToolByTitle(page, "Measure");
 
   // Verify it's active
-  const measureToolBtn = page.locator('.windrose-tool-btn[title*="Measure"]');
+  const measureToolBtn = page.locator('.windrose-tool-btn[aria-label*="Measure"]');
   const classes = await measureToolBtn.getAttribute("class");
   expect(classes).toContain("windrose-tool-btn-active");
 

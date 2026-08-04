@@ -14,6 +14,7 @@ import { CornerBrackets } from '../shared/CornerBrackets';
 import { getSettings } from '../../core/settingsAccessor';
 import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
 import { Icon } from '../shared/Icon';
+import { tooltipRef } from '../shared/obsidianTooltip';
 
 
 
@@ -151,13 +152,13 @@ const SubMenuFlyout = ({ subTools, currentSubTool, onSelect, onClose, fixedAncho
       {subTools.map(subTool => (
         <button
           key={subTool.id}
+          ref={tooltipRef(titleWithShortcut(subTool.title, subTool.actionId, subTool.shortcut))}
           className={`windrose-subtool-option interactive-child ${currentSubTool === subTool.id ? 'windrose-subtool-option-active' : ''}`}
           onClick={(e) => {
             e.stopPropagation();
             onSelect(subTool.id);
             onClose();
           }}
-          title={titleWithShortcut(subTool.title, subTool.actionId, subTool.shortcut)}
         >
           <Icon icon={subTool.icon} />
           <span>{subTool.label}</span>
@@ -254,16 +255,18 @@ const ToolButtonWithSubMenu = ({
     onToolSelect(subToolId);
   };
 
+  const buttonTooltip = titleWithShortcut(currentSubToolDef.title, currentSubToolDef.actionId ?? toolGroup.actionId, currentSubToolDef.shortcut ?? toolGroup.shortcut);
+  const buttonTooltipRef = tooltipRef(buttonTooltip, { placement: vertical ? 'right' : 'top' });
+
   return (
     <div className="windrose-tool-btn-container">
       <button
-        ref={buttonRef}
+        ref={(el) => { buttonRef.current = el; buttonTooltipRef(el); }}
         className={`windrose-tool-btn interactive-child ${isActive ? 'windrose-tool-btn-active' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
         onContextMenu={handleContextMenu}
-        title={titleWithShortcut(currentSubToolDef.title, currentSubToolDef.actionId ?? toolGroup.actionId, currentSubToolDef.shortcut ?? toolGroup.shortcut)}
       >
         <Icon icon={currentSubToolDef?.icon} />
         {hasMultipleSubTools && (
@@ -581,9 +584,9 @@ const ToolPalette = ({
       {visibleSimpleTools.map(tool => (
         <button
           key={tool.id}
+          ref={tooltipRef(titleWithShortcut(tool.title, tool.actionId, tool.shortcut), { placement: vertical ? 'right' : 'top' })}
           className={`windrose-tool-btn interactive-child ${currentTool === tool.id ? 'windrose-tool-btn-active' : ''}`}
           onClick={() => onToolChange(tool.id)}
-          title={titleWithShortcut(tool.title, tool.actionId, tool.shortcut)}
         >
           <Icon icon={tool.icon} />
         </button>
@@ -591,18 +594,18 @@ const ToolPalette = ({
 
       <div className="windrose-history-controls">
         <button
+          ref={tooltipRef('Undo', { placement: vertical ? 'right' : 'top' })}
           className="windrose-history-btn interactive-child"
           onClick={onUndo}
           disabled={!canUndo}
-          title="Undo"
         >
           <Icon icon="lucide-undo" />
         </button>
         <button
+          ref={tooltipRef('Redo', { placement: vertical ? 'right' : 'top' })}
           className="windrose-history-btn interactive-child"
           onClick={onRedo}
           disabled={!canRedo}
-          title="Redo"
         >
           <Icon icon="lucide-redo" />
         </button>

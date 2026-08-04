@@ -227,21 +227,23 @@ export async function selectToolByIndex(page: any, index: number): Promise<void>
 
 /**
  * Map a loose tool title pattern to a precise, non-colliding selector.
- * The wall tool's title is "Draw Wall/Path (select from Walls tab)", which
- * collides with a `[title*="Draw"]` match against the paint tool
- * ("Draw (fill cells)"). Normalize common patterns to unambiguous ones.
+ * Tool buttons carry their label in `aria-label` (set by Obsidian's
+ * setTooltip; the legacy `title` attribute was removed to avoid double
+ * tooltips). The wall tool's label is "Draw Wall/Path (select from Walls
+ * tab)", which collides with an `[aria-label*="Draw"]` match against the
+ * paint tool ("Draw (fill cells)"). Normalize common patterns.
  */
 function toolTitleSelector(titlePattern: string): string {
   const p = titlePattern.toLowerCase();
   // "Draw" alone (or "Draw (fill cells)") should mean the paint/fill tool,
   // NOT the wall tool. Disambiguate via "fill cells".
   if (p === "draw" || p.includes("fill cells")) {
-    return `.windrose-tool-btn[title*="fill cells"]`;
+    return `.windrose-tool-btn[aria-label*="fill cells"]`;
   }
   if (p.includes("wall")) {
-    return `.windrose-tool-btn[title*="Wall"]`;
+    return `.windrose-tool-btn[aria-label*="Wall"]`;
   }
-  return `.windrose-tool-btn[title*="${titlePattern}"]`;
+  return `.windrose-tool-btn[aria-label*="${titlePattern}"]`;
 }
 
 /** Select a tool by title attribute */

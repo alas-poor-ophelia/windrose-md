@@ -51,7 +51,7 @@ test("E key activates erase tool", async ({ page }) => {
   await page.waitForTimeout(200);
 
   // Erase tool should be active (look for the eraser icon button)
-  const eraseToolBtn = page.locator('.windrose-tool-btn[title*="Erase"]');
+  const eraseToolBtn = page.locator('.windrose-tool-btn[aria-label*="Erase"]');
   const classes = await eraseToolBtn.getAttribute("class");
   expect(classes).toContain("windrose-tool-btn-active");
 
@@ -100,7 +100,7 @@ test("M key activates measure tool", async ({ page }) => {
   await page.waitForTimeout(200);
 
   // Measure tool button should be active (look for ruler icon button)
-  const measureToolBtn = page.locator('.windrose-tool-btn[title*="Measure"]');
+  const measureToolBtn = page.locator('.windrose-tool-btn[aria-label*="Measure"]');
   const classes = await measureToolBtn.getAttribute("class");
   expect(classes).toContain("windrose-tool-btn-active");
 

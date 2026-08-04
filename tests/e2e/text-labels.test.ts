@@ -31,7 +31,7 @@ test("Text label tool can be selected", async ({ page }) => {
   await waitForToolPalette(page);
   await selectToolByTitle(page, "Add Text");
 
-  const textToolBtn = page.locator('.windrose-tool-btn[title*="Add Text"]');
+  const textToolBtn = page.locator('.windrose-tool-btn[aria-label*="Add Text"]');
   const classes = await textToolBtn.getAttribute("class") || "";
   expect(classes).toContain("windrose-tool-btn-active");
 

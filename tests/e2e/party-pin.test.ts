@@ -37,7 +37,7 @@ test("Party pin tool activates as a Pin group subtool", async ({ page }) => {
   await selectSubTool(page, "Note Pin", "Beacon");
 
   // The group button now carries the party pin identity and active state
-  const toolBtn = page.locator('.windrose-tool-btn[title*="Beacon"]');
+  const toolBtn = page.locator('.windrose-tool-btn[aria-label*="Beacon"]');
   const classes = await toolBtn.getAttribute("class");
   expect(classes).toContain("windrose-tool-btn-active");
 

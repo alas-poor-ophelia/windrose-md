@@ -142,7 +142,7 @@ test("Erasing a cell decreases cell count in data", async ({ page }) => {
   expect(countAfterPaint).toBeGreaterThan(0);
 
   // Now erase at the same position
-  const eraseToolBtn = page.locator('.windrose-tool-btn[title*="Erase"]');
+  const eraseToolBtn = page.locator('.windrose-tool-btn[aria-label*="Erase"]');
   await eraseToolBtn.click();
   await page.waitForTimeout(100);
   await page.mouse.click(center.x, center.y);
@@ -173,7 +173,7 @@ test("Rectangle fill creates multiple cells in data", async ({ page }) => {
   await waitForToolPalette(page);
 
   // Select rectangle tool (look for it by title to be precise)
-  const rectToolBtn = page.locator('.windrose-tool-btn[title*="Rectangle"]');
+  const rectToolBtn = page.locator('.windrose-tool-btn[aria-label*="Rectangle"]');
   await rectToolBtn.waitFor({ state: "visible", timeout: 5000 });
   await rectToolBtn.click();
   await page.waitForTimeout(100);

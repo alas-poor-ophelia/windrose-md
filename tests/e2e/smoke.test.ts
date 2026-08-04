@@ -319,7 +319,7 @@ test("Object rotation via toolbar button rotates 45 degrees", async ({ page }) =
   await waitForContainer(page);
   await waitForToolPalette(page);
 
-  const addObjectBtn = page.locator('.windrose-tool-btn[title*="Add Object"]');
+  const addObjectBtn = page.locator('.windrose-tool-btn[aria-label*="Add Object"]');
   await addObjectBtn.click();
   await page.waitForTimeout(200);
 
@@ -337,7 +337,7 @@ test("Object rotation via toolbar button rotates 45 degrees", async ({ page }) =
   await page.mouse.click(centerX, centerY);
   await page.waitForTimeout(500);
 
-  const selectToolBtn = page.locator('.windrose-tool-btn[title*="Select"]');
+  const selectToolBtn = page.locator('.windrose-tool-btn[aria-label*="Select"]');
   await selectToolBtn.click();
   await page.waitForTimeout(200);
   await page.mouse.click(centerX, centerY);
@@ -361,7 +361,7 @@ test("Object rotation via R key rotates 45 degrees", async ({ page }) => {
   await waitForContainer(page);
   await waitForToolPalette(page);
 
-  const addObjectBtn = page.locator('.windrose-tool-btn[title*="Add Object"]');
+  const addObjectBtn = page.locator('.windrose-tool-btn[aria-label*="Add Object"]');
   await addObjectBtn.click();
   await page.waitForTimeout(200);
 
@@ -379,7 +379,7 @@ test("Object rotation via R key rotates 45 degrees", async ({ page }) => {
   await page.mouse.click(centerX, centerY);
   await page.waitForTimeout(500);
 
-  const selectToolBtn = page.locator('.windrose-tool-btn[title*="Select"]');
+  const selectToolBtn = page.locator('.windrose-tool-btn[aria-label*="Select"]');
   await selectToolBtn.click();
   await page.waitForTimeout(200);
   await page.mouse.click(centerX, centerY);
