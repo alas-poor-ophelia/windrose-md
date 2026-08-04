@@ -12,7 +12,7 @@ import type { VNode } from 'preact';
 import { useState, useMemo } from 'preact/hooks';
 import { ColorPicker } from '../shared/ColorPicker';
 import { CollapsibleSection } from '../shared/CollapsibleSection';
-import { useAppearance, useModalShell } from '../../context/MapSettingsContext';
+import { useAppearance } from '../../context/MapSettingsContext';
 import type { SettingsOverrides } from '../../context/MapSettingsContext';
 import { resolveThemeColor } from '../../core/dmtConstants';
 import { SettingItem } from './SettingItem';
@@ -267,7 +267,6 @@ function FogOfWarSection(): VNode {
  * Appearance tab content
  */
 function AppearanceTab(): VNode {
-  const { mapType } = useModalShell();
   const {
     useGlobalSettings,
     overrides,
@@ -345,31 +344,29 @@ function AppearanceTab(): VNode {
         </div>
       </div>
 
-      {mapType === 'grid' && (
-        <SettingItem
-          name={`Grid Line Width: ${overrides.gridLineWidth ?? 1}px`}
-          description="Thickness of the grid lines (1-5 pixels)"
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: useGlobalSettings ? 0.5 : 1 }}>
-            <NativeSlider
-              min={1}
-              max={5}
-              value={overrides.gridLineWidth ?? 1}
-              onChange={(val: number) => handleLineWidthChange(val)}
-              disabled={useGlobalSettings}
-            />
-            <button
-              class="windrose-color-reset-btn"
-              disabled={useGlobalSettings}
-              onClick={() => !useGlobalSettings && handleLineWidthChange(1)}
-              title="Reset to default (1px)"
-              style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
-            >
-              <Icon icon="lucide-rotate-ccw" />
-            </button>
-          </div>
-        </SettingItem>
-      )}
+      <SettingItem
+        name={`Grid Line Width: ${overrides.gridLineWidth ?? 1}px`}
+        description="Thickness of the grid lines (1-5 pixels)"
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: useGlobalSettings ? 0.5 : 1 }}>
+          <NativeSlider
+            min={1}
+            max={5}
+            value={overrides.gridLineWidth ?? 1}
+            onChange={(val: number) => handleLineWidthChange(val)}
+            disabled={useGlobalSettings}
+          />
+          <button
+            class="windrose-color-reset-btn"
+            disabled={useGlobalSettings}
+            onClick={() => !useGlobalSettings && handleLineWidthChange(1)}
+            title="Reset to default (1px)"
+            style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
+          >
+            <Icon icon="lucide-rotate-ccw" />
+          </button>
+        </div>
+      </SettingItem>
 
       <FogOfWarSection />
 

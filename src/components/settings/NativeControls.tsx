@@ -47,9 +47,14 @@ function useNativeControl<C extends ValueComponent<V>, V>({ value, onChange, dis
       const setting = new Setting(tempContainer);
       const control = create(setting, (newVal: V) => onChangeRef.current(newVal));
 
-      // Move just the control element into our container
-      if (control != null && setting.controlEl.firstChild) {
-        containerRef.current.appendChild(setting.controlEl.firstChild);
+      // Move the control's elements into our container. Move ALL children,
+      // not just the first: Obsidian 1.13's addSlider creates a value span
+      // BEFORE the input (span.slider-value + input.slider) — taking only
+      // firstChild grabs the span and discards the slider itself.
+      if (control != null) {
+        while (setting.controlEl.firstChild) {
+          containerRef.current.appendChild(setting.controlEl.firstChild);
+        }
       }
 
       controlRef.current = control;
