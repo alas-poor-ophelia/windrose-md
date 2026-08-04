@@ -67,6 +67,8 @@ export interface Edge {
   side: 'right' | 'bottom';
   color: string;
   opacity?: number;
+  /** Stroke thickness in screen px. Absent = automatic (theme-derived) width. */
+  width?: number;
 }
 
 // ===========================================

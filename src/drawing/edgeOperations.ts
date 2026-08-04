@@ -53,6 +53,8 @@ export interface EdgeTemplate {
   y: number;
   side: EdgeSideNormalized;
   color: HexColor | null;
+  /** Stroke thickness in screen px. Absent = automatic (theme-derived) width. */
+  width?: number;
 }
 
 /** Partial edge for updates */
@@ -116,7 +118,10 @@ function getEdgeAt(
 }
 
 /**
- * Add edge or update color if edge already exists
+ * Add edge or update color if edge already exists.
+ * `width` is the per-stroke thickness in screen px; undefined means automatic
+ * (theme-derived) width. Repainting an edge restamps width — painting with
+ * automatic width clears a previously stored explicit width.
  */
 function addEdge(
   edges: Edge[] | null | undefined,
@@ -124,33 +129,40 @@ function addEdge(
   y: number,
   side: EdgeSideInput,
   color: HexColor,
-  opacity: number = 1
+  opacity: number = 1,
+  width?: number
 ): Edge[] {
   // Validate inputs - return unchanged array if invalid
   if (typeof x !== 'number' || typeof y !== 'number' || !side || !color) {
     return edges ?? [];
   }
-  
+
   const edgeArray = edges ?? [];
   const normalized = normalizeEdge(x, y, side);
   const existing = getEdgeAt(edgeArray, x, y, side);
-  
+
   if (existing) {
-    // Update existing edge color and opacity
-    return edgeArray.map(e => 
-      e.id === existing.id ? { ...e, color, opacity } : e
-    );
+    // Update existing edge color, opacity, and width (repaint restamps all)
+    return edgeArray.map(e => {
+      if (e.id !== existing.id) return e;
+      const updated: Edge = { ...e, color, opacity };
+      if (width != null) updated.width = width;
+      else delete updated.width;
+      return updated;
+    });
   }
-  
+
   // Add new edge
-  return [...edgeArray, {
+  const created: Edge = {
     id: generateEdgeId(),
     x: normalized.x,
     y: normalized.y,
     side: normalized.side,
     color,
     opacity
-  }];
+  };
+  if (width != null) created.width = width;
+  return [...edgeArray, created];
 }
 
 /**
@@ -215,26 +227,32 @@ function generateEdgeLine(
   startY: number,
   endX: number,
   endY: number,
-  color: HexColor | null
+  color: HexColor | null,
+  width?: number
 ): EdgeTemplate[] {
   const result: EdgeTemplate[] = [];
-  
+
+  const push = (normalized: NormalizedEdge): void => {
+    const template: EdgeTemplate = {
+      x: normalized.x,
+      y: normalized.y,
+      side: normalized.side,
+      color
+    };
+    if (width != null) template.width = width;
+    result.push(template);
+  };
+
   if (startX === endX) {
     // Vertical line at intersection column startX
     // This paints the 'right' edges of cells in column (startX - 1)
     const minY = Math.min(startY, endY);
     const maxY = Math.max(startY, endY);
     const cellX = startX - 1; // The cell column whose right edges we're painting
-    
+
     // Paint edges from minY to maxY-1 (edges between intersections)
     for (let y = minY; y < maxY; y++) {
-      const normalized = normalizeEdge(cellX, y, 'right');
-      result.push({ 
-        x: normalized.x, 
-        y: normalized.y, 
-        side: normalized.side, 
-        color 
-      });
+      push(normalizeEdge(cellX, y, 'right'));
     }
   } else if (startY === endY) {
     // Horizontal line at intersection row startY
@@ -242,20 +260,14 @@ function generateEdgeLine(
     const minX = Math.min(startX, endX);
     const maxX = Math.max(startX, endX);
     const cellY = startY - 1; // The cell row whose bottom edges we're painting
-    
+
     // Paint edges from minX to maxX-1 (edges between intersections)
     for (let x = minX; x < maxX; x++) {
-      const normalized = normalizeEdge(x, cellY, 'bottom');
-      result.push({ 
-        x: normalized.x, 
-        y: normalized.y, 
-        side: normalized.side, 
-        color 
-      });
+      push(normalizeEdge(x, cellY, 'bottom'));
     }
   }
   // If neither same x nor same y, return empty (diagonal not supported)
-  
+
   return result;
 }
 
@@ -268,7 +280,7 @@ function mergeEdges(edges: Edge[] | null | undefined, newEdges: EdgeTemplate[]):
   
   for (const edge of newEdges) {
     if (edge.color !== null) {
-      result = addEdge(result, edge.x, edge.y, edge.side, edge.color);
+      result = addEdge(result, edge.x, edge.y, edge.side, edge.color, 1, edge.width);
     }
   }
   

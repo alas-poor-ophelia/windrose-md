@@ -283,18 +283,21 @@ const gridRenderer = {
     if (edges == null || edges.length === 0) return;
     
     const scaledSize = geometry.getScaledCellSize(viewState.zoom);
-    // Edge thickness: slightly thicker than grid lines for visibility
-    // Use 2.5x grid line width, clamped between 2 and borderWidth
+    // Default edge thickness: slightly thicker than grid lines for visibility
+    // Use 2.5x grid line width, clamped between 2 and borderWidth. Edges that
+    // carry their own width (per-stroke thickness) override this per edge.
     const baseWidth = style.lineWidth ?? 1;
-    const edgeWidth = Math.min(Math.max(2, baseWidth * 2.5), style.borderWidth ?? 4);
-    const halfWidth = edgeWidth / 2;
-    
+    const autoWidth = Math.min(Math.max(2, baseWidth * 2.5), style.borderWidth ?? 4);
+
     for (const edge of edges) {
       // Skip malformed edges
       if (edge == null || typeof edge.x !== 'number' || typeof edge.y !== 'number' || edge.side == null || edge.color == null) {
         continue;
       }
-      
+
+      const edgeWidth = typeof edge.width === 'number' && edge.width > 0 ? edge.width : autoWidth;
+      const halfWidth = edgeWidth / 2;
+
       const { screenX, screenY } = geometry.gridToScreen(
         edge.x,
         edge.y,

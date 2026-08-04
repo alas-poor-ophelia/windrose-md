@@ -27,6 +27,8 @@ interface UseEdgeDragToolOptions {
   geometry: ExtendedGeometry | null;
   selectedColor: string;
   selectedOpacity: number;
+  /** Per-stroke edge thickness in px; null = automatic (theme-derived). */
+  edgeWidth?: number | null;
   screenToWorld: MapStateContextValue['screenToWorld'];
   getClientCoords: MapStateContextValue['getClientCoords'];
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
@@ -45,7 +47,7 @@ interface UseEdgeDragToolResult {
 
 function useEdgeDragTool({
   currentTool, mapData, geometry, selectedColor, selectedOpacity,
-  screenToWorld, getClientCoords, onEdgesChange
+  edgeWidth = null, screenToWorld, getClientCoords, onEdgesChange
 }: UseEdgeDragToolOptions): UseEdgeDragToolResult {
 
   const [edgeIsDrawing, setEdgeIsDrawing] = useState<boolean>(false);
@@ -65,7 +67,7 @@ function useEdgeDragTool({
     const isBatchedStroke = strokeInitialEdgesRef.current !== null;
 
     if (shouldPaint) {
-      const newEdges = addEdge(activeLayer.edges, x, y, side, selectedColor, selectedOpacity);
+      const newEdges = addEdge(activeLayer.edges, x, y, side, selectedColor, selectedOpacity, edgeWidth ?? undefined);
       onEdgesChange(newEdges, isBatchedStroke);
     } else {
       const newEdges = removeEdge(activeLayer.edges, x, y, side);

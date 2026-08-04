@@ -51,6 +51,8 @@ interface UseShapeToolsOptions {
   currentTool: ToolId;
   selectedColor: string;
   selectedOpacity: number;
+  /** Per-stroke edge thickness in px; null = automatic (theme-derived). */
+  edgeWidth?: number | null;
   previewSettings: PreviewSettings;
   mapData: MapData | null;
   geometry: ExtendedGeometry | null;
@@ -96,7 +98,7 @@ interface UseShapeToolsResult {
 }
 
 function useShapeTools({
-  currentTool, selectedColor, selectedOpacity, previewSettings,
+  currentTool, selectedColor, selectedOpacity, edgeWidth = null, previewSettings,
   mapData, geometry, screenToWorld, getClientCoords,
   onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
   removeObjectsInRectangle
@@ -201,10 +203,10 @@ function useShapeTools({
       lineX1 = x1; lineY1 = y1; lineX2 = x1; lineY2 = y2;
     }
 
-    const newEdgesData = generateEdgeLine(lineX1, lineY1, lineX2, lineY2, selectedColor);
+    const newEdgesData = generateEdgeLine(lineX1, lineY1, lineX2, lineY2, selectedColor, edgeWidth ?? undefined);
     const newEdges = mergeEdges(activeLayer.edges, newEdgesData);
     onEdgesChange(newEdges);
-  }, [mapData, geometry, selectedColor, onEdgesChange]);
+  }, [mapData, geometry, selectedColor, edgeWidth, onEdgesChange]);
 
   const updateShapeHover = useCallback((gridX: number, gridY: number): void => {
     if (touchConfirmPending) return;

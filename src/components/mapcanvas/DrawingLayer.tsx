@@ -11,7 +11,7 @@ import type { HexColor } from '#types/core/common.types';
 import type { EffectiveDistanceSettings } from '#types/hooks/distanceMeasurement.types';
 import type { ShapeStart, DragStartContext } from '#types/hooks/drawingTools.types';
 
-import { useCallback, useEffect, useMemo } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { useDrawingTools } from '../../hooks/drawing/useDrawingTools';
 import { useMapState } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
@@ -101,6 +101,12 @@ const DrawingLayer = ({
     return getEffectiveDistanceSettings(mapType, settings, mapDistanceOverrides);
   }, [mapData?.mapType, globalSettings, mapDistanceOverrides]);
 
+  // Per-stroke edge thickness for the edge/line tools. Session-scoped (the
+  // Outline-toolbar pattern): null = automatic theme-derived width, so maps
+  // drawn before this control existed keep rendering unchanged.
+  const [edgeWidth, setEdgeWidth] = useState<number | null>(null);
+  const isEdgeWidthTool = currentTool === 'edgeDraw' || currentTool === 'edgeLine';
+
   const {
     isDrawing,
     rectangleStart,
@@ -128,7 +134,7 @@ const DrawingLayer = ({
     segmentHoverInfo,
     updateSegmentHover,
     clearSegmentHover
-  } = useDrawingTools(currentTool, selectedColor ?? '', selectedOpacity, previewSettings);
+  } = useDrawingTools(currentTool, selectedColor ?? '', selectedOpacity, previewSettings, edgeWidth);
 
   const handleStopDrawing = useCallback(() => {
     if (currentTool === 'edgeDraw' || currentTool === 'edgeErase') {
@@ -363,6 +369,35 @@ const DrawingLayer = ({
     <>
       {renderStartMarker()}
       {renderShapePreview()}
+
+      {/* Thickness toolbar for the edge/line tools (Outline floating-bar pattern) */}
+      {isEdgeWidthTool && (
+        <div className="windrose-floating-bar">
+          <span className="windrose-floating-bar-label">Thickness</span>
+          <input
+            type="range"
+            min="1"
+            max="12"
+            step="1"
+            value={edgeWidth ?? 3}
+            onInput={(e) => setEdgeWidth(parseInt((e.target as HTMLInputElement).value, 10))}
+            title={edgeWidth != null ? `Thickness: ${edgeWidth}px` : 'Thickness: automatic'}
+            style={{ width: '80px', minHeight: '28px' }}
+          />
+          <span className="windrose-floating-bar-label-faint">
+            {edgeWidth != null ? `${edgeWidth}px` : 'Auto'}
+          </span>
+          {edgeWidth != null && (
+            <button
+              className="windrose-floating-bar-btn"
+              onClick={() => setEdgeWidth(null)}
+              title="Reset to automatic thickness"
+            >
+              Auto
+            </button>
+          )}
+        </div>
+      )}
 
       {currentTool === 'segmentDraw' && segmentHoverInfo && (
         <SegmentHoverOverlay

@@ -51,7 +51,8 @@ const useDrawingTools = (
   currentTool: ToolId,
   selectedColor: string,
   selectedOpacity: number = 1,
-  previewSettings: PreviewSettings = { kbmEnabled: true, touchEnabled: false }
+  previewSettings: PreviewSettings = { kbmEnabled: true, touchEnabled: false },
+  edgeWidth: number | null = null
 ): UseDrawingToolsResult => {
   const {
     geometry,
@@ -87,7 +88,7 @@ const useDrawingTools = (
   });
 
   const edgeDrag = useEdgeDragTool({
-    currentTool, mapData, geometry, selectedColor, selectedOpacity,
+    currentTool, mapData, geometry, selectedColor, selectedOpacity, edgeWidth,
     screenToWorld, getClientCoords, onEdgesChange
   });
 
@@ -97,7 +98,7 @@ const useDrawingTools = (
   });
 
   const shapes = useShapeTools({
-    currentTool, selectedColor, selectedOpacity, previewSettings,
+    currentTool, selectedColor, selectedOpacity, edgeWidth, previewSettings,
     mapData, geometry, screenToWorld, getClientCoords,
     onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
     removeObjectsInRectangle

@@ -220,6 +220,30 @@ describe("edgeOperations", () => {
       expect(result[0].opacity).toBe(0.5);
     });
 
+    it("omits width by default (automatic thickness)", () => {
+      const result = addEdge([], 5, 3, "right", "#ff0000");
+      expect("width" in result[0]).toBe(false);
+    });
+
+    it("stamps explicit width on new edges", () => {
+      const result = addEdge([], 5, 3, "right", "#ff0000", 1, 6);
+      expect(result[0].width).toBe(6);
+    });
+
+    it("restamps width when repainting an existing edge", () => {
+      const edges = addEdge([], 5, 3, "right", "#ff0000", 1, 6);
+      const result = addEdge(edges, 5, 3, "right", "#00ff00", 1, 2);
+      expect(result).toHaveLength(1);
+      expect(result[0].width).toBe(2);
+    });
+
+    it("clears stored width when repainting with automatic thickness", () => {
+      const edges = addEdge([], 5, 3, "right", "#ff0000", 1, 6);
+      const result = addEdge(edges, 5, 3, "right", "#00ff00", 1);
+      expect(result).toHaveLength(1);
+      expect("width" in result[0]).toBe(false);
+    });
+
     it("handles null edges", () => {
       const result = addEdge(null, 5, 3, "right", "#ff0000");
       expect(result).toHaveLength(1);
@@ -448,6 +472,18 @@ describe("edgeOperations", () => {
         expect(result).toHaveLength(2);
         expect(result[0].x).toBe(-3);
       });
+
+      it("omits width by default (automatic thickness)", () => {
+        const result = generateEdgeLine(0, 3, 3, 3, "#ff0000");
+        expect(result).toHaveLength(3);
+        expect(result.every(t => !("width" in t))).toBe(true);
+      });
+
+      it("stamps explicit width on every template", () => {
+        const result = generateEdgeLine(0, 3, 3, 3, "#ff0000", 5);
+        expect(result).toHaveLength(3);
+        expect(result.every(t => t.width === 5)).toBe(true);
+      });
     });
   });
 
@@ -474,6 +510,16 @@ describe("edgeOperations", () => {
       const result = mergeEdges(existing, newEdges);
 
       expect(result).toHaveLength(2);
+    });
+
+    it("carries template width through to created edges", () => {
+      const newEdges = [
+        { x: 0, y: 0, side: "right" as const, color: "#ff0000" as const, width: 7 },
+      ];
+      const result = mergeEdges([], newEdges);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].width).toBe(7);
     });
 
     it("updates existing edge colors", () => {
