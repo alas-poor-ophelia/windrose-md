@@ -7461,6 +7461,14 @@ button.windrose-edge-rail-btn.on {
   background: oklch(from var(--windrose-gold-bright) l c h/0.12);
 }
 
+/* Divider between panel icons and action icons (e.g. map settings) */
+.windrose-edge-rail-divider {
+  width: 22px;
+  height: 1px;
+  margin: 2px 0;
+  background: oklch(from var(--windrose-border-primary) l c h/0.35);
+}
+
 .windrose-edge-rail-drawer {
   /* Layout/chrome only — width, opacity, visibility and the fold transition are
      driven inline from EdgeRail.tsx (the DrawerDock pattern), because a
@@ -11966,31 +11974,30 @@ button.windrose-dock-panel-collapse:hover {
   color: var(--windrose-bg-primary);
 }
 
-/* Footer with settings button */
-.windrose-dock-view-footer {
-  padding-top: 4px;
-  border-top: 1px solid oklch(from var(--windrose-border-primary) l c h/0.15);
-}
-
-.windrose-dock-view-settings {
+/* Map settings — standalone action row at the bottom of the dock column
+   (moved out of the View panel, windrose-5cx). `button.` prefix beats
+   Obsidian's `button:not(.clickable-icon)` fill/bevel (see edge-rail note). */
+button.windrose-dock-settings-btn {
   display: flex;
   align-items: center;
   gap: 6px;
   width: 100%;
-  padding: 4px 8px;
-  border: none;
-  border-radius: 3px;
+  margin-top: 4px;
+  padding: 5px 10px;
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.15);
+  border-radius: 4px;
   background: transparent;
+  box-shadow: none;
   color: var(--windrose-text-muted);
   font-size: 11px;
   cursor: pointer;
   transition: var(--windrose-transition);
   line-height: 0;
 }
-.windrose-dock-view-settings span {
+button.windrose-dock-settings-btn span {
   line-height: normal;
 }
-.windrose-dock-view-settings:hover {
+button.windrose-dock-settings-btn:hover {
   background: oklch(from var(--windrose-border-primary) l c h/0.12);
   color: var(--windrose-text-secondary);
 }
@@ -12032,16 +12039,16 @@ button.windrose-dock-panel-collapse:hover {
   color: var(--windrose-bg-primary);
 }
 
-.is-tablet button.windrose-dock-view-settings {
+.is-tablet button.windrose-dock-settings-btn {
   width: 100%;
   height: auto;
   min-height: 0;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
-  border: none;
-  border-radius: 3px;
+  padding: 5px 10px;
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.15);
+  border-radius: 4px;
   background: transparent;
   box-shadow: none;
   color: var(--windrose-text-muted);

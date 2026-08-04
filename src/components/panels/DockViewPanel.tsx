@@ -44,7 +44,6 @@ interface DockViewPanelProps {
   layerVisibility: LayerVisibility;
   onToggleLayer: (layerId: keyof LayerVisibility) => void;
   mapType: MapType;
-  onSettingsClick: () => void;
   fogOfWarState: FogOfWarState;
   onFogToolSelect: (tool: FogToolId) => void;
   onFogVisibilityToggle: () => void;
@@ -59,7 +58,6 @@ const DockViewPanel = ({
   layerVisibility,
   onToggleLayer,
   mapType,
-  onSettingsClick,
   fogOfWarState,
   onFogToolSelect,
   onFogVisibilityToggle,
@@ -171,17 +169,6 @@ const DockViewPanel = ({
         </div>
       </div>
       )}
-
-      <div className="windrose-dock-view-footer">
-        <button
-          className="windrose-dock-view-settings"
-          onClick={onSettingsClick}
-          title="Map settings"
-        >
-          <Icon icon="lucide-settings" size={14} />
-          <span>Settings</span>
-        </button>
-      </div>
     </div>
   );
 };

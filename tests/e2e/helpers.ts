@@ -411,18 +411,13 @@ export async function expandObjectSidebarIfNeeded(page: any): Promise<void> {
 
 /**
  * Open the map settings modal.
- * In block/embed mode the old `.windrose-controls` hover → `.windrose-expand-btn`
- * settings button is gone (MapControls renders with `minimalControls`). Settings
- * now lives in the left EdgeRail's "View" panel as `.windrose-dock-view-settings`.
+ * In block/embed mode settings is a direct-action icon on the left EdgeRail
+ * (below the panel icons, after a divider) — it opens the modal without any
+ * flyout. The old View-panel footer button (`.windrose-dock-view-settings`)
+ * was removed when the button moved (windrose-5cx).
  */
 export async function openSettingsModal(page: any): Promise<void> {
-  // Open the View panel from the EdgeRail
-  const viewRailBtn = page.locator('.windrose-edge-rail-btn[title="View"]');
-  await viewRailBtn.waitFor({ state: "visible", timeout: 5000 });
-  await viewRailBtn.click();
-  await page.waitForTimeout(500); // fold animation
-
-  const settingsBtn = page.locator('.windrose-dock-view-settings');
+  const settingsBtn = page.locator('.windrose-edge-rail-btn[title="Map settings"]');
   await settingsBtn.waitFor({ state: "visible", timeout: 5000 });
   await settingsBtn.click();
   await page.waitForTimeout(300);

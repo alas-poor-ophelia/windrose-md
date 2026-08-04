@@ -1392,7 +1392,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                       layerVisibility={layerVisibility}
                       onToggleLayer={handleToggleLayerVisibility}
                       mapType={mapData.mapType}
-                      onSettingsClick={handleSettingsClick}
                       fogOfWarState={currentFogState}
                       onFogToolSelect={handleFogToolSelect}
                       onFogVisibilityToggle={handleFogVisibilityToggle}
@@ -1414,6 +1413,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     />
                   )
                 }] : [])
+              ]}
+              actions={[
+                { id: 'settings', icon: 'lucide-settings', title: 'Map settings', onClick: handleSettingsClick }
               ]}
             />
           )}
@@ -1852,7 +1854,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 layerVisibility={layerVisibility}
                 onToggleLayer={handleToggleLayerVisibility}
                 mapType={mapData.mapType}
-                onSettingsClick={handleSettingsClick}
                 fogOfWarState={currentFogState}
                 onFogToolSelect={handleFogToolSelect}
                 onFogVisibilityToggle={handleFogVisibilityToggle}
@@ -1998,8 +1999,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                       { id: 'layers', icon: 'lucide-layers', title: 'Layers' },
                       { id: 'colorPicker', icon: 'lucide-palette', title: 'Colors' },
                       { id: 'view', icon: 'lucide-eye', title: 'View' },
-                    ].filter(it => !isFloating(it.id as PanelId))}
-                    onExpand={handleDockRibbonExpand}
+                    ].filter(it => !isFloating(it.id as PanelId))
+                      // Settings is an action, not a panel — opens the modal directly
+                      .concat([{ id: 'settings', icon: 'lucide-settings', title: 'Map settings' }])}
+                    onExpand={(id) => id === 'settings' ? handleSettingsClick() : handleDockRibbonExpand(id)}
                   />
                 ) : (
                 <>
@@ -2070,7 +2073,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                       layerVisibility={layerVisibility}
                       onToggleLayer={handleToggleLayerVisibility}
                       mapType={mapData.mapType}
-                      onSettingsClick={handleSettingsClick}
                       fogOfWarState={currentFogState}
                       onFogToolSelect={handleFogToolSelect}
                       onFogVisibilityToggle={handleFogVisibilityToggle}
@@ -2079,6 +2081,16 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     />
                   </DockPanel>
                 )}
+                {/* Map settings — moved out of the View panel (windrose-5cx);
+                    a standalone action row at the bottom of the dock column. */}
+                <button
+                  className="windrose-dock-settings-btn interactive-child"
+                  onClick={handleSettingsClick}
+                  title="Map settings"
+                >
+                  <Icon icon="lucide-settings" size={14} />
+                  <span>Map settings</span>
+                </button>
                 </>
                 )}
               </div>

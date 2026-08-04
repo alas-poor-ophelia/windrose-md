@@ -13,20 +13,14 @@ import {
 // Settings Modal Tests
 // ===========================================
 
-test("Settings button is accessible via the View panel", async ({ page }) => {
+test("Settings button is accessible via the edge rail", async ({ page }) => {
   const errors = setupErrorTracking(page);
 
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  // Block mode: settings lives in the EdgeRail "View" panel
-  const viewRailBtn = page.locator('.windrose-edge-rail-btn[title="View"]');
-  await viewRailBtn.waitFor({ state: "visible", timeout: 5000 });
-  await viewRailBtn.click();
-  await page.waitForTimeout(500);
-
-  // Settings button should be visible
-  const settingsBtn = page.locator('.windrose-dock-view-settings');
+  // Block mode: settings is a direct-action icon on the EdgeRail (windrose-5cx)
+  const settingsBtn = page.locator('.windrose-edge-rail-btn[title="Map settings"]');
   await settingsBtn.waitFor({ state: "visible", timeout: 5000 });
   expect(await settingsBtn.isVisible()).toBe(true);
 

@@ -24,14 +24,24 @@ interface EdgeRailPanel {
   content: ComponentChildren;
 }
 
+/** Rail icon that fires an action directly instead of folding open a drawer panel. */
+interface EdgeRailAction {
+  id: string;
+  icon: string;
+  title: string;
+  onClick: () => void;
+}
+
 interface EdgeRailProps {
   panels: EdgeRailPanel[];
+  /** Action icons rendered below the panel icons, separated by a divider. */
+  actions?: EdgeRailAction[];
   /** Controlled open panel id (null = folded to rail). Lets canvas controls drive the rail too. */
   openId: string | null;
   onOpenChange: (id: string | null) => void;
 }
 
-const EdgeRail = ({ panels, openId, onOpenChange }: EdgeRailProps): VNode => {
+const EdgeRail = ({ panels, actions, openId, onOpenChange }: EdgeRailProps): VNode => {
   const toggle = (id: string): void => {
     onOpenChange(openId === id ? null : id);
   };
@@ -58,6 +68,21 @@ const EdgeRail = ({ panels, openId, onOpenChange }: EdgeRailProps): VNode => {
             <Icon icon={panel.icon} size={18} />
           </button>
         ))}
+        {actions != null && actions.length > 0 && (
+          <>
+            <div className="windrose-edge-rail-divider" />
+            {actions.map(action => (
+              <button
+                key={action.id}
+                className="windrose-edge-rail-btn interactive-child"
+                onClick={action.onClick}
+                title={action.title}
+              >
+                <Icon icon={action.icon} size={18} />
+              </button>
+            ))}
+          </>
+        )}
       </div>
 
       <div

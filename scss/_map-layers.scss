@@ -469,6 +469,14 @@ button.windrose-edge-rail-btn {
   }
 }
 
+/* Divider between panel icons and action icons (e.g. map settings) */
+.windrose-edge-rail-divider {
+  width: 22px;
+  height: 1px;
+  margin: 2px 0;
+  background: oklch(from var(--windrose-border-primary) l c h / 0.35);
+}
+
 .windrose-edge-rail-drawer {
   /* Layout/chrome only — width, opacity, visibility and the fold transition are
      driven inline from EdgeRail.tsx (the DrawerDock pattern), because a

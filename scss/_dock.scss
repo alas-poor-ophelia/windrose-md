@@ -1044,21 +1044,20 @@ button.windrose-dock-panel-collapse {
   }
 }
 
-/* Footer with settings button */
-.windrose-dock-view-footer {
-  padding-top: 4px;
-  border-top: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.15);
-}
-
-.windrose-dock-view-settings {
+/* Map settings — standalone action row at the bottom of the dock column
+   (moved out of the View panel, windrose-5cx). `button.` prefix beats
+   Obsidian's `button:not(.clickable-icon)` fill/bevel (see edge-rail note). */
+button.windrose-dock-settings-btn {
   display: flex;
   align-items: center;
   gap: 6px;
   width: 100%;
-  padding: 4px 8px;
-  border: none;
-  border-radius: 3px;
+  margin-top: 4px;
+  padding: 5px 10px;
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.15);
+  border-radius: 4px;
   background: transparent;
+  box-shadow: none;
   color: var(--windrose-text-muted);
   font-size: 11px;
   cursor: pointer;
@@ -1113,16 +1112,16 @@ button.windrose-dock-panel-collapse {
   }
 }
 
-.is-tablet button.windrose-dock-view-settings {
+.is-tablet button.windrose-dock-settings-btn {
   width: 100%;
   height: auto;
   min-height: 0;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
-  border: none;
-  border-radius: 3px;
+  padding: 5px 10px;
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.15);
+  border-radius: 4px;
   background: transparent;
   box-shadow: none;
   color: var(--windrose-text-muted);
