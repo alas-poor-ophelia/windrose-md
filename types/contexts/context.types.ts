@@ -18,6 +18,7 @@ import type { WallPath } from '../core/wallpath.types';
 import type { TerrainStroke } from '../core/terrainstroke.types';
 import type { ToolId } from '../tools/tool.types';
 import type { ViewController } from '../hooks/viewController.types';
+import type { MapDistanceOverrides } from '../hooks/distanceMeasurement.types';
 
 // ===========================================
 // Shared Helper Types
@@ -113,6 +114,14 @@ export interface MapStateContextValue {
   selectedObjectType?: string;
   /** Shared live pan/zoom controller — overlays subscribe to track gestures. */
   viewController?: ViewController;
+  /**
+   * Resolved distance overrides for the active map. Sub-hex-aware: inside a
+   * sub-hex these are live-derived from the parent chain. Null/undefined means
+   * fall through to global settings (root map with no per-map override).
+   */
+  distanceOverrides?: MapDistanceOverrides | null;
+  /** True when the active map is a drilled-into sub-hex (not the root map). */
+  isInSubHex?: boolean;
   GridGeometry?: new (...args: unknown[]) => ExtendedGeometry;
   HexGeometry?: new (...args: unknown[]) => IGeometry;
   onDrawingStateChange?: (state: DrawingLayerState) => void;

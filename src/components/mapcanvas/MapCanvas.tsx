@@ -17,6 +17,7 @@ import type {
 import type { ResolvedTheme } from '#types/settings/settings.types';
 import type { ExtendedGeometry, MapStateContextValue, MapOperationsContextValue } from '#types/contexts/context.types';
 import type { AdjacentSubHexRenderData } from '#types/hooks/canvasRenderer.types';
+import type { MapDistanceOverrides } from '#types/hooks/distanceMeasurement.types';
 import type { TileAssignment } from '#types/tiles/tile.types';
 import type { WallPath } from '#types/core/wallpath.types';
 import type { TerrainStroke } from '#types/core/terrainstroke.types';
@@ -121,6 +122,10 @@ interface MapCanvasContentProps {
   isAlignmentMode: boolean;
   /** Wall under active edit-drag; excluded from the static raster (live overlay owns it). */
   draggingWallId?: string | null;
+  /** Resolved distance overrides for the active map (sub-hex-aware; null/undefined = use global). */
+  distanceOverrides?: MapDistanceOverrides | null;
+  /** True when the active map is a drilled-into sub-hex. */
+  isInSubHex?: boolean;
   children: ComponentChildren;
 }
 
@@ -164,7 +169,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, draggingWallId, children }: MapCanvasContentProps): VNode => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, draggingWallId, distanceOverrides, isInSubHex, children }: MapCanvasContentProps): VNode => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -417,12 +422,14 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     viewController,
     GridGeometry,
     HexGeometry,
+    distanceOverrides,
+    isInSubHex: isInSubHex === true,
     // State change callbacks for layers
     onDrawingStateChange: handleDrawingStateChange,
     onPanZoomStateChange: handlePanZoomStateChange
   } as MapStateContextValue), [mapData, mapId, notePath, geometry, currentTool, selectedColor,
     selectedObjectType, screenToGrid, screenToWorld, getClientCoords, viewController,
-    handleDrawingStateChange, handlePanZoomStateChange]);
+    distanceOverrides, isInSubHex, handleDrawingStateChange, handlePanZoomStateChange]);
 
   const mapOperationsValue = useMemo(() => ({
     // Object operations

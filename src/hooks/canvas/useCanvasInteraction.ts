@@ -25,6 +25,7 @@ import type { ViewController } from '#types/hooks/viewController.types';
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULTS } from '../../core/dmtConstants';
+import { calculateFitZoom } from '../../geometry/core/hexMeasurements';
 
 /**
  * Wheel zoom has no natural gesture "end": it fires a burst of discrete ticks.
@@ -32,6 +33,48 @@ import { DEFAULTS } from '../../core/dmtConstants';
  * stop for this long — mirroring the static-layer cache's own settle window.
  */
 const ZOOM_SETTLE_MS = 150;
+
+/**
+ * Trackpad two-finger scrolls arrive as pixel-mode wheel events with small
+ * continuous deltas (and often a horizontal component). Mouse wheel notches
+ * are line/page-mode, or large quantized verticals (Chromium: ≥100 per notch).
+ * Vertical-only pixel deltas below this threshold are treated as trackpad pan.
+ */
+const TRACKPAD_PAN_MAX_DELTA = 50;
+
+/** Pinch (ctrl+wheel) zoom rate: multiplicative factor per delta pixel. */
+const PINCH_ZOOM_RATE = 0.005;
+/** Per-event clamp so a discrete ctrl+mouse-wheel notch stays a gentle step. */
+const PINCH_ZOOM_FACTOR_MIN = 0.8;
+const PINCH_ZOOM_FACTOR_MAX = 1.25;
+
+/** Upper zoom clamp for wheel and pinch zooming. */
+const MAX_WHEEL_ZOOM = 4;
+
+/**
+ * Seamless sub-hex zoom: dive when the zoom is already pinned at max and the
+ * user keeps zooming in over a hex that has a sub-map; surface when zoomed
+ * out below this fraction of the sub-map's fit zoom and still zooming out.
+ * The gap between "pinned at max" and "below fit" is the hysteresis band
+ * that keeps the transition from ping-ponging.
+ */
+const SEAMLESS_DIVE_EPSILON = 0.001;
+// Half of fit (not 0.75): a sub-map's stored zoom can sit slightly below the
+// LIVE fit zoom (fit was computed at creation-time canvas size), and a floor
+// too close to fit makes the first zoom-out tick bounce straight back out.
+const SEAMLESS_SURFACE_FIT_FRACTION = 0.5;
+/** Ignore further transitions briefly after one fires (wheel bursts re-tick). */
+const SEAMLESS_COOLDOWN_MS = 600;
+
+/**
+ * Heuristic: does this wheel event come from a trackpad two-finger scroll
+ * (pan intent) rather than a mouse wheel (zoom intent)?
+ */
+function isTrackpadPanWheel(e: WheelEvent): boolean {
+  if (e.deltaMode !== 0) return false; // line/page deltas come from mice
+  if (e.deltaX !== 0) return true; // horizontal component: two-axis gesture
+  return Math.abs(e.deltaY) < TRACKPAD_PAN_MAX_DELTA;
+}
 
 
 
@@ -49,7 +92,8 @@ function useCanvasInteraction(
   mapData: MapData | null,
   geometry: (IGeometry & { getScaledCellSize?: (zoom: number) => number }) | null,
   focused: boolean,
-  viewController: ViewController
+  viewController: ViewController,
+  isInSubHex: boolean = false
 ): UseCanvasInteractionResult {
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [isTouchPanning, setIsTouchPanning] = useState<boolean>(false);
@@ -76,6 +120,12 @@ function useCanvasInteraction(
   // eventual commit so a stale settle timer can't clobber a newer gesture.
   const gestureIdRef = useRef<number | null>(null);
   const wheelSettleTimerRef = useRef<number | null>(null);
+  // Wheel routing decided on the first tick of a wheel gesture and held until
+  // it settles: a fast trackpad fling ramps past any magnitude threshold, and
+  // re-classifying mid-gesture would flip a pan into a zoom.
+  const wheelModeRef = useRef<'pan' | 'zoom' | null>(null);
+  // Timestamp of the last seamless sub-hex dive/surface, for the cooldown.
+  const seamlessTransitionAtRef = useRef<number>(0);
 
   // Keep refs in sync with state for stable effect closures
   isPanningRef.current = isPanning;
@@ -101,6 +151,21 @@ function useCanvasInteraction(
       window.clearTimeout(wheelSettleTimerRef.current);
       wheelSettleTimerRef.current = null;
     }
+    wheelModeRef.current = null;
+  };
+
+  // (Re)arm the settle timer that commits the in-flight wheel gesture once
+  // ticks stop. Shared by wheel zoom, pinch zoom, and trackpad wheel pan.
+  const armWheelSettle = (): void => {
+    const gid = gestureIdRef.current;
+    if (gid == null) return;
+    if (wheelSettleTimerRef.current != null) window.clearTimeout(wheelSettleTimerRef.current);
+    wheelSettleTimerRef.current = window.setTimeout(() => {
+      wheelSettleTimerRef.current = null;
+      wheelModeRef.current = null;
+      viewController.commitIfCurrent(gid, viewController.getLive());
+      if (gestureIdRef.current === gid) gestureIdRef.current = null;
+    }, ZOOM_SETTLE_MS);
   };
 
   // Track recent touch to ignore synthetic mouse events
@@ -242,12 +307,130 @@ function useCanvasInteraction(
     return { worldX, worldY };
   };
 
+  /**
+   * Seamless sub-hex transitions, called from the wheel and touch-pinch zoom
+   * paths. Returns true when a transition fired (the caller should stop
+   * processing the tick — the map is about to swap).
+   *
+   * Dive: zoom already pinned at max, still zooming in, and the hex under the
+   * zoom anchor has an EXISTING sub-map → enter it (never creates one).
+   * Surface: inside a sub-hex, zoomed out below a fraction of the sub-map's
+   * fit zoom, and still zooming out → exit to the parent.
+   */
+  const maybeSeamlessSubHexTransition = (
+    zoomingIn: boolean,
+    currentZoom: number,
+    newZoom: number,
+    anchorClientX: number,
+    anchorClientY: number
+  ): boolean => {
+    if (!mapData || geometry?.type !== 'hex') return false;
+    if (Date.now() - seamlessTransitionAtRef.current < SEAMLESS_COOLDOWN_MS) return false;
+
+    if (zoomingIn) {
+      if (currentZoom < MAX_WHEEL_ZOOM - SEAMLESS_DIVE_EPSILON) return false;
+      const coords = screenToGrid(anchorClientX, anchorClientY);
+      if (!coords) return false;
+      const subHex = mapData.subHexMaps?.[`${coords.x},${coords.y}`];
+      const canvas = canvasRef.current;
+      if (subHex == null || canvas == null) return false;
+
+      // Open the sub-map at the LIVE canvas's fit zoom so it fills the screen.
+      // Its stored viewState was fit at creation-time canvas size (or wherever
+      // the user last left it) and may already sit inside the surface zone.
+      const child = subHex.mapData;
+      const rings = subHex.subdivisionRings ?? 7;
+      const childFit = calculateFitZoom(
+        child.hexSize ?? mapData.hexSize ?? DEFAULTS.hexSize,
+        child.orientation ?? mapData.orientation ?? DEFAULTS.hexOrientation,
+        child.hexBounds ?? { maxCol: rings * 2 + 1, maxRow: rings * 2 + 1, maxRing: rings },
+        canvas.width,
+        canvas.height
+      );
+
+      seamlessTransitionAtRef.current = Date.now();
+      // Commit the in-flight zoom so the parent's stored view (what exit
+      // restores) is the view the user dove from.
+      clearWheelSettle();
+      commitActiveGesture();
+      activeDocument.dispatchEvent(new CustomEvent('windrose:enter-sub-hex', {
+        detail: {
+          q: coords.x,
+          r: coords.y,
+          viewOverride: { zoom: childFit, center: { x: 0, y: 0 } }
+        }
+      }));
+      return true;
+    }
+
+    if (!isInSubHex) return false;
+    const canvas = canvasRef.current;
+    if (!canvas || mapData.hexBounds == null) return false;
+    const fitZoom = calculateFitZoom(
+      mapData.hexSize ?? DEFAULTS.hexSize,
+      mapData.orientation ?? DEFAULTS.hexOrientation,
+      mapData.hexBounds,
+      canvas.width,
+      canvas.height
+    );
+    if (newZoom >= fitZoom * SEAMLESS_SURFACE_FIT_FRACTION) return false;
+
+    seamlessTransitionAtRef.current = Date.now();
+    clearWheelSettle();
+    commitActiveGesture();
+    activeDocument.dispatchEvent(new CustomEvent('windrose:exit-sub-hex'));
+    return true;
+  };
+
+  // Trackpad two-finger scroll: pan the view by the wheel deltas, using the
+  // same rotation/scale math as pointer-drag panning. Content follows document
+  // scroll conventions (scroll down → content moves up).
+  const wheelPan = (e: WheelEvent): void => {
+    if (!mapData || !geometry) return;
+
+    const { zoom, center } = viewController.getLive();
+    const northDirection = mapData.northDirection ?? 0;
+
+    const angleRad = (-northDirection * Math.PI) / 180;
+    const rotatedDeltaX = e.deltaX * Math.cos(angleRad) - e.deltaY * Math.sin(angleRad);
+    const rotatedDeltaY = e.deltaX * Math.sin(angleRad) + e.deltaY * Math.cos(angleRad);
+
+    const scale = geometry.type === 'grid' && geometry.getScaledCellSize != null
+      ? geometry.getScaledCellSize(zoom)
+      : zoom;
+
+    gestureIdRef.current ??= viewController.beginGesture();
+    viewController.setLive({
+      zoom,
+      center: {
+        x: center.x + rotatedDeltaX / scale,
+        y: center.y + rotatedDeltaY / scale
+      }
+    });
+    armWheelSettle();
+  };
+
   const handleWheel = (e: WheelEvent): void => {
     e.preventDefault();
 
     if (!mapData) return;
     if (!geometry) return;
     if (!canvasRef.current) return;
+
+    // Route the event: ctrl/meta+wheel is pinch-zoom (macOS trackpads deliver
+    // pinch as ctrl+wheel), trackpad-shaped plain wheel is two-finger pan,
+    // discrete mouse notches keep the classic step zoom. The mode is decided
+    // on the gesture's first tick and held until it settles.
+    const isPinch = e.ctrlKey || e.metaKey;
+    const mode = isPinch
+      ? 'zoom'
+      : wheelModeRef.current ?? (isTrackpadPanWheel(e) ? 'pan' : 'zoom');
+    wheelModeRef.current = mode;
+
+    if (mode === 'pan') {
+      wheelPan(e);
+      return;
+    }
 
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
@@ -256,8 +439,24 @@ function useCanvasInteraction(
 
     const viewState = viewController.getLive();
 
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    const newZoom = Math.max(DEFAULTS.minZoom, Math.min(4, viewState.zoom + delta));
+    let newZoom: number;
+    if (isPinch) {
+      // Pinch streams many small deltas — zoom multiplicatively for smoothness,
+      // clamped per event so a discrete ctrl+mouse-notch stays a gentle step.
+      const factor = Math.min(
+        PINCH_ZOOM_FACTOR_MAX,
+        Math.max(PINCH_ZOOM_FACTOR_MIN, Math.exp(-e.deltaY * PINCH_ZOOM_RATE))
+      );
+      newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, viewState.zoom * factor));
+    } else {
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, viewState.zoom + delta));
+    }
+
+    // Seamless sub-hex dive/surface takes over the tick when it fires.
+    if (maybeSeamlessSubHexTransition(e.deltaY < 0, viewState.zoom, newZoom, e.clientX, e.clientY)) {
+      return;
+    }
 
     const { zoom: oldZoom, center: oldCenter } = viewState;
 
@@ -288,19 +487,13 @@ function useCanvasInteraction(
     // Wheel has no natural end — open a gesture on the first tick (reusing any
     // in-flight one) and (re)arm a settle timer that commits once ticks stop.
     gestureIdRef.current ??= viewController.beginGesture();
-    const wheelGestureId = gestureIdRef.current;
 
     viewController.setLive({
       zoom: newZoom,
       center: { x: newCenterX, y: newCenterY }
     });
 
-    if (wheelSettleTimerRef.current != null) window.clearTimeout(wheelSettleTimerRef.current);
-    wheelSettleTimerRef.current = window.setTimeout(() => {
-      wheelSettleTimerRef.current = null;
-      viewController.commitIfCurrent(wheelGestureId, viewController.getLive());
-      if (gestureIdRef.current === wheelGestureId) gestureIdRef.current = null;
-    }, ZOOM_SETTLE_MS);
+    armWheelSettle();
   };
 
   const startPan = (clientX: number, clientY: number): void => {
@@ -405,7 +598,14 @@ function useCanvasInteraction(
     let newZoom = zoom;
     if (initialPinchDistanceRef.current != null) {
       const scale = distance / initialPinchDistanceRef.current;
-      newZoom = Math.max(DEFAULTS.minZoom, Math.min(4, zoom * scale));
+      newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, zoom * scale));
+
+      // Seamless sub-hex dive/surface: end the touch gesture cleanly when it
+      // fires — the map is about to swap under the user's fingers.
+      if (scale !== 1 && maybeSeamlessSubHexTransition(scale > 1, zoom, newZoom, center.x, center.y)) {
+        stopTouchPan();
+        return;
+      }
     }
 
     const newViewState = {
@@ -528,4 +728,4 @@ function useCanvasInteraction(
   };
 }
 
-export { useCanvasInteraction };
+export { useCanvasInteraction, isTrackpadPanWheel };

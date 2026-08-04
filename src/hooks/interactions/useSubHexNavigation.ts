@@ -8,12 +8,15 @@
 
 import type { MapData, MapLayer, SubHexMapData, StoredViewState } from '#types/core/map.types';
 import type { MapDataUpdater } from '#types/hooks/mapData.types';
+import type { MapDistanceOverrides, ResolvedDistanceSettings, SubHexDistanceLevel } from '../../drawing/distanceOperations';
 
 import { useCallback, useMemo, useRef, useState } from 'preact/hooks';
 import { DEFAULTS, SCHEMA_VERSION } from '../../core/dmtConstants';
 import { isFeatureEnabled } from '../../core/featureFlags';
+import { getSettings } from '../../core/settingsAccessor';
 import { generateLayerId } from '../../persistence/layerAccessor';
 import { calculateFitZoom } from '../../geometry/core/hexMeasurements';
+import { resolveSubHexDistanceSettings } from '../../drawing/distanceOperations';
 
 // =========================================================================
 // Types
@@ -50,13 +53,19 @@ interface UseSubHexNavigationResult {
   isInSubHex: boolean;
   depth: number;
   breadcrumbs: BreadcrumbSegment[];
-  enterSubHex: (q: number, r: number) => void;
+  enterSubHex: (q: number, r: number, viewOverride?: StoredViewState) => void;
   exitSubHex: () => void;
   navigateToLevel: (depth: number) => void;
   navigateToSibling: (q: number, r: number) => void;
   navigationVersion: number;
   currentHexKey: string | null;
   adjacentSubHexes: AdjacentSubHex[];
+  /**
+   * Fully-resolved distance settings for the active sub-hex, derived live
+   * from the parent chain (each level divides by its sub-grid's cells-across
+   * unless it carries an explicit per-map override). Null at root level.
+   */
+  activeDistanceOverrides: ResolvedDistanceSettings | null;
 }
 
 // =========================================================================
@@ -179,8 +188,10 @@ function useSubHexNavigation({
     return segments;
   }, [navStack, isInSubHex, subHexMapData?.name]);
 
-  // Enter a sub-hex at the given axial coordinate
-  const enterSubHex = useCallback((q: number, r: number): void => {
+  // Enter a sub-hex at the given axial coordinate. `viewOverride` opens the
+  // sub-map at that view instead of its stored one (seamless zoom dives pass
+  // the live-canvas fit so the sub-map fills the screen).
+  const enterSubHex = useCallback((q: number, r: number, viewOverride?: StoredViewState): void => {
     const currentMapData = isInSubHex ? subHexMapData : rootMapData;
     if (!currentMapData) return;
 
@@ -221,7 +232,9 @@ function useSubHexNavigation({
     const newStack = [...navStack, frame];
     navStackRef.current = newStack;
     setNavStack(newStack);
-    setSubHexMapData(subHex.mapData);
+    setSubHexMapData(viewOverride != null
+      ? { ...subHex.mapData, viewState: { zoom: viewOverride.zoom, center: { ...viewOverride.center } } }
+      : subHex.mapData);
     setNavigationVersion(prev => prev + 1);
   }, [rootMapData, subHexMapData, isInSubHex, navStack]);
 
@@ -457,6 +470,31 @@ function useSubHexNavigation({
     return adjacent;
   }, [isInSubHex, navStack]);
 
+  // Live-derived distance settings for the active sub-hex: one parent hex
+  // spans the sub-map, so each nesting level divides distance-per-cell by
+  // the sub-grid's cells-across unless that level has an explicit override.
+  const activeDistanceOverrides = useMemo((): ResolvedDistanceSettings | null => {
+    if (navStack.length === 0) return null;
+
+    const mapOverrides = (map: MapData | null): MapDistanceOverrides | null =>
+      (map?.settings?.distanceSettings as MapDistanceOverrides | undefined) ?? null;
+
+    const levels: SubHexDistanceLevel[] = [
+      { overrides: mapOverrides(navStack[0].parentMapData), cellsAcross: null }
+    ];
+    for (let i = 0; i < navStack.length; i++) {
+      const frame = navStack[i];
+      const rings = frame.parentMapData.subHexMaps?.[frame.hexKey]?.subdivisionRings ?? 7;
+      const childMap = i + 1 < navStack.length ? navStack[i + 1].parentMapData : subHexMapData;
+      levels.push({
+        overrides: mapOverrides(childMap),
+        cellsAcross: rings * 2 + 1
+      });
+    }
+
+    return resolveSubHexDistanceSettings('hex', getSettings(), levels);
+  }, [navStack, subHexMapData]);
+
   return {
     activeMapData,
     activeUpdateMapData,
@@ -469,7 +507,8 @@ function useSubHexNavigation({
     navigateToSibling,
     navigationVersion,
     currentHexKey,
-    adjacentSubHexes
+    adjacentSubHexes,
+    activeDistanceOverrides
   };
 }
 

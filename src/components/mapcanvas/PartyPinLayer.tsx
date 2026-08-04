@@ -64,7 +64,7 @@ const PARTY_RELATED_CAP = 5;
 
 const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): VNode | null => {
   const app = useApp();
-  const { mapData, geometry, canvasRef, mapId, notePath, viewController } = useMapState();
+  const { mapData, geometry, canvasRef, mapId, notePath, viewController, distanceOverrides } = useMapState();
 
   // Transient highlight for "show on map" — cleared after the pulse finishes
   const [flashMarker, setFlashMarker] = useState<Point | null>(null);
@@ -112,7 +112,7 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     const distanceSettings = getEffectiveDistanceSettings(
       mapData.mapType,
       getSettings(),
-      (mapData.settings?.distanceSettings ?? null)
+      (distanceOverrides ?? null)
     );
     return queryPartyRange(mapData, geometry, pin, {
       rangeInCells: rangeUnitsToCells(pin.range, distanceSettings.distancePerCell),
@@ -122,7 +122,7 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
       displayFormat: distanceSettings.displayFormat,
       noteMetadata: noteMetadataAccessor
     });
-  }, [pin, mapData, geometry, noteMetadataAccessor]);
+  }, [pin, mapData, geometry, noteMetadataAccessor, distanceOverrides]);
 
   // ===========================================
   // Travel times per result (PP-35)
@@ -155,7 +155,7 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     const distanceSettings = getEffectiveDistanceSettings(
       mapData.mapType,
       getSettings(),
-      (mapData.settings?.distanceSettings ?? null)
+      (distanceOverrides ?? null)
     );
     return formatTravelTimesLabel(
       distanceInCells * distanceSettings.distancePerCell,
@@ -163,7 +163,7 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
       selectedTravelModes,
       travelAllowance
     );
-  }, [selectedTravelModes, travelAllowance, mapData]);
+  }, [selectedTravelModes, travelAllowance, mapData, distanceOverrides]);
 
   /** One explicit unit-guidance line when a selected mode cannot compute */
   const travelHint = useMemo((): string | null => {
@@ -171,10 +171,10 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     const distanceSettings = getEffectiveDistanceSettings(
       mapData.mapType,
       getSettings(),
-      (mapData.settings?.distanceSettings ?? null)
+      (distanceOverrides ?? null)
     );
     return findTravelMismatch(distanceSettings.distanceUnit, selectedTravelModes);
-  }, [selectedTravelModes, mapData]);
+  }, [selectedTravelModes, mapData, distanceOverrides]);
 
   /** Per-result travel labels for the party note's Travel column */
   const travelLabels = useMemo((): PartyNoteTravelLabels | undefined => {
@@ -225,9 +225,9 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     return getEffectiveDistanceSettings(
       mapData.mapType,
       getSettings(),
-      (mapData.settings?.distanceSettings ?? null)
+      (distanceOverrides ?? null)
     ).distanceUnit;
-  }, [mapData]);
+  }, [mapData, distanceOverrides]);
   const noteContext = useMemo(
     () => ({ mapId: mapId ?? '', mapName, mapNotePath: notePath ?? '', distanceUnit: noteDistanceUnit }),
     [mapId, mapName, notePath, noteDistanceUnit]
@@ -320,7 +320,7 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
   const distanceSettings = getEffectiveDistanceSettings(
     mapData.mapType,
     getSettings(),
-    (mapData.settings?.distanceSettings ?? null)
+    (distanceOverrides ?? null)
   );
   const rangeInCells = rangeUnitsToCells(pin.range, distanceSettings.distancePerCell);
 

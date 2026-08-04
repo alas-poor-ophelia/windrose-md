@@ -9,10 +9,11 @@
 import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
 import type { ShapeOverlay } from '#types/core/map.types';
-import type { DiagonalRule, DistanceDisplayFormat } from '#types/settings/settings.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
+import { getSettings } from '../../core/settingsAccessor';
+import { getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useShapeOverlayTools } from '../../hooks/interactions/useShapeOverlayTools';
@@ -36,7 +37,7 @@ const ShapeOverlayLayer = ({
   selectedOpacity,
   onShapeOverlaysChange
 }: ShapeOverlayLayerProps): VNode | null => {
-  const { canvasRef, containerRef, mapData, geometry, screenToWorld } = useMapState();
+  const { canvasRef, containerRef, mapData, geometry, screenToWorld, distanceOverrides } = useMapState();
   const { selectedItem, isDraggingSelection } = useMapSelection();
 
   const isShapeTool = currentTool === 'shape';
@@ -84,14 +85,8 @@ const ShapeOverlayLayer = ({
 
   const distanceSettings = useMemo(() => {
     if (!mapData) return null;
-    const settings = mapData.settings?.overrides ?? {};
-    return {
-      distancePerCell: (settings.distancePerCell as number) || 5,
-      distanceUnit: (settings.distanceUnit as string) || 'ft',
-      gridDiagonalRule: (settings.gridDiagonalRule as DiagonalRule) || 'alternating',
-      displayFormat: (settings.displayFormat as DistanceDisplayFormat) || 'both'
-    };
-  }, [mapData]);
+    return getEffectiveDistanceSettings(mapData.mapType, getSettings(), distanceOverrides ?? null);
+  }, [mapData, distanceOverrides]);
 
   const [showShapeColorPicker, setShowShapeColorPicker] = useState(false);
   const shapeColorBtnRef = useRef<HTMLButtonElement>(null);

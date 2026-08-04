@@ -19,6 +19,7 @@ import type { UsePanZoomCoordinatorOptions } from '#types/hooks/panZoomCoordinat
 import { useEffect, useRef } from 'preact/hooks';
 import { useCanvasInteraction } from './useCanvasInteraction';
 import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useMapState } from '../../context/MapContext';
 
 
 /**
@@ -36,6 +37,9 @@ const usePanZoomCoordinator = ({
   isFocused,
   viewController
 }: UsePanZoomCoordinatorOptions): void => {
+  // Sub-hex awareness for seamless zoom transitions (provided via MapContext)
+  const { isInSubHex } = useMapState();
+
   // Use canvas interaction hook for pan/zoom logic
   const {
     isPanning,
@@ -64,7 +68,7 @@ const usePanZoomCoordinator = ({
     setPanStart,
     setTouchPanStart,
     setInitialPinchDistance
-  } = useCanvasInteraction(canvasRef, mapData, geometry, isFocused, viewController);
+  } = useCanvasInteraction(canvasRef, mapData, geometry, isFocused, viewController, isInSubHex === true);
 
   // Register pan/zoom handlers with EventHandlerContext for event coordination
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();

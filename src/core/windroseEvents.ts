@@ -17,6 +17,12 @@ import type { ObjectLink } from '#types/objects/object.types';
 export interface SubHexCoordDetail {
   q: number;
   r: number;
+  /**
+   * Optional view to open the sub-map at, overriding its stored viewState.
+   * Seamless zoom dives pass the live-canvas fit zoom here so the sub-map
+   * fills the screen regardless of what canvas size its stored fit assumed.
+   */
+  viewOverride?: { zoom: number; center: { x: number; y: number } };
 }
 
 /** Right-click on a hex: axial coord + screen position for the context menu. */
@@ -78,6 +84,7 @@ export interface SettingsChangedDetail {
 /** Name → CustomEvent map for every Windrose custom DOM event. */
 export interface WindroseEventMap {
   'windrose:enter-sub-hex': CustomEvent<SubHexCoordDetail>;
+  'windrose:exit-sub-hex': CustomEvent<null>;
   'windrose:navigate-sibling-sub-hex': CustomEvent<SubHexCoordDetail>;
   'windrose:hex-context-menu': CustomEvent<HexContextMenuDetail>;
   'windrose:selection-context-menu': CustomEvent<SelectionContextMenuDetail>;

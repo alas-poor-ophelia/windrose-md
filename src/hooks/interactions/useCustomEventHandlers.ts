@@ -33,7 +33,7 @@ interface UseCustomEventHandlersOptions {
   geometry: ExtendedGeometry | null;
   updateMapData: (updater: MapData | ((current: MapData) => MapData)) => void;
   handleLayerSelect: (layerId: string) => void;
-  enterSubHex: (q: number, r: number) => void;
+  enterSubHex: (q: number, r: number, viewOverride?: { zoom: number; center: { x: number; y: number } }) => void;
   exitSubHex: () => void;
   isInSubHex: boolean;
   navigateToSibling?: (q: number, r: number) => void;
@@ -76,15 +76,26 @@ function useCustomEventHandlers({
   // Listen for sub-hex entry events from double-click on hex
   useEffect(() => {
     const handleEnterSubHex = (event: CustomEvent<SubHexCoordDetail>): void => {
-      const { q, r } = event.detail;
+      const { q, r, viewOverride } = event.detail;
       if (mapData?.mapType === 'hex') {
-        enterSubHex(q, r);
+        enterSubHex(q, r, viewOverride);
       }
     };
 
     activeDocument.addEventListener('windrose:enter-sub-hex', handleEnterSubHex);
     return () => activeDocument.removeEventListener('windrose:enter-sub-hex', handleEnterSubHex);
   }, [mapData?.mapType, enterSubHex]);
+
+  // Seamless zoom-out surfacing: the canvas dispatches this when a zoom-out
+  // tick lands below the sub-map's fit zoom. No-op at root level.
+  useEffect(() => {
+    if (!isInSubHex) return undefined;
+    const handleExitSubHex = (): void => {
+      exitSubHex();
+    };
+    activeDocument.addEventListener('windrose:exit-sub-hex', handleExitSubHex);
+    return () => activeDocument.removeEventListener('windrose:exit-sub-hex', handleExitSubHex);
+  }, [isInSubHex, exitSubHex]);
 
   // Listen for sibling sub-hex navigation (click on adjacent preview)
   useEffect(() => {

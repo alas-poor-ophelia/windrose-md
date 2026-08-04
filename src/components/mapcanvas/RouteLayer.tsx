@@ -63,7 +63,7 @@ export interface RouteLayerProps {
 
 const RouteLayer = ({ currentTool, onSavedRoutesChange }: RouteLayerProps): VNode | null => {
   const app = useApp();
-  const { mapData, geometry, canvasRef, screenToWorld, viewController } = useMapState();
+  const { mapData, geometry, canvasRef, screenToWorld, viewController, distanceOverrides } = useMapState();
 
   const worldGroupRef = useRef<SVGGElement | null>(null);
   const [revealedRouteId, setRevealedRouteId] = useState<string | null>(null);
@@ -152,7 +152,7 @@ const RouteLayer = ({ currentTool, onSavedRoutesChange }: RouteLayerProps): VNod
   const distanceSettings = getEffectiveDistanceSettings(
     mapData.mapType,
     getSettings(),
-    (mapData.settings?.distanceSettings ?? null)
+    (distanceOverrides ?? null)
   );
 
   // Terrain colors resolve against enabled packs; a vanished terrain simply

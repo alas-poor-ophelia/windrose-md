@@ -117,7 +117,53 @@ function getEffectiveDistanceSettings(
 }
 
 // ===========================================
+// Sub-hex Scale Resolution
+// ===========================================
+
+/** One level of a sub-hex nesting chain, ordered root first */
+export interface SubHexDistanceLevel {
+  /** Explicit distance settings stored on this map (null = inherit) */
+  overrides: MapDistanceOverrides | null;
+  /**
+   * Cell count spanning the parent hex this map subdivides
+   * (subdivisionRings * 2 + 1). Null for the root level.
+   */
+  cellsAcross: number | null;
+}
+
+/**
+ * Resolve distance settings for a map nested inside sub-hexes.
+ *
+ * Walks the chain root→active. Each sub-hex level derives its
+ * distance-per-cell by dividing the parent's effective value by the
+ * sub-hex grid's cells-across (one parent hex spans the whole sub-map),
+ * unless that level carries an explicit per-map override, which becomes
+ * the new baseline. Units and display settings inherit unless overridden.
+ */
+function resolveSubHexDistanceSettings(
+  mapType: MapType,
+  globalSettings: Partial<PluginSettings> | null | undefined,
+  levels: SubHexDistanceLevel[]
+): ResolvedDistanceSettings {
+  const [root, ...nested] = levels;
+  let resolved = getEffectiveDistanceSettings(mapType, globalSettings, root?.overrides ?? null);
+
+  for (const level of nested) {
+    const cellsAcross = level.cellsAcross != null && level.cellsAcross > 0 ? level.cellsAcross : 1;
+    const derivedPerCell = resolved.distancePerCell / cellsAcross;
+    resolved = {
+      distancePerCell: level.overrides?.distancePerCell ?? derivedPerCell,
+      distanceUnit: level.overrides?.distanceUnit ?? resolved.distanceUnit,
+      gridDiagonalRule: level.overrides?.gridDiagonalRule ?? resolved.gridDiagonalRule,
+      displayFormat: level.overrides?.displayFormat ?? resolved.displayFormat
+    };
+  }
+
+  return resolved;
+}
+
+// ===========================================
 // Exports
 // ===========================================
 
-export { formatDistance, getEffectiveDistanceSettings };
+export { formatDistance, getEffectiveDistanceSettings, resolveSubHexDistanceSettings };

@@ -10,6 +10,7 @@ import { describe, it, expect } from "vitest";
 import {
   formatDistance,
   getEffectiveDistanceSettings,
+  resolveSubHexDistanceSettings,
 } from "../../../src/drawing/distanceOperations";
 
 describe("distanceOperations", () => {
@@ -204,5 +205,94 @@ describe("distanceOperations", () => {
         expect(result.distanceUnit).toBe("mi"); // DEFAULTS.distance.unitHex
       });
     });
+  });
+});
+
+describe("resolveSubHexDistanceSettings", () => {
+  const GLOBAL = { distancePerCellHex: 6, distanceUnitHex: "mi" };
+  // Default sub-hex: 7 rings -> 15 cells across
+  const CELLS_ACROSS = 15;
+
+  it("returns root settings unchanged for a single-level chain", () => {
+    const result = resolveSubHexDistanceSettings("hex", GLOBAL, [
+      { overrides: null, cellsAcross: null },
+    ]);
+    expect(result.distancePerCell).toBe(6);
+    expect(result.distanceUnit).toBe("mi");
+  });
+
+  it("divides distance-per-cell by cells-across for one sub-hex level", () => {
+    const result = resolveSubHexDistanceSettings("hex", GLOBAL, [
+      { overrides: null, cellsAcross: null },
+      { overrides: null, cellsAcross: CELLS_ACROSS },
+    ]);
+    expect(result.distancePerCell).toBeCloseTo(6 / 15);
+    expect(result.distanceUnit).toBe("mi"); // parent units kept
+  });
+
+  it("compounds the division for nested sub-hexes", () => {
+    const result = resolveSubHexDistanceSettings("hex", GLOBAL, [
+      { overrides: null, cellsAcross: null },
+      { overrides: null, cellsAcross: CELLS_ACROSS },
+      { overrides: null, cellsAcross: CELLS_ACROSS },
+    ]);
+    expect(result.distancePerCell).toBeCloseTo(6 / 15 / 15);
+  });
+
+  it("derives from a root per-map override rather than global", () => {
+    const result = resolveSubHexDistanceSettings("hex", GLOBAL, [
+      { overrides: { distancePerCell: 30, distanceUnit: "km" }, cellsAcross: null },
+      { overrides: null, cellsAcross: CELLS_ACROSS },
+    ]);
+    expect(result.distancePerCell).toBeCloseTo(30 / 15);
+    expect(result.distanceUnit).toBe("km");
+  });
+
+  it("lets an explicit sub-hex override win over derivation", () => {
+    const result = resolveSubHexDistanceSettings("hex", GLOBAL, [
+      { overrides: null, cellsAcross: null },
+      { overrides: { distancePerCell: 100, distanceUnit: "ft" }, cellsAcross: CELLS_ACROSS },
+    ]);
+    expect(result.distancePerCell).toBe(100);
+    expect(result.distanceUnit).toBe("ft");
+  });
+
+  it("rebases deeper derivation on an intermediate override", () => {
+    const result = resolveSubHexDistanceSettings("hex", GLOBAL, [
+      { overrides: null, cellsAcross: null },
+      { overrides: { distancePerCell: 100, distanceUnit: "ft" }, cellsAcross: CELLS_ACROSS },
+      { overrides: null, cellsAcross: CELLS_ACROSS },
+    ]);
+    expect(result.distancePerCell).toBeCloseTo(100 / 15);
+    expect(result.distanceUnit).toBe("ft");
+  });
+
+  it("respects varying cells-across per level (different ring counts)", () => {
+    // rings=3 -> 7 cells across
+    const result = resolveSubHexDistanceSettings("hex", GLOBAL, [
+      { overrides: null, cellsAcross: null },
+      { overrides: null, cellsAcross: 7 },
+    ]);
+    expect(result.distancePerCell).toBeCloseTo(6 / 7);
+  });
+
+  it("guards against non-positive cells-across", () => {
+    const result = resolveSubHexDistanceSettings("hex", GLOBAL, [
+      { overrides: null, cellsAcross: null },
+      { overrides: null, cellsAcross: 0 },
+    ]);
+    expect(result.distancePerCell).toBe(6);
+  });
+
+  it("inherits diagonal rule and display format down the chain", () => {
+    const result = resolveSubHexDistanceSettings(
+      "hex",
+      { ...GLOBAL, distanceDisplayFormat: "units" as const },
+      [
+        { overrides: null, cellsAcross: null },
+        { overrides: null, cellsAcross: CELLS_ACROSS },
+      ]
+    );
+    expect(result.displayFormat).toBe("units");
   });
 });

@@ -95,7 +95,7 @@ const ObjectLayer = ({
   onDeleteCustomColor,
   freeformPlacementMode = false
 }: ObjectLayerProps): VNode | null => {
-  const { canvasRef, containerRef, mapData, mapId, notePath, geometry, screenToGrid } = useMapState();
+  const { canvasRef, containerRef, mapData, mapId, notePath, geometry, screenToGrid, distanceOverrides } = useMapState();
   const { getObjectAtPosition, updateObject, onObjectsChange: contextOnObjectsChange, onTextLabelsChange } = useMapOperations();
   const {
     selectedItem, setSelectedItem,
@@ -753,7 +753,7 @@ const ObjectLayer = ({
     const origin = measureOriginRef.current;
     if (origin.x === measureTarget.x && origin.y === measureTarget.y) return null;
     const globalSettings = getSettings() ?? {};
-    const overrides = mapData?.settings?.distanceSettings ?? null;
+    const overrides = distanceOverrides ?? null;
     const settings = getEffectiveDistanceSettings(mapData?.mapType ?? 'grid', globalSettings, overrides);
     const dist = geometry.getCellDistance(origin.x, origin.y, measureTarget.x, measureTarget.y, { diagonalRule: settings.gridDiagonalRule });
     return formatDistance(dist, settings.distancePerCell, settings.distanceUnit, settings.displayFormat);

@@ -129,8 +129,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     navigateToLevel,
     navigateToSibling,
     navigationVersion,
-    adjacentSubHexes
+    adjacentSubHexes,
+    activeDistanceOverrides
   } = useSubHexNavigation({ mapData: rootMapData, updateMapData: rootUpdateMapData });
+
+  // Distance overrides for the active map: sub-hex levels get live-derived
+  // scale from the parent chain; the root map uses its own stored settings.
+  const distanceOverrides = activeDistanceOverrides ?? mapData?.settings?.distanceSettings;
 
   // Populate the renderer's tile-metadata accessor on mount so terrain tiles
   // resolve to seamless region fills out-of-the-box, even if the tile browser
@@ -1412,12 +1417,15 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               layerVisibility={layerVisibility}
               adjacentSubHexes={showAdjacentSubMaps && isInSubHex ? adjacentSubHexes : null}
               draggingWallId={draggingWallId}
+              distanceOverrides={distanceOverrides}
+              isInSubHex={isInSubHex}
             >
               {/* DrawingLayer - handles all drawing tools */}
               <MapCanvas.DrawingLayer
                 currentTool={currentTool}
                 selectedColor={selectedColor}
                 selectedOpacity={selectedOpacity}
+                mapDistanceOverrides={distanceOverrides}
               />
 
               {/* FreehandLayer - handles freehand curve drawing */}
@@ -1550,7 +1558,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               <MapCanvas.MeasurementLayer
                 currentTool={currentTool}
                 globalSettings={effectiveSettings ?? undefined}
-                mapDistanceOverrides={mapData?.settings?.distanceSettings}
+                mapDistanceOverrides={distanceOverrides}
                 onMeasurementRouteChange={handleMeasurementRouteChange}
                 onSavedRoutesChange={handleSavedRoutesChange}
                 onTravelSettingsChange={handleTravelSettingsChange}
@@ -2042,7 +2050,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                             currentTool === 'addNote' ? 'Click to place note pin' :
                             currentTool === 'addText' ? 'Click to add text label' :
                               'Select a tool'
-            } | Undo/redo available | Middle-click or two-finger drag to pan | Scroll to zoom | Click compass to rotate | {getActiveLayer(mapData).cells.length} cells filled | {getActiveLayer(mapData).objects.length} objects placed | {getActiveLayer(mapData).textLabels.length} text labels
+            } | Undo/redo available | Middle-click, two-finger drag, or trackpad scroll to pan | Wheel or pinch to zoom | Click compass to rotate | {getActiveLayer(mapData).cells.length} cells filled | {getActiveLayer(mapData).objects.length} objects placed | {getActiveLayer(mapData).textLabels.length} text labels
           </div>
         )}
 
