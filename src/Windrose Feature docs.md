@@ -282,6 +282,10 @@ When inside a sub-region, there will be a **breadcrumb** UI above the tool palet
 
 If a given hex has a **sub-map** then a diamond icon will be shown in the center of that hex to indicate that.
 
+**Seamless zoom**: zooming all the way in on a hex that has a sub-map and continuing to zoom (wheel, trackpad pinch, or touch pinch) dives into that sub-map, opening it fit to the screen. Zooming out well past the sub-map's fit and continuing pops back up to the parent at the view you dove from. This only enters existing sub-maps — it never creates one.
+
+**Embedding a sub-map directly**: a `windrose-map` code block can open a specific sub-map with the `subhex` key — the value is the hex coordinate path from the root map, with `/` between nesting levels (e.g. `subhex: 0,0` or `subhex: 0,0/2,-1`). Get a ready-made block via right-click → "Copy sub-map embed" on any hex with a sub-map, or the header's copy-block button while drilled into one. If the path doesn't exist, the embed opens at the deepest level that does.
+
 ### Tiles (HEX ONLY)
 Hex maps support **tile images** — import a folder of tile images from your vault, and paint them onto individual hexes.
 

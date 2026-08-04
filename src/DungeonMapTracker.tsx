@@ -95,6 +95,8 @@ interface DungeonMapTrackerProps {
   mapName?: string;
   mapType?: MapType;
   notePath?: string;
+  /** Sub-hex path ('/'-joined hexKeys, e.g. "0,0/2,-1") to auto-drill into on load. */
+  initialSubHexPath?: string;
   /** Optional explicit MCP registration key. When provided and non-empty, overrides
    *  notePath as the key in window.__windrose.mcpInstances. Used by full-pane ItemViews
    *  which have notePath === '' and would otherwise be invisible to MCP tools. */
@@ -113,7 +115,7 @@ interface DungeonMapTrackerProps {
 // MAIN COMPONENT
 // ============================================================================
 
-const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', mcpKey, fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange, onMapDeleted }: DungeonMapTrackerProps): VNode => {
+const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', initialSubHexPath, mcpKey, fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange, onMapDeleted }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
   useThemeMode();
   const { mapData: rootMapData, isLoading, saveStatus, updateMapData: rootUpdateMapData, forceSave, markDeleted, tileImagesReady, getCachedImage } = useMapData(mapId, mapName, mapType);
@@ -130,8 +132,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     navigateToSibling,
     navigationVersion,
     adjacentSubHexes,
-    activeDistanceOverrides
-  } = useSubHexNavigation({ mapData: rootMapData, updateMapData: rootUpdateMapData });
+    activeDistanceOverrides,
+    subHexPath
+  } = useSubHexNavigation({ mapData: rootMapData, updateMapData: rootUpdateMapData, initialSubHexPath });
 
   // Distance overrides for the active map: sub-hex levels get live-derived
   // scale from the parent chain; the root map uses its own stored settings.
@@ -778,7 +781,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     mapData, mapId, geometry, updateMapData,
     handleLayerSelect, enterSubHex, exitSubHex, isInSubHex,
     navigateToSibling,
-    handleRegionsChange
+    handleRegionsChange,
+    subHexPath
   });
 
   // Player fog clearing on drop (reads latest state via functional updater, supports undo)
@@ -1187,6 +1191,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           onMapSelect={handleMapSelect}
           onNewMap={fullPane ? handleNewMap : undefined}
           onDeleteMap={fullPane ? () => { void handleDeleteMap(); } : undefined}
+          subHexPath={subHexPath}
         />
 
         {/* One-time upgrader notice pointing at the Features settings section. */}

@@ -10,7 +10,7 @@ import type { MapData, MapLayer, SubHexMapData, StoredViewState } from '#types/c
 import type { MapDataUpdater } from '#types/hooks/mapData.types';
 import type { MapDistanceOverrides, ResolvedDistanceSettings, SubHexDistanceLevel } from '../../drawing/distanceOperations';
 
-import { useCallback, useMemo, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { DEFAULTS, SCHEMA_VERSION } from '../../core/dmtConstants';
 import { isFeatureEnabled } from '../../core/featureFlags';
 import { getSettings } from '../../core/settingsAccessor';
@@ -36,6 +36,13 @@ interface BreadcrumbSegment {
 interface UseSubHexNavigationOptions {
   mapData: MapData | null;
   updateMapData: MapDataUpdater;
+  /**
+   * Optional sub-hex path to auto-drill into once the root map loads —
+   * hexKey segments separated by '/', e.g. "0,0" or "0,0/2,-1". Only
+   * EXISTING sub-maps are entered (drilling stops at a missing segment);
+   * applied once, so the user can freely navigate away afterwards.
+   */
+  initialSubHexPath?: string | null;
 }
 
 interface AdjacentSubHex {
@@ -66,6 +73,8 @@ interface UseSubHexNavigationResult {
    * unless it carries an explicit per-map override). Null at root level.
    */
   activeDistanceOverrides: ResolvedDistanceSettings | null;
+  /** Current drill-down path as '/'-joined hexKeys ("0,0/2,-1"); null at root. */
+  subHexPath: string | null;
 }
 
 // =========================================================================
@@ -144,7 +153,8 @@ function createSubHexMapData(parentMapData: MapData, q: number, r: number): SubH
 
 function useSubHexNavigation({
   mapData: rootMapData,
-  updateMapData: rootUpdateMapData
+  updateMapData: rootUpdateMapData,
+  initialSubHexPath
 }: UseSubHexNavigationOptions): UseSubHexNavigationResult {
 
   // Navigation stack: each frame holds the parent's state when we drilled down
@@ -470,6 +480,37 @@ function useSubHexNavigation({
     return adjacent;
   }, [isInSubHex, navStack]);
 
+  // Auto-drill into `initialSubHexPath` (embed blocks with a `subhex:` key).
+  // One segment per effect pass — enterSubHex reads state, so consecutive
+  // levels must each see the previous level committed. The counter only
+  // advances (never resets), so this runs once and never fights the user's
+  // own navigation afterwards. Missing segments stop the drill (drilling
+  // never creates sub-maps).
+  const initialPathAppliedRef = useRef(0);
+  useEffect(() => {
+    if (initialSubHexPath == null || initialSubHexPath === '') return;
+    const segments = initialSubHexPath.split('/').map(s => s.trim()).filter(s => s !== '');
+    const applied = initialPathAppliedRef.current;
+    if (applied >= segments.length) return;
+
+    const current = applied === 0 ? rootMapData : subHexMapData;
+    if (!current || navStack.length !== applied) return;
+
+    const [qStr, rStr] = segments[applied].split(',');
+    const q = parseInt(qStr, 10);
+    const r = parseInt(rStr, 10);
+    if (Number.isNaN(q) || Number.isNaN(r) || current.subHexMaps?.[`${q},${r}`] == null) {
+      initialPathAppliedRef.current = segments.length; // malformed or missing — stop drilling
+      return;
+    }
+
+    initialPathAppliedRef.current = applied + 1;
+    enterSubHex(q, r);
+  }, [initialSubHexPath, rootMapData, subHexMapData, navStack.length, enterSubHex]);
+
+  // Current drill-down path, for "copy embed block" to reference this sub-hex
+  const subHexPath = navStack.length > 0 ? navStack.map(f => f.hexKey).join('/') : null;
+
   // Live-derived distance settings for the active sub-hex: one parent hex
   // spans the sub-map, so each nesting level divides distance-per-cell by
   // the sub-grid's cells-across unless that level has an explicit override.
@@ -508,7 +549,8 @@ function useSubHexNavigation({
     navigationVersion,
     currentHexKey,
     adjacentSubHexes,
-    activeDistanceOverrides
+    activeDistanceOverrides,
+    subHexPath
   };
 }
 

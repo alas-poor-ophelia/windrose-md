@@ -38,6 +38,8 @@ interface UseCustomEventHandlersOptions {
   isInSubHex: boolean;
   navigateToSibling?: (q: number, r: number) => void;
   handleRegionsChange: (regions: Region[]) => void;
+  /** Current drill-down path ('/'-joined hexKeys), null at root. */
+  subHexPath?: string | null;
 }
 
 function useCustomEventHandlers({
@@ -50,7 +52,8 @@ function useCustomEventHandlers({
   exitSubHex,
   isInSubHex,
   navigateToSibling,
-  handleRegionsChange
+  handleRegionsChange,
+  subHexPath
 }: UseCustomEventHandlersOptions): void {
   const app = useApp();
 
@@ -248,7 +251,7 @@ function useCustomEventHandlers({
   }, [updateMapData]);
 
   // Hex context menu (extracted)
-  useHexContextMenu({ app, mapData, enterSubHex, handleRegionsChange });
+  useHexContextMenu({ app, mapData, mapId, subHexPath, enterSubHex, handleRegionsChange });
 }
 
 export { useCustomEventHandlers };

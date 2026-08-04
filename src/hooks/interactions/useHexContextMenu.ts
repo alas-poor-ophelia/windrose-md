@@ -2,7 +2,7 @@ import type { MapData, Region } from '#types/core/map.types';
 import type { App } from 'obsidian';
 
 import { useEffect } from 'preact/hooks';
-import { Menu } from 'obsidian';
+import { Menu, Notice } from 'obsidian';
 import type { MenuItem } from 'obsidian';
 import { openNativeNoteLinkModal } from '../../components/modals/NoteLinkModal';
 import { isFeatureEnabled } from '../../core/featureFlags';
@@ -11,6 +11,10 @@ import type { HexContextMenuDetail } from '../../core/windroseEvents';
 interface UseHexContextMenuOptions {
   app: App;
   mapData: MapData | null;
+  /** Root map id (the embed block always references the root map). */
+  mapId?: string;
+  /** Current drill-down path ('/'-joined hexKeys), null/undefined at root. */
+  subHexPath?: string | null;
   enterSubHex: (q: number, r: number) => void;
   handleRegionsChange: (regions: Region[]) => void;
 }
@@ -18,6 +22,8 @@ interface UseHexContextMenuOptions {
 function useHexContextMenu({
   app,
   mapData,
+  mapId,
+  subHexPath,
   enterSubHex,
   handleRegionsChange,
 }: UseHexContextMenuOptions): void {
@@ -38,6 +44,28 @@ function useHexContextMenu({
           item.setTitle(hasSubHex ? `Enter Sub-Hex (${q}, ${r})` : `Create Sub-Hex (${q}, ${r})`);
           item.setIcon(hasSubHex ? 'lucide-arrow-down-right' : 'lucide-plus-circle');
           item.onClick(() => enterSubHex(q, r));
+        });
+      }
+
+      // Copy an embed block that opens this sub-map directly in a note
+      if (hasSubHex && mapId != null && mapId !== '') {
+        const path = subHexPath != null && subHexPath !== '' ? `${subHexPath}/${hexKey}` : hexKey;
+        const subName = mapData.subHexMaps?.[hexKey]?.mapData?.name ?? '';
+        menu.addItem((item: MenuItem) => {
+          item.setTitle('Copy sub-map embed');
+          item.setIcon('lucide-copy');
+          item.onClick(() => {
+            const block = [
+              '```windrose-map',
+              `id: ${mapId}`,
+              `name: ${subName}`,
+              'type: hex',
+              `subhex: ${path}`,
+              '```'
+            ].join('\n');
+            void navigator.clipboard.writeText(block);
+            new Notice('Sub-map embed block copied');
+          });
         });
       }
 
@@ -113,7 +141,7 @@ function useHexContextMenu({
 
     activeDocument.addEventListener('windrose:hex-context-menu', handleHexContextMenu);
     return () => activeDocument.removeEventListener('windrose:hex-context-menu', handleHexContextMenu);
-  }, [app, mapData, enterSubHex, handleRegionsChange]);
+  }, [app, mapData, mapId, subHexPath, enterSubHex, handleRegionsChange]);
 }
 
 export { useHexContextMenu };

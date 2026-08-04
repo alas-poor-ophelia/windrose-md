@@ -18,9 +18,11 @@ interface MapHeaderProps {
   onMapSelect?: (entry: MapListEntry) => void;
   onNewMap?: () => void;
   onDeleteMap?: () => void;
+  /** Current sub-hex drill path; when set, the copied embed block opens this sub-map. */
+  subHexPath?: string | null;
 }
 
-const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFooter, fullPane, mapId, mapList, onMapSelect, onNewMap, onDeleteMap }: MapHeaderProps): VNode => {
+const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFooter, fullPane, mapId, mapList, onMapSelect, onNewMap, onDeleteMap, subHexPath }: MapHeaderProps): VNode => {
   const getStatusIcon = (): string => {
     if (saveStatus === 'Unsaved changes') return '○';
     if (saveStatus === 'Saving...') return '⟳';
@@ -56,10 +58,12 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
       `id: ${mapId}`,
       `name: ${mapName}`,
       `type: ${mapType}`,
+      // When drilled into a sub-hex, the block embeds that sub-map directly
+      ...(subHexPath != null && subHexPath !== '' ? [`subhex: ${subHexPath}`] : []),
       '```'
     ].join('\n');
     void navigator.clipboard.writeText(block);
-  }, [mapId, mapData.mapType, mapData.name]);
+  }, [mapId, mapData.mapType, mapData.name, subHexPath]);
 
   return (
     <div className="windrose-header">
