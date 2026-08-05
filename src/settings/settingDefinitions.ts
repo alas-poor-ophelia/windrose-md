@@ -10,6 +10,7 @@ import { getPackUnitOptions } from '../travel/travelPackOperations';
 import { DUNGEON_STYLE_NAMES } from '../generation/dungeonStyleColors';
 import { DUNGEON_STYLE_LABELS, addDungeonStyleColorPickers } from './tabs/TabRenderSettings';
 import { buildColorPaletteSections, buildTravelPackSections, buildTilesetSections, infoItem } from './settingDefinitionLists';
+import { buildObjectTypesSections } from './settingDefinitionObjects';
 import type { SettingsTabThis } from './tabs/settingsTabContext';
 
 // settingDefinitions.ts
@@ -461,10 +462,11 @@ function buildMeasurementGroup(tab: SettingsTabThis): SettingDefinitionItem {
 
 /**
  * Phases 1+2 definition set: stock-control sections plus the list sections
- * (Color palette, Travel packs, Tile sets — settingDefinitionLists.ts).
- * Object Types and Keyboard Shortcuts arrive in Phases 2b-3; until then this
- * array must stay behind the spike flag — on 1.13+ a non-empty return
- * renders ONLY these definitions. Section order mirrors the imperative tab.
+ * (Color palette, Travel packs, Tile sets — settingDefinitionLists.ts —
+ * and Object Types — settingDefinitionObjects.ts). Keyboard Shortcuts and
+ * the import banner arrive in Phase 3; until then this array must stay
+ * behind the spike flag — on 1.13+ a non-empty return renders ONLY these
+ * definitions. Section order mirrors the imperative tab.
  */
 function buildSettingDefinitions(tab: SettingsTabThis): SettingDefinitionItem[] {
   return [
@@ -477,7 +479,8 @@ function buildSettingDefinitions(tab: SettingsTabThis): SettingDefinitionItem[] 
     buildBehaviorGroup(),
     buildMeasurementGroup(tab),
     ...buildTravelPackSections(tab),
-    ...buildTilesetSections(tab)
+    ...buildTilesetSections(tab),
+    ...buildObjectTypesSections(tab)
   ];
 }
 

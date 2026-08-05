@@ -77,6 +77,11 @@ function colorRow(tab: SettingsTabThis, color: DisplayColor, isHidden: boolean):
     name: color.label,
     desc: hexText,
     render: (setting) => {
+      // Re-renders reuse the row element and re-invoke render (the framework
+      // only resets controlEl), so anything added outside controlEl must be
+      // cleared first or it accumulates.
+      setting.settingEl.querySelectorAll(':scope > .windrose-setting-color-swatch').forEach(n => n.remove());
+      setting.nameEl.querySelectorAll('.windrose-color-row-modified').forEach(n => n.remove());
       const swatch = createDiv({ cls: 'windrose-setting-color-swatch' });
       swatch.style.backgroundColor = color.color;
       swatch.style.opacity = String(opacity);
@@ -427,4 +432,4 @@ function buildTilesetSections(tab: SettingsTabThis): SettingDefinitionItem[] {
   return sections;
 }
 
-export { buildColorPaletteSections, buildTravelPackSections, buildTilesetSections, packSummary, packSlug, infoItem };
+export { buildColorPaletteSections, buildTravelPackSections, buildTilesetSections, packSummary, packSlug, infoItem, dedupeRowNames, saveAndRebuild };

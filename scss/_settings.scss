@@ -718,6 +718,14 @@
   flex-shrink: 0;
 }
 
+// Object symbol on declarative (1.13+) setting rows — prepended to the
+// .setting-item flex row like the color swatch below.
+.windrose-setting-object-symbol {
+  flex-shrink: 0;
+  align-self: center;
+  margin-right: 10px;
+}
+
 // Palette swatch on declarative (1.13+) setting rows — prepended to the
 // .setting-item flex row, so it needs its own centering and spacing.
 .windrose-setting-color-swatch {

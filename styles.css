@@ -9118,6 +9118,12 @@ button.windrose-breadcrumb-link {
   flex-shrink: 0;
 }
 
+.windrose-setting-object-symbol {
+  flex-shrink: 0;
+  align-self: center;
+  margin-right: 10px;
+}
+
 .windrose-setting-color-swatch {
   width: 24px;
   height: 24px;

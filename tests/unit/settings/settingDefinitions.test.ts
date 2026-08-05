@@ -26,8 +26,18 @@ function makeTab(overrides: Partial<PluginSettings> = {}): FakeTab {
     app: plugin.app,
     plugin,
     settingsChanged: false,
+    selectedMapType: 'grid',
+    objectFilter: '',
     refreshDomState: vi.fn(),
-    update: vi.fn()
+    update: vi.fn(),
+    getObjectSettingsForMapType() {
+      return {
+        objectOverrides: settings.gridObjectOverrides ?? {},
+        customObjects: settings.customGridObjects ?? [],
+        customCategories: settings.customGridCategories ?? []
+      };
+    },
+    updateObjectSettingsForMapType() { /* not exercised here */ }
   } as unknown as FakeTab;
 }
 
@@ -52,13 +62,21 @@ describe('buildSettingDefinitions', () => {
     const headings = defs.map(d => ('heading' in d ? d.heading : undefined));
     // undefined entries are the heading-less list/action sections that render
     // under the preceding section heading (see settingDefinitionLists.ts).
-    expect(headings).toEqual([
+    const fixedPrefix = [
       'Features', 'Hex map settings', 'Color settings',
       'Color palette', undefined,
       'Dungeon generation', 'Fog of war', 'Map behavior', 'Distance measurement',
       'Travel packs', undefined, undefined,
-      'Tile sets', undefined
-    ]);
+      'Tile sets', undefined,
+      'Object types', 'Object sets', undefined, 'Object customization'
+    ];
+    expect(headings.slice(0, fixedPrefix.length)).toEqual(fixedPrefix);
+    // The remainder is one named list per object category (count varies with
+    // the built-in set); no hidden-objects group on default settings.
+    const rest = headings.slice(fixedPrefix.length);
+    expect(rest.length).toBeGreaterThan(0);
+    expect(rest.every(h => typeof h === 'string' && h !== '')).toBe(true);
+    expect(rest.some(h => h?.startsWith('Hidden objects'))).toBe(false);
   });
 
   it('declares one toggle per gateable feature under features.* keys', () => {
