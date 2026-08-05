@@ -25,7 +25,7 @@
 
 import type { WallGap, WallGapTile, WallPath } from '#types/core/wallpath.types';
 
-import { projectPointToPolyline } from './wallPathOperations';
+import { projectPointToPolyline } from './segmentMath';
 
 // ===========================================
 // Constants
