@@ -63,28 +63,45 @@ async function setupModalInteract(
 
   modalEl.classList.add('windrose-native-modal-interactive');
 
-  const savedSize = loadModalSize(app);
-  if (savedSize && options.resizable === true) {
-    modalEl.style.setProperty('width', `${savedSize.width}px`);
-    modalEl.style.setProperty('height', `${savedSize.height}px`);
-  }
-
   const containerEl = modalEl.parentElement;
   if (containerEl) {
     containerEl.classList.add('windrose-modal-portal-container');
   }
 
-  const rect = modalEl.getBoundingClientRect();
-  if (containerEl) {
-    const containerRect = containerEl.getBoundingClientRect();
-    const x = (containerRect.width - rect.width) / 2;
-    const y = (containerRect.height - rect.height) / 2;
+  // The modal is position: fixed, so its coordinate frame is the VIEWPORT of
+  // its own window — never the parent container, whose rect can be larger
+  // than the viewport (observed live: 4456×1861 container in a 2488×1332
+  // window), which pushed the "centered" modal past the bottom-right corner.
+  const viewport = (): { w: number; h: number } => {
+    const win = modalEl.ownerDocument.defaultView ?? window;
+    return { w: win.innerWidth, h: win.innerHeight };
+  };
+
+  const savedSize = loadModalSize(app);
+  if (savedSize && options.resizable === true) {
+    // A size saved on a larger window must not exceed the current one
+    const { w, h } = viewport();
+    modalEl.style.setProperty('width', `${Math.min(savedSize.width, w)}px`);
+    modalEl.style.setProperty('height', `${Math.min(savedSize.height, h)}px`);
+  }
+
+  const centerInViewport = (): void => {
+    const rect = modalEl.getBoundingClientRect();
+    const { w, h } = viewport();
+    // Clamp so the top-left stays on-screen even when content overflows
+    const x = Math.max(0, (w - rect.width) / 2);
+    const y = Math.max(0, (h - rect.height) / 2);
     modalEl.style.setProperty('left', `${x}px`);
     modalEl.style.setProperty('top', `${y}px`);
     modalEl.classList.add('windrose-modal-centered');
     modalEl.dataset.x = String(x);
     modalEl.dataset.y = String(y);
-  }
+  };
+
+  centerInViewport();
+  // The portaled tab content mounts asynchronously after this measurement;
+  // re-center once it has painted so the position reflects the final size.
+  window.requestAnimationFrame(() => window.requestAnimationFrame(centerInViewport));
 
   if (options.resizable === true) {
     const edges = ['top', 'right', 'bottom', 'left', 'top-right', 'top-left', 'bottom-right', 'bottom-left'];

@@ -5684,8 +5684,28 @@ button.windrose-terrain-picker-item > span:nth-child(2),
   pointer-events: auto;
 }
 
-.windrose-native-modal-interactive {
+body .windrose-native-modal-interactive.windrose-native-modal-interactive {
   position: fixed;
+}
+
+.windrose-override-master {
+  border: 1px solid var(--background-modifier-border);
+  border-inline-start: 3px solid var(--text-muted);
+  border-radius: 6px;
+  padding: 2px 12px;
+  margin-block: 8px 12px;
+  background: var(--background-secondary);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.windrose-override-master .setting-item {
+  border-top: none;
+}
+.windrose-override-master .setting-item-name {
+  font-weight: 600;
+}
+.windrose-override-master.windrose-override-master-active {
+  border-inline-start-color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-secondary));
 }
 
 @keyframes fadeIn {

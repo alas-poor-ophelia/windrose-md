@@ -91,7 +91,7 @@ function CoordinateColorsContent(): VNode {
     <SettingItem
       name="Text Colors"
       description={useGlobalSettings
-        ? 'Using global settings (enable custom colors in Appearance tab to override)'
+        ? 'Using global settings (turn on "Custom appearance settings" in the Appearance tab to override)'
         : 'Custom colors for coordinate overlay text'}
       vertical
     >

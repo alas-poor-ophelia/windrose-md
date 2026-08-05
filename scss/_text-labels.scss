@@ -151,8 +151,38 @@
   }
 }
 
-.windrose-native-modal-interactive {
+// Doubled class + body qualifier (0,2,1): Obsidian 1.13's own .modal rules
+// out-rank a single class, leaving the modal position: relative inside the
+// flex-centered container — the JS-set left/top then SHIFT it from center
+// instead of placing it, pushing it past the bottom-right corner.
+body .windrose-native-modal-interactive.windrose-native-modal-interactive {
   position: fixed;
+}
+
+// Master override toggles in the map settings modal (Appearance/Measurement
+// tabs) — framed as a callout so they read as the tab's gate, not just
+// another settings row.
+.windrose-override-master {
+  border: 1px solid var(--background-modifier-border);
+  border-inline-start: 3px solid var(--text-muted);
+  border-radius: 6px;
+  padding: 2px 12px;
+  margin-block: 8px 12px;
+  background: var(--background-secondary);
+  transition: border-color 0.15s ease, background 0.15s ease;
+
+  .setting-item {
+    border-top: none;
+  }
+
+  .setting-item-name {
+    font-weight: 600;
+  }
+
+  &.windrose-override-master-active {
+    border-inline-start-color: var(--interactive-accent);
+    background: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-secondary));
+  }
 }
 
 @keyframes fadeIn {

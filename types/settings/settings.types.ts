@@ -132,9 +132,12 @@ export interface PluginSettings {
   canvasHeight: number;
   canvasHeightMobile: number;
 
-  // Canvas dimensions in picture frame mode (locked embed view)
+  // Canvas dimensions in picture frame mode (locked embed view).
+  // Width is optional: absent means the frame spans the note's content column.
   pictureFrameHeight?: number;
   pictureFrameHeightMobile?: number;
+  pictureFrameWidth?: number;
+  pictureFrameWidthMobile?: number;
 
   // Distance measurement settings
   distancePerCellGrid: number;

@@ -624,6 +624,14 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             : (effectiveSettings.canvasHeight ?? 600))
         : (isTouchDevice ? 400 : 600)));
 
+  // Width only applies in picture frame mode; unset means the frame spans
+  // the note's content column (the default embed behavior).
+  const canvasWidth = !fullPane && pictureFrameActive
+    ? (isTouchDevice
+        ? (effectiveSettings?.pictureFrameWidthMobile ?? null)
+        : (effectiveSettings?.pictureFrameWidth ?? null))
+    : null;
+
 
 
   // Compose settings close with alignment reset
@@ -1310,7 +1318,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
         <div
           className={`windrose-canvas-wrapper${fullPane ? ' windrose-full-pane-canvas' : ''}`}
-          style={canvasHeight != null ? { height: `${canvasHeight}px` } : undefined}
+          style={canvasHeight != null || canvasWidth != null ? {
+            ...(canvasHeight != null ? { height: `${canvasHeight}px` } : {}),
+            // Cap at the note column and center the frame when narrower
+            ...(canvasWidth != null ? { width: `${canvasWidth}px`, maxWidth: '100%', marginInline: 'auto' } : {})
+          } : undefined}
           onMouseEnter={() => setIsFocused(true)}
           onMouseLeave={() => setIsFocused(false)}
         >

@@ -300,15 +300,17 @@ function AppearanceTab(): VNode {
         </SettingItem>
       )}
 
-      <SettingItem
-        name="Custom colors"
-        description="Override global color settings for this map"
-      >
-        <NativeToggle
-          value={!useGlobalSettings}
-          onChange={handleToggleUseGlobal}
-        />
-      </SettingItem>
+      <div class={`windrose-override-master${useGlobalSettings ? '' : ' windrose-override-master-active'}`}>
+        <SettingItem
+          name="Custom appearance settings"
+          description="Override the global appearance for this map — colors, grid line width, fog of war, canvas and picture frame size, and coordinate text colors"
+        >
+          <NativeToggle
+            value={!useGlobalSettings}
+            onChange={handleToggleUseGlobal}
+          />
+        </SettingItem>
+      </div>
 
       <div style={{ opacity: useGlobalSettings ? 0.5 : 1 }}>
         <div
@@ -420,50 +422,74 @@ function AppearanceTab(): VNode {
 
       <SettingItem
         name="Picture Frame Size"
-        description="Height in pixels when this map is in picture frame mode (leave blank for global defaults)"
+        description="Size in pixels when this map is in picture frame mode (leave blank for global defaults; blank width spans the note)"
         vertical
       >
-        <div style={{ display: 'flex', gap: '12px', width: '100%', opacity: useGlobalSettings ? 0.5 : 1 }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Desktop</label>
-            <input
-              type="number"
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', opacity: useGlobalSettings ? 0.5 : 1 }}>
+          <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+            <FrameSizeInput
+              label="Height (desktop)"
               placeholder={String(globalSettings.pictureFrameHeight ?? 400)}
               value={useGlobalSettings ? '' : (overrides.pictureFrameHeight ?? '')}
-              onChange={(e: Event) => !useGlobalSettings && handleColorChange('pictureFrameHeight', (e.target as HTMLInputElement).value === '' ? undefined : parseInt((e.target as HTMLInputElement).value, 10))}
               disabled={useGlobalSettings}
-              style={{
-                width: '100%',
-                padding: '6px 10px',
-                borderRadius: '4px',
-                border: '1px solid var(--background-modifier-border)',
-                background: 'var(--background-primary)',
-                color: 'var(--text-normal)',
-                fontSize: '14px'
-              }}
+              onCommit={(v) => handleColorChange('pictureFrameHeight', v)}
             />
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Mobile</label>
-            <input
-              type="number"
+            <FrameSizeInput
+              label="Height (mobile)"
               placeholder={String(globalSettings.pictureFrameHeightMobile ?? 300)}
               value={useGlobalSettings ? '' : (overrides.pictureFrameHeightMobile ?? '')}
-              onChange={(e: Event) => !useGlobalSettings && handleColorChange('pictureFrameHeightMobile', (e.target as HTMLInputElement).value === '' ? undefined : parseInt((e.target as HTMLInputElement).value, 10))}
               disabled={useGlobalSettings}
-              style={{
-                width: '100%',
-                padding: '6px 10px',
-                borderRadius: '4px',
-                border: '1px solid var(--background-modifier-border)',
-                background: 'var(--background-primary)',
-                color: 'var(--text-normal)',
-                fontSize: '14px'
-              }}
+              onCommit={(v) => handleColorChange('pictureFrameHeightMobile', v)}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+            <FrameSizeInput
+              label="Width (desktop)"
+              placeholder={globalSettings.pictureFrameWidth != null ? String(globalSettings.pictureFrameWidth) : 'Full width'}
+              value={useGlobalSettings ? '' : (overrides.pictureFrameWidth ?? '')}
+              disabled={useGlobalSettings}
+              onCommit={(v) => handleColorChange('pictureFrameWidth', v)}
+            />
+            <FrameSizeInput
+              label="Width (mobile)"
+              placeholder={globalSettings.pictureFrameWidthMobile != null ? String(globalSettings.pictureFrameWidthMobile) : 'Full width'}
+              value={useGlobalSettings ? '' : (overrides.pictureFrameWidthMobile ?? '')}
+              disabled={useGlobalSettings}
+              onCommit={(v) => handleColorChange('pictureFrameWidthMobile', v)}
             />
           </div>
         </div>
       </SettingItem>
+    </div>
+  );
+}
+
+function FrameSizeInput({ label, placeholder, value, disabled, onCommit }: {
+  label: string;
+  placeholder: string;
+  value: number | string;
+  disabled: boolean;
+  onCommit: (value: number | undefined) => void;
+}): VNode {
+  return (
+    <div style={{ flex: 1 }}>
+      <label style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>{label}</label>
+      <input
+        type="number"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e: Event) => !disabled && onCommit((e.target as HTMLInputElement).value === '' ? undefined : parseInt((e.target as HTMLInputElement).value, 10))}
+        disabled={disabled}
+        style={{
+          width: '100%',
+          padding: '6px 10px',
+          borderRadius: '4px',
+          border: '1px solid var(--background-modifier-border)',
+          background: 'var(--background-primary)',
+          color: 'var(--text-normal)',
+          fontSize: '14px'
+        }}
+      />
     </div>
   );
 }

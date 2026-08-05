@@ -49,6 +49,8 @@ type DirectSettingKey =
   | 'canvasHeightMobile'
   | 'pictureFrameHeight'
   | 'pictureFrameHeightMobile'
+  | 'pictureFrameWidth'
+  | 'pictureFrameWidthMobile'
   | 'distancePerCellGrid'
   | 'distanceUnitGrid'
   | 'distancePerCellHex'
@@ -61,6 +63,7 @@ const DIRECT_KEYS = new Set<string>([
   'gridLineColor', 'gridLineWidth', 'backgroundColor', 'borderColor', 'coordinateKeyColor',
   'fogOfWarBlurEnabled', 'expandedByDefault', 'alwaysShowControls',
   'canvasHeight', 'canvasHeightMobile', 'pictureFrameHeight', 'pictureFrameHeightMobile',
+  'pictureFrameWidth', 'pictureFrameWidthMobile',
   'distancePerCellGrid', 'distanceUnitGrid', 'distancePerCellHex', 'distanceUnitHex',
   'gridDiagonalRule', 'distanceDisplayFormat',
 ] satisfies DirectSettingKey[]);
@@ -390,6 +393,16 @@ function buildBehaviorGroup(): SettingDefinitionItem {
         name: 'Picture frame height (mobile/touch)',
         desc: 'Height in pixels for embedded maps in picture frame mode on mobile and touch devices',
         control: { type: 'number', key: 'pictureFrameHeightMobile', placeholder: '300', step: 1 }
+      },
+      {
+        name: 'Picture frame width (desktop)',
+        desc: 'Width in pixels for picture frame mode on desktop. Leave blank to span the note.',
+        control: { type: 'number', key: 'pictureFrameWidth', placeholder: 'Full width', step: 1 }
+      },
+      {
+        name: 'Picture frame width (mobile/touch)',
+        desc: 'Width in pixels for picture frame mode on mobile and touch devices. Leave blank to span the note.',
+        control: { type: 'number', key: 'pictureFrameWidthMobile', placeholder: 'Full width', step: 1 }
       },
       {
         name: 'Link preview size',

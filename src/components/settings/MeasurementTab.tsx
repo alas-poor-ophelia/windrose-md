@@ -71,15 +71,17 @@ function MeasurementTab(): VNode {
 
   return (
     <div class="windrose-settings-tab-content">
-      <SettingItem
-        name="Custom measurement settings"
-        description="Override global distance settings for this map"
-      >
-        <NativeToggle
-          value={!distanceSettings.useGlobalDistance}
-          onChange={handleToggleUseGlobal}
-        />
-      </SettingItem>
+      <div class={`windrose-override-master${distanceSettings.useGlobalDistance ? '' : ' windrose-override-master-active'}`}>
+        <SettingItem
+          name="Custom measurement settings"
+          description="Override the global distance settings for this map — distance per cell, units, diagonal rule, and display format"
+        >
+          <NativeToggle
+            value={!distanceSettings.useGlobalDistance}
+            onChange={handleToggleUseGlobal}
+          />
+        </SettingItem>
+      </div>
 
       <div style={{ opacity: isDisabled ? 0.5 : 1 }}>
         <SettingItem name={`Distance per ${isHexMap ? 'Hex' : 'Cell'}`}>

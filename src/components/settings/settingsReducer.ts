@@ -68,6 +68,8 @@ export interface SettingsOverrides {
   canvasHeightMobile?: number;
   pictureFrameHeight?: number;
   pictureFrameHeightMobile?: number;
+  pictureFrameWidth?: number;
+  pictureFrameWidthMobile?: number;
   fogOfWarColor: HexColor;
   fogOfWarOpacity: number;
   fogOfWarImage: string | null;
@@ -629,6 +631,9 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
       canvasHeightMobile: o.canvasHeightMobile ?? globalSettings.canvasHeightMobile ?? 400,
       pictureFrameHeight: o.pictureFrameHeight ?? globalSettings.pictureFrameHeight ?? 400,
       pictureFrameHeightMobile: o.pictureFrameHeightMobile ?? globalSettings.pictureFrameHeightMobile ?? 300,
+      // No numeric fallback: undefined means the frame spans the note column
+      pictureFrameWidth: o.pictureFrameWidth ?? globalSettings.pictureFrameWidth,
+      pictureFrameWidthMobile: o.pictureFrameWidthMobile ?? globalSettings.pictureFrameWidthMobile,
       fogOfWarColor: o.fogOfWarColor ?? globalSettings.fogOfWarColor ?? '#000000',
       fogOfWarOpacity: o.fogOfWarOpacity ?? globalSettings.fogOfWarOpacity ?? 0.9,
       fogOfWarImage: o.fogOfWarImage ?? globalSettings.fogOfWarImage ?? null,
