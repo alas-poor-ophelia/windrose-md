@@ -16,7 +16,7 @@
         "@playwright/test": "^1.48.1",
         "@typescript-eslint/eslint-plugin": "^8.18.0",
         "@typescript-eslint/parser": "^8.18.0",
-        "brace-expansion": "^5.0.8",
+        "brace-expansion": "^5.0.9",
         "esbuild": "^0.28.1",
         "eslint": "^9.17.0",
         "eslint-plugin-obsidianmd": "0.4.1",
@@ -36,7 +36,7 @@
     },
   },
   "overrides": {
-    "brace-expansion": "^5.0.8",
+    "brace-expansion": "^5.0.9",
     "dompurify": "^3.4.11",
     "esbuild": "^0.28.1",
     "fast-uri": "^3.1.4",

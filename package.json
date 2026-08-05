@@ -35,7 +35,7 @@
     "@playwright/test": "^1.48.1",
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
-    "brace-expansion": "^5.0.8",
+    "brace-expansion": "^5.0.9",
     "esbuild": "^0.28.1",
     "eslint": "^9.17.0",
     "eslint-plugin-obsidianmd": "0.4.1",
@@ -59,6 +59,7 @@
     "ttrpg"
   ],
   "license": "MIT",
+  "//dependencies": "ajv, brace-expansion, minimatch, and picomatch are NOT imported by src/ — they are direct-dependency security pins forcing the resolver onto patched versions for the Obsidian store dependency scan (see //overrides). Do not prune them as unused. fflate is the only genuinely imported runtime dependency here besides preact (pinned in devDependencies).",
   "dependencies": {
     "@tanstack/virtual-core": "^3.17.0",
     "ajv": "^8.20.0",
@@ -70,7 +71,7 @@
   "//overrides": "Security pins for transitive dev/test tooling flagged by the Obsidian store dependency scan. None of these ship in main.js (esbuild externalizes obsidian/electron/codemirror; the mermaid subtree comes from obsidian-typings for type annotations only and is never imported at runtime). preact is the sole runtime-bundled package and is pinned separately in devDependencies.",
   "overrides": {
     "esbuild": "^0.28.1",
-    "brace-expansion": "^5.0.8",
+    "brace-expansion": "^5.0.9",
     "mermaid": "^11.16.0",
     "dompurify": "^3.4.11",
     "uuid": "^11.1.1",

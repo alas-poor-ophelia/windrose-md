@@ -205,7 +205,7 @@ function buildColorGroup(): SettingDefinitionItem {
         'gridLineColor', SETTING_DEFAULTS.DEFAULT_GRID_LINE_COLOR),
       {
         name: 'Grid line width',
-        desc: 'Thickness of grid lines in pixels (1-5). Applies to grid maps only.',
+        desc: 'Thickness of grid lines in pixels (1-5). Applies to grid and hex outlines.',
         control: { type: 'slider', key: 'gridLineWidth', min: 1, max: 5, step: 1, defaultValue: 1 }
       },
       colorItem('Background color', 'Canvas background color',

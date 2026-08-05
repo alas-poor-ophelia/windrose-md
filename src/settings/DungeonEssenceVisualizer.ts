@@ -60,6 +60,15 @@ interface VisualizerSettings {
 interface VisualizerOptions {
   height?: number;
   settings?: Partial<VisualizerSettings>;
+  /**
+   * Body element to sample Obsidian theme CSS variables from. Pass the MAIN
+   * app window's body (e.g. `app.workspace.containerEl.ownerDocument.body`): popout
+   * window bodies lack Obsidian's custom properties (--text-muted etc.), so
+   * sampling `activeDocument.body` from a focused popout silently falls back
+   * to the hardcoded default colors. (Audited 2026-06-20; re-broken once by a
+   * mechanical prefer-active-doc sweep — do not "fix" this back.)
+   */
+  themeBody?: HTMLElement;
 }
 
 interface SmoothDampResult {
@@ -82,9 +91,11 @@ export class DungeonEssenceVisualizer {
   width: number;
   stampSize: number;
   lastTime: number;
+  themeBody: HTMLElement | null;
 
   constructor(container: HTMLElement, options: VisualizerOptions = {}) {
     this.container = container;
+    this.themeBody = options.themeBody ?? null;
     this.height = options.height != null && options.height !== 0 ? options.height : 150;
     this.width = 0;
     this.stampSize = 0;
@@ -136,7 +147,9 @@ export class DungeonEssenceVisualizer {
   }
 
   sampleColors(): void {
-    const style = getComputedStyle(activeDocument.body);
+    // See VisualizerOptions.themeBody: theme vars must come from the main app
+    // window's body — a popout's activeDocument.body lacks them.
+    const style = getComputedStyle(this.themeBody ?? activeDocument.body);
     this.colors = {
       node: style.getPropertyValue('--text-muted').trim() || '#888',
       nodePulse: style.getPropertyValue('--interactive-accent').trim() || '#7c5cbf',

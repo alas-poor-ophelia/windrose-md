@@ -322,7 +322,9 @@ class InsertDungeonModal extends Modal {
 
     this.visualizer = new DungeonEssenceVisualizer(visualizerContainer, {
       height: 180,
-      settings: this.getVisualizerSettings()
+      settings: this.getVisualizerSettings(),
+      // Main app window's body — popout bodies lack the theme CSS vars.
+      themeBody: this.app.workspace.containerEl.ownerDocument.body
     });
     this.applyVisualizerTint();
     this.visualizer.start();

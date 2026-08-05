@@ -8,6 +8,7 @@
 import type { WallPath, WallPathId, WallVertex } from '#types/core/wallpath.types';
 
 import { flattenWallPath } from '../geometry/renderers/wallPathRenderer';
+import { closestPointOnSegment } from './segmentMath';
 
 /** Nearest-point projection of a world point onto a flattened polyline. */
 interface PolylineProjection {
@@ -38,16 +39,9 @@ function projectPointToPolyline(
 	for (let i = 1; i < points.length; i++) {
 		const [x0, y0] = points[i - 1];
 		const [x1, y1] = points[i];
-		const len2 = (x1 - x0) ** 2 + (y1 - y0) ** 2;
-		let t = 0;
-		if (len2 > 0) {
-			t = Math.max(0, Math.min(1, ((wx - x0) * (x1 - x0) + (wy - y0) * (y1 - y0)) / len2));
-		}
-		const px = x0 + t * (x1 - x0);
-		const py = y0 + t * (y1 - y0);
-		const d = Math.hypot(wx - px, wy - py);
-		if (best == null || d < best.dist) {
-			best = { segIndex: i, t, x: px, y: py, dist: d };
+		const proj = closestPointOnSegment(x0, y0, x1, y1, wx, wy);
+		if (best == null || proj.dist < best.dist) {
+			best = { segIndex: i, t: proj.t, x: proj.x, y: proj.y, dist: proj.dist };
 		}
 	}
 	return best;

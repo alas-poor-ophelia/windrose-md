@@ -18,7 +18,10 @@ import type { App } from 'obsidian';
 import { Modal, Notice, Setting } from 'obsidian';
 import type {
   TravelPack,
+  TravelUnit,
+  TravelTerrain,
   TravelMode,
+  TravelAllowance,
   TravelTimeUnit,
 } from '#types/settings/travelPack.types';
 import type { WindrosePlugin } from '../tabs/settingsTabContext';
@@ -38,10 +41,19 @@ import {
 const DEFAULT_TERRAIN_COLOR = '#a8a29e';
 const MODE_TIME_UNITS: TravelTimeUnit[] = ['minutes', 'hours', 'days'];
 
+/** Maps each pack list key to its entity type so patchItem patches typecheck */
+interface PackItemTypes {
+  units: TravelUnit;
+  terrains: TravelTerrain;
+  modes: TravelMode;
+  allowances: TravelAllowance;
+}
+
 class TravelPackEditModal extends Modal {
   private plugin: WindrosePlugin;
   private packId: string;
   private onChanged: () => void;
+  private notifyTimer: number | null = null;
 
   constructor(app: App, plugin: WindrosePlugin, packId: string, onChanged: () => void) {
     super(app);
@@ -54,11 +66,32 @@ class TravelPackEditModal extends Modal {
     return (this.plugin.settings.travelPacks ?? []).find(p => p.id === this.packId) ?? null;
   }
 
+  /**
+   * Settings mutate synchronously; persistence + onChanged fan out either
+   * immediately (structural edits, rerender=true) or debounced (per-keystroke
+   * text edits, rerender=false). onChanged rebuilds the settings tab behind
+   * the modal AND dispatches windrose-settings-changed to every open map
+   * view — per-character that cascade is a full-app refresh storm.
+   */
   private commit(pack: TravelPack, rerender: boolean): void {
     this.plugin.settings.travelPacks = upsertTravelPack(this.plugin.settings.travelPacks ?? [], pack);
+    if (rerender) {
+      this.flushNotify();
+      this.render();
+    } else {
+      if (this.notifyTimer != null) window.clearTimeout(this.notifyTimer);
+      this.notifyTimer = window.setTimeout(() => this.flushNotify(), 600);
+    }
+  }
+
+  /** Persist settings and notify listeners, cancelling any pending debounce */
+  private flushNotify(): void {
+    if (this.notifyTimer != null) {
+      window.clearTimeout(this.notifyTimer);
+      this.notifyTimer = null;
+    }
     void this.plugin.saveSettings();
     this.onChanged();
-    if (rerender) this.render();
   }
 
   /**
@@ -67,15 +100,15 @@ class TravelPackEditModal extends Modal {
    * entity would clobber every other field edited since the last re-render
    * (the stale-closure clobber: type a name, then a factor, name reverts).
    */
-  private patchItem(
-    key: 'units' | 'terrains' | 'modes' | 'allowances',
+  private patchItem<K extends keyof PackItemTypes>(
+    key: K,
     itemId: string,
-    patch: Record<string, unknown>,
+    patch: Partial<PackItemTypes[K]>,
     rerender = false
   ): void {
     const current = this.getPack();
     if (!current) return;
-    const item = (current[key] as { id: string }[]).find(e => e.id === itemId);
+    const item = (current[key] as PackItemTypes[K][]).find(e => e.id === itemId);
     if (!item) return;
     this.commit(upsertPackItem(current, key, { ...item, ...patch }), rerender);
   }
@@ -357,7 +390,8 @@ class TravelPackEditModal extends Modal {
         }
         dropdown.setValue(mode.timeUnit);
         dropdown.onChange(value => {
-          this.patchItem('modes', mode.id, { timeUnit: value });
+          // Options are populated from MODE_TIME_UNITS, so the cast is sound
+          this.patchItem('modes', mode.id, { timeUnit: value as TravelTimeUnit });
         });
       });
       row.addExtraButton(btn => btn
@@ -409,7 +443,8 @@ class TravelPackEditModal extends Modal {
         dropdown.addOption('minutes', 'Minutes/day');
         dropdown.setValue(allowance.timeUnit);
         dropdown.onChange(value => {
-          this.patchItem('allowances', allowance.id, { timeUnit: value });
+          // Options are 'hours'/'minutes' only, matching the allowance union
+          this.patchItem('allowances', allowance.id, { timeUnit: value as TravelAllowance['timeUnit'] });
         });
       });
       row.addExtraButton(btn => btn
@@ -423,6 +458,9 @@ class TravelPackEditModal extends Modal {
   }
 
   onClose(): void {
+    // Flush any debounced text-edit save so closing the modal never drops
+    // the last keystrokes.
+    if (this.notifyTimer != null) this.flushNotify();
     this.contentEl.empty();
   }
 }

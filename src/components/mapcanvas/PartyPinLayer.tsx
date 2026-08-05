@@ -196,12 +196,15 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
   const relatedMap = useMemo((): Map<string, RelatedNotes> | undefined => {
     const mode = pin?.relatedMode ?? 'off';
     if (mode === 'off' || pin == null || results.linked.length === 0) return undefined;
+    // Materialize the vault-wide tag table ONCE per recompute: getRelatedByTags
+    // iterates noteTags() fully per result, so a per-call generator would
+    // rescan every markdown file for every in-range note (O(results × vault)).
+    const noteTagsTable: Array<[string, string[]]> = mode === 'tags'
+      ? app.vault.getMarkdownFiles().map(file =>
+        [file.path, extractCacheTags(app.metadataCache.getFileCache(file))])
+      : [];
     const source: RelatedNotesSource = {
-      noteTags: function* (): Generator<[string, string[]]> {
-        for (const file of app.vault.getMarkdownFiles()) {
-          yield [file.path, extractCacheTags(app.metadataCache.getFileCache(file))];
-        }
-      },
+      noteTags: () => noteTagsTable,
       resolvedLinks: () => app.metadataCache.resolvedLinks
     };
     const excludePaths = pin.partyNote?.path != null && pin.partyNote.path !== '' ? [pin.partyNote.path] : [];

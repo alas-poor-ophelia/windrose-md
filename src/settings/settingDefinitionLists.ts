@@ -373,9 +373,9 @@ function tilesetFolderRow(tab: SettingsTabThis, folderPath: string, index: numbe
   return {
     name: `Tile folder ${index + 1}`,
     render: (setting) => {
+      let detectTimer: number | undefined;
       setting.addSearch(search => {
         new FolderSuggest(tab.app, search.inputEl);
-        let detectTimer: number | undefined;
         search
           .setPlaceholder('Assets/tiles/baumgart')
           .setValue(folderPath)
@@ -393,6 +393,10 @@ function tilesetFolderRow(tab: SettingsTabThis, folderPath: string, index: numbe
             }, FOLDER_DETECT_DEBOUNCE_MS);
           });
       });
+      // Drop a pending detection if the row is torn down mid-debounce
+      return () => {
+        if (detectTimer != null) window.clearTimeout(detectTimer);
+      };
     }
   };
 }

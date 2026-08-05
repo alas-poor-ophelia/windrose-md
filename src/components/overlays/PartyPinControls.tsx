@@ -30,6 +30,7 @@ import {
   PARTY_PIN_DEFAULTS
 } from '../../objects/partyPinOperations';
 import { openNoteInNewTab } from '../../persistence/noteOperations';
+import { findCanvasContainer } from '../../hooks/canvas/useLiveOverlayTransform';
 import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition';
 import { ColorPicker } from '../shared/ColorPicker';
 import { IconPickerPopup } from '../shared/IconPickerPopup';
@@ -131,13 +132,7 @@ const PartyPinControls = ({
     const canvasRect = canvas.getBoundingClientRect();
     const displayScale = canvasRect.width / canvasWidth;
 
-    container = canvas.parentElement;
-    let traversalCount = 0;
-    while (container?.classList && !container.classList.contains('windrose-canvas-container')) {
-      container = container.parentElement;
-      traversalCount++;
-      if (traversalCount > 10) break;
-    }
+    container = findCanvasContainer(canvas);
 
     if (container) {
       const containerRect = container.getBoundingClientRect();

@@ -14,6 +14,7 @@
 import type { Point, IGeometry } from '#types/core/geometry.types';
 import type { MeasurementRoute, SavedRoute } from '#types/core/map.types';
 import type { DiagonalRule } from '#types/settings/settings.types';
+import { closestPointOnSegment } from './segmentMath';
 
 /** Defaults for a freshly saved route */
 const SAVED_ROUTE_DEFAULTS = {
@@ -128,13 +129,7 @@ function sumDistances(segments: number[]): number {
  * space). Used for route hover/tap hit-testing.
  */
 function distanceToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
-  const dx = bx - ax;
-  const dy = by - ay;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq === 0) return Math.hypot(px - ax, py - ay);
-  let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
-  t = Math.max(0, Math.min(1, t));
-  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+  return closestPointOnSegment(ax, ay, bx, by, px, py).dist;
 }
 
 /**

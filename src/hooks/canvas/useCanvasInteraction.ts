@@ -156,7 +156,12 @@ function useCanvasInteraction(
 
   // (Re)arm the settle timer that commits the in-flight wheel gesture once
   // ticks stop. Shared by wheel zoom, pinch zoom, and trackpad wheel pan.
+  // A drag/touch pan owns the active gesture and commits it in stopPan — a
+  // wheel tick mid-pan must not arm a settle timer against the pan's token:
+  // firing mid-drag would commit a stale position, null the token so stopPan's
+  // commit no-ops, and re-enable syncCommitted's snap-back during the drag.
   const armWheelSettle = (): void => {
+    if (isPanningRef.current || isTouchPanningRef.current) return;
     const gid = gestureIdRef.current;
     if (gid == null) return;
     if (wheelSettleTimerRef.current != null) window.clearTimeout(wheelSettleTimerRef.current);
