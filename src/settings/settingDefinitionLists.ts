@@ -10,6 +10,7 @@ import {
   serializeTravelPack,
   setTravelPackEnabled,
   upsertTravelPack,
+  validateTravelPackImport,
 } from '../travel/travelPackOperations';
 import { ColorHelpers } from './helpers/colorHelpers';
 import { FolderSuggest } from './helpers/FolderSuggest';
@@ -219,6 +220,35 @@ function packSlug(name: string): string {
   return slug === '' ? 'pack' : slug;
 }
 
+async function importTravelPackFile(tab: SettingsTabThis, file: File): Promise<void> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await file.text());
+  } catch {
+    new Notice('Import failed: the file is not valid JSON');
+    return;
+  }
+
+  const result = validateTravelPackImport(parsed);
+  if (!result.valid || result.pack == null) {
+    new Notice('Import failed:\n' + result.errors.slice(0, 5).join('\n'), 10000);
+    return;
+  }
+
+  const existing = (tab.plugin.settings.travelPacks ?? []).find(p => p.id === result.pack?.id);
+  if (existing != null) {
+    const confirmed = await new ConfirmModal(tab.app, {
+      message: `A travel pack with this id already exists ("${existing.name}"). Replace it with "${result.pack.name}"?`,
+      confirmText: 'Replace pack'
+    }).openAndGetValue();
+    if (!confirmed) return;
+  }
+
+  tab.plugin.settings.travelPacks = upsertTravelPack(tab.plugin.settings.travelPacks ?? [], result.pack);
+  saveAndRebuild(tab);
+  new Notice(`Imported travel pack "${result.pack.name}"`);
+}
+
 function travelPackRow(tab: SettingsTabThis, pack: TravelPack): SettingGroupItem {
   return {
     name: pack.name,
@@ -320,7 +350,7 @@ function buildTravelPackSections(tab: SettingsTabThis): SettingDefinitionItem[] 
             input.addEventListener('change', () => {
               const file = input.files?.[0];
               if (!file) return;
-              void tab.importTravelPackFile(file).then(() => tab.update());
+              void importTravelPackFile(tab, file);
             });
             input.click();
           }

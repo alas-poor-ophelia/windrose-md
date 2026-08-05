@@ -9,11 +9,6 @@ interface WindrosePlugin {
   hasOldPluginData(): Promise<boolean>;
 }
 
-interface SectionRef {
-  details: HTMLDetailsElement & { settingItems?: HTMLElement[] };
-  title: string;
-}
-
 interface ObjectSettingsForMapType {
   objectOverrides: Record<string, ObjectOverride>;
   customObjects: CustomObject[];
@@ -26,69 +21,25 @@ interface ObjectSettingsUpdate {
   customCategories?: CustomCategory[];
 }
 
+/**
+ * Structural surface of WindroseMDSettingsTab consumed by the declarative
+ * definition builders (settingDefinitions.ts, settingDefinitionLists.ts,
+ * settingDefinitionObjects.ts). update()/refreshDomState() come from the
+ * Obsidian 1.13 SettingTab base class.
+ */
 interface SettingsTabThis {
-  // From PluginSettingTab
   app: App;
   containerEl: HTMLElement;
-
-  // From constructor
   plugin: WindrosePlugin;
   settingsChanged: boolean;
-  objectFilter: string;
   selectedMapType: 'grid' | 'hex';
-
-  // Dynamic properties
-  noResultsEl: HTMLElement;
-  sections: SectionRef[];
   /** Result of the async hasOldPluginData() check, kicked off at construction
    *  so getSettingDefinitions() stays synchronous and cheap. */
   cachedHasOldData: boolean;
-
-  // From SettingTab (Obsidian 1.13 declarative API; only invoked on 1.13+)
   update(): void;
   refreshDomState(): void;
-
-  // Class methods
-  display(): void;
   getObjectSettingsForMapType(): ObjectSettingsForMapType;
   updateObjectSettingsForMapType(updates: ObjectSettingsUpdate): void;
-  createCollapsibleSection(containerEl: HTMLElement, title: string, renderFn: (el: HTMLElement) => void, options?: { open?: boolean }): HTMLDetailsElement;
-
-  // Core mixin
-  renderSearchBar(containerEl: HTMLElement): void;
-
-  // Settings mixin
-  renderHexSettingsContent(el: HTMLElement): void;
-  renderColorSettingsContent(el: HTMLElement): void;
-  renderMapGenerationSettingsContent(el: HTMLElement): void;
-  renderFogOfWarSettingsContent(el: HTMLElement): void;
-  renderMapBehaviorSettingsContent(el: HTMLElement): void;
-  renderDistanceMeasurementSettingsContent(el: HTMLElement): void;
-
-  // Colors mixin
-  renderColorPaletteContent(el: HTMLElement): void;
-  renderColorList(container: HTMLElement): void;
-  renderColorRow(container: HTMLElement, color: Record<string, unknown>, index: number, isCustom: boolean): void;
-
-  // Objects mixin
-  renderObjectTypesContent(el: HTMLElement): void;
-  renderObjectList(container: HTMLElement): void;
-  renderObjectRow(container: HTMLElement, obj: Record<string, unknown>, isCustom: boolean, index?: number): void;
-  renderObjectSetsBlock(containerEl: HTMLElement): void;
-  setupDragDropForList(listEl: HTMLElement, items: unknown[], onReorder: () => void): void;
-
-  // Features mixin
-  renderFeaturesContent(el: HTMLElement): void;
-
-  // Tilesets mixin
-  renderTilesetFoldersContent(el: HTMLElement): void;
-
-  // Travel packs mixin
-  renderTravelPacksContent(el: HTMLElement): void;
-  importTravelPackFile(file: File): Promise<void>;
-
-  // Keyboard shortcuts mixin
-  renderKeyboardShortcutsContent(el: HTMLElement): void;
 }
 
-export type { SettingsTabThis, WindrosePlugin, SectionRef, ObjectSettingsForMapType, ObjectSettingsUpdate };
+export type { SettingsTabThis, WindrosePlugin, ObjectSettingsForMapType, ObjectSettingsUpdate };

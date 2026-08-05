@@ -1,6 +1,7 @@
-import type { SettingDefinitionItem, SettingGroupItem } from 'obsidian';
+import type { Setting, SettingDefinitionItem, SettingGroupItem } from 'obsidian';
 import { Notice, Platform } from 'obsidian';
 import type { WindroseFeature } from '#types/settings/settings.types';
+import type { DungeonStyleName, DungeonStyleColors } from '#types/core/map.types';
 import type { InstalledPack } from '#types/content-packs/contentPack.types';
 import { THEME, DEFAULTS } from '../core/dmtConstants';
 import { FEATURE_DEFINITIONS, isFeatureEnabled } from '../core/featureFlags';
@@ -8,18 +9,16 @@ import { ContentPackBrowserModal } from '../content-packs/ContentPackBrowserModa
 import { getInstalledPacks } from '../content-packs/installedPacksService';
 import { fogPackImagePath } from '../content-packs/contentPackConstants';
 import { getPackUnitOptions } from '../travel/travelPackOperations';
-import { DUNGEON_STYLE_NAMES } from '../generation/dungeonStyleColors';
-import { DUNGEON_STYLE_LABELS, addDungeonStyleColorPickers } from './tabs/TabRenderSettings';
+import { DUNGEON_STYLE_NAMES, DUNGEON_STYLE_COLOR_DEFAULTS } from '../generation/dungeonStyleColors';
 import { buildColorPaletteSections, buildTravelPackSections, buildTilesetSections, infoItem } from './settingDefinitionLists';
 import { buildObjectTypesSections } from './settingDefinitionObjects';
 import type { SettingsTabThis } from './tabs/settingsTabContext';
 
 // settingDefinitions.ts
 // Declarative Settings API (Obsidian 1.13+) definition arrays and control
-// value plumbing for WindroseMDSettingsTab. Phase 1 of the migration in
-// docs/proposals/settings-api-migration.md: all stock-control sections.
-// The imperative TabRender* mixins remain as the pre-1.13 display() fallback
-// until Phase 4 demolition.
+// value plumbing for WindroseMDSettingsTab: stock-control sections, dungeon
+// style pickers, keyboard shortcuts, and the import banner. List sections
+// live in settingDefinitionLists.ts / settingDefinitionObjects.ts.
 
 const SETTING_DEFAULTS = {
   DEFAULT_GRID_LINE_COLOR: THEME.grid.lines,
@@ -214,6 +213,50 @@ function buildColorGroup(): SettingDefinitionItem {
         'coordinateKeyColor', SETTING_DEFAULTS.DEFAULT_COORDINATE_KEY_COLOR)
     ]
   };
+}
+
+const DUNGEON_STYLE_LABELS: Record<DungeonStyleName, string> = {
+  classic: 'Classic',
+  cavern: 'Cavern',
+  fortress: 'Fortress',
+  crypt: 'Crypt'
+};
+
+const DUNGEON_COLOR_CHANNELS: Array<keyof DungeonStyleColors> = ['floor', 'wall', 'water'];
+
+/**
+ * Attach the three per-style generation color pickers (floor, wall, water)
+ * plus a reset button to a Setting row.
+ */
+function addDungeonStyleColorPickers(
+  tab: SettingsTabThis,
+  setting: Setting,
+  style: DungeonStyleName,
+  onReset: () => void
+): void {
+  const defaults = DUNGEON_STYLE_COLOR_DEFAULTS[style];
+  for (const channel of DUNGEON_COLOR_CHANNELS) {
+    setting.addColorPicker(picker => picker
+      .setValue(tab.plugin.settings.dungeonStyleColors?.[style]?.[channel] ?? defaults[channel])
+      .onChange(async (value: string) => {
+        const overrides = tab.plugin.settings.dungeonStyleColors ?? {};
+        overrides[style] = { ...overrides[style], [channel]: value };
+        tab.plugin.settings.dungeonStyleColors = overrides;
+        tab.settingsChanged = true;
+        await tab.plugin.saveSettings();
+      }));
+  }
+  setting.addExtraButton(btn => btn
+    .setIcon('rotate-ccw')
+    .setTooltip('Reset to defaults')
+    .onClick(async () => {
+      if (tab.plugin.settings.dungeonStyleColors) {
+        delete tab.plugin.settings.dungeonStyleColors[style];
+      }
+      tab.settingsChanged = true;
+      await tab.plugin.saveSettings();
+      onReset();
+    }));
 }
 
 function buildDungeonGenerationGroup(tab: SettingsTabThis): SettingDefinitionItem {

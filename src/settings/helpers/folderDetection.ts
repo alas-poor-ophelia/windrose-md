@@ -9,8 +9,8 @@ import {
 } from '../../persistence/tileMetadata';
 
 // folderDetection.ts
-// Auto-detection for folder-added tilesets, shared by the imperative tab
-// (TabRenderTilesets) and the declarative setting definitions.
+// Auto-detection for folder-added tilesets, used by the declarative tile
+// set definitions (settingDefinitionLists.ts).
 
 /** Debounce before a committed folder path triggers auto-detection. */
 const FOLDER_DETECT_DEBOUNCE_MS = 1200;
