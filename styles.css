@@ -5684,10 +5684,6 @@ button.windrose-terrain-picker-item > span:nth-child(2),
   pointer-events: auto;
 }
 
-body .windrose-native-modal-interactive.windrose-native-modal-interactive {
-  position: fixed;
-}
-
 .windrose-override-master {
   border: 1px solid var(--background-modifier-border);
   border-inline-start: 3px solid var(--text-muted);

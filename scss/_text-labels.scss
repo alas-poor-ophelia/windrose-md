@@ -151,13 +151,11 @@
   }
 }
 
-// Doubled class + body qualifier (0,2,1): Obsidian 1.13's own .modal rules
-// out-rank a single class, leaving the modal position: relative inside the
-// flex-centered container — the JS-set left/top then SHIFT it from center
-// instead of placing it, pushing it past the bottom-right corner.
-body .windrose-native-modal-interactive.windrose-native-modal-interactive {
-  position: fixed;
-}
+// Interactive modals keep Obsidian's own positioning: the modal container
+// flex-centers its child (correct at any size, re-centers on window resize),
+// and drag/resize apply left/top as offsets from that centered rest position.
+// Do NOT force position: fixed here — fighting the host's .modal rules is
+// what previously pushed the modal past the bottom-right corner.
 
 // Master override toggles in the map settings modal (Appearance/Measurement
 // tabs) — framed as a callout so they read as the tab's gate, not just
