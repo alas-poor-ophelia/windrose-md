@@ -39,6 +39,7 @@ hooks/
 │   ├── useHistory.ts            # Undo/redo stack
 │   ├── useDataHandlers.ts       # Data persistence coordination
 │   ├── useToolState.ts          # Current tool selection
+│   ├── useMcpBridge.ts          # window.__windrose.mcpInstances registration (MCP server + E2E ops)
 │   ├── usePanelState.ts         # Panel visibility state
 │   ├── useUILayout.ts           # UI layout calculations
 │   └── useViewControls.ts       # View control state
