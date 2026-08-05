@@ -1,52 +1,12 @@
 import type { SettingsTabThis } from './settingsTabContext';
-import { Platform, Setting } from 'obsidian';
+import { Setting } from 'obsidian';
+import { SHORTCUT_ACTIONS, DEFAULT_SHORTCUTS, formatKeyLabel as formatKey } from '../settingDefinitions';
 
 // settingsPlugin-TabRenderKeyboardShortcuts.ts
 // WindroseMDSettingsTab render methods - Keyboard Shortcuts section
 
-interface ShortcutAction {
-  id: string;
-  label: string;
-  scope: string;
-}
-
 export const TabRenderKeyboardShortcutsMethods = {
   renderKeyboardShortcutsContent(this: SettingsTabThis, containerEl: HTMLElement): void {
-    const SHORTCUT_ACTIONS: ShortcutAction[] = [
-      { id: 'selectTool', label: 'Select Tool', scope: 'Map hover' },
-      { id: 'drawTool', label: 'Draw Tool', scope: 'Map hover' },
-      { id: 'freehandTool', label: 'Freehand Draw', scope: 'Map hover' },
-      { id: 'eraseTool', label: 'Erase Tool', scope: 'Map hover' },
-      { id: 'notePinTool', label: 'Place Note Pin', scope: 'Map hover' },
-      { id: 'measureTool', label: 'Measure Distance', scope: 'Map hover' },
-      { id: 'panMode', label: 'Pan (hold)', scope: 'Map hover' },
-      { id: 'showCoordinates', label: 'Show Coordinates', scope: 'Map hover' },
-      { id: 'rotate', label: 'Rotate Selected', scope: 'Object selected' },
-      { id: 'layerPrev', label: 'Previous Layer', scope: 'Map hover' },
-      { id: 'layerNext', label: 'Next Layer', scope: 'Map hover' },
-      { id: 'undo', label: 'Undo', scope: 'Map hover' },
-      { id: 'redo', label: 'Redo', scope: 'Map hover' },
-      { id: 'pictureFrame', label: 'Picture Frame Mode', scope: 'Map hover (embedded maps)' }
-    ];
-
-    const DEFAULT_SHORTCUTS: Record<string, string> = {
-      selectTool: 's', drawTool: 'd', freehandTool: 'f', eraseTool: 'e',
-      notePinTool: 'n', measureTool: 'm', panMode: 'Space', showCoordinates: 'c',
-      rotate: 'r', layerPrev: '[', layerNext: ']', undo: 'Mod+Z', redo: 'Mod+Y',
-      pictureFrame: 'p'
-    };
-
-    const isMac = Platform.isMacOS;
-
-    function formatKey(keyStr: string): string {
-      if (!keyStr) return '—';
-      return keyStr
-        .replace(/Mod\+/gi, isMac ? '⌘' : 'Ctrl+')
-        .replace(/Shift\+/gi, isMac ? '⇧' : 'Shift+')
-        .replace(/Alt\+/gi, isMac ? '⌥' : 'Alt+')
-        .replace('Space', '␣');
-    }
-
     containerEl.createEl('p', {
       text: 'Keyboard shortcuts activate when the mouse is over the map canvas. Click a shortcut to rebind it.',
       cls: 'setting-item-description'

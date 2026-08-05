@@ -1,4 +1,5 @@
 import type { SettingDefinitionItem, SettingGroupItem } from 'obsidian';
+import { Notice, Platform } from 'obsidian';
 import type { WindroseFeature } from '#types/settings/settings.types';
 import type { InstalledPack } from '#types/content-packs/contentPack.types';
 import { THEME, DEFAULTS } from '../core/dmtConstants';
@@ -460,16 +461,214 @@ function buildMeasurementGroup(tab: SettingsTabThis): SettingDefinitionItem {
   };
 }
 
+// --- Import banner (Phase 3) ---
+
+function buildImportBannerItem(tab: SettingsTabThis): SettingDefinitionItem {
+  return {
+    name: 'Import settings from previous installation',
+    desc: 'Found settings from the previous installation. Import object sets, custom objects, and overrides.',
+    searchable: false,
+    visible: () => tab.cachedHasOldData && tab.plugin.settings.oldImportBannerDismissed !== true,
+    render: (setting) => {
+      setting.addButton(btn => btn
+        .setButtonText('Import')
+        .setCta()
+        .onClick(async () => {
+          const { imported } = await tab.plugin.mergeFromOldPlugin();
+          if (imported.length > 0) {
+            new Notice(`Windrose: Imported ${imported.join(', ')}`, 10000);
+            tab.plugin.settings.oldImportBannerDismissed = true;
+            await tab.plugin.saveSettings();
+            tab.settingsChanged = true;
+            tab.update();
+          } else {
+            new Notice('Windrose: Nothing new to import — all settings already present.', 5000);
+          }
+        }));
+      setting.addButton(btn => btn
+        .setButtonText('Dismiss')
+        .onClick(async () => {
+          tab.plugin.settings.oldImportBannerDismissed = true;
+          await tab.plugin.saveSettings();
+          tab.refreshDomState();
+        }));
+    }
+  };
+}
+
+// --- Keyboard shortcuts (Phase 3) ---
+
+interface ShortcutAction {
+  id: string;
+  label: string;
+  scope: string;
+}
+
+const SHORTCUT_ACTIONS: ShortcutAction[] = [
+  { id: 'selectTool', label: 'Select Tool', scope: 'Map hover' },
+  { id: 'drawTool', label: 'Draw Tool', scope: 'Map hover' },
+  { id: 'freehandTool', label: 'Freehand Draw', scope: 'Map hover' },
+  { id: 'eraseTool', label: 'Erase Tool', scope: 'Map hover' },
+  { id: 'notePinTool', label: 'Place Note Pin', scope: 'Map hover' },
+  { id: 'measureTool', label: 'Measure Distance', scope: 'Map hover' },
+  { id: 'panMode', label: 'Pan (hold)', scope: 'Map hover' },
+  { id: 'showCoordinates', label: 'Show Coordinates', scope: 'Map hover' },
+  { id: 'rotate', label: 'Rotate Selected', scope: 'Object selected' },
+  { id: 'layerPrev', label: 'Previous Layer', scope: 'Map hover' },
+  { id: 'layerNext', label: 'Next Layer', scope: 'Map hover' },
+  { id: 'undo', label: 'Undo', scope: 'Map hover' },
+  { id: 'redo', label: 'Redo', scope: 'Map hover' },
+  { id: 'pictureFrame', label: 'Picture Frame Mode', scope: 'Map hover (embedded maps)' }
+];
+
+const DEFAULT_SHORTCUTS: Record<string, string> = {
+  selectTool: 's', drawTool: 'd', freehandTool: 'f', eraseTool: 'e',
+  notePinTool: 'n', measureTool: 'm', panMode: 'Space', showCoordinates: 'c',
+  rotate: 'r', layerPrev: '[', layerNext: ']', undo: 'Mod+Z', redo: 'Mod+Y',
+  pictureFrame: 'p'
+};
+
+function formatKeyLabel(keyStr: string): string {
+  if (!keyStr) return '—';
+  const isMac = Platform.isMacOS;
+  return keyStr
+    .replace(/Mod\+/gi, isMac ? '⌘' : 'Ctrl+')
+    .replace(/Shift\+/gi, isMac ? '⇧' : 'Shift+')
+    .replace(/Alt\+/gi, isMac ? '⌥' : 'Alt+')
+    .replace('Space', '␣');
+}
+
+function shortcutRow(tab: SettingsTabThis, action: ShortcutAction): SettingGroupItem {
+  return {
+    name: action.label,
+    desc: action.scope,
+    render: (setting) => {
+      const shortcuts = tab.plugin.settings.keyboardShortcuts ?? {};
+      const currentKey = shortcuts[action.id] || DEFAULT_SHORTCUTS[action.id] || '';
+
+      const kbdEl = setting.controlEl.createDiv({ cls: 'windrose-kbd-container' }).createEl('kbd', {
+        text: formatKeyLabel(currentKey),
+        cls: 'windrose-kbd-key'
+      });
+      kbdEl.setCssStyles({
+        cursor: 'pointer',
+        padding: '2px 8px',
+        border: '1px solid var(--background-modifier-border)',
+        borderRadius: '4px',
+        fontFamily: 'var(--font-monospace)',
+        fontSize: '0.85em',
+        minWidth: '24px',
+        textAlign: 'center',
+        display: 'inline-block',
+        background: 'var(--background-secondary)'
+      });
+
+      // The 1.13 settings window is a popout with its own window object —
+      // key capture must listen there, not on the plugin's main window.
+      const captureWin = kbdEl.ownerDocument.defaultView ?? window;
+      let isCapturing = false;
+      let activeHandler: ((e: KeyboardEvent) => void) | null = null;
+
+      kbdEl.addEventListener('click', () => {
+        if (isCapturing) return;
+        isCapturing = true;
+        kbdEl.textContent = 'Press a key...';
+        kbdEl.setCssStyles({ color: 'var(--text-accent)', borderColor: 'var(--text-accent)' });
+
+        const captureHandler = (e: KeyboardEvent): void => {
+          e.preventDefault();
+          e.stopPropagation();
+
+          if (e.key === 'Escape') {
+            kbdEl.textContent = formatKeyLabel(currentKey);
+            kbdEl.setCssStyles({ color: '', borderColor: 'var(--background-modifier-border)' });
+            isCapturing = false;
+            captureWin.removeEventListener('keydown', captureHandler, true);
+            activeHandler = null;
+            return;
+          }
+
+          if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;
+
+          let newKey = '';
+          if (e.ctrlKey || e.metaKey) newKey += 'Mod+';
+          if (e.shiftKey) newKey += 'Shift+';
+          if (e.altKey) newKey += 'Alt+';
+
+          if (e.key === ' ') newKey += 'Space';
+          else if (e.key.length === 1) newKey += e.key.toLowerCase();
+          else newKey += e.key;
+
+          tab.plugin.settings.keyboardShortcuts ??= Object.assign({}, DEFAULT_SHORTCUTS);
+          tab.plugin.settings.keyboardShortcuts[action.id] = newKey;
+          tab.settingsChanged = true;
+          void tab.plugin.saveSettings();
+
+          kbdEl.textContent = formatKeyLabel(newKey);
+          kbdEl.setCssStyles({ color: '', borderColor: 'var(--background-modifier-border)' });
+          isCapturing = false;
+          captureWin.removeEventListener('keydown', captureHandler, true);
+          activeHandler = null;
+        };
+
+        activeHandler = captureHandler;
+        captureWin.addEventListener('keydown', captureHandler, true);
+      });
+
+      setting.addExtraButton(btn => btn
+        .setIcon('rotate-ccw')
+        .setTooltip('Reset to default')
+        .onClick(async () => {
+          tab.plugin.settings.keyboardShortcuts ??= Object.assign({}, DEFAULT_SHORTCUTS);
+          tab.plugin.settings.keyboardShortcuts[action.id] = DEFAULT_SHORTCUTS[action.id];
+          tab.settingsChanged = true;
+          await tab.plugin.saveSettings();
+          tab.update();
+        }));
+
+      // Drop a dangling capture listener if the row is torn down mid-capture
+      return () => {
+        if (activeHandler != null) {
+          captureWin.removeEventListener('keydown', activeHandler, true);
+        }
+      };
+    }
+  };
+}
+
+function buildKeyboardShortcutsGroup(tab: SettingsTabThis): SettingDefinitionItem {
+  return {
+    type: 'group',
+    heading: 'Keyboard shortcuts',
+    items: [
+      infoItem('Keyboard shortcuts activate when the mouse is over the map canvas. Click a shortcut to rebind it.'),
+      ...SHORTCUT_ACTIONS.map(action => shortcutRow(tab, action)),
+      {
+        name: 'Reset all shortcuts',
+        desc: 'Restore all keyboard shortcuts to their default values',
+        action: () => {
+          void (async () => {
+            tab.plugin.settings.keyboardShortcuts = Object.assign({}, DEFAULT_SHORTCUTS);
+            tab.settingsChanged = true;
+            await tab.plugin.saveSettings();
+            tab.update();
+          })();
+        }
+      }
+    ]
+  };
+}
+
 /**
- * Phases 1+2 definition set: stock-control sections plus the list sections
- * (Color palette, Travel packs, Tile sets — settingDefinitionLists.ts —
- * and Object Types — settingDefinitionObjects.ts). Keyboard Shortcuts and
- * the import banner arrive in Phase 3; until then this array must stay
- * behind the spike flag — on 1.13+ a non-empty return renders ONLY these
- * definitions. Section order mirrors the imperative tab.
+ * Full declarative definition set (Phases 1-3): every section of the
+ * imperative tab, in the same order, plus the import banner up top. Still
+ * behind the spike flag until the Phase 4 cut-over (minAppVersion bump +
+ * imperative demolition); on 1.13+ a non-empty return renders ONLY these
+ * definitions and skips display() entirely.
  */
 function buildSettingDefinitions(tab: SettingsTabThis): SettingDefinitionItem[] {
   return [
+    buildImportBannerItem(tab),
     buildFeaturesGroup(),
     buildHexGroup(),
     buildColorGroup(),
@@ -480,8 +679,9 @@ function buildSettingDefinitions(tab: SettingsTabThis): SettingDefinitionItem[] 
     buildMeasurementGroup(tab),
     ...buildTravelPackSections(tab),
     ...buildTilesetSections(tab),
-    ...buildObjectTypesSections(tab)
+    ...buildObjectTypesSections(tab),
+    buildKeyboardShortcutsGroup(tab)
   ];
 }
 
-export { buildSettingDefinitions, getSettingControlValue, setSettingControlValue };
+export { buildSettingDefinitions, getSettingControlValue, setSettingControlValue, SHORTCUT_ACTIONS, DEFAULT_SHORTCUTS, formatKeyLabel };

@@ -63,6 +63,7 @@ describe('buildSettingDefinitions', () => {
     // undefined entries are the heading-less list/action sections that render
     // under the preceding section heading (see settingDefinitionLists.ts).
     const fixedPrefix = [
+      undefined, // import banner (bare row, visible only with cached old data)
       'Features', 'Hex map settings', 'Color settings',
       'Color palette', undefined,
       'Dungeon generation', 'Fog of war', 'Map behavior', 'Distance measurement',
@@ -169,6 +170,30 @@ describe('buildSettingDefinitions', () => {
     const dropdown = controlItems(measurement).find(i => i.control.key === 'distanceUnitHex');
     const options = (dropdown?.control as { options: Record<string, string> }).options;
     expect(options.lg).toBe('lg (pack disabled)');
+  });
+
+  it('shows the import banner only with cached old data and not dismissed', () => {
+    const tab = makeTab();
+    const banner = buildSettingDefinitions(tab)[0];
+    expect('render' in banner && typeof banner.render === 'function').toBe(true);
+    const visible = ('visible' in banner ? banner.visible : undefined) as () => boolean;
+    expect(typeof visible).toBe('function');
+    (tab as unknown as { cachedHasOldData: boolean }).cachedHasOldData = false;
+    expect(visible()).toBe(false);
+    (tab as unknown as { cachedHasOldData: boolean }).cachedHasOldData = true;
+    expect(visible()).toBe(true);
+    tab.plugin.settings.oldImportBannerDismissed = true;
+    expect(visible()).toBe(false);
+  });
+
+  it('declares one capture row per shortcut action plus a reset-all action', () => {
+    const shortcuts = groupByHeading(buildSettingDefinitions(makeTab()), 'Keyboard shortcuts');
+    const items = shortcuts.items ?? [];
+    const captureRows = items.filter(i => 'render' in i && typeof i.render === 'function' && 'name' in i && i.name !== '');
+    expect(captureRows.map(i => ('name' in i ? i.name : ''))).toContain('Undo');
+    expect(captureRows).toHaveLength(14);
+    const resetAll = items.find(i => 'name' in i && i.name === 'Reset all shortcuts');
+    expect(resetAll != null && 'action' in resetAll && typeof resetAll.action === 'function').toBe(true);
   });
 
   it('rejects non-positive distances via validate', () => {

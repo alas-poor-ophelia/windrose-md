@@ -5,6 +5,8 @@ interface WindrosePlugin {
   app: App;
   settings: PluginSettings;
   saveSettings(): Promise<void>;
+  mergeFromOldPlugin(): Promise<{ imported: string[] }>;
+  hasOldPluginData(): Promise<boolean>;
 }
 
 interface SectionRef {
@@ -38,6 +40,9 @@ interface SettingsTabThis {
   // Dynamic properties
   noResultsEl: HTMLElement;
   sections: SectionRef[];
+  /** Result of the async hasOldPluginData() check, kicked off at construction
+   *  so getSettingDefinitions() stays synchronous and cheap. */
+  cachedHasOldData: boolean;
 
   // From SettingTab (Obsidian 1.13 declarative API; only invoked on 1.13+)
   update(): void;

@@ -57,6 +57,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
   selectedMapType: 'grid' | 'hex';
   noResultsEl!: HTMLElement;
   sections: SectionRef[];
+  cachedHasOldData: boolean;
 
   constructor(app: App, plugin: WindrosePlugin) {
     super(app, plugin);
@@ -65,6 +66,19 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     this.objectFilter = '';
     this.selectedMapType = 'grid';
     this.sections = [];
+    // Definitions must stay synchronous, so the old-plugin-data check runs
+    // once here; the import banner's visible() reads the cached result.
+    this.cachedHasOldData = false;
+    void this.plugin.hasOldPluginData().then(hasOld => {
+      this.cachedHasOldData = hasOld;
+      // Re-evaluate banner visibility if the declarative tab already
+      // rendered. Structural access keeps the pre-1.13 fallback path free of
+      // 1.13-only API references; the typeof guard is the runtime gate.
+      const refresh = (this as { refreshDomState?: () => void }).refreshDomState;
+      if (hasOld && typeof refresh === 'function') {
+        refresh.call(this);
+      }
+    });
   }
 
   private renderImportBanner(containerEl: HTMLElement): void {
