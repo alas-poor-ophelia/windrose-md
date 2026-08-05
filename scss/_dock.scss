@@ -553,28 +553,6 @@ button.windrose-dock-panel-collapse {
   border-radius: 4px;
 }
 
-.windrose-dock-board-tab {
-  padding: 3px 8px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: oklch(from var(--windrose-border-primary) l c h / 0.1);
-  color: var(--windrose-text-muted);
-  font-size: 11px;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
-
-  &:hover {
-    background: oklch(from var(--windrose-border-primary) l c h / 0.2);
-  }
-
-  &.active {
-    background: oklch(from var(--windrose-text-primary) l c h / 0.16);
-    color: var(--windrose-text-primary);
-    font-weight: 600;
-  }
-}
-
 .windrose-dock-board-actions {
   display: flex;
   align-items: center;
@@ -875,20 +853,6 @@ button.windrose-dock-panel-collapse {
   border-radius: 4px;
   color: var(--windrose-text-muted);
   font-size: 11px;
-}
-
-/* Phase 7 Board->Strata->Layer buttons — neutralize Obsidian's injected padding/background */
-.is-tablet button.windrose-dock-board-tab {
-  padding: 3px 8px;
-  background: oklch(from var(--windrose-border-primary) l c h / 0.1);
-  border: 1px solid transparent;
-  border-radius: 4px;
-  color: var(--windrose-text-muted);
-
-  &.active {
-    background: oklch(from var(--windrose-text-primary) l c h / 0.16);
-    color: var(--windrose-text-primary);
-  }
 }
 
 .is-tablet button.windrose-dock-board-btn {

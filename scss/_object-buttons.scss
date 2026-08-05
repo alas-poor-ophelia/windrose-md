@@ -16,66 +16,6 @@
   z-index: 1000;
 }
 
-.windrose-rotate-button,
-.windrose-note-button,
-.windrose-link-note-button,
-.windrose-resize-button {
-  width: 32px;
-  height: 32px;
-  background-color: oklch(from var(--windrose-accent-blue) l c h/0.9);
-  border: 2px solid var(--windrose-text-primary);
-  border-radius: 50%;
-  color: var(--windrose-text-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: var(--windrose-transition);
-  z-index: 150;
-  user-select: none;
-  box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.3);
-
-  &:hover {
-    background-color: var(--windrose-accent-blue);
-    transform: scale(1.1);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-}
-
-.windrose-rotate-button {
-  font-size: 20px;
-}
-
-.windrose-resize-button {
-  font-size: 18px;
-}
-
-.windrose-note-button svg {
-  width: 18px;
-  height: 18px;
-  color: var(--windrose-text-primary);
-}
-
-.windrose-link-note-button svg {
-  width: 18px;
-  height: 18px;
-  color: var(--windrose-text-primary);
-}
-
-.windrose-selected-object-note {
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
-  padding: 4px 8px;
-  white-space: nowrap;
-  box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.3);
-  z-index: 150;
-  position: relative;
-}
-
 .windrose-note-display-link {
   display: flex;
   align-items: center;

@@ -80,7 +80,7 @@
     padding: 0 2px;
 
     &.is-error {
-      color: oklch(70% 0.14 75deg);
+      color: var(--windrose-error);
     }
   }
 

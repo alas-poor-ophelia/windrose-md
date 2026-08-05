@@ -190,24 +190,6 @@ button.windrose-fow-toggle-btn.expanded,
   color: var(--windrose-text-muted);
 }
 
-/* FoW tools panel (expandable) */
-.windrose-fow-tools-panel {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  overflow: hidden;
-  max-width: 0;
-  opacity: 0;
-  transition: max-width 200ms ease-out, opacity 200ms ease-out, margin 200ms ease-out;
-}
-.windrose-fow-tools-panel.expanded {
-  max-width: 250px;
-  opacity: 1;
-  margin-left: 4px;
-  padding-left: 4px;
-  border-left: 1px solid var(--windrose-border-secondary);
-}
-
 /* Individual FoW tool buttons - with tablet overrides */
 .is-tablet button.windrose-fow-tool-btn,
 button.windrose-fow-tool-btn,
@@ -495,41 +477,6 @@ button.windrose-edge-rail-btn {
   z-index: 9;
 }
 
-/* Inner content is pinned to the full 198px so it clips (rather than reflows)
-   while the drawer width animates — the same trick the right drawer uses. */
-.windrose-edge-rail-drawer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex: 0 0 auto;
-  box-sizing: border-box;
-  width: 198px;
-  padding: 7px 10px;
-  font-family: "Cinzel", serif;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--windrose-gold-bright);
-  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.5);
-}
-
-.windrose-edge-rail-drawer-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px;
-  background: transparent;
-  border: none;
-  border-radius: 3px;
-  color: var(--windrose-text-muted);
-  cursor: pointer;
-  box-shadow: none;
-
-  &:hover {
-    color: var(--windrose-text-primary);
-    background: var(--windrose-bg-tertiary);
-  }
-}
-
 .windrose-edge-rail-drawer-body {
   flex: 1 1 auto;
   box-sizing: border-box;
@@ -557,17 +504,6 @@ button.windrose-edge-rail-btn {
     border-color: oklch(from var(--windrose-gold-bright) l c h / 0.5);
     background: oklch(from var(--windrose-gold-bright) l c h / 0.12);
   }
-}
-
-.is-tablet button.windrose-edge-rail-drawer-close {
-  width: auto;
-  height: auto;
-  padding: 2px;
-  background: transparent;
-  border: none;
-  border-radius: 3px;
-  box-shadow: none;
-  color: var(--windrose-text-muted);
 }
 
 .is-tablet button.windrose-visibility-btn {
@@ -708,7 +644,7 @@ button.windrose-layer-option-btn {
 }
 
 .windrose-layer-option-btn:hover {
-  color: var(--windrose-text-normal);
+  color: var(--windrose-text-primary);
   border-color: oklch(from var(--windrose-border-primary) l c h/0.6);
 }
 
@@ -945,7 +881,7 @@ button.windrose-region-item {
 }
 
 .windrose-region-item:hover {
-  border-color: var(--windrose-accent-muted);
+  border-color: var(--windrose-border-primary-dark);
   background: var(--windrose-bg-tertiary);
 }
 
@@ -1016,7 +952,7 @@ button.windrose-region-visibility-btn {
 button.windrose-breadcrumb-link {
   background: none;
   border: none;
-  color: var(--windrose-accent-primary);
+  color: var(--windrose-accent-blue);
   cursor: pointer;
   padding: 2px 4px;
   border-radius: 3px;

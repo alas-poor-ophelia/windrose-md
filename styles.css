@@ -1485,40 +1485,6 @@ button.windrose-object-grid-item:hover,
   box-sizing: border-box;
 }
 
-/* ---- Corner brackets ---- */
-.windrose-tb-bracket {
-  position: absolute;
-  width: 15px;
-  height: 15px;
-  pointer-events: none;
-  z-index: 6;
-  opacity: 0.42;
-}
-.windrose-tb-bracket svg {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-.windrose-tb-bracket-tl {
-  top: 5px;
-  left: 5px;
-}
-.windrose-tb-bracket-tr {
-  top: 5px;
-  right: 5px;
-  transform: scaleX(-1);
-}
-.windrose-tb-bracket-bl {
-  bottom: 5px;
-  left: 5px;
-  transform: scaleY(-1);
-}
-.windrose-tb-bracket-br {
-  bottom: 5px;
-  right: 5px;
-  transform: scale(-1, -1);
-}
-
 /* ---- Header ----
    Flat, quiet header — no gradient, sits on the drawer background. The title
    matches the right dock's panel headers (uppercase, muted) rather than the old
@@ -1608,36 +1574,6 @@ button.windrose-object-grid-item:hover,
   background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h/0.07), oklch(0% 0 0deg / 0.06));
   border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.2);
   flex-shrink: 0;
-}
-
-/* ---- Tileset selector ---- */
-.windrose-tb-tileset {
-  padding: 4px 10px;
-  border-bottom: 1px solid var(--windrose-border-secondary);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.windrose-tb-tileset-select {
-  flex: 1;
-  min-width: 0;
-  background: var(--windrose-bg-secondary);
-  color: var(--windrose-text-primary);
-  border: 1px solid var(--windrose-border-secondary);
-  border-radius: 3px;
-  padding: 3px 4px;
-  font-size: 11px;
-}
-
-.windrose-tb-tileset-name {
-  flex: 1;
-  font-size: 12px;
-  color: var(--windrose-text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* ---- Tileset config panel ---- */
@@ -2201,12 +2137,6 @@ button.windrose-object-grid-item:hover,
   overflow: hidden;
 }
 
-.windrose-tb-raildiv {
-  height: 1px;
-  background: var(--windrose-border-secondary);
-  margin: 6px 4px;
-}
-
 .windrose-tb-raillabel {
   font-size: 8px;
   font-weight: 700;
@@ -2262,12 +2192,6 @@ button.windrose-object-grid-item:hover,
   background: oklch(from var(--windrose-bg-primary) calc(l + 0.04) c h);
   padding: 1px 6px;
   border-radius: 999px;
-}
-
-/* ---- Tile grid ---- */
-.windrose-tb-grid {
-  display: grid;
-  gap: 6px;
 }
 
 /* ---- Tile list view (dense rows) ---- */
@@ -2930,9 +2854,6 @@ input.windrose-tb-spanin:focus {
 .windrose-tb-iconbtn,
 .windrose-tb-seclabel,
 .windrose-tb-card,
-.windrose-tb-tileset-tab,
-.windrose-tb-mosaic-card,
-.windrose-tb-foot-clear,
 .windrose-tb-listrow,
 .windrose-tb-packchip,
 .windrose-tb-packclear) {
@@ -3546,7 +3467,6 @@ button:is(.windrose-tb-railbtn,
 .windrose-tb-packclear,
 .windrose-fd-ribtab,
 .windrose-fd-subtool,
-.windrose-tile-spine-expand,
 .windrose-tile-spine-fbtn,
 .windrose-spine-flyout-close):not(:hover):not(.on):not(.sel):not(.active) {
   background-color: transparent;
@@ -3807,18 +3727,6 @@ button:is(.windrose-tb-iconbtn,
 }
 
 /* Collapsed-spine buttons — keep their fixed icon-button boxes on tablet */
-.is-tablet button.windrose-tile-spine-expand {
-  width: 100%;
-  height: 34px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.22);
-  border-radius: 0;
-  box-shadow: none;
-  color: var(--windrose-gold-bright);
-}
-
 .is-tablet button.windrose-tile-spine-fbtn {
   width: 28px;
   height: 28px;
@@ -3867,27 +3775,6 @@ button:is(.windrose-tb-iconbtn,
   flex-direction: column;
   height: 100%;
   background: linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h/0.08), transparent 90px), var(--windrose-bg-primary);
-}
-
-/* Expand button at top of spine */
-.windrose-tile-spine-expand {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 34px;
-  flex-shrink: 0;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.22);
-  color: var(--windrose-gold-bright, var(--windrose-border-primary));
-  cursor: pointer;
-}
-.windrose-tile-spine-expand:hover {
-  background: oklch(from var(--windrose-border-primary) l c h/0.14);
-}
-.is-compact .windrose-tile-spine-expand {
-  height: 30px;
 }
 
 /* Loaded-tile chip at bottom of spine */
@@ -4163,70 +4050,6 @@ button:is(.windrose-tb-iconbtn,
   pointer-events: none;
   position: fixed;
   z-index: 1000;
-}
-
-.windrose-rotate-button,
-.windrose-note-button,
-.windrose-link-note-button,
-.windrose-resize-button {
-  width: 32px;
-  height: 32px;
-  background-color: oklch(from var(--windrose-accent-blue) l c h/0.9);
-  border: 2px solid var(--windrose-text-primary);
-  border-radius: 50%;
-  color: var(--windrose-text-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: var(--windrose-transition);
-  z-index: 150;
-  user-select: none;
-  box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.3);
-}
-.windrose-rotate-button:hover,
-.windrose-note-button:hover,
-.windrose-link-note-button:hover,
-.windrose-resize-button:hover {
-  background-color: var(--windrose-accent-blue);
-  transform: scale(1.1);
-}
-.windrose-rotate-button:active,
-.windrose-note-button:active,
-.windrose-link-note-button:active,
-.windrose-resize-button:active {
-  transform: scale(0.95);
-}
-
-.windrose-rotate-button {
-  font-size: 20px;
-}
-
-.windrose-resize-button {
-  font-size: 18px;
-}
-
-.windrose-note-button svg {
-  width: 18px;
-  height: 18px;
-  color: var(--windrose-text-primary);
-}
-
-.windrose-link-note-button svg {
-  width: 18px;
-  height: 18px;
-  color: var(--windrose-text-primary);
-}
-
-.windrose-selected-object-note {
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
-  padding: 4px 8px;
-  white-space: nowrap;
-  box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.3);
-  z-index: 150;
-  position: relative;
 }
 
 .windrose-note-display-link {
@@ -5414,7 +5237,7 @@ button.windrose-measure-controls-btn:disabled,
   padding: 0 2px;
 }
 .windrose-measure-controls-travel-line.is-error {
-  color: oklch(70% 0.14 75deg);
+  color: var(--windrose-error);
 }
 .windrose-measure-controls-travel-name {
   flex: 1;
@@ -5862,9 +5685,6 @@ button.windrose-terrain-picker-item > span:nth-child(2),
   padding: 12px;
   background-color: oklch(0% 0 0deg / 0.2);
   border-radius: 6px;
-}
-.windrose-settings-upgrade-container .windrose-plugin-installer-card {
-  margin: 0;
 }
 
 /* Fallback (non-native) modal: cap the inner height */
@@ -6488,8 +6308,8 @@ button.windrose-icon-picker-cell:hover,
 .is-tablet button.windrose-icon-picker-cell.is-selected,
 button.windrose-icon-picker-cell.is-selected,
 .windrose-icon-picker-cell.is-selected {
-  background-color: oklch(from var(--windrose-accent-gold, #c4a57b) l c h/0.25);
-  border-color: var(--windrose-accent-gold, #c4a57b);
+  background-color: oklch(from var(--windrose-gold-bright) l c h/0.25);
+  border-color: var(--windrose-gold-bright);
 }
 
 .windrose-icon-picker-glyph {
@@ -6501,7 +6321,7 @@ button.windrose-icon-picker-cell.is-selected,
 .windrose-icon-picker-empty {
   grid-column: 1/-1;
   padding: 12px 0;
-  color: var(--windrose-text-muted, var(--windrose-text-disabled));
+  color: var(--windrose-text-muted);
   font-size: 12px;
   text-align: center;
 }
@@ -6801,192 +6621,6 @@ button.windrose-icon-picker-cell.is-selected,
   }
 }
 /* ============================================
-   PLUGIN INSTALLER
-   ============================================ */
-.windrose-plugin-installer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 400px;
-  padding: 20px;
-  background: var(--windrose-bg-primary);
-}
-.windrose-plugin-installer-card {
-  max-width: 600px;
-  background: var(--windrose-bg-secondary);
-  border: 2px solid var(--windrose-border-primary);
-  border-radius: 8px;
-  padding: 32px;
-  box-shadow: 0 4px 20px oklch(0% 0 0deg / 0.3), inset 0 0 0 1px oklch(from var(--windrose-border-primary) l c h/0.2);
-}
-.windrose-plugin-installer-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 24px;
-}
-.windrose-plugin-installer-icon svg {
-  width: 64px;
-  height: 64px;
-  color: var(--windrose-border-primary);
-  filter: drop-shadow(0 0 8px oklch(from var(--windrose-border-primary) l c h/0.4));
-}
-.windrose-plugin-installer-content h3 {
-  margin: 0 0 16px 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--windrose-text-primary);
-  text-align: center;
-}
-.windrose-plugin-installer-content p {
-  margin: 0 0 12px 0;
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--windrose-text-secondary);
-}
-.windrose-plugin-installer-content ul {
-  margin: 16px 0;
-  padding-left: 24px;
-}
-.windrose-plugin-installer-content ul li {
-  margin: 8px 0;
-  font-size: 14px;
-  color: var(--windrose-text-secondary);
-}
-.windrose-plugin-installer-content .windrose-plugin-installer-note {
-  margin-top: 20px;
-  padding: 12px;
-  background: oklch(from var(--windrose-border-primary) l c h/0.1);
-  border-left: 3px solid var(--windrose-border-primary);
-  border-radius: 4px;
-  font-size: 13px;
-  color: var(--windrose-text-muted);
-}
-.windrose-plugin-installer-error {
-  margin-top: 16px;
-  padding: 12px;
-  background: oklch(from var(--windrose-accent-red) l c h/0.1);
-  border: 1px solid var(--windrose-error);
-  border-radius: 4px;
-  color: var(--windrose-error);
-  font-size: 14px;
-  text-align: center;
-}
-.windrose-plugin-installer-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-  justify-content: center;
-}
-.windrose-plugin-installer-btn {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 6px;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-.windrose-plugin-installer-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.windrose-plugin-installer-btn-primary {
-  background: linear-gradient(135deg, var(--windrose-border-primary) 0%, var(--windrose-border-primary-dark) 100%);
-  color: var(--windrose-bg-primary);
-  box-shadow: 0 2px 8px oklch(from var(--windrose-border-primary) l c h/0.3);
-}
-.windrose-plugin-installer-btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px oklch(from var(--windrose-border-primary) l c h/0.4);
-}
-.windrose-plugin-installer-btn-primary:active:not(:disabled) {
-  transform: translateY(0);
-}
-.windrose-plugin-installer-btn-secondary {
-  background: var(--windrose-bg-tertiary);
-  color: var(--windrose-text-secondary);
-  border: 1px solid var(--windrose-border-secondary);
-}
-.windrose-plugin-installer-btn-secondary:hover:not(:disabled) {
-  background: oklch(100% 0 0deg / 0.1);
-  color: var(--windrose-text-primary);
-}
-
-/* Success Modal */
-.windrose-plugin-success-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: oklch(0% 0 0deg / 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10000;
-  backdrop-filter: blur(4px);
-}
-.windrose-plugin-success-modal {
-  max-width: 500px;
-  background: var(--windrose-bg-secondary);
-  border: 2px solid var(--windrose-border-primary);
-  border-radius: 8px;
-  padding: 32px;
-  box-shadow: 0 8px 32px oklch(0% 0 0deg / 0.5), inset 0 0 0 1px oklch(from var(--windrose-border-primary) l c h/0.2);
-  animation: dmt-modal-fade-in 0.2s ease;
-}
-.windrose-plugin-success-modal h3 {
-  margin: 0 0 16px 0;
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--windrose-text-primary);
-  text-align: center;
-}
-.windrose-plugin-success-modal p {
-  margin: 0 0 12px 0;
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--windrose-text-secondary);
-  text-align: center;
-}
-.windrose-plugin-success-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 20px;
-}
-.windrose-plugin-success-icon svg {
-  width: 56px;
-  height: 56px;
-  color: oklch(80% 0.17 155deg);
-  filter: drop-shadow(0 0 12px oklch(80% 0.17 155deg / 0.5));
-}
-.windrose-plugin-success-note {
-  margin-top: 16px;
-  padding: 12px;
-  background: oklch(from var(--windrose-border-primary) l c h/0.1);
-  border-left: 3px solid var(--windrose-border-primary);
-  border-radius: 4px;
-  font-size: 13px;
-  color: var(--windrose-text-muted);
-  text-align: left;
-}
-.windrose-plugin-success-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-  justify-content: center;
-}
-
-@keyframes dmt-modal-fade-in {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-/* ============================================
    Hex Coordinate Layer
    ============================================ */
 .windrose-coordinate-layer {
@@ -7184,25 +6818,6 @@ button.windrose-fow-toggle-btn.expanded,
 .windrose-fow-label {
   font-size: 11px;
   color: var(--windrose-text-muted);
-}
-
-/* FoW tools panel (expandable) */
-.windrose-fow-tools-panel {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  overflow: hidden;
-  max-width: 0;
-  opacity: 0;
-  transition: max-width 200ms ease-out, opacity 200ms ease-out, margin 200ms ease-out;
-}
-
-.windrose-fow-tools-panel.expanded {
-  max-width: 250px;
-  opacity: 1;
-  margin-left: 4px;
-  padding-left: 4px;
-  border-left: 1px solid var(--windrose-border-secondary);
 }
 
 /* Individual FoW tool buttons - with tablet overrides */
@@ -7503,40 +7118,6 @@ button.windrose-edge-rail-btn.on {
   z-index: 9;
 }
 
-/* Inner content is pinned to the full 198px so it clips (rather than reflows)
-   while the drawer width animates — the same trick the right drawer uses. */
-.windrose-edge-rail-drawer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex: 0 0 auto;
-  box-sizing: border-box;
-  width: 198px;
-  padding: 7px 10px;
-  font-family: "Cinzel", serif;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--windrose-gold-bright);
-  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h/0.5);
-}
-
-.windrose-edge-rail-drawer-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px;
-  background: transparent;
-  border: none;
-  border-radius: 3px;
-  color: var(--windrose-text-muted);
-  cursor: pointer;
-  box-shadow: none;
-}
-.windrose-edge-rail-drawer-close:hover {
-  color: var(--windrose-text-primary);
-  background: var(--windrose-bg-tertiary);
-}
-
 .windrose-edge-rail-drawer-body {
   flex: 1 1 auto;
   box-sizing: border-box;
@@ -7563,17 +7144,6 @@ button.windrose-edge-rail-btn.on {
   color: var(--windrose-gold-bright);
   border-color: oklch(from var(--windrose-gold-bright) l c h/0.5);
   background: oklch(from var(--windrose-gold-bright) l c h/0.12);
-}
-
-.is-tablet button.windrose-edge-rail-drawer-close {
-  width: auto;
-  height: auto;
-  padding: 2px;
-  background: transparent;
-  border: none;
-  border-radius: 3px;
-  box-shadow: none;
-  color: var(--windrose-text-muted);
 }
 
 .is-tablet button.windrose-visibility-btn {
@@ -7714,7 +7284,7 @@ button.windrose-layer-option-btn {
 }
 
 .windrose-layer-option-btn:hover {
-  color: var(--windrose-text-normal);
+  color: var(--windrose-text-primary);
   border-color: oklch(from var(--windrose-border-primary) l c h/0.6);
 }
 
@@ -7951,7 +7521,7 @@ button.windrose-region-item {
 }
 
 .windrose-region-item:hover {
-  border-color: var(--windrose-accent-muted);
+  border-color: var(--windrose-border-primary-dark);
   background: var(--windrose-bg-tertiary);
 }
 
@@ -8022,7 +7592,7 @@ button.windrose-region-visibility-btn {
 button.windrose-breadcrumb-link {
   background: none;
   border: none;
-  color: var(--windrose-accent-primary);
+  color: var(--windrose-accent-blue);
   cursor: pointer;
   padding: 2px 4px;
   border-radius: 3px;
@@ -8415,145 +7985,8 @@ button.windrose-breadcrumb-link {
 }
 
 /* ===========================================
- * Subheadings
+ * Object Symbol (declarative object-list rows)
  * =========================================== */
-.windrose-settings-subheading {
-  text-wrap: balance;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-muted);
-  margin: 1.5em 0 0.5em 0;
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--background-modifier-border);
-}
-
-/* ===========================================
- * Search/Filter
- * =========================================== */
-.windrose-settings-search-container {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 1em;
-}
-
-.windrose-settings-search-input {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
-  background: var(--background-primary);
-  font-size: 14px;
-}
-
-.windrose-settings-search-input:focus {
-  border-color: var(--interactive-accent);
-  outline: none;
-}
-
-.windrose-settings-search-clear {
-  background: transparent;
-  border: none;
-  padding: 6px;
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.windrose-settings-search-clear:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-.windrose-settings-no-results {
-  text-align: center;
-  padding: 2em;
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-/* ===========================================
- * Category Containers
- * =========================================== */
-.windrose-settings-category {
-  margin: 1em 0;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.windrose-settings-category-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background: var(--background-secondary);
-  border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.windrose-settings-category-label {
-  font-weight: 600;
-  font-size: 0.95em;
-}
-
-.windrose-settings-category-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.windrose-settings-category-muted {
-  opacity: 0.7;
-}
-
-.windrose-settings-empty-message {
-  padding: 16px;
-  text-align: center;
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-/* ===========================================
- * Object Rows
- * =========================================== */
-.windrose-settings-object-list {
-  padding: 4px 0;
-}
-
-.windrose-settings-object-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  transition: background-color 0.15s ease;
-}
-
-.windrose-settings-object-row:hover {
-  background: var(--background-modifier-hover);
-}
-
-.windrose-drag-handle {
-  color: var(--text-muted);
-  cursor: grab;
-  padding: 0 4px;
-  font-size: 1em;
-  opacity: 0.4;
-  user-select: none;
-  flex-shrink: 0;
-}
-
-.windrose-settings-object-row:hover .windrose-drag-handle {
-  opacity: 1;
-}
-
-.windrose-dragging.windrose-dragging {
-  opacity: 0.5;
-  background: var(--interactive-accent);
-  border-radius: 4px;
-}
-
 .windrose-settings-object-symbol {
   font-family: "Noto Emoji", "Noto Sans Symbols 2", sans-serif;
   font-size: 1.4em;
@@ -8568,92 +8001,6 @@ button.windrose-breadcrumb-link {
 .windrose-settings-object-symbol .ra {
   font-size: 1.2em;
   line-height: 1;
-}
-
-.windrose-settings-object-label {
-  flex: 1;
-  min-width: 0;
-}
-
-.windrose-settings-object-label.windrose-settings-modified {
-  font-style: italic;
-  color: var(--text-accent);
-}
-
-.windrose-settings-object-label.windrose-settings-modified::after {
-  content: " •";
-  font-size: 0.8em;
-  opacity: 0.7;
-}
-
-.windrose-settings-object-actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-/* ===========================================
- * Icon Buttons
- * =========================================== */
-.windrose-settings-icon-btn {
-  background: transparent;
-  border: none;
-  padding: 4px 6px;
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.windrose-settings-icon-btn:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-.windrose-settings-icon-btn-danger:hover {
-  color: var(--text-error);
-}
-
-.windrose-btn-icon {
-  background: transparent;
-  border: none;
-  padding: clamp(0.25rem, 0.4vw, 0.375rem);
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.windrose-btn-icon:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-.windrose-btn-icon.windrose-btn-danger:hover {
-  background: var(--background-modifier-error);
-  color: var(--text-on-accent);
-}
-
-/* ===========================================
- * Hidden Section
- * =========================================== */
-.windrose-settings-hidden-section {
-  margin-top: 2em;
-  padding-top: 1em;
-  border-top: 1px solid var(--background-modifier-border);
-}
-
-.windrose-settings-hidden-list {
-  margin-top: 8px;
-  opacity: 0.7;
-}
-
-.windrose-settings-hidden-list .windrose-settings-object-row {
-  background: var(--background-secondary);
 }
 
 /* ===========================================
@@ -8993,147 +8340,8 @@ button.windrose-breadcrumb-link {
 }
 
 /* ===========================================
- * Collapsible Sections
- * =========================================== */
-.windrose-settings-section {
-  margin: 0 0 8px 0;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.windrose-settings-section > summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  background: var(--background-secondary);
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 15px;
-  list-style: none;
-  user-select: none;
-}
-
-.windrose-settings-section > summary::-webkit-details-marker {
-  display: none;
-}
-
-.windrose-settings-section > summary::before {
-  content: "▶";
-  font-size: 10px;
-  transition: transform 0.2s ease;
-  color: var(--text-muted);
-}
-
-.windrose-settings-section[open] > summary::before {
-  transform: rotate(90deg);
-}
-
-.windrose-settings-section > summary:hover {
-  background: var(--background-modifier-hover);
-}
-
-.windrose-settings-section-content {
-  padding: 12px 16px;
-  border-top: 1px solid var(--background-modifier-border);
-}
-
-.windrose-settings-section-content > .setting-item:first-child {
-  border-top: none;
-  padding-top: 0;
-}
-
-/* ===========================================
- * Settings Search
- * =========================================== */
-.windrose-settings-search-wrapper {
-  margin-bottom: 16px;
-  position: sticky;
-  top: 0;
-  background: var(--background-primary);
-  padding: 8px 0;
-  z-index: 10;
-}
-
-.windrose-settings-search-box {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  background: var(--background-primary);
-}
-
-.windrose-settings-search-box:focus-within {
-  border-color: var(--interactive-accent);
-}
-
-.windrose-settings-search-box input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  font-size: 14px;
-  outline: none;
-}
-
-.windrose-settings-search-box .search-icon {
-  color: var(--text-muted);
-}
-
-.windrose-settings-search-box .clear-btn {
-  background: transparent;
-  border: none;
-  padding: 2px 6px;
-  cursor: pointer;
-  color: var(--text-muted);
-  border-radius: 4px;
-}
-
-.windrose-settings-search-box .clear-btn:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-/* Hide non-matching settings during search */
-.windrose-setting-hidden.windrose-setting-hidden {
-  display: none;
-}
-
-/* Highlight matching text */
-.windrose-search-match {
-  background: var(--text-highlight-bg);
-  border-radius: 2px;
-}
-
-/* ===========================================
  * Color Palette Section
  * =========================================== */
-.windrose-color-list {
-  padding: 8px 0;
-}
-
-.windrose-color-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  transition: background-color 0.15s ease;
-}
-
-.windrose-color-row:hover {
-  background: var(--background-modifier-hover);
-}
-
-.windrose-color-row-swatch {
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  border: 2px solid var(--background-modifier-border);
-  flex-shrink: 0;
-}
-
 .windrose-setting-object-symbol {
   flex-shrink: 0;
   align-self: center;
@@ -9150,34 +8358,10 @@ button.windrose-breadcrumb-link {
   margin-right: 10px;
 }
 
-.windrose-color-row-label {
-  flex: 1;
-  min-width: 0;
-}
-
-.windrose-color-row-name {
-  font-weight: 500;
-}
-
-.windrose-color-row-modified,
-.windrose-color-row-custom {
+.windrose-color-row-modified {
   font-size: 0.85em;
   color: var(--text-muted);
   font-style: italic;
-}
-
-.windrose-color-row-hex {
-  font-size: 0.85em;
-  color: var(--text-muted);
-  background: var(--background-secondary);
-  padding: 2px 6px;
-  border-radius: 3px;
-}
-
-.windrose-color-row-actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
 }
 
 /* ===========================================
@@ -9618,103 +8802,6 @@ button.windrose-breadcrumb-link {
   color: var(--text-muted);
   margin-left: 142px;
   margin-top: 2px;
-}
-
-/* ===========================================
- * Object Sets
- * =========================================== */
-.windrose-set-separator {
-  border-top: 1px solid var(--background-modifier-border);
-  margin: 1.5em 0 1em 0;
-}
-
-.windrose-set-active-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--background-secondary);
-  border: 1px solid var(--interactive-accent);
-  border-radius: 6px;
-  margin-bottom: 12px;
-  font-size: 13px;
-}
-
-.windrose-set-active-name {
-  font-weight: 600;
-  color: var(--interactive-accent);
-}
-
-.windrose-set-active-bar .windrose-settings-icon-btn {
-  margin-left: auto;
-  font-size: 11px;
-}
-
-.windrose-set-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
-}
-
-.windrose-set-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: 4px;
-  background: var(--background-secondary);
-  border: 1px solid transparent;
-}
-
-.windrose-set-row-active {
-  border-color: var(--interactive-accent);
-}
-
-.windrose-set-name {
-  font-weight: 500;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.windrose-set-badges {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.windrose-set-badge {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: var(--background-modifier-border);
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.windrose-set-badge-source {
-  background: var(--background-modifier-border-hover, var(--background-modifier-border));
-  font-style: italic;
-}
-
-.windrose-set-actions {
-  display: flex;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.windrose-set-modified-badge {
-  color: var(--text-warning);
-  font-size: 12px;
-  font-style: italic;
-}
-
-.windrose-set-modified-bar {
-  border-color: var(--text-warning);
 }
 
 /* ==========================================================================
@@ -11555,26 +10642,6 @@ button.windrose-dock-panel-collapse:hover {
   border-radius: 4px;
 }
 
-.windrose-dock-board-tab {
-  padding: 3px 8px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: oklch(from var(--windrose-border-primary) l c h/0.1);
-  color: var(--windrose-text-muted);
-  font-size: 11px;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-.windrose-dock-board-tab:hover {
-  background: oklch(from var(--windrose-border-primary) l c h/0.2);
-}
-.windrose-dock-board-tab.active {
-  background: oklch(from var(--windrose-text-primary) l c h/0.16);
-  color: var(--windrose-text-primary);
-  font-weight: 600;
-}
-
 .windrose-dock-board-actions {
   display: flex;
   align-items: center;
@@ -11858,19 +10925,6 @@ button.windrose-dock-panel-collapse:hover {
   border-radius: 4px;
   color: var(--windrose-text-muted);
   font-size: 11px;
-}
-
-/* Phase 7 Board->Strata->Layer buttons — neutralize Obsidian's injected padding/background */
-.is-tablet button.windrose-dock-board-tab {
-  padding: 3px 8px;
-  background: oklch(from var(--windrose-border-primary) l c h/0.1);
-  border: 1px solid transparent;
-  border-radius: 4px;
-  color: var(--windrose-text-muted);
-}
-.is-tablet button.windrose-dock-board-tab.active {
-  background: oklch(from var(--windrose-text-primary) l c h/0.16);
-  color: var(--windrose-text-primary);
 }
 
 .is-tablet button.windrose-dock-board-btn {

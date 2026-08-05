@@ -125,8 +125,8 @@
       }
 
       &.is-selected {
-        background-color: oklch(from var(--windrose-accent-gold, #c4a57b) l c h/0.25);
-        border-color: var(--windrose-accent-gold, #c4a57b);
+        background-color: oklch(from var(--windrose-gold-bright) l c h/0.25);
+        border-color: var(--windrose-gold-bright);
       }
     }
   }
@@ -141,7 +141,7 @@
   &-empty {
     grid-column: 1 / -1;
     padding: 12px 0;
-    color: var(--windrose-text-muted, var(--windrose-text-disabled));
+    color: var(--windrose-text-muted);
     font-size: 12px;
     text-align: center;
   }

@@ -73,7 +73,6 @@ button:is(
   .windrose-tb-packclear,
   .windrose-fd-ribtab,
   .windrose-fd-subtool,
-  .windrose-tile-spine-expand,
   .windrose-tile-spine-fbtn,
   .windrose-spine-flyout-close
 ):not(:hover):not(.on):not(.sel):not(.active) {
@@ -346,18 +345,6 @@ button:is(
 }
 
 /* Collapsed-spine buttons — keep their fixed icon-button boxes on tablet */
-.is-tablet button.windrose-tile-spine-expand {
-  width: 100%;
-  height: 34px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.22);
-  border-radius: 0;
-  box-shadow: none;
-  color: var(--windrose-gold-bright);
-}
-
 .is-tablet button.windrose-tile-spine-fbtn {
   width: 28px;
   height: 28px;
@@ -410,29 +397,6 @@ button:is(
   background:
     linear-gradient(180deg, oklch(from var(--windrose-border-primary) l c h / 0.08), transparent 90px),
     var(--windrose-bg-primary);
-}
-
-/* Expand button at top of spine */
-.windrose-tile-spine-expand {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 34px;
-  flex-shrink: 0;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.22);
-  color: var(--windrose-gold-bright, var(--windrose-border-primary));
-  cursor: pointer;
-
-  &:hover {
-    background: oklch(from var(--windrose-border-primary) l c h / 0.14);
-  }
-
-  .is-compact & {
-    height: 30px;
-  }
 }
 
 /* Loaded-tile chip at bottom of spine */
