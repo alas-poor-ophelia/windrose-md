@@ -3,6 +3,8 @@
    Card shell/brackets come from .windrose-selection-card; this partial
    positions the card and styles the measure-specific content.
    ========================================================================== */
+@use 'mixins' as *;
+
 .windrose-measure-controls {
   $ctl: &;
 
@@ -28,35 +30,20 @@
     white-space: nowrap;
   }
 
-  @at-root {
-    .is-tablet button#{$ctl}-btn,
-    button#{$ctl}-btn,
-    #{$ctl}-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 26px;
-      height: 26px;
-      min-width: unset;
-      min-height: unset;
-      padding: 0;
-      background: transparent;
-      border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.35);
-      border-radius: 3px;
-      color: var(--windrose-text-primary);
-      opacity: 0.8;
-      cursor: pointer;
-      transition: var(--windrose-transition);
+  @include host-proof-button('#{$ctl}-btn') {
+    @include icon-btn-core(26px);
+    border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.35);
+    color: var(--windrose-text-primary);
+    opacity: 0.8;
 
-      &:hover:not(:disabled) {
-        opacity: 1;
-        border-color: oklch(from var(--windrose-border-primary) l c h/0.7);
-      }
+    &:hover:not(:disabled) {
+      opacity: 1;
+      border-color: oklch(from var(--windrose-border-primary) l c h/0.7);
+    }
 
-      &:disabled {
-        opacity: 0.35;
-        cursor: default;
-      }
+    &:disabled {
+      opacity: 0.35;
+      cursor: default;
     }
   }
 }
@@ -104,31 +91,27 @@
     color: oklch(70% 0.14 75deg / 0.9);
   }
 
-  @at-root {
-    .is-tablet button#{&}-toggle,
-    button#{&}-toggle,
-    #{&}-toggle {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      min-height: unset;
-      padding: 3px 2px;
-      background: transparent;
-      border: none;
-      box-shadow: none;
-      color: var(--windrose-text-primary);
-      font-size: 11px;
-      opacity: 0.7;
-      cursor: pointer;
+  @include host-proof-button('#{&}-toggle') {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-height: unset;
+    padding: 3px 2px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: var(--windrose-text-primary);
+    font-size: 11px;
+    opacity: 0.7;
+    cursor: pointer;
 
-      &:hover {
-        opacity: 1;
-      }
+    &:hover {
+      opacity: 1;
+    }
 
-      > span {
-        flex: 1;
-        text-align: left;
-      }
+    > span {
+      flex: 1;
+      text-align: left;
     }
   }
 
@@ -185,37 +168,33 @@
     font-weight: 600;
   }
 
-  @at-root {
-    .is-tablet button#{$picker}-item,
-    button#{$picker}-item,
-    #{$picker}-item {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      width: 100%;
-      min-height: unset;
-      padding: 4px 6px;
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: 3px;
-      color: var(--windrose-text-primary);
-      font-size: 11px;
-      text-align: left;
-      cursor: pointer;
-      transition: var(--windrose-transition);
+  @include host-proof-button('#{$picker}-item') {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    min-height: unset;
+    padding: 4px 6px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: var(--windrose-text-primary);
+    font-size: 11px;
+    text-align: left;
+    cursor: pointer;
+    transition: var(--windrose-transition);
 
-      &:hover {
-        border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
-      }
+    &:hover {
+      border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
+    }
 
-      &.is-active {
-        border-color: oklch(from var(--windrose-border-primary) l c h/0.8);
-        background: oklch(from var(--windrose-border-primary) l c h/0.12);
-      }
+    &.is-active {
+      border-color: oklch(from var(--windrose-border-primary) l c h/0.8);
+      background: oklch(from var(--windrose-border-primary) l c h/0.12);
+    }
 
-      > span:nth-child(2) {
-        flex: 1;
-      }
+    > span:nth-child(2) {
+      flex: 1;
     }
   }
 

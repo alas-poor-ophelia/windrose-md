@@ -3,6 +3,8 @@
    Card shell/brackets come from .windrose-selection-card; this partial
    styles the pin-specific content.
    ========================================================================== */
+@use 'mixins' as *;
+
 .windrose-party-controls {
   $ctl: &;
 
@@ -20,30 +22,12 @@
     }
   }
 
-  @at-root {
-    .is-tablet button#{$ctl}-icon,
-    button#{$ctl}-icon,
-    #{$ctl}-icon,
-    .is-tablet button#{$ctl}-color,
-    button#{$ctl}-color,
-    #{$ctl}-color {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 24px;
-      height: 24px;
-      min-width: unset;
-      min-height: unset;
-      padding: 0;
-      background: transparent;
-      border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.35);
-      border-radius: 3px;
-      cursor: pointer;
-      transition: var(--windrose-transition);
+  @include host-proof-button('#{$ctl}-icon', '#{$ctl}-color') {
+    @include icon-btn-core(24px);
+    border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.35);
 
-      &:hover {
-        border-color: oklch(from var(--windrose-border-primary) l c h/0.7);
-      }
+    &:hover {
+      border-color: oklch(from var(--windrose-border-primary) l c h/0.7);
     }
   }
 
@@ -64,31 +48,16 @@
     }
   }
 
-  @at-root {
-    .is-tablet button#{$ctl}-remove,
-    button#{$ctl}-remove,
-    #{$ctl}-remove {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 24px;
-      height: 24px;
-      min-width: unset;
-      min-height: unset;
-      padding: 0;
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: 3px;
-      color: var(--windrose-text-primary);
-      opacity: 0.65;
-      cursor: pointer;
-      transition: var(--windrose-transition);
+  @include host-proof-button('#{$ctl}-remove') {
+    @include icon-btn-core(24px);
+    border: 1px solid transparent;
+    color: var(--windrose-text-primary);
+    opacity: 0.65;
 
-      &:hover {
-        opacity: 1;
-        color: oklch(65% 0.18 25deg);
-        border-color: oklch(65% 0.18 25deg / 0.4);
-      }
+    &:hover {
+      opacity: 1;
+      color: oklch(65% 0.18 25deg);
+      border-color: oklch(65% 0.18 25deg / 0.4);
     }
   }
 
@@ -189,37 +158,33 @@
     border-top: 1px solid oklch(from var(--windrose-border-primary) l c h/0.25);
   }
 
-  @at-root {
-    .is-tablet button#{$ctl}-filters-toggle,
-    button#{$ctl}-filters-toggle,
-    #{$ctl}-filters-toggle {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      width: 100%;
-      height: 24px;
-      min-height: 24px;
-      padding: 2px;
-      min-width: unset;
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: 3px;
-      color: var(--windrose-text-primary);
-      cursor: pointer;
-      font-size: 11px;
-      font-weight: 600;
-      opacity: 0.85;
-      transition: var(--windrose-transition);
+  @include host-proof-button('#{$ctl}-filters-toggle') {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    height: 24px;
+    min-height: 24px;
+    padding: 2px;
+    min-width: unset;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: var(--windrose-text-primary);
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.85;
+    transition: var(--windrose-transition);
 
-      > span {
-        flex: 1;
-        text-align: left;
-      }
+    > span {
+      flex: 1;
+      text-align: left;
+    }
 
-      &:hover {
-        opacity: 1;
-        background: oklch(30% 0 0deg / 0.3);
-      }
+    &:hover {
+      opacity: 1;
+      background: oklch(30% 0 0deg / 0.3);
     }
   }
 
@@ -298,30 +263,15 @@
     }
   }
 
-  @at-root {
-    .is-tablet button#{$ctl}-note-open,
-    button#{$ctl}-note-open,
-    #{$ctl}-note-open {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 22px;
-      height: 22px;
-      min-width: unset;
-      min-height: unset;
-      padding: 0;
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: 3px;
-      color: var(--windrose-text-primary);
-      opacity: 0.65;
-      cursor: pointer;
-      transition: var(--windrose-transition);
+  @include host-proof-button('#{$ctl}-note-open') {
+    @include icon-btn-core(22px);
+    border: 1px solid transparent;
+    color: var(--windrose-text-primary);
+    opacity: 0.65;
 
-      &:hover {
-        opacity: 1;
-        border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
-      }
+    &:hover {
+      opacity: 1;
+      border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
     }
   }
 
@@ -418,56 +368,52 @@
     overflow-y: auto;
   }
 
-  @at-root {
-    .is-tablet button#{$ctl}-nearby-row,
-    button#{$ctl}-nearby-row,
-    #{$ctl}-nearby-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      width: 100%;
-      height: 26px;
-      min-height: 26px;
-      padding: 2px 6px;
-      min-width: unset;
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: 3px;
-      color: var(--windrose-text-primary);
-      cursor: pointer;
-      font-size: 12px;
-      text-align: left;
-      transition: var(--windrose-transition);
+  @include host-proof-button('#{$ctl}-nearby-row') {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    height: 26px;
+    min-height: 26px;
+    padding: 2px 6px;
+    min-width: unset;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: var(--windrose-text-primary);
+    cursor: pointer;
+    font-size: 12px;
+    text-align: left;
+    transition: var(--windrose-transition);
 
-      a {
-        flex: 1;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        color: inherit;
-        text-decoration: none;
-      }
+    a {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: inherit;
+      text-decoration: none;
+    }
 
-      > span:first-child {
-        flex: 1;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
+    > span:first-child {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    &:hover {
+      background: oklch(30% 0 0deg / 0.4);
+    }
+
+    &.is-static {
+      cursor: default;
 
       &:hover {
-        background: oklch(30% 0 0deg / 0.4);
-      }
-
-      &.is-static {
-        cursor: default;
-
-        &:hover {
-          background: transparent;
-        }
+        background: transparent;
       }
     }
   }
@@ -505,31 +451,16 @@
     }
   }
 
-  @at-root {
-    .is-tablet button#{$ctl}-locate,
-    button#{$ctl}-locate,
-    #{$ctl}-locate {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      width: 22px;
-      height: 22px;
-      min-width: unset;
-      min-height: unset;
-      padding: 0;
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: 3px;
-      color: var(--windrose-text-primary);
-      opacity: 0.55;
-      cursor: pointer;
-      transition: var(--windrose-transition);
+  @include host-proof-button('#{$ctl}-locate') {
+    @include icon-btn-core(22px);
+    flex-shrink: 0;
+    border: 1px solid transparent;
+    color: var(--windrose-text-primary);
+    opacity: 0.55;
 
-      &:hover {
-        opacity: 1;
-        border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
-      }
+    &:hover {
+      opacity: 1;
+      border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
     }
   }
 }

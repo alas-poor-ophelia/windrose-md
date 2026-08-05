@@ -1,0 +1,40 @@
+/* ==========================================================================
+   Shared mixins
+   ========================================================================== */
+
+@use 'sass:list';
+
+/// Specificity ladder that outruns Obsidian's host button styles on desktop
+/// AND tablet: for each selector S, emits `.is-tablet button S, button S, S`
+/// at root. Pass selectors as interpolated strings, e.g.
+/// `@include host-proof-button('#{$ctl}-icon', '#{$ctl}-color') { ... }`.
+@mixin host-proof-button($selectors...) {
+  $ladder: ();
+  @each $s in $selectors {
+    $ladder: list.append($ladder, '.is-tablet button#{$s}', comma);
+    $ladder: list.append($ladder, 'button#{$s}', comma);
+    $ladder: list.append($ladder, '#{$s}', comma);
+  }
+  @at-root {
+    #{$ladder} {
+      @content;
+    }
+  }
+}
+
+/// Square icon-button core: flex-centered, fixed size, host-style resets,
+/// transparent chrome. Callers add border/color/opacity/hover on top.
+@mixin icon-btn-core($size) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: $size;
+  height: $size;
+  min-width: unset;
+  min-height: unset;
+  padding: 0;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+}

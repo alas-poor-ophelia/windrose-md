@@ -4634,6 +4634,9 @@ button.windrose-sel-icon-btn,
    Card shell/brackets come from .windrose-selection-card; this partial
    styles the pin-specific content.
    ========================================================================== */
+/* ==========================================================================
+   Shared mixins
+   ========================================================================== */
 .windrose-party-controls-header {
   display: flex;
   align-items: center;
@@ -4646,12 +4649,7 @@ button.windrose-sel-icon-btn,
 .windrose-party-controls-header > span {
   flex: 1;
 }
-.is-tablet button.windrose-party-controls-icon,
-button.windrose-party-controls-icon,
-.windrose-party-controls-icon,
-.is-tablet button.windrose-party-controls-color,
-button.windrose-party-controls-color,
-.windrose-party-controls-color {
+.is-tablet button.windrose-party-controls-icon, button.windrose-party-controls-icon, .windrose-party-controls-icon, .is-tablet button.windrose-party-controls-color, button.windrose-party-controls-color, .windrose-party-controls-color {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4661,17 +4659,12 @@ button.windrose-party-controls-color,
   min-height: unset;
   padding: 0;
   background: transparent;
-  border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.35);
   border-radius: 3px;
   cursor: pointer;
   transition: var(--windrose-transition);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.35);
 }
-.is-tablet button.windrose-party-controls-icon:hover,
-button.windrose-party-controls-icon:hover,
-.windrose-party-controls-icon:hover,
-.is-tablet button.windrose-party-controls-color:hover,
-button.windrose-party-controls-color:hover,
-.windrose-party-controls-color:hover {
+.is-tablet button.windrose-party-controls-icon:hover, button.windrose-party-controls-icon:hover, .windrose-party-controls-icon:hover, .is-tablet button.windrose-party-controls-color:hover, button.windrose-party-controls-color:hover, .windrose-party-controls-color:hover {
   border-color: oklch(from var(--windrose-border-primary) l c h/0.7);
 }
 
@@ -4689,9 +4682,7 @@ button.windrose-party-controls-color:hover,
 .windrose-party-controls-icon-glyph.is-ra {
   font-family: "rpgawesome";
 }
-.is-tablet button.windrose-party-controls-remove,
-button.windrose-party-controls-remove,
-.windrose-party-controls-remove {
+.is-tablet button.windrose-party-controls-remove, button.windrose-party-controls-remove, .windrose-party-controls-remove {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4701,16 +4692,14 @@ button.windrose-party-controls-remove,
   min-height: unset;
   padding: 0;
   background: transparent;
-  border: 1px solid transparent;
   border-radius: 3px;
-  color: var(--windrose-text-primary);
-  opacity: 0.65;
   cursor: pointer;
   transition: var(--windrose-transition);
+  border: 1px solid transparent;
+  color: var(--windrose-text-primary);
+  opacity: 0.65;
 }
-.is-tablet button.windrose-party-controls-remove:hover,
-button.windrose-party-controls-remove:hover,
-.windrose-party-controls-remove:hover {
+.is-tablet button.windrose-party-controls-remove:hover, button.windrose-party-controls-remove:hover, .windrose-party-controls-remove:hover {
   opacity: 1;
   color: oklch(65% 0.18 25deg);
   border-color: oklch(65% 0.18 25deg / 0.4);
@@ -4798,9 +4787,7 @@ button.windrose-party-controls-remove:hover,
   padding-top: 4px;
   border-top: 1px solid oklch(from var(--windrose-border-primary) l c h/0.25);
 }
-.is-tablet button.windrose-party-controls-filters-toggle,
-button.windrose-party-controls-filters-toggle,
-.windrose-party-controls-filters-toggle {
+.is-tablet button.windrose-party-controls-filters-toggle, button.windrose-party-controls-filters-toggle, .windrose-party-controls-filters-toggle {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -4819,15 +4806,11 @@ button.windrose-party-controls-filters-toggle,
   opacity: 0.85;
   transition: var(--windrose-transition);
 }
-.is-tablet button.windrose-party-controls-filters-toggle > span,
-button.windrose-party-controls-filters-toggle > span,
-.windrose-party-controls-filters-toggle > span {
+.is-tablet button.windrose-party-controls-filters-toggle > span, button.windrose-party-controls-filters-toggle > span, .windrose-party-controls-filters-toggle > span {
   flex: 1;
   text-align: left;
 }
-.is-tablet button.windrose-party-controls-filters-toggle:hover,
-button.windrose-party-controls-filters-toggle:hover,
-.windrose-party-controls-filters-toggle:hover {
+.is-tablet button.windrose-party-controls-filters-toggle:hover, button.windrose-party-controls-filters-toggle:hover, .windrose-party-controls-filters-toggle:hover {
   opacity: 1;
   background: oklch(30% 0 0deg / 0.3);
 }
@@ -4897,9 +4880,7 @@ button.windrose-party-controls-filters-toggle:hover,
 .windrose-party-controls-note-toggle input[type=checkbox] {
   margin: 0;
 }
-.is-tablet button.windrose-party-controls-note-open,
-button.windrose-party-controls-note-open,
-.windrose-party-controls-note-open {
+.is-tablet button.windrose-party-controls-note-open, button.windrose-party-controls-note-open, .windrose-party-controls-note-open {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4909,16 +4890,14 @@ button.windrose-party-controls-note-open,
   min-height: unset;
   padding: 0;
   background: transparent;
-  border: 1px solid transparent;
   border-radius: 3px;
-  color: var(--windrose-text-primary);
-  opacity: 0.65;
   cursor: pointer;
   transition: var(--windrose-transition);
+  border: 1px solid transparent;
+  color: var(--windrose-text-primary);
+  opacity: 0.65;
 }
-.is-tablet button.windrose-party-controls-note-open:hover,
-button.windrose-party-controls-note-open:hover,
-.windrose-party-controls-note-open:hover {
+.is-tablet button.windrose-party-controls-note-open:hover, button.windrose-party-controls-note-open:hover, .windrose-party-controls-note-open:hover {
   opacity: 1;
   border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
 }
@@ -5005,9 +4984,7 @@ button.windrose-party-controls-note-open:hover,
   max-height: 168px;
   overflow-y: auto;
 }
-.is-tablet button.windrose-party-controls-nearby-row,
-button.windrose-party-controls-nearby-row,
-.windrose-party-controls-nearby-row {
+.is-tablet button.windrose-party-controls-nearby-row, button.windrose-party-controls-nearby-row, .windrose-party-controls-nearby-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -5026,9 +5003,7 @@ button.windrose-party-controls-nearby-row,
   text-align: left;
   transition: var(--windrose-transition);
 }
-.is-tablet button.windrose-party-controls-nearby-row a,
-button.windrose-party-controls-nearby-row a,
-.windrose-party-controls-nearby-row a {
+.is-tablet button.windrose-party-controls-nearby-row a, button.windrose-party-controls-nearby-row a, .windrose-party-controls-nearby-row a {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -5037,28 +5012,20 @@ button.windrose-party-controls-nearby-row a,
   color: inherit;
   text-decoration: none;
 }
-.is-tablet button.windrose-party-controls-nearby-row > span:first-child,
-button.windrose-party-controls-nearby-row > span:first-child,
-.windrose-party-controls-nearby-row > span:first-child {
+.is-tablet button.windrose-party-controls-nearby-row > span:first-child, button.windrose-party-controls-nearby-row > span:first-child, .windrose-party-controls-nearby-row > span:first-child {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.is-tablet button.windrose-party-controls-nearby-row:hover,
-button.windrose-party-controls-nearby-row:hover,
-.windrose-party-controls-nearby-row:hover {
+.is-tablet button.windrose-party-controls-nearby-row:hover, button.windrose-party-controls-nearby-row:hover, .windrose-party-controls-nearby-row:hover {
   background: oklch(30% 0 0deg / 0.4);
 }
-.is-tablet button.windrose-party-controls-nearby-row.is-static,
-button.windrose-party-controls-nearby-row.is-static,
-.windrose-party-controls-nearby-row.is-static {
+.is-tablet button.windrose-party-controls-nearby-row.is-static, button.windrose-party-controls-nearby-row.is-static, .windrose-party-controls-nearby-row.is-static {
   cursor: default;
 }
-.is-tablet button.windrose-party-controls-nearby-row.is-static:hover,
-button.windrose-party-controls-nearby-row.is-static:hover,
-.windrose-party-controls-nearby-row.is-static:hover {
+.is-tablet button.windrose-party-controls-nearby-row.is-static:hover, button.windrose-party-controls-nearby-row.is-static:hover, .windrose-party-controls-nearby-row.is-static:hover {
   background: transparent;
 }
 
@@ -5090,29 +5057,25 @@ button.windrose-party-controls-nearby-row.is-static:hover,
 .windrose-party-controls-travel-hint > span {
   flex: 1;
 }
-.is-tablet button.windrose-party-controls-locate,
-button.windrose-party-controls-locate,
-.windrose-party-controls-locate {
+.is-tablet button.windrose-party-controls-locate, button.windrose-party-controls-locate, .windrose-party-controls-locate {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
   width: 22px;
   height: 22px;
   min-width: unset;
   min-height: unset;
   padding: 0;
   background: transparent;
-  border: 1px solid transparent;
   border-radius: 3px;
-  color: var(--windrose-text-primary);
-  opacity: 0.55;
   cursor: pointer;
   transition: var(--windrose-transition);
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  color: var(--windrose-text-primary);
+  opacity: 0.55;
 }
-.is-tablet button.windrose-party-controls-locate:hover,
-button.windrose-party-controls-locate:hover,
-.windrose-party-controls-locate:hover {
+.is-tablet button.windrose-party-controls-locate:hover, button.windrose-party-controls-locate:hover, .windrose-party-controls-locate:hover {
   opacity: 1;
   border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
 }
@@ -5186,9 +5149,7 @@ button.windrose-party-controls-locate:hover,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.is-tablet button.windrose-measure-controls-btn,
-button.windrose-measure-controls-btn,
-.windrose-measure-controls-btn {
+.is-tablet button.windrose-measure-controls-btn, button.windrose-measure-controls-btn, .windrose-measure-controls-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5198,22 +5159,18 @@ button.windrose-measure-controls-btn,
   min-height: unset;
   padding: 0;
   background: transparent;
-  border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.35);
   border-radius: 3px;
-  color: var(--windrose-text-primary);
-  opacity: 0.8;
   cursor: pointer;
   transition: var(--windrose-transition);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.35);
+  color: var(--windrose-text-primary);
+  opacity: 0.8;
 }
-.is-tablet button.windrose-measure-controls-btn:hover:not(:disabled),
-button.windrose-measure-controls-btn:hover:not(:disabled),
-.windrose-measure-controls-btn:hover:not(:disabled) {
+.is-tablet button.windrose-measure-controls-btn:hover:not(:disabled), button.windrose-measure-controls-btn:hover:not(:disabled), .windrose-measure-controls-btn:hover:not(:disabled) {
   opacity: 1;
   border-color: oklch(from var(--windrose-border-primary) l c h/0.7);
 }
-.is-tablet button.windrose-measure-controls-btn:disabled,
-button.windrose-measure-controls-btn:disabled,
-.windrose-measure-controls-btn:disabled {
+.is-tablet button.windrose-measure-controls-btn:disabled, button.windrose-measure-controls-btn:disabled, .windrose-measure-controls-btn:disabled {
   opacity: 0.35;
   cursor: default;
 }
@@ -5256,9 +5213,7 @@ button.windrose-measure-controls-btn:disabled,
   line-height: 1.35;
   color: oklch(70% 0.14 75deg / 0.9);
 }
-.is-tablet button.windrose-measure-controls-travel-toggle,
-button.windrose-measure-controls-travel-toggle,
-.windrose-measure-controls-travel-toggle {
+.is-tablet button.windrose-measure-controls-travel-toggle, button.windrose-measure-controls-travel-toggle, .windrose-measure-controls-travel-toggle {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -5272,14 +5227,10 @@ button.windrose-measure-controls-travel-toggle,
   opacity: 0.7;
   cursor: pointer;
 }
-.is-tablet button.windrose-measure-controls-travel-toggle:hover,
-button.windrose-measure-controls-travel-toggle:hover,
-.windrose-measure-controls-travel-toggle:hover {
+.is-tablet button.windrose-measure-controls-travel-toggle:hover, button.windrose-measure-controls-travel-toggle:hover, .windrose-measure-controls-travel-toggle:hover {
   opacity: 1;
 }
-.is-tablet button.windrose-measure-controls-travel-toggle > span,
-button.windrose-measure-controls-travel-toggle > span,
-.windrose-measure-controls-travel-toggle > span {
+.is-tablet button.windrose-measure-controls-travel-toggle > span, button.windrose-measure-controls-travel-toggle > span, .windrose-measure-controls-travel-toggle > span {
   flex: 1;
   text-align: left;
 }
@@ -5328,9 +5279,7 @@ button.windrose-measure-controls-travel-toggle > span,
   font-size: 11px;
   font-weight: 600;
 }
-.is-tablet button.windrose-terrain-picker-item,
-button.windrose-terrain-picker-item,
-.windrose-terrain-picker-item {
+.is-tablet button.windrose-terrain-picker-item, button.windrose-terrain-picker-item, .windrose-terrain-picker-item {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -5346,20 +5295,14 @@ button.windrose-terrain-picker-item,
   cursor: pointer;
   transition: var(--windrose-transition);
 }
-.is-tablet button.windrose-terrain-picker-item:hover,
-button.windrose-terrain-picker-item:hover,
-.windrose-terrain-picker-item:hover {
+.is-tablet button.windrose-terrain-picker-item:hover, button.windrose-terrain-picker-item:hover, .windrose-terrain-picker-item:hover {
   border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
 }
-.is-tablet button.windrose-terrain-picker-item.is-active,
-button.windrose-terrain-picker-item.is-active,
-.windrose-terrain-picker-item.is-active {
+.is-tablet button.windrose-terrain-picker-item.is-active, button.windrose-terrain-picker-item.is-active, .windrose-terrain-picker-item.is-active {
   border-color: oklch(from var(--windrose-border-primary) l c h/0.8);
   background: oklch(from var(--windrose-border-primary) l c h/0.12);
 }
-.is-tablet button.windrose-terrain-picker-item > span:nth-child(2),
-button.windrose-terrain-picker-item > span:nth-child(2),
-.windrose-terrain-picker-item > span:nth-child(2) {
+.is-tablet button.windrose-terrain-picker-item > span:nth-child(2), button.windrose-terrain-picker-item > span:nth-child(2), .windrose-terrain-picker-item > span:nth-child(2) {
   flex: 1;
 }
 
@@ -6219,9 +6162,7 @@ input.windrose-color-input-as-button {
   font-size: 12px;
   font-weight: 600;
 }
-.is-tablet button.windrose-icon-picker-clear,
-button.windrose-icon-picker-clear,
-.windrose-icon-picker-clear {
+.is-tablet button.windrose-icon-picker-clear, button.windrose-icon-picker-clear, .windrose-icon-picker-clear {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -6231,16 +6172,14 @@ button.windrose-icon-picker-clear,
   min-height: unset;
   padding: 0;
   background: transparent;
-  border: 1px solid transparent;
   border-radius: 3px;
-  color: var(--windrose-text-primary);
-  opacity: 0.65;
   cursor: pointer;
   transition: var(--windrose-transition);
+  border: 1px solid transparent;
+  color: var(--windrose-text-primary);
+  opacity: 0.65;
 }
-.is-tablet button.windrose-icon-picker-clear:hover,
-button.windrose-icon-picker-clear:hover,
-.windrose-icon-picker-clear:hover {
+.is-tablet button.windrose-icon-picker-clear:hover, button.windrose-icon-picker-clear:hover, .windrose-icon-picker-clear:hover {
   opacity: 1;
   border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
 }
@@ -6256,9 +6195,7 @@ button.windrose-icon-picker-clear:hover,
   color: var(--windrose-text-primary);
   font-size: 12px;
 }
-.is-tablet button.windrose-icon-picker-symbol,
-button.windrose-icon-picker-symbol,
-.windrose-icon-picker-symbol {
+.is-tablet button.windrose-icon-picker-symbol, button.windrose-icon-picker-symbol, .windrose-icon-picker-symbol {
   width: 100%;
   margin-bottom: 8px;
   padding: 4px 8px;
@@ -6270,9 +6207,7 @@ button.windrose-icon-picker-symbol,
   cursor: pointer;
   transition: var(--windrose-transition);
 }
-.is-tablet button.windrose-icon-picker-symbol:hover,
-button.windrose-icon-picker-symbol:hover,
-.windrose-icon-picker-symbol:hover {
+.is-tablet button.windrose-icon-picker-symbol:hover, button.windrose-icon-picker-symbol:hover, .windrose-icon-picker-symbol:hover {
   border-color: oklch(from var(--windrose-border-primary) l c h/0.9);
 }
 
@@ -6283,9 +6218,7 @@ button.windrose-icon-picker-symbol:hover,
   max-height: 208px;
   overflow-y: auto;
 }
-.is-tablet button.windrose-icon-picker-cell,
-button.windrose-icon-picker-cell,
-.windrose-icon-picker-cell {
+.is-tablet button.windrose-icon-picker-cell, button.windrose-icon-picker-cell, .windrose-icon-picker-cell {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -6299,15 +6232,11 @@ button.windrose-icon-picker-cell,
   cursor: pointer;
   transition: var(--windrose-transition);
 }
-.is-tablet button.windrose-icon-picker-cell:hover,
-button.windrose-icon-picker-cell:hover,
-.windrose-icon-picker-cell:hover {
+.is-tablet button.windrose-icon-picker-cell:hover, button.windrose-icon-picker-cell:hover, .windrose-icon-picker-cell:hover {
   background-color: oklch(from var(--windrose-bg-primary) l c h/0.8);
   border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
 }
-.is-tablet button.windrose-icon-picker-cell.is-selected,
-button.windrose-icon-picker-cell.is-selected,
-.windrose-icon-picker-cell.is-selected {
+.is-tablet button.windrose-icon-picker-cell.is-selected, button.windrose-icon-picker-cell.is-selected, .windrose-icon-picker-cell.is-selected {
   background-color: oklch(from var(--windrose-gold-bright) l c h/0.25);
   border-color: var(--windrose-gold-bright);
 }
