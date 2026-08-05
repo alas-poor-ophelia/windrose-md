@@ -140,11 +140,14 @@ src/
 │   ├── mapcanvas/         # Canvas layer components
 │   └── settings/          # Settings UI components
 ├── context/               # Preact Contexts
-├── settings/              # Obsidian settings tab
-│   ├── WindroseSettingsTab.ts  # Main settings tab
+├── settings/              # Obsidian settings tab (declarative 1.13+ Settings API)
+│   ├── WindroseSettingsTab.ts       # Tab class: definitions + control value plumbing
+│   ├── settingDefinitions.ts        # Stock sections, dungeon pickers, shortcuts, banner
+│   ├── settingDefinitionLists.ts    # List sections: colors, travel packs, tile sets
+│   ├── settingDefinitionObjects.ts  # Object types section
 │   ├── helpers/           # Settings utilities
 │   ├── modals/            # Settings modals
-│   └── tabs/              # Tab render mixins
+│   └── tabs/settingsTabContext.ts   # Structural tab type for definition builders
 └── generation/            # Random map generation
 ```
 

@@ -1,6 +1,6 @@
 # Proposal: Migrate Windrose to the Obsidian 1.13 Declarative Settings API
 
-**Status:** Proposed (2026-07-30)
+**Status:** Implemented (2026-08-04) — all phases complete; imperative tab demolished, `minAppVersion` 1.13.0. Remaining: iPad visual check (windrose-9le), dead-SCSS prune (windrose-vqk).
 **Scope:** Plugin-global settings tab only (`src/settings/`). Per-map settings and all modals are explicitly out of scope.
 
 ## Background
