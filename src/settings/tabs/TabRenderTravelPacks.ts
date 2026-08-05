@@ -21,27 +21,7 @@ import {
   upsertTravelPack,
   validateTravelPackImport,
 } from '../../travel/travelPackOperations';
-import type { TravelPack } from '#types/settings/travelPack.types';
-
-/** Summarize a pack's contents for its list row */
-function packSummary(pack: TravelPack): string {
-  const parts = [
-    `${pack.modes.length} mode(s)`,
-    `${pack.terrains.length} terrain(s)`,
-    `${pack.units.length} unit(s)`,
-    `${pack.allowances.length} allowance(s)`,
-  ];
-  const summary = parts.join(' · ');
-  return pack.description != null && pack.description !== ''
-    ? `${pack.description} — ${summary}`
-    : summary;
-}
-
-/** Vault-safe filename slug from a pack name */
-function packSlug(name: string): string {
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  return slug === '' ? 'pack' : slug;
-}
+import { packSummary, packSlug } from '../settingDefinitionLists';
 
 export const TabRenderTravelPacksMethods = {
   renderTravelPacksContent(this: SettingsTabThis, containerEl: HTMLElement): void {

@@ -9,6 +9,7 @@ import { fogPackImagePath } from '../content-packs/contentPackConstants';
 import { getPackUnitOptions } from '../travel/travelPackOperations';
 import { DUNGEON_STYLE_NAMES } from '../generation/dungeonStyleColors';
 import { DUNGEON_STYLE_LABELS, addDungeonStyleColorPickers } from './tabs/TabRenderSettings';
+import { buildColorPaletteSections, buildTravelPackSections, buildTilesetSections, infoItem } from './settingDefinitionLists';
 import type { SettingsTabThis } from './tabs/settingsTabContext';
 
 // settingDefinitions.ts
@@ -142,10 +143,7 @@ function buildFeaturesGroup(): SettingDefinitionItem {
     type: 'group',
     heading: 'Features',
     items: [
-      {
-        name: '',
-        desc: 'Show or hide entire feature groups. Disabling a feature hides its tools and panels — existing map content always stays visible.'
-      },
+      infoItem('Show or hide entire feature groups. Disabling a feature hides its tools and panels — existing map content always stays visible.'),
       ...FEATURE_DEFINITIONS.map((def): SettingGroupItem => ({
         name: def.label,
         desc: def.desc,
@@ -198,10 +196,7 @@ function buildColorGroup(): SettingDefinitionItem {
     type: 'group',
     heading: 'Color settings',
     items: [
-      {
-        name: '',
-        desc: 'These settings control default colors and behavior for all windrosemd maps in this vault.'
-      },
+      infoItem('These settings control default colors and behavior for all windrosemd maps in this vault.'),
       colorItem('Grid line color', 'Color for grid lines',
         'gridLineColor', SETTING_DEFAULTS.DEFAULT_GRID_LINE_COLOR),
       {
@@ -225,10 +220,7 @@ function buildDungeonGenerationGroup(tab: SettingsTabThis): SettingDefinitionIte
     heading: 'Dungeon generation',
     visible: () => isFeatureEnabled('dungeonGenerator'),
     items: [
-      {
-        name: '',
-        desc: 'Default colors the random dungeon generator uses for each style. Pickers set the floor, wall, and water colors in that order.'
-      },
+      infoItem('Default colors the random dungeon generator uses for each style. Pickers set the floor, wall, and water colors in that order.'),
       ...DUNGEON_STYLE_NAMES.map((style): SettingGroupItem => ({
         name: DUNGEON_STYLE_LABELS[style],
         desc: 'Floor, wall, and water colors',
@@ -281,10 +273,7 @@ function buildFogGroup(tab: SettingsTabThis): SettingDefinitionItem {
     heading: 'Fog of war',
     visible: () => isFeatureEnabled('fogOfWar'),
     items: [
-      {
-        name: '',
-        desc: 'Default fog of war appearance settings for new maps. Individual maps can override these in their settings.'
-      },
+      infoItem('Default fog of war appearance settings for new maps. Individual maps can override these in their settings.'),
       {
         name: 'Soft edges',
         desc: 'Enable a blur effect at fog boundaries for a softer, more atmospheric look',
@@ -471,20 +460,24 @@ function buildMeasurementGroup(tab: SettingsTabThis): SettingDefinitionItem {
 }
 
 /**
- * Phase 1 definition set: every stock-control section of the settings tab.
- * Color Palette, Object Types, Travel Packs, Tile Sets (lists) and Keyboard
- * Shortcuts arrive in Phases 2-3; until then this array must stay behind the
- * spike flag — on 1.13+ a non-empty return renders ONLY these definitions.
+ * Phases 1+2 definition set: stock-control sections plus the list sections
+ * (Color palette, Travel packs, Tile sets — settingDefinitionLists.ts).
+ * Object Types and Keyboard Shortcuts arrive in Phases 2b-3; until then this
+ * array must stay behind the spike flag — on 1.13+ a non-empty return
+ * renders ONLY these definitions. Section order mirrors the imperative tab.
  */
 function buildSettingDefinitions(tab: SettingsTabThis): SettingDefinitionItem[] {
   return [
     buildFeaturesGroup(),
     buildHexGroup(),
     buildColorGroup(),
+    ...buildColorPaletteSections(tab),
     buildDungeonGenerationGroup(tab),
     buildFogGroup(tab),
     buildBehaviorGroup(),
-    buildMeasurementGroup(tab)
+    buildMeasurementGroup(tab),
+    ...buildTravelPackSections(tab),
+    ...buildTilesetSections(tab)
   ];
 }
 

@@ -47,12 +47,17 @@ afterEach(() => {
 });
 
 describe('buildSettingDefinitions', () => {
-  it('returns the seven Phase 1 groups in tab order', () => {
+  it('returns the Phase 1+2 sections in imperative tab order', () => {
     const defs = buildSettingDefinitions(makeTab());
     const headings = defs.map(d => ('heading' in d ? d.heading : undefined));
+    // undefined entries are the heading-less list/action sections that render
+    // under the preceding section heading (see settingDefinitionLists.ts).
     expect(headings).toEqual([
-      'Features', 'Hex map settings', 'Color settings', 'Dungeon generation',
-      'Fog of war', 'Map behavior', 'Distance measurement'
+      'Features', 'Hex map settings', 'Color settings',
+      'Color palette', undefined,
+      'Dungeon generation', 'Fog of war', 'Map behavior', 'Distance measurement',
+      'Travel packs', undefined, undefined,
+      'Tile sets', undefined
     ]);
   });
 
@@ -90,9 +95,22 @@ describe('buildSettingDefinitions', () => {
 
   it('declares one render row per dungeon generation style', () => {
     const dungeon = groupByHeading(buildSettingDefinitions(makeTab()), 'Dungeon generation');
-    const rows = (dungeon.items ?? []).filter(i => 'render' in i && typeof i.render === 'function');
+    const rows = (dungeon.items ?? []).filter(i => 'render' in i && typeof i.render === 'function' && 'name' in i && i.name !== '');
     const names = rows.map(i => ('name' in i ? i.name : ''));
     expect(names).toEqual(['Classic', 'Cavern', 'Fortress', 'Crypt']);
+  });
+
+  it('gives every nameless info row a render callback so 1.13 renders it', () => {
+    // The 1.13 declarative renderer silently drops control-less items whose
+    // name is empty (verified live on 1.13.4); the no-op render keeps them.
+    const groups = buildSettingDefinitions(makeTab());
+    const nameless = groups
+      .flatMap(g => ('items' in g ? g.items ?? [] : []))
+      .filter(i => 'name' in i && i.name === '');
+    expect(nameless.length).toBeGreaterThan(0);
+    for (const row of nameless) {
+      expect('render' in row && typeof row.render === 'function').toBe(true);
+    }
   });
 
   it('lists installed fog packs with render rows, marking the active texture', () => {
@@ -115,7 +133,8 @@ describe('buildSettingDefinitions', () => {
     const tab = makeTab({
       travelPacks: [{
         id: 'wilds', name: 'Wilds', enabled: true,
-        units: [{ id: 'league', name: 'League', abbreviation: 'lg' }]
+        units: [{ id: 'league', name: 'League', abbreviation: 'lg' }],
+        modes: [], terrains: [], allowances: []
       }] as unknown as PluginSettings['travelPacks'],
       distanceUnitGrid: 'ft'
     });
