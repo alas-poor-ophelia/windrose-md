@@ -608,6 +608,17 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.2.1
+
+A small patch for the tile drawer, from two reports.
+
+### Bug Fixes
+- **The tile drawer no longer goes see-through when you have no tile packs.** With nothing imported, the drawer painted no background at all — the map showed straight through it. In the full-pane view it also lost its collapse button and its Tiles/Objects switch, so there was no way to fold it away or get back to Objects short of opening settings. The empty state now keeps the whole drawer frame.
+- **Removing a tile pack folder now actually unregisters its tiles.** Deleting a folder from the tile set settings left its tiles sitting in the drawer, and the stale set survived a restart. Tiles you've already placed are left alone.
+
+### Improvements
+- If you haven't set up any tile packs yet, the drawer opens on Objects rather than landing you on an empty Tiles pane. The Tiles half of the switch still shows the empty state, with a shortcut into settings, whenever you want it.
+
 ## Version 2.2.0
 
 The biggest release since 2.0 — and the first one that asks for a newer Obsidian.
