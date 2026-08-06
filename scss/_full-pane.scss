@@ -56,6 +56,10 @@
 .windrose-full-pane .windrose-stage {
   display: flex;
   flex-direction: row;
+  /* Rail-left-of-canvas relies purely on DOM order: an inherited
+     direction: rtl (Obsidian's RTL reading direction, RTL snippets) would
+     visually flip the rail to the right edge (windrose-pqv). Pin it. */
+  direction: ltr;
   flex: 1;
   min-height: 0;
 }

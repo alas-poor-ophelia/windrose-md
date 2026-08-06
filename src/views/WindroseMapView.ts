@@ -90,6 +90,12 @@ class WindroseMapView extends ItemView {
   }
 
   private selectMap(id: string, name: string, type: MapType): void {
+    if (id !== this.mapId) {
+      // Floating-panel positions are per-map runtime state: without this
+      // reset the next map inherits the previous map's floated panels at
+      // their old coordinates (windrose-pqv).
+      this.floatingPanels = {};
+    }
     this.mapId = id;
     this.mapName = name;
     this.mapType = type;
