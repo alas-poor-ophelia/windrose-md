@@ -608,6 +608,41 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.2.0
+
+The biggest release since 2.0 — and the first one that asks for a newer Obsidian.
+
+**Windrose now requires Obsidian 1.13.0 or later.** The settings screen has been rebuilt on Obsidian's new declarative Settings API: a lot of custom code replaced with something hopefully more legible and consistent.
+
+### New Features
+- **Seamless subhex zoom.** Zooming past a hex region's threshold now carries you into its sub-map continuously, instead of stopping at the boundary and making you open it by hand.
+- **Embed a sub-map directly.** A subhex can be embedded in a note on its own, addressed by its block key.
+- **Picture frame mode.** A locked, chrome-free embed for sharing a map as a finished picture: no toolbars or accidental edits, with a hover-reveal exit when you want to swap back. Frame width is configurable per embed.
+- **Per-tileset Art scale + vertical offset.** A render-time size multiplier for a whole tileset (and vertical offset adjustment). Some hex packs aren't neccessarily cut to exact geometric width, and this attempts to close the hairline seams between tiles without re-importing the pack; nudge it a few percent until the art looks right.
+- **Adjustable thickness for the drawing edges.** Draw heavier or finer strokes without changing tools.
+- **Per-style dungeon generation colors.** Each generation style can carry its own default palette, so a generated cavern and a generated keep don't both come out in the same palette. Customizable from settings.
+- **Two-finger trackpad navigation.** Pan and zoom with a trackpad the way the rest of the system expects.
+
+### Improvements
+- Map settings have moved out of the View panel into a home of their own to make them easier to find.
+- The tile drawer got a pass: the scale readout is now directly editable rather than slider-only, and tileset settings are reachable from block and embedded maps, not just the full-pane view.
+- Every tooltip in the plugin now uses Obsidian's native tooltip system, so they follow your theme and appearance settings instead of the browser default.
+
+### Bug Fixes
+- **Hand-drawn hex tiles with padded art now seat better.** Packs that ship art larger than the hex face (extending mountains, tree canopies) were landing at the wrong size and z-order for some packs, leaving visible gaps and wrong overlaps. Detection, painter order, and edge handling were all reworked to hopefully land closer to truth.
+- Attempted to fix a reported issue of floating panels occasionally anchoring to the wrong side of the screen, or to the wrong window entirely, when multiple map views are open.
+- Fixed a 1.13.x bug where per-map grid line width slider was missing in Map Settings. It's back.
+- The Beacon's note writer can no longer resurrect a Beacon note you just deleted. A debounced write could previously land after the delete and bring it back.
+- Wheel-zooming in the middle of a drag-pan no longer leaves the view in a confused state.
+- The travel pack editor no longer writes to disk on every keystroke.
+- The dungeon essence visualizer keeps your theme when opened in a popout window.
+- The Map Settings modal now centers properly instead of opening past the bottom-right corner, and the override toggle says what it actually scopes.
+- Tool palette tooltips work again.
+
+### Under the hood
+- Roughly 970 lines of dead stylesheet removed, which is 1,928 fewer lines of CSS (SCSS ✨)
+- The Beacon layer no longer rescans the whole vault once per nearby result.
+
 ## Version 2.1.3
 
 The rest of the community directory's scan findings, hunted to zero this time. No feature changes.

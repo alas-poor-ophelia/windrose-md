@@ -679,8 +679,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         : (isTouchDevice ? 400 : 600)));
 
   // Width only applies in picture frame mode; unset means the frame spans
-  // the note's content column (the default embed behavior).
-  const canvasWidth = !fullPane && pictureFrameActive
+  // the note's content column (the default embed behavior). This sizes the
+  // CONTAINER, not the canvas wrapper — the visible frame (border, inset ring,
+  // corner brackets) lives on .windrose-container, which _layout.scss pins to
+  // width:100%. Sizing the inner wrapper instead only shrinks the canvas and
+  // leaves the frame spanning the full note column.
+  const frameWidth = !fullPane && pictureFrameActive
     ? (isTouchDevice
         ? (effectiveSettings?.pictureFrameWidthMobile ?? null)
         : (effectiveSettings?.pictureFrameWidth ?? null))
@@ -978,6 +982,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       <div
         ref={containerRef}
         className={`windrose-container interactive-child${fullPane ? '' : ' windrose-container-block'}${pictureFrameActive ? ' windrose-picture-frame' : ''}`}
+        style={frameWidth != null ? { width: `${frameWidth}px`, maxWidth: '100%', marginInline: 'auto' } : undefined}
       >
         <CornerBrackets classPrefix="windrose-corner-bracket" variant="ornate" filterId="bracket" />
 
@@ -1085,11 +1090,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
         <div
           className={`windrose-canvas-wrapper${fullPane ? ' windrose-full-pane-canvas' : ''}`}
-          style={canvasHeight != null || canvasWidth != null ? {
-            ...(canvasHeight != null ? { height: `${canvasHeight}px` } : {}),
-            // Cap at the note column and center the frame when narrower
-            ...(canvasWidth != null ? { width: `${canvasWidth}px`, maxWidth: '100%', marginInline: 'auto' } : {})
-          } : undefined}
+          style={canvasHeight != null ? { height: `${canvasHeight}px` } : undefined}
           onMouseEnter={() => setIsFocused(true)}
           onMouseLeave={() => setIsFocused(false)}
         >
