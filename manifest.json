@@ -1,7 +1,7 @@
 {
   "id": "windrose-md",
   "name": "Windrose MapDesigner",
-  "version": "2.1.3",
+  "version": "2.2.0",
   "minAppVersion": "1.13.0",
   "description": "Interactive dungeon and world mapping tool for tabletop RPGs.",
   "author": "alas, poor ophelia",
