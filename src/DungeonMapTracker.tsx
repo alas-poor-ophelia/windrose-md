@@ -30,7 +30,7 @@ import { FogOfWarToolbar } from './components/toolbars/FogOfWarToolbar';
 import { WindroseCompass } from './components/shared/WindroseCompass';
 
 import { MapSettingsModal } from './components/settings/MapSettingsModal';
-import { getTheme, getEffectiveSettings, getSettings } from './core/settingsAccessor';
+import { getTheme, getEffectiveSettings, getSettings, getTilesetFolders } from './core/settingsAccessor';
 import { isFeatureEnabled } from './core/featureFlags';
 import { getColorByHex, isDefaultColor, DEFAULT_COLOR } from './drawing/colorOperations';
 import { ImageAlignmentMode } from './components/overlays/ImageAlignmentMode';
@@ -176,8 +176,16 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   }, []);
 
   // Tile drawer pane: Tiles vs Objects (Objects sidebar folded into the drawer).
+  // Open on Objects when this vault has no tile packs configured — the Tiles
+  // pane's empty state is a dead end for anyone who has not imported anything.
+  // Read the FOLDER SETTINGS, not mapData.tilesets: settings are available
+  // synchronously at mount, whereas tilesets are attached later by the async
+  // tileset builder, so keying off the map data opened every tiled vault on
+  // Objects (the builder had not run yet).
   const [tilePane, setTilePane] = useState<'tiles' | 'objects'>(
-    () => (isFeatureEnabled('tiles') ? 'tiles' : 'objects')
+    () => (isFeatureEnabled('tiles') && getTilesetFolders().some(f => f.trim() !== '')
+      ? 'tiles'
+      : 'objects')
   );
   // Selecting a pane couples to the active tool: Objects → addObject, Tiles → tilePaint.
   // Forcing tilePaint on the Tiles tab avoids ping-pong with the coupling effect below.
@@ -527,20 +535,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   );
   const showTilePanel = mapData != null;
 
-  // Pane default: a vault with no tilesets lands on the Tiles pane's empty state,
-  // which is a dead end for anyone who has not imported tiles yet — open on
-  // Objects instead, and leave the Tiles half of the switch to show the empty
-  // state when they ask for it. Deliberately ONE-SHOT (guarded by the ref, not
-  // reactive like the featureFlags.tiles effect above): tilesets are derived from
-  // map data, which is empty on first render for every map, so a reactive check
-  // would yank a tiled vault onto Objects and then jump back once data resolved.
-  // Once the default is applied the pane belongs to the user.
-  const paneDefaulted = useRef(false);
-  useEffect(() => {
-    if (paneDefaulted.current || isLoading || mapData == null) return;
-    paneDefaulted.current = true;
-    if (availableTilesets.length === 0) setTilePane('objects');
-  }, [isLoading, mapData, availableTilesets]);
 
   // Stable handlers: TileAssetBrowser is memo()'d, so its props must keep
   // identity across the per-pointermove re-renders of this component.
