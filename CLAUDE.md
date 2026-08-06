@@ -35,7 +35,7 @@ npm run deploy       # Dev build + copy main.js/styles.css/manifest.json to vaul
 npm run build:watch  # Watch mode (rebuilds on file change)
 npm run lint:scanner # Store-scan replica lint (raw obsidianmd preset, NO local opt-outs) — must be 0 problems before every release
 npm run test:unit   # Unit tests (~4s)
-npm run test:e2e    # E2E tests (FULL SUITE ~15 MIN — see Test Output Capture below)
+npm run test:e2e    # E2E tests (FULL SUITE 20-30+ MIN — see Test Output Capture below)
 npm run check       # Typecheck + lint
 ```
 
@@ -70,12 +70,14 @@ npm run check       # Typecheck + lint
 
 ## E2E Build & Fixture Rules
 
+- **NEVER start an E2E run (full suite OR single file) without the user's explicit go-ahead in the current conversation.** Each run boots real Obsidian on this machine. The full suite takes 20-30+ minutes; do not launch it as a side effect of some other goal.
+- **E2E runs are quiet by default**: `tests/e2e/quiet-launch.cjs` is injected into Electron's main process (via `electron --require`, wired in `patches/obsidian-testing-framework+0.1.6.patch`) — every test window shows inactive, offscreen, with focus() neutered and background throttling disabled, so runs never steal the user's keyboard/mouse focus. Set `WINDROSE_E2E_VISIBLE=1` (or `npm run test:e2e:visible`) to watch the window. Note: Obsidian ignores `--window-position`/`--window-size` CLI flags — main-process injection is the only approach that works.
 - **E2E runs against the DEV build**: `npm run build:dev` (or `deploy`) before `test:e2e` — NOT `npm run build` (production). The minified bundle fails at least one openings test (windrose-fvh); the dev bundle is the harness's historical, intended target.
 - **Restore fixtures before judging failures**: repeated E2E runs churn `tests/fixtures/test-vault/` (workspace.json, smoke-test notes), which can deterministically fail specific tests (openings closing-segment resize). `git checkout -- tests/fixtures/` then re-run before believing a failure.
 
 ## Test Output Capture (E2E)
 
-The full E2E suite takes ~15 minutes. **NEVER truncate its live output** (`| Select-Object -Last N`, `| Select-String`, `| tail`) — a truncated failing run loses the failure list and costs a full re-run just to learn which tests failed. This has happened repeatedly.
+The full E2E suite takes 20-30+ minutes (Obsidian boots once per TEST, not per file). **NEVER truncate its live output** (`| Select-Object -Last N`, `| Select-String`, `| tail`) — a truncated failing run loses the failure list and costs a full re-run just to learn which tests failed. This has happened repeatedly.
 
 - Every `npm run test:e2e` run automatically writes full machine-readable results to `test-results.json` (vitest `json` reporter, gitignored). Read failures from there after the run — the console can be truncated with impunity, the JSON cannot be lost.
 - PowerShell one-liner to list failures from the last run:

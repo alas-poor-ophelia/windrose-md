@@ -37,7 +37,7 @@ index 5c02743..f6604bd 100644
  // @ts-ignore some error about a string type now having `undefined` as part of it's union
  export const test = base.extend({
      electronApp: [
-@@ -70,16 +89,21 @@ export const test = base.extend({
+@@ -70,16 +89,29 @@ export const test = base.extend({
              const vault = inject("vault");
              process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = "true";
              console.log("asar located at:", getExe());
@@ -58,16 +58,24 @@ index 5c02743..f6604bd 100644
 +            console.log("Vault hash:", vaultHash);
 +            // Pass vault URI to open the vault directly
 +            const vaultUri = `obsidian://open?vault=${vaultHash}`;
-+            // Background mode: move window offscreen unless WINDROSE_E2E_VISIBLE=1
-+            const bgArgs = process.env.WINDROSE_E2E_VISIBLE ? [] : ["--window-position=-32000,-32000", "--window-size=1280,720"];
++            // Quiet mode: inject a main-process module (electron --require) that
++            // forces showInactive() + offscreen position so the test window can
++            // never steal focus or cover the user's screen. Occlusion detection
++            // is disabled so the offscreen window keeps rendering for canvas
++            // tests. WINDROSE_E2E_VISIBLE=1 bypasses. (--window-position and
++            // --window-size are ignored by Obsidian, which creates its own
++            // BrowserWindow, so the old flag-based approach never worked.)
++            const quietArgs = process.env.WINDROSE_E2E_VISIBLE
++                ? []
++                : ["--require", path.resolve(process.cwd(), "tests/e2e/quiet-launch.cjs"), "--disable-features=CalculateNativeWinOcclusion"];
              const electronApp = await electron.launch({
                  timeout: 60000,
 -                args: [getExe(), uriArg].filter((a) => !!a),
-+                args: [getExe(), "--user-data-dir=" + testDataDir, ...bgArgs, vaultUri],
++                args: [...quietArgs, getExe(), "--user-data-dir=" + testDataDir, vaultUri],
              });
              electronApp.on("console", async (msg) => {
                  console.log(...(await Promise.all(msg.args().map((a) => a.jsonValue()))));
-@@ -95,6 +119,35 @@ export const test = base.extend({
+@@ -95,6 +127,35 @@ export const test = base.extend({
              // console.log("windows", windows);
              let page = windows[windows.length - 1];
              await page.waitForLoadState("domcontentloaded");
