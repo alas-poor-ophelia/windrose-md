@@ -275,6 +275,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Block-mode shared drawer header: a segmented Tiles|Objects control (the
   // block spec's pane switch, replacing the .fd-subrib), the grid/list view
   // toggle (tiles only) and a collapse button — sits above both panes.
+  // Block mode hides the tile browser's internal header, so the tileset-config
+  // toggle is hoisted here into the compact drawer head (windrose-48j).
+  const [blockTilesetConfigOpen, setBlockTilesetConfigOpen] = useState(false);
+
   const renderCompactDrawerHead = (): VNode => {
     // The grid/list toggle serves whichever pane is active.
     const paneViewMode = tilePane === 'tiles' ? tileViewMode : objectViewMode;
@@ -307,6 +311,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             onClick={() => setPaneViewMode('list')}
           ><Icon icon="lucide-list" size={14} /></button>
         </div>
+        {tilePane === 'tiles' && availableTilesets.length > 0 && (
+          <button
+            className={`windrose-tb-iconbtn interactive-child ${blockTilesetConfigOpen ? 'active' : 'ghost'}`}
+            ref={tooltipRef('Tileset settings')}
+            onClick={() => setBlockTilesetConfigOpen(v => !v)}
+          ><Icon icon="lucide-sliders-horizontal" size={14} /></button>
+        )}
         <button
           className="windrose-tb-iconbtn ghost interactive-child windrose-cd-collapse"
           ref={tooltipRef('Collapse to edge')}
@@ -1495,6 +1506,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onTilesetOverrideChange={handleTilesetOverrideChange}
                 onTilesetArtOffsetChange={handleTilesetArtOffsetChange}
                 onTilesetArtScaleChange={handleTilesetArtScaleChange}
+                tilesetConfigOpen={blockTilesetConfigOpen}
+                onTilesetConfigOpenChange={setBlockTilesetConfigOpen}
                 compact
                 hideHeader
                 active={!tileBrowserCollapsed}

@@ -47,6 +47,80 @@ import { TilesetConfigPanel } from './TilesetConfigPanel';
 import { tooltipRef } from '../shared/obsidianTooltip';
 
 // ===========================================
+// Per-tile scale control (slider + editable readout)
+// ===========================================
+
+const TILE_SCALE_MIN = 0.25;
+const TILE_SCALE_MAX = 3;
+const TILE_SCALE_STEP = 0.25;
+
+/** Direct entry allows finer precision (0.05) than the slider detents. */
+function clampTileScale(v: number): number {
+  return Math.min(TILE_SCALE_MAX, Math.max(TILE_SCALE_MIN, Math.round(v * 20) / 20));
+}
+
+/** Scale slider with a live readout: the mouse wheel steps the value over the
+ *  slider, and clicking the readout swaps it for a direct numeric input
+ *  (Enter/blur commits, Esc cancels). Drop-in for a bare range+cap pair. */
+function TileScaleSlider({ value, onChange }: {
+  value: number;
+  onChange: (v: number) => void;
+}): VNode {
+  const [editing, setEditing] = useState(false);
+  const handleWheel = useCallback((e: WheelEvent) => {
+    e.preventDefault();
+    const dir = e.deltaY < 0 ? 1 : -1;
+    onChange(clampTileScale(value + dir * TILE_SCALE_STEP));
+  }, [value, onChange]);
+  const commit = (raw: string): void => {
+    const v = parseFloat(raw);
+    if (Number.isFinite(v)) onChange(clampTileScale(v));
+    setEditing(false);
+  };
+  return (
+    <>
+      <input
+        className="windrose-tb-range"
+        type="range"
+        min={TILE_SCALE_MIN}
+        max={TILE_SCALE_MAX}
+        step={TILE_SCALE_STEP}
+        value={value}
+        onInput={(e: Event) => onChange(parseFloat((e.target as HTMLInputElement).value))}
+        onWheel={handleWheel}
+        style={{ flex: 1, minWidth: 0 }}
+      />
+      {editing ? (
+        <input
+          className="windrose-tb-scale-input"
+          type="number"
+          min={TILE_SCALE_MIN}
+          max={TILE_SCALE_MAX}
+          step={0.05}
+          defaultValue={String(value)}
+          ref={(el: HTMLInputElement | null) => { el?.focus(); el?.select(); }}
+          onKeyDown={(e: KeyboardEvent) => {
+            const el = e.target as HTMLInputElement;
+            if (e.key === 'Enter') commit(el.value);
+            else if (e.key === 'Escape') { el.dataset.cancel = '1'; setEditing(false); }
+          }}
+          onBlur={(e: Event) => {
+            const el = e.target as HTMLInputElement;
+            if (el.dataset.cancel !== '1') commit(el.value);
+          }}
+        />
+      ) : (
+        <button
+          className="windrose-tb-cap windrose-tb-cap-edit"
+          ref={tooltipRef('Edit scale')}
+          onClick={() => setEditing(true)}
+        >{value}×</button>
+      )}
+    </>
+  );
+}
+
+// ===========================================
 // Horizontal scroller (wheel→sideways + drag)
 // ===========================================
 
@@ -199,6 +273,11 @@ interface TileAssetBrowserProps {
   onTilesetArtOffsetChange?: (tilesetId: string, value: number | undefined) => void;
   /** Global per-tileset art scale multiplier (1 = auto); undefined clears. */
   onTilesetArtScaleChange?: (tilesetId: string, value: number | undefined) => void;
+  /** Controlled tileset-config visibility: block mode hoists the toggle into
+      the compact drawer head (the internal header that carries the button is
+      hidden there). Omit both to let the browser own the state. */
+  tilesetConfigOpen?: boolean;
+  onTilesetConfigOpenChange?: (open: boolean) => void;
   showRail?: boolean;
   compact?: boolean;
   /** Suppress the internal header — block mode hoists a shared compact header
@@ -293,6 +372,8 @@ const TileAssetBrowser = memo(({
   onTilesetOverrideChange,
   onTilesetArtOffsetChange,
   onTilesetArtScaleChange,
+  tilesetConfigOpen,
+  onTilesetConfigOpenChange,
   showRail = false,
   compact = false,
   hideHeader = false,
@@ -310,7 +391,11 @@ const TileAssetBrowser = memo(({
   const featureFlags = useFeatureFlags();
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
-  const [showTilesetConfig, setShowTilesetConfig] = useState<boolean>(false);
+  // Controlled/uncontrolled hybrid (same contract as railSel): block mode
+  // hoists the toggle into the compact drawer head, full-pane keeps it local.
+  const [localTilesetConfig, setLocalTilesetConfig] = useState<boolean>(false);
+  const showTilesetConfig = tilesetConfigOpen ?? localTilesetConfig;
+  const setShowTilesetConfig = onTilesetConfigOpenChange ?? setLocalTilesetConfig;
   const [hoveredTile, setHoveredTile] = useState<TileEntry | null>(null);
   // Controlled/uncontrolled hybrid: when the host supplies railSel + onRailSelChange
   // (so Recent/Starred can live on the drawer ribbon) we defer to it; otherwise we
@@ -1636,16 +1721,7 @@ const TileAssetBrowser = memo(({
             ) : (
               <>
                 <span className="label">Scale</span>
-                <input
-                  className="windrose-tb-range"
-                  type="range"
-                  min="0.25"
-                  max="3"
-                  step="0.25"
-                  value={tileScale}
-                  onInput={(e: Event) => onTileScaleChange(parseFloat((e.target as HTMLInputElement).value))}
-                  style={{ flex: 1, minWidth: 0 }}
-                />
+                <TileScaleSlider value={tileScale} onChange={onTileScaleChange} />
               </>
             )}
             <button
@@ -1758,17 +1834,7 @@ const TileAssetBrowser = memo(({
                 </button>
                 <span className="sep" />
                 <span className="label">Scale</span>
-                <input
-                  className="windrose-tb-range"
-                  type="range"
-                  min="0.25"
-                  max="3"
-                  step="0.25"
-                  value={tileScale}
-                  onInput={(e: Event) => onTileScaleChange(parseFloat((e.target as HTMLInputElement).value))}
-                  style={{ flex: 1, minWidth: 60 }}
-                />
-                <span className="windrose-tb-cap" style={{ minWidth: 24, textAlign: 'right' }}>{tileScale}×</span>
+                <TileScaleSlider value={tileScale} onChange={onTileScaleChange} />
               </>
             )}
           </div>

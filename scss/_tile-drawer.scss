@@ -146,7 +146,10 @@ button:is(
 }
 
 .windrose-cd-segbtn {
-  padding: 3px 10px;
+  /* 6px horizontal (not 10) — at the 240px drawer width the head row holds
+     six controls; the wider padding pushed the collapse button past the
+     right edge (windrose-48j follow-up). */
+  padding: 3px 6px;
   font-size: 10.5px;
   font-weight: 600;
   border: none;
@@ -329,7 +332,7 @@ button:is(
 /* Compact-drawer header segmented control */
 .is-tablet button.windrose-cd-segbtn {
   height: auto;
-  padding: 3px 10px;
+  padding: 3px 6px;
   border: none;
   border-radius: 5px;
   background: transparent;

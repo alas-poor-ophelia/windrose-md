@@ -45,6 +45,39 @@
   color: var(--windrose-text-muted);
 }
 
+/* Editable scale readout — a button so it's clickable/focusable; the
+   class-qualified selector neutralizes Obsidian's global button box
+   (height/padding/background/box-shadow at 0,1,1). */
+button.windrose-tb-cap-edit {
+  height: auto;
+  min-width: 26px;
+  padding: 0 2px;
+  background: none;
+  border: none;
+  box-shadow: none;
+  cursor: text;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+
+  &:hover {
+    color: var(--windrose-text-primary);
+    text-decoration: underline dotted;
+  }
+}
+
+/* Direct-entry twin of the readout: swaps in place, same footprint. */
+.windrose-tb-scale-input {
+  width: 48px;
+  flex-shrink: 0;
+  font-size: 10px;
+  padding: 1px 3px;
+  background: var(--windrose-bg-primary);
+  border: 1px solid var(--windrose-border-secondary);
+  border-radius: 3px;
+  color: var(--windrose-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---- Icon buttons ---- */
 .windrose-tb-iconbtn {
   display: inline-flex;
