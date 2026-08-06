@@ -84,7 +84,7 @@
     "yaml": "^2.8.3",
     "js-yaml": "^4.2.0",
     "flatted": "^3.4.2",
-    "fast-uri": "^3.1.4"
+    "fast-uri": "^3.1.5"
   },
   "resolutions": {
     "mermaid": "^11.16.0",
@@ -99,6 +99,6 @@
     "yaml": "^2.8.3",
     "js-yaml": "^4.2.0",
     "flatted": "^3.4.2",
-    "fast-uri": "^3.1.4"
+    "fast-uri": "^3.1.5"
   }
 }
