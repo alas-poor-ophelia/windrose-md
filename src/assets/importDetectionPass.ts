@@ -26,7 +26,7 @@ import {
 import { predictDepthTier } from './depthPredictor';
 import { predictRenderMode } from './renderModePredictor';
 import { predictSpan, DEFAULT_PIXELS_PER_CELL } from './spanPredictor';
-import { runDetectionScan } from './tileImageScan';
+import { runDetectionScan, HEX_ART_MIN_SOURCE_PX } from './tileImageScan';
 
 /** Minimum confidence before a depth-tier prediction persists. */
 export const DEPTH_CONFIDENCE_THRESHOLD = 0.4;
@@ -83,11 +83,16 @@ export async function runImportDetectionPass(
   const stats: ImportDetectionStats = { scanned: 0, depth: 0, region: 0, spans: 0 };
 
   // 1. Detection signals for tiles missing them (srcW check catches older
-  //    scans that cached coverage/bounds but not natural dims).
+  //    scans that cached coverage/bounds but not natural dims). Entries whose
+  //    hexArt violates the size floor are re-scanned too — the only exception
+  //    to fill-missing-only, because that verdict is provably invalid (written
+  //    before the floor existed) and the fresh scan clears it.
   const needsScan = tiles
     .filter(t => {
       const e = metadata[t.vaultPath];
-      return e?.alphaCoverage == null || e?.srcW == null;
+      if (e?.alphaCoverage == null || e?.srcW == null) return true;
+      return e.hexArt != null &&
+        ((e.srcW ?? 0) < HEX_ART_MIN_SOURCE_PX || (e.srcH ?? 0) < HEX_ART_MIN_SOURCE_PX);
     })
     .map(t => t.vaultPath);
   for (let i = 0; i < needsScan.length; i += SCAN_BATCH) {
@@ -139,6 +144,28 @@ export async function runImportDetectionPass(
 
   // 4. Footprint from natural dims ÷ authoring resolution. Region tiles tile
   //    seamlessly and have no footprint; 1×1 stays implicit (only >1 persists).
+  //
+  //    Hexagonal art is one cell by definition — the DD pixels-per-cell rule
+  //    does not apply to one-hex-per-image packs (e.g. 2MT world map tiles,
+  //    795px images that would otherwise predict a 3x3 footprint). Because a
+  //    single tile's mask can defeat the hexagon gates (tree canopy overflow),
+  //    same-dimension families vote: hex packs author every hex tile at
+  //    identical pixel dimensions, so classified members extend the skip to
+  //    their unclassifiable siblings.
+  const famTotal = new Map<string, number>();
+  const famHex = new Map<string, number>();
+  for (const tile of predictable) {
+    const e = metadata[tile.vaultPath];
+    if (e?.srcW == null || e.srcH == null) continue;
+    const key = `${e.srcW}x${e.srcH}`;
+    famTotal.set(key, (famTotal.get(key) ?? 0) + 1);
+    if (e.hexArt != null) famHex.set(key, (famHex.get(key) ?? 0) + 1);
+  }
+  const isHexFamily = (key: string): boolean => {
+    const hex = famHex.get(key) ?? 0;
+    return hex >= 2 && hex >= (famTotal.get(key) ?? 0) * 0.25;
+  };
+
   const ppc = opts.pixelsPerCell ?? DEFAULT_PIXELS_PER_CELL;
   const spanEntries: Array<{ vaultPath: string; spanW: number; spanH: number }> = [];
   for (const tile of predictable) {
@@ -146,6 +173,7 @@ export async function runImportDetectionPass(
     if (e == null || e.renderMode === 'region') continue;
     if (e.defaultSpanW != null || e.defaultSpanH != null) continue;
     if (e.srcW == null || e.srcH == null) continue;
+    if (e.hexArt != null || isHexFamily(`${e.srcW}x${e.srcH}`)) continue;
     const { spanW, spanH } = predictSpan(e.srcW, e.srcH, ppc);
     if (spanW > 1 || spanH > 1) spanEntries.push({ vaultPath: tile.vaultPath, spanW, spanH });
   }

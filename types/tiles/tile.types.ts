@@ -36,9 +36,18 @@ interface TilesetBase {
    *  frame and rotates ±30° so the art snaps to the cell. Absent = unknown
    *  (non-hexagonal art, e.g. square DD textures) → no adaptation. */
   artOrientation?: 'flat' | 'pointy';
+  /** Opaque hexagon width in art px, measured from the alpha mask alongside
+   *  artOrientation. When set, cell sizing maps THIS (not tileWidth) to the
+   *  cell width, so hex art padded inside a larger image still fills its cell
+   *  exactly. Absent = art fills the image (legacy behavior). */
+  hexWidth?: number;
   /** Minimum stamp scale as fraction of cell's smaller screen dimension.
    *  Prevents tiny stamps from becoming invisible at low zoom. @default 0.2 */
   minStampScale?: number;
+  /** Manual vertical nudge in world px (positive raises the art) — hydrated
+   *  from the GLOBAL settings.tilesetArtOffsets at build time (and applied
+   *  live by the config panel); not produced by detection. */
+  artOffsetY?: number;
   /** Auto-tile configuration (reserved for future use) */
   autoTileConfig?: {
     type: '4bit' | '8bit-blob' | 'dual-grid';
@@ -263,6 +272,11 @@ export interface TileMetadataEntry {
   srcW?: number;
   /** Cached detection signal: full natural image height in source px. */
   srcH?: number;
+  /** Cached detection signal: the tile's art is a hexagon of this orientation
+   *  (alpha-mask classification). Hexagonal art is definitionally one cell, so
+   *  footprint prediction skips these tiles — the DD pixels-per-cell rule does
+   *  not apply to one-hex-per-image packs (e.g. 2MT world map tiles). */
+  hexArt?: 'flat' | 'pointy';
   /** For wall/path strips: vault path of the paired `_end` cap texture, if any. */
   wallEndCapPath?: string;
   /** For wall strips: default tint from the .dungeondraft_wall sidecar (hex, no #). */

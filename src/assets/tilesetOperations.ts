@@ -178,6 +178,27 @@ function resolveTileEntry(
 // ===========================================
 
 /**
+ * Read a tile image's bytes: vault index first, adapter fallback for files
+ * the index hasn't caught up to yet. Bulk-extracting a pack into the vault
+ * from outside Obsidian can drop most of the file-watcher events, leaving
+ * hundreds of tiles unindexed for minutes — a TFile-only read then silently
+ * starves the detection scan AND the tileset probe (a padded hex pack probed
+ * through the gap loses its hexWidth mapping and draws at the wrong size).
+ */
+async function readTileImageBinary(app: App, vaultPath: string): Promise<ArrayBuffer | null> {
+  const file = app.vault.getAbstractFileByPath(vaultPath);
+  if (file instanceof TFile) return await app.vault.readBinary(file);
+  try {
+    if (await app.vault.adapter.exists(vaultPath)) {
+      return await app.vault.adapter.readBinary(vaultPath);
+    }
+  } catch {
+    /* unreadable — treated as missing below */
+  }
+  return null;
+}
+
+/**
  * Measure alpha coverage of a tile image (fraction of non-transparent pixels).
  * Used to auto-detect fitMode: high coverage = hex-filling terrain, low = stamp/object.
  */
@@ -226,24 +247,52 @@ async function measureAlphaCoverage(app: App, tile: TileEntry): Promise<number |
 }
 
 /**
+ * Deterministic probe candidate order: shallowest folder first, then path.
+ * Determinism matters because vault scan order varies between mounts (index
+ * churn), which fed different probe samples — and thus different tileset
+ * geometry — to every reload. Depth-first matters MORE: a pack's primary
+ * tiles live at the folder root while decorations live in subfolders, and a
+ * plain path sort put "Extras/" banners ahead of the "Hex - *" tiles — the
+ * probe sampled five ribbons, no hexagon verdict survived, and every hex
+ * tile fell back to legacy mapping at half size.
+ */
+function probeCandidateOrder(tiles: TileEntry[]): TileEntry[] {
+  const depth = (p: string): number => p.split('/').length;
+  return [...tiles].sort((a, b) =>
+    depth(a.vaultPath) - depth(b.vaultPath) || a.vaultPath.localeCompare(b.vaultPath));
+}
+
+/**
  * Probe tile images to find the dominant (most common) pixel dimensions.
  * Samples up to 5 images, skipping tiny ones (< 64px), and returns
  * the most frequently occurring size plus alpha coverage for fitMode detection.
  */
-async function probeFirstTileImage(app: App, tiles: TileEntry[]): Promise<{ width: number; height: number; alphaCoverage?: number; artOrientation?: 'flat' | 'pointy' } | null> {
+async function probeFirstTileImage(app: App, tiles: TileEntry[]): Promise<{
+  width: number;
+  height: number;
+  alphaCoverage?: number;
+  artOrientation?: 'flat' | 'pointy';
+  /** Set only for padded hex art (hexagon smaller than its image) — see below. */
+  hexWidth?: number;
+  hexHeight?: number;
+  overflowTop?: number;
+} | null> {
   const MIN_SIZE = 64;
   const MAX_PROBES = 5;
   const sizes: { width: number; height: number }[] = [];
-  // First probed tile per size key, for art-orientation classification of the winner
-  const firstTileBySize = new Map<string, TileEntry>();
+  // All probed tiles per size key — hex-art classification tries each candidate
+  // at the winning size in turn, because a single sample can defeat the mask
+  // gates (e.g. tree canopy overflowing a 2MT forest hex) while its clean
+  // same-size siblings classify fine.
+  const tilesBySize = new Map<string, TileEntry[]>();
 
-  for (const tile of tiles) {
+  const ordered = probeCandidateOrder(tiles);
+
+  for (const tile of ordered) {
     if (sizes.length >= MAX_PROBES) break;
     try {
-      const file = app.vault.getAbstractFileByPath(tile.vaultPath);
-      if (!(file instanceof TFile)) continue;
-
-      const binary = await app.vault.readBinary(file);
+      const binary = await readTileImageBinary(app, tile.vaultPath);
+      if (binary == null) continue;
       const blob = new Blob([binary]);
       const url = URL.createObjectURL(blob);
 
@@ -263,7 +312,9 @@ async function probeFirstTileImage(app: App, tiles: TileEntry[]): Promise<{ widt
       if (dims && dims.width >= MIN_SIZE && dims.height >= MIN_SIZE) {
         sizes.push(dims);
         const key = `${dims.width}x${dims.height}`;
-        if (!firstTileBySize.has(key)) firstTileBySize.set(key, tile);
+        const list = tilesBySize.get(key);
+        if (list == null) tilesBySize.set(key, [tile]);
+        else list.push(tile);
       }
     } catch {
       continue;
@@ -293,10 +344,53 @@ async function probeFirstTileImage(app: App, tiles: TileEntry[]): Promise<{ widt
     }
   }
 
-  const sample = firstTileBySize.get(`${best.width}x${best.height}`);
-  const artOrientation = sample ? await detectArtOrientation(app, sample) : undefined;
+  // Analyze every probed candidate at the winning size. The ORIENTATION comes
+  // from the first candidate whose hexagon gates pass; the METRICS come from
+  // the most corner-symmetric candidate — decorations can defeat the gates or
+  // pollute a corner on some tiles (2MT forests) while identical-dimension
+  // siblings measure the true face cleanly.
+  let orientation: 'flat' | 'pointy' | undefined;
+  let metrics: HexArtAnalysis | undefined;
+  for (const sample of tilesBySize.get(`${best.width}x${best.height}`) ?? []) {
+    const a = await detectHexArtAnalysis(app, sample);
+    if (a == null) continue;
+    orientation ??= a.verdict;
+    if (metrics == null || a.cornerSkew < metrics.cornerSkew) metrics = a;
+  }
 
-  return { ...best, artOrientation };
+  // Padded hex art (hexagon floating in transparent margin, e.g. 2MT world map
+  // tiles: a 224x194 image whose face+skirt occupy only the central ~116px):
+  // derive cell-mapping dimensions from the measured hexagon so the face fills
+  // its cell exactly. Art that spans its image keeps the legacy mapping.
+  if (orientation != null && metrics != null && metrics.hexWidth < best.width * HEX_PADDED_WIDTH_FRACTION) {
+    // Face width → cell width, PLUS edge bleed: storing the measured width
+    // divided by (1+bleed) makes the renderer draw the face slightly larger
+    // than the cell, so its ink overshoots the boundary and buries the grid
+    // line. hexHeight is the effective face's regular-hexagon height
+    // UNROUNDED so the renderer's scaleY equals scaleX exactly (zero aspect
+    // distortion — the art is drawn uniformly scaled, never stretched).
+    const effWidth = metrics.hexWidth / (1 + HEX_ART_EDGE_BLEED);
+    const hexHeight = orientation === 'flat'
+      ? effWidth * (Math.sqrt(3) / 2)
+      : effWidth * (2 / Math.sqrt(3));
+    return {
+      ...best,
+      artOrientation: orientation,
+      hexWidth: effWidth,
+      hexHeight,
+      // COVERAGE anchor: the fitted face center guarantees every grid edge is
+      // covered with zero excess at the top (fitHexCellCenterY); the renderer
+      // centers the hex band [overflowTop, overflowTop+hexHeight) on the
+      // cell, so a band centered on the fit is exactly that anchor. Falls
+      // back to the corner-line (widest-row) center when no full-coverage
+      // position exists. The 3D skirt hangs into the southern neighbor's
+      // cell, where the world-y painter order (south draws over north)
+      // covers it.
+      overflowTop: Math.max(0, (metrics.cellFitCenterY ?? metrics.cornerRowY) - hexHeight / 2),
+    };
+  }
+
+  return { ...best, artOrientation: orientation };
 }
 
 /** Alpha coverage threshold: above this → hex-filling (fill), below → stamp (contain) */
@@ -316,20 +410,86 @@ const MASK_SQUARE_COVERAGE = 0.88;
 const MASK_HEX_EDGE_FRACTION = 0.18;
 /** Bottom-band width below this fraction of the bbox = bottom vertex (pointy). */
 const MASK_POINTY_BOTTOM_FRACTION = 0.38;
+/** Hexagon narrower than this fraction of its image width = padded art →
+ *  cell sizing switches to the measured hexagon. At or above it, the art
+ *  spans its image and the legacy image-dimension mapping stays untouched. */
+const HEX_PADDED_WIDTH_FRACTION = 0.95;
+/** Edge bleed for padded hex art: the face draws this fraction LARGER than
+ *  the cell, so its ink overshoots the boundary and buries the grid line.
+ *  Ink that merely TOUCHES the boundary leaves the line's outer half visible
+ *  (measured 2026-08-05: top edges 38/39 grid-visible at exact-fit scale).
+ *  2% ≈ 2.6px per side at zoom 1.6 — past a 1–2px grid line + AA, and the
+ *  overshoot stays proportional across zoom levels. */
+const HEX_ART_EDGE_BLEED = 0.02;
+
+/** Hexagonal art classified from its opaque alpha mask. */
+interface HexArtMask {
+  orientation: 'flat' | 'pointy';
+  /** Widest opaque row in px — the hexagon's true width for both orientations
+   *  (corner-to-corner for flat art, edge-to-edge for pointy art). */
+  hexWidth: number;
+}
 
 /**
- * Classify hexagonal tile art orientation from its opaque mask.
- * Pure — operates on an alpha accessor so tests can feed synthetic masks.
+ * Full mask analysis. Metrics are measured for every hexagon-plausible mask;
+ * `verdict` is set only when the strict hexagon-signature gates pass. The two
+ * are separate because decorations (tree canopy, bushes) can defeat the gates
+ * or pollute a corner on SOME tiles of a hex pack while identical-dimension
+ * siblings measure cleanly — the probe classifies from any gate-passer but
+ * takes metrics from the most corner-symmetric candidate.
+ */
+interface HexArtAnalysis {
+  /** Orientation when the hexagon gates pass; undefined for decorated or
+   *  ambiguous masks (whose metrics may still be valid family measurements). */
+  verdict?: 'flat' | 'pointy';
+  hexWidth: number;
+  /** Vertical midpoint (px from image top) of the widest-row band — the line
+   *  through the face's side corner points. Aligning it to the cell's center
+   *  line lands the corners exactly in the cell's corner crooks. */
+  cornerRowY: number;
+  /** Horizontal midpoint of the corner row's opaque span — the face's true
+   *  x-center even when the art floats off-center in its image. */
+  cornerRowCenterX: number;
+  /** Coverage-fitted face center: the HIGHEST cell-polygon position whose
+   *  entire boundary lands on ink (see fitHexCellCenterY). Preferred over
+   *  cornerRowY when available — it guarantees every grid edge is covered
+   *  with zero excess at the top. Absent when no position fully covers. */
+  cellFitCenterY?: number;
+  /** Top edge of the opaque pixels (minY). For an undecorated hex tile this
+   *  is the face's top edge — the skirt only extends the bounds DOWNWARD, so
+   *  a clean candidate's opaque top anchors the face onto the cell. */
+  opaqueTop: number;
+  /** Exclusive bottom edge of the opaque pixels (maxY + 1) — the bottom of the
+   *  art's 3D skirt. Decorations (canopy, hill bumps) sit ABOVE the face, so
+   *  the opaque bottom is stable face+skirt geometry across a hex family. */
+  opaqueBottom: number;
+  /** Top y of the leftmost/rightmost opaque columns — the corner tips. For
+   *  flat art the corner tips sit exactly on the face mid-line; for pointy art
+   *  they are the tops of the vertical edges (hexWidth/(2·√3) above center).
+   *  Canopy never reaches the extreme columns and skirts extrude corners
+   *  DOWNWARD, so the tip tops are decoration-immune face geometry. */
+  tipTopL: number;
+  tipTopR: number;
+  /** |tipTopL − tipTopR|: corner symmetry. Art touching one corner column
+   *  (a 2MT forest canopy) skews this — high skew means unreliable metrics. */
+  cornerSkew: number;
+}
+
+/**
+ * Analyze a tile's opaque mask: corner-tip metrics plus a gated orientation
+ * verdict. Pure — operates on an alpha accessor so tests can feed synthetic
+ * masks.
  *
  * Pointy-top art narrows to a vertex at the bottom of its opaque bounds;
  * flat-top art ends in a wide horizontal edge. Square-ish art (seamless
- * textures) and non-hexagonal props return undefined (no adaptation).
+ * textures) and empty/tiny masks return undefined; blobby props return
+ * metrics without a verdict.
  */
-function classifyTileArtMask(
+function analyzeTileArtMask(
   alphaAt: (x: number, y: number) => number,
   width: number,
   height: number
-): 'flat' | 'pointy' | undefined {
+): HexArtAnalysis | undefined {
   let minX = width, maxX = -1, minY = height, maxY = -1;
   let opaque = 0;
   // Row/column opaque extents in one pass
@@ -371,7 +531,6 @@ function classifyTileArtMask(
     if (colMax[x] >= 0 && (colMax[x] - colMin[x] + 1) >= bboxH * 0.97) fullHeightCols++;
   }
   const edgeFraction = Math.max(fullWidthRows / bboxH, fullHeightCols / bboxW);
-  if (edgeFraction < MASK_HEX_EDGE_FRACTION) return undefined;
 
   // Bottom band: vertex (narrow) = pointy, edge (wide) = flat. The bottom is
   // used rather than the top because overflow art (tree canopy, mountain
@@ -381,20 +540,134 @@ function classifyTileArtMask(
   for (let y = Math.max(minY, bandStart); y <= maxY; y++) {
     if (rowMax[y] >= 0) bandWidth = Math.max(bandWidth, rowMax[y] - rowMin[y] + 1);
   }
-  return bandWidth / bboxW < MASK_POINTY_BOTTOM_FRACTION ? 'pointy' : 'flat';
+  const orientation = bandWidth / bboxW < MASK_POINTY_BOTTOM_FRACTION ? 'pointy' : 'flat';
+
+  let maxRowWidth = 0;
+  for (let y = minY; y <= maxY; y++) {
+    if (rowMax[y] >= 0) maxRowWidth = Math.max(maxRowWidth, rowMax[y] - rowMin[y] + 1);
+  }
+  // Corner line: the FIRST row at maximum width — the line through the face's
+  // side corner points. First, not band-midpoint: the 3D skirt extrudes the
+  // corners straight down, keeping rows at max width BELOW the corner line,
+  // so any midpoint measure gets dragged down by half the skirt height. For
+  // pointy art the max-width band is the side-edge run and its top sits a
+  // known hexWidth/(2·√3) above the face mid-line.
+  let cornerFirst = minY;
+  for (let y = minY; y <= maxY; y++) {
+    if (rowMax[y] >= 0 && (rowMax[y] - rowMin[y] + 1) >= maxRowWidth) { cornerFirst = y; break; }
+  }
+  const cornerRowY = orientation === 'pointy'
+    ? cornerFirst + maxRowWidth / (2 * Math.sqrt(3))
+    : cornerFirst;
+  const cornerRowCenterX = (rowMin[cornerFirst] + rowMax[cornerFirst] + 1) / 2;
+
+  const tipTopL = colMin[minX];
+  const tipTopR = colMin[maxX];
+  return {
+    verdict: edgeFraction >= MASK_HEX_EDGE_FRACTION ? orientation : undefined,
+    hexWidth: maxRowWidth,
+    cornerRowY,
+    cornerRowCenterX,
+    opaqueTop: minY,
+    opaqueBottom: maxY + 1,
+    tipTopL,
+    tipTopR,
+    cornerSkew: Math.abs(tipTopL - tipTopR),
+  };
 }
 
 /**
- * Detect a tileset's art orientation by decoding one representative image
- * (the first probed at the dominant size) and classifying its alpha mask.
+ * Coverage fit: slide the cell polygon vertically over the mask and return
+ * the HIGHEST position (smallest center y) at which EVERY boundary point of
+ * the cell hexagon lands on ink. Drawing anchored there puts the art as low
+ * as possible while still covering every grid edge — "just barely covers,
+ * pixel perfect" (product owner spec, 2026-08-05). Decorations (canopy,
+ * peaks) only ADD ink so they never constrain the fit; the skirt makes the
+ * bottom edges generous, leaving the upper edges — where an uncovered grid
+ * line is actually visible — as the binding constraint. Returns undefined
+ * when no position in the search window achieves full coverage (caller falls
+ * back to the corner-line anchor).
+ *
+ * Pure — operates on an alpha accessor so tests can feed synthetic masks.
  */
-async function detectArtOrientation(app: App, tile: TileEntry): Promise<'flat' | 'pointy' | undefined> {
+function fitHexCellCenterY(
+  alphaAt: (x: number, y: number) => number,
+  width: number,
+  height: number,
+  hexWidth: number,
+  orientation: 'flat' | 'pointy',
+  centerX: number,
+  aroundY: number,
+  /** Art px added below the minimal covering position, so the top boundary
+   *  settles this deep into ink instead of exactly at its edge (a boundary
+   *  at the ink's very edge leaves the outer half of the grid line showing).
+   *  Callers pass the edge-bleed margin. @default 0 */
+  settleMargin = 0,
+): number | undefined {
+  const R = hexWidth / 2;
+  const S3 = Math.sqrt(3);
+  const verts: Array<[number, number]> = orientation === 'flat'
+    ? [[R, 0], [R / 2, R * S3 / 2], [-R / 2, R * S3 / 2], [-R, 0], [-R / 2, -R * S3 / 2], [R / 2, -R * S3 / 2]]
+    : (() => {
+        const s = hexWidth / S3;
+        return [[R, s / 2], [0, s], [-R, s / 2], [-R, -s / 2], [0, -s], [R, -s / 2]] as Array<[number, number]>;
+      })();
+  // Raster tolerance: any of the 4 pixels around the sample point being inked
+  // counts as covering — a polygon edge lies BETWEEN pixel centers.
+  const covered = (x: number, y: number): boolean => {
+    const x0 = Math.floor(x), y0 = Math.floor(y);
+    for (let dy = 0; dy <= 1; dy++) {
+      for (let dx = 0; dx <= 1; dx++) {
+        const px = x0 + dx, py = y0 + dy;
+        if (px >= 0 && py >= 0 && px < width && py < height && alphaAt(px, py) > MASK_ALPHA_THRESHOLD) return true;
+      }
+    }
+    return false;
+  };
+  const fits = (cy: number): boolean => {
+    for (let e = 0; e < 6; e++) {
+      const [ax, ay] = verts[e];
+      const [bx, by] = verts[(e + 1) % 6];
+      const steps = Math.max(4, Math.ceil(Math.hypot(bx - ax, by - ay)));
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        if (!covered(centerX + ax + (bx - ax) * t, cy + ay + (by - ay) * t)) return false;
+      }
+    }
+    return true;
+  };
+  const span = Math.max(6, Math.round(hexWidth * 0.08));
+  for (let cy = aroundY - span; cy <= aroundY + span; cy += 0.5) {
+    if (fits(cy)) return cy + settleMargin;
+  }
+  return undefined;
+}
+
+/**
+ * Classify hexagonal tile art orientation from its opaque mask — verdict-only
+ * view of analyzeTileArtMask for consumers that need a per-tile yes/no
+ * (the import scan's hexArt signal).
+ */
+function classifyTileArtMask(
+  alphaAt: (x: number, y: number) => number,
+  width: number,
+  height: number
+): HexArtMask | undefined {
+  const a = analyzeTileArtMask(alphaAt, width, height);
+  if (a?.verdict == null) return undefined;
+  return { orientation: a.verdict, hexWidth: a.hexWidth };
+}
+
+/**
+ * Analyze one probed tile's art by decoding its image and running the
+ * alpha-mask analysis at full resolution.
+ */
+async function detectHexArtAnalysis(app: App, tile: TileEntry): Promise<HexArtAnalysis | undefined> {
   try {
-    const file = app.vault.getAbstractFileByPath(tile.vaultPath);
-    if (!(file instanceof TFile)) return undefined;
-    const binary = await app.vault.readBinary(file);
+    const binary = await readTileImageBinary(app, tile.vaultPath);
+    if (binary == null) return undefined;
     const url = URL.createObjectURL(new Blob([binary]));
-    return await new Promise<'flat' | 'pointy' | undefined>((resolve) => {
+    return await new Promise<HexArtAnalysis | undefined>((resolve) => {
       const img = new Image();
       img.onload = () => {
         try {
@@ -407,7 +680,23 @@ async function detectArtOrientation(app: App, tile: TileEntry): Promise<'flat' |
           if (!ctx || w === 0 || h === 0) { resolve(undefined); return; }
           ctx.drawImage(img, 0, 0);
           const data = ctx.getImageData(0, 0, w, h).data;
-          resolve(classifyTileArtMask((x, y) => data[(y * w + x) * 4 + 3], w, h));
+          const alphaAt = (x: number, y: number): number => data[(y * w + x) * 4 + 3];
+          const a = analyzeTileArtMask(alphaAt, w, h);
+          if (a?.verdict != null) {
+            // Fit the EFFECTIVE cell polygon (cell size after edge bleed —
+            // smaller than the ink hexagon), so the boundary sits inside the
+            // ink by the bleed margin and the grid line stays buried.
+            const effWidth = a.hexWidth / (1 + HEX_ART_EDGE_BLEED);
+            // Settle one full bleed margin + 1px: deep enough that the face's
+            // OPAQUE band (not its AA fringe) owns the boundary, and covers
+            // sibling tiles whose face sits a couple art-px higher in their
+            // image than this calibration candidate (per-tile authoring
+            // variance — a forest's skirt peeking over the neighbor below).
+            const settle = (a.hexWidth - effWidth) + 1;
+            const fit = fitHexCellCenterY(alphaAt, w, h, effWidth, a.verdict, a.cornerRowCenterX, a.cornerRowY, settle);
+            if (fit != null) a.cellFitCenterY = fit;
+          }
+          resolve(a);
         } catch {
           resolve(undefined);
         } finally {
@@ -433,6 +722,7 @@ function createTilesetFromTiles(
   options?: {
     tileWidth?: number;
     tileHeight?: number;
+    hexWidth?: number;
     hexHeight?: number;
     fitMode?: 'fill' | 'contain';
     overflowTop?: number;
@@ -459,6 +749,7 @@ function createTilesetFromTiles(
     folderPath,
     tileWidth,
     tileHeight,
+    hexWidth: options?.hexWidth,
     hexHeight: options?.hexHeight ?? detected.hexHeight,
     overflowTop: options?.overflowTop ?? detected.overflowTop,
     overflowBottom: options?.overflowBottom ?? detected.overflowBottom,
@@ -489,4 +780,5 @@ async function createTileset(
 // Module Exports
 // ===========================================
 
-export { scanTilesetFolder, createTileset, createTilesetFromTiles, probeFirstTileImage, measureAlphaCoverage, autoDetectOverflow, generateTilesetId, classifyTileArtMask, detectArtOrientation, resolveTileEntry, tileIdBasename, mintTileId, ALPHA_COVERAGE_THRESHOLD };
+export { scanTilesetFolder, createTileset, createTilesetFromTiles, probeFirstTileImage, probeCandidateOrder, measureAlphaCoverage, autoDetectOverflow, generateTilesetId, classifyTileArtMask, analyzeTileArtMask, detectHexArtAnalysis, fitHexCellCenterY, readTileImageBinary, resolveTileEntry, tileIdBasename, mintTileId, ALPHA_COVERAGE_THRESHOLD };
+export type { HexArtMask, HexArtAnalysis };

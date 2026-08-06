@@ -137,6 +137,7 @@ function pruneEmptyEntries(metadata: TileMetadataStore): TileMetadataStore {
       entry.opaqueH != null ||
       entry.srcW != null ||
       entry.srcH != null ||
+      entry.hexArt != null ||
       entry.wallEndCapPath != null ||
       entry.wallDefaultColor != null ||
       entry.isWallEndCap === true
@@ -368,12 +369,12 @@ function bulkClearDefaultSpan(metadata: TileMetadataStore, paths: string[]): Til
 
 function bulkSetDetectionSignals(
   metadata: TileMetadataStore,
-  entries: Array<{ vaultPath: string; signals: { alphaCoverage: number; opaqueW: number; opaqueH: number; naturalW: number; naturalH: number } }>
+  entries: Array<{ vaultPath: string; signals: { alphaCoverage: number; opaqueW: number; opaqueH: number; naturalW: number; naturalH: number; hexArt?: 'flat' | 'pointy' } }>
 ): TileMetadataStore {
   const result = { ...metadata };
   for (const { vaultPath, signals } of entries) {
     const existing = result[vaultPath] ?? {};
-    result[vaultPath] = {
+    const next = {
       ...existing,
       alphaCoverage: signals.alphaCoverage,
       opaqueW: signals.opaqueW,
@@ -381,6 +382,12 @@ function bulkSetDetectionSignals(
       srcW: signals.naturalW,
       srcH: signals.naturalH,
     };
+    // The scan is authoritative for hexArt: a fresh scan with no verdict must
+    // also CLEAR a stale one, or entries misclassified before the size floor
+    // existed would keep their bogus hexArt forever.
+    if (signals.hexArt != null) next.hexArt = signals.hexArt;
+    else delete next.hexArt;
+    result[vaultPath] = next;
   }
   return result;
 }

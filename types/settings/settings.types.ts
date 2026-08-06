@@ -187,6 +187,12 @@ export interface PluginSettings {
   // Tileset folders (vault paths scanned for tile images)
   tilesetFolders?: string[];
 
+  /** Per-tileset vertical art nudge in world px (tileset id → offset,
+   *  positive raises the art). GLOBAL: applies to the tileset on every map —
+   *  tileset ids are deterministic hashes of the folder path, so the key is
+   *  stable across maps and remounts. */
+  tilesetArtOffsets?: Record<string, number>;
+
   // Keyboard shortcuts (action ID → key string)
   keyboardShortcuts?: Record<string, string>;
 

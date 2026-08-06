@@ -17,6 +17,8 @@ export interface TilesetConfigPanelProps {
   selectedTilesetId: string | null;
   tilesetOverrides?: Record<string, TilesetOverrides>;
   onTilesetOverrideChange: (tilesetId: string, overrides: TilesetOverrides) => void;
+  /** GLOBAL per-tileset art nudge (world px, positive raises); undefined clears. */
+  onArtOffsetChange?: (tilesetId: string, value: number | undefined) => void;
   isGrid: boolean;
   setTileMetadata: Dispatch<StateUpdater<TileMetadataStore>>;
 }
@@ -26,6 +28,7 @@ const TilesetConfigPanel = ({
   selectedTilesetId,
   tilesetOverrides,
   onTilesetOverrideChange,
+  onArtOffsetChange,
   isGrid,
   setTileMetadata,
 }: TilesetConfigPanelProps): VNode => {
@@ -51,6 +54,9 @@ const TilesetConfigPanel = ({
   const worldRepeat = currentOverrides.worldRepeat ?? configTileset.worldRepeat ?? 4;
   const edgeFeather = currentOverrides.edgeFeather ?? configTileset.edgeFeather ?? 0.25;
   const pixelsPerCell = currentOverrides.pixelsPerCell ?? configTileset.pixelsPerCell ?? DEFAULT_PIXELS_PER_CELL;
+  // Global nudge lives on the live def (hydrated from settings), not in the
+  // per-map overrides.
+  const artOffsetY = configTileset.artOffsetY ?? 0;
 
   const handleOverrideChange = useCallback((field: keyof TilesetOverrides, value: number | string | undefined): void => {
     const updated = { ...currentOverrides, [field]: value };
@@ -185,6 +191,26 @@ const TilesetConfigPanel = ({
         />
         <span className="windrose-tile-config-value">{(minScale * 100).toFixed(0)}%</span>
       </div>
+      {onArtOffsetChange != null && (
+        <div className="windrose-tile-config-row">
+          <label>Art nudge</label>
+          <input
+            type="range"
+            min="-8"
+            max="8"
+            step="0.25"
+            value={artOffsetY}
+            onInput={(e: Event) => {
+              const v = parseFloat((e.target as HTMLInputElement).value);
+              onArtOffsetChange(configTileset.id, v === 0 ? undefined : v);
+            }}
+            className="windrose-tile-config-slider"
+          />
+          <span className="windrose-tile-config-value">
+            {artOffsetY === 0 ? 'Auto' : `${artOffsetY > 0 ? '↑' : '↓'} ${Math.abs(artOffsetY)} px (all maps)`}
+          </span>
+        </div>
+      )}
       <div className="windrose-tile-config-row">
         <label>Px / cell</label>
         <input

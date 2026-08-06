@@ -9,7 +9,6 @@
 import type { TileAssignment, TilesetDef, FolderTileset, TileMetadataStore } from '#types/tiles/tile.types';
 import type { TerrainStroke } from '#types/core/terrainstroke.types';
 
-import { axialToOffset } from '../core/offsetCoordinates';
 import { resolveTileRender } from '../../assets/tileRenderResolution';
 import { effectiveSpan } from '../../assets/tileFootprint';
 import { getRenderSource } from '../../assets/imageOperations';
@@ -609,28 +608,33 @@ function hardFillRegion(
 }
 
 /**
- * Sort tiles by offset row ascending (back → front), then col for stability.
- * Pre-computes offsets to avoid redundant axialToOffset calls during sort.
- * Returns a new array; does not mutate the original.
+ * Sort tiles back → front by WORLD y ascending (then world x for stability),
+ * so southern tiles paint over northern ones — 2.5D overlap art (skirts,
+ * rising peaks) composites correctly against every neighbor.
+ *
+ * Offset rows are NOT a paint order on hex maps: staggered columns put
+ * diagonal neighbors half a cell apart in world y yet in the SAME offset row,
+ * and the old row-then-col tie-break painted the eastern tile over its
+ * southwest neighbor (water over the stone in front of it).
  */
 function sortTilesForRendering(
   tiles: TileAssignment[],
   orientation: string
 ): TileAssignment[] {
-  const isHex = orientation === 'flat' || orientation === 'pointy';
-  const offsets = new Map<TileAssignment, { col: number; row: number }>();
+  const keys = new Map<TileAssignment, { x: number; y: number }>();
   for (const t of tiles) {
-    offsets.set(t, isHex
-      ? axialToOffset(t.col, t.row, orientation)
-      : { col: t.col, row: t.row }
-    );
+    keys.set(t, orientation === 'flat'
+      ? { y: t.row + t.col / 2, x: t.col }
+      : orientation === 'pointy'
+        ? { y: t.row, x: t.col + t.row / 2 }
+        : { y: t.row, x: t.col });
   }
   return [...tiles].sort((a, b) => {
-    const oa = offsets.get(a);
-    const ob = offsets.get(b);
-    if (oa == null || ob == null) return 0;
-    if (oa.row !== ob.row) return oa.row - ob.row;
-    return oa.col - ob.col;
+    const ka = keys.get(a);
+    const kb = keys.get(b);
+    if (ka == null || kb == null) return 0;
+    if (ka.y !== kb.y) return ka.y - kb.y;
+    return ka.x - kb.x;
   });
 }
 
@@ -670,10 +674,15 @@ function calculateTileDrawRect(
   const folder = isFolderTileset(tileset) ? tileset : null;
   const hexHeight = folder?.hexHeight ?? tileset.tileHeight;
   const overflowTop = folder?.overflowTop ?? 0;
+  // Manual per-tileset vertical nudge (world px, positive raises the art) —
+  // the user's final word on seating when auto-detection is a pixel off the
+  // art's visual center.
+  const artLift = (tileset.artOffsetY ?? 0) * zoom;
 
   // Independent scale factors:
-  // tileWidth maps to hex width, hexHeight maps to hex height
-  const scaleX = hexScreenWidth / tileset.tileWidth;
+  // hexWidth (the measured art hexagon, when the art is padded inside a larger
+  // image) or tileWidth maps to hex width, hexHeight maps to hex height
+  const scaleX = hexScreenWidth / (tileset.hexWidth ?? tileset.tileWidth);
   const scaleY = hexScreenHeight / hexHeight;
 
   const effectiveFit = fitMode ?? tileset.fitMode ?? 'fill';
@@ -687,7 +696,7 @@ function calculateTileDrawRect(
     // Center within the hex bounding box
     const drawX = screenX - drawWidth / 2;
     const hexAreaCenterInTile = overflowTop + hexHeight / 2;
-    const drawY = screenY - hexAreaCenterInTile * uniformScale;
+    const drawY = screenY - hexAreaCenterInTile * uniformScale - artLift;
 
     return { drawX, drawY, drawWidth, drawHeight };
   }
@@ -700,7 +709,7 @@ function calculateTileDrawRect(
   // The hex area starts at overflowTop pixels from the top of the tile image
   const hexAreaCenterInTile = overflowTop + hexHeight / 2;
   const drawX = screenX - drawWidth / 2;
-  const drawY = screenY - hexAreaCenterInTile * scaleY;
+  const drawY = screenY - hexAreaCenterInTile * scaleY - artLift;
 
   return { drawX, drawY, drawWidth, drawHeight };
 }
@@ -746,6 +755,9 @@ function getEntryMap(tilesets: TilesetDef[]): Map<string, { entry: { vaultPath: 
       + ':' + (ts.stampThreshold ?? '')
       + ':' + (ts.minStampScale ?? '')
       + ':' + (ts.artOrientation ?? '')
+      + ':' + (ts.hexWidth ?? '')
+      + ':' + (ts.artOffsetY ?? '')
+      + ':' + (isFolderTileset(ts) ? (ts.hexHeight ?? '') + ':' + (ts.overflowTop ?? '') + ':' + (ts.overflowBottom ?? '') : '')
       + ',';
   }
   // Tile IDS can change without altering tile count (a rescan re-mints ids in

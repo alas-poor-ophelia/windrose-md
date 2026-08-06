@@ -29,13 +29,13 @@ describe('tileRenderer', () => {
       col, row, tilesetId: 'ts1', tileId: 'tile1',
     });
 
-    it('sorts by offset row ascending (flat-top)', () => {
+    it('sorts by world y ascending (flat-top)', () => {
       const tiles = [makeTile(0, 2), makeTile(0, 0), makeTile(0, 1)];
       const sorted = sortTilesForRendering(tiles, 'flat');
       expect(sorted.map(t => t.row)).toEqual([0, 1, 2]);
     });
 
-    it('sorts by offset row ascending (pointy-top)', () => {
+    it('sorts by world y ascending (pointy-top)', () => {
       const tiles = [makeTile(0, 3), makeTile(0, 1), makeTile(0, 2)];
       const sorted = sortTilesForRendering(tiles, 'pointy');
       expect(sorted.map(t => t.row)).toEqual([1, 2, 3]);
@@ -45,6 +45,29 @@ describe('tileRenderer', () => {
       const tiles = [makeTile(2, 0), makeTile(0, 0), makeTile(1, 0)];
       const sorted = sortTilesForRendering(tiles, 'flat');
       expect(sorted.map(t => t.col)).toEqual([0, 1, 2]);
+    });
+
+    it('paints the southwest diagonal neighbor OVER its northeast neighbor (flat-top)', () => {
+      // Regression (2026-08-05): axial (17,5) and (18,4) share OFFSET row 13
+      // on a flat-top map, but (17,5) sits half a cell FURTHER SOUTH in world
+      // y. The old row-then-col tie-break painted (18,4)'s water skirt over
+      // the stone in front of it. World-y order draws (18,4) first.
+      const stone = makeTile(17, 5);
+      const water = makeTile(18, 4);
+      const sorted = sortTilesForRendering([stone, water], 'flat');
+      expect(sorted).toEqual([water, stone]);
+
+      // Same shape one row up: grass (18,3) must NOT paint over forest (17,4).
+      const forest = makeTile(17, 4);
+      const grass = makeTile(18, 3);
+      expect(sortTilesForRendering([forest, grass], 'flat')).toEqual([grass, forest]);
+    });
+
+    it('paints the south diagonal neighbor over its north neighbor (pointy-top)', () => {
+      // Pointy-top world y depends on r alone; same-r tiles are a true tie.
+      const north = makeTile(3, 1);
+      const south = makeTile(2, 2);
+      expect(sortTilesForRendering([south, north], 'pointy')).toEqual([north, south]);
     });
 
     it('does not mutate the original array', () => {
@@ -128,6 +151,42 @@ describe('tileRenderer', () => {
       const rect = calculateTileDrawRect(400, 300, tileset, 80, 1, 'pointy');
       // Pointy-top hex height = 2 * hexSize = 160
       expect(rect.drawHeight).toBeCloseTo(2 * 80, 2);
+    });
+
+    it('maps hexWidth (not tileWidth) to the cell width for padded hex art', () => {
+      // 2MT world map tile: 795x691 image whose flat-top hexagon face is only
+      // 412px wide (rest is transparent padding + 3D skirt). The measured face
+      // must land exactly on the cell; the padded image extends beyond it.
+      const tileset = makeTileset({
+        tileWidth: 795, tileHeight: 691,
+        hexWidth: 412, hexHeight: 357, overflowTop: 165,
+      });
+      const rect = calculateTileDrawRect(400, 300, tileset, 80, 1, 'flat');
+
+      const hexScreenW = 2 * 80;
+      const scaleX = hexScreenW / 412;
+      // Full image scales up so the 412px face spans exactly one cell width
+      expect(rect.drawWidth).toBeCloseTo(795 * scaleX, 2);
+      expect(412 * scaleX).toBeCloseTo(hexScreenW, 2);
+      // Face center (overflowTop + hexHeight/2, in image px) sits on the cell center
+      const scaleY = (SQRT3 * 80) / 357;
+      expect(rect.drawY).toBeCloseTo(300 - (165 + 357 / 2) * scaleY, 2);
+    });
+
+    it('applies the manual artOffsetY nudge in screen px scaled by zoom', () => {
+      const base = calculateTileDrawRect(400, 300, makeTileset(), 80, 2, 'flat');
+      const nudged = calculateTileDrawRect(400, 300, makeTileset({ artOffsetY: 3 }), 80, 2, 'flat');
+      // +3 world px at zoom 2 raises the art 6 screen px; nothing else moves.
+      expect(nudged.drawY).toBeCloseTo(base.drawY - 6, 2);
+      expect(nudged.drawX).toBeCloseTo(base.drawX, 2);
+      expect(nudged.drawWidth).toBeCloseTo(base.drawWidth, 2);
+      expect(nudged.drawHeight).toBeCloseTo(base.drawHeight, 2);
+    });
+
+    it('absent hexWidth keeps legacy image-width mapping byte-identical', () => {
+      const legacy = calculateTileDrawRect(400, 300, makeTileset(), 80, 1, 'flat');
+      expect(legacy.drawWidth).toBeCloseTo(2 * 80, 2);
+      expect(legacy.drawX).toBeCloseTo(400 - 80, 2);
     });
 
     it('scales the draw rect by footprint span on grid (fill)', () => {

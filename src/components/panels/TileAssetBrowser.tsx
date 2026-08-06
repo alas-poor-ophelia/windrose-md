@@ -195,6 +195,8 @@ interface TileAssetBrowserProps {
   getCachedImage?: (path: string) => HTMLImageElement | null;
   tilesetOverrides?: Record<string, TilesetOverrides>;
   onTilesetOverrideChange?: (tilesetId: string, overrides: TilesetOverrides) => void;
+  /** Global per-tileset art nudge (world px, positive raises); undefined clears. */
+  onTilesetArtOffsetChange?: (tilesetId: string, value: number | undefined) => void;
   showRail?: boolean;
   compact?: boolean;
   /** Suppress the internal header — block mode hoists a shared compact header
@@ -287,6 +289,7 @@ const TileAssetBrowser = memo(({
   getCachedImage,
   tilesetOverrides,
   onTilesetOverrideChange,
+  onTilesetArtOffsetChange,
   showRail = false,
   compact = false,
   hideHeader = false,
@@ -1231,6 +1234,7 @@ const TileAssetBrowser = memo(({
           selectedTilesetId={selectedTilesetId}
           tilesetOverrides={tilesetOverrides}
           onTilesetOverrideChange={onTilesetOverrideChange}
+          onArtOffsetChange={onTilesetArtOffsetChange}
           isGrid={isGrid}
           setTileMetadata={setTileMetadata}
         />

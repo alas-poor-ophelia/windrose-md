@@ -47,7 +47,14 @@ function useTilesetBuilder(
           const tiles = await scanTilesetFolder(app, folder);
           const dims = await probeFirstTileImage(app, tiles);
           const options = dims
-            ? { tileWidth: dims.width, tileHeight: dims.height, artOrientation: dims.artOrientation }
+            ? {
+                tileWidth: dims.width,
+                tileHeight: dims.height,
+                artOrientation: dims.artOrientation,
+                hexWidth: dims.hexWidth,
+                hexHeight: dims.hexHeight,
+                overflowTop: dims.overflowTop,
+              }
             : undefined;
 
           const tileset = createTilesetFromTiles(folder, name, tiles, options);
@@ -84,9 +91,14 @@ function useTilesetBuilder(
         setMapData((current: MapData | null) => {
           if (!current) return current;
           const overrides = current.tilesetOverrides;
+          // Art nudges are GLOBAL (plugin settings), not per-map overrides —
+          // one adjustment seats the set identically on every map.
+          const artOffsets = getSettings().tilesetArtOffsets ?? {};
           const mergedTilesets = newTilesets.map(ts => {
             const ov = overrides?.[ts.id];
-            return ov != null ? { ...ts, ...ov } : ts;
+            const merged = ov != null ? { ...ts, ...ov } : ts;
+            const nudge = artOffsets[ts.id];
+            return nudge != null ? { ...merged, artOffsetY: nudge } : merged;
           });
           return { ...current, tilesets: mergedTilesets };
         });

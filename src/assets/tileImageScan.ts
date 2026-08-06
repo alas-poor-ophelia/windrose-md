@@ -16,12 +16,17 @@
  */
 
 import type { App } from 'obsidian';
-import { TFile } from 'obsidian';
+import { classifyTileArtMask, readTileImageBinary } from './tilesetOperations';
 
 /** Downscale target for the scan canvas (longest edge). Keeps getImageData cheap. */
 const SCAN_SIZE = 128;
 /** Alpha value (0-255) above which a pixel counts as opaque. */
 const ALPHA_OPAQUE_THRESHOLD = 10;
+/** Minimum source dimensions (px) for a hexArt verdict. Tiny decorations
+ *  (a 20×43 banner, a 17px statue) trivially satisfy the mask's hexagon
+ *  gates at scan scale — real hex-cell art is never this small. Matches the
+ *  tileset probe's MIN_SIZE so both classifiers agree on what's too small. */
+export const HEX_ART_MIN_SOURCE_PX = 64;
 
 export interface TileImageSignals {
   /** Opaque-pixel fraction 0-1 (terrain fills approach 1, stamps are low). */
@@ -33,6 +38,9 @@ export interface TileImageSignals {
   /** Full natural image dimensions in source pixels. */
   naturalW: number;
   naturalH: number;
+  /** The art is a hexagon of this orientation (alpha-mask classification).
+   *  Hex art is definitionally one cell — footprint prediction skips it. */
+  hexArt?: 'flat' | 'pointy';
 }
 
 export interface AlphaAnalysis {
@@ -87,9 +95,8 @@ function getScanCtx(w: number, h: number): CanvasRenderingContext2D | null {
 
 async function loadBitmap(app: App, vaultPath: string): Promise<ImageBitmap | null> {
   try {
-    const file = app.vault.getAbstractFileByPath(vaultPath);
-    if (!(file instanceof TFile)) return null;
-    const binary = await app.vault.readBinary(file);
+    const binary = await readTileImageBinary(app, vaultPath);
+    if (binary == null) return null;
     return await createImageBitmap(new Blob([binary]));
   } catch {
     return null;
@@ -119,6 +126,9 @@ export async function scanTileImageSignals(
     const { data } = ctx.getImageData(0, 0, scanW, scanH);
 
     const { alphaCoverage, bounds } = analyzeAlphaPixels(data, scanW, scanH);
+    const hexArt = natW >= HEX_ART_MIN_SOURCE_PX && natH >= HEX_ART_MIN_SOURCE_PX
+      ? classifyTileArtMask((x, y) => data[(y * scanW + x) * 4 + 3], scanW, scanH)
+      : undefined;
     const invScale = 1 / scale;
     return {
       alphaCoverage,
@@ -126,6 +136,7 @@ export async function scanTileImageSignals(
       opaqueH: bounds == null ? 0 : Math.round(bounds.h * invScale),
       naturalW: natW,
       naturalH: natH,
+      ...(hexArt != null ? { hexArt: hexArt.orientation } : {}),
     };
   } finally {
     bmp.close();

@@ -124,6 +124,99 @@ describe('runImportDetectionPass', () => {
     expect(result.stats.spans).toBe(0);
   });
 
+  it('skips span prediction for hex-art tiles (one-hex-per-image packs)', async () => {
+    // 2MT world map tile: 795x691 image, hexagon art — the DD 256ppc rule
+    // would predict a 3x3 footprint; hex art is definitionally one cell.
+    const tiles = [tile('a/Hex - Mountains.png'), tile('a/table_big.png')];
+    const { scanner } = stubScanner({
+      'a/Hex - Mountains.png': {
+        alphaCoverage: 0.22, opaqueW: 412, opaqueH: 385, naturalW: 795, naturalH: 691, hexArt: 'flat',
+      },
+      'a/table_big.png': BIG_PROP,
+    });
+
+    const result = await runImportDetectionPass(app, tiles, {}, {
+      applyRenderMode: false, scanner,
+    });
+    expect(result.metadata['a/Hex - Mountains.png']?.hexArt).toBe('flat');
+    expect(result.metadata['a/Hex - Mountains.png']?.defaultSpanW).toBeUndefined();
+    expect(result.metadata['a/Hex - Mountains.png']?.defaultSpanH).toBeUndefined();
+    // Non-hex props in the same pack still get their footprint.
+    expect(result.metadata['a/table_big.png']?.defaultSpanW).toBe(2);
+    expect(result.stats.spans).toBe(1);
+  });
+
+  it('extends the hex-art span skip to unclassifiable same-dimension siblings (family vote)', async () => {
+    // 2MT forest hexes: canopy overflow defeats the mask gates, but they share
+    // exact pixel dimensions with their classified siblings — the family skips.
+    const hexSignals = (hexArt?: 'flat'): TileImageSignals => ({
+      alphaCoverage: 0.22, opaqueW: 412, opaqueH: 385, naturalW: 795, naturalH: 691,
+      ...(hexArt != null ? { hexArt } : {}),
+    });
+    const tiles = [tile('a/Hex - Mountains.png'), tile('a/Hex - Hills.png'), tile('a/Hex - Forest.png')];
+    const { scanner } = stubScanner({
+      'a/Hex - Mountains.png': hexSignals('flat'),
+      'a/Hex - Hills.png': hexSignals('flat'),
+      'a/Hex - Forest.png': hexSignals(),   // canopy: no hexArt signal
+    });
+
+    const result = await runImportDetectionPass(app, tiles, {}, {
+      applyRenderMode: false, scanner,
+    });
+    expect(result.metadata['a/Hex - Forest.png']?.hexArt).toBeUndefined();
+    expect(result.metadata['a/Hex - Forest.png']?.defaultSpanW).toBeUndefined();
+    expect(result.stats.spans).toBe(0);
+  });
+
+  it('does not let a lone hex classification suppress spans for a big prop family', async () => {
+    // One false-positive hexArt in a 6-member family (hex < 2 or < 25%) must
+    // not strip footprints from genuinely multi-cell props.
+    const propSignals = (hexArt?: 'flat'): TileImageSignals => ({
+      alphaCoverage: 0.4, opaqueW: 500, opaqueH: 250, naturalW: 512, naturalH: 256,
+      ...(hexArt != null ? { hexArt } : {}),
+    });
+    const paths = ['a/p1.png', 'a/p2.png', 'a/p3.png', 'a/p4.png', 'a/p5.png', 'a/p6.png'];
+    const byPath: Record<string, TileImageSignals> = {};
+    for (const p of paths) byPath[p] = propSignals(p === 'a/p1.png' ? 'flat' : undefined);
+    const { scanner } = stubScanner(byPath);
+
+    const result = await runImportDetectionPass(app, paths.map(tile), {}, {
+      applyRenderMode: false, scanner,
+    });
+    // p1 itself skips (own hexArt); the other five keep their 2x1 footprint.
+    expect(result.metadata['a/p1.png']?.defaultSpanW).toBeUndefined();
+    expect(result.metadata['a/p2.png']?.defaultSpanW).toBe(2);
+    expect(result.stats.spans).toBe(5);
+  });
+
+  it('re-scans and clears hexArt on entries below the size floor (self-heal)', async () => {
+    // A 20x43 banner misclassified as hexArt before the size floor existed:
+    // the pass re-scans it (sole exception to fill-missing-only) and the
+    // fresh scan — which no longer emits hexArt for tiny images — clears it.
+    const tiles = [tile('a/Extras/Banner 1.png'), tile('a/Hex - Mountains.png')];
+    const metadata: TileMetadataStore = {
+      'a/Extras/Banner 1.png': {
+        alphaCoverage: 0.3, opaqueW: 16, opaqueH: 40, srcW: 20, srcH: 43, hexArt: 'pointy',
+      },
+      'a/Hex - Mountains.png': {
+        alphaCoverage: 0.22, opaqueW: 412, opaqueH: 385, srcW: 795, srcH: 691, hexArt: 'flat',
+      },
+    };
+    const { scanner, scannedPaths } = stubScanner({
+      'a/Extras/Banner 1.png': {
+        alphaCoverage: 0.3, opaqueW: 16, opaqueH: 40, naturalW: 20, naturalH: 43,
+      },
+    });
+
+    const result = await runImportDetectionPass(app, tiles, metadata, {
+      applyRenderMode: false, scanner,
+    });
+    // Only the invalid entry re-scans; a valid above-floor hexArt is untouched.
+    expect(scannedPaths).toEqual(['a/Extras/Banner 1.png']);
+    expect(result.metadata['a/Extras/Banner 1.png']?.hexArt).toBeUndefined();
+    expect(result.metadata['a/Hex - Mountains.png']?.hexArt).toBe('flat');
+  });
+
   it('honours pixelsPerCell for span prediction', async () => {
     const tiles = [tile('a/table.png')];
     const { scanner } = stubScanner({

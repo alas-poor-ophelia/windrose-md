@@ -11,6 +11,9 @@ import {
   autoDetectOverflow,
   createTilesetFromTiles,
   classifyTileArtMask,
+  analyzeTileArtMask,
+  fitHexCellCenterY,
+  probeCandidateOrder,
   resolveTileEntry,
   tileIdBasename,
   mintTileId,
@@ -283,6 +286,37 @@ describe('tilesetOperations', () => {
     });
   });
 
+  describe('probeCandidateOrder', () => {
+    const entry = (vaultPath: string): TileEntry => {
+      const filename = vaultPath.split('/').pop() ?? '';
+      return { id: filename.replace(/\.\w+$/, ''), filename, vaultPath, tags: [] };
+    };
+
+    it('puts root-level tiles ahead of subfolder decorations regardless of alphabet', () => {
+      // Regression (2026-08-05): a plain path sort put "Extras/" banners ahead
+      // of the root "Hex - *" tiles — the probe sampled five ribbons, no
+      // hexagon verdict survived, and every hex tile rendered at half size.
+      const tiles = [
+        entry('2MT World Map Hex Tiles/Extras/Title Banner 5 (long).png'),
+        entry('2MT World Map Hex Tiles/Hex - Base (lush).png'),
+        entry('2MT World Map Hex Tiles/Extras/Banner 1 (blue).png'),
+        entry('2MT World Map Hex Tiles/Hex - Base (blank).png'),
+      ];
+      const ordered = probeCandidateOrder(tiles).map(t => t.vaultPath);
+      expect(ordered).toEqual([
+        '2MT World Map Hex Tiles/Hex - Base (blank).png',
+        '2MT World Map Hex Tiles/Hex - Base (lush).png',
+        '2MT World Map Hex Tiles/Extras/Banner 1 (blue).png',
+        '2MT World Map Hex Tiles/Extras/Title Banner 5 (long).png',
+      ]);
+    });
+
+    it('is deterministic within a depth level (path order)', () => {
+      const tiles = [entry('a/z.png'), entry('a/b.png'), entry('a/m.png')];
+      expect(probeCandidateOrder(tiles).map(t => t.vaultPath)).toEqual(['a/b.png', 'a/m.png', 'a/z.png']);
+    });
+  });
+
   describe('ALPHA_COVERAGE_THRESHOLD', () => {
     it('is a number between 0 and 1', () => {
       expect(ALPHA_COVERAGE_THRESHOLD).toBeGreaterThan(0);
@@ -315,18 +349,120 @@ describe('tilesetOperations', () => {
 
     it('classifies a regular pointy-top hexagon as pointy', () => {
       const h = Math.round(W * 2 / Math.sqrt(3));
-      expect(classifyTileArtMask(pointyHexAlpha(W, h), W, h)).toBe('pointy');
+      expect(classifyTileArtMask(pointyHexAlpha(W, h), W, h)?.orientation).toBe('pointy');
     });
 
     it('classifies a vertically squashed (isometric) pointy hexagon as pointy', () => {
       // Pseudo-3D hex tile art: pointy topology squashed to ~0.85 of its width
       const h = Math.round(W * 0.85);
-      expect(classifyTileArtMask(pointyHexAlpha(W, h), W, h)).toBe('pointy');
+      expect(classifyTileArtMask(pointyHexAlpha(W, h), W, h)?.orientation).toBe('pointy');
     });
 
     it('classifies a regular flat-top hexagon as flat', () => {
       const h = Math.round(W * Math.sqrt(3) / 2);
-      expect(classifyTileArtMask(flatHexAlpha(W, h), W, h)).toBe('flat');
+      expect(classifyTileArtMask(flatHexAlpha(W, h), W, h)?.orientation).toBe('flat');
+    });
+
+    it('measures hexWidth and opaqueBottom for a padded flat hexagon with a skirt (2MT-style)', () => {
+      // Board-piece art: flat-top hexagon face floating centered in a larger
+      // transparent frame, with a "3D thickness" skirt hanging below the face.
+      const imgW = 200, imgH = 174;
+      const faceW = 104;
+      const faceH = Math.round(faceW * Math.sqrt(3) / 2); // 90
+      const faceLeft = (imgW - faceW) / 2;                 // 48
+      const faceTop = 30;
+      const face = flatHexAlpha(faceW, faceH);
+      const alpha = (x: number, y: number): number => {
+        if (face(x - faceLeft, y - faceTop) > 0) return 255;
+        // skirt: bottom half of the face outline extruded 8px down
+        const yUp = y - faceTop - 8;
+        return y > faceTop + faceH / 2 && yUp >= 0 && face(x - faceLeft, yUp) > 0 ? 255 : 0;
+      };
+      const result = analyzeTileArtMask(alpha, imgW, imgH);
+      expect(result?.verdict).toBe('flat');
+      // Widest row = the face's corner-to-corner width (±1px discretization),
+      // not the image width
+      expect(result?.hexWidth).toBeGreaterThanOrEqual(faceW - 2);
+      expect(result?.hexWidth).toBeLessThanOrEqual(faceW + 1);
+      // Opaque top = the FACE's top edge (skirt only extends bounds downward).
+      expect(result?.opaqueTop).toBeGreaterThanOrEqual(faceTop - 1);
+      expect(result?.opaqueTop).toBeLessThanOrEqual(faceTop + 1);
+      // Corner line = the face's vertical mid-line (through its side corner
+      // points) — the anchor that puts the corners in the cell's crooks. The
+      // skirt below must not drag it down.
+      expect(result?.cornerRowY).toBeGreaterThanOrEqual(faceTop + faceH / 2 - 2);
+      expect(result?.cornerRowY).toBeLessThanOrEqual(faceTop + faceH / 2 + 2);
+      // Opaque bottom = the SKIRT's bottom edge (face bottom + 8px extrusion).
+      expect(result?.opaqueBottom).toBeGreaterThanOrEqual(faceTop + faceH + 8 - 2);
+      expect(result?.opaqueBottom).toBeLessThanOrEqual(faceTop + faceH + 8 + 1);
+    });
+
+    it('reports opaqueBottom and a centered corner line for a regular pointy hexagon', () => {
+      const h = Math.round(W * 2 / Math.sqrt(3));
+      const result = analyzeTileArtMask(pointyHexAlpha(W, h), W, h);
+      expect(result?.hexWidth).toBeGreaterThanOrEqual(W - 2);
+      expect(result?.hexWidth).toBeLessThanOrEqual(W + 1);
+      expect(result?.opaqueBottom).toBeGreaterThanOrEqual(h - 2);
+      expect(result?.opaqueBottom).toBeLessThanOrEqual(h);
+      expect(result?.cornerRowY).toBeGreaterThanOrEqual(h / 2 - 2);
+      expect(result?.cornerRowY).toBeLessThanOrEqual(h / 2 + 2);
+    });
+
+    it('measures metrics without a verdict for canopy-decorated hex art, and flags corner pollution', () => {
+      // 2MT forest hex: wide canopy blob overflowing above the face defeats
+      // the edge gates (verdict undefined), but the face metrics still measure;
+      // a decoration touching ONE corner column shows up as cornerSkew.
+      const imgW = 200, imgH = 200;
+      const faceW = 104;
+      const faceH = Math.round(faceW * Math.sqrt(3) / 2);
+      const faceLeft = (imgW - faceW) / 2, faceTop = 70;
+      const face = flatHexAlpha(faceW, faceH);
+      const alpha = (x: number, y: number): number => {
+        if (face(x - faceLeft, y - faceTop) > 0) return 255;
+        // canopy: wide ellipse above the face, reaching the RIGHT corner column
+        const dx = (x - imgW / 2 - 10) / (faceW * 0.55), dy = (y - faceTop - 10) / 45;
+        return dx * dx + dy * dy <= 1 ? 255 : 0;
+      };
+      const a = analyzeTileArtMask(alpha, imgW, imgH);
+      expect(a).toBeDefined();
+      expect(a?.hexWidth).toBeGreaterThanOrEqual(faceW - 2);
+      // Left corner tip is clean face geometry (the mid-line)…
+      expect(a?.tipTopL).toBeGreaterThanOrEqual(faceTop + faceH / 2 - 2);
+      // …while the canopy touching the right corner column skews the pair.
+      expect(a?.cornerSkew).toBeGreaterThan(10);
+    });
+
+    it('coverage-fits the cell polygon to a padded flat hexagon face (skirt below, canopy above)', () => {
+      // 2MT-style board piece: face + skirt + a canopy blob over the top
+      // middle. The fit must land on the face center: the skirt (ink below)
+      // and canopy (ink above the middle only) never move it, because the
+      // binding constraint is the upper diagonal edges near the corners.
+      const imgW = 200, imgH = 200;
+      const faceW = 104;
+      const faceH = Math.round(faceW * Math.sqrt(3) / 2); // 90
+      const faceLeft = (imgW - faceW) / 2, faceTop = 60;
+      const face = flatHexAlpha(faceW, faceH);
+      const alpha = (x: number, y: number): number => {
+        if (face(x - faceLeft, y - faceTop) > 0) return 255;
+        const yUp = y - faceTop - 8;
+        if (y > faceTop + faceH / 2 && yUp >= 0 && face(x - faceLeft, yUp) > 0) return 255;
+        const dx = (x - imgW / 2) / (faceW * 0.3), dy = (y - faceTop - 5) / 30;
+        return dx * dx + dy * dy <= 1 ? 255 : 0;
+      };
+      const fit = fitHexCellCenterY(alpha, imgW, imgH, faceW, 'flat', imgW / 2, faceTop + faceH / 2 + 3);
+      expect(fit).toBeDefined();
+      expect(fit as number).toBeGreaterThanOrEqual(faceTop + faceH / 2 - 2);
+      expect(fit as number).toBeLessThanOrEqual(faceTop + faceH / 2 + 2);
+    });
+
+    it('coverage fit returns undefined when the mask cannot cover the cell polygon', () => {
+      // A hexagon reported wider than the ink that exists (nothing can cover).
+      const imgW = 120, imgH = 120;
+      const blob = (x: number, y: number): number => {
+        const dx = (x - 60) / 20, dy = (y - 60) / 20;
+        return dx * dx + dy * dy <= 1 ? 255 : 0;
+      };
+      expect(fitHexCellCenterY(blob, imgW, imgH, 100, 'flat', 60, 60)).toBeUndefined();
     });
 
     it('returns undefined for fully opaque square art (seamless textures)', () => {
@@ -361,7 +497,7 @@ describe('tilesetOperations', () => {
         const dx = (x - W / 2) / (W * 0.35), dy = (y - hexTop) / 50;
         return dx * dx + dy * dy <= 1 ? 255 : 0;
       };
-      expect(classifyTileArtMask(alpha, W, h)).toBe('pointy');
+      expect(classifyTileArtMask(alpha, W, h)?.orientation).toBe('pointy');
     });
   });
 
