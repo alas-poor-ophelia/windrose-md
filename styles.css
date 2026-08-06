@@ -2496,15 +2496,22 @@ button.windrose-tb-cap-edit:hover {
   max-width: 192px;
 }
 
-/* ---- Empty states ---- */
-.windrose-tile-browser-empty-state {
-  background: transparent;
-}
-
+/* ---- Empty states ----
+   .windrose-tile-browser-empty-state deliberately carries NO background: it sits
+   on the same element as .windrose-tile-browser and must inherit that drawer
+   surface. It used to set `background: transparent` — correct back when the empty
+   state was a small element inside an already-painted dock parent, but after the
+   drawer redesign this element IS the painted surface, so the rule (equal
+   specificity, later in source) won and the whole pane went see-through with the
+   map showing through it. Do not re-add a background here. */
 .windrose-tile-browser-empty-message {
   display: flex;
+  /* Fills the flex-row .windrose-tb-body beside the ribbon, so the message
+     centres in the drawer instead of hugging the ribbon's edge. */
+  flex: 1;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   padding: 16px 8px;
   color: var(--windrose-text-muted);

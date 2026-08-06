@@ -1082,18 +1082,37 @@ const TileAssetBrowser = memo(({
       settingApp.setting.openTabById('windrose-md');
     };
 
+    // Render the full drawer frame, not just the message. This branch used to
+    // return the message alone, which skipped DrawerPaneHead (the collapse
+    // button) and the {ribbon} slot (the Tiles/Objects switch) — and because an
+    // open drawer hides the spine layer that carries the only other copy of
+    // both, a user with no tilesets had no way to collapse the drawer or reach
+    // the Objects pane. The frame stays; only the body content differs.
     return (
-      <div className="windrose-tile-browser windrose-tile-browser-empty-state">
-        <div className="windrose-tile-browser-empty-message">
-          <Icon icon="lucide-image" size={24} />
-          <span>No tilesets configured</span>
-          <button
-            className="windrose-tile-browser-configure-btn"
-            onClick={openTilesetSettings}
-          >
-            <Icon icon="lucide-settings" size={14} />
-            <span>Configure Tilesets</span>
-          </button>
+      <div ref={browserRef} className="windrose-tile-browser windrose-tile-browser-empty-state">
+        {!hideHeader && (
+          <DrawerPaneHead
+            title="Tiles"
+            actions={onCollapse && (
+              <button className="windrose-tb-iconbtn ghost" ref={tooltipRef('Collapse to edge')} onClick={onCollapse}>
+                <Icon icon="lucide-panel-left-open" size={15} />
+              </button>
+            )}
+          />
+        )}
+        <div className="windrose-tb-body">
+          {ribbon}
+          <div className="windrose-tile-browser-empty-message">
+            <Icon icon="lucide-image" size={24} />
+            <span>No tilesets configured</span>
+            <button
+              className="windrose-tile-browser-configure-btn"
+              onClick={openTilesetSettings}
+            >
+              <Icon icon="lucide-settings" size={14} />
+              <span>Configure Tilesets</span>
+            </button>
+          </div>
         </div>
       </div>
     );

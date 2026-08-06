@@ -527,6 +527,21 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   );
   const showTilePanel = mapData != null;
 
+  // Pane default: a vault with no tilesets lands on the Tiles pane's empty state,
+  // which is a dead end for anyone who has not imported tiles yet — open on
+  // Objects instead, and leave the Tiles half of the switch to show the empty
+  // state when they ask for it. Deliberately ONE-SHOT (guarded by the ref, not
+  // reactive like the featureFlags.tiles effect above): tilesets are derived from
+  // map data, which is empty on first render for every map, so a reactive check
+  // would yank a tiled vault onto Objects and then jump back once data resolved.
+  // Once the default is applied the pane belongs to the user.
+  const paneDefaulted = useRef(false);
+  useEffect(() => {
+    if (paneDefaulted.current || isLoading || mapData == null) return;
+    paneDefaulted.current = true;
+    if (availableTilesets.length === 0) setTilePane('objects');
+  }, [isLoading, mapData, availableTilesets]);
+
   // Stable handlers: TileAssetBrowser is memo()'d, so its props must keep
   // identity across the per-pointermove re-renders of this component.
   const collapseTileBrowser = useCallback(() => setTileBrowserCollapsed(true), [setTileBrowserCollapsed]);
