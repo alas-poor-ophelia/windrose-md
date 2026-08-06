@@ -52,7 +52,7 @@ Maps live in your notes as a small `windrose-map` code block; the drawing data i
 ---
 
 > [!alert] FOR A FULLER FEATURE LIST....
-> Check the more exhaustive [Feature List](docs/FEATURES.md) for a bit more detail on what features Windrose has and how they all work.
+> Check the more exhaustive [Feature List](https://github.com/alas-poor-ophelia/windrose-md/blob/main/docs/FEATURES.md) for a bit more detail on what features Windrose has and how they all work.
 
 ## Features
 
@@ -133,7 +133,7 @@ The **Beacon** is a movable position marker with a configurable range — track 
 - **Travel packs** are importable rule bundles — units, terrain speed multipliers, travel modes, and per-day allowances — for a given system (D&D 5e overland travel, for example). With a pack enabled, measured routes and Beacon results also show **travel times**.
 - The measure tool draws **multi-waypoint routes**, which can be saved as persistent paths on the map with per-segment terrain assignments.
 
-Details in the [feature list](docs/FEATURES.md).
+Details in the [feature list](https://github.com/alas-poor-ophelia/windrose-md/blob/main/docs/FEATURES.md).
 
 ### Boards, Strata, and Layers
 
@@ -255,4 +255,4 @@ And Blacksmithgu for creating [Datacore](https://github.com/blacksmithgu/datacor
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/alas-poor-ophelia/windrose-md/blob/main/LICENSE)
