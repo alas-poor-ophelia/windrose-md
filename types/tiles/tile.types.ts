@@ -48,6 +48,12 @@ interface TilesetBase {
    *  from the GLOBAL settings.tilesetArtOffsets at build time (and applied
    *  live by the config panel); not produced by detection. */
   artOffsetY?: number;
+  /** Manual art scale multiplier (1 = auto) — grows cell-filling art about
+   *  its face center so neighboring tiles' inked borders overlap and the
+   *  seam reads single-width. Multiplies the import-time edge bleed. Hydrated
+   *  from the GLOBAL settings.tilesetArtScales at build time; not produced
+   *  by detection. Stamps are unaffected. */
+  artScale?: number;
   /** Auto-tile configuration (reserved for future use) */
   autoTileConfig?: {
     type: '4bit' | '8bit-blob' | 'dual-grid';

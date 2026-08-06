@@ -19,6 +19,8 @@ export interface TilesetConfigPanelProps {
   onTilesetOverrideChange: (tilesetId: string, overrides: TilesetOverrides) => void;
   /** GLOBAL per-tileset art nudge (world px, positive raises); undefined clears. */
   onArtOffsetChange?: (tilesetId: string, value: number | undefined) => void;
+  /** GLOBAL per-tileset art scale multiplier (1 = auto); undefined clears. */
+  onArtScaleChange?: (tilesetId: string, value: number | undefined) => void;
   isGrid: boolean;
   setTileMetadata: Dispatch<StateUpdater<TileMetadataStore>>;
 }
@@ -29,6 +31,7 @@ const TilesetConfigPanel = ({
   tilesetOverrides,
   onTilesetOverrideChange,
   onArtOffsetChange,
+  onArtScaleChange,
   isGrid,
   setTileMetadata,
 }: TilesetConfigPanelProps): VNode => {
@@ -54,9 +57,10 @@ const TilesetConfigPanel = ({
   const worldRepeat = currentOverrides.worldRepeat ?? configTileset.worldRepeat ?? 4;
   const edgeFeather = currentOverrides.edgeFeather ?? configTileset.edgeFeather ?? 0.25;
   const pixelsPerCell = currentOverrides.pixelsPerCell ?? configTileset.pixelsPerCell ?? DEFAULT_PIXELS_PER_CELL;
-  // Global nudge lives on the live def (hydrated from settings), not in the
-  // per-map overrides.
+  // Global nudge/scale live on the live def (hydrated from settings), not in
+  // the per-map overrides.
   const artOffsetY = configTileset.artOffsetY ?? 0;
+  const artScale = configTileset.artScale ?? 1;
 
   const handleOverrideChange = useCallback((field: keyof TilesetOverrides, value: number | string | undefined): void => {
     const updated = { ...currentOverrides, [field]: value };
@@ -208,6 +212,26 @@ const TilesetConfigPanel = ({
           />
           <span className="windrose-tile-config-value">
             {artOffsetY === 0 ? 'Auto' : `${artOffsetY > 0 ? '↑' : '↓'} ${Math.abs(artOffsetY)} px (all maps)`}
+          </span>
+        </div>
+      )}
+      {onArtScaleChange != null && (
+        <div className="windrose-tile-config-row">
+          <label>Art scale</label>
+          <input
+            type="range"
+            min="0.9"
+            max="1.2"
+            step="0.005"
+            value={artScale}
+            onInput={(e: Event) => {
+              const v = parseFloat((e.target as HTMLInputElement).value);
+              onArtScaleChange(configTileset.id, v === 1 ? undefined : v);
+            }}
+            className="windrose-tile-config-slider"
+          />
+          <span className="windrose-tile-config-value">
+            {artScale === 1 ? 'Auto' : `${artScale > 1 ? '+' : '−'}${Math.abs((artScale - 1) * 100).toFixed(1)}% (all maps)`}
           </span>
         </div>
       )}

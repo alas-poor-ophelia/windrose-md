@@ -197,6 +197,8 @@ interface TileAssetBrowserProps {
   onTilesetOverrideChange?: (tilesetId: string, overrides: TilesetOverrides) => void;
   /** Global per-tileset art nudge (world px, positive raises); undefined clears. */
   onTilesetArtOffsetChange?: (tilesetId: string, value: number | undefined) => void;
+  /** Global per-tileset art scale multiplier (1 = auto); undefined clears. */
+  onTilesetArtScaleChange?: (tilesetId: string, value: number | undefined) => void;
   showRail?: boolean;
   compact?: boolean;
   /** Suppress the internal header — block mode hoists a shared compact header
@@ -290,6 +292,7 @@ const TileAssetBrowser = memo(({
   tilesetOverrides,
   onTilesetOverrideChange,
   onTilesetArtOffsetChange,
+  onTilesetArtScaleChange,
   showRail = false,
   compact = false,
   hideHeader = false,
@@ -1235,6 +1238,7 @@ const TileAssetBrowser = memo(({
           tilesetOverrides={tilesetOverrides}
           onTilesetOverrideChange={onTilesetOverrideChange}
           onArtOffsetChange={onTilesetArtOffsetChange}
+          onArtScaleChange={onTilesetArtScaleChange}
           isGrid={isGrid}
           setTileMetadata={setTileMetadata}
         />

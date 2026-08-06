@@ -183,6 +183,29 @@ describe('tileRenderer', () => {
       expect(nudged.drawHeight).toBeCloseTo(base.drawHeight, 2);
     });
 
+    it('applies the manual artScale about the face center', () => {
+      const padded = {
+        tileWidth: 795, tileHeight: 691,
+        hexWidth: 412, hexHeight: 357, overflowTop: 165,
+      };
+      const base = calculateTileDrawRect(400, 300, makeTileset(padded), 80, 1, 'flat');
+      const grown = calculateTileDrawRect(400, 300, makeTileset({ ...padded, artScale: 1.05 }), 80, 1, 'flat');
+      expect(grown.drawWidth).toBeCloseTo(base.drawWidth * 1.05, 2);
+      expect(grown.drawHeight).toBeCloseTo(base.drawHeight * 1.05, 2);
+      // Growth splits evenly left/right — the rect stays centered on the cell
+      expect(grown.drawX + grown.drawWidth / 2).toBeCloseTo(400, 2);
+      // Face center (overflowTop + hexHeight/2, image px) stays pinned to the
+      // cell center — the overshoot spills symmetrically into the seams
+      const scaleY = ((SQRT3 * 80) / 357) * 1.05;
+      expect(grown.drawY + (165 + 357 / 2) * scaleY).toBeCloseTo(300, 2);
+    });
+
+    it('artScale of 1 and absent artScale are identical', () => {
+      const base = calculateTileDrawRect(400, 300, makeTileset(), 80, 1, 'flat');
+      const explicit = calculateTileDrawRect(400, 300, makeTileset({ artScale: 1 }), 80, 1, 'flat');
+      expect(explicit).toEqual(base);
+    });
+
     it('absent hexWidth keeps legacy image-width mapping byte-identical', () => {
       const legacy = calculateTileDrawRect(400, 300, makeTileset(), 80, 1, 'flat');
       expect(legacy.drawWidth).toBeCloseTo(2 * 80, 2);

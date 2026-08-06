@@ -679,11 +679,17 @@ function calculateTileDrawRect(
   // art's visual center.
   const artLift = (tileset.artOffsetY ?? 0) * zoom;
 
+  // Manual per-tileset art scale (1 = auto): grows the art about its face
+  // center — the only global transform that closes seams BETWEEN neighbors
+  // (a translation preserves inter-tile gaps). Multiplies the import-time
+  // edge bleed so adjacent tiles' inked borders overlap.
+  const artScale = tileset.artScale ?? 1;
+
   // Independent scale factors:
   // hexWidth (the measured art hexagon, when the art is padded inside a larger
   // image) or tileWidth maps to hex width, hexHeight maps to hex height
-  const scaleX = hexScreenWidth / (tileset.hexWidth ?? tileset.tileWidth);
-  const scaleY = hexScreenHeight / hexHeight;
+  const scaleX = hexScreenWidth / (tileset.hexWidth ?? tileset.tileWidth) * artScale;
+  const scaleY = hexScreenHeight / hexHeight * artScale;
 
   const effectiveFit = fitMode ?? tileset.fitMode ?? 'fill';
 
@@ -757,6 +763,7 @@ function getEntryMap(tilesets: TilesetDef[]): Map<string, { entry: { vaultPath: 
       + ':' + (ts.artOrientation ?? '')
       + ':' + (ts.hexWidth ?? '')
       + ':' + (ts.artOffsetY ?? '')
+      + ':' + (ts.artScale ?? '')
       + ':' + (isFolderTileset(ts) ? (ts.hexHeight ?? '') + ':' + (ts.overflowTop ?? '') + ':' + (ts.overflowBottom ?? '') : '')
       + ',';
   }

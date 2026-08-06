@@ -193,6 +193,11 @@ export interface PluginSettings {
    *  stable across maps and remounts. */
   tilesetArtOffsets?: Record<string, number>;
 
+  /** Per-tileset art scale multiplier (tileset id → scale, 1 = auto/absent).
+   *  GLOBAL like tilesetArtOffsets: grows cell-filling art about its face
+   *  center on every map so neighboring tiles' borders overlap. */
+  tilesetArtScales?: Record<string, number>;
+
   // Keyboard shortcuts (action ID → key string)
   keyboardShortcuts?: Record<string, string>;
 

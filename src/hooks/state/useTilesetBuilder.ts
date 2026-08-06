@@ -91,14 +91,18 @@ function useTilesetBuilder(
         setMapData((current: MapData | null) => {
           if (!current) return current;
           const overrides = current.tilesetOverrides;
-          // Art nudges are GLOBAL (plugin settings), not per-map overrides —
-          // one adjustment seats the set identically on every map.
+          // Art nudges/scales are GLOBAL (plugin settings), not per-map
+          // overrides — one adjustment seats the set identically on every map.
           const artOffsets = getSettings().tilesetArtOffsets ?? {};
+          const artScales = getSettings().tilesetArtScales ?? {};
           const mergedTilesets = newTilesets.map(ts => {
             const ov = overrides?.[ts.id];
-            const merged = ov != null ? { ...ts, ...ov } : ts;
+            let merged = ov != null ? { ...ts, ...ov } : ts;
             const nudge = artOffsets[ts.id];
-            return nudge != null ? { ...merged, artOffsetY: nudge } : merged;
+            if (nudge != null) merged = { ...merged, artOffsetY: nudge };
+            const scale = artScales[ts.id];
+            if (scale != null) merged = { ...merged, artScale: scale };
+            return merged;
           });
           return { ...current, tilesets: mergedTilesets };
         });

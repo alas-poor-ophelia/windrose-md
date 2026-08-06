@@ -580,6 +580,31 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     }, 600);
   }, [updateMapData, app]);
 
+  // Art scale mirrors the art nudge exactly: GLOBAL per tileset, applied to
+  // the live merged tileset immediately, persisted debounced.
+  const artScaleSaveTimer = useRef<number | null>(null);
+  const handleTilesetArtScaleChange = useCallback((tilesetId: string, value: number | undefined) => {
+    updateMapData((prev: MapData) => ({
+      ...prev,
+      tilesets: (prev.tilesets ?? []).map(ts => ts.id === tilesetId ? { ...ts, artScale: value } : ts),
+    }));
+    if (artScaleSaveTimer.current != null) window.clearTimeout(artScaleSaveTimer.current);
+    artScaleSaveTimer.current = window.setTimeout(() => {
+      artScaleSaveTimer.current = null;
+      try {
+        const plugin = app.plugins.plugins['windrose-md'] as unknown as
+          { settings: { tilesetArtScales?: Record<string, number> }; saveSettings(): Promise<void> } | undefined;
+        if (plugin != null) {
+          const scales = { ...(plugin.settings.tilesetArtScales ?? {}) };
+          if (value == null || value === 1) delete scales[tilesetId];
+          else scales[tilesetId] = value;
+          plugin.settings.tilesetArtScales = scales;
+          void plugin.saveSettings();
+        }
+      } catch { /* settings plugin unavailable */ }
+    }, 600);
+  }, [updateMapData, app]);
+
   // Image alignment mode (extracted to useAlignmentMode hook)
   const {
     isAlignmentMode, alignmentOffsetX, alignmentOffsetY,
@@ -1469,6 +1494,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 tilesetOverrides={mapData?.tilesetOverrides}
                 onTilesetOverrideChange={handleTilesetOverrideChange}
                 onTilesetArtOffsetChange={handleTilesetArtOffsetChange}
+                onTilesetArtScaleChange={handleTilesetArtScaleChange}
                 compact
                 hideHeader
                 active={!tileBrowserCollapsed}
@@ -1654,6 +1680,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 tilesetOverrides={mapData?.tilesetOverrides}
                 onTilesetOverrideChange={handleTilesetOverrideChange}
                 onTilesetArtOffsetChange={handleTilesetArtOffsetChange}
+                onTilesetArtScaleChange={handleTilesetArtScaleChange}
                 recentTiles={recentTiles}
                 onSelectedFormChange={setSelectedTileForm}
               />
@@ -1725,6 +1752,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     tilesetOverrides={mapData?.tilesetOverrides}
                     onTilesetOverrideChange={handleTilesetOverrideChange}
                 onTilesetArtOffsetChange={handleTilesetArtOffsetChange}
+                onTilesetArtScaleChange={handleTilesetArtScaleChange}
                     showRail
                     active={!tileBrowserCollapsed}
                     recentTiles={recentTiles}
