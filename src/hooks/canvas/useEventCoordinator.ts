@@ -853,10 +853,17 @@ const useEventCoordinator = ({
       const coords = screenToGrid(e.clientX, e.clientY);
       if (coords) {
         // Pass the clicked world point so the listener can open the sub-map
-        // centered on it (same anchor-preserving remap as the seamless dive).
+        // centered on it (same anchor-preserving remap as the seamless dive),
+        // and the live canvas size so it can fit-zoom against the real pane.
         const anchor = screenToWorld?.(e.clientX, e.clientY) ?? undefined;
+        const dblCanvas = canvasRef.current;
         activeDocument.dispatchEvent(new CustomEvent('windrose:enter-sub-hex', {
-          detail: { q: coords.x, r: coords.y, anchor }
+          detail: {
+            q: coords.x,
+            r: coords.y,
+            anchor,
+            canvasSize: dblCanvas != null ? { width: dblCanvas.width, height: dblCanvas.height } : undefined
+          }
         }));
         return;
       }
@@ -896,7 +903,7 @@ const useEventCoordinator = ({
     if (!textHandlers?.handleCanvasDoubleClick) return;
 
     textHandlers.handleCanvasDoubleClick(e);
-  }, [currentTool, getHandlers, geometry, screenToGrid, screenToWorld, interactionLocked]);
+  }, [currentTool, getHandlers, geometry, screenToGrid, screenToWorld, interactionLocked, canvasRef]);
 
   const handleContextMenu = useCallback((e: MouseEvent): void => {
     e.preventDefault();
@@ -914,8 +921,15 @@ const useEventCoordinator = ({
     if (geometry?.type === 'hex' && screenToGrid != null) {
       const coords = screenToGrid(e.clientX, e.clientY);
       if (coords) {
+        const ctxCanvas = canvasRef.current;
         activeDocument.dispatchEvent(new CustomEvent('windrose:hex-context-menu', {
-          detail: { q: coords.x, r: coords.y, screenX: e.clientX, screenY: e.clientY }
+          detail: {
+            q: coords.x,
+            r: coords.y,
+            screenX: e.clientX,
+            screenY: e.clientY,
+            canvasSize: ctxCanvas != null ? { width: ctxCanvas.width, height: ctxCanvas.height } : undefined
+          }
         }));
         return;
       }
@@ -931,7 +945,7 @@ const useEventCoordinator = ({
     if (drawingHandlers?.cancelShapePreview) {
       drawingHandlers.cancelShapePreview();
     }
-  }, [getHandlers, geometry, screenToGrid, interactionLocked]);
+  }, [getHandlers, geometry, screenToGrid, interactionLocked, canvasRef]);
 
   // Long-press timer for touch context menu
   const longPressTimerRef = useRef<number | null>(null);

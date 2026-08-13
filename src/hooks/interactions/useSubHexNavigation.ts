@@ -9,13 +9,15 @@
 import type { MapData, MapLayer, SubHexMapData, StoredViewState } from '#types/core/map.types';
 import type { MapDataUpdater } from '#types/hooks/mapData.types';
 import type { MapDistanceOverrides, ResolvedDistanceSettings, SubHexDistanceLevel } from '../../drawing/distanceOperations';
+import type { SubHexExitDetail } from '../../core/windroseEvents';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { DEFAULTS, SCHEMA_VERSION } from '../../core/dmtConstants';
 import { isFeatureEnabled } from '../../core/featureFlags';
 import { getSettings } from '../../core/settingsAccessor';
 import { generateLayerId } from '../../persistence/layerAccessor';
-import { calculateFitZoom } from '../../geometry/core/hexMeasurements';
+import { calculateFitZoom, subHexChildPointToParentOffset, subHexContinuityZoom } from '../../geometry/core/hexMeasurements';
+import { createGeometry } from '../../geometry/core/createGeometry';
 import { resolveSubHexDistanceSettings } from '../../drawing/distanceOperations';
 
 // =========================================================================
@@ -72,7 +74,13 @@ interface UseSubHexNavigationResult {
   depth: number;
   breadcrumbs: BreadcrumbSegment[];
   enterSubHex: (q: number, r: number, viewOverride?: StoredViewState) => void;
-  exitSubHex: () => void;
+  /**
+   * Exit to the parent level. A seamless zoom-out surface passes the child
+   * view at the moment it fired so the parent reopens visually continuous
+   * (sub-map footprint → hex footprint); plain exits restore the dive-time
+   * parent view.
+   */
+  exitSubHex: (seamlessExit?: SubHexExitDetail | null) => void;
   /**
    * Drill into an absolute sub-hex path ('/'-joined "q,r" hexKeys) from root,
    * tolerating missing segments. `onArrive` fires once the target (or nearest
@@ -298,11 +306,55 @@ function useSubHexNavigation({
   }, [rootUpdateMapData]);
 
   // Exit current sub-hex (go up one level)
-  const exitSubHex = useCallback((): void => {
+  const exitSubHex = useCallback((seamlessExit?: SubHexExitDetail | null): void => {
     if (navStack.length === 0) return;
 
     const currentSubHex = subHexMapData;
     const topFrame = navStack[navStack.length - 1];
+
+    // Plain exits (Escape, breadcrumbs) restore the dive-time parent view.
+    // Seamless surfaces instead compute the visually-continuous parent view:
+    // zoom where the hex footprint matches the sub-map's current screen size,
+    // centered so the anchor point stays at the same screen position.
+    let restoredViewState = topFrame.parentStoredViewState;
+    if (seamlessExit != null && currentSubHex != null) {
+      const parentMap = topFrame.parentMapData;
+      const rings = parentMap.subHexMaps?.[topFrame.hexKey]?.subdivisionRings
+        ?? currentSubHex.hexBounds?.maxRing ?? 7;
+      const parentHexSize = parentMap.hexSize ?? DEFAULTS.hexSize;
+      const childHexSize = currentSubHex.hexSize ?? parentHexSize;
+      const orientation = currentSubHex.orientation ?? parentMap.orientation ?? DEFAULTS.hexOrientation;
+
+      const continuityRatio = subHexContinuityZoom(1, parentHexSize, childHexSize, rings);
+      const parentZoom = Math.max(
+        DEFAULTS.minZoom,
+        Math.min(DEFAULTS.maxZoom, seamlessExit.childZoom / continuityRatio)
+      );
+
+      const [qStr, rStr] = topFrame.hexKey.split(',');
+      const hexCenter = createGeometry(parentMap).gridToWorld(parseInt(qStr, 10), parseInt(rStr, 10));
+      const anchorOffset = subHexChildPointToParentOffset(
+        seamlessExit.childAnchor.x,
+        seamlessExit.childAnchor.y,
+        parentHexSize,
+        childHexSize,
+        orientation,
+        rings
+      );
+      // center = anchor − screenOffset/zoom, with the screen offset rotated
+      // into the parent's world axes when the parent map is rotated.
+      const angleRad = (-(parentMap.northDirection ?? 0) * Math.PI) / 180;
+      const { dx, dy } = seamlessExit.anchorOffset;
+      const rotDx = dx * Math.cos(angleRad) - dy * Math.sin(angleRad);
+      const rotDy = dx * Math.sin(angleRad) + dy * Math.cos(angleRad);
+      restoredViewState = {
+        zoom: parentZoom,
+        center: {
+          x: hexCenter.worldX + anchorOffset.x - rotDx / parentZoom,
+          y: hexCenter.worldY + anchorOffset.y - rotDy / parentZoom
+        }
+      };
+    }
 
     // Merge current sub-hex data back into parent's subHexMaps
     const restoredParent = {
@@ -316,7 +368,7 @@ function useSubHexNavigation({
         }
       },
       // Restore the parent's viewState
-      viewState: topFrame.parentStoredViewState
+      viewState: restoredViewState
     } as MapData;
 
     const newStack = navStack.slice(0, -1);

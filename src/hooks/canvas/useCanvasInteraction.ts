@@ -25,7 +25,7 @@ import type { ViewController } from '#types/hooks/viewController.types';
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULTS } from '../../core/dmtConstants';
-import { calculateFitZoom, subHexAnchorToChildCenter } from '../../geometry/core/hexMeasurements';
+import { calculateFitZoom, subHexAnchorToChildCenter, subHexContinuityZoom } from '../../geometry/core/hexMeasurements';
 
 /**
  * Wheel zoom has no natural gesture "end": it fires a burst of discrete ticks.
@@ -52,16 +52,24 @@ const PINCH_ZOOM_FACTOR_MAX = 1.25;
 const MAX_WHEEL_ZOOM = 4;
 
 /**
- * Seamless sub-hex zoom: dive when the zoom is already pinned at max and the
- * user keeps zooming in over a hex that has a sub-map; surface when zoomed
- * out below this fraction of the sub-map's fit zoom and still zooming out.
- * The gap between "pinned at max" and "below fit" is the hysteresis band
- * that keeps the transition from ping-ponging.
+ * Mouse-wheel notch zoom step, multiplicative (~12% per notch). A multiplicative
+ * step keeps the perceived zoom speed uniform at every scale — an additive step
+ * crawls near max zoom (2.5%/tick at 4.0) and lurches at low zoom (37%/tick at
+ * 0.27), which made seamless sub-hex dives feel dead-then-sudden.
+ */
+const WHEEL_ZOOM_STEP_FACTOR = 1.12;
+
+/**
+ * Seamless sub-hex zoom: dive when a zoom-in tick reaches the max-zoom ceiling
+ * over a hex that has a sub-map; surface when a zoom-out tick drops below the
+ * visual-continuity zoom (where the sub-map has shrunk back to the parent
+ * hex's max-zoom footprint). Both swaps are footprint-matched, so entry sits
+ * just above the surface threshold — the cooldown below is what keeps a
+ * single wheel burst from ping-ponging across it.
  */
 const SEAMLESS_DIVE_EPSILON = 0.001;
-// Half of fit (not 0.75): a sub-map's stored zoom can sit slightly below the
-// LIVE fit zoom (fit was computed at creation-time canvas size), and a floor
-// too close to fit makes the first zoom-out tick bounce straight back out.
+// Legacy surface threshold (fraction of the sub-map's fit zoom), used only
+// for sub-maps without ring bounds where continuity can't be derived.
 const SEAMLESS_SURFACE_FIT_FRACTION = 0.5;
 /** Ignore further transitions briefly after one fires (wheel bursts re-tick). */
 const SEAMLESS_COOLDOWN_MS = 600;
@@ -317,10 +325,12 @@ function useCanvasInteraction(
    * paths. Returns true when a transition fired (the caller should stop
    * processing the tick — the map is about to swap).
    *
-   * Dive: zoom already pinned at max, still zooming in, and the hex under the
-   * zoom anchor has an EXISTING sub-map → enter it (never creates one).
-   * Surface: inside a sub-hex, zoomed out below a fraction of the sub-map's
-   * fit zoom, and still zooming out → exit to the parent.
+   * Dive: a zoom-in tick reaches the ceiling and the hex under the zoom
+   * anchor has an EXISTING sub-map → enter it (never creates one), opening at
+   * the visual-continuity view (child grid in the parent hex's footprint,
+   * anchor point kept under the cursor).
+   * Surface: inside a sub-hex, a zoom-out tick drops below the continuity
+   * zoom → exit to the parent at the mirrored continuity view.
    */
   const maybeSeamlessSubHexTransition = (
     zoomingIn: boolean,
@@ -333,35 +343,33 @@ function useCanvasInteraction(
     if (Date.now() - seamlessTransitionAtRef.current < SEAMLESS_COOLDOWN_MS) return false;
 
     if (zoomingIn) {
-      if (currentZoom < MAX_WHEEL_ZOOM - SEAMLESS_DIVE_EPSILON) return false;
+      // Fire on the tick that REACHES the ceiling (not the one after it), so
+      // there are no dead ticks pinned at max zoom before the dive.
+      if (newZoom < MAX_WHEEL_ZOOM - SEAMLESS_DIVE_EPSILON) return false;
       const coords = screenToGrid(anchorClientX, anchorClientY);
       if (!coords) return false;
       const subHex = mapData.subHexMaps?.[`${coords.x},${coords.y}`];
       const canvas = canvasRef.current;
       if (subHex == null || canvas == null) return false;
 
-      // Open the sub-map at the LIVE canvas's fit zoom so it fills the screen.
-      // Its stored viewState was fit at creation-time canvas size (or wherever
-      // the user last left it) and may already sit inside the surface zone.
+      // Open the sub-map at VISUAL CONTINUITY: the child grid occupies the
+      // same screen footprint the parent hex has right now, and the world
+      // point under the zoom anchor stays under the anchor. The swap is
+      // pixel-continuous; the user just keeps zooming in from there.
       const child = subHex.mapData;
       const rings = subHex.subdivisionRings ?? 7;
       const parentHexSize = mapData.hexSize ?? DEFAULTS.hexSize;
       const childHexSize = child.hexSize ?? mapData.hexSize ?? DEFAULTS.hexSize;
       const orientation = child.orientation ?? mapData.orientation ?? DEFAULTS.hexOrientation;
-      const childFit = calculateFitZoom(
-        childHexSize,
-        orientation,
-        child.hexBounds ?? { maxCol: rings * 2 + 1, maxRow: rings * 2 + 1, maxRing: rings },
-        canvas.width,
-        canvas.height
+      const childZoom = Math.max(
+        DEFAULTS.minZoom,
+        subHexContinuityZoom(currentZoom, parentHexSize, childHexSize, rings)
       );
 
-      // Center the child on the SAME world point the user was zooming toward
-      // within the parent hex, instead of snapping to the child origin. Map the
-      // anchor's offset from the parent hex center into the child map's extent.
+      // The anchor point, mapped into the child map's extent…
       const anchorWorld = screenToWorld(anchorClientX, anchorClientY);
       const parentCenter = geometry.gridToWorld(coords.x, coords.y);
-      const childCenter = anchorWorld != null
+      const childAnchor = anchorWorld != null
         ? subHexAnchorToChildCenter(
             anchorWorld.worldX - parentCenter.worldX,
             anchorWorld.worldY - parentCenter.worldY,
@@ -372,16 +380,30 @@ function useCanvasInteraction(
           )
         : { x: 0, y: 0 };
 
+      // …placed at the anchor's SCREEN position, not the canvas center:
+      // center = anchor − screenOffset/zoom (screen offset rotated into the
+      // child's world axes when the child map is rotated).
+      const rect = canvas.getBoundingClientRect();
+      const dx = (anchorClientX - rect.left) * (canvas.width / rect.width) - canvas.width / 2;
+      const dy = (anchorClientY - rect.top) * (canvas.height / rect.height) - canvas.height / 2;
+      const childAngleRad = (-(child.northDirection ?? 0) * Math.PI) / 180;
+      const rotDx = dx * Math.cos(childAngleRad) - dy * Math.sin(childAngleRad);
+      const rotDy = dx * Math.sin(childAngleRad) + dy * Math.cos(childAngleRad);
+      const childCenter = {
+        x: childAnchor.x - rotDx / childZoom,
+        y: childAnchor.y - rotDy / childZoom
+      };
+
       seamlessTransitionAtRef.current = Date.now();
-      // Commit the in-flight zoom so the parent's stored view (what exit
-      // restores) is the view the user dove from.
+      // Commit the in-flight zoom so the parent's stored view (what a
+      // non-seamless exit restores) is the view the user dove from.
       clearWheelSettle();
       commitActiveGesture();
       activeDocument.dispatchEvent(new CustomEvent('windrose:enter-sub-hex', {
         detail: {
           q: coords.x,
           r: coords.y,
-          viewOverride: { zoom: childFit, center: childCenter }
+          viewOverride: { zoom: childZoom, center: childCenter }
         }
       }));
       return true;
@@ -389,20 +411,48 @@ function useCanvasInteraction(
 
     if (!isInSubHex) return false;
     const canvas = canvasRef.current;
-    if (!canvas || mapData.hexBounds == null) return false;
-    const fitZoom = calculateFitZoom(
-      mapData.hexSize ?? DEFAULTS.hexSize,
-      mapData.orientation ?? DEFAULTS.hexOrientation,
-      mapData.hexBounds,
-      canvas.width,
-      canvas.height
-    );
-    if (newZoom >= fitZoom * SEAMLESS_SURFACE_FIT_FRACTION) return false;
+    if (!canvas) return false;
+
+    // Surface at the visual-continuity zoom — the point where the sub-map has
+    // shrunk back to the parent hex's max-zoom footprint — so the exit swap is
+    // as continuous as the dive. Sub-maps inherit the parent's hex size, so
+    // the parent/child sizes cancel out of the threshold. Legacy sub-maps
+    // without ring bounds fall back to the old fit-fraction threshold.
+    const ownRings = mapData.hexBounds?.maxRing;
+    let surfaceThreshold: number;
+    if (ownRings != null && ownRings > 0) {
+      surfaceThreshold = subHexContinuityZoom(MAX_WHEEL_ZOOM, 1, 1, ownRings);
+    } else {
+      if (mapData.hexBounds == null) return false;
+      surfaceThreshold = SEAMLESS_SURFACE_FIT_FRACTION * calculateFitZoom(
+        mapData.hexSize ?? DEFAULTS.hexSize,
+        mapData.orientation ?? DEFAULTS.hexOrientation,
+        mapData.hexBounds,
+        canvas.width,
+        canvas.height
+      );
+    }
+    if (newZoom >= surfaceThreshold) return false;
+
+    // Hand the exit the child view at this instant so it can restore a
+    // visually-continuous parent view (same spot, matched footprint).
+    const anchorWorld = screenToWorld(anchorClientX, anchorClientY);
+    const rect = canvas.getBoundingClientRect();
+    const exitDetail = anchorWorld != null
+      ? {
+          childZoom: newZoom,
+          childAnchor: { x: anchorWorld.worldX, y: anchorWorld.worldY },
+          anchorOffset: {
+            dx: (anchorClientX - rect.left) * (canvas.width / rect.width) - canvas.width / 2,
+            dy: (anchorClientY - rect.top) * (canvas.height / rect.height) - canvas.height / 2
+          }
+        }
+      : null;
 
     seamlessTransitionAtRef.current = Date.now();
     clearWheelSettle();
     commitActiveGesture();
-    activeDocument.dispatchEvent(new CustomEvent('windrose:exit-sub-hex'));
+    activeDocument.dispatchEvent(new CustomEvent('windrose:exit-sub-hex', { detail: exitDetail }));
     return true;
   };
 
@@ -473,8 +523,8 @@ function useCanvasInteraction(
       );
       newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, viewState.zoom * factor));
     } else {
-      const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, viewState.zoom + delta));
+      const factor = e.deltaY > 0 ? 1 / WHEEL_ZOOM_STEP_FACTOR : WHEEL_ZOOM_STEP_FACTOR;
+      newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, viewState.zoom * factor));
     }
 
     // Seamless sub-hex dive/surface takes over the tick when it fires.

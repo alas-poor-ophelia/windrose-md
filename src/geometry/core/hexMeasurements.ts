@@ -329,6 +329,56 @@ function subHexAnchorToChildCenter(
   };
 }
 
+/**
+ * Inverse of subHexAnchorToChildCenter: map a point in a sub-map's world space
+ * back to the equivalent offset from its parent hex's center. Used when
+ * surfacing out of a sub-hex to keep the exit view anchored on the same spot.
+ */
+function subHexChildPointToParentOffset(
+  childX: number,
+  childY: number,
+  parentHexSize: number,
+  childHexSize: number,
+  orientation: string,
+  rings: number
+): { x: number; y: number } {
+  const sqrt3 = Math.sqrt(3);
+  let parentHalfW: number, parentHalfH: number, childHalfW: number, childHalfH: number;
+  if (orientation === 'flat') {
+    parentHalfW = parentHexSize;
+    parentHalfH = parentHexSize * sqrt3 / 2;
+    childHalfW = childHexSize * (rings * 1.5 + 1);
+    childHalfH = childHexSize * sqrt3 * (rings * 2 + 1) / 2;
+  } else {
+    parentHalfW = parentHexSize * sqrt3 / 2;
+    parentHalfH = parentHexSize;
+    childHalfW = childHexSize * sqrt3 * (rings * 2 + 1) / 2;
+    childHalfH = childHexSize * (rings * 1.5 + 1);
+  }
+  if (childHalfW <= 0 || childHalfH <= 0) return { x: 0, y: 0 };
+  return {
+    x: (childX / childHalfW) * parentHalfW,
+    y: (childY / childHalfH) * parentHalfH
+  };
+}
+
+/**
+ * Zoom at which a sub-map occupies the same screen footprint its parent hex
+ * has at `parentZoom` — the visual-continuity zoom for a seamless dive (and,
+ * inverted, the surface threshold). One parent hex spans (rings*2+1) child
+ * cells across, matching the sub-hex distance model.
+ */
+function subHexContinuityZoom(
+  parentZoom: number,
+  parentHexSize: number,
+  childHexSize: number,
+  rings: number
+): number {
+  const cellsAcross = rings * 2 + 1;
+  if (childHexSize <= 0 || cellsAcross <= 0) return parentZoom;
+  return (parentZoom * parentHexSize) / (childHexSize * cellsAcross);
+}
+
 // ===========================================
 // Exports
 // ===========================================
@@ -339,5 +389,6 @@ export {
   calculateColumns, calculateRows, calculateHexSizeFromColumns,
   calculateGridFromMeasurement, calculateGridFromColumns,
   validateMeasurementSize, validateFineTune, getFineTuneRange,
-  calculateFitZoom, subHexAnchorToChildCenter
+  calculateFitZoom, subHexAnchorToChildCenter,
+  subHexChildPointToParentOffset, subHexContinuityZoom
 };

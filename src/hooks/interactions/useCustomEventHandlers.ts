@@ -21,13 +21,14 @@ import { consumePendingNavigate } from '../../persistence/deepLinkHandler';
 import type { NavigationEventDetail } from '../../persistence/deepLinkHandler';
 import type {
   SubHexCoordDetail,
+  SubHexExitDetail,
   RegionIdDetail,
   CreateObjectLinkDetail,
   RemoveObjectLinkDetail
 } from '../../core/windroseEvents';
 import { useHexContextMenu } from './useHexContextMenu';
 import { DEFAULTS } from '../../core/dmtConstants';
-import { subHexAnchorToChildCenter } from '../../geometry/core/hexMeasurements';
+import { calculateFitZoom, subHexAnchorToChildCenter } from '../../geometry/core/hexMeasurements';
 
 interface UseCustomEventHandlersOptions {
   mapData: MapData | null;
@@ -36,7 +37,7 @@ interface UseCustomEventHandlersOptions {
   updateMapData: (updater: MapData | ((current: MapData) => MapData)) => void;
   handleLayerSelect: (layerId: string) => void;
   enterSubHex: (q: number, r: number, viewOverride?: { zoom: number; center: { x: number; y: number } }) => void;
-  exitSubHex: () => void;
+  exitSubHex: (seamlessExit?: SubHexExitDetail | null) => void;
   /** Drill into an absolute sub-hex path, then run onArrive. Deep-link navigation. */
   drillToSubHexPath?: (path: string | null, onArrive?: () => void) => void;
   isInSubHex: boolean;
@@ -84,23 +85,34 @@ function useCustomEventHandlers({
   // Listen for sub-hex entry events from double-click on hex
   useEffect(() => {
     const handleEnterSubHex = (event: CustomEvent<SubHexCoordDetail>): void => {
-      const { q, r, viewOverride, anchor } = event.detail;
+      const { q, r, viewOverride, anchor, canvasSize } = event.detail;
       if (mapData?.mapType !== 'hex') return;
 
-      // Seamless dives supply a full viewOverride. The double-click path instead
-      // supplies the clicked world point (`anchor`); remap it into the child's
-      // extent so the sub-map opens centered on the same spot, keeping the
-      // child's own stored zoom.
+      // Seamless dives supply a full viewOverride. The double-click path
+      // instead supplies the clicked world point (`anchor`) and the live
+      // canvas size: the sub-map opens at a fit zoom computed against the
+      // REAL viewport (its stored zoom was fit at creation-time canvas
+      // dimensions and opens over-zoomed in any smaller pane), centered on
+      // the clicked spot. Also covers to-be-created sub-maps, which use the
+      // same defaults createSubHexMapData will.
       let override = viewOverride;
-      if (override == null && anchor != null && geometry?.type === 'hex') {
+      if (override == null && geometry?.type === 'hex') {
         const subHex = mapData.subHexMaps?.[`${q},${r}`];
-        if (subHex != null) {
+        const rings = subHex?.subdivisionRings ?? 7;
+        const parentHexSize = mapData.hexSize ?? DEFAULTS.hexSize;
+        const childHexSize = subHex?.mapData.hexSize ?? parentHexSize;
+        const orientation = mapData.orientation ?? DEFAULTS.hexOrientation;
+        const childBounds = subHex?.mapData.hexBounds
+          ?? { maxCol: rings * 2 + 1, maxRow: rings * 2 + 1, maxRing: rings };
+
+        const zoom = canvasSize != null
+          ? calculateFitZoom(childHexSize, orientation, childBounds, canvasSize.width, canvasSize.height)
+          : subHex?.mapData.viewState?.zoom ?? 1;
+
+        let center = { x: 0, y: 0 };
+        if (anchor != null) {
           const parentCenter = geometry.hexToWorld(q, r);
-          const rings = subHex.subdivisionRings ?? 7;
-          const parentHexSize = mapData.hexSize ?? DEFAULTS.hexSize;
-          const childHexSize = subHex.mapData.hexSize ?? parentHexSize;
-          const orientation = mapData.orientation ?? DEFAULTS.hexOrientation;
-          const childCenter = subHexAnchorToChildCenter(
+          center = subHexAnchorToChildCenter(
             anchor.worldX - parentCenter.worldX,
             anchor.worldY - parentCenter.worldY,
             parentHexSize,
@@ -108,11 +120,8 @@ function useCustomEventHandlers({
             orientation,
             rings
           );
-          override = {
-            zoom: subHex.mapData.viewState?.zoom ?? 1,
-            center: childCenter
-          };
         }
+        override = { zoom, center };
       }
 
       enterSubHex(q, r, override);
@@ -123,11 +132,12 @@ function useCustomEventHandlers({
   }, [mapData, geometry, enterSubHex]);
 
   // Seamless zoom-out surfacing: the canvas dispatches this when a zoom-out
-  // tick lands below the sub-map's fit zoom. No-op at root level.
+  // tick drops below the continuity zoom, carrying the child view at that
+  // instant so the exit restores a continuous parent view. No-op at root.
   useEffect(() => {
     if (!isInSubHex) return undefined;
-    const handleExitSubHex = (): void => {
-      exitSubHex();
+    const handleExitSubHex = (event: CustomEvent<SubHexExitDetail | null>): void => {
+      exitSubHex(event.detail);
     };
     activeDocument.addEventListener('windrose:exit-sub-hex', handleExitSubHex);
     return () => activeDocument.removeEventListener('windrose:exit-sub-hex', handleExitSubHex);

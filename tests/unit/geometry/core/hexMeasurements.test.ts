@@ -24,6 +24,8 @@ import {
   validateFineTune,
   getFineTuneRange,
   subHexAnchorToChildCenter,
+  subHexChildPointToParentOffset,
+  subHexContinuityZoom,
 } from "../../../../src/geometry/core/hexMeasurements";
 
 const SQRT3 = Math.sqrt(3);
@@ -407,6 +409,64 @@ describe("hexMeasurements", () => {
     it("returns the origin for a degenerate (zero-size) parent hex", () => {
       const c = subHexAnchorToChildCenter(5, 5, 0, 0, "flat", RINGS);
       expect(c).toEqual({ x: 0, y: 0 });
+    });
+  });
+
+  // ===========================================================================
+  // Child-point → parent-offset remap (seamless surface)
+  // ===========================================================================
+
+  describe("subHexChildPointToParentOffset", () => {
+    const HEX = 30;
+    const RINGS = 7;
+
+    it("is the inverse of subHexAnchorToChildCenter (flat)", () => {
+      const child = subHexAnchorToChildCenter(12, -8, HEX, HEX, "flat", RINGS);
+      const back = subHexChildPointToParentOffset(child.x, child.y, HEX, HEX, "flat", RINGS);
+      expect(back.x).toBeCloseTo(12, 6);
+      expect(back.y).toBeCloseTo(-8, 6);
+    });
+
+    it("is the inverse of subHexAnchorToChildCenter (pointy)", () => {
+      const child = subHexAnchorToChildCenter(-7, 15, HEX, HEX, "pointy", RINGS);
+      const back = subHexChildPointToParentOffset(child.x, child.y, HEX, HEX, "pointy", RINGS);
+      expect(back.x).toBeCloseTo(-7, 6);
+      expect(back.y).toBeCloseTo(15, 6);
+    });
+
+    it("maps the child origin to the parent hex center", () => {
+      expect(subHexChildPointToParentOffset(0, 0, HEX, HEX, "flat", RINGS)).toEqual({ x: 0, y: 0 });
+    });
+
+    it("returns the origin for a degenerate (zero-size) child grid", () => {
+      const c = subHexChildPointToParentOffset(5, 5, HEX, 0, "flat", RINGS);
+      expect(c).toEqual({ x: 0, y: 0 });
+    });
+  });
+
+  // ===========================================================================
+  // Visual-continuity zoom (seamless dive/surface footprint matching)
+  // ===========================================================================
+
+  describe("subHexContinuityZoom", () => {
+    it("divides the parent zoom by cells-across for equal hex sizes", () => {
+      // rings=7 → 15 cells across; parent at 4.0 → child continuity ≈ 0.2667
+      expect(subHexContinuityZoom(4, 30, 30, 7)).toBeCloseTo(4 / 15, 10);
+    });
+
+    it("scales with the parent/child hex-size ratio", () => {
+      // A child with half-size hexes needs double the zoom to fill the footprint
+      expect(subHexContinuityZoom(4, 30, 15, 7)).toBeCloseTo((4 / 15) * 2, 10);
+    });
+
+    it("round-trips: parentZoom → continuity → back", () => {
+      const continuity = subHexContinuityZoom(3.2, 30, 30, 7);
+      const ratio = subHexContinuityZoom(1, 30, 30, 7);
+      expect(continuity / ratio).toBeCloseTo(3.2, 10);
+    });
+
+    it("returns the parent zoom unchanged for a degenerate child hex size", () => {
+      expect(subHexContinuityZoom(2.5, 30, 0, 7)).toBe(2.5);
     });
   });
 });

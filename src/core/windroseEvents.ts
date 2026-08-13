@@ -19,8 +19,8 @@ export interface SubHexCoordDetail {
   r: number;
   /**
    * Optional view to open the sub-map at, overriding its stored viewState.
-   * Seamless zoom dives pass the live-canvas fit zoom here so the sub-map
-   * fills the screen regardless of what canvas size its stored fit assumed.
+   * Seamless zoom dives pass a visual-continuity view here so the sub-map
+   * appears exactly where the parent hex was on screen.
    */
   viewOverride?: { zoom: number; center: { x: number; y: number } };
   /**
@@ -29,6 +29,12 @@ export interface SubHexCoordDetail {
    * sub-map centered on the corresponding point instead of the child origin.
    */
   anchor?: { worldX: number; worldY: number };
+  /**
+   * Live canvas size at dispatch time, so the listener can compute the
+   * sub-map's fit zoom against the REAL viewport instead of trusting a
+   * stored fit computed at creation-time canvas dimensions.
+   */
+  canvasSize?: { width: number; height: number };
 }
 
 /** Right-click on a hex: axial coord + screen position for the context menu. */
@@ -37,6 +43,24 @@ export interface HexContextMenuDetail {
   r: number;
   screenX: number;
   screenY: number;
+  /** Live canvas size at dispatch time (see SubHexCoordDetail.canvasSize). */
+  canvasSize?: { width: number; height: number };
+}
+
+/**
+ * Seamless zoom-out surfacing payload: the child view at the moment the
+ * surface fired, so the exit can restore a visually-continuous parent view
+ * (sub-map footprint → parent hex footprint) instead of the stale dive-time
+ * view. Escape-key / breadcrumb exits dispatch no detail and keep the
+ * classic restore.
+ */
+export interface SubHexExitDetail {
+  /** Child zoom the surfacing tick was heading to. */
+  childZoom: number;
+  /** Child world point under the zoom anchor (cursor / pinch center). */
+  childAnchor: { x: number; y: number };
+  /** Anchor's screen offset from the canvas center, in canvas pixels. */
+  anchorOffset: { dx: number; dy: number };
 }
 
 /**
@@ -90,7 +114,7 @@ export interface SettingsChangedDetail {
 /** Name → CustomEvent map for every Windrose custom DOM event. */
 export interface WindroseEventMap {
   'windrose:enter-sub-hex': CustomEvent<SubHexCoordDetail>;
-  'windrose:exit-sub-hex': CustomEvent<null>;
+  'windrose:exit-sub-hex': CustomEvent<SubHexExitDetail | null>;
   'windrose:navigate-sibling-sub-hex': CustomEvent<SubHexCoordDetail>;
   'windrose:hex-context-menu': CustomEvent<HexContextMenuDetail>;
   'windrose:selection-context-menu': CustomEvent<SelectionContextMenuDetail>;

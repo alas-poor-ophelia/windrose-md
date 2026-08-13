@@ -6,6 +6,8 @@ import { Menu, Notice } from 'obsidian';
 import type { MenuItem } from 'obsidian';
 import { openNativeNoteLinkModal } from '../../components/modals/NoteLinkModal';
 import { isFeatureEnabled } from '../../core/featureFlags';
+import { DEFAULTS } from '../../core/dmtConstants';
+import { calculateFitZoom } from '../../geometry/core/hexMeasurements';
 import type { HexContextMenuDetail } from '../../core/windroseEvents';
 
 interface UseHexContextMenuOptions {
@@ -15,7 +17,7 @@ interface UseHexContextMenuOptions {
   mapId?: string;
   /** Current drill-down path ('/'-joined hexKeys), null/undefined at root. */
   subHexPath?: string | null;
-  enterSubHex: (q: number, r: number) => void;
+  enterSubHex: (q: number, r: number, viewOverride?: { zoom: number; center: { x: number; y: number } }) => void;
   handleRegionsChange: (regions: Region[]) => void;
 }
 
@@ -31,7 +33,7 @@ function useHexContextMenu({
     const handleHexContextMenu = (event: CustomEvent<HexContextMenuDetail>): void => {
       if (!mapData || mapData.mapType !== 'hex') return;
 
-      const { q, r, screenX, screenY } = event.detail;
+      const { q, r, screenX, screenY, canvasSize } = event.detail;
       const hexKey = `${q},${r}`;
       const hasSubHex = mapData.subHexMaps != null && mapData.subHexMaps[hexKey] != null;
 
@@ -43,7 +45,26 @@ function useHexContextMenu({
         menu.addItem((item: MenuItem) => {
           item.setTitle(hasSubHex ? `Enter Sub-Hex (${q}, ${r})` : `Create Sub-Hex (${q}, ${r})`);
           item.setIcon(hasSubHex ? 'lucide-arrow-down-right' : 'lucide-plus-circle');
-          item.onClick(() => enterSubHex(q, r));
+          item.onClick(() => {
+            // Open at a fit zoom computed against the LIVE canvas — the
+            // sub-map's stored zoom was fit at creation-time canvas size and
+            // opens over-zoomed in any smaller pane. No override without
+            // canvas dims (falls back to the stored view).
+            let viewOverride: { zoom: number; center: { x: number; y: number } } | undefined;
+            if (canvasSize != null) {
+              const subHex = mapData.subHexMaps?.[hexKey];
+              const rings = subHex?.subdivisionRings ?? 7;
+              const childHexSize = subHex?.mapData.hexSize ?? mapData.hexSize ?? DEFAULTS.hexSize;
+              const orientation = mapData.orientation ?? DEFAULTS.hexOrientation;
+              const childBounds = subHex?.mapData.hexBounds
+                ?? { maxCol: rings * 2 + 1, maxRow: rings * 2 + 1, maxRing: rings };
+              viewOverride = {
+                zoom: calculateFitZoom(childHexSize, orientation, childBounds, canvasSize.width, canvasSize.height),
+                center: { x: 0, y: 0 }
+              };
+            }
+            enterSubHex(q, r, viewOverride);
+          });
         });
       }
 
