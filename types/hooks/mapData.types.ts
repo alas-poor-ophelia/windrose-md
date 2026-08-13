@@ -24,6 +24,23 @@ export type SaveStatus = 'Saved' | 'Saving...' | 'Unsaved changes' | 'Save faile
 export type MapDataUpdater = (updaterOrData: MapData | ((prev: MapData) => MapData)) => void;
 
 // ===========================================
+// Load Failure
+// ===========================================
+
+/**
+ * Set when the data file EXISTS but could not be read or parsed.
+ *
+ * The UI must block editing entirely in this state — a blank map rendered over
+ * an unreadable file gets saved back and merges over the real data.
+ */
+export interface MapDataLoadFailure {
+  /** Vault path of the unreadable data file. */
+  dataPath: string;
+  /** Diagnostic message (not user-facing copy). */
+  message: string;
+}
+
+// ===========================================
 // Hook Return Type
 // ===========================================
 
@@ -33,6 +50,12 @@ export interface UseMapDataResult {
 
   /** Whether the map is currently loading */
   isLoading: boolean;
+
+  /** Non-null when the data file could not be read — editing must be disabled */
+  loadFailure: MapDataLoadFailure | null;
+
+  /** Re-read the data file from disk, clearing any previous load failure */
+  reload: () => void;
 
   /** Current save status */
   saveStatus: SaveStatus;

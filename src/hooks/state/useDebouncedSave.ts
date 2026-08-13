@@ -4,8 +4,13 @@ import type { App } from 'obsidian';
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { saveMapData } from '../../persistence/fileOperations';
+import { registerSaveInstance, unregisterSaveInstance } from '../../persistence/saveCoordinator';
+import { clearJournal, journalPending } from '../../persistence/saveJournal';
 
 type MapDataSetter = (value: MapData | null | ((prev: MapData | null) => MapData | null)) => void;
+
+/** Unique per mounted hook instance — the coordinator registry is keyed by it. */
+let instanceCounter = 0;
 
 interface UseDebouncedSaveResult {
   saveStatus: SaveStatus;
@@ -43,6 +48,8 @@ function useDebouncedSave(
       setSaveStatus('Saving...');
       const success = await saveMapData(app, mapId, pendingData);
 
+      if (success) clearJournal(app, mapId);
+
       if (deletedRef.current) return;
       if (saveVersionRef.current === currentVersion) {
         setSaveStatus(success ? 'Saved' : 'Save failed');
@@ -75,7 +82,13 @@ function useDebouncedSave(
       const { app: a, mapId: m, pendingData: pd } = flushRef.current;
       if (pd && saveTimerRef.current != null && !deletedRef.current) {
         window.clearTimeout(saveTimerRef.current);
-        void saveMapData(a, m, pd);
+        // Journal FIRST and synchronously: the unmount flush is unawaited by
+        // construction (cleanup functions can't be async), so if the event loop
+        // dies before the vault write finishes, the journal is the only record.
+        journalPending(a, m, pd);
+        void saveMapData(a, m, pd).then((ok) => {
+          if (ok) clearJournal(a, m);
+        }, () => undefined);
       }
     };
   }, []);
@@ -94,6 +107,9 @@ function useDebouncedSave(
 
   const markDeleted = useCallback((): void => {
     deletedRef.current = true;
+    // A journal entry for a deleted map would offer to resurrect it on the next
+    // load, so it goes at the same moment the tombstone does.
+    clearJournal(app, mapId);
     if (saveTimerRef.current != null) {
       window.clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
@@ -105,7 +121,7 @@ function useDebouncedSave(
     saveVersionRef.current++;
     setPendingData(null);
     setSaveStatus('Saved');
-  }, []);
+  }, [app, mapId]);
 
   const forceSave = useCallback(async (): Promise<void> => {
     if (deletedRef.current) return;
@@ -119,6 +135,7 @@ function useDebouncedSave(
 
       setSaveStatus('Saving...');
       const success = await saveMapData(app, mapId, pendingData);
+      if (success) clearJournal(app, mapId);
 
       if (deletedRef.current) return;
       if (saveVersionRef.current === versionAtSaveStart) {
@@ -131,6 +148,27 @@ function useDebouncedSave(
       }
     }
   }, [pendingData, mapId, app]);
+
+  // Shutdown registry: quit, view close and plugin unload all need to reach
+  // every mounted map's pending edits. The refs keep the registration stable
+  // (register once on mount) while still exposing the latest closure.
+  const forceSaveRef = useRef(forceSave);
+  forceSaveRef.current = forceSave;
+  const instanceIdRef = useRef<string>('');
+  if (instanceIdRef.current === '') instanceIdRef.current = `windrose-save-${++instanceCounter}`;
+
+  useEffect(() => {
+    const id = instanceIdRef.current;
+    registerSaveInstance(id, {
+      getPending: () => {
+        const { mapId: m, pendingData: pd } = flushRef.current;
+        if (!pd || deletedRef.current) return null;
+        return { mapId: m, data: pd };
+      },
+      flush: async () => { await forceSaveRef.current(); },
+    });
+    return () => unregisterSaveInstance(id);
+  }, []);
 
   return { saveStatus, updateMapData, forceSave, markDeleted };
 }

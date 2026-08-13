@@ -18,14 +18,42 @@ import { migrateToLayerSchema, needsMigration, generateLayerId, ensureBoards, DE
 import { calculateFitZoom } from '../geometry/core/hexMeasurements';
 import { resolveTileEntry } from '../assets/tilesetOperations';
 
-// Serializes saveMapData calls so concurrent writes can't race or interleave.
+// Serializes EVERY data-file operation (reads as well as writes) so concurrent
+// access can't race or interleave. Reads have to share the mutex: a read that
+// starts while a chunked write is in flight can observe a half-written file and
+// hand a truncated document to JSON.parse.
 // The chain is kept healthy by catching errors before re-assigning, so one
-// failed save doesn't poison subsequent ones.
+// failed op doesn't poison subsequent ones.
 let saveQueue: Promise<unknown> = Promise.resolve();
-function enqueueSave<T>(task: () => Promise<T>): Promise<T> {
+function enqueueDataFileOp<T>(task: () => Promise<T>): Promise<T> {
   const next = saveQueue.then(task, task);
   saveQueue = next.catch(() => undefined);
   return next;
+}
+
+/**
+ * The tail of the data-file queue. Awaiting it waits for every operation
+ * enqueued so far to settle — used by the quit handler so Obsidian doesn't tear
+ * the event loop down mid-write.
+ */
+function getSaveQueue(): Promise<unknown> {
+  return saveQueue;
+}
+
+/**
+ * Thrown by loadMapData when the data file EXISTS but cannot be read or parsed.
+ *
+ * Returning a fresh map in this case is how a truncated file became permanent
+ * data loss: the blank map got edited, saved, and merged over the real entry.
+ * Callers must block editing instead.
+ */
+class MapDataUnreadableError extends Error {
+  readonly dataPath: string;
+  constructor(dataPath: string) {
+    super(`Map data file could not be read: ${dataPath}`);
+    this.name = 'MapDataUnreadableError';
+    this.dataPath = dataPath;
+  }
 }
 
 // Throttle the corrupted-file notice so we don't spam the user with a toast
@@ -47,6 +75,178 @@ function notifyCorruptedDataFile(dataPath: string): void {
 /** Data file structure */
 interface DataFile {
   maps: Record<string, MapData>;
+}
+
+// ===========================================
+// Two-slot backup rotation
+// ===========================================
+
+/**
+ * Minimum gap between two backup writes, regardless of how much editing
+ * happened in between.
+ *
+ * A backup is itself a vault write. Autosave can fire in a tight burst while a
+ * tool is dragged — this repo once logged ~47 saves/sec — so backing up "on
+ * every save that had changes" would turn the safety net into the exact I/O
+ * storm it is meant to survive. One rotation per 15 minutes is enough to keep a
+ * recent known-good copy without adding measurable write load.
+ */
+const BAK_THROTTLE_MS = 15 * 60 * 1000;
+
+type BakSlot = 1 | 2;
+const BAK_SLOTS: readonly BakSlot[] = [1, 2];
+
+/** null until the first rotation of this plugin session (which always happens). */
+let lastBakAt: number | null = null;
+/** The slot the NEXT rotation writes. Alternates so a torn .bak can't be the only copy. */
+let nextBakSlot: BakSlot = 1;
+
+/**
+ * Whether a backup rotation is due. Pure — the caller owns `lastBakAt`.
+ *
+ * The first successful parse-and-save of a session always rotates (lastAt
+ * null): that is the cheapest moment to capture a file we have just proven is
+ * readable. After that, at most one rotation per BAK_THROTTLE_MS.
+ */
+function shouldRotateBak(lastAt: number | null, now: number): boolean {
+  if (lastAt == null) return true;
+  return now - lastAt > BAK_THROTTLE_MS;
+}
+
+/** Slot alternation: 1 → 2 → 1 → … Pure. */
+function otherBakSlot(slot: BakSlot): BakSlot {
+  return slot === 1 ? 2 : 1;
+}
+
+/** `<dataPath minus .json>.bak<slot>.json` — e.g. `maps/data.json` → `maps/data.bak1.json`. */
+function bakPathForSlot(dataPath: string, slot: BakSlot): string {
+  const base = dataPath.endsWith('.json') ? dataPath.slice(0, -'.json'.length) : dataPath;
+  return `${base}.bak${slot}.json`;
+}
+
+/** `yyyymmdd-hhmmss` in local time, for the preserved-corrupt-file suffix. */
+function backupTimestamp(when: Date): string {
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return (
+    `${String(when.getFullYear())}${pad(when.getMonth() + 1)}${pad(when.getDate())}` +
+    `-${pad(when.getHours())}${pad(when.getMinutes())}${pad(when.getSeconds())}`
+  );
+}
+
+/**
+ * Write `knownGood` (content already proven to parse) into a backup slot.
+ *
+ * Awaited inside the data-file mutex so it serializes with every other data
+ * file operation, but a failure NEVER aborts the save it protects — a missing
+ * backup is a smaller problem than a skipped save.
+ */
+async function writeBackupSlot(app: App, dataPath: string, slot: BakSlot, knownGood: string): Promise<void> {
+  const bakPath = bakPathForSlot(dataPath, slot);
+  try {
+    const existing = app.vault.getAbstractFileByPath(bakPath);
+    if (existing instanceof TFile) {
+      await app.vault.modify(existing, knownGood);
+    } else {
+      await app.vault.create(bakPath, knownGood);
+    }
+  } catch (error) {
+    console.error('[saveMapData] Backup rotation failed (the save itself continues):', error);
+  }
+}
+
+/** A parsed, usable backup slot found by findBestBackup. */
+interface DataFileBackup {
+  /** Vault path of the slot file. */
+  path: string;
+  /** Raw file content (already proven to parse). */
+  content: string;
+  /** Slot file mtime, epoch ms — 0 when the adapter could not stat it. */
+  mtime: number;
+  /** How many maps the backup holds, for the confirm prompt. */
+  mapCount: number;
+}
+
+/**
+ * The newest backup slot that still parses, or null when neither does.
+ *
+ * Reads only the .bak paths (never the data file), so it does not need the
+ * data-file mutex.
+ */
+async function findBestBackup(app: App): Promise<DataFileBackup | null> {
+  const dataPath = getDataFilePath();
+  const adapter = app.vault.adapter;
+  let best: DataFileBackup | null = null;
+
+  for (const slot of BAK_SLOTS) {
+    const path = bakPathForSlot(dataPath, slot);
+    try {
+      if (!(await adapter.exists(path))) continue;
+      const content = await adapter.read(path);
+      const parsed = JSON.parse(content) as DataFile;
+      if (parsed == null || typeof parsed !== 'object' || parsed.maps == null || typeof parsed.maps !== 'object') {
+        continue;
+      }
+      const stat = await adapter.stat(path);
+      const candidate: DataFileBackup = {
+        path,
+        content,
+        mtime: stat?.mtime ?? 0,
+        mapCount: Object.keys(parsed.maps).length,
+      };
+      if (best == null || candidate.mtime > best.mtime) best = candidate;
+    } catch (error) {
+      console.error('[findBestBackup] Backup slot is unusable:', path, error);
+    }
+  }
+
+  return best;
+}
+
+/** Outcome of restoreFromBackup. `corruptPath` is where the old file was preserved. */
+interface RestoreResult {
+  ok: boolean;
+  corruptPath: string | null;
+}
+
+/**
+ * Replace the data file with `backup`, preserving the current (unreadable) file
+ * first as `<dataPath>.corrupt-<yyyymmdd-hhmmss>`.
+ *
+ * Evidence before repair: if the copy-aside fails, the restore is abandoned
+ * rather than destroying a file the user may still be able to salvage by hand.
+ * The current file is read through the ADAPTER — `vault.read` goes through the
+ * cached TFile and can choke on content the vault never parsed.
+ */
+async function restoreFromBackup(app: App, backup: DataFileBackup): Promise<RestoreResult> {
+  const dataPath = getDataFilePath();
+  return enqueueDataFileOp(async (): Promise<RestoreResult> => {
+    const adapter = app.vault.adapter;
+    let corruptPath: string | null = null;
+
+    try {
+      if (await adapter.exists(dataPath)) {
+        const corrupt = await adapter.read(dataPath);
+        corruptPath = `${dataPath}.corrupt-${backupTimestamp(new Date())}`;
+        await adapter.write(corruptPath, corrupt);
+      }
+    } catch (error) {
+      console.error('[restoreFromBackup] Could not preserve the unreadable file, restore abandoned:', error);
+      return { ok: false, corruptPath: null };
+    }
+
+    try {
+      const existing = app.vault.getAbstractFileByPath(dataPath);
+      if (existing instanceof TFile) {
+        await app.vault.modify(existing, backup.content);
+      } else {
+        await app.vault.create(dataPath, backup.content);
+      }
+      return { ok: true, corruptPath };
+    } catch (error) {
+      console.error('[restoreFromBackup] Writing the backup over the data file failed:', error);
+      return { ok: false, corruptPath };
+    }
+  });
 }
 
 // Session-lifetime tombstones for deleted map IDs. loadMapData silently
@@ -266,32 +466,85 @@ function applyLockedViewState(mapData: MapData): MapData {
   return mapData;
 }
 
+/**
+ * Load one map from the data file.
+ *
+ * Returns a fresh map ONLY when the data file is absent, or when it parses
+ * cleanly but holds no entry for `mapId`. Any other failure (unreadable file,
+ * bad JSON, structurally-wrong document, migration blowup) throws
+ * MapDataUnreadableError so the caller can block editing — silently returning a
+ * blank map here is what turned a truncated read into permanent data loss.
+ *
+ * Serialized through the data-file mutex so it can never observe a write in
+ * progress.
+ */
 async function loadMapData(app: App, mapId: string, mapName: string = '', mapType: MapType = 'grid'): Promise<MapData> {
   const dataPath = getDataFilePath();
-  try {
+  return enqueueDataFileOp(async () => {
     const file = app.vault.getAbstractFileByPath(dataPath);
 
     if (!(file instanceof TFile)) {
       return createNewMap(mapName, mapType);
     }
 
-    const content = await app.vault.read(file);
-    const data = JSON.parse(content) as DataFile;
+    let data: DataFile;
+    try {
+      const content = await app.vault.read(file);
+      data = JSON.parse(content) as DataFile;
+      if (data == null || typeof data !== 'object' || data.maps == null || typeof data.maps !== 'object') {
+        throw new Error('data file has no "maps" object');
+      }
+    } catch (error) {
+      console.error('[loadMapData] Data file exists but could not be read. Refusing to substitute a blank map:', error);
+      notifyCorruptedDataFile(dataPath);
+      throw new MapDataUnreadableError(dataPath);
+    }
 
-    if (data.maps[mapId] != null) {
+    if (data.maps[mapId] == null) {
+      return createNewMap(mapName, mapType);
+    }
+
+    try {
       data.maps[mapId] = migrateMapData(data.maps[mapId]);
       if (data.maps[mapId].name == null && mapName) {
         data.maps[mapId].name = mapName;
       }
       return applyLockedViewState(data.maps[mapId]);
+    } catch (error) {
+      // The entry exists but is malformed enough to break migration. Same rule:
+      // never hand back a blank map that a later save would merge over it.
+      console.error('[loadMapData] Stored map entry could not be migrated. Refusing to substitute a blank map:', error);
+      notifyCorruptedDataFile(dataPath);
+      throw new MapDataUnreadableError(dataPath);
     }
+  });
+}
 
-    return createNewMap(mapName, mapType);
-  } catch (error) {
-    console.error('[loadMapData] Failed to load map data, creating new map:', error);
-    notifyCorruptedDataFile(dataPath);
-    return createNewMap(mapName, mapType);
-  }
+/**
+ * The raw, unmigrated JSON text of one stored map entry (null when the file or
+ * the entry is absent, or the file is unreadable).
+ *
+ * Used only by the save-journal replay check, which must compare against what
+ * is literally on disk — the migrated object loadMapData returns has already
+ * been mutated and would produce false "unsaved changes" prompts.
+ */
+async function readRawMapEntry(app: App, mapId: string): Promise<string | null> {
+  return enqueueDataFileOp(async () => {
+    try {
+      const file = app.vault.getAbstractFileByPath(getDataFilePath());
+      if (!(file instanceof TFile)) return null;
+      const data = JSON.parse(await app.vault.read(file)) as DataFile;
+      const entry = data?.maps?.[mapId];
+      return entry != null ? JSON.stringify(entry) : null;
+    } catch {
+      return null;
+    }
+  });
+}
+
+/** Whether this session has tombstoned `mapId` (deleted via deleteMapData). */
+function isMapTombstoned(mapId: string): boolean {
+  return deletedMapIds.has(mapId);
 }
 
 /**
@@ -376,7 +629,7 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
   // stale instance's save status settle to 'Saved' instead of flagging an error
   // for an intentional no-op.
   if (deletedMapIds.has(mapId)) return true;
-  return enqueueSave(async () => {
+  return enqueueDataFileOp(async () => {
     try {
       let allData: DataFile = { maps: {} };
 
@@ -396,6 +649,20 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
           );
           notifyCorruptedDataFile(dataPath);
           return false;
+        }
+
+        // Backup rotation. `content` has just been proven to parse, so it is
+        // known-good — the backup captures THAT, never the merged output we are
+        // about to write (a backup of unverified new state protects nothing).
+        // Runs before vault.modify, inside the mutex.
+        const now = Date.now();
+        if (shouldRotateBak(lastBakAt, now)) {
+          const slot = nextBakSlot;
+          // Stamped BEFORE the write: a slot that keeps failing must not retry
+          // on every autosave (see BAK_THROTTLE_MS).
+          lastBakAt = now;
+          nextBakSlot = otherBakSlot(slot);
+          await writeBackupSlot(app, dataPath, slot, content);
         }
       }
 
@@ -445,7 +712,7 @@ async function deleteMapData(app: App, mapId: string): Promise<boolean> {
   // Tombstone before enqueue so post-tombstone saves are refused immediately;
   // pre-tombstone saves that beat us into the mutex write first and are deleted after.
   deletedMapIds.add(mapId);
-  return enqueueSave(async () => {
+  return enqueueDataFileOp(async () => {
     try {
       const dataPath = getDataFilePath();
       const abstractFile = app.vault.getAbstractFileByPath(dataPath);
@@ -610,23 +877,33 @@ interface MapListEntry {
 }
 
 async function listMaps(app: App): Promise<MapListEntry[]> {
-  try {
-    const dataPath = getDataFilePath();
-    const file = app.vault.getAbstractFileByPath(dataPath);
-    if (!(file instanceof TFile)) return [];
+  // Serialized with writes: an unserialized read can catch a chunked write
+  // mid-flight and see a truncated document.
+  return enqueueDataFileOp(async () => {
+    try {
+      const dataPath = getDataFilePath();
+      const file = app.vault.getAbstractFileByPath(dataPath);
+      if (!(file instanceof TFile)) return [];
 
-    const content = await app.vault.read(file);
-    const data = JSON.parse(content) as DataFile;
+      const content = await app.vault.read(file);
+      const data = JSON.parse(content) as DataFile;
 
-    return Object.entries(data.maps).map(([id, mapData]) => ({
-      id,
-      name: mapData.name != null && mapData.name !== '' ? mapData.name : id,
-      type: mapData.mapType || 'grid',
-    }));
-  } catch {
-    return [];
-  }
+      return Object.entries(data.maps).map(([id, mapData]) => ({
+        id,
+        name: mapData.name != null && mapData.name !== '' ? mapData.name : id,
+        type: mapData.mapType || 'grid',
+      }));
+    } catch {
+      return [];
+    }
+  });
 }
 
-export { loadMapData, saveMapData, deleteMapData, createNewMap, listMaps, migrateMapData, canonicalizeTileIds, applyLockedViewState };
-export type { MapListEntry };
+export {
+  loadMapData, saveMapData, deleteMapData, createNewMap, listMaps, migrateMapData,
+  canonicalizeTileIds, applyLockedViewState, enqueueDataFileOp, getSaveQueue,
+  notifyCorruptedDataFile, readRawMapEntry, isMapTombstoned, MapDataUnreadableError,
+  shouldRotateBak, otherBakSlot, bakPathForSlot, backupTimestamp,
+  findBestBackup, restoreFromBackup, BAK_THROTTLE_MS
+};
+export type { MapListEntry, BakSlot, DataFileBackup, RestoreResult };

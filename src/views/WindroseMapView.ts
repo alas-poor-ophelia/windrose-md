@@ -3,6 +3,7 @@ import { h, render } from 'preact';
 import { AppContext } from '../context/AppContext';
 import { DungeonMapTracker } from '../DungeonMapTracker';
 import { listMaps } from '../persistence/fileOperations';
+import { flushAll } from '../persistence/saveCoordinator';
 import type { MapListEntry } from '../persistence/fileOperations';
 import type { MapType } from '#types/core/map.types';
 
@@ -58,6 +59,11 @@ class WindroseMapView extends ItemView {
   }
 
   async onClose(): Promise<void> {
+    // Flush BEFORE unmounting: the unmount cleanup's save is unawaited, so if
+    // the leaf is closing as part of a shutdown it may never land. Obsidian
+    // awaits onClose, which gives the write a real chance to complete.
+    await flushAll();
+    console.debug('[windrose] view close flush complete');
     render(null, this.contentEl);
   }
 

@@ -17,6 +17,9 @@ import { VIEW_TYPE_WINDROSE_MAP, WindroseMapView } from './views/WindroseMapView
 import { recordPerfTelemetry } from './utils/perfTelemetry';
 import { writeCanvasCapabilityReport } from './utils/canvasCapabilityReport';
 import { scanTilesetFolder } from './assets/tilesetOperations';
+import { enqueueDataFileOp, getSaveQueue, notifyCorruptedDataFile } from './persistence/fileOperations';
+import { flushAll, installLifecycleJournaling, journalAll } from './persistence/saveCoordinator';
+import { pruneJournal } from './persistence/saveJournal';
 import { runImportDetectionPass } from './assets/importDetectionPass';
 import {
   loadTileMetadata,
@@ -180,6 +183,20 @@ export default class WindrosePlugin extends Plugin {
       name: 'Rescan tile classification (fill missing)',
       callback: () => { void this.rescanTileClassification(); },
     });
+
+    // Data-loss guards. Obsidian awaits the promises added to the quit Tasks
+    // bag, which is the only hook that can hold the event loop open long enough
+    // for a multi-megabyte chunked vault write to finish.
+    this.registerEvent(this.app.workspace.on('quit', (tasks) => {
+      tasks.addPromise((async () => {
+        await flushAll();
+        await getSaveQueue();
+      })());
+    }));
+
+    // Suspend/hide has no such guarantee, so those paths journal synchronously.
+    this.register(installLifecycleJournaling(this.app));
+    pruneJournal(this.app);
   }
 
   /**
@@ -250,6 +267,10 @@ export default class WindrosePlugin extends Plugin {
   }
 
   onunload(): void {
+    // Unmounting runs each tree's cleanup, which fires an unawaited save. If
+    // the unload is part of an app shutdown that save may never land, so every
+    // mounted map's pending data is journalled synchronously first.
+    journalAll(this.app);
     for (const el of this.mountedElements) {
       render(null, el);
     }
@@ -476,9 +497,18 @@ export default class WindrosePlugin extends Plugin {
     return { enabled: true, foggedCells };
   }
 
+  /**
+   * Write a generated dungeon into the shared data file.
+   *
+   * Runs inside the data-file mutex: it is a read-modify-write of the whole
+   * file, so without serialization it can interleave with an autosave and lose
+   * one of the two updates. Refuses to write over an unparseable file for the
+   * same reason saveMapData does.
+   */
   private async saveDungeonToJson(mapId: string, mapName: string, cells: DungeonCell[], objects: unknown[], edges: unknown[], options: DungeonGenOptions): Promise<void> {
     const SCHEMA_VERSION = 2;
 
+    return enqueueDataFileOp(async () => {
     try {
       const dataFilePath = this.dataFilePath;
       let allData: { maps: Record<string, unknown> } = { maps: {} };
@@ -487,7 +517,16 @@ export default class WindrosePlugin extends Plugin {
       const file = abstractFile instanceof TFile ? abstractFile : null;
       if (file != null) {
         const content = await this.app.vault.read(file);
-        allData = JSON.parse(content) as { maps: Record<string, unknown> };
+        try {
+          allData = JSON.parse(content) as { maps: Record<string, unknown> };
+        } catch (parseError) {
+          console.error(
+            '[Windrose] Existing data file is unparseable. Refusing to overwrite it with a generated dungeon.',
+            parseError
+          );
+          notifyCorruptedDataFile(dataFilePath);
+          throw new Error('Windrose: map data file is unreadable, dungeon not saved.');
+        }
       }
 
       allData.maps ??= {};
@@ -570,6 +609,7 @@ export default class WindrosePlugin extends Plugin {
       console.error('[Windrose] Failed to save dungeon:', error);
       throw error;
     }
+    });
   }
 
   async loadSettings(): Promise<void> {
