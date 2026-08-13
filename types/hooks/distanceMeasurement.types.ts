@@ -59,6 +59,12 @@ export interface UseDistanceMeasurementResult {
   totalDistance: number | null;
   /** Formatted running total for display */
   formattedTotal: string | null;
+  /**
+   * Formatted true Euclidean ("as the crow flies") running total, including
+   * the preview segment; null with no waypoints or when displayFormat is
+   * 'cells' (unit display opted out).
+   */
+  formattedEuclideanTotal: string | null;
   /** Formatted label per committed segment */
   formattedSegments: string[];
   distanceSettings: EffectiveDistanceSettings;

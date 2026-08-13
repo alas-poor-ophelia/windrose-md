@@ -129,6 +129,8 @@ interface MapCanvasContentProps {
   distanceOverrides?: MapDistanceOverrides | null;
   /** True when the active map is a drilled-into sub-hex. */
   isInSubHex?: boolean;
+  /** Current sub-hex drill path ('/'-joined "q,r" hexKeys); null at root. */
+  subHexPath?: string | null;
   children: ComponentChildren;
 }
 
@@ -173,7 +175,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, children }: MapCanvasContentProps): VNode => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, children }: MapCanvasContentProps): VNode => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -428,12 +430,13 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     HexGeometry,
     distanceOverrides,
     isInSubHex: isInSubHex === true,
+    subHexPath: subHexPath ?? null,
     // State change callbacks for layers
     onDrawingStateChange: handleDrawingStateChange,
     onPanZoomStateChange: handlePanZoomStateChange
   } as MapStateContextValue), [mapData, mapId, notePath, geometry, currentTool, selectedColor,
     selectedObjectType, screenToGrid, screenToWorld, getClientCoords, viewController,
-    distanceOverrides, isInSubHex, handleDrawingStateChange, handlePanZoomStateChange]);
+    distanceOverrides, isInSubHex, subHexPath, handleDrawingStateChange, handlePanZoomStateChange]);
 
   const mapOperationsValue = useMemo(() => ({
     // Object operations

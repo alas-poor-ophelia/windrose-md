@@ -21,6 +21,8 @@ interface MeasurementOverlayProps {
   waypoints: MeasurementPoint[];
   previewTarget: MeasurementPoint | null;
   formattedTotal: string | null;
+  /** True Euclidean ("as the crow flies") running total; null hides the suffix */
+  formattedEuclideanTotal?: string | null;
   formattedSegments: string[];
   /** Resolved terrain color per segment (null = default measure color) */
   segmentColors?: (string | null)[];
@@ -42,6 +44,7 @@ const MeasurementOverlay = ({
   waypoints,
   previewTarget,
   formattedTotal,
+  formattedEuclideanTotal,
   formattedSegments,
   segmentColors,
   onSegmentClick,
@@ -52,13 +55,20 @@ const MeasurementOverlay = ({
   const textRef = useRef<SVGTextElement | null>(null);
   const [textWidth, setTextWidth] = useState(80);
 
+  // The hex/cell-count total, with the true "as the crow flies" total
+  // appended when available — a straight route makes the two agree; a
+  // bent one reads visibly longer.
+  const totalDisplay = formattedTotal != null && formattedEuclideanTotal != null && formattedEuclideanTotal !== ''
+    ? `${formattedTotal} · ${formattedEuclideanTotal} direct`
+    : formattedTotal;
+
   // Measure text width for auto-sizing tooltip
   useEffect(() => {
-    if (textRef.current && formattedTotal != null && formattedTotal !== '') {
+    if (textRef.current && totalDisplay != null && totalDisplay !== '') {
       const bbox = textRef.current.getBBox();
       setTextWidth(Math.max(bbox.width + 20, 60));
     }
-  }, [formattedTotal]);
+  }, [totalDisplay]);
 
   if (waypoints.length === 0 || !geometry || !mapData || !canvasRef?.current) {
     return null;
@@ -237,7 +247,7 @@ const MeasurementOverlay = ({
       })}
 
       {/* Running total tooltip */}
-      {formattedTotal != null && formattedTotal !== '' && (
+      {totalDisplay != null && totalDisplay !== '' && (
         <g transform={`translate(${tooltipX}, ${tooltipY})`}>
           <rect
             x={0}
@@ -259,7 +269,7 @@ const MeasurementOverlay = ({
             fontFamily="var(--font-interface, -apple-system, BlinkMacSystemFont, sans-serif)"
             fontWeight="500"
           >
-            {formattedTotal}
+            {totalDisplay}
           </text>
         </g>
       )}

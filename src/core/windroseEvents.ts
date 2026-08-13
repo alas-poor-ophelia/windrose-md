@@ -23,6 +23,12 @@ export interface SubHexCoordDetail {
    * fills the screen regardless of what canvas size its stored fit assumed.
    */
   viewOverride?: { zoom: number; center: { x: number; y: number } };
+  /**
+   * Optional world-space point the user targeted (e.g. the double-clicked
+   * pixel). When `viewOverride` is absent, the listener uses this to open the
+   * sub-map centered on the corresponding point instead of the child origin.
+   */
+  anchor?: { worldX: number; worldY: number };
 }
 
 /** Right-click on a hex: axial coord + screen position for the context menu. */

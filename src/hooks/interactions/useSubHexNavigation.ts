@@ -33,6 +33,17 @@ interface BreadcrumbSegment {
   depth: number;
 }
 
+/**
+ * In-flight sub-hex drill. Segments are '/'-split "q,r" hexKeys; `index` is how
+ * many have been entered so far (the drill advances one per render). `onArrive`
+ * fires once, on completion or on the first unresolvable segment.
+ */
+interface PendingDrill {
+  segments: string[];
+  index: number;
+  onArrive?: () => void;
+}
+
 interface UseSubHexNavigationOptions {
   mapData: MapData | null;
   updateMapData: MapDataUpdater;
@@ -62,6 +73,12 @@ interface UseSubHexNavigationResult {
   breadcrumbs: BreadcrumbSegment[];
   enterSubHex: (q: number, r: number, viewOverride?: StoredViewState) => void;
   exitSubHex: () => void;
+  /**
+   * Drill into an absolute sub-hex path ('/'-joined "q,r" hexKeys) from root,
+   * tolerating missing segments. `onArrive` fires once the target (or nearest
+   * resolvable level) is reached. Used by deep-link navigation.
+   */
+  drillToSubHexPath: (path: string | null, onArrive?: () => void) => void;
   navigateToLevel: (depth: number) => void;
   navigateToSibling: (q: number, r: number) => void;
   navigationVersion: number;
@@ -167,6 +184,8 @@ function useSubHexNavigation({
   const [subHexMapData, setSubHexMapData] = useState<MapData | null>(null);
   // Counter to signal history resets
   const [navigationVersion, setNavigationVersion] = useState(0);
+  // Active sub-hex drill (embed auto-drill or deep-link navigation); null = idle
+  const [pendingDrill, setPendingDrill] = useState<PendingDrill | null>(null);
 
   const isInSubHex = navStack.length > 0;
   const depth = navStack.length;
@@ -480,33 +499,64 @@ function useSubHexNavigation({
     return adjacent;
   }, [isInSubHex, navStack]);
 
-  // Auto-drill into `initialSubHexPath` (embed blocks with a `subhex:` key).
-  // One segment per effect pass — enterSubHex reads state, so consecutive
-  // levels must each see the previous level committed. The counter only
-  // advances (never resets), so this runs once and never fights the user's
-  // own navigation afterwards. Missing segments stop the drill (drilling
-  // never creates sub-maps).
-  const initialPathAppliedRef = useRef(0);
+  // Advance the active sub-hex drill one level per render. enterSubHex reads
+  // state, so each level must commit before the next segment is read; the
+  // effect re-fires as navStack catches up. Missing/malformed segments stop
+  // the drill at the nearest resolvable level (drilling never creates
+  // sub-maps). `onArrive` fires exactly once, on completion or on stop.
   useEffect(() => {
-    if (initialSubHexPath == null || initialSubHexPath === '') return;
-    const segments = initialSubHexPath.split('/').map(s => s.trim()).filter(s => s !== '');
-    const applied = initialPathAppliedRef.current;
-    if (applied >= segments.length) return;
+    if (pendingDrill == null) return;
+    const { segments, index, onArrive } = pendingDrill;
 
-    const current = applied === 0 ? rootMapData : subHexMapData;
-    if (!current || navStack.length !== applied) return;
+    // Wait until the stack reflects the segments applied so far.
+    if (navStack.length !== index) return;
 
-    const [qStr, rStr] = segments[applied].split(',');
-    const q = parseInt(qStr, 10);
-    const r = parseInt(rStr, 10);
-    if (Number.isNaN(q) || Number.isNaN(r) || current.subHexMaps?.[`${q},${r}`] == null) {
-      initialPathAppliedRef.current = segments.length; // malformed or missing — stop drilling
+    if (index >= segments.length) {
+      setPendingDrill(null);
+      onArrive?.();
       return;
     }
 
-    initialPathAppliedRef.current = applied + 1;
+    const current = index === 0 ? rootMapData : subHexMapData;
+    const [qStr, rStr] = segments[index].split(',');
+    const q = parseInt(qStr, 10);
+    const r = parseInt(rStr, 10);
+    if (current == null || Number.isNaN(q) || Number.isNaN(r) || current.subHexMaps?.[`${q},${r}`] == null) {
+      setPendingDrill(null);
+      onArrive?.();
+      return;
+    }
+
+    setPendingDrill({ segments, index: index + 1, onArrive });
     enterSubHex(q, r);
-  }, [initialSubHexPath, rootMapData, subHexMapData, navStack.length, enterSubHex]);
+  }, [pendingDrill, navStack.length, rootMapData, subHexMapData, enterSubHex]);
+
+  // Seed the auto-drill from an embed block's `subhex:` key, once per load.
+  // Runs from root (mount stack is empty), so this never fights the user's
+  // own navigation afterwards.
+  const initialSeededRef = useRef(false);
+  useEffect(() => {
+    if (initialSeededRef.current) return;
+    if (initialSubHexPath == null || initialSubHexPath === '') return;
+    if (rootMapData == null) return; // wait for the root map to load
+    initialSeededRef.current = true;
+    const segments = initialSubHexPath.split('/').map(s => s.trim()).filter(s => s !== '');
+    if (segments.length > 0) setPendingDrill({ segments, index: 0 });
+  }, [initialSubHexPath, rootMapData]);
+
+  // Drill into an absolute sub-hex path from root (deep-link navigation).
+  // Resets to root first so the absolute path drills from a known base;
+  // `onArrive` fires once the target (or nearest resolvable level) is reached.
+  const drillToSubHexPath = useCallback((path: string | null, onArrive?: () => void): void => {
+    const segments = (path ?? '').split('/').map(s => s.trim()).filter(s => s !== '');
+    if (navStack.length > 0) navigateToLevel(0);
+    if (segments.length === 0) {
+      setPendingDrill(null);
+      onArrive?.();
+      return;
+    }
+    setPendingDrill({ segments, index: 0, onArrive });
+  }, [navStack.length, navigateToLevel]);
 
   // Current drill-down path, for "copy embed block" to reference this sub-hex
   const subHexPath = navStack.length > 0 ? navStack.map(f => f.hexKey).join('/') : null;
@@ -544,6 +594,7 @@ function useSubHexNavigation({
     breadcrumbs,
     enterSubHex,
     exitSubHex,
+    drillToSubHexPath,
     navigateToLevel,
     navigateToSibling,
     navigationVersion,

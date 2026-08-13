@@ -852,8 +852,11 @@ const useEventCoordinator = ({
     if ((currentTool === 'select' || interactionLocked) && geometry?.type === 'hex' && screenToGrid != null) {
       const coords = screenToGrid(e.clientX, e.clientY);
       if (coords) {
+        // Pass the clicked world point so the listener can open the sub-map
+        // centered on it (same anchor-preserving remap as the seamless dive).
+        const anchor = screenToWorld?.(e.clientX, e.clientY) ?? undefined;
         activeDocument.dispatchEvent(new CustomEvent('windrose:enter-sub-hex', {
-          detail: { q: coords.x, r: coords.y }
+          detail: { q: coords.x, r: coords.y, anchor }
         }));
         return;
       }
@@ -893,7 +896,7 @@ const useEventCoordinator = ({
     if (!textHandlers?.handleCanvasDoubleClick) return;
 
     textHandlers.handleCanvasDoubleClick(e);
-  }, [currentTool, getHandlers, geometry, screenToGrid, interactionLocked]);
+  }, [currentTool, getHandlers, geometry, screenToGrid, screenToWorld, interactionLocked]);
 
   const handleContextMenu = useCallback((e: MouseEvent): void => {
     e.preventDefault();

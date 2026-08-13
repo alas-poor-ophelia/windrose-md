@@ -122,6 +122,11 @@ export interface MapStateContextValue {
   distanceOverrides?: MapDistanceOverrides | null;
   /** True when the active map is a drilled-into sub-hex (not the root map). */
   isInSubHex?: boolean;
+  /**
+   * Current sub-hex drill path ('/'-joined "q,r" hexKeys), null at root. Layers
+   * encode this into copied deep links so they open at the correct sub-hex.
+   */
+  subHexPath?: string | null;
   GridGeometry?: new (...args: unknown[]) => ExtendedGeometry;
   HexGeometry?: new (...args: unknown[]) => IGeometry;
   onDrawingStateChange?: (state: DrawingLayerState) => void;

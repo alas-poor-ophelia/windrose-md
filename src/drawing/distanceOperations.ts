@@ -81,6 +81,36 @@ function formatDistance(
   }
 }
 
+/**
+ * Format a true Euclidean ("as the crow flies") path length for display,
+ * converting a world-pixel length into the same real-world units as
+ * formatDistance's 'units'/'both' output.
+ *
+ * @param pixelLength - World-pixel Euclidean length (computeEuclideanPathLength)
+ * @param cellPitchPixels - World-pixel distance for one cell step (getCellPitchPixels)
+ * @param distancePerCell - Real-world units per cell (same resolved value formatDistance uses)
+ * @param unit - Unit string (e.g., 'ft', 'mi', 'm', 'km')
+ * @param displayFormat - 'cells' | 'units' | 'both'; 'cells' opts out of unit display entirely
+ * @returns Formatted distance string, or null when there is nothing to show
+ */
+function formatEuclideanDistance(
+  pixelLength: number,
+  cellPitchPixels: number,
+  distancePerCell: number,
+  unit: string,
+  displayFormat: DistanceDisplayFormat
+): string | null {
+  if (displayFormat === 'cells' || cellPitchPixels <= 0) return null;
+
+  const realDistance = (pixelLength / cellPitchPixels) * distancePerCell;
+  const roundedDistance = Number.isInteger(realDistance)
+    ? realDistance
+    : Math.round(realDistance * 10) / 10;
+  const unitDisplay = unit || '';
+
+  return `${roundedDistance} ${unitDisplay}`.trim();
+}
+
 // ===========================================
 // Settings Resolution
 // ===========================================
@@ -166,4 +196,4 @@ function resolveSubHexDistanceSettings(
 // Exports
 // ===========================================
 
-export { formatDistance, getEffectiveDistanceSettings, resolveSubHexDistanceSettings };
+export { formatDistance, formatEuclideanDistance, getEffectiveDistanceSettings, resolveSubHexDistanceSettings };

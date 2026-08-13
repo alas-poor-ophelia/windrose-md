@@ -16,6 +16,8 @@ import {
   setSegmentTerrain,
   computeSegmentDistances,
   sumDistances,
+  computeEuclideanPathLength,
+  getCellPitchPixels,
   createSavedRoute,
   updateSavedRoute,
   removeSavedRoute,
@@ -247,6 +249,66 @@ describe("routeOperations", () => {
 
     it("returns 0 for an empty list", () => {
       expect(sumDistances([])).toBe(0);
+    });
+  });
+
+  // ===========================================================================
+  // computeEuclideanPathLength / getCellPitchPixels
+  // ===========================================================================
+
+  describe("computeEuclideanPathLength", () => {
+    it("returns 0 for 0 or 1 points", () => {
+      expect(computeEuclideanPathLength([], gridGeometry)).toBe(0);
+      expect(computeEuclideanPathLength([{ x: 0, y: 0 }], gridGeometry)).toBe(0);
+    });
+
+    it("matches straight cell-pitch multiples on a grid", () => {
+      // (0,0) -> (4,0) is 4 cell-widths in a straight line
+      const length = computeEuclideanPathLength([{ x: 0, y: 0 }, { x: 4, y: 0 }], gridGeometry);
+      expect(length).toBeCloseTo(4 * getCellPitchPixels(gridGeometry));
+    });
+
+    it("reports a longer length for an L-shaped path than a straight path between the same endpoints (grid)", () => {
+      const straight = computeEuclideanPathLength([{ x: 0, y: 0 }, { x: 4, y: 4 }], gridGeometry);
+      const lShaped = computeEuclideanPathLength(
+        [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 4 }],
+        gridGeometry
+      );
+      expect(lShaped).toBeGreaterThan(straight);
+    });
+
+    it("reports a longer length for an L-shaped path than a straight path between the same endpoints (hex)", () => {
+      const straight = computeEuclideanPathLength([{ x: 0, y: 0 }, { x: 4, y: 2 }], hexGeometry);
+      const lShaped = computeEuclideanPathLength(
+        [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 2 }],
+        hexGeometry
+      );
+      expect(lShaped).toBeGreaterThan(straight);
+
+      // True hex distance ties for both paths regardless of shape
+      const straightHex = sumDistances(computeSegmentDistances(
+        [{ x: 0, y: 0 }, { x: 4, y: 2 }], hexGeometry, "equal"
+      ));
+      const lShapedHex = sumDistances(computeSegmentDistances(
+        [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 2 }], hexGeometry, "equal"
+      ));
+      expect(lShapedHex).toBe(straightHex);
+    });
+
+    it("does not mutate the geometry's own state across calls", () => {
+      const a = computeEuclideanPathLength([{ x: 0, y: 0 }, { x: 2, y: 0 }], gridGeometry);
+      const b = computeEuclideanPathLength([{ x: 0, y: 0 }, { x: 2, y: 0 }], gridGeometry);
+      expect(a).toBe(b);
+    });
+  });
+
+  describe("getCellPitchPixels", () => {
+    it("equals the grid cell size for a square grid", () => {
+      expect(getCellPitchPixels(gridGeometry)).toBeCloseTo(32);
+    });
+
+    it("equals sqrt(3) * hexSize for a hex grid", () => {
+      expect(getCellPitchPixels(hexGeometry)).toBeCloseTo(Math.sqrt(3) * 32);
     });
   });
 

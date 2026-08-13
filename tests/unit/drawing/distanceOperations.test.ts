@@ -9,6 +9,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   formatDistance,
+  formatEuclideanDistance,
   getEffectiveDistanceSettings,
   resolveSubHexDistanceSettings,
 } from "../../../src/drawing/distanceOperations";
@@ -90,6 +91,41 @@ describe("distanceOperations", () => {
       it("handles large distances", () => {
         expect(formatDistance(100, 5, "ft", "both")).toBe("100 cells (500 ft)");
       });
+    });
+  });
+
+  // ===========================================================================
+  // formatEuclideanDistance
+  // ===========================================================================
+
+  describe("formatEuclideanDistance", () => {
+    it("converts a pixel length to real units via the cell pitch", () => {
+      // 3 cell-pitches of pixel length, 5 units per cell -> 15
+      expect(formatEuclideanDistance(96, 32, 5, "ft", "units")).toBe("15 ft");
+    });
+
+    it("rounds to 1 decimal place like formatDistance", () => {
+      expect(formatEuclideanDistance(80, 32, 5, "ft", "units")).toBe("12.5 ft");
+    });
+
+    it("handles an empty unit string", () => {
+      expect(formatEuclideanDistance(96, 32, 5, "", "units")).toBe("15");
+    });
+
+    it("formats under 'both' the same as 'units' (no cell count of its own)", () => {
+      expect(formatEuclideanDistance(96, 32, 5, "ft", "both")).toBe("15 ft");
+    });
+
+    it("returns null when displayFormat is 'cells' (unit display opted out)", () => {
+      expect(formatEuclideanDistance(96, 32, 5, "ft", "cells")).toBeNull();
+    });
+
+    it("returns null for a non-positive cell pitch", () => {
+      expect(formatEuclideanDistance(96, 0, 5, "ft", "units")).toBeNull();
+    });
+
+    it("handles zero pixel length", () => {
+      expect(formatEuclideanDistance(0, 32, 5, "ft", "units")).toBe("0 ft");
     });
   });
 

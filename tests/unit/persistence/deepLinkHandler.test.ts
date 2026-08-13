@@ -248,6 +248,70 @@ describe('deepLinkHandler', () => {
     });
   });
 
+  describe('sub-hex path (item 6)', () => {
+    it('parses a link with a single-segment sub-hex path', () => {
+      const result = parseDeepLink('windrose:World.md|world-map,3,4,1.18,layer_001|0,0');
+      expect(result).toEqual({
+        notePath: 'World.md',
+        mapId: 'world-map',
+        x: 3,
+        y: 4,
+        zoom: 1.18,
+        layerId: 'layer_001',
+        subHexPath: '0,0'
+      });
+    });
+
+    it('parses a link with a multi-segment sub-hex path (with negatives)', () => {
+      const result = parseDeepLink('windrose:World.md|world-map,3.5,4,1.18,layer_001|0,0/2,-1');
+      expect(result).toEqual({
+        notePath: 'World.md',
+        mapId: 'world-map',
+        x: 3.5,
+        y: 4,
+        zoom: 1.18,
+        layerId: 'layer_001',
+        subHexPath: '0,0/2,-1'
+      });
+    });
+
+    it('omits subHexPath entirely for legacy (no sub-hex) links', () => {
+      const result = parseDeepLink('windrose:World.md|world-map,3,4,1.18,layer_001');
+      expect(result).not.toHaveProperty('subHexPath');
+    });
+
+    it('generates a link with a sub-hex path appended after a second pipe', () => {
+      const result = generateDeepLink('World.md', 'world-map', 3.5, 4, 1.18, 'layer_001', '0,0/2,-1');
+      expect(result).toBe('windrose:World.md|world-map,3.5,4,1.18,layer_001|0,0/2,-1');
+    });
+
+    it('is byte-identical to legacy when sub-hex path is omitted/empty/null', () => {
+      const legacy = 'windrose:World.md|world-map,3.5,4,1.18,layer_001';
+      expect(generateDeepLink('World.md', 'world-map', 3.5, 4, 1.18, 'layer_001')).toBe(legacy);
+      expect(generateDeepLink('World.md', 'world-map', 3.5, 4, 1.18, 'layer_001', '')).toBe(legacy);
+      expect(generateDeepLink('World.md', 'world-map', 3.5, 4, 1.18, 'layer_001', null)).toBe(legacy);
+    });
+
+    it('round-trips a sub-hex link generate -> parse', () => {
+      const generated = generateDeepLink('Maps/world.md', 'map-abc', 12.34, 56.78, 1.5, 'layer-xyz', '1,2/-3,4');
+      const parsed = parseDeepLink(generated);
+      expect(parsed).toEqual({
+        notePath: 'Maps/world.md',
+        mapId: 'map-abc',
+        x: 12.34,
+        y: 56.78,
+        zoom: 1.5,
+        layerId: 'layer-xyz',
+        subHexPath: '1,2/-3,4'
+      });
+    });
+
+    it('embeds the sub-hex path in generated markdown', () => {
+      const result = generateDeepLinkMarkdown('Cavern', 'World.md', 'world-map', 3, 4, 1.2, 'layer_001', '0,0');
+      expect(result).toBe('[Cavern](windrose:World.md|world-map,3,4,1.2,layer_001|0,0)');
+    });
+  });
+
   describe('round-trip parsing', () => {
     it('can parse a generated link', () => {
       const generated = generateDeepLink('Maps/world.md', 'map-abc', 12.34, 56.78, 1.5, 'layer-xyz');

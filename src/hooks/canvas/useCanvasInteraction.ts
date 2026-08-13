@@ -25,7 +25,7 @@ import type { ViewController } from '#types/hooks/viewController.types';
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULTS } from '../../core/dmtConstants';
-import { calculateFitZoom } from '../../geometry/core/hexMeasurements';
+import { calculateFitZoom, subHexAnchorToChildCenter } from '../../geometry/core/hexMeasurements';
 
 /**
  * Wheel zoom has no natural gesture "end": it fires a burst of discrete ticks.
@@ -345,13 +345,32 @@ function useCanvasInteraction(
       // the user last left it) and may already sit inside the surface zone.
       const child = subHex.mapData;
       const rings = subHex.subdivisionRings ?? 7;
+      const parentHexSize = mapData.hexSize ?? DEFAULTS.hexSize;
+      const childHexSize = child.hexSize ?? mapData.hexSize ?? DEFAULTS.hexSize;
+      const orientation = child.orientation ?? mapData.orientation ?? DEFAULTS.hexOrientation;
       const childFit = calculateFitZoom(
-        child.hexSize ?? mapData.hexSize ?? DEFAULTS.hexSize,
-        child.orientation ?? mapData.orientation ?? DEFAULTS.hexOrientation,
+        childHexSize,
+        orientation,
         child.hexBounds ?? { maxCol: rings * 2 + 1, maxRow: rings * 2 + 1, maxRing: rings },
         canvas.width,
         canvas.height
       );
+
+      // Center the child on the SAME world point the user was zooming toward
+      // within the parent hex, instead of snapping to the child origin. Map the
+      // anchor's offset from the parent hex center into the child map's extent.
+      const anchorWorld = screenToWorld(anchorClientX, anchorClientY);
+      const parentCenter = geometry.gridToWorld(coords.x, coords.y);
+      const childCenter = anchorWorld != null
+        ? subHexAnchorToChildCenter(
+            anchorWorld.worldX - parentCenter.worldX,
+            anchorWorld.worldY - parentCenter.worldY,
+            parentHexSize,
+            childHexSize,
+            orientation,
+            rings
+          )
+        : { x: 0, y: 0 };
 
       seamlessTransitionAtRef.current = Date.now();
       // Commit the in-flight zoom so the parent's stored view (what exit
@@ -362,7 +381,7 @@ function useCanvasInteraction(
         detail: {
           q: coords.x,
           r: coords.y,
-          viewOverride: { zoom: childFit, center: { x: 0, y: 0 } }
+          viewOverride: { zoom: childFit, center: childCenter }
         }
       }));
       return true;

@@ -6,7 +6,7 @@
  */
 
 import type { HexColor } from '../core/common.types';
-import type { DungeonStyleName, DungeonStyleColors } from '../core/map.types';
+import type { DungeonStyleName, DungeonStyleColors, MapTravelSettings } from '../core/map.types';
 import type { InstalledPack } from '../content-packs/contentPack.types';
 import type { TravelPack } from './travelPack.types';
 
@@ -206,6 +206,11 @@ export interface PluginSettings {
 
   // Travel packs (rule bundles: units, terrains, modes, allowances)
   travelPacks?: TravelPack[];
+
+  // Default travel display selection new/unset maps inherit (per-map
+  // travelSettings override it). Absent or empty modeIds = no default,
+  // so unset maps start empty exactly as before.
+  defaultTravelSettings?: MapTravelSettings;
 
   // Dungeon generation default colors per style
   // (absent style or channel = built-in style default)

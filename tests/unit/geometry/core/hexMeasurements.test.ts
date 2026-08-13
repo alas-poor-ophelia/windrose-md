@@ -23,6 +23,7 @@ import {
   validateMeasurementSize,
   validateFineTune,
   getFineTuneRange,
+  subHexAnchorToChildCenter,
 } from "../../../../src/geometry/core/hexMeasurements";
 
 const SQRT3 = Math.sqrt(3);
@@ -353,6 +354,59 @@ describe("hexMeasurements", () => {
       const hexSize20 = calculateHexSizeFromColumns(imageWidth, 20, "flat");
 
       expect(hexSize10).toBeGreaterThan(hexSize20);
+    });
+  });
+
+  // ===========================================================================
+  // Sub-hex anchor → child-center remap (seamless dive)
+  // ===========================================================================
+
+  describe("subHexAnchorToChildCenter", () => {
+    const HEX = 30;
+    const RINGS = 7;
+
+    it("maps the parent hex center to the child origin", () => {
+      const c = subHexAnchorToChildCenter(0, 0, HEX, HEX, "flat", RINGS);
+      expect(c.x).toBe(0);
+      expect(c.y).toBe(0);
+    });
+
+    it("maps the parent hex EAST edge to the child's east edge (flat)", () => {
+      // Flat hex: east vertex sits at +hexSize in world X.
+      const c = subHexAnchorToChildCenter(HEX, 0, HEX, HEX, "flat", RINGS);
+      // Child half-width (flat) = hexSize * (rings*1.5 + 1).
+      const childHalfW = HEX * (RINGS * 1.5 + 1);
+      expect(c.x).toBeCloseTo(childHalfW, 6);
+      expect(c.y).toBeCloseTo(0, 6);
+    });
+
+    it("maps the parent hex NORTH edge to the child's north side (flat)", () => {
+      // Flat hex: flat edge sits at hexSize*sqrt(3)/2 in world Y.
+      const c = subHexAnchorToChildCenter(0, (HEX * SQRT3) / 2, HEX, HEX, "flat", RINGS);
+      const childHalfH = (HEX * SQRT3 * (RINGS * 2 + 1)) / 2;
+      expect(c.x).toBeCloseTo(0, 6);
+      expect(c.y).toBeCloseTo(childHalfH, 6);
+    });
+
+    it("is sign-preserving and monotonic (a point left of center lands left)", () => {
+      const left = subHexAnchorToChildCenter(-HEX / 2, 0, HEX, HEX, "flat", RINGS);
+      const right = subHexAnchorToChildCenter(HEX / 2, 0, HEX, HEX, "flat", RINGS);
+      expect(left.x).toBeLessThan(0);
+      expect(right.x).toBeGreaterThan(0);
+      expect(right.x).toBeCloseTo(-left.x, 6);
+    });
+
+    it("maps the parent hex NORTH vertex to the child's north edge (pointy)", () => {
+      // Pointy hex: top vertex sits at +hexSize in world Y.
+      const c = subHexAnchorToChildCenter(0, HEX, HEX, HEX, "pointy", RINGS);
+      const childHalfH = HEX * (RINGS * 1.5 + 1);
+      expect(c.x).toBeCloseTo(0, 6);
+      expect(c.y).toBeCloseTo(childHalfH, 6);
+    });
+
+    it("returns the origin for a degenerate (zero-size) parent hex", () => {
+      const c = subHexAnchorToChildCenter(5, 5, 0, 0, "flat", RINGS);
+      expect(c).toEqual({ x: 0, y: 0 });
     });
   });
 });

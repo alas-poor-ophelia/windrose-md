@@ -24,6 +24,7 @@ import {
   findModesReferencingUnit,
   resolvePackUnit,
   getPackUnitOptions,
+  getEffectiveTravelSettings,
   exportTravelPack,
   serializeTravelPack,
   validateTravelPackImport,
@@ -278,6 +279,58 @@ describe("travelPackOperations", () => {
       const result = validateTravelPackImport(exportTravelPack(createTravelPack("Empty")));
       expect(result.valid).toBe(true);
       expect(result.pack?.units).toEqual([]);
+    });
+  });
+
+  // ===========================================================================
+  // Effective travel settings (global default + per-map override)
+  // ===========================================================================
+
+  describe("getEffectiveTravelSettings", () => {
+    it("uses the per-map override when it selects at least one mode", () => {
+      const globalDefault = { modeIds: ["global-a"], allowanceId: "global-allow" };
+      const mapOverride = { modeIds: ["map-a", "map-b"], allowanceId: "map-allow" };
+      expect(getEffectiveTravelSettings(globalDefault, mapOverride)).toEqual({
+        modeIds: ["map-a", "map-b"],
+        allowanceId: "map-allow",
+      });
+    });
+
+    it("falls back to the global default when the per-map selection is empty", () => {
+      const globalDefault = { modeIds: ["global-a"], allowanceId: "global-allow" };
+      const mapOverride = { modeIds: [], allowanceId: "map-allow" };
+      expect(getEffectiveTravelSettings(globalDefault, mapOverride)).toEqual({
+        modeIds: ["global-a"],
+        allowanceId: "global-allow",
+      });
+    });
+
+    it("falls back to the global default when the per-map override is missing", () => {
+      const globalDefault = { modeIds: ["global-a"], allowanceId: null };
+      expect(getEffectiveTravelSettings(globalDefault, null)).toEqual({
+        modeIds: ["global-a"],
+        allowanceId: null,
+      });
+      expect(getEffectiveTravelSettings(globalDefault, undefined)).toEqual({
+        modeIds: ["global-a"],
+        allowanceId: null,
+      });
+    });
+
+    it("returns an empty selection when both inputs are empty or absent", () => {
+      expect(getEffectiveTravelSettings(null, null)).toEqual({ modeIds: [], allowanceId: null });
+      expect(getEffectiveTravelSettings(undefined, undefined)).toEqual({ modeIds: [], allowanceId: null });
+      expect(getEffectiveTravelSettings({ modeIds: [] }, { modeIds: [] })).toEqual({
+        modeIds: [],
+        allowanceId: null,
+      });
+    });
+
+    it("normalizes a missing allowanceId to null", () => {
+      expect(getEffectiveTravelSettings(null, { modeIds: ["map-a"] })).toEqual({
+        modeIds: ["map-a"],
+        allowanceId: null,
+      });
     });
   });
 });

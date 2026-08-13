@@ -20,7 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { useDistanceMeasurement } from '../../hooks/interactions/useDistanceMeasurement';
 import { getSettings } from '../../core/settingsAccessor';
 import { createSavedRoute } from '../../drawing/routeOperations';
-import { getEnabledTravelPacks } from '../../travel/travelPackOperations';
+import { getEnabledTravelPacks, getEffectiveTravelSettings } from '../../travel/travelPackOperations';
 import {
   collectEnabledTerrains,
   computeRouteTravelTime,
@@ -104,6 +104,7 @@ const MeasurementLayer = ({
     segmentDistances,
     previewDistance,
     formattedTotal,
+    formattedEuclideanTotal,
     formattedSegments,
     distanceSettings,
     handleMeasureClick,
@@ -190,7 +191,14 @@ const MeasurementLayer = ({
   // Travel times (TM-14..18)
   // ===========================================
 
-  const travelSettings = mapData?.travelSettings;
+  // Read-time fallback: an unset/empty per-map selection inherits the global
+  // default (settings.defaultTravelSettings). No data migration — the map's
+  // own travelSettings still override, and a user edit still writes per-map.
+  // Re-read on settingsVersion so a changed global default takes effect live.
+  const travelSettings = useMemo(
+    () => getEffectiveTravelSettings(getSettings().defaultTravelSettings, mapData?.travelSettings),
+    [mapData?.travelSettings, settingsVersion]
+  );
   const selectedModes = useMemo(
     () => resolveSelectedModes(enabledPacks, travelSettings?.modeIds ?? []),
     [enabledPacks, travelSettings]
@@ -237,15 +245,37 @@ const MeasurementLayer = ({
     return enabledPacks.flatMap(pack => pack.allowances.map(a => ({ id: a.id, name: a.name })));
   }, [enabledPacks]);
 
+  // Toggle/allowance edits write the per-map override, seeded from the
+  // effective selection — so the first edit to an unset map materializes the
+  // inherited global default before applying the change (empty default =>
+  // effective equals raw per-map, so behavior is unchanged).
   const handleToggleMode = useCallback((modeId: string, selected: boolean): void => {
-    const current = mapData?.travelSettings?.modeIds ?? [];
+    const current = travelSettings.modeIds;
     const next = selected ? [...current, modeId] : current.filter(id => id !== modeId);
-    onTravelSettingsChange?.({ modeIds: next, allowanceId: mapData?.travelSettings?.allowanceId ?? null });
-  }, [mapData, onTravelSettingsChange]);
+    onTravelSettingsChange?.({ modeIds: next, allowanceId: travelSettings.allowanceId ?? null });
+  }, [travelSettings, onTravelSettingsChange]);
 
   const handleAllowanceChange = useCallback((allowanceId: string | null): void => {
-    onTravelSettingsChange?.({ modeIds: mapData?.travelSettings?.modeIds ?? [], allowanceId });
-  }, [mapData, onTravelSettingsChange]);
+    onTravelSettingsChange?.({ modeIds: travelSettings.modeIds, allowanceId });
+  }, [travelSettings, onTravelSettingsChange]);
+
+  // Capture the current effective selection as the global default for new/unset
+  // maps. GLOBAL plugin setting (like tilesetArtScales): write + saveSettings on
+  // the live plugin; saveSettings fires windrose-settings-changed, which our
+  // settingsVersion listener picks up.
+  const handleSetTravelDefault = useCallback((): void => {
+    try {
+      const plugin = app.plugins.plugins['windrose-md'] as unknown as
+        { settings: { defaultTravelSettings?: MapTravelSettings }; saveSettings(): Promise<void> } | undefined;
+      if (plugin != null) {
+        plugin.settings.defaultTravelSettings = {
+          modeIds: [...travelSettings.modeIds],
+          allowanceId: travelSettings.allowanceId ?? null,
+        };
+        void plugin.saveSettings();
+      }
+    } catch { /* settings plugin unavailable */ }
+  }, [app, travelSettings]);
 
   // ===========================================
   // Terrain assignment (TM-19..22)
@@ -276,6 +306,7 @@ const MeasurementLayer = ({
         waypoints={waypoints}
         previewTarget={previewTarget}
         formattedTotal={formattedTotal}
+        formattedEuclideanTotal={formattedEuclideanTotal}
         formattedSegments={formattedSegments}
         segmentColors={segmentColors}
         onSegmentClick={terrainAssignmentAvailable ? handleSegmentClick : undefined}
@@ -292,6 +323,7 @@ const MeasurementLayer = ({
         selectedAllowanceId={travelSettings?.allowanceId ?? null}
         onToggleMode={handleToggleMode}
         onAllowanceChange={handleAllowanceChange}
+        onSetAsDefault={handleSetTravelDefault}
         onRemoveLast={removeLastWaypoint}
         onClear={clearMeasurement}
         onSaveRoute={handleSaveRoute}

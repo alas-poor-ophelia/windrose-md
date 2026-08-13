@@ -125,6 +125,39 @@ function sumDistances(segments: number[]): number {
 }
 
 /**
+ * True Euclidean ("as the crow flies") world-pixel length of a waypoint
+ * polyline: the sum of straight-line distances between consecutive cell
+ * centers. Unlike computeSegmentDistances (hex-metric cell count, where a
+ * straight and an L-shaped path between the same endpoints tie), this
+ * grows with the actual drawn path length — an L-shaped route reports a
+ * longer euclidean length than a straight one.
+ *
+ * Do NOT use geometry.getEuclideanDistance for this: on HexGeometry it is
+ * aliased to hex-count distance, not true Euclidean pixel distance.
+ */
+function computeEuclideanPathLength(points: Point[], geometry: IGeometry): number {
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    const a = geometry.getCellCenter(points[i - 1].x, points[i - 1].y);
+    const b = geometry.getCellCenter(points[i].x, points[i].y);
+    total += Math.hypot(b.worldX - a.worldX, b.worldY - a.worldY);
+  }
+  return total;
+}
+
+/**
+ * World-pixel distance spanning one cell step — the center-to-center
+ * distance between two adjacent cells — derived from the geometry's own
+ * getCellCenter so it stays correct if hex size / cell size changes.
+ * Used to convert a Euclidean pixel length into real-world units.
+ */
+function getCellPitchPixels(geometry: IGeometry): number {
+  const a = geometry.getCellCenter(0, 0);
+  const b = geometry.getCellCenter(1, 0);
+  return Math.hypot(b.worldX - a.worldX, b.worldY - a.worldY);
+}
+
+/**
  * Distance from a point to a line segment (both in the same coordinate
  * space). Used for route hover/tap hit-testing.
  */
@@ -189,6 +222,8 @@ export {
   setSegmentTerrain,
   computeSegmentDistances,
   sumDistances,
+  computeEuclideanPathLength,
+  getCellPitchPixels,
   distanceToSegment,
   createSavedRoute,
   updateSavedRoute,

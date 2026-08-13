@@ -61,10 +61,13 @@ function clampTileScale(v: number): number {
 
 /** Scale slider with a live readout: the mouse wheel steps the value over the
  *  slider, and clicking the readout swaps it for a direct numeric input
- *  (Enter/blur commits, Esc cancels). Drop-in for a bare range+cap pair. */
-function TileScaleSlider({ value, onChange }: {
+ *  (Enter/blur commits, Esc cancels). Drop-in for a bare range+cap pair.
+ *  In compact (block) mode the range bar is too cramped to be useful, so it is
+ *  dropped and only the click-to-edit readout remains. */
+function TileScaleSlider({ value, onChange, compact = false }: {
   value: number;
   onChange: (v: number) => void;
+  compact?: boolean;
 }): VNode {
   const [editing, setEditing] = useState(false);
   const handleWheel = useCallback((e: WheelEvent) => {
@@ -79,17 +82,19 @@ function TileScaleSlider({ value, onChange }: {
   };
   return (
     <>
-      <input
-        className="windrose-tb-range"
-        type="range"
-        min={TILE_SCALE_MIN}
-        max={TILE_SCALE_MAX}
-        step={TILE_SCALE_STEP}
-        value={value}
-        onInput={(e: Event) => onChange(parseFloat((e.target as HTMLInputElement).value))}
-        onWheel={handleWheel}
-        style={{ flex: 1, minWidth: 0 }}
-      />
+      {!compact && (
+        <input
+          className="windrose-tb-range"
+          type="range"
+          min={TILE_SCALE_MIN}
+          max={TILE_SCALE_MAX}
+          step={TILE_SCALE_STEP}
+          value={value}
+          onInput={(e: Event) => onChange(parseFloat((e.target as HTMLInputElement).value))}
+          onWheel={handleWheel}
+          style={{ flex: 1, minWidth: 0 }}
+        />
+      )}
       {editing ? (
         <input
           className="windrose-tb-scale-input"
@@ -1740,7 +1745,7 @@ const TileAssetBrowser = memo(({
             ) : (
               <>
                 <span className="label">Scale</span>
-                <TileScaleSlider value={tileScale} onChange={onTileScaleChange} />
+                <TileScaleSlider value={tileScale} onChange={onTileScaleChange} compact />
               </>
             )}
             <button

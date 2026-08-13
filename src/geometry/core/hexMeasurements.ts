@@ -286,6 +286,49 @@ function calculateFitZoom(
   return Math.max(DEFAULTS.minZoom, Math.min(DEFAULTS.maxZoom, fitZoom));
 }
 
+/**
+ * Map an anchor point inside a parent hex to the equivalent center point in
+ * that hex's sub-map (child) world space — the core of a seamless dive.
+ *
+ * The parent hex (center-to-vertex radius `parentHexSize`) is subdivided into a
+ * child hex-grid of `rings` rings. A point at the parent hex CENTER maps to the
+ * child origin (0,0); a point at the parent hex EDGE maps to the corresponding
+ * edge of the child map. `anchorOffset{X,Y}` is the anchor's world position
+ * MINUS the parent hex center (both in the parent's unrotated world space).
+ *
+ * The mapping is per-axis (parent-hex bounding box → child bounding box), so the
+ * east edge maps to the child's east side, north to north, etc. `childHexSize`
+ * is usually equal to `parentHexSize` (sub-maps inherit it), but is kept
+ * separate so a resized child still lands correctly.
+ */
+function subHexAnchorToChildCenter(
+  anchorOffsetX: number,
+  anchorOffsetY: number,
+  parentHexSize: number,
+  childHexSize: number,
+  orientation: string,
+  rings: number
+): { x: number; y: number } {
+  const sqrt3 = Math.sqrt(3);
+  let parentHalfW: number, parentHalfH: number, childHalfW: number, childHalfH: number;
+  if (orientation === 'flat') {
+    parentHalfW = parentHexSize;                 // corner-to-corner / 2
+    parentHalfH = parentHexSize * sqrt3 / 2;     // edge-to-edge / 2
+    childHalfW = childHexSize * (rings * 1.5 + 1);
+    childHalfH = childHexSize * sqrt3 * (rings * 2 + 1) / 2;
+  } else {
+    parentHalfW = parentHexSize * sqrt3 / 2;
+    parentHalfH = parentHexSize;
+    childHalfW = childHexSize * sqrt3 * (rings * 2 + 1) / 2;
+    childHalfH = childHexSize * (rings * 1.5 + 1);
+  }
+  if (parentHalfW <= 0 || parentHalfH <= 0) return { x: 0, y: 0 };
+  return {
+    x: (anchorOffsetX / parentHalfW) * childHalfW,
+    y: (anchorOffsetY / parentHalfH) * childHalfH
+  };
+}
+
 // ===========================================
 // Exports
 // ===========================================
@@ -296,5 +339,5 @@ export {
   calculateColumns, calculateRows, calculateHexSizeFromColumns,
   calculateGridFromMeasurement, calculateGridFromColumns,
   validateMeasurementSize, validateFineTune, getFineTuneRange,
-  calculateFitZoom
+  calculateFitZoom, subHexAnchorToChildCenter
 };

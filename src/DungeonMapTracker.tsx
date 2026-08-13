@@ -36,9 +36,11 @@ import { getColorByHex, isDefaultColor, DEFAULT_COLOR } from './drawing/colorOpe
 import { ImageAlignmentMode } from './components/overlays/ImageAlignmentMode';
 import { OnboardingSurvey } from './components/overlays/OnboardingSurvey';
 import { WhatsNewNotice } from './components/overlays/WhatsNewNotice';
+import { DataFileRecoveryPanel } from './components/overlays/DataFileRecoveryPanel';
 import { useAlignmentMode } from './hooks/interactions/useAlignmentMode';
 import { ModalPortal } from './components/modals/ModalPortal';
 import { getActiveLayer, getLayerById, getActiveBoardLayers, getBoardsOrdered, updateBoard, addBoard, setActiveBoard, removeBoard, setLayerMode, addLayer, updateActiveLayer } from './persistence/layerAccessor';
+import { copyDeepLinkToClipboard } from './persistence/deepLinkHandler';
 import type { TileLayerRole } from '#types/tiles/tile.types';
 import { resolveTileEntry } from './assets/tilesetOperations';
 import { FloatingPanel } from './components/panels/FloatingPanel';
@@ -110,7 +112,7 @@ interface DungeonMapTrackerProps {
 const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', initialSubHexPath, mcpKey, fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange, onMapDeleted }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
   useThemeMode();
-  const { mapData: rootMapData, isLoading, saveStatus, updateMapData: rootUpdateMapData, forceSave, markDeleted, tileImagesReady, getCachedImage } = useMapData(mapId, mapName, mapType);
+  const { mapData: rootMapData, isLoading, loadFailure, reload: reloadMapData, saveStatus, updateMapData: rootUpdateMapData, forceSave, markDeleted, tileImagesReady, getCachedImage } = useMapData(mapId, mapName, mapType);
   const [mapDeleted, setMapDeleted] = useState(false);
 
   const {
@@ -120,6 +122,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     breadcrumbs,
     enterSubHex,
     exitSubHex,
+    drillToSubHexPath,
     navigateToLevel,
     navigateToSibling,
     navigationVersion,
@@ -639,6 +642,24 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     return createGeometry(mapData);
   }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
 
+  // Copy a clickable deep link to the CURRENT sub-hex view. Encodes the drill
+  // path so the link reopens at this sub-hex, then centres on the current view.
+  // Needs a host note to open, so it is block-mode only (full-pane notePath='').
+  const handleCopySubHexLink = useCallback(() => {
+    if (notePath === '' || mapId === '' || subHexPath == null || subHexPath === '' || !mapData) return;
+    const center = mapData.viewState?.center ?? { x: 0, y: 0 };
+    const zoom = mapData.viewState?.zoom ?? 1;
+    const layerId = mapData.activeLayerId ?? getActiveLayer(mapData)?.id ?? 'layer_001';
+    let x = center.x;
+    let y = center.y;
+    if (geometry?.type === 'hex') {
+      const hc = geometry.worldToHex(center.x, center.y);
+      x = hc.q;
+      y = hc.r;
+    }
+    copyDeepLinkToClipboard(mapData.name ?? 'Sub-hex view', notePath, mapId, x, y, zoom, layerId, subHexPath);
+  }, [notePath, mapId, subHexPath, mapData, geometry]);
+
   // Fog of War state and handlers (extracted to useFogOfWar hook)
   const {
     showFogTools,
@@ -882,7 +903,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Custom event listeners (sub-hex, deep links, regions, object links, hex context menu)
   useCustomEventHandlers({
     mapData, mapId, geometry, updateMapData,
-    handleLayerSelect, enterSubHex, exitSubHex, isInSubHex,
+    handleLayerSelect, enterSubHex, exitSubHex, drillToSubHexPath, isInSubHex,
     navigateToSibling,
     handleRegionsChange,
     subHexPath
@@ -974,6 +995,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     return <div className="windrose-loading">Map deleted. You can remove this windrose-map code block.</div>;
   }
 
+  // Unreadable data file: render a blocking panel INSTEAD of the canvas. No
+  // canvas means no edits, which means nothing can overwrite the file while it
+  // is in an unknown state. The panel also offers the backup restore.
+  if (loadFailure) {
+    return <DataFileRecoveryPanel dataPath={loadFailure.dataPath} onRestored={reloadMapData} />;
+  }
+
   if (isLoading || !mapData) {
     return <div className="windrose-loading">Loading map...</div>;
   }
@@ -1038,6 +1066,24 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 }}
               >
                 <Icon icon="lucide-layers" />
+              </button>
+            )}
+            {notePath !== '' && (
+              <button
+                onClick={handleCopySubHexLink}
+                ref={tooltipRef('Copy link to this sub-hex view')}
+                style={{
+                  padding: '2px 8px',
+                  fontSize: '11px',
+                  background: 'var(--background-secondary)',
+                  color: 'var(--text-muted)',
+                  border: '1px solid var(--background-modifier-border)',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Icon icon="lucide-link" />
               </button>
             )}
           </div>
@@ -1261,6 +1307,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               draggingWallId={draggingWallId}
               distanceOverrides={distanceOverrides}
               isInSubHex={isInSubHex}
+              subHexPath={subHexPath}
             >
               {/* DrawingLayer - handles all drawing tools */}
               <MapCanvas.DrawingLayer

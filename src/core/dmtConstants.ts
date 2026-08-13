@@ -3,7 +3,7 @@
 
 // Type-only imports
 import type { SegmentName } from '#types/core/cell.types';
-import type { HexBounds, MapType } from '#types/core/map.types';
+import type { HexBounds, MapType, MapTravelSettings } from '#types/core/map.types';
 import type { HexColor } from '#types/core/common.types';
 import type {
   HexOrientation,
@@ -103,6 +103,7 @@ interface Defaults {
   zoomButtonStep: number;
   zoomWheelStep: number;
   distance: DistanceDefaults;
+  travel: MapTravelSettings;
 }
 
 // =============================================================================
@@ -275,6 +276,13 @@ const DEFAULTS: Defaults = {
     unitHex: 'mi',
     gridDiagonalRule: 'alternating',
     displayFormat: 'both'
+  },
+
+  // Default travel display selection new/unset maps inherit (empty = start
+  // empty, so behavior is unchanged until a user sets a default)
+  travel: {
+    modeIds: [],
+    allowanceId: null
   }
 };
 

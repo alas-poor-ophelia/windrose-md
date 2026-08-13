@@ -26,10 +26,12 @@ import type {
 } from '#types/hooks/distanceMeasurement.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { formatDistance, getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
+import { formatDistance, formatEuclideanDistance, getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
 import {
   appendRouteWaypoint,
+  computeEuclideanPathLength,
   computeSegmentDistances,
+  getCellPitchPixels,
   removeLastRouteWaypoint,
   setSegmentTerrain,
   sumDistances,
@@ -177,6 +179,26 @@ const useDistanceMeasurement = (
     );
   }, [totalDistance, distanceSettings]);
 
+  /**
+   * True Euclidean ("as the crow flies") running total, preview included —
+   * the straight-line polyline length through cell centers, converted to
+   * the same real-world units as formattedTotal. Reads longer than the
+   * hex/cell-count total for any non-straight route.
+   */
+  const formattedEuclideanTotal = useMemo((): string | null => {
+    if (!geometry || waypoints.length === 0) return null;
+    const pathPoints = previewTarget != null ? [...waypoints, previewTarget] : waypoints;
+    const pixelLength = computeEuclideanPathLength(pathPoints, geometry);
+    const cellPitchPixels = getCellPitchPixels(geometry);
+    return formatEuclideanDistance(
+      pixelLength,
+      cellPitchPixels,
+      distanceSettings.distancePerCell,
+      distanceSettings.distanceUnit,
+      distanceSettings.displayFormat
+    );
+  }, [waypoints, previewTarget, geometry, distanceSettings]);
+
   const formattedSegments = useMemo((): string[] => {
     return segmentDistances.map(d => formatDistance(
       d,
@@ -194,6 +216,7 @@ const useDistanceMeasurement = (
     previewDistance,
     totalDistance,
     formattedTotal,
+    formattedEuclideanTotal,
     formattedSegments,
     distanceSettings,
     handleMeasureClick,

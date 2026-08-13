@@ -57,6 +57,8 @@ interface MeasurementControlsProps {
   selectedAllowanceId?: string | null;
   onToggleMode?: (modeId: string, selected: boolean) => void;
   onAllowanceChange?: (allowanceId: string | null) => void;
+  /** Store the current selection as the global default for new/unset maps */
+  onSetAsDefault?: () => void;
   onRemoveLast: () => void;
   onClear: () => void;
   onSaveRoute: () => void;
@@ -71,6 +73,7 @@ const MeasurementControls = ({
   selectedAllowanceId = null,
   onToggleMode,
   onAllowanceChange,
+  onSetAsDefault,
   onRemoveLast,
   onClear,
   onSaveRoute
@@ -184,6 +187,18 @@ const MeasurementControls = ({
                       ))}
                     </select>
                   </label>
+                )}
+                {onSetAsDefault != null && (
+                  <button
+                    type="button"
+                    className="windrose-measure-controls-travel-toggle"
+                    ref={tooltipRef('Use this travel selection as the default for new maps')}
+                    aria-label="Set as default for new maps"
+                    onClick={onSetAsDefault}
+                  >
+                    <Icon icon="lucide-star" size={12} />
+                    <span>Set as default for new maps</span>
+                  </button>
                 )}
               </div>
             )}

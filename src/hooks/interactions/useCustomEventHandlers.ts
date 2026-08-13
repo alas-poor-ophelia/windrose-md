@@ -15,7 +15,7 @@ import type { ExtendedGeometry } from '#types/contexts/context.types';
 import { Notice } from 'obsidian';
 import type { MapObject, ObjectLink } from '#types/objects/object.types';
 
-import { useEffect } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
 import { consumePendingNavigate } from '../../persistence/deepLinkHandler';
 import type { NavigationEventDetail } from '../../persistence/deepLinkHandler';
@@ -26,6 +26,8 @@ import type {
   RemoveObjectLinkDetail
 } from '../../core/windroseEvents';
 import { useHexContextMenu } from './useHexContextMenu';
+import { DEFAULTS } from '../../core/dmtConstants';
+import { subHexAnchorToChildCenter } from '../../geometry/core/hexMeasurements';
 
 interface UseCustomEventHandlersOptions {
   mapData: MapData | null;
@@ -35,6 +37,8 @@ interface UseCustomEventHandlersOptions {
   handleLayerSelect: (layerId: string) => void;
   enterSubHex: (q: number, r: number, viewOverride?: { zoom: number; center: { x: number; y: number } }) => void;
   exitSubHex: () => void;
+  /** Drill into an absolute sub-hex path, then run onArrive. Deep-link navigation. */
+  drillToSubHexPath?: (path: string | null, onArrive?: () => void) => void;
   isInSubHex: boolean;
   navigateToSibling?: (q: number, r: number) => void;
   handleRegionsChange: (regions: Region[]) => void;
@@ -50,6 +54,7 @@ function useCustomEventHandlers({
   handleLayerSelect,
   enterSubHex,
   exitSubHex,
+  drillToSubHexPath,
   isInSubHex,
   navigateToSibling,
   handleRegionsChange,
@@ -79,15 +84,43 @@ function useCustomEventHandlers({
   // Listen for sub-hex entry events from double-click on hex
   useEffect(() => {
     const handleEnterSubHex = (event: CustomEvent<SubHexCoordDetail>): void => {
-      const { q, r, viewOverride } = event.detail;
-      if (mapData?.mapType === 'hex') {
-        enterSubHex(q, r, viewOverride);
+      const { q, r, viewOverride, anchor } = event.detail;
+      if (mapData?.mapType !== 'hex') return;
+
+      // Seamless dives supply a full viewOverride. The double-click path instead
+      // supplies the clicked world point (`anchor`); remap it into the child's
+      // extent so the sub-map opens centered on the same spot, keeping the
+      // child's own stored zoom.
+      let override = viewOverride;
+      if (override == null && anchor != null && geometry?.type === 'hex') {
+        const subHex = mapData.subHexMaps?.[`${q},${r}`];
+        if (subHex != null) {
+          const parentCenter = geometry.hexToWorld(q, r);
+          const rings = subHex.subdivisionRings ?? 7;
+          const parentHexSize = mapData.hexSize ?? DEFAULTS.hexSize;
+          const childHexSize = subHex.mapData.hexSize ?? parentHexSize;
+          const orientation = mapData.orientation ?? DEFAULTS.hexOrientation;
+          const childCenter = subHexAnchorToChildCenter(
+            anchor.worldX - parentCenter.worldX,
+            anchor.worldY - parentCenter.worldY,
+            parentHexSize,
+            childHexSize,
+            orientation,
+            rings
+          );
+          override = {
+            zoom: subHex.mapData.viewState?.zoom ?? 1,
+            center: childCenter
+          };
+        }
       }
+
+      enterSubHex(q, r, override);
     };
 
     activeDocument.addEventListener('windrose:enter-sub-hex', handleEnterSubHex);
     return () => activeDocument.removeEventListener('windrose:enter-sub-hex', handleEnterSubHex);
-  }, [mapData?.mapType, enterSubHex]);
+  }, [mapData, geometry, enterSubHex]);
 
   // Seamless zoom-out surfacing: the canvas dispatches this when a zoom-out
   // tick lands below the sub-map's fit zoom. No-op at root level.
@@ -111,46 +144,78 @@ function useCustomEventHandlers({
     return () => activeDocument.removeEventListener('windrose:navigate-sibling-sub-hex', handleNavigateSibling);
   }, [isInSubHex, navigateToSibling]);
 
-  // Deep link navigation — also consumes stashed navigation from cross-note openLinkText
+  // Deep link navigation — also consumes stashed navigation from cross-note openLinkText.
+  //
+  // applyViewRef holds an ALWAYS-FRESH applier: reassigned every render so that
+  // after a sub-hex drill it closes over the target level's geometry/updateMapData
+  // (avoiding a stale closure when onArrive fires from useSubHexNavigation).
+  const applyViewRef = useRef<(x: number, y: number, zoom: number, layerId: string) => void>(() => { /* noop until assigned */ });
+  applyViewRef.current = (x: number, y: number, zoom: number, layerId: string): void => {
+    if (mapData?.layers != null && layerId != null && layerId !== '') {
+      const targetLayer = mapData.layers.find(l => l.id === layerId);
+      if (targetLayer != null && mapData.activeLayerId !== layerId) {
+        handleLayerSelect(layerId);
+      }
+    }
+
+    const DEEP_LINK_ZOOM = 1.175;
+    const effectiveZoom = (zoom != null && zoom > 0) ? zoom : DEEP_LINK_ZOOM;
+
+    let centerX = x;
+    let centerY = y;
+    if (geometry?.type === 'hex') {
+      const worldCoords = geometry.hexToWorld(x, y);
+      if (worldCoords != null) {
+        centerX = worldCoords.worldX;
+        centerY = worldCoords.worldY;
+      }
+    }
+
+    updateMapData((currentMapData: MapData) => {
+      if (!currentMapData.viewState) return currentMapData;
+      return {
+        ...currentMapData,
+        viewState: {
+          ...currentMapData.viewState,
+          center: { x: centerX, y: centerY },
+          zoom: effectiveZoom
+        }
+      };
+    });
+
+    new Notice(`Navigated to location on ${mapData?.name ?? 'map'}`);
+  };
+
+  // Stashed target view for a link into a sub-hex; applied once the drill lands.
+  const pendingSubHexViewRef = useRef<{ x: number; y: number; zoom: number; layerId: string } | null>(null);
+
   useEffect(() => {
     const handleNavigateTo = (event: CustomEvent<NavigationEventDetail>): void => {
-      const { mapId: targetMapId, x, y, zoom, layerId } = event.detail;
+      const { mapId: targetMapId, x, y, zoom, layerId, subHexPath: targetSubHexPath } = event.detail;
 
       if (targetMapId !== mapId) return;
 
-      if (mapData?.layers != null && layerId != null && layerId !== '') {
-        const targetLayer = mapData.layers.find(l => l.id === layerId);
-        if (targetLayer != null && mapData.activeLayerId !== layerId) {
-          handleLayerSelect(layerId);
-        }
-      }
-
-      const DEEP_LINK_ZOOM = 1.175;
-      const effectiveZoom = (zoom != null && zoom > 0) ? zoom : DEEP_LINK_ZOOM;
-
-      let centerX = x;
-      let centerY = y;
-      if (geometry?.type === 'hex') {
-        const worldCoords = geometry.hexToWorld(x, y);
-        if (worldCoords != null) {
-          centerX = worldCoords.worldX;
-          centerY = worldCoords.worldY;
-        }
-      }
-
-      updateMapData((currentMapData: MapData) => {
-        if (!currentMapData.viewState) return currentMapData;
-        return {
-          ...currentMapData,
-          viewState: {
-            ...currentMapData.viewState,
-            center: { x: centerX, y: centerY },
-            zoom: effectiveZoom
+      // Link into a sub-hex: drill there first, then apply the view at that
+      // level. Unless already at the target path (apply immediately). Root/
+      // legacy links (no sub-hex segment) apply immediately — unchanged.
+      if (
+        drillToSubHexPath != null &&
+        targetSubHexPath != null &&
+        targetSubHexPath !== '' &&
+        (subHexPath ?? '') !== targetSubHexPath
+      ) {
+        pendingSubHexViewRef.current = { x, y, zoom, layerId };
+        drillToSubHexPath(targetSubHexPath, () => {
+          const pendingView = pendingSubHexViewRef.current;
+          pendingSubHexViewRef.current = null;
+          if (pendingView != null) {
+            applyViewRef.current(pendingView.x, pendingView.y, pendingView.zoom, pendingView.layerId);
           }
-        };
-      });
+        });
+        return;
+      }
 
-      new Notice(`Navigated to location on ${mapData?.name ?? 'map'}`);
+      applyViewRef.current(x, y, zoom, layerId);
     };
 
     window.addEventListener('windrose-navigate-to', handleNavigateTo);
@@ -163,7 +228,7 @@ function useCustomEventHandlers({
     return () => {
       window.removeEventListener('windrose-navigate-to', handleNavigateTo);
     };
-  }, [mapId, mapData, geometry, updateMapData, handleLayerSelect]);
+  }, [mapId, mapData, geometry, updateMapData, handleLayerSelect, drillToSubHexPath, subHexPath]);
 
   // Center-on-region events from region panel
   useEffect(() => {

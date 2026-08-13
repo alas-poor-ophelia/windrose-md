@@ -21,6 +21,7 @@ import type {
   TravelAllowance,
   TravelTimeUnit,
 } from '#types/settings/travelPack.types';
+import type { MapTravelSettings } from '#types/core/map.types';
 
 /** Version stamp written into exported pack files */
 const TRAVEL_PACK_FORMAT = 'windrose-travel-pack';
@@ -176,6 +177,35 @@ function getPackUnitOptions(
     }
   }
   return options;
+}
+
+// ===========================================
+// Effective travel settings (global default + per-map override)
+// ===========================================
+
+/**
+ * Resolve the travel display selection for a map, merging the global default
+ * with the per-map override. The per-map override wins when it selects at
+ * least one mode; otherwise the global default applies; otherwise empty.
+ *
+ * Read-time fallback only — nothing is written into the map. Mirrors the
+ * shape of getEffectiveDistanceSettings (null-safe on both inputs).
+ *
+ * @param globalDefault - Global default selection from plugin settings (or null)
+ * @param mapOverride - The map's own travelSettings (or null when unset)
+ * @returns The effective { modeIds, allowanceId } to drive the travel readout
+ */
+function getEffectiveTravelSettings(
+  globalDefault: MapTravelSettings | null | undefined,
+  mapOverride: MapTravelSettings | null | undefined
+): MapTravelSettings {
+  if (mapOverride != null && mapOverride.modeIds.length > 0) {
+    return { modeIds: mapOverride.modeIds, allowanceId: mapOverride.allowanceId ?? null };
+  }
+  if (globalDefault != null && globalDefault.modeIds.length > 0) {
+    return { modeIds: globalDefault.modeIds, allowanceId: globalDefault.allowanceId ?? null };
+  }
+  return { modeIds: [], allowanceId: null };
 }
 
 // ===========================================
@@ -379,6 +409,7 @@ export {
   findModesReferencingUnit,
   resolvePackUnit,
   getPackUnitOptions,
+  getEffectiveTravelSettings,
   exportTravelPack,
   serializeTravelPack,
   validateTravelPackImport,

@@ -95,7 +95,7 @@ const ObjectLayer = ({
   onDeleteCustomColor,
   freeformPlacementMode = false
 }: ObjectLayerProps): VNode | null => {
-  const { canvasRef, containerRef, mapData, mapId, notePath, geometry, screenToGrid, distanceOverrides } = useMapState();
+  const { canvasRef, containerRef, mapData, mapId, notePath, geometry, screenToGrid, distanceOverrides, subHexPath } = useMapState();
   const { getObjectAtPosition, updateObject, onObjectsChange: contextOnObjectsChange, onTextLabelsChange } = useMapOperations();
   const {
     selectedItem, setSelectedItem,
@@ -347,8 +347,8 @@ const ObjectLayer = ({
       y = label.position.y / gridSize;
     }
 
-    copyDeepLinkToClipboard(displayText, notePath, mapId, x, y, zoom, layerId);
-  }, [selectedItem, mapData, mapId, notePath]);
+    copyDeepLinkToClipboard(displayText, notePath, mapId, x, y, zoom, layerId, subHexPath);
+  }, [selectedItem, mapData, mapId, notePath, subHexPath]);
 
   const {
     isResizing,
