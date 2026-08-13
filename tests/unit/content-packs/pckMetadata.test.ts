@@ -188,7 +188,10 @@ describe('pckMetadata', () => {
 			expect(result.error).toContain('does not allow third-party');
 		});
 
-		it('rejects when allow_3rd_party field is missing', async () => {
+		it('accepts packs whose allow_3rd_party field is missing (pre-flag packers)', async () => {
+			// Real-world shape: 2MT packs carry only name/id/version/author.
+			// The flag is opt-in and absent from packs built before it existed —
+			// only an author's explicit false refuses (policy decision 2026-08-13).
 			const json = JSON.stringify({ name: 'No Flag', id: 'X', version: '1', author: 'A' });
 			const source = buildPckSource([
 				{ path: 'res://packs/X/pack.json', data: textBytes(json) },
@@ -196,7 +199,10 @@ describe('pckMetadata', () => {
 			const archive = await parsePck(source);
 			const result = await parsePackMetadata(source, archive);
 
-			expect(result.ok).toBe(false);
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.meta.allow3rdParty).toBe(true);
+			expect(result.meta.name).toBe('No Flag');
 		});
 
 		it('returns error when no pack.json exists', async () => {

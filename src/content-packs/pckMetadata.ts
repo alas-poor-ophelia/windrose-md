@@ -49,7 +49,11 @@ async function parsePackMetadata(source: PckSource, archive: PckArchive): Promis
 		return { ok: false, error: 'Invalid JSON in pack.json' };
 	}
 
-	const allow3rdParty = json.allow_3rd_party_mapping_software_to_read === true;
+	// The flag is an opt-in checkbox in Dungeondraft's packer; packs built
+	// before the flag existed (or with tools that omit it) carry no key at
+	// all. Absence means "unstated", not "refused" — only an author's
+	// explicit false is honored as a refusal.
+	const allow3rdParty = json.allow_3rd_party_mapping_software_to_read !== false;
 
 	if (!allow3rdParty) {
 		return {
