@@ -26,7 +26,7 @@
     "build:prod": "bun run build",
     "build:watch": "node esbuild.config.mjs --watch",
     "build:css:watch": "sass scss/main.scss styles.css --no-source-map --no-charset --watch",
-    "deploy": "bun run build:dev && node -e \"const fs=require('fs');const d='C:/Users/whipl/OneDrive/Documents/Absalom/.obsidian/plugins/windrose-map-designer';['main.js','styles.css','manifest.json'].forEach(f=>fs.copyFileSync(f,d+'/'+f));console.log('Deployed to vault')\"",
+    "deploy": "bun run build:dev && node -e \"const fs=require('fs');const base='C:/Users/whipl/OneDrive/Documents/Absalom/.obsidian/plugins/';for(const d of ['windrose-md','windrose-map-designer'].map(n=>base+n)){if(!fs.existsSync(d))continue;['main.js','styles.css','manifest.json'].forEach(f=>fs.copyFileSync(f,d+'/'+f));console.log('Deployed to '+d)}\"",
     "lint:scanner": "eslint --config eslint.scanner-replica.mjs \"src/**/*.ts\" \"src/**/*.tsx\"",
     "postinstall": "patch-package",
     "prepare": "git config core.hooksPath .githooks || true"
