@@ -16,6 +16,7 @@ import { DEFAULTS, SCHEMA_VERSION } from '../../core/dmtConstants';
 import { isFeatureEnabled } from '../../core/featureFlags';
 import { getSettings } from '../../core/settingsAccessor';
 import { generateLayerId } from '../../persistence/layerAccessor';
+import { clearSubHexBackdrop } from '../../core/subHexBackdropStore';
 import { calculateFitZoom, subHexChildPointToParentOffset, subHexContinuityZoom } from '../../geometry/core/hexMeasurements';
 import { createGeometry } from '../../geometry/core/createGeometry';
 import { resolveSubHexDistanceSettings } from '../../drawing/distanceOperations';
@@ -199,6 +200,10 @@ function useSubHexNavigation({
   const depth = navStack.length;
   const activeMapData = isInSubHex ? subHexMapData : rootMapData;
 
+  // If the map unmounts while still nested (leaf closed, mode switch), no exit
+  // path runs — release the backdrop snapshot so it can't outlive its canvas.
+  useEffect(() => () => clearSubHexBackdrop(), []);
+
   // Build breadcrumb segments using actual map names
   const breadcrumbs = useMemo((): BreadcrumbSegment[] => {
     if (!isInSubHex) return [];
@@ -309,6 +314,10 @@ function useSubHexNavigation({
   const exitSubHex = useCallback((seamlessExit?: SubHexExitDetail | null): void => {
     if (navStack.length === 0) return;
 
+    // The parent-map still only backs the level being left; v1 keeps a single
+    // snapshot, so surfacing discards it rather than restoring an outer one.
+    clearSubHexBackdrop();
+
     const currentSubHex = subHexMapData;
     const topFrame = navStack[navStack.length - 1];
 
@@ -392,6 +401,8 @@ function useSubHexNavigation({
   const navigateToLevel = useCallback((targetDepth: number): void => {
     if (targetDepth >= depth) return;
 
+    clearSubHexBackdrop();
+
     // Pop levels from top down to target
     let currentData = subHexMapData;
     let stack = [...navStack];
@@ -454,6 +465,9 @@ function useSubHexNavigation({
   // Navigate to a sibling sub-hex (atomic exit + enter)
   const navigateToSibling = useCallback((q: number, r: number): void => {
     if (navStack.length === 0) return;
+
+    // The snapshot is keyed to the hex being left, not its sibling.
+    clearSubHexBackdrop();
 
     const currentSubHex = subHexMapData;
     const topFrame = navStack[navStack.length - 1];

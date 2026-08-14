@@ -37,8 +37,9 @@ const usePanZoomCoordinator = ({
   isFocused,
   viewController
 }: UsePanZoomCoordinatorOptions): void => {
-  // Sub-hex awareness for seamless zoom transitions (provided via MapContext)
-  const { isInSubHex } = useMapState();
+  // Sub-hex awareness for seamless zoom transitions (provided via MapContext).
+  // The drill path keys the parent-map backdrop captured on a dive.
+  const { isInSubHex, subHexPath } = useMapState();
 
   // Use canvas interaction hook for pan/zoom logic
   const {
@@ -57,6 +58,9 @@ const usePanZoomCoordinator = ({
     getTouchDistance,
     screenToGrid,
     handleWheel,
+    handleGestureStart,
+    handleGestureChange,
+    handleGestureEnd,
     startPan,
     updatePan,
     stopPan,
@@ -68,7 +72,7 @@ const usePanZoomCoordinator = ({
     setPanStart,
     setTouchPanStart,
     setInitialPinchDistance
-  } = useCanvasInteraction(canvasRef, mapData, geometry, isFocused, viewController, isInSubHex === true);
+  } = useCanvasInteraction(canvasRef, mapData, geometry, isFocused, viewController, isInSubHex === true, subHexPath ?? null);
 
   // Register pan/zoom handlers with EventHandlerContext for event coordination
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
@@ -80,6 +84,7 @@ const usePanZoomCoordinator = ({
     startPan, updatePan, stopPan,
     startTouchPan, updateTouchPan, stopTouchPan,
     handleWheel,
+    handleGestureStart, handleGestureChange, handleGestureEnd,
     getClientCoords, getTouchCenter, getTouchDistance, screenToGrid,
     isPanning, isTouchPanning, panStart, touchPanStart, spaceKeyPressed,
     isTouchPanningRef, touchPanStartRef, initialPinchDistanceRef,

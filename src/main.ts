@@ -16,6 +16,7 @@ import { WindroseMDSettingsTab } from './settings/WindroseSettingsTab';
 import { VIEW_TYPE_WINDROSE_MAP, WindroseMapView } from './views/WindroseMapView';
 import { recordPerfTelemetry } from './utils/perfTelemetry';
 import { writeCanvasCapabilityReport } from './utils/canvasCapabilityReport';
+import { recordInputEventProbe } from './utils/inputEventProbe';
 import { scanTilesetFolder } from './assets/tilesetOperations';
 import { enqueueDataFileOp, getSaveQueue, notifyCorruptedDataFile } from './persistence/fileOperations';
 import { flushAll, installLifecycleJournaling, journalAll } from './persistence/saveCoordinator';
@@ -88,6 +89,11 @@ export default class WindrosePlugin extends Plugin {
       id: 'record-perf-telemetry',
       name: 'Record performance telemetry (60s)',
       callback: () => { void recordPerfTelemetry(this.app); },
+    });
+    this.addCommand({
+      id: 'input-event-probe',
+      name: 'Record input event probe (15s)',
+      callback: () => { void recordInputEventProbe(this.app); },
     });
     this.addCommand({
       id: 'canvas-capability-report',

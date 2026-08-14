@@ -75,6 +75,14 @@ export interface CoordinateHelpers {
 /** Zoom handlers */
 export interface ZoomHandlers {
   handleWheel: (e: WheelEvent) => void;
+  /**
+   * WebKit-proprietary trackpad pinch (iPadOS / macOS Safari GestureEvents).
+   * WebKit does not synthesize ctrl+wheel for trackpad pinch; Chromium never
+   * fires these, so they are safe no-ops there.
+   */
+  handleGestureStart: (e: Event) => void;
+  handleGestureChange: (e: Event) => void;
+  handleGestureEnd: (e: Event) => void;
 }
 
 /** Pan handlers */

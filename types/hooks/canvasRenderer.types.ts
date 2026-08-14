@@ -79,6 +79,12 @@ export interface RenderCanvasOptions {
    */
   draggingWallId?: string | null;
   /**
+   * Current sub-hex drill path ('/'-joined "q,r" hexKeys); null at root. Keys
+   * the parent-map backdrop snapshot, which only renders for the exact path it
+   * was captured for.
+   */
+  subHexPath?: string | null;
+  /**
    * Live viewState from the ViewController during a pan/zoom/pinch gesture.
    * When present it OVERRIDES mapData.viewState for the canvas transform, so
    * the canvas follows the gesture without setMapData reconciling the tree.

@@ -173,6 +173,10 @@ export interface PanZoomHandlers {
   panStart: PanStartPosition | null;
   touchPanStart: { x: number; y: number } | null;
   handleWheel: (e: WheelEvent) => void;
+  /** WebKit-proprietary trackpad pinch (iPadOS / macOS Safari GestureEvents). */
+  handleGestureStart: (e: Event) => void;
+  handleGestureChange: (e: Event) => void;
+  handleGestureEnd: (e: Event) => void;
 }
 
 /** Measure tool handlers */

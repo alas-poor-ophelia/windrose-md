@@ -45,6 +45,7 @@ import { renderTiles } from '../../geometry/renderers/tileRenderer';
 import { gridRenderer } from '../../geometry/renderers/gridRenderer';
 import { hexRenderer } from '../../geometry/renderers/hexRenderer';
 import { renderCurves } from '../../geometry/renderers/curveRenderer';
+import { renderSubHexBackdrop } from '../../geometry/renderers/subHexBackdropRenderer';
 import { renderWallPaths } from '../../geometry/renderers/wallPathRenderer';
 import { buildMergeIndex } from '../../geometry/curves/curveCellOverlap';
 import { getCachedImage, getImageCacheVersion } from '../../assets/imageOperations';
@@ -404,7 +405,7 @@ function renderLayerCellsAndEdges(
 }
 
 const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, selectedItems = [], options = {}) => {
-  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null, hiddenTileLayers = undefined, draggingWallId = null, liveViewState = null } = options;
+  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null, hiddenTileLayers = undefined, draggingWallId = null, subHexPath = null, liveViewState = null } = options;
   if (canvas == null) return;
 
   // Normalize selectedItems to array (backward compatibility)
@@ -445,6 +446,12 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Clear canvas
   ctx.fillStyle = THEME.grid.background;
   ctx.fillRect(0, 0, width, height);
+
+  // Sub-hex backdrop: a still of the parent map, captured at dive time, so a
+  // sub-map doesn't float in an empty void. Drawn straight after the background
+  // fill — every layer below composites over it — and skipped entirely at root
+  // or when no snapshot matches this canvas and drill path.
+  renderSubHexBackdrop(ctx, canvas, viewState, subHexPath, northDirection ?? 0);
 
   // Save context and apply rotation
   ctx.save();
@@ -964,7 +971,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 };
 
 const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], options = {}, viewController) => {
-  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false, adjacentSubHexes = null, hiddenTileLayers = undefined, draggingWallId = null } = options;
+  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false, adjacentSubHexes = null, hiddenTileLayers = undefined, draggingWallId = null, subHexPath = null } = options;
   // Coalesce renders to at most one per animation frame. Pan/zoom writes viewState
   // (stored on mapData) on EVERY pointermove/touchmove; on a 120Hz touch device that
   // fires far faster than the display refreshes, so rendering synchronously per update
@@ -984,10 +991,11 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
     hiddenTileLayers: typeof hiddenTileLayers;
     tileImagesReady: boolean;
     draggingWallId: typeof draggingWallId;
+    subHexPath: typeof subHexPath;
   } | null>(null);
 
   useEffect(() => {
-    renderInputsRef.current = { mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, hiddenTileLayers, tileImagesReady, draggingWallId };
+    renderInputsRef.current = { mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, hiddenTileLayers, tileImagesReady, draggingWallId, subHexPath };
     const scheduleRender = (): void => {
       // A frame is already queued — it will pick up the latest inputs from the ref.
       if (rafIdRef.current != null) return;
@@ -998,7 +1006,7 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
           const fogCanvas = fogCanvasRef?.current ?? null;
           // Read the live viewState at FIRE time so a gesture's setLive→scheduleRender
           // path paints the current pan/zoom even though mapData hasn't changed.
-          renderCanvas(canvasRef.current, fogCanvas, a.mapData, a.geometry, a.selectedItems, { isResizeMode: a.isResizeMode, theme: a.theme, showCoordinates: a.showCoordinates, layerVisibility: a.layerVisibility, adjacentSubHexes: a.adjacentSubHexes, hiddenTileLayers: a.hiddenTileLayers, tileImagesReady: a.tileImagesReady, draggingWallId: a.draggingWallId, liveViewState: viewController.getLive() });
+          renderCanvas(canvasRef.current, fogCanvas, a.mapData, a.geometry, a.selectedItems, { isResizeMode: a.isResizeMode, theme: a.theme, showCoordinates: a.showCoordinates, layerVisibility: a.layerVisibility, adjacentSubHexes: a.adjacentSubHexes, hiddenTileLayers: a.hiddenTileLayers, tileImagesReady: a.tileImagesReady, draggingWallId: a.draggingWallId, subHexPath: a.subHexPath, liveViewState: viewController.getLive() });
         }
       });
     };
@@ -1008,7 +1016,7 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
     // The ViewController drives imperative renders on setLive() during a gesture.
     viewController.setRenderCallback(scheduleRender);
     scheduleRender();
-  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, hiddenTileLayers, draggingWallId, viewController]);
+  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, hiddenTileLayers, draggingWallId, subHexPath, viewController]);
 
   // Cancel any frame still pending when the component unmounts.
   useEffect(() => () => {

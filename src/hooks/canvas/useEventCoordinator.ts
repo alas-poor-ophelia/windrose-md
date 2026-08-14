@@ -21,6 +21,7 @@ import { useMapState } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { useRegisteredHandlers } from '../../context/EventHandlerContext';
 import { useGroupDrag } from '../objects/useGroupDrag';
+import { captureSubHexBackdrop } from '../../core/subHexBackdropStore';
 
 const DRAWING_TOOL_SET: Set<string> = new Set([
   'draw', 'erase', 'rectangle', 'circle', 'clearArea',
@@ -43,7 +44,13 @@ const useEventCoordinator = ({
   isAlignmentMode = false,
   interactionLocked = false
 }: UseEventCoordinatorOptions): void => {
-  const { canvasRef, currentTool, screenToGrid, screenToWorld, geometry } = useMapState();
+  const { canvasRef, currentTool, screenToGrid, screenToWorld, geometry, mapData, viewController, subHexPath } = useMapState();
+
+  // Read by the double-click sub-hex dive when it snapshots the parent map.
+  // Held in a ref because mapData changes on every edit: as a dependency it
+  // would re-run the canvas listener effect (14 listeners) per stroke.
+  const subHexDiveRef = useRef({ mapData, viewController, subHexPath });
+  subHexDiveRef.current = { mapData, viewController, subHexPath };
   const { selectedItem, setSelectedItem, isDraggingSelection, setIsDraggingSelection, dragStart, setDragStart, layerVisibility, hasMultiSelection, isGroupDragging, clearSelection } = useMapSelection();
   const { getHandlers } = useRegisteredHandlers();
 
@@ -846,6 +853,21 @@ const useEventCoordinator = ({
     panZoomHandlers.handleWheel(e);
   }, [getHandlers]);
 
+  // WebKit trackpad pinch (iPadOS Magic Keyboard / macOS Safari): pinch
+  // arrives as proprietary GestureEvents, never as Chromium's ctrl+wheel.
+  // Chromium never fires these, so the listeners are inert no-ops there.
+  const handleGestureStart = useCallback((e: Event): void => {
+    getHandlers('panZoom')?.handleGestureStart?.(e);
+  }, [getHandlers]);
+
+  const handleGestureChange = useCallback((e: Event): void => {
+    getHandlers('panZoom')?.handleGestureChange?.(e);
+  }, [getHandlers]);
+
+  const handleGestureEnd = useCallback((e: Event): void => {
+    getHandlers('panZoom')?.handleGestureEnd?.(e);
+  }, [getHandlers]);
+
   const handleCanvasDoubleClick = useCallback((e: MouseEvent): void => {
     // Sub-hex entry: double-click on hex in select mode (or any tool while the
     // map is view-locked — picture frame allows navigation, never edits)
@@ -857,6 +879,19 @@ const useEventCoordinator = ({
         // and the live canvas size so it can fit-zoom against the real pane.
         const anchor = screenToWorld?.(e.clientX, e.clientY) ?? undefined;
         const dblCanvas = canvasRef.current;
+        // Freeze the parent map behind the sub-map (see subHexBackdropStore).
+        const dive = subHexDiveRef.current;
+        if (dive.mapData != null && dive.viewController != null) {
+          captureSubHexBackdrop({
+            canvas: dblCanvas,
+            parentMapData: dive.mapData,
+            geometry,
+            q: coords.x,
+            r: coords.y,
+            parentView: dive.viewController.getLive(),
+            parentSubHexPath: dive.subHexPath ?? null
+          });
+        }
         activeDocument.dispatchEvent(new CustomEvent('windrose:enter-sub-hex', {
           detail: {
             q: coords.x,
@@ -1025,7 +1060,12 @@ const useEventCoordinator = ({
     canvas.addEventListener('touchmove', handlePointerMove as EventListener, { passive: false });
     canvas.addEventListener('touchend', handlePointerUp as EventListener);
     canvas.addEventListener('mouseleave', handlePointerLeave);
-    canvas.addEventListener('wheel', handleWheel);
+    // Explicitly non-passive: WebKit needs preventDefault on the first wheel
+    // of a trackpad scroll sequence or it hands the stream to native scrolling.
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    canvas.addEventListener('gesturestart', handleGestureStart, { passive: false });
+    canvas.addEventListener('gesturechange', handleGestureChange, { passive: false });
+    canvas.addEventListener('gestureend', handleGestureEnd, { passive: false });
     canvas.addEventListener('dblclick', handleCanvasDoubleClick);
     canvas.addEventListener('contextmenu', handleContextMenu);
 
@@ -1043,6 +1083,9 @@ const useEventCoordinator = ({
       canvas.removeEventListener('touchend', handlePointerUp as EventListener);
       canvas.removeEventListener('mouseleave', handlePointerLeave);
       canvas.removeEventListener('wheel', handleWheel);
+      canvas.removeEventListener('gesturestart', handleGestureStart);
+      canvas.removeEventListener('gesturechange', handleGestureChange);
+      canvas.removeEventListener('gestureend', handleGestureEnd);
       canvas.removeEventListener('dblclick', handleCanvasDoubleClick);
       canvas.removeEventListener('contextmenu', handleContextMenu);
     };
@@ -1055,6 +1098,9 @@ const useEventCoordinator = ({
     handlePanStart,
     handlePanEnd,
     handleWheel,
+    handleGestureStart,
+    handleGestureChange,
+    handleGestureEnd,
     handleCanvasDoubleClick,
     handleContextMenu
   ]);

@@ -25,6 +25,7 @@ import type { ViewController } from '#types/hooks/viewController.types';
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULTS } from '../../core/dmtConstants';
+import { captureSubHexBackdrop } from '../../core/subHexBackdropStore';
 import { calculateFitZoom, subHexAnchorToChildCenter, subHexContinuityZoom } from '../../geometry/core/hexMeasurements';
 
 /**
@@ -71,6 +72,17 @@ const SEAMLESS_DIVE_EPSILON = 0.001;
 // Legacy surface threshold (fraction of the sub-map's fit zoom), used only
 // for sub-maps without ring bounds where continuity can't be derived.
 const SEAMLESS_SURFACE_FIT_FRACTION = 0.5;
+/**
+ * Surface hysteresis: a dive lands exactly at the continuity zoom, so a
+ * surface threshold at that same value lets touch-pinch jitter (per-tick
+ * scale noise around 1.0) eject the user right back out — dive/surface
+ * ping-pong. Surfacing requires zooming a deliberate fraction BELOW the
+ * entry zoom. The exit view is continuity-mapped from the ACTUAL zoom at
+ * surface time, so this band costs no exit smoothness — only clearer intent.
+ * (Symmetrically, the surfaced parent lands at this fraction of max zoom,
+ * safely below the dive trigger.)
+ */
+const SEAMLESS_SURFACE_CONTINUITY_FRACTION = 0.8;
 /** Ignore further transitions briefly after one fires (wheel bursts re-tick). */
 const SEAMLESS_COOLDOWN_MS = 600;
 
@@ -95,13 +107,27 @@ interface CanvasRef {
   current: HTMLCanvasElement | null;
 }
 
+/**
+ * WebKit's proprietary trackpad-pinch events (iPadOS / macOS Safari). WebKit
+ * does NOT synthesize the ctrl+wheel that Chromium sends for trackpad pinch —
+ * without listening for these, a Magic Keyboard / Magic Trackpad pinch is
+ * inert on iPad. Chromium never fires them, so the listeners attach
+ * unconditionally and are no-ops there.
+ */
+interface WebKitGestureEvent extends UIEvent {
+  readonly scale: number;
+  readonly clientX: number;
+  readonly clientY: number;
+}
+
 function useCanvasInteraction(
   canvasRef: CanvasRef,
   mapData: MapData | null,
   geometry: (IGeometry & { getScaledCellSize?: (zoom: number) => number }) | null,
   focused: boolean,
   viewController: ViewController,
-  isInSubHex: boolean = false
+  isInSubHex: boolean = false,
+  subHexPath: string | null = null
 ): UseCanvasInteractionResult {
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [isTouchPanning, setIsTouchPanning] = useState<boolean>(false);
@@ -134,6 +160,37 @@ function useCanvasInteraction(
   const wheelModeRef = useRef<'pan' | 'zoom' | null>(null);
   // Timestamp of the last seamless sub-hex dive/surface, for the cooldown.
   const seamlessTransitionAtRef = useRef<number>(0);
+  // Zoom at gesturestart of a WebKit trackpad pinch (null = no pinch active).
+  // GestureEvent `scale` is cumulative from the gesture's start.
+  const webkitGestureStartZoomRef = useRef<number | null>(null);
+
+  // iPad Magic Keyboard: WKWebView strips modifier flags from wheel events
+  // (probe-verified: ctrl/cmd+scroll arrives with ctrlKey/metaKey false), so
+  // scroll-to-zoom can never trigger off the event flags there. Track the
+  // modifier state from keyboard events instead and OR it into the pinch
+  // decision. Cleared on window blur so a lost keyup can't wedge zoom mode.
+  const zoomModifierHeldRef = useRef<boolean>(false);
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Meta' || e.key === 'Control' || e.metaKey || e.ctrlKey) {
+        zoomModifierHeldRef.current = true;
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent): void => {
+      if (!e.metaKey && !e.ctrlKey) zoomModifierHeldRef.current = false;
+    };
+    const onBlur = (): void => {
+      zoomModifierHeldRef.current = false;
+    };
+    activeDocument.addEventListener('keydown', onKeyDown, true);
+    activeDocument.addEventListener('keyup', onKeyUp, true);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      activeDocument.removeEventListener('keydown', onKeyDown, true);
+      activeDocument.removeEventListener('keyup', onKeyUp, true);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, []);
 
   // Keep refs in sync with state for stable effect closures
   isPanningRef.current = isPanning;
@@ -394,6 +451,19 @@ function useCanvasInteraction(
         y: childAnchor.y - rotDy / childZoom
       };
 
+      // Freeze the parent as it looks RIGHT NOW (still at `currentZoom` — the
+      // tick that triggered the dive was never applied) so the sub-map opens
+      // over a still of the world it came from.
+      captureSubHexBackdrop({
+        canvas,
+        parentMapData: mapData,
+        geometry,
+        q: coords.x,
+        r: coords.y,
+        parentView: viewController.getLive(),
+        parentSubHexPath: subHexPath
+      });
+
       seamlessTransitionAtRef.current = Date.now();
       // Commit the in-flight zoom so the parent's stored view (what a
       // non-seamless exit restores) is the view the user dove from.
@@ -421,7 +491,8 @@ function useCanvasInteraction(
     const ownRings = mapData.hexBounds?.maxRing;
     let surfaceThreshold: number;
     if (ownRings != null && ownRings > 0) {
-      surfaceThreshold = subHexContinuityZoom(MAX_WHEEL_ZOOM, 1, 1, ownRings);
+      surfaceThreshold = SEAMLESS_SURFACE_CONTINUITY_FRACTION *
+        subHexContinuityZoom(MAX_WHEEL_ZOOM, 1, 1, ownRings);
     } else {
       if (mapData.hexBounds == null) return false;
       surfaceThreshold = SEAMLESS_SURFACE_FIT_FRACTION * calculateFitZoom(
@@ -484,55 +555,19 @@ function useCanvasInteraction(
     armWheelSettle();
   };
 
-  const handleWheel = (e: WheelEvent): void => {
-    e.preventDefault();
-
-    if (!mapData) return;
-    if (!geometry) return;
-    if (!canvasRef.current) return;
-
-    // Route the event: ctrl/meta+wheel is pinch-zoom (macOS trackpads deliver
-    // pinch as ctrl+wheel), trackpad-shaped plain wheel is two-finger pan,
-    // discrete mouse notches keep the classic step zoom. The mode is decided
-    // on the gesture's first tick and held until it settles.
-    const isPinch = e.ctrlKey || e.metaKey;
-    const mode = isPinch
-      ? 'zoom'
-      : wheelModeRef.current ?? (isTrackpadPanWheel(e) ? 'pan' : 'zoom');
-    wheelModeRef.current = mode;
-
-    if (mode === 'pan') {
-      wheelPan(e);
-      return;
-    }
-
+  /**
+   * Apply `newZoom` keeping the world point under (clientX, clientY) fixed,
+   * inside an open (or newly opened) ViewController gesture. Shared by the
+   * wheel/ctrl-wheel path and the WebKit GestureEvent pinch path.
+   */
+  const applyAnchoredZoom = (clientX: number, clientY: number, newZoom: number): void => {
     const canvas = canvasRef.current;
+    if (!canvas || !geometry) return;
+
     const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    const viewState = viewController.getLive();
-
-    let newZoom: number;
-    if (isPinch) {
-      // Pinch streams many small deltas — zoom multiplicatively for smoothness,
-      // clamped per event so a discrete ctrl+mouse-notch stays a gentle step.
-      const factor = Math.min(
-        PINCH_ZOOM_FACTOR_MAX,
-        Math.max(PINCH_ZOOM_FACTOR_MIN, Math.exp(-e.deltaY * PINCH_ZOOM_RATE))
-      );
-      newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, viewState.zoom * factor));
-    } else {
-      const factor = e.deltaY > 0 ? 1 / WHEEL_ZOOM_STEP_FACTOR : WHEEL_ZOOM_STEP_FACTOR;
-      newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, viewState.zoom * factor));
-    }
-
-    // Seamless sub-hex dive/surface takes over the tick when it fires.
-    if (maybeSeamlessSubHexTransition(e.deltaY < 0, viewState.zoom, newZoom, e.clientX, e.clientY)) {
-      return;
-    }
-
-    const { zoom: oldZoom, center: oldCenter } = viewState;
+    const mouseX = clientX - rect.left;
+    const mouseY = clientY - rect.top;
+    const { zoom: oldZoom, center: oldCenter } = viewController.getLive();
 
     // Use the same offset formula as screenToWorld/screenToGrid:
     // Grid maps: offset = canvas/2 - center * cellSize * zoom
@@ -558,16 +593,104 @@ function useCanvasInteraction(
     const newCenterX = (canvas.width / 2 - newOffsetX) / newScale;
     const newCenterY = (canvas.height / 2 - newOffsetY) / newScale;
 
-    // Wheel has no natural end — open a gesture on the first tick (reusing any
-    // in-flight one) and (re)arm a settle timer that commits once ticks stop.
     gestureIdRef.current ??= viewController.beginGesture();
-
     viewController.setLive({
       zoom: newZoom,
       center: { x: newCenterX, y: newCenterY }
     });
+  };
 
+  const handleWheel = (e: WheelEvent): void => {
+    e.preventDefault();
+
+    if (!mapData) return;
+    if (!geometry) return;
+    if (!canvasRef.current) return;
+
+    // A WebKit trackpad pinch is in flight — its GestureEvents carry the
+    // zoom; swallow any wheel events WebKit also emits for the same gesture
+    // so the pinch isn't double-applied.
+    if (webkitGestureStartZoomRef.current != null) return;
+
+    // Route the event: ctrl/meta+wheel is pinch-zoom (macOS trackpads deliver
+    // pinch as ctrl+wheel), trackpad-shaped plain wheel is two-finger pan,
+    // discrete mouse notches keep the classic step zoom. The mode is decided
+    // on the gesture's first tick and held until it settles. The tracked
+    // modifier ref covers WebViews that strip flags from wheel events (iPad).
+    const isPinch = e.ctrlKey || e.metaKey || zoomModifierHeldRef.current;
+    const mode = isPinch
+      ? 'zoom'
+      : wheelModeRef.current ?? (isTrackpadPanWheel(e) ? 'pan' : 'zoom');
+    wheelModeRef.current = mode;
+
+    if (mode === 'pan') {
+      wheelPan(e);
+      return;
+    }
+
+    const viewState = viewController.getLive();
+
+    let newZoom: number;
+    if (isPinch) {
+      // Pinch streams many small deltas — zoom multiplicatively for smoothness,
+      // clamped per event so a discrete ctrl+mouse-notch stays a gentle step.
+      const factor = Math.min(
+        PINCH_ZOOM_FACTOR_MAX,
+        Math.max(PINCH_ZOOM_FACTOR_MIN, Math.exp(-e.deltaY * PINCH_ZOOM_RATE))
+      );
+      newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, viewState.zoom * factor));
+    } else {
+      const factor = e.deltaY > 0 ? 1 / WHEEL_ZOOM_STEP_FACTOR : WHEEL_ZOOM_STEP_FACTOR;
+      newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, viewState.zoom * factor));
+    }
+
+    // Seamless sub-hex dive/surface takes over the tick when it fires.
+    if (maybeSeamlessSubHexTransition(e.deltaY < 0, viewState.zoom, newZoom, e.clientX, e.clientY)) {
+      return;
+    }
+
+    // Wheel has no natural end — applyAnchoredZoom opens a gesture on the
+    // first tick (reusing any in-flight one) and the settle timer commits
+    // once ticks stop.
+    applyAnchoredZoom(e.clientX, e.clientY, newZoom);
     armWheelSettle();
+  };
+
+  // WebKit trackpad pinch (see WebKitGestureEvent above). `scale` is
+  // cumulative from gesture start, so zoom = startZoom * scale; the gesture
+  // has a real end, so it commits at gestureend rather than via settle timer.
+  const handleGestureStart = (e: Event): void => {
+    if (!mapData || !geometry) return;
+    e.preventDefault();
+    clearWheelSettle();
+    webkitGestureStartZoomRef.current = viewController.getLive().zoom;
+    gestureIdRef.current ??= viewController.beginGesture();
+  };
+
+  const handleGestureChange = (e: Event): void => {
+    const startZoom = webkitGestureStartZoomRef.current;
+    if (startZoom == null || !mapData || !geometry) return;
+    e.preventDefault();
+    const ge = e as WebKitGestureEvent;
+    const currentZoom = viewController.getLive().zoom;
+    const newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, startZoom * ge.scale));
+
+    // Seamless sub-hex dive/surface: end the pinch cleanly when it fires —
+    // the map is about to swap under the cursor.
+    if (newZoom !== currentZoom &&
+        maybeSeamlessSubHexTransition(newZoom > currentZoom, currentZoom, newZoom, ge.clientX, ge.clientY)) {
+      webkitGestureStartZoomRef.current = null;
+      return;
+    }
+
+    applyAnchoredZoom(ge.clientX, ge.clientY, newZoom);
+  };
+
+  const handleGestureEnd = (e: Event): void => {
+    if (webkitGestureStartZoomRef.current == null) return;
+    e.preventDefault();
+    webkitGestureStartZoomRef.current = null;
+    commitActiveGesture();
   };
 
   const startPan = (clientX: number, clientY: number): void => {
@@ -785,6 +908,9 @@ function useCanvasInteraction(
     screenToWorld,
 
     handleWheel,
+    handleGestureStart,
+    handleGestureChange,
+    handleGestureEnd,
 
     startPan,
     updatePan,
