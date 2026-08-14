@@ -608,6 +608,29 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.3.0
+
+Data-safety release: defense-in-depth against a save-file truncation bug, plus a rework of sub-map zoom navigation and iPad input handling.
+
+### Data safety
+- **Save-file corruption defense.** A shutdown-timing race could tear the map data file mid-write, truncating it at a chunk boundary. Writes are now guarded by a read mutex, saves hold app quit until flushed, and every save is journaled. A file that fails to parse at load is never overwritten: loading refuses and surfaces a recovery panel.
+- **Rolling backups.** Two alternating known-good backup slots, written at most once per 15 minutes, plus a "Restore from backup" action.
+
+### New Features
+- **Direct distance readout.** The measure tool reports Euclidean distance alongside hex-count distance: `9 cells (45 ft) · 32 ft direct`. Respects per-map and sub-map distance settings, including the live measurement preview.
+- **Parent-map backdrop in sub-maps.** Entering a subhex renders a static snapshot of the parent map behind the sub-grid, aligned to the dive point. Captured at entry, discarded on exit.
+- **Sub-map deep links.** The deep-link format now carries a subhex path segment (backward compatible with existing links). Links copied inside a sub-map resolve back to that sub-map; nested paths supported.
+- **Travel settings defaults.** Travel settings can be defined globally with per-map overrides; existing per-map settings take precedence.
+
+### Improvements
+- **Seamless subhex zoom rework.** Transitions are visually continuous in both directions: the sub-map opens occupying the parent hex's exact screen footprint with the cursor point held fixed, and surfacing restores the matching parent view. Wheel zoom is now multiplicative (~12% per notch) for uniform zoom speed at every scale. Double-click and context-menu entry compute fit zoom against the live canvas instead of a stored creation-time fit.
+- **iPad Magic Keyboard: two-finger trackpad scroll now pans the map.** The canvas wheel listener is explicitly non-passive, which WebKit requires to deliver a trackpad scroll stream. Trackpad pinch is consumed natively by the app shell before reaching plugin code; touchscreen pinch is unaffected.
+- Block-mode tile drawer: tile scale is an editable numeric field; the range slider is hidden at compact widths.
+- Dungeondraft import: packs lacking the third-party-access flag (built before the flag existed) now import. An explicit refusal by the pack author is still honored.
+
+### Bug Fixes
+- Touch-pinch near the sub-map transition boundary no longer ping-pongs between entering and exiting (hysteresis band added below the entry zoom).
+
 ## Version 2.2.1
 
 A small patch for the tile drawer, from two reports.
