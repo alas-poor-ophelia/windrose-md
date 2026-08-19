@@ -64,6 +64,7 @@ const usePanZoomCoordinator = ({
     startPan,
     updatePan,
     stopPan,
+    markPanAnchorStale,
     startTouchPan,
     updateTouchPan,
     stopTouchPan,
@@ -81,7 +82,7 @@ const usePanZoomCoordinator = ({
   // always get current closures without effect re-registration churn.
   const handlersRef = useRef<Record<string, unknown> | null>(null);
   handlersRef.current = {
-    startPan, updatePan, stopPan,
+    startPan, updatePan, stopPan, markPanAnchorStale,
     startTouchPan, updateTouchPan, stopTouchPan,
     handleWheel,
     handleGestureStart, handleGestureChange, handleGestureEnd,

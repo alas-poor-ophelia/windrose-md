@@ -23,7 +23,7 @@ import type {
 } from '#types/hooks/canvasInteraction.types';
 import type { ViewController } from '#types/hooks/viewController.types';
 
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULTS } from '../../core/dmtConstants';
 import { captureSubHexBackdrop } from '../../core/subHexBackdropStore';
 import { calculateFitZoom, subHexAnchorToChildCenter, subHexContinuityZoom } from '../../geometry/core/hexMeasurements';
@@ -149,6 +149,13 @@ function useCanvasInteraction(
   const panStartRef = useRef<PanStart | null>(null);
   const touchPanStartRef = useRef<TouchCenter | null>(null);
   const initialPinchDistanceRef = useRef<number | null>(null);
+  // Set when a multi-touch is observed while a single-pointer pan is armed
+  // (1→2→1 finger transition): the pan anchor froze at the pre-pinch finger
+  // position while the fingers kept moving, so the next updatePan would compute
+  // one huge delta from it. updatePan re-anchors (zero delta) instead. This is
+  // ref-only by design — a setState anywhere in the live gesture path re-renders
+  // mid-gesture and rolls the touch refs back to stale state (runaway zoom).
+  const panAnchorStaleRef = useRef<boolean>(false);
 
   // Active ViewController gesture token (pan / wheel-settle / pinch). Guards the
   // eventual commit so a stale settle timer can't clobber a newer gesture.
@@ -237,6 +244,53 @@ function useCanvasInteraction(
       if (gestureIdRef.current === gid) gestureIdRef.current = null;
     }, ZOOM_SETTLE_MS);
   };
+
+  // A seamless dive/surface swaps the map identity under this hook — and under
+  // the SHARED ViewController — without a remount. A trackpad pinch keeps
+  // streaming ctrl+wheel ticks after the dive tick; each tail tick reopens a
+  // gesture against the OLD map's live view (zooming it back toward the
+  // ceiling in parent space), which starves syncCommitted from ever applying
+  // the child's continuity view, and the tail's settle timer then commits that
+  // parent-space near-max view into the CHILD's store (the "enter at 400% /
+  // teleport" bug). At the identity boundary: abandon any in-flight gesture
+  // UNCOMMITTED, drop the stale drag-pan anchor (updatePan no-ops until the
+  // pointer lifts), and apply the new map's stored view — enterSubHex/exitSubHex
+  // bake the continuity view into it — to the live controller. Tail ticks that
+  // arrive after this open fresh gestures on the new map from the continuity
+  // view, so a pinch flows through the swap instead of rocketing to max.
+  // useLayoutEffect (not useEffect): it must run before the next input event
+  // can be processed, or a tick lands in the render→effect gap holding the
+  // stale gesture token.
+  const prevSubHexPathRef = useRef<string | null | undefined>(undefined);
+  useLayoutEffect(() => {
+    const prev = prevSubHexPathRef.current;
+    prevSubHexPathRef.current = subHexPath;
+    if (prev === undefined || prev === subHexPath) return; // mount / no swap
+    clearWheelSettle();
+    if (gestureIdRef.current != null) {
+      viewController.cancelIfCurrent(gestureIdRef.current);
+      gestureIdRef.current = null;
+    }
+    panStartRef.current = null;
+    panAnchorStaleRef.current = false;
+    // A touch-pan live at the swap (wheel/trackpad dive during a 2-finger drag,
+    // e.g. iPad + Magic Trackpad) must reset through STATE — the render body
+    // re-seeds touchPanStartRef/initialPinchDistanceRef from state, so nulling
+    // the refs alone un-nulls next render. This is stopTouchPan minus the
+    // commit (the dive already committed; the tail must die uncommitted).
+    if (isTouchPanningRef.current) {
+      setIsTouchPanning(false);
+      isTouchPanningRef.current = false;
+      setTouchPanStart(null);
+      touchPanStartRef.current = null;
+      setInitialPinchDistance(null);
+      initialPinchDistanceRef.current = null;
+    }
+    // Deliberate duplicate of MapCanvas's viewState-sync effect: that one is a
+    // post-paint useEffect and no-ops against an open gesture — here the
+    // gesture was just cancelled and the sync must land pre-paint.
+    if (mapData?.viewState != null) viewController.syncCommitted(mapData.viewState);
+  });
 
   // Track recent touch to ignore synthetic mouse events
   const lastTouchTimeRef = useRef<number>(0);
@@ -418,9 +472,12 @@ function useCanvasInteraction(
       const parentHexSize = mapData.hexSize ?? DEFAULTS.hexSize;
       const childHexSize = child.hexSize ?? mapData.hexSize ?? DEFAULTS.hexSize;
       const orientation = child.orientation ?? mapData.orientation ?? DEFAULTS.hexOrientation;
+      // Clamped to the wheel ceiling: subHexContinuityZoom has no upper bound,
+      // and an unusual child/parent hex-size ratio could otherwise open the
+      // child above max zoom.
       const childZoom = Math.max(
         DEFAULTS.minZoom,
-        subHexContinuityZoom(currentZoom, parentHexSize, childHexSize, rings)
+        Math.min(MAX_WHEEL_ZOOM, subHexContinuityZoom(currentZoom, parentHexSize, childHexSize, rings))
       );
 
       // The anchor point, mapped into the child map's extent…
@@ -697,6 +754,7 @@ function useCanvasInteraction(
     if (!mapData) return;
     clearWheelSettle(); // a pan takes over any in-flight wheel gesture
     const viewState = viewController.getLive();
+    panAnchorStaleRef.current = false;
     setIsPanning(true);
     const anchor: PanStart = {
       x: clientX,
@@ -712,6 +770,15 @@ function useCanvasInteraction(
   const updatePan = (clientX: number, clientY: number): void => {
     if (!isPanningRef.current || !panStartRef.current || !mapData) return;
     if (!geometry) return;
+
+    if (panAnchorStaleRef.current) {
+      // A multi-touch intervened since the anchor was last rolled — re-anchor
+      // at the current pointer and apply no delta this tick.
+      panAnchorStaleRef.current = false;
+      const { center } = viewController.getLive();
+      panStartRef.current = { x: clientX, y: clientY, centerX: center.x, centerY: center.y };
+      return;
+    }
 
     const anchor = panStartRef.current;
     const deltaX = clientX - anchor.x;
@@ -749,8 +816,16 @@ function useCanvasInteraction(
   const stopPan = (): void => {
     setIsPanning(false);
     panStartRef.current = null;
+    panAnchorStaleRef.current = false;
     setPanStart(null);
     commitActiveGesture();
+  };
+
+  // Ref-only: the event coordinator calls this whenever it sees a multi-touch
+  // event while a single-pointer pan may be armed. No setState — see
+  // panAnchorStaleRef.
+  const markPanAnchorStale = (): void => {
+    if (isPanningRef.current) panAnchorStaleRef.current = true;
   };
 
   const startTouchPan = (center: TouchCenter): void => {
@@ -915,6 +990,7 @@ function useCanvasInteraction(
     startPan,
     updatePan,
     stopPan,
+    markPanAnchorStale,
     startTouchPan,
     updateTouchPan,
     stopTouchPan,

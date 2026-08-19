@@ -90,6 +90,12 @@ export interface PanHandlers {
   startPan: (clientX: number, clientY: number) => void;
   updatePan: (clientX: number, clientY: number) => void;
   stopPan: () => void;
+  /**
+   * Ref-only notification that a multi-touch was observed while a
+   * single-pointer pan may be armed (1→2→1 finger transition). The next
+   * updatePan re-anchors instead of computing a delta from the frozen anchor.
+   */
+  markPanAnchorStale: () => void;
   startTouchPan: (center: TouchCenter) => void;
   updateTouchPan: (touches: TouchList) => void;
   stopTouchPan: () => void;

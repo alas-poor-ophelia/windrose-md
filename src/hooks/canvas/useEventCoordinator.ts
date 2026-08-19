@@ -140,6 +140,9 @@ const useEventCoordinator = ({
       }
 
       setRecentMultiTouch(true);
+      // The second finger doesn't end an armed single-finger pan; it freezes
+      // its anchor. Mark it stale so the pan re-anchors instead of jumping.
+      panZoomHandlers.markPanAnchorStale?.();
       const center = getTouchCenter(touchEvent.touches);
       const distance = getTouchDistance(touchEvent.touches);
       if (center != null && distance != null) {
@@ -448,6 +451,10 @@ const useEventCoordinator = ({
     if (touchEvent.touches != null && touchEvent.touches.length === 2) {
       e.preventDefault();
       e.stopPropagation();
+      // Covers multi-touches the pointer-down path never saw (e.g. the second
+      // finger landed on an overlay, so no canvas touchstart fired): any
+      // 2-touch move while a pan is armed means its anchor is frozen/stale.
+      panZoomHandlers.markPanAnchorStale?.();
       if (isTouchPanningRef?.current === true) {
         if (pendingToolTimeoutRef.current != null) {
           window.clearTimeout(pendingToolTimeoutRef.current);
@@ -466,6 +473,7 @@ const useEventCoordinator = ({
     }
 
     if (touchEvent.touches != null && touchEvent.touches.length > 1) {
+      panZoomHandlers.markPanAnchorStale?.();
       if (pendingToolTimeoutRef.current != null) {
         window.clearTimeout(pendingToolTimeoutRef.current);
         pendingToolTimeoutRef.current = null;

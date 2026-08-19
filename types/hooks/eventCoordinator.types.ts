@@ -160,6 +160,8 @@ export interface PanZoomHandlers {
   startPan: (clientX: number, clientY: number) => void;
   updatePan: (clientX: number, clientY: number) => void;
   stopPan: () => void;
+  /** Ref-only: a multi-touch was seen while a single-pointer pan may be armed. */
+  markPanAnchorStale: () => void;
   startTouchPan: (center: { x: number; y: number }) => void;
   updateTouchPan: (touches: TouchList) => void;
   stopTouchPan: () => void;
