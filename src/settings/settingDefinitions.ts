@@ -11,7 +11,7 @@ import { fogPackImagePath } from '../content-packs/contentPackConstants';
 import { getPackUnitOptions } from '../travel/travelPackOperations';
 import { DUNGEON_STYLE_NAMES, DUNGEON_STYLE_COLOR_DEFAULTS } from '../generation/dungeonStyleColors';
 import { buildColorPaletteSections, buildTravelPackSections, buildTilesetSections, infoItem } from './settingDefinitionLists';
-import { buildObjectTypesSections } from './settingDefinitionObjects';
+import { buildObjectTypesSections, objectsPageDisplayValue } from './settingDefinitionObjects';
 import type { SettingsTabThis } from './tabs/settingsTabContext';
 
 // settingDefinitions.ts
@@ -761,6 +761,14 @@ function buildSettingDefinitions(tab: SettingsTabThis): SettingDefinitionItem[] 
       name: 'Fog of war',
       desc: 'Default fog appearance and fog textures',
       visible: () => isFeatureEnabled('fogOfWar'),
+      // displayValue is honored from 1.13.1; older renderers ignore the field
+      displayValue: () => {
+        const active = tab.plugin.settings.fogOfWarImage;
+        if (active == null || active === '') return 'Default';
+        const pack = getInstalledPacks(tab.plugin)
+          .find(p => p.type === 'fog-pack' && fogPackImagePath(p) === active);
+        return pack?.name ?? 'Custom';
+      },
       items: [buildFogGroup(tab)]
     },
     {
@@ -778,12 +786,17 @@ function buildSettingDefinitions(tab: SettingsTabThis): SettingDefinitionItem[] 
       name: 'Tile sets',
       desc: 'Vault folders providing hex tile images',
       visible: () => isFeatureEnabled('tiles'),
+      displayValue: () => {
+        const count = (tab.plugin.settings.tilesetFolders ?? []).filter(f => f.trim() !== '').length;
+        return count === 1 ? '1 folder' : `${count} folders`;
+      },
       items: buildTilesetSections(tab)
     },
     {
       type: 'page',
       name: 'Objects',
       desc: 'Object sets, custom objects, and per-category customization',
+      displayValue: () => objectsPageDisplayValue(tab),
       items: buildObjectTypesSections(tab)
     },
     {

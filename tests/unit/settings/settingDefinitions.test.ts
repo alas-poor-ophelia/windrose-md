@@ -250,6 +250,49 @@ describe('buildSettingDefinitions', () => {
     expect(resetAll != null && 'action' in resetAll && typeof resetAll.action === 'function').toBe(true);
   });
 
+  describe('page displayValue chips (1.13.1; ignored by older renderers)', () => {
+    function displayValueOf(tab: FakeTab, pageName: string): () => string {
+      const page = pageByName(buildSettingDefinitions(tab), pageName);
+      const dv = ('displayValue' in page ? page.displayValue : undefined) as (() => string) | undefined;
+      expect(typeof dv, `page "${pageName}" displayValue`).toBe('function');
+      return dv as () => string;
+    }
+
+    it('summarizes tile folder count with singular/plural, skipping blank rows', () => {
+      expect(displayValueOf(makeTab({ tilesetFolders: [] }), 'Tile sets')()).toBe('0 folders');
+      expect(displayValueOf(makeTab({ tilesetFolders: ['Assets/tiles'] }), 'Tile sets')()).toBe('1 folder');
+      expect(displayValueOf(makeTab({ tilesetFolders: ['Assets/tiles', 'Assets/more'] }), 'Tile sets')()).toBe('2 folders');
+      expect(displayValueOf(makeTab({ tilesetFolders: ['Assets/tiles', '  '] }), 'Tile sets')()).toBe('1 folder');
+    });
+
+    it('names the active fog texture, falling back to Default and Custom', () => {
+      expect(displayValueOf(makeTab({ fogOfWarImage: null }), 'Fog of war')()).toBe('Default');
+      const withPack = makeTab({
+        installedContentPacks: [
+          { id: 'mist', name: 'Rolling mist', version: '1.0.0', type: 'fog-pack', vaultPath: 'windrose-content/mist' }
+        ] as PluginSettings['installedContentPacks'],
+        fogOfWarImage: 'windrose-content/mist/mist.jpg'
+      });
+      expect(displayValueOf(withPack, 'Fog of war')()).toBe('Rolling mist');
+      expect(displayValueOf(makeTab({ fogOfWarImage: 'some/manual/path.png' }), 'Fog of war')()).toBe('Custom');
+    });
+
+    it('shows the active object set name with a modified marker', () => {
+      expect(displayValueOf(makeTab(), 'Objects')()).toBe('Default');
+      const dirtyNoSet = makeTab({
+        customGridObjects: [{ id: 'c1', symbol: 'X', label: 'Probe', category: 'custom' }] as PluginSettings['customGridObjects']
+      });
+      expect(displayValueOf(dirtyNoSet, 'Objects')()).toBe('Modified');
+      const withSet = makeTab({
+        objectSets: [{ id: 's1', name: 'Wilderness', data: {} }] as PluginSettings['objectSets'],
+        activeObjectSetId: 's1'
+      });
+      expect(displayValueOf(withSet, 'Objects')()).toBe('Wilderness');
+      withSet.plugin.settings.customGridObjects = [{ id: 'c1', symbol: 'X', label: 'Probe', category: 'custom' }] as PluginSettings['customGridObjects'];
+      expect(displayValueOf(withSet, 'Objects')()).toBe('Wilderness (modified)');
+    });
+  });
+
   it('rejects non-positive distances via validate', () => {
     const measurement = groupByHeading(buildSettingDefinitions(makeTab()), 'Distance measurement');
     const distance = controlItems(measurement).find(i => i.control.key === 'distancePerCellGrid');

@@ -576,6 +576,17 @@ function categoryList(tab: SettingsTabThis, category: ResolvedCategory, category
   return list;
 }
 
+/** Summary for the Objects page entry: active set name plus a modified marker. */
+function objectsPageDisplayValue(tab: SettingsTabThis): string {
+  const s = tab.plugin.settings;
+  const activeSet = (s.objectSets ?? []).find(set => set.id === s.activeObjectSetId);
+  const isDirty = ObjectSetHelpers.isDirty(tab.plugin);
+  if (activeSet != null) {
+    return isDirty ? `${activeSet.name} (modified)` : activeSet.name;
+  }
+  return isDirty ? 'Modified' : 'Default';
+}
+
 // --- Section assembly ---
 
 function buildObjectTypesSections(tab: SettingsTabThis): SettingDefinitionItem[] {
@@ -620,4 +631,4 @@ function buildObjectTypesSections(tab: SettingsTabThis): SettingDefinitionItem[]
   return sections;
 }
 
-export { buildObjectTypesSections };
+export { buildObjectTypesSections, objectsPageDisplayValue };
