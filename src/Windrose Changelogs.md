@@ -608,6 +608,22 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.3.1
+
+Follow-up polish for 2.3.0's sub-map rework: this release is mostly about making seamless dives and surfacing actually feel seamless, plus a fix for a nasty iPad pinch bug. Some settings quality-of-life snuck in as well.
+
+### Bug Fixes
+- **iPad: a pinch could instantly slam the map to 400% zoom** due to a gesture race condition. Fixed by turning off detection for other gestures when diving.
+- **Seamless dive no longer lands the sub-map at the wrong zoom.** A pinch still in flight when the sub-map opened could commit its zoom into the child map.
+- **Sub-map transitions should be actually visually continuous.** A cluster of fixes for the moment of the dive: the parent backdrop no longer drifts or escapes its hex, the first frame no longer flashes stale content, map chrome tweens instead of popping, zoom momentum rides through the transition, and asset preloading no longer stalls it.
+- **Backdrop alignment under fast gestures.** The parent snapshot behind a sub-map is positioned from the view that was actually painted, not the live view — fast dives no longer offset the backdrop by the gesture's velocity.
+- Touch: releasing a pan with a flick no longer flings the map from a stale anchor.
+
+### Improvements
+- **Settings are now organized into sub-pages.** Following the transition to Obsidian's new Settings API, the settings screen became a single long scroll, but is now once again a short page: the Features switchboard plus eight navigable sections. Settings search still finds everything inside them, and the Objects, Tile sets, and Fog of war entries show their current value at a glance.
+- **Beacon has a feature toggle.** Like the other session tools, the beacon can be switched off under Features; the first-run survey now accounts for it.
+- **Backdrop visibility setting + recenter.** The parent-map backdrop behind sub-maps can be toggled off, and there's a new recenter-view button with a keyboard shortcut (Home).
+
 ## Version 2.3.0
 
 Data-safety release: defense-in-depth against a save-file truncation bug, plus a rework of sub-map zoom navigation and iPad input handling.
