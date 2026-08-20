@@ -130,6 +130,7 @@ interface SettingsSaveData {
   coordinateDisplayMode: CoordinateDisplayMode;
   distanceSettings: DistanceSettingsSave | null;
   objectSetId?: string | null;
+  showParentBackdrop?: boolean;
 }
 
 /** Handler functions exposed by context */
@@ -151,6 +152,9 @@ interface MapSettingsHandlers {
   // Distance settings
   setDistanceSettings: (updates: Partial<DistanceSettings>) => void;
   setCoordinateDisplayMode: (mode: CoordinateDisplayMode) => void;
+
+  // Sub-hex parent map backdrop override
+  setShowParentBackdrop: (value: boolean | undefined) => void;
 
   // Color picker
   setActiveColorPicker: (picker: string | null) => void;
@@ -310,6 +314,8 @@ export interface HexGridContextValue {
   setCoordinateDisplayMode: (mode: CoordinateDisplayMode) => void;
   handleResizeConfirmDelete: () => void;
   handleResizeConfirmCancel: () => void;
+  showParentBackdrop: boolean | undefined;
+  setShowParentBackdrop: (value: boolean | undefined) => void;
 }
 
 /** Provider props */
@@ -585,13 +591,14 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     overrides: state.useGlobalSettings ? {} : state.overrides,
     coordinateDisplayMode: state.coordinateDisplayMode,
     objectSetId: state.objectSetId,
+    showParentBackdrop: state.showParentBackdrop,
     distanceSettings: state.distanceSettings.useGlobalDistance ? null : {
       distancePerCell: state.distanceSettings.distancePerCell,
       distanceUnit: state.distanceSettings.distanceUnit,
       gridDiagonalRule: state.distanceSettings.gridDiagonalRule,
       displayFormat: state.distanceSettings.displayFormat
     }
-  }), [state.useGlobalSettings, state.overrides, state.coordinateDisplayMode, state.objectSetId, state.distanceSettings]);
+  }), [state.useGlobalSettings, state.overrides, state.coordinateDisplayMode, state.objectSetId, state.showParentBackdrop, state.distanceSettings]);
 
   const backgroundImageData = useMemo((): BackgroundImageConfig | null => {
     if (state.backgroundImagePath == null || state.backgroundImagePath === '') return null;
@@ -640,6 +647,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       coordinateDisplayMode: settingsData.coordinateDisplayMode,
       distanceSettings: settingsData.distanceSettings != null ? settingsData.distanceSettings as unknown as Record<string, unknown> : undefined,
       objectSetId: settingsData.objectSetId,
+      showParentBackdrop: settingsData.showParentBackdrop,
     };
     onSave(mapSettings, state.preferences, mapType === 'hex' ? state.hexBounds : null, backgroundImageData, calculatedHexSize, forceDelete);
     dispatch({ type: Actions.CLEAR_DELETE_FLAG });
@@ -706,6 +714,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     handlePreferenceToggle: (key) => dispatch({ type: Actions.TOGGLE_PREFERENCE, payload: key }),
     setDistanceSettings: (updates) => dispatch({ type: Actions.SET_DISTANCE_SETTING, payload: updates }),
     setCoordinateDisplayMode: (mode) => dispatch({ type: Actions.SET_COORDINATE_MODE, payload: mode }),
+    setShowParentBackdrop: (value) => dispatch({ type: Actions.SET_PARENT_BACKDROP, payload: value }),
     setActiveColorPicker: (picker) => dispatch({ type: Actions.SET_ACTIVE_COLOR_PICKER, payload: picker as ColorPickerId }),
     setBackgroundImageDisplayName: (name) => dispatch({ type: Actions.SET_IMAGE_DISPLAY_NAME, payload: name }),
     handleImageClear: () => dispatch({ type: Actions.CLEAR_IMAGE }),
@@ -898,13 +907,16 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     setCoordinateDisplayMode: handlers.setCoordinateDisplayMode,
     handleResizeConfirmDelete: stableHandleResizeConfirmDelete,
     handleResizeConfirmCancel: handlers.handleResizeConfirmCancel,
+    showParentBackdrop: state.showParentBackdrop,
+    setShowParentBackdrop: handlers.setShowParentBackdrop,
   }), [
     state.hexBounds, state.boundsShape, state.boundsLocked,
     state.coordinateDisplayMode, state.showResizeConfirm,
-    state.pendingBoundsChange, state.orphanInfo,
+    state.pendingBoundsChange, state.orphanInfo, state.showParentBackdrop,
     stableHandleResizeConfirmDelete,
     handlers.handleBoundsLockToggle, handlers.handleBoundsShapeChange, handlers.handleHexBoundsChange,
-    handlers.handleRadiusChange, handlers.handleResizeConfirmCancel, handlers.setCoordinateDisplayMode
+    handlers.handleRadiusChange, handlers.handleResizeConfirmCancel, handlers.setCoordinateDisplayMode,
+    handlers.setShowParentBackdrop
   ]);
 
   return (

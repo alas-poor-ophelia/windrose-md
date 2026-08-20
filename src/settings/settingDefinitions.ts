@@ -56,7 +56,8 @@ type DirectSettingKey =
   | 'distancePerCellHex'
   | 'distanceUnitHex'
   | 'gridDiagonalRule'
-  | 'distanceDisplayFormat';
+  | 'distanceDisplayFormat'
+  | 'showSubHexBackdrop';
 
 const DIRECT_KEYS = new Set<string>([
   'hexOrientation', 'coordinateKeyMode', 'coordinateTextColor', 'coordinateTextShadow',
@@ -65,7 +66,7 @@ const DIRECT_KEYS = new Set<string>([
   'canvasHeight', 'canvasHeightMobile', 'pictureFrameHeight', 'pictureFrameHeightMobile',
   'pictureFrameWidth', 'pictureFrameWidthMobile',
   'distancePerCellGrid', 'distanceUnitGrid', 'distancePerCellHex', 'distanceUnitHex',
-  'gridDiagonalRule', 'distanceDisplayFormat',
+  'gridDiagonalRule', 'distanceDisplayFormat', 'showSubHexBackdrop',
 ] satisfies DirectSettingKey[]);
 
 // Sliders present percentages; settings store fractions. These virtual keys
@@ -375,6 +376,11 @@ function buildBehaviorGroup(): SettingDefinitionItem {
         control: { type: 'toggle', key: 'alwaysShowControls' }
       },
       {
+        name: 'Show parent map behind sub-maps',
+        desc: 'Render a still of the parent map behind sub-hex maps as a backdrop',
+        control: { type: 'toggle', key: 'showSubHexBackdrop', defaultValue: true }
+      },
+      {
         name: 'Canvas height (desktop)',
         desc: 'Default height in pixels for map canvas on desktop devices',
         control: { type: 'number', key: 'canvasHeight', placeholder: '600', step: 1 }
@@ -574,14 +580,15 @@ const SHORTCUT_ACTIONS: ShortcutAction[] = [
   { id: 'layerNext', label: 'Next Layer', scope: 'Map hover' },
   { id: 'undo', label: 'Undo', scope: 'Map hover' },
   { id: 'redo', label: 'Redo', scope: 'Map hover' },
-  { id: 'pictureFrame', label: 'Picture Frame Mode', scope: 'Map hover (embedded maps)' }
+  { id: 'pictureFrame', label: 'Picture Frame Mode', scope: 'Map hover (embedded maps)' },
+  { id: 'recenter', label: 'Recenter View', scope: 'Map hover' }
 ];
 
 const DEFAULT_SHORTCUTS: Record<string, string> = {
   selectTool: 's', drawTool: 'd', freehandTool: 'f', eraseTool: 'e',
   notePinTool: 'n', measureTool: 'm', panMode: 'Space', showCoordinates: 'c',
   rotate: 'r', layerPrev: '[', layerNext: ']', undo: 'Mod+Z', redo: 'Mod+Y',
-  pictureFrame: 'p'
+  pictureFrame: 'p', recenter: 'Home'
 };
 
 function formatKeyLabel(keyStr: string): string {

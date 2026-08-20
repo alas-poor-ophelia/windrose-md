@@ -13,6 +13,7 @@ import { BackgroundImageSection } from './BackgroundImageSection';
 import { SizingModeSection } from './SizingModeSection';
 import { BoundsSection } from './BoundsSection';
 import { CoordinateDisplaySection } from './CoordinateDisplaySection';
+import { SubHexBackdropSection } from './SubHexBackdropSection';
 
 
 
@@ -47,6 +48,9 @@ function HexGridTab(): VNode | null {
 
       {/* Coordinate Display Section - mode selector and text colors */}
       <CoordinateDisplaySection />
+
+      {/* Sub-hex parent map backdrop override (sub-hex maps only) */}
+      <SubHexBackdropSection />
     </div>
   );
 }

@@ -57,6 +57,8 @@ export interface MapSettings {
   coordinateDisplayMode?: string;
   /** Object set identifier override */
   objectSetId?: string | null;
+  /** Parent map backdrop override for sub-hex maps (absent = inherit global PluginSettings.showSubHexBackdrop) */
+  showParentBackdrop?: boolean;
 }
 
 // ===========================================

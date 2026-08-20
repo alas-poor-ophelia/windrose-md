@@ -22,7 +22,7 @@ import type {
 } from '#types/hooks/canvasRenderer.types';
 
 import { useEffect, useRef } from 'preact/hooks';
-import { getTheme, getEffectiveSettings } from '../../core/settingsAccessor';
+import { getTheme, getEffectiveSettings, getSettings } from '../../core/settingsAccessor';
 import { buildCellLookup, calculateBordersOptimized } from '../../drawing/borderCalculator';
 import { getObjectType } from '../../objects/objectOperations';
 import { getRenderChar } from '../../objects/objectTypeResolver';
@@ -450,8 +450,13 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Sub-hex backdrop: a still of the parent map, captured at dive time, so a
   // sub-map doesn't float in an empty void. Drawn straight after the background
   // fill — every layer below composites over it — and skipped entirely at root
-  // or when no snapshot matches this canvas and drill path.
-  renderSubHexBackdrop(ctx, canvas, viewState, subHexPath, northDirection ?? 0);
+  // or when no snapshot matches this canvas and drill path. Per-map setting
+  // overrides the global toggle; capture itself is never gated so toggling
+  // back on mid-session has a snapshot ready immediately.
+  const showBackdrop = mapData.settings?.showParentBackdrop ?? getSettings().showSubHexBackdrop ?? true;
+  if (showBackdrop) {
+    renderSubHexBackdrop(ctx, canvas, viewState, subHexPath, northDirection ?? 0);
+  }
 
   // Save context and apply rotation
   ctx.save();

@@ -964,17 +964,26 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     return () => activeDocument.removeEventListener('click', handleAdjacentClick, true);
   }, [showAdjacentSubMaps, isInSubHex, adjacentSubHexes, geometry, mapData]);
 
-  // View controls (zoom, compass)
-  const { handleZoomIn, handleZoomOut, handleCompassClick } = useViewControls({
-    mapData, updateMapData, handleViewStateChange
+  // Canvas pixel size for view-fitting calculations (recenter-view).
+  // querySelector depends on DOM order: the MAIN map canvas must stay the
+  // first <canvas> under this container (the fog canvas renders after it).
+  const getCanvasSize = useCallback((): { width: number; height: number } | null => {
+    const canvas = containerRef.current?.querySelector('canvas');
+    return canvas ? { width: canvas.width, height: canvas.height } : null;
+  }, [containerRef]);
+
+  // View controls (zoom, compass, recenter)
+  const { handleZoomIn, handleZoomOut, handleCompassClick, handleRecenterView } = useViewControls({
+    mapData, updateMapData, handleViewStateChange, geometry, getCanvasSize
   });
 
-  // Global keyboard shortcuts: layer nav, undo/redo, picture frame toggle
+  // Global keyboard shortcuts: layer nav, undo/redo, picture frame toggle, recenter view
   useKeyboardShortcuts({
     isFocused, mapData,
     handleUndo: wrappedHandleUndo, handleRedo, handleLayerSelect,
     pictureFrameLocked: pictureFrameActive,
-    onTogglePictureFrame: !fullPane ? handleTogglePictureFrame : undefined
+    onTogglePictureFrame: !fullPane ? handleTogglePictureFrame : undefined,
+    onRecenterView: handleRecenterView
   });
 
   // MCP bridge: each map instance registers its own state + operations.
@@ -1467,6 +1476,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 onZoomIn={handleZoomIn}
                 onZoomOut={handleZoomOut}
                 onCompassClick={handleCompassClick}
+                onRecenterView={handleRecenterView}
                 onSettingsClick={handleSettingsClick}
                 northDirection={mapData.northDirection ?? 0}
                 currentZoom={mapData.viewState?.zoom ?? 1}

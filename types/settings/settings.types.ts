@@ -184,6 +184,11 @@ export interface PluginSettings {
   // Sub-map display
   showAdjacentSubMaps?: boolean;
 
+  // Sub-hex parent map backdrop (a still of the parent map behind the
+  // sub-map grid). Absent = enabled. Per-map MapSettings.showParentBackdrop
+  // overrides this when set.
+  showSubHexBackdrop?: boolean;
+
   // Tileset folders (vault paths scanned for tile images)
   tilesetFolders?: string[];
 

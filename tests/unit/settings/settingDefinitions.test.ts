@@ -191,7 +191,7 @@ describe('buildSettingDefinitions', () => {
     const items = shortcuts.items ?? [];
     const captureRows = items.filter(i => 'render' in i && typeof i.render === 'function' && 'name' in i && i.name !== '');
     expect(captureRows.map(i => ('name' in i ? i.name : ''))).toContain('Undo');
-    expect(captureRows).toHaveLength(14);
+    expect(captureRows).toHaveLength(15);
     const resetAll = items.find(i => 'name' in i && i.name === 'Reset all shortcuts');
     expect(resetAll != null && 'action' in resetAll && typeof resetAll.action === 'function').toBe(true);
   });

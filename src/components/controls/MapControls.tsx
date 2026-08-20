@@ -19,6 +19,7 @@ interface MapControlsProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onCompassClick: () => void;
+  onRecenterView: () => void;
   northDirection: number;
   currentZoom: number;
   isExpanded: boolean;
@@ -44,6 +45,7 @@ const MapControls = ({
   onZoomIn,
   onZoomOut,
   onCompassClick,
+  onRecenterView,
   northDirection,
   currentZoom,
   isExpanded,
@@ -240,6 +242,13 @@ const MapControls = ({
                 ref={tooltipRef('Zoom Out')}
               >
                 -
+              </button>
+              <button
+                className="windrose-zoom-btn"
+                onClick={handleControlInteraction(onRecenterView)}
+                ref={tooltipRef('Recenter view')}
+              >
+                <Icon icon="lucide-locate-fixed" />
               </button>
             </div>
             

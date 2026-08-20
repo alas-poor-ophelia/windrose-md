@@ -136,7 +136,10 @@ export interface SettingsModalState {
   
   // Coordinate display
   coordinateDisplayMode: CoordinateDisplayMode;
-  
+
+  // Sub-hex parent map backdrop override (undefined = inherit global)
+  showParentBackdrop?: boolean;
+
   // Background image
   backgroundImagePath: string | null;
   backgroundImageDisplayName: string;
@@ -189,6 +192,7 @@ export interface CurrentSettings {
   useGlobalSettings?: boolean;
   overrides?: Record<string, unknown>;
   coordinateDisplayMode?: string;
+  showParentBackdrop?: boolean;
 }
 
 /** Current background image settings */
@@ -271,7 +275,8 @@ const Actions = {
   FOG_IMAGE_SELECTED: 'FOG_IMAGE_SELECTED',
   CLEAR_FOG_IMAGE: 'CLEAR_FOG_IMAGE',
   SET_OBJECT_SET_ID: 'SET_OBJECT_SET_ID',
-  SET_BOUNDS_SHAPE: 'SET_BOUNDS_SHAPE'
+  SET_BOUNDS_SHAPE: 'SET_BOUNDS_SHAPE',
+  SET_PARENT_BACKDROP: 'SET_PARENT_BACKDROP'
 } as const;
 
 /** Action type union */
@@ -454,6 +459,11 @@ interface SetBoundsShapeAction {
   payload: BoundsShape;
 }
 
+interface SetParentBackdropAction {
+  type: typeof Actions.SET_PARENT_BACKDROP;
+  payload: boolean | undefined;
+}
+
 /** Discriminated union of all actions */
 type SettingsAction =
   | InitializeAction
@@ -491,7 +501,8 @@ type SettingsAction =
   | FogImageSelectedAction
   | ClearFogImageAction
   | SetObjectSetIdAction
-  | SetBoundsShapeAction;
+  | SetBoundsShapeAction
+  | SetParentBackdropAction;
 
 // ===========================================
 // Constants
@@ -664,7 +675,9 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
     },
     
     coordinateDisplayMode: (currentSettings?.coordinateDisplayMode ?? 'rectangular') as CoordinateDisplayMode,
-    
+
+    showParentBackdrop: currentSettings?.showParentBackdrop,
+
     backgroundImagePath: currentBackgroundImage?.path ?? null,
     backgroundImageDisplayName: currentBackgroundImage?.path != null && currentBackgroundImage.path !== ''
       ? getDisplayNameFromPath(currentBackgroundImage.path)
@@ -852,7 +865,10 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
     
     case Actions.SET_COORDINATE_MODE:
       return { ...state, coordinateDisplayMode: action.payload };
-    
+
+    case Actions.SET_PARENT_BACKDROP:
+      return { ...state, showParentBackdrop: action.payload };
+
     case Actions.SET_IMAGE_SEARCH_RESULTS:
       return { ...state, imageSearchResults: action.payload };
 

@@ -12,11 +12,13 @@ interface UseKeyboardShortcutsOptions {
   pictureFrameLocked?: boolean;
   /** Toggle picture frame mode (block mode only; undefined in full-pane). */
   onTogglePictureFrame?: () => void;
+  /** Recenter the view on the current layer's content. */
+  onRecenterView?: () => void;
 }
 
 function useKeyboardShortcuts({
   isFocused, mapData, handleUndo, handleRedo, handleLayerSelect,
-  pictureFrameLocked = false, onTogglePictureFrame
+  pictureFrameLocked = false, onTogglePictureFrame, onRecenterView
 }: UseKeyboardShortcutsOptions): void {
   useEffect((): (() => void) | undefined => {
     if (!isFocused || !mapData) return undefined;
@@ -37,6 +39,10 @@ function useKeyboardShortcuts({
 
       // Everything below edits map data; inert while the frame is locked.
       if (pictureFrameLocked) return;
+
+      if (onRecenterView && !mod && !e.altKey && key.toLowerCase() === bareKey(shortcuts.recenter ?? 'home')) {
+        onRecenterView(); e.preventDefault(); return;
+      }
 
       if (mod && !e.shiftKey && key.toLowerCase() === bareKey(shortcuts.undo ?? 'z')) {
         handleUndo(); e.preventDefault(); return;
@@ -68,7 +74,7 @@ function useKeyboardShortcuts({
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isFocused, mapData, handleUndo, handleRedo, handleLayerSelect, pictureFrameLocked, onTogglePictureFrame]);
+  }, [isFocused, mapData, handleUndo, handleRedo, handleLayerSelect, pictureFrameLocked, onTogglePictureFrame, onRecenterView]);
 }
 
 export { useKeyboardShortcuts };
