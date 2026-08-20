@@ -85,6 +85,7 @@ export type WindroseFeature =
   | 'tiles'
   | 'walls'
   | 'notePins'
+  | 'partyPin'
   | 'shapeOverlays'
   | 'measurement';
 

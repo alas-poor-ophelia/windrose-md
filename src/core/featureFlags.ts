@@ -36,6 +36,7 @@ const FEATURE_DEFINITIONS: FeatureDefinition[] = [
   { id: 'tiles', label: 'Image tiles', desc: 'Paint with image tiles and textures, including Dungeondraft asset packs.' },
   { id: 'walls', label: 'Walls & paths', desc: 'Draw wall and path tiles along lines and curves.' },
   { id: 'notePins', label: 'Note pins', desc: 'Pin notes to map locations and deep-link back to them.' },
+  { id: 'partyPin', label: 'Beacon', desc: 'Mark a live position on the map with a movable beacon.' },
   { id: 'shapeOverlays', label: 'Shape overlays', desc: 'Place resizable shape overlays (circles, cones, areas) on the map.' },
   { id: 'measurement', label: 'Distance measurement', desc: 'Measure distances in cells or map units.' },
 ];

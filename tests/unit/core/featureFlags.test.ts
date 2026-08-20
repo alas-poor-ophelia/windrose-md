@@ -28,10 +28,10 @@ afterEach(() => {
 });
 
 describe('FEATURE_DEFINITIONS', () => {
-  it('defines 11 unique features with labels and descriptions', () => {
-    expect(FEATURE_DEFINITIONS).toHaveLength(11);
+  it('defines 12 unique features with labels and descriptions', () => {
+    expect(FEATURE_DEFINITIONS).toHaveLength(12);
     const ids = FEATURE_DEFINITIONS.map(d => d.id);
-    expect(new Set(ids).size).toBe(11);
+    expect(new Set(ids).size).toBe(12);
     for (const def of FEATURE_DEFINITIONS) {
       expect(def.label.length).toBeGreaterThan(0);
       expect(def.desc.length).toBeGreaterThan(0);

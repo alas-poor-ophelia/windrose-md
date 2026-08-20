@@ -69,8 +69,8 @@ describe('mapAnswersToFeatures', () => {
     expectOff(mapAnswersToFeatures({ visualStyle: ['rich'] }), []);
   });
 
-  it('not running games turns off fog of war and measurement', () => {
-    expectOff(mapAnswersToFeatures({ runGames: ['no'] }), ['fogOfWar', 'measurement']);
+  it('not running games turns off fog of war, measurement, and the beacon', () => {
+    expectOff(mapAnswersToFeatures({ runGames: ['no'] }), ['fogOfWar', 'measurement', 'partyPin']);
   });
 
   it('running games disables nothing', () => {
@@ -93,7 +93,7 @@ describe('mapAnswersToFeatures', () => {
         runGames: ['no'],
         dungeonGen: ['no'],
       }),
-      ['dungeonGenerator', 'tiles', 'walls', 'shapeOverlays', 'fogOfWar', 'measurement'],
+      ['dungeonGenerator', 'tiles', 'walls', 'shapeOverlays', 'fogOfWar', 'measurement', 'partyPin'],
     );
   });
 
@@ -105,7 +105,7 @@ describe('mapAnswersToFeatures', () => {
         runGames: ['no'],
         dungeonGen: ['no'],
       }),
-      ['hexMaps', 'regions', 'outlines', 'subMaps', 'tiles', 'walls', 'shapeOverlays', 'fogOfWar', 'measurement', 'dungeonGenerator'],
+      ['hexMaps', 'regions', 'outlines', 'subMaps', 'tiles', 'walls', 'shapeOverlays', 'fogOfWar', 'measurement', 'partyPin', 'dungeonGenerator'],
     );
   });
 
@@ -130,5 +130,10 @@ describe('mapAnswersToFeatures', () => {
     for (const answers of combos) {
       expect(mapAnswersToFeatures(answers).notePins).toBe(true);
     }
+  });
+
+  it('keeps the beacon on for GMs regardless of other answers', () => {
+    expect(mapAnswersToFeatures({ mapKinds: ['hex'], visualStyle: ['simple'], runGames: ['yes'] }).partyPin).toBe(true);
+    expect(mapAnswersToFeatures({}).partyPin).toBe(true);
   });
 });

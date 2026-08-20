@@ -56,7 +56,7 @@ const ONBOARDING_QUESTIONS: OnboardingQuestion[] = [
     id: 'runGames',
     prompt: 'Will you run games from these maps?',
     options: [
-      { id: 'yes', label: 'Yes — I’m a GM', desc: 'Reveal maps to players with fog of war and measure distances.' },
+      { id: 'yes', label: 'Yes — I’m a GM', desc: 'Reveal maps to players with fog of war, measure distances, and mark positions with the beacon.' },
       { id: 'no', label: 'No — worldbuilding & notes', desc: 'Maps as reference and documentation.' },
     ],
   },
@@ -111,10 +111,11 @@ function mapAnswersToFeatures(answers: OnboardingAnswers): Record<WindroseFeatur
     flags.shapeOverlays = false;
   }
 
-  // Q3: not running games → no fog or measurement
+  // Q3: not running games → no fog, measurement, or beacon
   if ((answers['runGames'] ?? []).includes('no')) {
     flags.fogOfWar = false;
     flags.measurement = false;
+    flags.partyPin = false;
   }
 
   // Q4: no generated dungeons — also off when grid maps weren't chosen at all

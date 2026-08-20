@@ -343,7 +343,7 @@ const toolGroups: ToolGroup[] = [
     id: 'pin',
     subTools: [
       { id: 'addNote', label: 'Note Pin', title: 'Place Note Pin', icon: 'lucide-pin', shortcut: 'n', actionId: 'notePinTool', feature: 'notePins' },
-      { id: 'partyPin', label: 'Beacon', title: 'Place Beacon', icon: 'lucide-users' }
+      { id: 'partyPin', label: 'Beacon', title: 'Place Beacon', icon: 'lucide-users', feature: 'partyPin' }
     ]
   },
 ];
