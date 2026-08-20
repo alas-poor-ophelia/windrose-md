@@ -78,3 +78,6 @@ tests/fixtures/test-vault/Projects/dungeon-map-tracker
 *.db
 .beads-credential-key
 .beads/proxieddb/
+
+# Local plugin-folder backups (never commit)
+backups/
