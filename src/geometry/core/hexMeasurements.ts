@@ -292,74 +292,52 @@ function calculateFitZoom(
  *
  * The parent hex (center-to-vertex radius `parentHexSize`) is subdivided into a
  * child hex-grid of `rings` rings. A point at the parent hex CENTER maps to the
- * child origin (0,0); a point at the parent hex EDGE maps to the corresponding
- * edge of the child map. `anchorOffset{X,Y}` is the anchor's world position
- * MINUS the parent hex center (both in the parent's unrotated world space).
+ * child origin (0,0). `anchorOffset{X,Y}` is the anchor's world position MINUS
+ * the parent hex center (both in the parent's unrotated world space).
  *
- * The mapping is per-axis (parent-hex bounding box → child bounding box), so the
- * east edge maps to the child's east side, north to north, etc. `childHexSize`
- * is usually equal to `parentHexSize` (sub-maps inherit it), but is kept
- * separate so a resized child still lands correctly.
+ * The mapping is UNIFORM — one scale for both axes, the inverse of the
+ * continuity ratio (one parent hex spans rings*2+1 child cells across). At
+ * that scale the child ring-grid's hull inscribes exactly in the parent
+ * hexagon: its support along every parent edge normal is
+ * √3·childHexSize·(2·rings+1)/2, which the scale maps precisely onto the
+ * parent's √3·parentHexSize/2 — for flat AND pointy alike, so orientation
+ * doesn't enter. It must stay uniform: a per-axis (bounding-box) mapping here
+ * disagrees with the isotropic continuity zoom used to place the parent
+ * backdrop, which made the backdrop pan out of lockstep with the child grid
+ * on one orientation-dependent axis (the 2.3.x backdrop-drift bug).
+ * `childHexSize` is usually equal to `parentHexSize` (sub-maps inherit it),
+ * but is kept separate so a resized child still lands correctly.
  */
 function subHexAnchorToChildCenter(
   anchorOffsetX: number,
   anchorOffsetY: number,
   parentHexSize: number,
   childHexSize: number,
-  orientation: string,
   rings: number
 ): { x: number; y: number } {
-  const sqrt3 = Math.sqrt(3);
-  let parentHalfW: number, parentHalfH: number, childHalfW: number, childHalfH: number;
-  if (orientation === 'flat') {
-    parentHalfW = parentHexSize;                 // corner-to-corner / 2
-    parentHalfH = parentHexSize * sqrt3 / 2;     // edge-to-edge / 2
-    childHalfW = childHexSize * (rings * 1.5 + 1);
-    childHalfH = childHexSize * sqrt3 * (rings * 2 + 1) / 2;
-  } else {
-    parentHalfW = parentHexSize * sqrt3 / 2;
-    parentHalfH = parentHexSize;
-    childHalfW = childHexSize * sqrt3 * (rings * 2 + 1) / 2;
-    childHalfH = childHexSize * (rings * 1.5 + 1);
-  }
-  if (parentHalfW <= 0 || parentHalfH <= 0) return { x: 0, y: 0 };
-  return {
-    x: (anchorOffsetX / parentHalfW) * childHalfW,
-    y: (anchorOffsetY / parentHalfH) * childHalfH
-  };
+  if (parentHexSize <= 0 || childHexSize <= 0) return { x: 0, y: 0 };
+  const scale = (childHexSize * (rings * 2 + 1)) / parentHexSize; // child units per parent unit
+  return { x: anchorOffsetX * scale, y: anchorOffsetY * scale };
 }
 
 /**
  * Inverse of subHexAnchorToChildCenter: map a point in a sub-map's world space
  * back to the equivalent offset from its parent hex's center. Used when
- * surfacing out of a sub-hex to keep the exit view anchored on the same spot.
+ * surfacing out of a sub-hex to keep the exit view anchored on the same spot,
+ * and by the backdrop placement every frame — same uniform scale as the
+ * forward mapping, so the backdrop pans in exact lockstep with the grid.
  */
 function subHexChildPointToParentOffset(
   childX: number,
   childY: number,
   parentHexSize: number,
   childHexSize: number,
-  orientation: string,
   rings: number
 ): { x: number; y: number } {
-  const sqrt3 = Math.sqrt(3);
-  let parentHalfW: number, parentHalfH: number, childHalfW: number, childHalfH: number;
-  if (orientation === 'flat') {
-    parentHalfW = parentHexSize;
-    parentHalfH = parentHexSize * sqrt3 / 2;
-    childHalfW = childHexSize * (rings * 1.5 + 1);
-    childHalfH = childHexSize * sqrt3 * (rings * 2 + 1) / 2;
-  } else {
-    parentHalfW = parentHexSize * sqrt3 / 2;
-    parentHalfH = parentHexSize;
-    childHalfW = childHexSize * sqrt3 * (rings * 2 + 1) / 2;
-    childHalfH = childHexSize * (rings * 1.5 + 1);
-  }
-  if (childHalfW <= 0 || childHalfH <= 0) return { x: 0, y: 0 };
-  return {
-    x: (childX / childHalfW) * parentHalfW,
-    y: (childY / childHalfH) * parentHalfH
-  };
+  const cellsAcross = rings * 2 + 1;
+  if (parentHexSize <= 0 || childHexSize <= 0 || cellsAcross <= 0) return { x: 0, y: 0 };
+  const scale = parentHexSize / (childHexSize * cellsAcross); // parent units per child unit
+  return { x: childX * scale, y: childY * scale };
 }
 
 /**

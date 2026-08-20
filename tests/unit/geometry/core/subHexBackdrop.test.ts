@@ -59,7 +59,6 @@ function continuityView(capture: SubHexBackdropCapture): BackdropView {
     capture.view.center.y - capture.hexCenterWorld.y,
     capture.parentHexSize,
     capture.childHexSize,
-    capture.orientation,
     capture.rings
   );
   return {
@@ -175,11 +174,10 @@ describe("subHexBackdrop", () => {
       expect(placement).not.toBeNull();
       expect(placement!.dx).toBeLessThan(centered!.dx);
       expect(placement!.dy).toBeCloseTo(centered!.dy, 6);
-      // The shift is the child pan expressed in parent world units, times the
-      // equivalent parent zoom.
+      // The child pan mapped to parent world units (× the continuity ratio),
+      // times the equivalent parent zoom.
       const parentZoom = base.zoom / RATIO;
-      const childHalfW = CHILD_HEX_SIZE * (RINGS * 1.5 + 1);
-      const expected = -(40 / childHalfW) * PARENT_HEX_SIZE * parentZoom;
+      const expected = -(40 * RATIO) * parentZoom;
       expect(placement!.dx - centered!.dx).toBeCloseTo(expected, 6);
     });
 
@@ -193,6 +191,33 @@ describe("subHexBackdrop", () => {
 
       expect(placement!.dx).toBeCloseTo(centered!.dx, 6);
       expect(placement!.dy).toBeGreaterThan(centered!.dy);
+    });
+
+    it("pans in exact lockstep with the child grid on BOTH axes (drift regression)", () => {
+      // The grid layer's screen shift per unit of child-center pan is exactly
+      // -childZoom (offset = canvas/2 − center·zoom). The backdrop must shift
+      // at the identical rate on both axes, for both orientations — the 2.3.0
+      // per-axis mapping drifted at ~1.3× on one orientation-dependent axis.
+      for (const orientation of ["flat", "pointy"]) {
+        const capture = makeCapture({ orientation });
+        const base = continuityView(capture);
+        const dCenter = 37;
+
+        const centered = computeBackdropPlacement(base, capture, TARGET)!;
+        const pannedX = computeBackdropPlacement(
+          { zoom: base.zoom, center: { x: base.center.x + dCenter, y: base.center.y } },
+          capture,
+          TARGET
+        )!;
+        const pannedY = computeBackdropPlacement(
+          { zoom: base.zoom, center: { x: base.center.x, y: base.center.y + dCenter } },
+          capture,
+          TARGET
+        )!;
+
+        expect((pannedX.dx - centered.dx) / dCenter).toBeCloseTo(-base.zoom, 10);
+        expect((pannedY.dy - centered.dy) / dCenter).toBeCloseTo(-base.zoom, 10);
+      }
     });
 
     it("returns null once the snapshot is entirely off screen", () => {

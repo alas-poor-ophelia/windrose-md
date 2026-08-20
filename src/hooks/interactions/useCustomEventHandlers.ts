@@ -117,7 +117,6 @@ function useCustomEventHandlers({
             anchor.worldY - parentCenter.worldY,
             parentHexSize,
             childHexSize,
-            orientation,
             rings
           );
         }

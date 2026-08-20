@@ -366,80 +366,113 @@ describe("hexMeasurements", () => {
   describe("subHexAnchorToChildCenter", () => {
     const HEX = 30;
     const RINGS = 7;
+    const CELLS_ACROSS = RINGS * 2 + 1;
 
     it("maps the parent hex center to the child origin", () => {
-      const c = subHexAnchorToChildCenter(0, 0, HEX, HEX, "flat", RINGS);
+      const c = subHexAnchorToChildCenter(0, 0, HEX, HEX, RINGS);
       expect(c.x).toBe(0);
       expect(c.y).toBe(0);
     });
 
-    it("maps the parent hex EAST edge to the child's east edge (flat)", () => {
-      // Flat hex: east vertex sits at +hexSize in world X.
-      const c = subHexAnchorToChildCenter(HEX, 0, HEX, HEX, "flat", RINGS);
-      // Child half-width (flat) = hexSize * (rings*1.5 + 1).
-      const childHalfW = HEX * (RINGS * 1.5 + 1);
-      expect(c.x).toBeCloseTo(childHalfW, 6);
-      expect(c.y).toBeCloseTo(0, 6);
+    it("scales uniformly by cells-across (both axes, one scale)", () => {
+      // The mapping must be the exact inverse of the continuity ratio —
+      // anything per-axis makes the backdrop pan out of lockstep with the grid.
+      const c = subHexAnchorToChildCenter(HEX, HEX / 2, HEX, HEX, RINGS);
+      expect(c.x).toBeCloseTo(HEX * CELLS_ACROSS, 6);
+      expect(c.y).toBeCloseTo((HEX / 2) * CELLS_ACROSS, 6);
     });
 
-    it("maps the parent hex NORTH edge to the child's north side (flat)", () => {
-      // Flat hex: flat edge sits at hexSize*sqrt(3)/2 in world Y.
-      const c = subHexAnchorToChildCenter(0, (HEX * SQRT3) / 2, HEX, HEX, "flat", RINGS);
-      const childHalfH = (HEX * SQRT3 * (RINGS * 2 + 1)) / 2;
-      expect(c.x).toBeCloseTo(0, 6);
-      expect(c.y).toBeCloseTo(childHalfH, 6);
+    it("matches the continuity zoom's scale exactly", () => {
+      const ratio = subHexContinuityZoom(1, HEX, HEX, RINGS); // parent units per child unit
+      const c = subHexAnchorToChildCenter(7, -11, HEX, HEX, RINGS);
+      expect(c.x * ratio).toBeCloseTo(7, 10);
+      expect(c.y * ratio).toBeCloseTo(-11, 10);
     });
 
     it("is sign-preserving and monotonic (a point left of center lands left)", () => {
-      const left = subHexAnchorToChildCenter(-HEX / 2, 0, HEX, HEX, "flat", RINGS);
-      const right = subHexAnchorToChildCenter(HEX / 2, 0, HEX, HEX, "flat", RINGS);
+      const left = subHexAnchorToChildCenter(-HEX / 2, 0, HEX, HEX, RINGS);
+      const right = subHexAnchorToChildCenter(HEX / 2, 0, HEX, HEX, RINGS);
       expect(left.x).toBeLessThan(0);
       expect(right.x).toBeGreaterThan(0);
       expect(right.x).toBeCloseTo(-left.x, 6);
     });
 
-    it("maps the parent hex NORTH vertex to the child's north edge (pointy)", () => {
-      // Pointy hex: top vertex sits at +hexSize in world Y.
-      const c = subHexAnchorToChildCenter(0, HEX, HEX, HEX, "pointy", RINGS);
-      const childHalfH = HEX * (RINGS * 1.5 + 1);
-      expect(c.x).toBeCloseTo(0, 6);
-      expect(c.y).toBeCloseTo(childHalfH, 6);
+    it("accounts for a resized child hex size", () => {
+      // Child hexes half the size: same parent point lands at half the world distance.
+      const full = subHexAnchorToChildCenter(HEX, 0, HEX, HEX, RINGS);
+      const half = subHexAnchorToChildCenter(HEX, 0, HEX, HEX / 2, RINGS);
+      expect(half.x).toBeCloseTo(full.x / 2, 6);
     });
 
     it("returns the origin for a degenerate (zero-size) parent hex", () => {
-      const c = subHexAnchorToChildCenter(5, 5, 0, 0, "flat", RINGS);
+      const c = subHexAnchorToChildCenter(5, 5, 0, 0, RINGS);
       expect(c).toEqual({ x: 0, y: 0 });
     });
   });
 
   // ===========================================================================
-  // Child-point → parent-offset remap (seamless surface)
+  // Child-point → parent-offset remap (seamless surface + backdrop placement)
   // ===========================================================================
 
   describe("subHexChildPointToParentOffset", () => {
     const HEX = 30;
     const RINGS = 7;
 
-    it("is the inverse of subHexAnchorToChildCenter (flat)", () => {
-      const child = subHexAnchorToChildCenter(12, -8, HEX, HEX, "flat", RINGS);
-      const back = subHexChildPointToParentOffset(child.x, child.y, HEX, HEX, "flat", RINGS);
+    it("is the inverse of subHexAnchorToChildCenter", () => {
+      const child = subHexAnchorToChildCenter(12, -8, HEX, HEX, RINGS);
+      const back = subHexChildPointToParentOffset(child.x, child.y, HEX, HEX, RINGS);
       expect(back.x).toBeCloseTo(12, 6);
       expect(back.y).toBeCloseTo(-8, 6);
     });
 
-    it("is the inverse of subHexAnchorToChildCenter (pointy)", () => {
-      const child = subHexAnchorToChildCenter(-7, 15, HEX, HEX, "pointy", RINGS);
-      const back = subHexChildPointToParentOffset(child.x, child.y, HEX, HEX, "pointy", RINGS);
+    it("round-trips with a resized child hex size", () => {
+      const child = subHexAnchorToChildCenter(-7, 15, HEX, HEX / 3, RINGS);
+      const back = subHexChildPointToParentOffset(child.x, child.y, HEX, HEX / 3, RINGS);
       expect(back.x).toBeCloseTo(-7, 6);
       expect(back.y).toBeCloseTo(15, 6);
     });
 
     it("maps the child origin to the parent hex center", () => {
-      expect(subHexChildPointToParentOffset(0, 0, HEX, HEX, "flat", RINGS)).toEqual({ x: 0, y: 0 });
+      expect(subHexChildPointToParentOffset(0, 0, HEX, HEX, RINGS)).toEqual({ x: 0, y: 0 });
+    });
+
+    it("uses the continuity ratio as its scale (backdrop pan lockstep)", () => {
+      // The backdrop pans at d(parentOffset)/d(childPoint) · parentZoom where
+      // parentZoom = childZoom / ratio. Lockstep with the grid (rate exactly
+      // childZoom) therefore requires this mapping's scale to BE the ratio.
+      const ratio = subHexContinuityZoom(1, HEX, HEX, RINGS);
+      const p = subHexChildPointToParentOffset(100, -40, HEX, HEX, RINGS);
+      expect(p.x).toBeCloseTo(100 * ratio, 10);
+      expect(p.y).toBeCloseTo(-40 * ratio, 10);
+    });
+
+    it("keeps the child ring-grid hull inscribed in the parent hexagon", () => {
+      // Support of a ring-R grid's hull along every parent-hex edge normal is
+      // √3·childHexSize·(2R+1)/2 (flat and pointy alike, by symmetry). Mapped
+      // to parent space it must not exceed the parent's edge distance √3·P/2.
+      const hullSupport = (SQRT3 * HEX * (RINGS * 2 + 1)) / 2;
+      const parentEdgeDistance = (SQRT3 * HEX) / 2;
+      // Flat-top parent edge normals: (0,±1), (±√3/2, ±1/2). Check one of each
+      // family; the rest follow by symmetry.
+      for (const n of [
+        { x: 0, y: 1 },
+        { x: SQRT3 / 2, y: 0.5 },
+      ]) {
+        const extreme = subHexChildPointToParentOffset(
+          hullSupport * n.x,
+          hullSupport * n.y,
+          HEX,
+          HEX,
+          RINGS
+        );
+        const support = extreme.x * n.x + extreme.y * n.y;
+        expect(support).toBeLessThanOrEqual(parentEdgeDistance + 1e-9);
+        expect(support).toBeCloseTo(parentEdgeDistance, 6); // exact inscription
+      }
     });
 
     it("returns the origin for a degenerate (zero-size) child grid", () => {
-      const c = subHexChildPointToParentOffset(5, 5, HEX, 0, "flat", RINGS);
+      const c = subHexChildPointToParentOffset(5, 5, HEX, 0, RINGS);
       expect(c).toEqual({ x: 0, y: 0 });
     });
   });

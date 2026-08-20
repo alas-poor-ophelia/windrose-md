@@ -7,12 +7,13 @@
  * canvas as it looked at dive time and never re-renders — the only thing that
  * changes is WHERE it lands on screen as the sub-map is panned and zoomed.
  *
- * A sub-map's world space is an affine remap of its parent hex (see
- * subHexAnchorToChildCenter / subHexChildPointToParentOffset in hexMeasurements),
- * so every child view has an equivalent PARENT view: zoom divided by the
- * continuity ratio, center mapped back through the parent hex. Placing the
- * snapshot is then just projecting its own capture-time parent view into that
- * equivalent view — one axis-aligned drawImage rect.
+ * A sub-map's world space is a UNIFORM remap of its parent hex (see
+ * subHexAnchorToChildCenter / subHexChildPointToParentOffset in hexMeasurements
+ * — one scale, both axes, same ratio as subHexContinuityZoom), so every child
+ * view has an equivalent PARENT view: zoom divided by the continuity ratio,
+ * center mapped back through the parent hex. Placing the snapshot is then just
+ * projecting its own capture-time parent view into that equivalent view — one
+ * axis-aligned drawImage rect that pans in exact lockstep with the child grid.
  */
 
 import { subHexChildPointToParentOffset, subHexContinuityZoom } from './hexMeasurements';
@@ -95,7 +96,6 @@ function computeBackdropPlacement(
     childView.center.y,
     parentHexSize,
     childHexSize,
-    capture.orientation,
     rings
   );
   const parentCenterX = capture.hexCenterWorld.x + offset.x;

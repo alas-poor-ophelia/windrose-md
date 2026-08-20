@@ -471,7 +471,6 @@ function useCanvasInteraction(
       const rings = subHex.subdivisionRings ?? 7;
       const parentHexSize = mapData.hexSize ?? DEFAULTS.hexSize;
       const childHexSize = child.hexSize ?? mapData.hexSize ?? DEFAULTS.hexSize;
-      const orientation = child.orientation ?? mapData.orientation ?? DEFAULTS.hexOrientation;
       // Clamped to the wheel ceiling: subHexContinuityZoom has no upper bound,
       // and an unusual child/parent hex-size ratio could otherwise open the
       // child above max zoom.
@@ -489,7 +488,6 @@ function useCanvasInteraction(
             anchorWorld.worldY - parentCenter.worldY,
             parentHexSize,
             childHexSize,
-            orientation,
             rings
           )
         : { x: 0, y: 0 };

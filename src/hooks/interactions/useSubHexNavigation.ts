@@ -332,7 +332,6 @@ function useSubHexNavigation({
         ?? currentSubHex.hexBounds?.maxRing ?? 7;
       const parentHexSize = parentMap.hexSize ?? DEFAULTS.hexSize;
       const childHexSize = currentSubHex.hexSize ?? parentHexSize;
-      const orientation = currentSubHex.orientation ?? parentMap.orientation ?? DEFAULTS.hexOrientation;
 
       const continuityRatio = subHexContinuityZoom(1, parentHexSize, childHexSize, rings);
       const parentZoom = Math.max(
@@ -347,7 +346,6 @@ function useSubHexNavigation({
         seamlessExit.childAnchor.y,
         parentHexSize,
         childHexSize,
-        orientation,
         rings
       );
       // center = anchor − screenOffset/zoom, with the screen offset rotated
