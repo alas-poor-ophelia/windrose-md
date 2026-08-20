@@ -41,10 +41,24 @@ function makeTab(overrides: Partial<PluginSettings> = {}): FakeTab {
   } as unknown as FakeTab;
 }
 
+/** Flatten page entries so lookups reach groups nested inside sub-pages. */
+function flattenPages(items: SettingDefinitionItem[]): SettingDefinitionItem[] {
+  return items.flatMap(item =>
+    'type' in item && item.type === 'page' && item.items != null
+      ? [item, ...flattenPages(item.items)]
+      : [item]);
+}
+
 function groupByHeading(items: SettingDefinitionItem[], heading: string): SettingDefinitionGroup {
-  const group = items.find(item => 'heading' in item && item.heading === heading);
+  const group = flattenPages(items).find(item => 'heading' in item && item.heading === heading);
   expect(group, `group "${heading}"`).toBeDefined();
   return group as SettingDefinitionGroup;
+}
+
+function pageByName(items: SettingDefinitionItem[], name: string): SettingDefinitionItem {
+  const page = items.find(item => 'type' in item && item.type === 'page' && 'name' in item && item.name === name);
+  expect(page, `page "${name}"`).toBeDefined();
+  return page as SettingDefinitionItem;
 }
 
 function controlItems(group: SettingDefinitionGroup): SettingDefinitionControl[] {
@@ -57,27 +71,66 @@ afterEach(() => {
 });
 
 describe('buildSettingDefinitions', () => {
-  it('returns the Phase 1+2 sections in imperative tab order', () => {
+  it('keeps a short root: banner, Features, then one sub-page per cluster', () => {
     const defs = buildSettingDefinitions(makeTab());
-    const headings = defs.map(d => ('heading' in d ? d.heading : undefined));
-    // undefined entries are the heading-less list/action sections that render
-    // under the preceding section heading (see settingDefinitionLists.ts).
+    const rootShape = defs.map(d => {
+      if ('type' in d && d.type === 'page') return `page:${'name' in d ? d.name : ''}`;
+      if ('heading' in d) return `group:${d.heading}`;
+      return 'row';
+    });
+    expect(rootShape).toEqual([
+      'row', // import banner (visible only with cached old data)
+      'group:Features',
+      'page:Display & behavior',
+      'page:Color palette',
+      'page:Dungeon generation',
+      'page:Fog of war',
+      'page:Measurement & travel',
+      'page:Tile sets',
+      'page:Objects',
+      'page:Keyboard shortcuts'
+    ]);
+  });
+
+  it('nests every former section inside its page, in the drafted order', () => {
+    const defs = buildSettingDefinitions(makeTab());
+    const headings = flattenPages(defs).map(d => ('heading' in d ? d.heading : undefined));
+    // undefined entries are page markers, bare rows, and the heading-less
+    // list/action sections that render under the preceding section heading.
+    const named = headings.filter((h): h is string => typeof h === 'string' && h !== '');
     const fixedPrefix = [
-      undefined, // import banner (bare row, visible only with cached old data)
-      'Features', 'Hex map settings', 'Color settings',
-      'Color palette', undefined,
-      'Dungeon generation', 'Fog of war', 'Map behavior', 'Distance measurement',
-      'Travel packs', undefined, undefined,
-      'Tile sets', undefined,
-      'Object types', 'Object sets', undefined, 'Object customization'
+      'Features',
+      'Map behavior', 'Color settings', 'Hex map settings',
+      'Color palette',
+      'Dungeon generation',
+      'Fog of war',
+      'Distance measurement', 'Travel packs',
+      'Tile sets',
+      'Object types', 'Object sets', 'Object customization'
     ];
-    expect(headings.slice(0, fixedPrefix.length)).toEqual(fixedPrefix);
-    // The remainder is one named list per object category (count varies with
-    // the built-in set); no hidden-objects group on default settings.
-    const rest = headings.slice(fixedPrefix.length);
-    expect(rest.length).toBeGreaterThan(0);
-    expect(rest.every(h => typeof h === 'string' && h !== '')).toBe(true);
-    expect(rest.some(h => h?.startsWith('Hidden objects'))).toBe(false);
+    expect(named.slice(0, fixedPrefix.length)).toEqual(fixedPrefix);
+    // The remainder is one named list per object category, then shortcuts;
+    // no hidden-objects group on default settings.
+    const rest = named.slice(fixedPrefix.length);
+    expect(rest.length).toBeGreaterThan(1);
+    expect(rest[rest.length - 1]).toBe('Keyboard shortcuts');
+    expect(rest.some(h => h.startsWith('Hidden objects'))).toBe(false);
+  });
+
+  it('gates the dungeon, fog, measurement, and tiles pages on their feature flags', () => {
+    const tab = makeTab({ features: { dungeonGenerator: false, fogOfWar: false, measurement: false, tiles: false } });
+    setPlugin({ settings: tab.plugin.settings } as never);
+    const defs = buildSettingDefinitions(tab);
+    for (const name of ['Dungeon generation', 'Fog of war', 'Measurement & travel', 'Tile sets']) {
+      const page = pageByName(defs, name);
+      const visible = ('visible' in page ? page.visible : undefined) as (() => boolean) | undefined;
+      expect(typeof visible, `page "${name}" visible()`).toBe('function');
+      expect(visible?.()).toBe(false);
+    }
+    for (const name of ['Display & behavior', 'Color palette', 'Objects', 'Keyboard shortcuts']) {
+      const page = pageByName(defs, name);
+      expect('visible' in page ? page.visible : undefined, `page "${name}" is ungated`).toBeUndefined();
+    }
   });
 
   it('declares one toggle per gateable feature under features.* keys', () => {
@@ -122,8 +175,9 @@ describe('buildSettingDefinitions', () => {
   it('gives every nameless info row a render callback so 1.13 renders it', () => {
     // The 1.13 declarative renderer silently drops control-less items whose
     // name is empty (verified live on 1.13.4); the no-op render keeps them.
-    const groups = buildSettingDefinitions(makeTab());
+    const groups = flattenPages(buildSettingDefinitions(makeTab()));
     const nameless = groups
+      .filter(g => !('type' in g && g.type === 'page'))
       .flatMap(g => ('items' in g ? g.items ?? [] : []))
       .filter(i => 'name' in i && i.name === '');
     expect(nameless.length).toBeGreaterThan(0);

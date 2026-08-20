@@ -723,27 +723,75 @@ function buildKeyboardShortcutsGroup(tab: SettingsTabThis): SettingDefinitionIte
 }
 
 /**
- * Full declarative definition set (Phases 1-3): every section of the
- * imperative tab, in the same order, plus the import banner up top. Still
- * behind the spike flag until the Phase 4 cut-over (minAppVersion bump +
- * imperative demolition); on 1.13+ a non-empty return renders ONLY these
- * definitions and skips display() entirely.
+ * Full declarative definition set. The root page stays short — the import
+ * banner, the Features switchboard, and one navigable sub-page
+ * (SettingDefinitionPage) per section cluster. Feature gating lives on the
+ * page entries; the builders' own group-level visible() predicates remain
+ * as redundant-but-harmless gates inside their pages.
  */
 function buildSettingDefinitions(tab: SettingsTabThis): SettingDefinitionItem[] {
   return [
     buildImportBannerItem(tab),
     buildFeaturesGroup(),
-    buildHexGroup(),
-    buildColorGroup(),
-    ...buildColorPaletteSections(tab),
-    buildDungeonGenerationGroup(tab),
-    buildFogGroup(tab),
-    buildBehaviorGroup(),
-    buildMeasurementGroup(tab),
-    ...buildTravelPackSections(tab),
-    ...buildTilesetSections(tab),
-    ...buildObjectTypesSections(tab),
-    buildKeyboardShortcutsGroup(tab)
+    {
+      type: 'page',
+      name: 'Display & behavior',
+      desc: 'Map sizing, controls, default colors, and hex map options',
+      items: [
+        buildBehaviorGroup(),
+        buildColorGroup(),
+        buildHexGroup()
+      ]
+    },
+    {
+      type: 'page',
+      name: 'Color palette',
+      desc: 'Edit, add, or hide drawing palette colors',
+      items: buildColorPaletteSections(tab)
+    },
+    {
+      type: 'page',
+      name: 'Dungeon generation',
+      desc: 'Default colors for generated dungeon styles',
+      visible: () => isFeatureEnabled('dungeonGenerator'),
+      items: [buildDungeonGenerationGroup(tab)]
+    },
+    {
+      type: 'page',
+      name: 'Fog of war',
+      desc: 'Default fog appearance and fog textures',
+      visible: () => isFeatureEnabled('fogOfWar'),
+      items: [buildFogGroup(tab)]
+    },
+    {
+      type: 'page',
+      name: 'Measurement & travel',
+      desc: 'Distances, units, diagonal rules, and travel packs',
+      visible: () => isFeatureEnabled('measurement'),
+      items: [
+        buildMeasurementGroup(tab),
+        ...buildTravelPackSections(tab)
+      ]
+    },
+    {
+      type: 'page',
+      name: 'Tile sets',
+      desc: 'Vault folders providing hex tile images',
+      visible: () => isFeatureEnabled('tiles'),
+      items: buildTilesetSections(tab)
+    },
+    {
+      type: 'page',
+      name: 'Objects',
+      desc: 'Object sets, custom objects, and per-category customization',
+      items: buildObjectTypesSections(tab)
+    },
+    {
+      type: 'page',
+      name: 'Keyboard shortcuts',
+      desc: 'Rebind map tool shortcuts',
+      items: [buildKeyboardShortcutsGroup(tab)]
+    }
   ];
 }
 
