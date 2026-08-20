@@ -1,3 +1,4 @@
+import { beforeEach } from "vitest";
 import {
   test,
   expect,
@@ -7,8 +8,14 @@ import {
   getCanvasCenter,
   selectToolByTitle,
   getHistoryButtons,
+  resetDataFile,
   TEST_MAPS
 } from "./helpers";
+
+// Saved routes persist across tests since the durability fix (quit-hold) —
+// these tests previously relied on teardown save LOSS for isolation. Reset
+// the data file so `.first()` route selectors never grab a prior test's route.
+beforeEach(() => resetDataFile());
 
 /**
  * Activate the measure tool and click a sequence of waypoints relative to

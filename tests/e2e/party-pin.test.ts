@@ -1,3 +1,4 @@
+import { beforeEach } from "vitest";
 import {
   test,
   expect,
@@ -9,8 +10,13 @@ import {
   selectSubTool,
   getHistoryButtons,
   doWithApp,
+  resetDataFile,
   TEST_MAPS
 } from "./helpers";
+
+// Pin state persists across tests since the durability fix (quit-hold) —
+// these tests previously relied on teardown save LOSS for isolation.
+beforeEach(() => resetDataFile());
 
 // ===========================================
 // Party Pin Tests
