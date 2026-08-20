@@ -17,6 +17,8 @@ import type { IGeometry } from '#types/core/geometry.types';
 import type { SubHexBackdropCapture } from '../geometry/core/subHexBackdrop';
 
 import { DEFAULTS } from './dmtConstants';
+import { getPaintedView } from './paintedViewStore';
+import { traceZoom } from '../utils/zoomTraceProbe';
 
 /** Rings a sub-map is created with; used when it doesn't exist yet. */
 const DEFAULT_SUBDIVISION_RINGS = 7;
@@ -78,6 +80,14 @@ function captureSubHexBackdrop({
   const parentHexSize = parentMapData.hexSize ?? DEFAULTS.hexSize;
   const hexCenter = geometry.gridToWorld(q, r);
 
+  // The snapshot copied the last PAINTED frame, which lags the live view by
+  // up to a frame under fast gestures (rapid unsettled dive/surface cycles).
+  // Label the bitmap with the view it actually depicts — labeling it with
+  // the live view makes placement project it from a view it doesn't show
+  // (backdrop wrong size / off center by gesture velocity × paint lag).
+  const paintedView = getPaintedView(canvas) ?? parentView;
+  traceZoom('capture', { liveZoom: parentView.zoom, paintedZoom: paintedView.zoom });
+
   entry = {
     snapshot,
     canvas,
@@ -85,7 +95,7 @@ function captureSubHexBackdrop({
       ? `${parentSubHexPath}/${hexKey}`
       : hexKey,
     capture: {
-      view: { zoom: parentView.zoom, center: { x: parentView.center.x, y: parentView.center.y } },
+      view: { zoom: paintedView.zoom, center: { x: paintedView.center.x, y: paintedView.center.y } },
       canvasSize: { width: canvas.width, height: canvas.height },
       hexCenterWorld: { x: hexCenter.worldX, y: hexCenter.worldY },
       parentHexSize,

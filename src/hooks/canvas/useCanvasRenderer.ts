@@ -23,6 +23,7 @@ import type {
 
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import { getTheme, getEffectiveSettings, getSettings } from '../../core/settingsAccessor';
+import { recordPaintedView } from '../../core/paintedViewStore';
 import { traceZoom } from '../../utils/zoomTraceProbe';
 import { buildCellLookup, calculateBordersOptimized } from '../../drawing/borderCalculator';
 import { getObjectType } from '../../objects/objectOperations';
@@ -451,6 +452,9 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     path: subHexPath,
     ring: mapData.hexBounds?.maxRing ?? null
   });
+  // Label the canvas with the view this frame paints — snapshot consumers
+  // (sub-hex backdrop capture) must know what the pixels actually depict.
+  recordPaintedView(canvas, viewState);
 
   // Clear canvas
   ctx.fillStyle = THEME.grid.background;
