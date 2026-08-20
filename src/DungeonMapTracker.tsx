@@ -13,6 +13,7 @@ import type { CustomColor } from '#types/core/common.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useMapData } from './hooks/state/useMapData';
+import { useImagePreloading } from './hooks/state/useImagePreloading';
 import { useLayerHistory } from './hooks/state/useLayerHistory';
 import { useToolState } from './hooks/state/useToolState';
 import { useFeatureFlags } from './hooks/state/useFeatureFlags';
@@ -105,6 +106,14 @@ interface DungeonMapTrackerProps {
   onMapDeleted?: () => void;
 }
 
+/**
+ * Delay before the sub-hex breadcrumb row tweens open after a dive: the
+ * seamless zoom should settle before the layout moves. The row expanding
+ * synchronously with the map swap reflowed the canvas mid-transition — the
+ * most visible part of the dive "blink" (windrose-1mc).
+ */
+const SUBHEX_ROW_REVEAL_DELAY_MS = 450;
+
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -112,7 +121,7 @@ interface DungeonMapTrackerProps {
 const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', initialSubHexPath, mcpKey, fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange, onMapDeleted }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
   useThemeMode();
-  const { mapData: rootMapData, isLoading, loadFailure, reload: reloadMapData, saveStatus, updateMapData: rootUpdateMapData, forceSave, markDeleted, tileImagesReady, getCachedImage } = useMapData(mapId, mapName, mapType);
+  const { mapData: rootMapData, isLoading, loadFailure, reload: reloadMapData, saveStatus, updateMapData: rootUpdateMapData, forceSave, markDeleted, settingsVersion, getCachedImage } = useMapData(mapId, mapName, mapType);
   const [mapDeleted, setMapDeleted] = useState(false);
 
   const {
@@ -134,6 +143,19 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Distance overrides for the active map: sub-hex levels get live-derived
   // scale from the parent chain; the root map uses its own stored settings.
   const distanceOverrides = activeDistanceOverrides ?? mapData?.settings?.distanceSettings;
+
+  // Sub-hex breadcrumb row reveal: opens on a delay after the dive settles
+  // (height tween + content fade in CSS, .windrose-subhex-row), closes
+  // immediately on exit so the collapse tween plays while the map swaps.
+  const [subHexRowOpen, setSubHexRowOpen] = useState(false);
+  useEffect(() => {
+    if (!isInSubHex) {
+      setSubHexRowOpen(false);
+      return undefined;
+    }
+    const t = window.setTimeout(() => setSubHexRowOpen(true), SUBHEX_ROW_REVEAL_DELAY_MS);
+    return () => window.clearTimeout(t);
+  }, [isInSubHex, subHexPath]);
 
   // Picture frame mode (locked embed view) is a property of the ROOT map — it
   // must survive sub-hex dives and reloads. Block mode only.
@@ -537,6 +559,20 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     [rootMapData?.tilesets, mapData?.tilesets]
   );
   const showTilePanel = mapData != null;
+
+  // Preload image assets for the ACTIVE map (root or sub-hex), not just the
+  // root: a dive re-scans the child's placed art, a surface re-warms anything
+  // the LRU evicted while below (windrose-1mc — cold child art painted as
+  // holes at the transition). Sub-map data doesn't carry the root-scoped
+  // tileset catalog, so enrich with availableTilesets — the same shape
+  // MapCanvas receives.
+  const preloadMapData = useMemo(
+    () => (mapData != null && availableTilesets.length > 0
+      ? { ...mapData, tilesets: availableTilesets }
+      : mapData),
+    [mapData, availableTilesets]
+  );
+  const { tileImagesReady } = useImagePreloading(app, preloadMapData, settingsVersion);
 
 
   // Stable handlers: TileAssetBrowser is memo()'d, so its props must keep
@@ -1053,7 +1089,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         {/* One-time upgrader notice pointing at the Features settings section. */}
         {onboarding === 'whatsnew' && !pictureFrameActive && <WhatsNewNotice />}
 
-        {isInSubHex && !pictureFrameActive && (
+        <div className={`windrose-subhex-row${subHexRowOpen && isInSubHex && !pictureFrameActive ? ' is-open' : ''}`}>
+          <div className="windrose-subhex-row-inner">
+          {isInSubHex && !pictureFrameActive && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <SubHexBreadcrumb
               breadcrumbs={breadcrumbs}
@@ -1096,7 +1134,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               </button>
             )}
           </div>
-        )}
+          )}
+          </div>
+        </div>
 
         <div className="windrose-stage">
         {!pictureFrameActive && <div className="windrose-toolbar-anchor">

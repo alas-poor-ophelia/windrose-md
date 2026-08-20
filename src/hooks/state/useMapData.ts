@@ -14,7 +14,6 @@ import { getDataFilePath } from '../../core/settingsAccessor';
 import { resolveJournalOnLoad } from '../../persistence/saveJournal';
 import { getCachedImage } from '../../assets/imageOperations';
 import { useDebouncedSave } from './useDebouncedSave';
-import { useImagePreloading } from './useImagePreloading';
 import { useTilesetBuilder } from './useTilesetBuilder';
 
 function useMapData(
@@ -89,11 +88,11 @@ function useMapData(
     };
   }, []);
 
-  // Compose sub-hooks
+  // Compose sub-hooks. Image preloading deliberately does NOT live here:
+  // this hook only ever holds the ROOT map, and preloading must follow the
+  // ACTIVE map (root or sub-hex) — the caller invokes useImagePreloading
+  // with the active map and this hook's settingsVersion (windrose-1mc).
   useTilesetBuilder(app, mapData, setMapData, isLoading, settingsVersion);
-
-  const { backgroundImageReady, fowImageReady, tileImagesReady } =
-    useImagePreloading(app, mapData, settingsVersion);
 
   const { saveStatus, updateMapData, forceSave, markDeleted } =
     useDebouncedSave(app, mapId, setMapData);
@@ -108,9 +107,7 @@ function useMapData(
     updateMapData,
     forceSave,
     markDeleted,
-    backgroundImageReady,
-    fowImageReady,
-    tileImagesReady,
+    settingsVersion,
     getCachedImage,
   };
 }

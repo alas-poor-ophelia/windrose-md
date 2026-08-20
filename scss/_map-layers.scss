@@ -923,6 +923,42 @@ button.windrose-region-visibility-btn {
 /* ==========================================================================
    SUB-HEX BREADCRUMB
    ========================================================================== */
+
+/* Reveal wrapper: the row tweens open AFTER a dive settles (the 0fr -> 1fr
+   grid-row transition animates height-to-auto natively), then the content
+   fades in once the height has mostly landed. Collapses immediately on exit
+   so the canvas reflow is a smooth slide, not a one-frame jump — the row
+   popping in synchronously with the map swap was the most visible part of
+   the dive "blink" (windrose-1mc). */
+.windrose-subhex-row {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 250ms ease;
+
+  > .windrose-subhex-row-inner {
+    overflow: hidden;
+    min-height: 0;
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+
+  &.is-open {
+    grid-template-rows: 1fr;
+
+    > .windrose-subhex-row-inner {
+      opacity: 1;
+      transition: opacity 180ms ease 180ms;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .windrose-subhex-row,
+  .windrose-subhex-row > .windrose-subhex-row-inner {
+    transition: none;
+  }
+}
+
 .windrose-sub-hex-breadcrumb {
   display: flex;
   align-items: center;

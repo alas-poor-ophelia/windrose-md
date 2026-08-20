@@ -69,14 +69,12 @@ export interface UseMapDataResult {
   /** Permanently disable all saves for this instance (post-deletion guard) */
   markDeleted: () => void;
 
-  /** Whether the background image has been preloaded */
-  backgroundImageReady: boolean;
-
-  /** Whether the fog of war texture has been preloaded */
-  fowImageReady: boolean;
-
-  /** Whether tile images have been preloaded */
-  tileImagesReady: boolean;
+  /**
+   * Bumped when plugin settings change. Exposed so the caller can drive
+   * useImagePreloading against the ACTIVE map (root or sub-hex) — preloading
+   * deliberately does not live in this root-scoped hook (windrose-1mc).
+   */
+  settingsVersion: number;
 
   /** Get a cached image element by vault path (null if not loaded) */
   getCachedImage: (path: string) => HTMLImageElement | null;

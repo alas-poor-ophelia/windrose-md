@@ -21,8 +21,9 @@ import type {
   RendererViewState,
 } from '#types/hooks/canvasRenderer.types';
 
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import { getTheme, getEffectiveSettings, getSettings } from '../../core/settingsAccessor';
+import { traceZoom } from '../../utils/zoomTraceProbe';
 import { buildCellLookup, calculateBordersOptimized } from '../../drawing/borderCalculator';
 import { getObjectType } from '../../objects/objectOperations';
 import { getRenderChar } from '../../objects/objectTypeResolver';
@@ -442,6 +443,14 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   const viewState = liveViewState ?? mapData.viewState;
   if (!viewState) return;
   const { zoom, center } = viewState;
+
+  traceZoom('paint', {
+    zoom,
+    live: liveViewState != null,
+    map: mapData.name ?? '(unnamed)',
+    path: subHexPath,
+    ring: mapData.hexBounds?.maxRing ?? null
+  });
 
   // Clear canvas
   ctx.fillStyle = THEME.grid.background;
@@ -999,7 +1008,13 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
     subHexPath: typeof subHexPath;
   } | null>(null);
 
-  useEffect(() => {
+  // useLayoutEffect (not useEffect): the inputs ref must refresh at COMMIT,
+  // before any already-scheduled rAF can fire. The sub-hex swap boundary
+  // (useCanvasInteraction) syncs the new map's view into the ViewController
+  // in its own layout effect, which schedules a render — with a deferred
+  // useEffect here, that frame painted the OLD map at the NEW view (the
+  // "giant grid" ghost frame on surfacing, windrose-1mc trace 2026-08-20).
+  useLayoutEffect(() => {
     renderInputsRef.current = { mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, hiddenTileLayers, tileImagesReady, draggingWallId, subHexPath };
     const scheduleRender = (): void => {
       // A frame is already queued — it will pick up the latest inputs from the ref.

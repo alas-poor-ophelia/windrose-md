@@ -15,6 +15,57 @@ interface UseImagePreloadingResult {
   tileImagesReady: boolean;
 }
 
+/**
+ * Every image path a map's render actually needs: tile art placed on layers,
+ * wall-path strips (+ end caps), terrain-stroke textures. Pure collection —
+ * shared by the preloading hook and the pre-dive prewarm.
+ */
+function collectPlacedImagePaths(mapData: MapData): Set<string> {
+  const placedPaths = new Set<string>();
+  if (mapData.tilesets == null || mapData.tilesets.length === 0) return placedPaths;
+  for (const layer of mapData.layers) {
+    if (layer.tiles) {
+      for (const tile of layer.tiles) {
+        const ts = mapData.tilesets.find(t => t.id === tile.tilesetId);
+        const entry = resolveTileEntry(ts, tile.tileId);
+        if (entry?.vaultPath != null && entry.vaultPath !== '') placedPaths.add(entry.vaultPath);
+      }
+    }
+    // Wall path strips + their end caps are render-time images too.
+    if (layer.wallPaths != null && layer.wallPaths.length > 0) {
+      for (const p of collectWallPathImagePaths(layer.wallPaths, mapData.tilesets, getTileMetadataForRender())) {
+        placedPaths.add(p);
+      }
+    }
+    // Terrain brush strokes reference region textures like placed tiles.
+    if (layer.terrainStrokes != null && layer.terrainStrokes.length > 0) {
+      for (const s of layer.terrainStrokes) {
+        const ts = mapData.tilesets.find(t => t.id === s.tilesetId);
+        const entry = resolveTileEntry(ts, s.tileId);
+        if (entry?.vaultPath != null && entry.vaultPath !== '') placedPaths.add(entry.vaultPath);
+      }
+    }
+  }
+  return placedPaths;
+}
+
+/**
+ * Fire-and-forget asset warm-up for a map that is ABOUT to render (e.g. the
+ * target child of a seamless dive, warmed while the zoom is still
+ * approaching the ceiling — windrose-1mc: cold child art painted as holes).
+ * preloadImage dedupes in-flight loads and no-ops on cached paths, so
+ * calling this repeatedly is cheap.
+ */
+function prewarmMapAssets(app: App, mapData: MapData): void {
+  const bgPath = mapData.backgroundImage?.path;
+  if (bgPath != null && bgPath !== '') void preloadImage(app, bgPath);
+  const fowImagePath = getEffectiveSettings(mapData.settings).fogOfWarImage;
+  if (fowImagePath != null && fowImagePath !== '') void preloadImage(app, fowImagePath);
+  for (const path of collectPlacedImagePaths(mapData)) {
+    if (!getCachedImage(path)) void preloadImage(app, path);
+  }
+}
+
 function useImagePreloading(
   app: App,
   mapData: MapData | null,
@@ -79,32 +130,7 @@ function useImagePreloading(
 
     // Only preload tiles actually placed on the map, not the entire catalog.
     // The tile browser loads thumbnails on-demand via CSS background-image.
-    const placedPaths = new Set<string>();
-    for (const layer of mapData.layers) {
-      if (layer.tiles) {
-        for (const tile of layer.tiles) {
-          const tsId = tile.tilesetId;
-          const tId = tile.tileId;
-          const ts = mapData.tilesets.find(t => t.id === tsId);
-          const entry = resolveTileEntry(ts, tId);
-          if (entry?.vaultPath != null && entry.vaultPath !== '') placedPaths.add(entry.vaultPath);
-        }
-      }
-      // Wall path strips + their end caps are render-time images too.
-      if (layer.wallPaths != null && layer.wallPaths.length > 0) {
-        for (const p of collectWallPathImagePaths(layer.wallPaths, mapData.tilesets, getTileMetadataForRender())) {
-          placedPaths.add(p);
-        }
-      }
-      // Terrain brush strokes reference region textures like placed tiles.
-      if (layer.terrainStrokes != null && layer.terrainStrokes.length > 0) {
-        for (const s of layer.terrainStrokes) {
-          const ts = mapData.tilesets.find(t => t.id === s.tilesetId);
-          const entry = resolveTileEntry(ts, s.tileId);
-          if (entry?.vaultPath != null && entry.vaultPath !== '') placedPaths.add(entry.vaultPath);
-        }
-      }
-    }
+    const placedPaths = collectPlacedImagePaths(mapData);
 
     if (placedPaths.size === 0) {
       setTileImagesReady(true);
@@ -135,4 +161,4 @@ function useImagePreloading(
   return { backgroundImageReady, fowImageReady, tileImagesReady };
 }
 
-export { useImagePreloading };
+export { useImagePreloading, collectPlacedImagePaths, prewarmMapAssets };

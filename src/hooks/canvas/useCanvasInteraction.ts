@@ -25,7 +25,9 @@ import type { ViewController } from '#types/hooks/viewController.types';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULTS } from '../../core/dmtConstants';
+import { getApp } from '../../core/settingsAccessor';
 import { captureSubHexBackdrop } from '../../core/subHexBackdropStore';
+import { prewarmMapAssets } from '../state/useImagePreloading';
 import { traceZoom } from '../../utils/zoomTraceProbe';
 import { calculateFitZoom, subHexAnchorToChildCenter, subHexContinuityZoom } from '../../geometry/core/hexMeasurements';
 
@@ -86,6 +88,12 @@ const SEAMLESS_SURFACE_FIT_FRACTION = 0.5;
 const SEAMLESS_SURFACE_CONTINUITY_FRACTION = 0.8;
 /** Ignore further transitions briefly after one fires (wheel bursts re-tick). */
 const SEAMLESS_COOLDOWN_MS = 600;
+/**
+ * Zoom at which an approaching dive starts prewarming the target child's
+ * image assets, so the swap's first frame paints complete instead of with
+ * cold-image holes (windrose-1mc).
+ */
+const SEAMLESS_PREWARM_ZOOM = 3;
 
 /**
  * Heuristic: does this wheel event come from a trackpad two-finger scroll
@@ -168,6 +176,13 @@ function useCanvasInteraction(
   const wheelModeRef = useRef<'pan' | 'zoom' | null>(null);
   // Timestamp of the last seamless sub-hex dive/surface, for the cooldown.
   const seamlessTransitionAtRef = useRef<number>(0);
+  // Sub-hex key whose assets were last prewarmed (avoids re-firing per tick).
+  const prewarmedSubHexKeyRef = useRef<string | null>(null);
+  // Set when a touch pinch rides THROUGH a seamless dive/surface: the next
+  // updateTouchPan tick re-anchors (fresh center/distance baselines, fresh
+  // gesture) on the new map instead of applying a delta, so the pinch's
+  // momentum carries across the swap. Ref-only — no mid-gesture setState.
+  const touchReanchorRef = useRef<boolean>(false);
   // Zoom at gesturestart of a WebKit trackpad pinch (null = no pinch active).
   // GestureEvent `scale` is cumulative from the gesture's start.
   const webkitGestureStartZoomRef = useRef<number | null>(null);
@@ -280,19 +295,18 @@ function useCanvasInteraction(
       viewController.cancelIfCurrent(gestureIdRef.current);
       gestureIdRef.current = null;
     }
-    panStartRef.current = null;
-    panAnchorStaleRef.current = false;
-    // A touch-pan live at the swap (wheel/trackpad dive during a 2-finger drag,
-    // e.g. iPad + Magic Trackpad) resets ref AND state together, like every
-    // touch-anchor writer. This is stopTouchPan minus the commit (the dive
-    // already committed; the tail must die uncommitted).
+    // A mouse drag-pan live at the swap also rides through: re-anchor on the
+    // next updatePan tick (its stale branch re-opens a gesture if needed).
+    if (isPanningRef.current) panAnchorStaleRef.current = true;
+    // Hex keys are per-map — a "0,0" in the new map is a different sub-hex.
+    prewarmedSubHexKeyRef.current = null;
+    // A touch pinch live at the swap rides THROUGH it: mark it for re-anchor
+    // (fresh baselines + fresh gesture on the next tick) instead of killing
+    // it, so the zoom's momentum carries into the new map. The stale anchors
+    // stay non-null on purpose — updateTouchPan's entry guard must pass so
+    // the re-anchor branch can run; it overwrites them before any delta math.
     if (isTouchPanningRef.current) {
-      setIsTouchPanning(false);
-      isTouchPanningRef.current = false;
-      setTouchPanStart(null);
-      touchPanStartRef.current = null;
-      setInitialPinchDistance(null);
-      initialPinchDistanceRef.current = null;
+      touchReanchorRef.current = true;
     }
     // Deliberate duplicate of MapCanvas's viewState-sync effect: that one is a
     // post-paint useEffect and no-ops against an open gesture — here the
@@ -462,6 +476,19 @@ function useCanvasInteraction(
     if (Date.now() - seamlessTransitionAtRef.current < SEAMLESS_COOLDOWN_MS) return false;
 
     if (zoomingIn) {
+      // Approach band: prewarm the target child's image assets while the
+      // zoom is still climbing toward the ceiling, so the dive's first frame
+      // paints complete instead of with cold-image holes. Fire-and-forget,
+      // deduped per hex key; preloadImage itself dedupes in-flight loads.
+      if (newZoom >= SEAMLESS_PREWARM_ZOOM && newZoom < MAX_WHEEL_ZOOM - SEAMLESS_DIVE_EPSILON) {
+        const warmCoords = screenToGrid(anchorClientX, anchorClientY);
+        const warmKey = warmCoords != null ? `${warmCoords.x},${warmCoords.y}` : null;
+        const warmTarget = warmKey != null ? mapData.subHexMaps?.[warmKey] : undefined;
+        if (warmTarget != null && warmKey !== prewarmedSubHexKeyRef.current) {
+          prewarmedSubHexKeyRef.current = warmKey;
+          prewarmMapAssets(getApp(), { ...warmTarget.mapData, tilesets: mapData.tilesets });
+        }
+      }
       // Fire on the tick that REACHES the ceiling (not the one after it), so
       // there are no dead ticks pinned at max zoom before the dive.
       if (newZoom < MAX_WHEEL_ZOOM - SEAMLESS_DIVE_EPSILON) return false;
@@ -812,9 +839,13 @@ function useCanvasInteraction(
     if (!geometry) return;
 
     if (panAnchorStaleRef.current) {
-      // A multi-touch intervened since the anchor was last rolled — re-anchor
-      // at the current pointer and apply no delta this tick.
+      // A multi-touch intervened since the anchor was last rolled, or the map
+      // swapped under the drag (seamless dive/surface) — re-anchor at the
+      // current pointer and apply no delta this tick. After a swap the old
+      // gesture token was cancelled at the boundary; reopen one so the
+      // continued drag can commit (?? keeps a still-valid token intact).
       panAnchorStaleRef.current = false;
+      gestureIdRef.current ??= viewController.beginGesture();
       const { center } = viewController.getLive();
       panStartRef.current = { x: clientX, y: clientY, centerX: center.x, centerY: center.y };
       return;
@@ -871,6 +902,7 @@ function useCanvasInteraction(
   const startTouchPan = (center: TouchCenter): void => {
     clearWheelSettle(); // a pinch/two-finger pan takes over any in-flight wheel gesture
     traceZoom('touchStart', { zoom: viewController.getLive().zoom });
+    touchReanchorRef.current = false;
     setIsTouchPanning(true);
     isTouchPanningRef.current = true;
     setTouchPanStart(center);
@@ -896,6 +928,18 @@ function useCanvasInteraction(
     const center = getTouchCenter(touches);
     const distance = getTouchDistance(touches);
     if (center == null || distance == null) return;
+
+    if (touchReanchorRef.current) {
+      // The pinch just crossed a seamless dive/surface — re-anchor its
+      // baselines at the current fingers and open a fresh gesture on the
+      // new map's view (the old token was cancelled at the boundary). Zero
+      // delta this tick; momentum resumes on the next.
+      touchReanchorRef.current = false;
+      touchPanStartRef.current = center;
+      initialPinchDistanceRef.current = distance;
+      gestureIdRef.current = viewController.beginGesture();
+      return;
+    }
 
     const startCenter = touchPanStartRef.current;
     const deltaX = center.x - startCenter.x;
@@ -923,10 +967,15 @@ function useCanvasInteraction(
       newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, zoom * scale));
       traceZoom('touchTick', { d: distance, d0: initialPinchDistanceRef.current, scale, zoom, newZoom });
 
-      // Seamless sub-hex dive/surface: end the touch gesture cleanly when it
-      // fires — the map is about to swap under the user's fingers.
+      // Seamless sub-hex dive/surface: the pinch rides through the swap.
+      // (An earlier hard stopTouchPan() here guarded the swap race that the
+      // subHexPath boundary effect now actually fixes — killing the gesture
+      // halted the zoom's momentum at every transition.) The transition
+      // already committed the outgoing view; mark the anchors for re-anchor
+      // so the remaining pinch continues on the new map from its continuity
+      // view. Physically feel-test any change here — this is live-gesture code.
       if (scale !== 1 && maybeSeamlessSubHexTransition(scale > 1, zoom, newZoom, center.x, center.y)) {
-        stopTouchPan();
+        touchReanchorRef.current = true;
         return;
       }
     }
@@ -948,6 +997,7 @@ function useCanvasInteraction(
 
   const stopTouchPan = (): void => {
     traceZoom('touchStop', { zoom: viewController.getLive().zoom });
+    touchReanchorRef.current = false;
     setIsTouchPanning(false);
     isTouchPanningRef.current = false;
     setTouchPanStart(null);
