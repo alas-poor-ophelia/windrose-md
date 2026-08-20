@@ -111,7 +111,8 @@ export interface CanvasInteractionSetters {
   setIsTouchPanning: Dispatch<StateUpdater<boolean>>;
   setPanStart: Dispatch<StateUpdater<PanStart | null>>;
   setTouchPanStart: Dispatch<StateUpdater<TouchCenter | null>>;
-  setInitialPinchDistance: Dispatch<StateUpdater<number | null>>;
+  /** Seeds the pinch baseline into ref and state together — plain values only. */
+  setInitialPinchDistance: (distance: number | null) => void;
   setSpaceKeyPressed: Dispatch<StateUpdater<boolean>>;
 }
 

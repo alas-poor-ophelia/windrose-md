@@ -17,6 +17,7 @@ import { VIEW_TYPE_WINDROSE_MAP, WindroseMapView } from './views/WindroseMapView
 import { recordPerfTelemetry } from './utils/perfTelemetry';
 import { writeCanvasCapabilityReport } from './utils/canvasCapabilityReport';
 import { recordInputEventProbe } from './utils/inputEventProbe';
+import { recordZoomTrace } from './utils/zoomTraceProbe';
 import { scanTilesetFolder } from './assets/tilesetOperations';
 import { enqueueDataFileOp, getSaveQueue, notifyCorruptedDataFile } from './persistence/fileOperations';
 import { flushAll, installLifecycleJournaling, journalAll } from './persistence/saveCoordinator';
@@ -94,6 +95,11 @@ export default class WindrosePlugin extends Plugin {
       id: 'input-event-probe',
       name: 'Record input event probe (15s)',
       callback: () => { void recordInputEventProbe(this.app); },
+    });
+    this.addCommand({
+      id: 'zoom-trace-probe',
+      name: 'Record zoom trace (25s)',
+      callback: () => { void recordZoomTrace(this.app); },
     });
     this.addCommand({
       id: 'canvas-capability-report',

@@ -24,6 +24,7 @@ import type { StoredViewState } from '#types/core/map.types';
 import type { ViewController } from '#types/hooks/viewController.types';
 
 import { useRef } from 'preact/hooks';
+import { traceZoom } from '../../utils/zoomTraceProbe';
 
 export type { ViewController };
 
@@ -58,6 +59,7 @@ function useViewController(
       getLive: () => s.live,
       isGesturing: () => s.gestureId != null,
       setLive: (vs) => {
+        traceZoom('vc.setLive', { zoom: vs.zoom, gid: s.gestureId });
         s.live = vs;
         s.renderCb();
         notifyLive();
@@ -65,23 +67,32 @@ function useViewController(
       beginGesture: () => {
         s.gestureId = s.nextId;
         s.nextId += 1;
+        traceZoom('vc.begin', { gid: s.gestureId });
         return s.gestureId;
       },
       commitIfCurrent: (gestureId, vs) => {
-        if (gestureId !== s.gestureId) return;
+        if (gestureId !== s.gestureId) {
+          traceZoom('vc.commitStale', { gid: gestureId, cur: s.gestureId, zoom: vs.zoom });
+          return;
+        }
+        traceZoom('vc.commit', { gid: gestureId, zoom: vs.zoom });
         s.live = vs;
         s.gestureId = null;
         commitRef.current(vs);
         notifyLive();
       },
       cancelIfCurrent: (gestureId) => {
+        traceZoom('vc.cancel', { gid: gestureId, matched: gestureId === s.gestureId });
         if (gestureId === s.gestureId) s.gestureId = null;
       },
       syncCommitted: (vs) => {
         if (s.gestureId == null) {
+          traceZoom('vc.sync', { zoom: vs.zoom });
           s.live = vs;
           s.renderCb();
           notifyLive();
+        } else {
+          traceZoom('vc.syncBlocked', { zoom: vs.zoom, gid: s.gestureId });
         }
       },
       setRenderCallback: (cb) => {

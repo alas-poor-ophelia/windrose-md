@@ -19,6 +19,7 @@ import { generateLayerId } from '../../persistence/layerAccessor';
 import { clearSubHexBackdrop } from '../../core/subHexBackdropStore';
 import { calculateFitZoom, subHexChildPointToParentOffset, subHexContinuityZoom } from '../../geometry/core/hexMeasurements';
 import { createGeometry } from '../../geometry/core/createGeometry';
+import { traceZoom } from '../../utils/zoomTraceProbe';
 import { resolveSubHexDistanceSettings } from '../../drawing/distanceOperations';
 
 // =========================================================================
@@ -274,6 +275,9 @@ function useSubHexNavigation({
     const newStack = [...navStack, frame];
     navStackRef.current = newStack;
     setNavStack(newStack);
+    traceZoom('enterSubHex', viewOverride != null
+      ? { hexKey, overrideZoom: viewOverride.zoom }
+      : { hexKey, storedZoom: subHex.mapData.viewState?.zoom ?? null });
     setSubHexMapData(viewOverride != null
       ? { ...subHex.mapData, viewState: { zoom: viewOverride.zoom, center: { ...viewOverride.center } } }
       : subHex.mapData);

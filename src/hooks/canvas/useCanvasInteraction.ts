@@ -26,6 +26,7 @@ import type { ViewController } from '#types/hooks/viewController.types';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULTS } from '../../core/dmtConstants';
 import { captureSubHexBackdrop } from '../../core/subHexBackdropStore';
+import { traceZoom } from '../../utils/zoomTraceProbe';
 import { calculateFitZoom, subHexAnchorToChildCenter, subHexContinuityZoom } from '../../geometry/core/hexMeasurements';
 
 /**
@@ -153,8 +154,8 @@ function useCanvasInteraction(
   // (1→2→1 finger transition): the pan anchor froze at the pre-pinch finger
   // position while the fingers kept moving, so the next updatePan would compute
   // one huge delta from it. updatePan re-anchors (zero delta) instead. This is
-  // ref-only by design — a setState anywhere in the live gesture path re-renders
-  // mid-gesture and rolls the touch refs back to stale state (runaway zoom).
+  // ref-only by design — marking staleness must not trigger a render in the
+  // middle of a live gesture.
   const panAnchorStaleRef = useRef<boolean>(false);
 
   // Active ViewController gesture token (pan / wheel-settle / pinch). Guards the
@@ -199,12 +200,19 @@ function useCanvasInteraction(
     };
   }, []);
 
-  // Keep refs in sync with state for stable effect closures
+  // Keep boolean gate refs in sync with state for stable effect closures.
+  // The ROLLED anchors (touchPanStartRef / initialPinchDistanceRef /
+  // panStartRef) must NEVER be re-seeded from state here: state holds only
+  // gesture-START values while the refs roll forward every tick, and any
+  // mid-gesture render (e.g. the recentMultiTouch reset timer ~100-300ms in)
+  // would snap the refs back to gesture start — the next tick then applies a
+  // CUMULATIVE scale/delta on top of the already-advanced view, compounding
+  // zoom straight to the ceiling (the iPad "instant 400% into a sub-hex"
+  // bug; same failure family as the 2026-08-13 runaway-zoom incident).
+  // Every writer sets ref and state together instead.
   isPanningRef.current = isPanning;
   spaceKeyPressedRef.current = spaceKeyPressed;
   isTouchPanningRef.current = isTouchPanning;
-  touchPanStartRef.current = touchPanStart;
-  initialPinchDistanceRef.current = initialPinchDistance;
 
   // Commit any in-flight gesture to mapData. Called from stopPan/stopTouchPan,
   // the wheel-settle timer, and the blur/pointercancel/unmount safety nets.
@@ -266,6 +274,7 @@ function useCanvasInteraction(
     const prev = prevSubHexPathRef.current;
     prevSubHexPathRef.current = subHexPath;
     if (prev === undefined || prev === subHexPath) return; // mount / no swap
+    traceZoom('boundary', { path: subHexPath, storedZoom: mapData?.viewState?.zoom });
     clearWheelSettle();
     if (gestureIdRef.current != null) {
       viewController.cancelIfCurrent(gestureIdRef.current);
@@ -274,10 +283,9 @@ function useCanvasInteraction(
     panStartRef.current = null;
     panAnchorStaleRef.current = false;
     // A touch-pan live at the swap (wheel/trackpad dive during a 2-finger drag,
-    // e.g. iPad + Magic Trackpad) must reset through STATE — the render body
-    // re-seeds touchPanStartRef/initialPinchDistanceRef from state, so nulling
-    // the refs alone un-nulls next render. This is stopTouchPan minus the
-    // commit (the dive already committed; the tail must die uncommitted).
+    // e.g. iPad + Magic Trackpad) resets ref AND state together, like every
+    // touch-anchor writer. This is stopTouchPan minus the commit (the dive
+    // already committed; the tail must die uncommitted).
     if (isTouchPanningRef.current) {
       setIsTouchPanning(false);
       isTouchPanningRef.current = false;
@@ -520,6 +528,7 @@ function useCanvasInteraction(
       });
 
       seamlessTransitionAtRef.current = Date.now();
+      traceZoom('dive', { zoom: currentZoom, childZoom, cx: childCenter.x, cy: childCenter.y });
       // Commit the in-flight zoom so the parent's stored view (what a
       // non-seamless exit restores) is the view the user dove from.
       clearWheelSettle();
@@ -576,6 +585,7 @@ function useCanvasInteraction(
       : null;
 
     seamlessTransitionAtRef.current = Date.now();
+    traceZoom('surface', { newZoom });
     clearWheelSettle();
     commitActiveGesture();
     activeDocument.dispatchEvent(new CustomEvent('windrose:exit-sub-hex', { detail: exitDetail }));
@@ -665,7 +675,10 @@ function useCanvasInteraction(
     // A WebKit trackpad pinch is in flight — its GestureEvents carry the
     // zoom; swallow any wheel events WebKit also emits for the same gesture
     // so the pinch isn't double-applied.
-    if (webkitGestureStartZoomRef.current != null) return;
+    if (webkitGestureStartZoomRef.current != null) {
+      traceZoom('wheelSwallowed', { dY: e.deltaY });
+      return;
+    }
 
     // Route the event: ctrl/meta+wheel is pinch-zoom (macOS trackpads deliver
     // pinch as ctrl+wheel), trackpad-shaped plain wheel is two-finger pan,
@@ -699,6 +712,8 @@ function useCanvasInteraction(
       newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, viewState.zoom * factor));
     }
 
+    traceZoom('wheel', { mode, pinch: isPinch, dY: e.deltaY, zoom: viewState.zoom, newZoom });
+
     // Seamless sub-hex dive/surface takes over the tick when it fires.
     if (maybeSeamlessSubHexTransition(e.deltaY < 0, viewState.zoom, newZoom, e.clientX, e.clientY)) {
       return;
@@ -711,13 +726,32 @@ function useCanvasInteraction(
     armWheelSettle();
   };
 
+  // On iPadOS, WebKit GestureEvents fire for SCREEN pinches too (zoom-trace
+  // verified 2026-08-20; the older "never dispatched" probe only covered
+  // trackpad pinches). A screen pinch is already fully handled by the touch
+  // path — letting the gesture path run in parallel double-drives the zoom
+  // with an ABSOLUTE parent-baseline write (startZoom * cumulative scale)
+  // that fights the touch ticks and, across a seamless dive, slams the
+  // freshly-opened child straight to max zoom. Trackpad pinches — the reason
+  // these handlers exist — produce no TouchEvents, so recent touch activity
+  // means "not a trackpad": stand down.
+  const WEBKIT_GESTURE_TOUCH_SUPPRESS_MS = 500;
+  const isTouchDrivenGesture = (): boolean =>
+    isTouchPanningRef.current ||
+    Date.now() - lastTouchTimeRef.current < WEBKIT_GESTURE_TOUCH_SUPPRESS_MS;
+
   // WebKit trackpad pinch (see WebKitGestureEvent above). `scale` is
   // cumulative from gesture start, so zoom = startZoom * scale; the gesture
   // has a real end, so it commits at gestureend rather than via settle timer.
   const handleGestureStart = (e: Event): void => {
     if (!mapData || !geometry) return;
     e.preventDefault();
+    if (isTouchDrivenGesture()) {
+      traceZoom('gestStartSuppressed', { zoom: viewController.getLive().zoom });
+      return;
+    }
     clearWheelSettle();
+    traceZoom('gestStart', { zoom: viewController.getLive().zoom });
     webkitGestureStartZoomRef.current = viewController.getLive().zoom;
     gestureIdRef.current ??= viewController.beginGesture();
   };
@@ -726,9 +760,17 @@ function useCanvasInteraction(
     const startZoom = webkitGestureStartZoomRef.current;
     if (startZoom == null || !mapData || !geometry) return;
     e.preventDefault();
+    if (isTouchDrivenGesture()) {
+      // A touch pinch took over after this gesture opened — abandon the
+      // gesture's baseline entirely; the touch path owns the zoom now.
+      webkitGestureStartZoomRef.current = null;
+      traceZoom('gestChangeSuppressed', { startZoom });
+      return;
+    }
     const ge = e as WebKitGestureEvent;
     const currentZoom = viewController.getLive().zoom;
     const newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, startZoom * ge.scale));
+    traceZoom('gestChange', { scale: ge.scale, startZoom, zoom: currentZoom, newZoom });
 
     // Seamless sub-hex dive/surface: end the pinch cleanly when it fires —
     // the map is about to swap under the cursor.
@@ -828,11 +870,21 @@ function useCanvasInteraction(
 
   const startTouchPan = (center: TouchCenter): void => {
     clearWheelSettle(); // a pinch/two-finger pan takes over any in-flight wheel gesture
+    traceZoom('touchStart', { zoom: viewController.getLive().zoom });
     setIsTouchPanning(true);
     isTouchPanningRef.current = true;
     setTouchPanStart(center);
     touchPanStartRef.current = center;
     gestureIdRef.current = viewController.beginGesture();
+  };
+
+  // Seed the pinch baseline into ref AND state together (the render body no
+  // longer re-seeds rolled refs from state — see the comment on the gate-ref
+  // sync above). The ref is the live per-tick baseline; the state is only the
+  // gesture-start gate. This is the setter handed to the event coordinator.
+  const seedInitialPinchDistance = (distance: number | null): void => {
+    initialPinchDistanceRef.current = distance;
+    setInitialPinchDistance(distance);
   };
 
   const updateTouchPan = (touches: TouchList): void => {
@@ -869,6 +921,7 @@ function useCanvasInteraction(
     if (initialPinchDistanceRef.current != null) {
       const scale = distance / initialPinchDistanceRef.current;
       newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, zoom * scale));
+      traceZoom('touchTick', { d: distance, d0: initialPinchDistanceRef.current, scale, zoom, newZoom });
 
       // Seamless sub-hex dive/surface: end the touch gesture cleanly when it
       // fires — the map is about to swap under the user's fingers.
@@ -894,6 +947,7 @@ function useCanvasInteraction(
   };
 
   const stopTouchPan = (): void => {
+    traceZoom('touchStop', { zoom: viewController.getLive().zoom });
     setIsTouchPanning(false);
     isTouchPanningRef.current = false;
     setTouchPanStart(null);
@@ -997,7 +1051,7 @@ function useCanvasInteraction(
     setIsTouchPanning,
     setPanStart,
     setTouchPanStart,
-    setInitialPinchDistance,
+    setInitialPinchDistance: seedInitialPinchDistance,
     setSpaceKeyPressed
   };
 }
