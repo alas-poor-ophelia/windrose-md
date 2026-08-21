@@ -209,8 +209,11 @@ test("Clicking a saved route opens the edit menu and rename updates the label", 
   await page.waitForTimeout(400);
 
   // Click the route's rendered hit polyline (measure tool still active) to
-  // open the menu — cell snapping can shift the line off raw click coords
-  const routeHit = page.locator('svg.windrose-route-layer polyline[stroke="transparent"]').first();
+  // open the menu — cell snapping can shift the line off raw click coords.
+  // .last() = the route THIS test just saved: routes render in save order,
+  // so .first() grabs a prior test's residue whenever teardown-flush racing
+  // re-seeds the data file after resetDataFile().
+  const routeHit = page.locator('svg.windrose-route-layer polyline[stroke="transparent"]').last();
   const routeBox = await routeHit.boundingBox();
   expect(routeBox).not.toBeNull();
   await page.mouse.click(routeBox!.x + routeBox!.width / 2, routeBox!.y + routeBox!.height / 2);
