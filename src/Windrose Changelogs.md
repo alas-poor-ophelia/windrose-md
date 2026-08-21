@@ -608,6 +608,16 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.3.3
+
+Small patch: smooth navigation between adjacent sub-maps, and sub-maps can finally be deleted.
+
+### New Features
+- **Delete a sub-map.** Right-click a hex that has a sub-map and choose "Delete Sub-Hex." A confirmation lists everything inside (painted cells, shapes, tiles, objects, text labels, and any nested sub-maps) before anything is removed — the delete covers the whole nested tree and cannot be undone. Previously the only way to get rid of a sub-map was erasing its contents by hand.
+
+### Bug Fixes
+- **Moving between adjacent sub-maps no longer jumps.** Clicking across to a neighboring sub-map used to slide the world over and then snap to wherever that map's view had last been saved. The arrival view is now carried over from where you were looking: a smooth slide at your current zoom, landing exactly where the neighbor's preview was drawn.
+
 ## Version 2.3.2
 
 Emergency-ish patch for three sub-map bugs reported against 2.3.1 — including one data-corruption bug — plus a real fix for the underlying hazard that made it possible.
