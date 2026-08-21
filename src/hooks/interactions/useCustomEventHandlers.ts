@@ -346,7 +346,7 @@ function useCustomEventHandlers({
   }, [updateMapData, instanceId]);
 
   // Hex context menu (extracted)
-  useHexContextMenu({ app, mapData, mapId, instanceId, subHexPath, enterSubHex, handleRegionsChange });
+  useHexContextMenu({ app, mapData, mapId, instanceId, subHexPath, enterSubHex, updateMapData, handleRegionsChange });
 
   return { requestEnterSubHex, requestExitSubHex };
 }

@@ -1,10 +1,12 @@
-import type { MapData, Region } from '#types/core/map.types';
+import type { MapData, Region, SubHexMapData } from '#types/core/map.types';
+import type { MapDataUpdater } from '#types/hooks/mapData.types';
 import type { App } from 'obsidian';
 
-import { useEffect } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
 import { Menu, Notice } from 'obsidian';
 import type { MenuItem } from 'obsidian';
 import { openNativeNoteLinkModal } from '../../components/modals/NoteLinkModal';
+import { ConfirmModal } from '../../settings/modals/ConfirmModal';
 import { isFeatureEnabled } from '../../core/featureFlags';
 import { DEFAULTS } from '../../core/dmtConstants';
 import { calculateFitZoom } from '../../geometry/core/hexMeasurements';
@@ -21,7 +23,35 @@ interface UseHexContextMenuOptions {
   /** Current drill-down path ('/'-joined hexKeys), null/undefined at root. */
   subHexPath?: string | null;
   enterSubHex: (q: number, r: number, viewOverride?: { zoom: number; center: { x: number; y: number } }) => void;
+  /** Active-level updater — sub-hex deletion writes through it to root. */
+  updateMapData: MapDataUpdater;
   handleRegionsChange: (regions: Region[]) => void;
+}
+
+/**
+ * Tally a sub-hex map's contents across its ENTIRE subtree (the entry is
+ * recursive, so deleting it removes every descendant too) — the confirm
+ * dialog itemizes what the user is about to lose.
+ */
+function summarizeSubHexTree(subHex: SubHexMapData): {
+  cells: number; curves: number; tiles: number; objects: number; labels: number; nested: number;
+} {
+  const total = { cells: 0, curves: 0, tiles: 0, objects: 0, labels: 0, nested: 0 };
+  const walk = (map: MapData): void => {
+    for (const layer of map.layers ?? []) {
+      total.cells += layer.cells.length;
+      total.curves += layer.curves.length;
+      total.objects += layer.objects.length;
+      total.labels += layer.textLabels.length;
+      total.tiles += layer.tiles?.length ?? 0;
+    }
+    for (const child of Object.values(map.subHexMaps ?? {})) {
+      total.nested += 1;
+      walk(child.mapData);
+    }
+  };
+  walk(subHex.mapData);
+  return total;
 }
 
 function useHexContextMenu({
@@ -31,8 +61,18 @@ function useHexContextMenu({
   instanceId,
   subHexPath,
   enterSubHex,
+  updateMapData,
   handleRegionsChange,
 }: UseHexContextMenuOptions): void {
+  // Latest props, for guards that fire after an async modal wait — the menu
+  // and its onClick closures are frozen at menu-open time, but the delete
+  // confirm can sit open across navigation or writes from another pane.
+  const liveRef = useRef<{ mapData: MapData | null; subHexPath: string | null }>({
+    mapData,
+    subHexPath: subHexPath ?? null
+  });
+  liveRef.current = { mapData, subHexPath: subHexPath ?? null };
+
   useEffect(() => {
     const handleHexContextMenu = (event: CustomEvent<HexContextMenuDetail>): void => {
       if (isForeignInstanceEvent(event.detail, instanceId)) return;
@@ -91,6 +131,58 @@ function useHexContextMenu({
             ].join('\n');
             void navigator.clipboard.writeText(block);
             new Notice('Sub-map embed block copied');
+          });
+        });
+      }
+
+      // Delete the sub-hex map (and its whole nested subtree). Only offered
+      // from OUTSIDE the target — the clicked hex belongs to the active map,
+      // so the target is never on the drill stack and can't be resurrected
+      // by a later exit-merge. Sub-hex structure lives outside layer history:
+      // no undo, so the destructive confirm is mandatory.
+      if (hasSubHex) {
+        menu.addItem((item: MenuItem) => {
+          item.setTitle(`Delete Sub-Hex (${q}, ${r})`);
+          item.setIcon('lucide-trash-2');
+          item.setWarning(true);
+          item.onClick(() => {
+            void (async () => {
+              const subHex = mapData.subHexMaps?.[hexKey];
+              if (subHex == null) return;
+              const s = summarizeSubHexTree(subHex);
+              const parts: string[] = [];
+              if (s.cells > 0) parts.push(`${s.cells} painted cell${s.cells === 1 ? '' : 's'}`);
+              if (s.curves > 0) parts.push(`${s.curves} shape${s.curves === 1 ? '' : 's'}`);
+              if (s.tiles > 0) parts.push(`${s.tiles} tile${s.tiles === 1 ? '' : 's'}`);
+              if (s.objects > 0) parts.push(`${s.objects} object${s.objects === 1 ? '' : 's'}`);
+              if (s.labels > 0) parts.push(`${s.labels} text label${s.labels === 1 ? '' : 's'}`);
+              if (s.nested > 0) parts.push(`${s.nested} nested sub-hex map${s.nested === 1 ? '' : 's'}`);
+              const contents = parts.length > 0 ? `It contains ${parts.join(', ')}.` : 'It is empty.';
+              const confirmed = await new ConfirmModal(app, {
+                message: `Delete the sub-hex map at (${q}, ${r})?\n${contents}\nThis cannot be undone. Links into this sub-map will open the nearest remaining level instead.`,
+                confirmText: 'Delete',
+                isDestructive: true
+              }).openAndGetValue();
+              if (!confirmed) return;
+              // The confirm wait is an async gap under user control. If the
+              // active level changed meanwhile (navigation slipped past the
+              // modal) the captured updater targets a DIFFERENT map that may
+              // hold the same hexKey — and if another pane already removed
+              // the entry, "deleted" would be a lie. Re-check against the
+              // live props before committing; there is no undo for this.
+              const live = liveRef.current;
+              if (live.subHexPath !== (subHexPath ?? null) || live.mapData?.subHexMaps?.[hexKey] == null) {
+                new Notice('Sub-hex delete cancelled: the map changed');
+                return;
+              }
+              updateMapData(prev => {
+                if (prev.subHexMaps?.[hexKey] == null) return prev;
+                const remaining = { ...prev.subHexMaps };
+                delete remaining[hexKey];
+                return { ...prev, subHexMaps: remaining };
+              });
+              new Notice(`Sub-hex map (${q}, ${r}) deleted`);
+            })();
           });
         });
       }
@@ -167,7 +259,7 @@ function useHexContextMenu({
 
     activeDocument.addEventListener('windrose:hex-context-menu', handleHexContextMenu);
     return () => activeDocument.removeEventListener('windrose:hex-context-menu', handleHexContextMenu);
-  }, [app, mapData, mapId, instanceId, subHexPath, enterSubHex, handleRegionsChange]);
+  }, [app, mapData, mapId, instanceId, subHexPath, enterSubHex, updateMapData, handleRegionsChange]);
 }
 
 export { useHexContextMenu };

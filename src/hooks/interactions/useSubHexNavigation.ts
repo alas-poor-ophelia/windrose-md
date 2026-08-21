@@ -17,7 +17,7 @@ import { isFeatureEnabled } from '../../core/featureFlags';
 import { getSettings } from '../../core/settingsAccessor';
 import { generateLayerId } from '../../persistence/layerAccessor';
 import { clearSubHexBackdrop, pruneSubHexBackdrops, relabelSubHexBackdrop } from '../../core/subHexBackdropStore';
-import { calculateFitZoom, subHexChildPointToParentOffset, subHexContinuityZoom } from '../../geometry/core/hexMeasurements';
+import { calculateFitZoom, subHexAnchorToChildCenter, subHexChildPointToParentOffset, subHexContinuityZoom } from '../../geometry/core/hexMeasurements';
 import { createGeometry } from '../../geometry/core/createGeometry';
 import { traceZoom } from '../../utils/zoomTraceProbe';
 import { resolveSubHexDistanceSettings } from '../../drawing/distanceOperations';
@@ -526,6 +526,60 @@ function useSubHexNavigation({
       };
     }
 
+    const parentMap = topFrame.parentMapData;
+    const parentHexSize = parentMap.hexSize ?? DEFAULTS.hexSize;
+    const parentGeometry = createGeometry(parentMap);
+    const siblingCenter = parentGeometry.gridToWorld(q, r);
+
+    // View continuity: adjacent siblings tile the SAME parent world, one hex
+    // apart, so the arrival view must be the departing view translated through
+    // parent space — never the sibling's own stored view, which has no
+    // geometric relation to where the user is looking (the "moves over, then
+    // jumps" bug: the backdrop relabel slides to the correct adjacent hex
+    // while the foreground snapped to an arbitrary saved view). Map the
+    // departing view center child→parent→child and convert zoom through the
+    // two continuity ratios; with matching hex size and rings (the normal
+    // case) this is a pure translation at unchanged zoom.
+    const [cqStr, crStr] = topFrame.hexKey.split(',');
+    const currentCenter = parentGeometry.gridToWorld(parseInt(cqStr, 10), parseInt(crStr, 10));
+    const departingView = currentSubHex?.viewState;
+    let siblingMapData = siblingSubHex.mapData;
+    if (departingView != null) {
+      const currentRings = parentMap.subHexMaps?.[topFrame.hexKey]?.subdivisionRings ?? 7;
+      const currentHexSize = currentSubHex?.hexSize ?? parentHexSize;
+      const siblingRings = siblingSubHex.subdivisionRings ?? 7;
+      const siblingHexSize = siblingMapData.hexSize ?? parentHexSize;
+
+      const parentOffset = subHexChildPointToParentOffset(
+        departingView.center.x,
+        departingView.center.y,
+        parentHexSize,
+        currentHexSize,
+        currentRings
+      );
+      const arrivalCenter = subHexAnchorToChildCenter(
+        currentCenter.worldX + parentOffset.x - siblingCenter.worldX,
+        currentCenter.worldY + parentOffset.y - siblingCenter.worldY,
+        parentHexSize,
+        siblingHexSize,
+        siblingRings
+      );
+      const departRatio = subHexContinuityZoom(1, parentHexSize, currentHexSize, currentRings);
+      const arriveRatio = subHexContinuityZoom(1, parentHexSize, siblingHexSize, siblingRings);
+      const arrivalZoom = Math.max(
+        DEFAULTS.minZoom,
+        Math.min(DEFAULTS.maxZoom, departingView.zoom * (arriveRatio / departRatio))
+      );
+      traceZoom('siblingNav', {
+        from: topFrame.hexKey, to: siblingKey,
+        zoom: departingView.zoom, arrivalZoom, cx: arrivalCenter.x, cy: arrivalCenter.y
+      });
+      siblingMapData = {
+        ...siblingMapData,
+        viewState: { zoom: arrivalZoom, center: arrivalCenter }
+      };
+    }
+
     // The backdrop snapshot depicts the PARENT map's world — identical for
     // adjacent siblings, only the anchor hex changes. Re-label it to the
     // sibling's path instead of dropping it (dropping was the "background
@@ -536,14 +590,11 @@ function useSubHexNavigation({
     const newPath = [...navStack.slice(0, -1).map(f => f.hexKey), siblingKey].join('/');
     const canvas = getCanvas?.() ?? null;
     if (canvas != null) {
-      const parentMap = topFrame.parentMapData;
-      const parentHexSize = parentMap.hexSize ?? DEFAULTS.hexSize;
-      const hexCenter = createGeometry(parentMap).gridToWorld(q, r);
       relabelSubHexBackdrop({
         canvas,
         oldSubHexPath: navStack.map(f => f.hexKey).join('/'),
         newSubHexPath: newPath,
-        hexCenterWorld: { x: hexCenter.worldX, y: hexCenter.worldY },
+        hexCenterWorld: { x: siblingCenter.worldX, y: siblingCenter.worldY },
         childHexSize: siblingSubHex.mapData.hexSize ?? parentHexSize,
         rings: siblingSubHex.subdivisionRings ?? 7
       });
@@ -559,7 +610,6 @@ function useSubHexNavigation({
     const newStack = [...navStack.slice(0, -1), newFrame];
     navStackRef.current = newStack;
     setNavStack(newStack);
-    const siblingMapData = siblingSubHex.mapData;
     setSubHexMapData(siblingMapData);
     setNavigationVersion(prev => prev + 1);
 
