@@ -1,0 +1,31 @@
+title: Windrose MapDesigner
+description: >-
+  Documentation for Windrose MapDesigner — a TTRPG dungeon and world map
+  designer that lives inside your Obsidian notes. Grid and hex maps, tiles,
+  fog of war, sub-maps, travel tools, and deep Obsidian integration.
+url: "https://alas-poor-ophelia.github.io"
+# baseurl is intentionally blank: the docs workflow injects the real base path
+# at build time via actions/configure-pages (--baseurl flag).
+baseurl: ""
+
+theme: just-the-docs
+color_scheme: dark
+
+plugins:
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+aux_links:
+  GitHub:
+    - "https://github.com/alas-poor-ophelia/windrose-md"
+  Releases:
+    - "https://github.com/alas-poor-ophelia/windrose-md/releases"
+
+# docs/ doubles as the repo's dev-docs folder; keep contributor-facing
+# material out of the published site.
+exclude:
+  - CONTRIBUTING.md
+  - proposals/
+  - vendor/
+  - Gemfile
+  - Gemfile.lock

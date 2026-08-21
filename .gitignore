@@ -81,3 +81,8 @@ tests/fixtures/test-vault/Projects/dungeon-map-tracker
 
 # Local plugin-folder backups (never commit)
 backups/
+
+# Jekyll docs site build artifacts
+docs/_site/
+docs/.jekyll-cache/
+docs/vendor/
