@@ -38,6 +38,7 @@ import { ImageAlignmentMode } from './components/overlays/ImageAlignmentMode';
 import { OnboardingSurvey } from './components/overlays/OnboardingSurvey';
 import { WhatsNewNotice } from './components/overlays/WhatsNewNotice';
 import { DataFileRecoveryPanel } from './components/overlays/DataFileRecoveryPanel';
+import { StaleMapConflictPanel } from './components/overlays/StaleMapConflictPanel';
 import { useAlignmentMode } from './hooks/interactions/useAlignmentMode';
 import { ModalPortal } from './components/modals/ModalPortal';
 import { getActiveLayer, getLayerById, getActiveBoardLayers, getBoardsOrdered, updateBoard, addBoard, setActiveBoard, removeBoard, setLayerMode, addLayer, updateActiveLayer } from './persistence/layerAccessor';
@@ -114,6 +115,14 @@ interface DungeonMapTrackerProps {
  */
 const SUBHEX_ROW_REVEAL_DELAY_MS = 450;
 
+/**
+ * Per-mount instance counter (same pattern as useDebouncedSave's save
+ * registry). Each mounted map block stamps its id into map-scoped custom
+ * events so co-mounted blocks — including a second embed of the SAME map,
+ * where mapId can't discriminate — ignore each other's events.
+ */
+let mapInstanceCounter = 0;
+
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -121,8 +130,19 @@ const SUBHEX_ROW_REVEAL_DELAY_MS = 450;
 const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', initialSubHexPath, mcpKey, fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange, onMapDeleted }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
   useThemeMode();
-  const { mapData: rootMapData, isLoading, loadFailure, reload: reloadMapData, saveStatus, updateMapData: rootUpdateMapData, forceSave, markDeleted, settingsVersion, getCachedImage } = useMapData(mapId, mapName, mapType);
+  const { mapData: rootMapData, isLoading, loadFailure, reload: reloadMapData, saveStatus, updateMapData: rootUpdateMapData, forceSave, markDeleted, staleConflict, acknowledgeStaleConflict, settingsVersion, getCachedImage } = useMapData(mapId, mapName, mapType);
   const [mapDeleted, setMapDeleted] = useState(false);
+
+  // Per-mount instance id for event scoping (see mapInstanceCounter above).
+  const instanceIdRef = useRef('');
+  if (instanceIdRef.current === '') instanceIdRef.current = `windrose-map-${++mapInstanceCounter}`;
+  const instanceId = instanceIdRef.current;
+
+  // Stable accessor for this block's main map canvas. containerRef is
+  // declared further down (useUILayout), so route through a ref the render
+  // body reassigns — the getter identity stays stable for hook deps.
+  const canvasGetterRef = useRef<() => HTMLCanvasElement | null>(() => null);
+  const getCanvasEl = useCallback((): HTMLCanvasElement | null => canvasGetterRef.current(), []);
 
   const {
     activeMapData: mapData,
@@ -138,7 +158,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     adjacentSubHexes,
     activeDistanceOverrides,
     subHexPath
-  } = useSubHexNavigation({ mapData: rootMapData, updateMapData: rootUpdateMapData, initialSubHexPath });
+  } = useSubHexNavigation({ mapData: rootMapData, updateMapData: rootUpdateMapData, initialSubHexPath, getCanvas: getCanvasEl });
 
   // Distance overrides for the active map: sub-hex levels get live-derived
   // scale from the parent chain; the root map uses its own stored settings.
@@ -376,6 +396,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     showVisibilityToolbar, setShowVisibilityToolbar,
     layerVisibility, handleToggleLayerVisibility
   } = useUILayout({ mapData, updateMapData, fullPane });
+
+  // The MAIN map canvas is the first <canvas> under this container (fog
+  // canvas renders after it) — same contract getCanvasSize relies on.
+  canvasGetterRef.current = () => containerRef.current?.querySelector('canvas') ?? null;
 
   // Block-mode left icon rail: which flyout (if any) is open. Canvas controls
   // (MapControls Layers/Regions buttons) drive this too, so it's lifted here.
@@ -823,12 +847,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
   // Wrap undo to let in-progress operations (e.g. region creation) cancel first
   const wrappedHandleUndo = useCallback(() => {
-    const event = new CustomEvent('windrose:before-undo', { cancelable: true });
+    const event = new CustomEvent('windrose:before-undo', { cancelable: true, detail: { instanceId } });
     activeDocument.dispatchEvent(event);
     if (!event.defaultPrevented) {
       handleUndo();
     }
-  }, [handleUndo]);
+  }, [handleUndo, instanceId]);
 
   // Clone layer modal state (Preact fallback only)
   const [cloningLayerId, setCloningLayerId] = useState<string | null>(null);
@@ -936,17 +960,17 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     if (role != null && role !== tileDepth) setTileDepth(role);
   }, [mapData, tileDepth, setTileDepth]);
 
-  // Custom event listeners (sub-hex, deep links, regions, object links, hex context menu)
-  useCustomEventHandlers({
-    mapData, mapId, geometry, updateMapData,
+  // Custom event listeners (deep links, regions, object links, hex context
+  // menu) + the direct sub-hex dive/surface callbacks the canvas layer calls.
+  const { requestEnterSubHex, requestExitSubHex } = useCustomEventHandlers({
+    mapData, mapId, instanceId, isFocused, geometry, updateMapData,
     handleLayerSelect, enterSubHex, exitSubHex, drillToSubHexPath, isInSubHex,
-    navigateToSibling,
     handleRegionsChange,
     subHexPath
   });
 
   // Player fog clearing on drop (reads latest state via functional updater, supports undo)
-  usePlayerFogClear({ geometry, updateMapData, addToHistory, isApplyingHistory });
+  usePlayerFogClear({ geometry, updateMapData, addToHistory, isApplyingHistory, instanceId });
 
   // Adjacent sub-map click-to-navigate
   useEffect((): (() => void) | undefined => {
@@ -957,6 +981,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     const handleAdjacentClick = (e: MouseEvent): void => {
       const canvas = (e.target as HTMLElement).closest('canvas');
       if (canvas == null) return;
+      // Document-level listener: only react to clicks on THIS block's canvas,
+      // or a click on any co-mounted map could hit-test against our adjacency
+      // geometry and navigate this map sympathetically.
+      if (containerRef.current == null || !containerRef.current.contains(canvas)) return;
 
       const rect = canvas.getBoundingClientRect();
       const canvasX = (e.clientX - rect.left) * (canvas.width / rect.width);
@@ -986,9 +1014,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         const hexSize = geometry.hexSize ?? 1;
         const gridRadius = hexSize * Math.sqrt(3) * maxRing;
         if (relX * relX + relY * relY < gridRadius * gridRadius) {
-          // Parse the hex key to get absolute q, r
+          // Parse the hex key to get absolute q, r. Direct call — this was a
+          // document event every co-mounted map obeyed (sympathetic zoom).
           const [aq, ar] = adj.hexKey.split(',').map(Number);
-          activeDocument.dispatchEvent(new CustomEvent('windrose:navigate-sibling-sub-hex', { detail: { q: aq, r: ar } }));
+          navigateToSibling(aq, ar);
           e.stopPropagation();
           e.preventDefault();
           return;
@@ -998,7 +1027,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
     activeDocument.addEventListener('click', handleAdjacentClick, true);
     return () => activeDocument.removeEventListener('click', handleAdjacentClick, true);
-  }, [showAdjacentSubMaps, isInSubHex, adjacentSubHexes, geometry, mapData]);
+  }, [showAdjacentSubMaps, isInSubHex, adjacentSubHexes, geometry, mapData, navigateToSibling, containerRef]);
 
   // Canvas pixel size for view-fitting calculations (recenter-view).
   // querySelector depends on DOM order: the MAIN map canvas must stay the
@@ -1045,6 +1074,20 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // is in an unknown state. The panel also offers the backup restore.
   if (loadFailure) {
     return <DataFileRecoveryPanel dataPath={loadFailure.dataPath} onRestored={reloadMapData} />;
+  }
+
+  // A save carrying real edits was refused because another mount of this map
+  // saved first. Block editing behind a reload — continuing would either keep
+  // failing to save or clobber the other mount's committed work.
+  if (staleConflict) {
+    return (
+      <StaleMapConflictPanel
+        onReload={() => {
+          acknowledgeStaleConflict();
+          reloadMapData();
+        }}
+      />
+    );
   }
 
   if (isLoading || !mapData) {
@@ -1295,6 +1338,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                       onRegionsChange={handleRegionsChange}
                       sidebarCollapsed={false}
                       isOpen
+                      instanceId={instanceId}
                     />
                   )
                 }] : [])
@@ -1357,6 +1401,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               distanceOverrides={distanceOverrides}
               isInSubHex={isInSubHex}
               subHexPath={subHexPath}
+              instanceId={instanceId}
+              requestEnterSubHex={requestEnterSubHex}
+              requestExitSubHex={requestExitSubHex}
             >
               {/* DrawingLayer - handles all drawing tools */}
               <MapCanvas.DrawingLayer

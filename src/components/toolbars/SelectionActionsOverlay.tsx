@@ -28,6 +28,8 @@ import { Icon } from '../shared/Icon';
 import { InternalLink } from '../shared/InternalLink';
 import { Z_INDEX } from '../../core/dmtConstants';
 import type { SelectionContextMenuDetail } from '../../core/windroseEvents';
+import { isForeignInstanceEvent } from '../../core/windroseEvents';
+import { useMapState } from '../../context/MapContext';
 import { tooltipRef } from '../shared/obsidianTooltip';
 
 
@@ -119,6 +121,9 @@ const SelectionActionsOverlay = ({
   lightColorButtonRef,
   distanceUnit
 }: SelectionActionsOverlayProps): VNode | null => {
+  // Per-mount instance id: this overlay always renders inside the MapCanvas
+  // provider tree, and must only claim context-menu events from its own mount.
+  const { instanceId } = useMapState();
 
   const isNotePin = selectedItems.length === 1 && (selectedItems[0].data as MapObject | undefined)?.type === 'note_pin';
   const [linksExpanded, setLinksExpanded] = useState(isNotePin);
@@ -127,6 +132,8 @@ const SelectionActionsOverlay = ({
   useEffect(() => {
     const handler = (e: CustomEvent<SelectionContextMenuDetail>): void => {
       const detail = e.detail;
+      // Foreign mount's event: don't act on it — and don't claim it either.
+      if (isForeignInstanceEvent(detail, instanceId)) return;
       if (detail.handled === true) return;
       detail.handled = true;
       const { screenX, screenY } = detail;
@@ -154,7 +161,7 @@ const SelectionActionsOverlay = ({
 
     activeDocument.addEventListener('windrose:selection-context-menu', handler);
     return () => activeDocument.removeEventListener('windrose:selection-context-menu', handler);
-  }, [actions]);
+  }, [actions, instanceId]);
 
   const hasRequiredRefs = selectedItems.length > 0 && canvasRef.current != null && containerRef.current != null;
 

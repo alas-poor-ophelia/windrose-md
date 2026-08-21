@@ -125,7 +125,7 @@ describe('deleted-map tombstones (saveMapData guard)', () => {
     await deleteMapData(app, 'tomb-1');
     const saveResult = await saveMapData(app, 'tomb-1', map);
 
-    expect(saveResult).toBe(true);
+    expect(saveResult.status).toBe('saved');
     const after = JSON.parse(read()) as { maps: Record<string, MapData> };
     expect(after.maps['tomb-1']).toBeUndefined();
   });
@@ -148,7 +148,7 @@ describe('deleted-map tombstones (saveMapData guard)', () => {
 
     const result = await saveMapData(app, 'alive-1', map);
 
-    expect(result).toBe(true);
+    expect(result.status).toBe('saved');
     const after = JSON.parse(read()) as { maps: Record<string, MapData> };
     expect(after.maps['alive-1']).toBeDefined();
     expect(after.maps['alive-1'].name).toBe('Alive');

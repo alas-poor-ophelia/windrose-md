@@ -9,12 +9,15 @@ import { isFeatureEnabled } from '../../core/featureFlags';
 import { DEFAULTS } from '../../core/dmtConstants';
 import { calculateFitZoom } from '../../geometry/core/hexMeasurements';
 import type { HexContextMenuDetail } from '../../core/windroseEvents';
+import { isForeignInstanceEvent } from '../../core/windroseEvents';
 
 interface UseHexContextMenuOptions {
   app: App;
   mapData: MapData | null;
   /** Root map id (the embed block always references the root map). */
   mapId?: string;
+  /** Per-mount instance id — gates the context-menu event (fail-open). */
+  instanceId?: string;
   /** Current drill-down path ('/'-joined hexKeys), null/undefined at root. */
   subHexPath?: string | null;
   enterSubHex: (q: number, r: number, viewOverride?: { zoom: number; center: { x: number; y: number } }) => void;
@@ -25,12 +28,14 @@ function useHexContextMenu({
   app,
   mapData,
   mapId,
+  instanceId,
   subHexPath,
   enterSubHex,
   handleRegionsChange,
 }: UseHexContextMenuOptions): void {
   useEffect(() => {
     const handleHexContextMenu = (event: CustomEvent<HexContextMenuDetail>): void => {
+      if (isForeignInstanceEvent(event.detail, instanceId)) return;
       if (!mapData || mapData.mapType !== 'hex') return;
 
       const { q, r, screenX, screenY, canvasSize } = event.detail;
@@ -100,7 +105,7 @@ function useHexContextMenu({
           item.setTitle(`Edit Region: ${region.name}`);
           item.setIcon('lucide-pencil');
           item.onClick(() => {
-            activeDocument.dispatchEvent(new CustomEvent('windrose:edit-region', { detail: { regionId: region.id } }));
+            activeDocument.dispatchEvent(new CustomEvent('windrose:edit-region', { detail: { regionId: region.id, instanceId } }));
           });
         });
 
@@ -162,7 +167,7 @@ function useHexContextMenu({
 
     activeDocument.addEventListener('windrose:hex-context-menu', handleHexContextMenu);
     return () => activeDocument.removeEventListener('windrose:hex-context-menu', handleHexContextMenu);
-  }, [app, mapData, mapId, subHexPath, enterSubHex, handleRegionsChange]);
+  }, [app, mapData, mapId, instanceId, subHexPath, enterSubHex, handleRegionsChange]);
 }
 
 export { useHexContextMenu };

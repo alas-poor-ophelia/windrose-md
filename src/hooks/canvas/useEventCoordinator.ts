@@ -44,13 +44,15 @@ const useEventCoordinator = ({
   isAlignmentMode = false,
   interactionLocked = false
 }: UseEventCoordinatorOptions): void => {
-  const { canvasRef, currentTool, screenToGrid, screenToWorld, geometry, mapData, viewController, subHexPath } = useMapState();
+  const { canvasRef, currentTool, screenToGrid, screenToWorld, geometry, mapData, viewController, subHexPath, instanceId, requestEnterSubHex } = useMapState();
 
   // Read by the double-click sub-hex dive when it snapshots the parent map.
   // Held in a ref because mapData changes on every edit: as a dependency it
   // would re-run the canvas listener effect (14 listeners) per stroke.
-  const subHexDiveRef = useRef({ mapData, viewController, subHexPath });
-  subHexDiveRef.current = { mapData, viewController, subHexPath };
+  // requestEnterSubHex rides in the same ref for the same reason (its
+  // identity follows mapData's).
+  const subHexDiveRef = useRef({ mapData, viewController, subHexPath, requestEnterSubHex });
+  subHexDiveRef.current = { mapData, viewController, subHexPath, requestEnterSubHex };
   const { selectedItem, setSelectedItem, isDraggingSelection, setIsDraggingSelection, dragStart, setDragStart, layerVisibility, hasMultiSelection, isGroupDragging, clearSelection } = useMapSelection();
   const { getHandlers } = useRegisteredHandlers();
 
@@ -900,14 +902,12 @@ const useEventCoordinator = ({
             parentSubHexPath: dive.subHexPath ?? null
           });
         }
-        activeDocument.dispatchEvent(new CustomEvent('windrose:enter-sub-hex', {
-          detail: {
-            q: coords.x,
-            r: coords.y,
-            anchor,
-            canvasSize: dblCanvas != null ? { width: dblCanvas.width, height: dblCanvas.height } : undefined
-          }
-        }));
+        dive.requestEnterSubHex?.({
+          q: coords.x,
+          r: coords.y,
+          anchor,
+          canvasSize: dblCanvas != null ? { width: dblCanvas.width, height: dblCanvas.height } : undefined
+        });
         return;
       }
     }
@@ -955,7 +955,7 @@ const useEventCoordinator = ({
     if (interactionLocked) return;
 
     // Try object/text context menu first — dispatch event for handlers to claim
-    const contextDetail = { screenX: e.clientX, screenY: e.clientY, clientX: e.clientX, clientY: e.clientY, handled: false };
+    const contextDetail = { screenX: e.clientX, screenY: e.clientY, clientX: e.clientX, clientY: e.clientY, handled: false, instanceId: instanceId ?? undefined };
     const contextEvent = new CustomEvent('windrose:selection-context-menu', { detail: contextDetail });
     activeDocument.dispatchEvent(contextEvent);
     if (contextDetail.handled) return;
@@ -971,7 +971,8 @@ const useEventCoordinator = ({
             r: coords.y,
             screenX: e.clientX,
             screenY: e.clientY,
-            canvasSize: ctxCanvas != null ? { width: ctxCanvas.width, height: ctxCanvas.height } : undefined
+            canvasSize: ctxCanvas != null ? { width: ctxCanvas.width, height: ctxCanvas.height } : undefined,
+            instanceId: instanceId ?? undefined
           }
         }));
         return;
@@ -988,7 +989,7 @@ const useEventCoordinator = ({
     if (drawingHandlers?.cancelShapePreview) {
       drawingHandlers.cancelShapePreview();
     }
-  }, [getHandlers, geometry, screenToGrid, interactionLocked, canvasRef]);
+  }, [getHandlers, geometry, screenToGrid, interactionLocked, canvasRef, instanceId]);
 
   // Long-press timer for touch context menu
   const longPressTimerRef = useRef<number | null>(null);

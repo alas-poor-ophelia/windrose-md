@@ -18,6 +18,12 @@ export interface DeepLinkData {
 
 export interface NavigationEventDetail extends DeepLinkData {
   timestamp: number;
+  /**
+   * Mutable claim flag: with the same map embedded in several blocks, every
+   * mount's listener passes the mapId gate — the first to act sets this so
+   * the rest skip, instead of every block drilling/navigating in parallel.
+   */
+  handled?: boolean;
 }
 
 const PROTOCOL = 'windrose:';

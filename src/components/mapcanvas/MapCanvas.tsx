@@ -131,6 +131,11 @@ interface MapCanvasContentProps {
   isInSubHex?: boolean;
   /** Current sub-hex drill path ('/'-joined "q,r" hexKeys); null at root. */
   subHexPath?: string | null;
+  /** Per-mount instance id — stamped into map-scoped custom events. */
+  instanceId?: string | null;
+  /** Direct sub-hex dive/surface callbacks for this mount (see MapContext). */
+  requestEnterSubHex?: MapStateContextValue['requestEnterSubHex'];
+  requestExitSubHex?: MapStateContextValue['requestExitSubHex'];
   children: ComponentChildren;
 }
 
@@ -175,7 +180,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, children }: MapCanvasContentProps): VNode => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex, children }: MapCanvasContentProps): VNode => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -242,7 +247,14 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     if (mapData?.viewState) viewController.syncCommitted(mapData.viewState);
   }, [mapData?.viewState, viewController]);
 
-  // Use canvas interaction ONLY for coordinate utility functions
+  // Use canvas interaction ONLY for coordinate utility functions — do NOT
+  // pass the sub-hex args here. The three outputs consumed below never read
+  // them, and threading subHexPath in wakes the hook's internal sub-hex
+  // boundary layout effect in a SECOND instance sharing the one
+  // ViewController: every dive/surface then double-fires syncCommitted/
+  // notifyLive (live overlays aren't rAF-coalesced), which showed up as
+  // wheel dive/surface jitter. Only the handler-registering instance in
+  // usePanZoomCoordinator gets the sub-hex wiring.
   const {
     screenToGrid,
     screenToWorld,
@@ -431,12 +443,16 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     distanceOverrides,
     isInSubHex: isInSubHex === true,
     subHexPath: subHexPath ?? null,
+    instanceId: instanceId ?? null,
+    requestEnterSubHex,
+    requestExitSubHex,
     // State change callbacks for layers
     onDrawingStateChange: handleDrawingStateChange,
     onPanZoomStateChange: handlePanZoomStateChange
   } as MapStateContextValue), [mapData, mapId, notePath, geometry, currentTool, selectedColor,
     selectedObjectType, screenToGrid, screenToWorld, getClientCoords, viewController,
-    distanceOverrides, isInSubHex, subHexPath, handleDrawingStateChange, handlePanZoomStateChange]);
+    distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex,
+    handleDrawingStateChange, handlePanZoomStateChange]);
 
   const mapOperationsValue = useMemo(() => ({
     // Object operations

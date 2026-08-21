@@ -255,20 +255,23 @@ function useDataHandlers({
     });
   }, [updateMapData]);
 
-  // Handle view state change - NOT tracked in history
+  // Handle view state change - NOT tracked in history. Cosmetic: a pan/zoom
+  // write refused as stale (map open in another pane) is dropped silently
+  // instead of blocking the pane behind the conflict panel.
   const handleViewStateChange = useCallback((newViewState: StoredViewState): void => {
     updateMapData((currentMapData) => {
       if (currentMapData == null) return currentMapData;
       return { ...currentMapData, viewState: newViewState };
-    });
+    }, { cosmetic: true });
   }, [updateMapData]);
 
-  // Handle sidebar collapse state change - NOT tracked in history
+  // Handle sidebar collapse state change - NOT tracked in history (cosmetic,
+  // same rationale as handleViewStateChange)
   const handleSidebarCollapseChange = useCallback((collapsed: boolean): void => {
     updateMapData((currentMapData) => {
       if (currentMapData == null) return currentMapData;
       return { ...currentMapData, sidebarCollapsed: collapsed };
-    });
+    }, { cosmetic: true });
   }, [updateMapData]);
 
   // Handle object set change - NOT tracked in history

@@ -13,6 +13,35 @@
 import type { NavigationEventDetail } from '../persistence/deepLinkHandler';
 import type { ObjectLink } from '#types/objects/object.types';
 
+/**
+ * Per-mount instance scoping for map-scoped events.
+ *
+ * Every windrose-map code block is its own component mount, but these custom
+ * events broadcast on `activeDocument`/`window`, which the whole Obsidian
+ * window shares — so without a sender identity, EVERY mounted map reacts to
+ * every other map's events (the 2.3.1 "sympathetic zoom" family of bugs).
+ * Dispatchers stamp their mount's `instanceId` into the detail; listeners
+ * gate with `isForeignInstanceEvent`. The gate is FAIL-OPEN: an event with no
+ * instanceId (hand-dispatched from the console, older tooling) is handled by
+ * everyone, preserving pre-token behavior.
+ */
+export interface InstanceScopedDetail {
+  /** Per-mount sender id; absent = unscoped (handled by all instances). */
+  instanceId?: string;
+}
+
+/**
+ * True when `detail` carries another mount's instanceId — the listener should
+ * ignore the event. Fail-open: missing detail, missing instanceId, or a
+ * listener with no own id all return false (event is handled).
+ */
+export function isForeignInstanceEvent(
+  detail: InstanceScopedDetail | null | undefined,
+  ownInstanceId: string | null | undefined
+): boolean {
+  return detail?.instanceId != null && ownInstanceId != null && detail.instanceId !== ownInstanceId;
+}
+
 /** Axial hex coordinate payload (sub-hex entry / sibling navigation). */
 export interface SubHexCoordDetail {
   q: number;
@@ -38,7 +67,7 @@ export interface SubHexCoordDetail {
 }
 
 /** Right-click on a hex: axial coord + screen position for the context menu. */
-export interface HexContextMenuDetail {
+export interface HexContextMenuDetail extends InstanceScopedDetail {
   q: number;
   r: number;
   screenX: number;
@@ -67,7 +96,7 @@ export interface SubHexExitDetail {
  * Right-click on a selection. `handled` is a mutable claim flag: the first
  * handler to act sets it true so later handlers skip (not a cancelable event).
  */
-export interface SelectionContextMenuDetail {
+export interface SelectionContextMenuDetail extends InstanceScopedDetail {
   screenX: number;
   screenY: number;
   clientX: number;
@@ -76,17 +105,17 @@ export interface SelectionContextMenuDetail {
 }
 
 /** Region-targeted events (edit / center-on). */
-export interface RegionIdDetail {
+export interface RegionIdDetail extends InstanceScopedDetail {
   regionId: string;
 }
 
 /** A player object was dropped — clear fog within its light radius. */
-export interface PlayerFogClearDetail {
+export interface PlayerFogClearDetail extends InstanceScopedDetail {
   objectId: string;
 }
 
 /** Cross-layer object link creation. */
-export interface CreateObjectLinkDetail {
+export interface CreateObjectLinkDetail extends InstanceScopedDetail {
   sourceLayerId: string;
   sourceObjectId: string;
   sourceLink: ObjectLink;
@@ -96,7 +125,7 @@ export interface CreateObjectLinkDetail {
 }
 
 /** Cross-layer object link removal. */
-export interface RemoveObjectLinkDetail {
+export interface RemoveObjectLinkDetail extends InstanceScopedDetail {
   sourceLayerId: string;
   sourceObjectId: string;
   targetLayerId: string;
@@ -111,16 +140,21 @@ export interface SettingsChangedDetail {
   timestamp?: number;
 }
 
-/** Name → CustomEvent map for every Windrose custom DOM event. */
+/**
+ * Name → CustomEvent map for every Windrose custom DOM event.
+ *
+ * Sub-hex navigation (enter / exit / navigate-sibling) is NOT event-driven
+ * anymore: dispatcher and listener were always the same mount, so as of 2.3.2
+ * those flow through direct callbacks (requestEnterSubHex / requestExitSubHex
+ * via MapContext, navigateToSibling in DungeonMapTracker) and can no longer
+ * leak between co-mounted maps.
+ */
 export interface WindroseEventMap {
-  'windrose:enter-sub-hex': CustomEvent<SubHexCoordDetail>;
-  'windrose:exit-sub-hex': CustomEvent<SubHexExitDetail | null>;
-  'windrose:navigate-sibling-sub-hex': CustomEvent<SubHexCoordDetail>;
   'windrose:hex-context-menu': CustomEvent<HexContextMenuDetail>;
   'windrose:selection-context-menu': CustomEvent<SelectionContextMenuDetail>;
   'windrose:edit-region': CustomEvent<RegionIdDetail>;
   'windrose:center-on-region': CustomEvent<RegionIdDetail>;
-  'windrose:before-undo': CustomEvent<null>;
+  'windrose:before-undo': CustomEvent<InstanceScopedDetail | null>;
   'windrose:player-fog-clear': CustomEvent<PlayerFogClearDetail>;
   'windrose-navigate-to': CustomEvent<NavigationEventDetail>;
   'windrose-create-object-link': CustomEvent<CreateObjectLinkDetail>;

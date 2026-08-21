@@ -7,7 +7,7 @@
  */
 
 import type { MapData, MapLayer, SubHexMapData, StoredViewState } from '#types/core/map.types';
-import type { MapDataUpdater } from '#types/hooks/mapData.types';
+import type { MapDataUpdater, MapDataUpdateOptions } from '#types/hooks/mapData.types';
 import type { MapDistanceOverrides, ResolvedDistanceSettings, SubHexDistanceLevel } from '../../drawing/distanceOperations';
 import type { SubHexExitDetail } from '../../core/windroseEvents';
 
@@ -16,7 +16,7 @@ import { DEFAULTS, SCHEMA_VERSION } from '../../core/dmtConstants';
 import { isFeatureEnabled } from '../../core/featureFlags';
 import { getSettings } from '../../core/settingsAccessor';
 import { generateLayerId } from '../../persistence/layerAccessor';
-import { clearSubHexBackdrop } from '../../core/subHexBackdropStore';
+import { clearSubHexBackdrop, pruneSubHexBackdrops, relabelSubHexBackdrop } from '../../core/subHexBackdropStore';
 import { calculateFitZoom, subHexChildPointToParentOffset, subHexContinuityZoom } from '../../geometry/core/hexMeasurements';
 import { createGeometry } from '../../geometry/core/createGeometry';
 import { traceZoom } from '../../utils/zoomTraceProbe';
@@ -58,6 +58,12 @@ interface UseSubHexNavigationOptions {
    * applied once, so the user can freely navigate away afterwards.
    */
   initialSubHexPath?: string | null;
+  /**
+   * Live map canvas accessor (stable identity). The backdrop store is keyed
+   * per-canvas, so exits clear and sibling navigation re-labels THIS view's
+   * snapshot only. Null/absent degrades to no backdrop bookkeeping.
+   */
+  getCanvas?: () => HTMLCanvasElement | null;
 }
 
 interface AdjacentSubHex {
@@ -181,7 +187,8 @@ function createSubHexMapData(parentMapData: MapData, q: number, r: number): SubH
 function useSubHexNavigation({
   mapData: rootMapData,
   updateMapData: rootUpdateMapData,
-  initialSubHexPath
+  initialSubHexPath,
+  getCanvas
 }: UseSubHexNavigationOptions): UseSubHexNavigationResult {
 
   // Navigation stack: each frame holds the parent's state when we drilled down
@@ -202,8 +209,9 @@ function useSubHexNavigation({
   const activeMapData = isInSubHex ? subHexMapData : rootMapData;
 
   // If the map unmounts while still nested (leaf closed, mode switch), no exit
-  // path runs — release the backdrop snapshot so it can't outlive its canvas.
-  useEffect(() => () => clearSubHexBackdrop(), []);
+  // path runs — release the backdrop snapshot eagerly (the WeakMap would also
+  // free it with the canvas, but the bitmap is large; don't wait for GC).
+  useEffect(() => () => clearSubHexBackdrop(getCanvas?.() ?? null), [getCanvas]);
 
   // Build breadcrumb segments using actual map names
   const breadcrumbs = useMemo((): BreadcrumbSegment[] => {
@@ -284,10 +292,13 @@ function useSubHexNavigation({
     setNavigationVersion(prev => prev + 1);
   }, [rootMapData, subHexMapData, isInSubHex, navStack]);
 
-  // Propagate sub-hex changes up the navigation stack to root for saving
+  // Propagate sub-hex changes up the navigation stack to root for saving.
+  // `options` rides through to the root updater so cosmetic-only changes
+  // (pan/zoom inside a sub-hex) keep their cosmetic flag at the save layer.
   const propagateToRoot = useCallback((
     currentSubHexMapData: MapData,
-    stack: SubHexNavFrame[]
+    stack: SubHexNavFrame[],
+    options?: MapDataUpdateOptions
   ): void => {
     if (stack.length === 0) return;
 
@@ -311,16 +322,17 @@ function useSubHexNavigation({
     }
 
     // nestedMapData is now the fully-updated root
-    rootUpdateMapData(nestedMapData);
+    rootUpdateMapData(nestedMapData, options);
   }, [rootUpdateMapData]);
 
   // Exit current sub-hex (go up one level)
   const exitSubHex = useCallback((seamlessExit?: SubHexExitDetail | null): void => {
     if (navStack.length === 0) return;
 
-    // The parent-map still only backs the level being left; v1 keeps a single
-    // snapshot, so surfacing discards it rather than restoring an outer one.
-    clearSubHexBackdrop();
+    // Discard only the LEAVING level's snapshot: ancestor levels keep theirs,
+    // so surfacing from a nested dive re-exposes the outer backdrop instead
+    // of leaving the intermediate level in a void.
+    clearSubHexBackdrop(getCanvas?.() ?? null, navStack.map(f => f.hexKey).join('/'));
 
     const currentSubHex = subHexMapData;
     const topFrame = navStack[navStack.length - 1];
@@ -397,13 +409,18 @@ function useSubHexNavigation({
     }
 
     setNavigationVersion(prev => prev + 1);
-  }, [navStack, subHexMapData, rootUpdateMapData, propagateToRoot]);
+  }, [navStack, subHexMapData, rootUpdateMapData, propagateToRoot, getCanvas]);
 
   // Navigate to a specific breadcrumb level (0 = root)
   const navigateToLevel = useCallback((targetDepth: number): void => {
     if (targetDepth >= depth) return;
 
-    clearSubHexBackdrop();
+    // Drop the snapshots of every level being left; levels still on the
+    // remaining drill path keep theirs.
+    pruneSubHexBackdrops(
+      getCanvas?.() ?? null,
+      targetDepth === 0 ? null : navStack.slice(0, targetDepth).map(f => f.hexKey).join('/')
+    );
 
     // Pop levels from top down to target
     let currentData = subHexMapData;
@@ -439,13 +456,13 @@ function useSubHexNavigation({
     }
 
     setNavigationVersion(prev => prev + 1);
-  }, [navStack, subHexMapData, depth, rootUpdateMapData, propagateToRoot]);
+  }, [navStack, subHexMapData, depth, rootUpdateMapData, propagateToRoot, getCanvas]);
 
   // Wrapped updateMapData that routes writes to the correct level
-  const activeUpdateMapData = useCallback<MapDataUpdater>((updaterOrData) => {
+  const activeUpdateMapData = useCallback<MapDataUpdater>((updaterOrData, options) => {
     if (!isInSubHex) {
       // At root level, delegate directly
-      rootUpdateMapData(updaterOrData);
+      rootUpdateMapData(updaterOrData, options);
       return;
     }
 
@@ -457,8 +474,22 @@ function useSubHexNavigation({
         : updaterOrData;
       if (newData == null) return prev;
 
-      // Propagate to root for saving (async, after state update)
-      window.setTimeout(() => propagateToRoot(newData, navStackRef.current), 0);
+      // Propagate to root for saving (async, after state update). Guarded by
+      // the drill path as of scheduling: `newData` belongs to THIS level, and
+      // propagateToRoot writes it under the top frame's hexKey — if navigation
+      // moves the stack before the timeout fires, that write would nest one
+      // level's map inside a different level's slot (a map can end up its own
+      // child). A skipped propagate loses nothing: every navigation path
+      // merges the live subHexMapData into the parent itself.
+      const scheduledPath = navStackRef.current.map(f => f.hexKey).join('/');
+      window.setTimeout(() => {
+        const currentPath = navStackRef.current.map(f => f.hexKey).join('/');
+        if (currentPath !== scheduledPath) {
+          traceZoom('propagateSkipped', { scheduledPath, currentPath });
+          return;
+        }
+        propagateToRoot(newData, navStackRef.current, options);
+      }, 0);
 
       return newData;
     });
@@ -467,9 +498,6 @@ function useSubHexNavigation({
   // Navigate to a sibling sub-hex (atomic exit + enter)
   const navigateToSibling = useCallback((q: number, r: number): void => {
     if (navStack.length === 0) return;
-
-    // The snapshot is keyed to the hex being left, not its sibling.
-    clearSubHexBackdrop();
 
     const currentSubHex = subHexMapData;
     const topFrame = navStack[navStack.length - 1];
@@ -498,6 +526,29 @@ function useSubHexNavigation({
       };
     }
 
+    // The backdrop snapshot depicts the PARENT map's world — identical for
+    // adjacent siblings, only the anchor hex changes. Re-label it to the
+    // sibling's path instead of dropping it (dropping was the "background
+    // vanishes on adjacent navigation" bug: capture only ever ran on dives,
+    // so a cleared snapshot never came back). Recapturing here would be
+    // wrong too: the live canvas shows the DEPARTING sibling's interior,
+    // not the parent imagery.
+    const newPath = [...navStack.slice(0, -1).map(f => f.hexKey), siblingKey].join('/');
+    const canvas = getCanvas?.() ?? null;
+    if (canvas != null) {
+      const parentMap = topFrame.parentMapData;
+      const parentHexSize = parentMap.hexSize ?? DEFAULTS.hexSize;
+      const hexCenter = createGeometry(parentMap).gridToWorld(q, r);
+      relabelSubHexBackdrop({
+        canvas,
+        oldSubHexPath: navStack.map(f => f.hexKey).join('/'),
+        newSubHexPath: newPath,
+        hexCenterWorld: { x: hexCenter.worldX, y: hexCenter.worldY },
+        childHexSize: siblingSubHex.mapData.hexSize ?? parentHexSize,
+        rings: siblingSubHex.subdivisionRings ?? 7
+      });
+    }
+
     // Replace the top frame with the sibling's frame
     const newFrame: SubHexNavFrame = {
       parentMapData: restoredParent,
@@ -512,9 +563,18 @@ function useSubHexNavigation({
     setSubHexMapData(siblingMapData);
     setNavigationVersion(prev => prev + 1);
 
-    // Propagate to root
-    window.setTimeout(() => propagateToRoot(siblingMapData, navStackRef.current), 0);
-  }, [navStack, subHexMapData, propagateToRoot]);
+    // Propagate to root, guarded by the drill path as of scheduling (see
+    // activeUpdateMapData) — a propagate firing after further navigation
+    // would write this level's map into the wrong slot.
+    window.setTimeout(() => {
+      const currentPath = navStackRef.current.map(f => f.hexKey).join('/');
+      if (currentPath !== newPath) {
+        traceZoom('propagateSkipped', { scheduledPath: newPath, currentPath });
+        return;
+      }
+      propagateToRoot(siblingMapData, navStackRef.current);
+    }, 0);
+  }, [navStack, subHexMapData, propagateToRoot, getCanvas]);
 
   // Current hex key (for adjacent sub-hex lookup)
   const currentHexKey = isInSubHex ? navStack[navStack.length - 1].hexKey : null;

@@ -95,11 +95,18 @@ Used for communication between Datacore components:
 
 | Event | Payload | Notes |
 |-------|---------|-------|
-| `windrose:enter-sub-hex` | `{ q, r }` | Double-click hex to drill down |
-| `windrose:hex-context-menu` | `{ q, r, screenX, screenY }` | Right-click hex |
-| `windrose:center-on-region` | `{ regionId }` | Pan to region |
-| `windrose:edit-region` | `{ regionId }` | Open region editor |
-| `windrose:before-undo` | None (cancelable) | `preventDefault()` to cancel undo |
+| `windrose:hex-context-menu` | `{ q, r, screenX, screenY, instanceId? }` | Right-click hex |
+| `windrose:center-on-region` | `{ regionId, instanceId? }` | Pan to region |
+| `windrose:edit-region` | `{ regionId, instanceId? }` | Open region editor |
+| `windrose:before-undo` | `{ instanceId? }` or none (cancelable) | `preventDefault()` to cancel undo |
+
+> **Removed in 2.3.2:** `windrose:enter-sub-hex`, `windrose:exit-sub-hex`, and
+> `windrose:navigate-sibling-sub-hex` no longer exist — sub-hex navigation is
+> direct callbacks now (dispatching them from the console does nothing). Drive
+> sub-hex navigation through UI interaction or the MCP bridge instead.
+> Instance-scoped events carry an optional `instanceId` (per-mount sender id);
+> listeners are FAIL-OPEN — a hand-dispatched event without `instanceId` is
+> still handled by every mounted map block.
 
 **Dispatch pattern:**
 ```typescript

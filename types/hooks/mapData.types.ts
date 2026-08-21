@@ -17,11 +17,25 @@ export type SaveStatus = 'Saved' | 'Saving...' | 'Unsaved changes' | 'Save faile
 // Map Data Updater
 // ===========================================
 
+/** Options carried alongside a map data update. */
+export interface MapDataUpdateOptions {
+  /**
+   * View-only change (pan/zoom viewState, sidebar collapse). Still saved
+   * normally, but when a save is refused as stale (the same map was written
+   * by another mount first), a cosmetic-only refusal stays silent instead of
+   * blocking the pane — merely panning must never cost the user a reload.
+   */
+  cosmetic?: boolean;
+}
+
 /**
  * Function to update map data.
  * Accepts either a new MapData object or an updater function.
  */
-export type MapDataUpdater = (updaterOrData: MapData | ((prev: MapData) => MapData)) => void;
+export type MapDataUpdater = (
+  updaterOrData: MapData | ((prev: MapData) => MapData),
+  options?: MapDataUpdateOptions
+) => void;
 
 // ===========================================
 // Load Failure
@@ -68,6 +82,18 @@ export interface UseMapDataResult {
 
   /** Permanently disable all saves for this instance (post-deletion guard) */
   markDeleted: () => void;
+
+  /**
+   * True when a save carrying real edits was refused because another mount of
+   * the same map saved first (this instance's tree is stale). The UI must
+   * block editing behind a reload prompt — further saves from this instance
+   * would keep being refused, and force-writing would clobber the other
+   * mount's committed work.
+   */
+  staleConflict: boolean;
+
+  /** Dismiss the stale-conflict state (call together with reload()). */
+  acknowledgeStaleConflict: () => void;
 
   /**
    * Bumped when plugin settings change. Exposed so the caller can drive

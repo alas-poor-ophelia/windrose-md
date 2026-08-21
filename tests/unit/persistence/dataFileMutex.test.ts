@@ -104,9 +104,9 @@ describe('data-file mutex covers reads', () => {
     const { app } = makeApp(fileWith({}), 15);
 
     let landed = false;
-    const savePromise = saveMapData(app, 'mutex-3', createNewMap('Queued', 'grid')).then((ok) => {
-      landed = ok;
-      return ok;
+    const savePromise = saveMapData(app, 'mutex-3', createNewMap('Queued', 'grid')).then((res) => {
+      landed = res.status === 'saved';
+      return res;
     });
 
     await getSaveQueue();

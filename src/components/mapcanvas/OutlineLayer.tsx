@@ -21,6 +21,7 @@ import type { MenuItem } from 'obsidian';
 import { Modal, Menu } from 'obsidian';
 import { useApp } from '../../context/AppContext';
 import type { HexContextMenuDetail } from '../../core/windroseEvents';
+import { isForeignInstanceEvent } from '../../core/windroseEvents';
 import { tooltipRef } from '../shared/obsidianTooltip';
 
 
@@ -42,7 +43,7 @@ const OutlineLayer = ({
   onOutlinesChange
 }: OutlineLayerProps): VNode | null => {
   const app = useApp();
-  const { canvasRef, mapData, geometry, screenToWorld } = useMapState();
+  const { canvasRef, mapData, geometry, screenToWorld, instanceId } = useMapState();
 
   const isOutlineTool = currentTool === 'outline';
 
@@ -119,6 +120,7 @@ const OutlineLayer = ({
     if (!isOutlineTool) return undefined;
 
     const handler = (e: CustomEvent<HexContextMenuDetail>): void => {
+      if (isForeignInstanceEvent(e.detail, instanceId)) return;
       const { screenX, screenY } = e.detail;
       if (!mapData?.outlines) return;
 
@@ -183,7 +185,7 @@ const OutlineLayer = ({
 
     activeDocument.addEventListener('windrose:hex-context-menu', handler);
     return () => activeDocument.removeEventListener('windrose:hex-context-menu', handler);
-  }, [isOutlineTool, mapData?.outlines, geometry, screenToWorld, deleteOutline, updateOutline, onOutlinesChange]);
+  }, [isOutlineTool, mapData?.outlines, geometry, screenToWorld, deleteOutline, updateOutline, onOutlinesChange, instanceId]);
 
   // ── Overlay canvas for in-progress drawing ────────────────────────
   const overlayRef = useRef<HTMLCanvasElement | null>(null);

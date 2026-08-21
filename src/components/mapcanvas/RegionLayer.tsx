@@ -20,7 +20,8 @@ import type { MenuItem } from 'obsidian';
 import { Menu } from 'obsidian';
 import { openNativeNoteLinkModal } from '../modals/NoteLinkModal';
 import { Icon } from '../shared/Icon';
-import type { RegionIdDetail } from '../../core/windroseEvents';
+import type { InstanceScopedDetail, RegionIdDetail } from '../../core/windroseEvents';
+import { isForeignInstanceEvent } from '../../core/windroseEvents';
 import { tooltipRef } from '../shared/obsidianTooltip';
 
 
@@ -46,7 +47,7 @@ const RegionLayer = ({
   onRegionsChange
 }: RegionLayerProps): VNode | null => {
   const app = useApp();
-  const { canvasRef, mapData, geometry, screenToWorld, screenToGrid } = useMapState();
+  const { canvasRef, mapData, geometry, screenToWorld, screenToGrid, instanceId } = useMapState();
 
   const isRegionTool = currentTool === 'regionPaint' || currentTool === 'regionBoundary';
 
@@ -88,6 +89,7 @@ const RegionLayer = ({
   // Listen for edit-region events from sidebar panel
   useEffect(() => {
     const handler = (e: CustomEvent<RegionIdDetail>): void => {
+      if (isForeignInstanceEvent(e.detail, instanceId)) return;
       const { regionId } = e.detail;
       if (regionId !== '') {
         startEditingRegion(regionId);
@@ -95,7 +97,7 @@ const RegionLayer = ({
     };
     activeDocument.addEventListener('windrose:edit-region', handler);
     return () => activeDocument.removeEventListener('windrose:edit-region', handler);
-  }, [startEditingRegion]);
+  }, [startEditingRegion, instanceId]);
 
   // Name input state
   const [showNameInput, setShowNameInput] = useState(false);
@@ -103,7 +105,11 @@ const RegionLayer = ({
 
   // Intercept undo when region creation/editing is in progress — cancel instead
   useEffect(() => {
-    const handler = (e: Event): void => {
+    const handler = (e: CustomEvent<InstanceScopedDetail | null>): void => {
+      // Ctrl+Z in another co-mounted map must not cancel THIS map's
+      // in-progress region draw (before-undo is cancelable — a foreign
+      // handler claiming it would also swallow that map's undo).
+      if (isForeignInstanceEvent(e.detail, instanceId)) return;
       if (pendingHexes.length > 0 || (editingRegionId != null && editingRegionId !== '') || showNameInput) {
         e.preventDefault();
         cancelRegion();
@@ -113,7 +119,7 @@ const RegionLayer = ({
     };
     activeDocument.addEventListener('windrose:before-undo', handler);
     return () => activeDocument.removeEventListener('windrose:before-undo', handler);
-  }, [pendingHexes.length, editingRegionId, showNameInput, cancelRegion]);
+  }, [pendingHexes.length, editingRegionId, showNameInput, cancelRegion, instanceId]);
 
   const handleCreateClick = useCallback(() => {
     setShowNameInput(true);

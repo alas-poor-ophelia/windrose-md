@@ -22,6 +22,7 @@ import type {
   UseCanvasInteractionResult,
 } from '#types/hooks/canvasInteraction.types';
 import type { ViewController } from '#types/hooks/viewController.types';
+import type { SubHexCoordDetail, SubHexExitDetail } from '../../core/windroseEvents';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULTS } from '../../core/dmtConstants';
@@ -136,7 +137,13 @@ function useCanvasInteraction(
   focused: boolean,
   viewController: ViewController,
   isInSubHex: boolean = false,
-  subHexPath: string | null = null
+  subHexPath: string | null = null,
+  // Direct sub-hex dive/surface callbacks for THIS mount (replaced the
+  // windrose:enter/exit-sub-hex document events, which every co-mounted hex
+  // map obeyed). Absent on the coordinate-utility instantiation in MapCanvas
+  // when unwired — seamless transitions simply don't fire there.
+  requestEnterSubHex?: (detail: SubHexCoordDetail) => void,
+  requestExitSubHex?: (detail: SubHexExitDetail | null) => void
 ): UseCanvasInteractionResult {
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [isTouchPanning, setIsTouchPanning] = useState<boolean>(false);
@@ -496,7 +503,7 @@ function useCanvasInteraction(
       if (!coords) return false;
       const subHex = mapData.subHexMaps?.[`${coords.x},${coords.y}`];
       const canvas = canvasRef.current;
-      if (subHex == null || canvas == null) return false;
+      if (subHex == null || canvas == null || requestEnterSubHex == null) return false;
 
       // Open the sub-map at VISUAL CONTINUITY: the child grid occupies the
       // same screen footprint the parent hex has right now, and the world
@@ -560,17 +567,15 @@ function useCanvasInteraction(
       // non-seamless exit restores) is the view the user dove from.
       clearWheelSettle();
       commitActiveGesture();
-      activeDocument.dispatchEvent(new CustomEvent('windrose:enter-sub-hex', {
-        detail: {
-          q: coords.x,
-          r: coords.y,
-          viewOverride: { zoom: childZoom, center: childCenter }
-        }
-      }));
+      requestEnterSubHex({
+        q: coords.x,
+        r: coords.y,
+        viewOverride: { zoom: childZoom, center: childCenter }
+      });
       return true;
     }
 
-    if (!isInSubHex) return false;
+    if (!isInSubHex || requestExitSubHex == null) return false;
     const canvas = canvasRef.current;
     if (!canvas) return false;
 
@@ -615,7 +620,7 @@ function useCanvasInteraction(
     traceZoom('surface', { newZoom });
     clearWheelSettle();
     commitActiveGesture();
-    activeDocument.dispatchEvent(new CustomEvent('windrose:exit-sub-hex', { detail: exitDetail }));
+    requestExitSubHex(exitDetail);
     return true;
   };
 

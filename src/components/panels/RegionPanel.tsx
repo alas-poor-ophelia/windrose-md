@@ -21,13 +21,16 @@ export interface RegionPanelProps {
   onRegionsChange: (regions: Region[]) => void;
   sidebarCollapsed: boolean;
   isOpen?: boolean;
+  /** Per-mount instance id — stamped into center-on-region events. */
+  instanceId?: string;
 }
 
 const RegionPanel = ({
   regions,
   onRegionsChange,
   sidebarCollapsed,
-  isOpen = false
+  isOpen = false,
+  instanceId
 }: RegionPanelProps): VNode | null => {
 
   const getDisplayName = (name: string): string => {
@@ -46,7 +49,7 @@ const RegionPanel = ({
 
   const handleRegionClick = (regionId: string): void => {
     activeDocument.dispatchEvent(new CustomEvent('windrose:center-on-region', {
-      detail: { regionId }
+      detail: { regionId, instanceId }
     }));
   };
 

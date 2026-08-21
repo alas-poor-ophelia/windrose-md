@@ -38,8 +38,10 @@ const usePanZoomCoordinator = ({
   viewController
 }: UsePanZoomCoordinatorOptions): void => {
   // Sub-hex awareness for seamless zoom transitions (provided via MapContext).
-  // The drill path keys the parent-map backdrop captured on a dive.
-  const { isInSubHex, subHexPath } = useMapState();
+  // The drill path keys the parent-map backdrop captured on a dive; the
+  // request callbacks route dives/surfaces DIRECTLY to this mount's
+  // navigation hook (no document events — see core/windroseEvents.ts).
+  const { isInSubHex, subHexPath, requestEnterSubHex, requestExitSubHex } = useMapState();
 
   // Use canvas interaction hook for pan/zoom logic
   const {
@@ -73,7 +75,7 @@ const usePanZoomCoordinator = ({
     setPanStart,
     setTouchPanStart,
     setInitialPinchDistance
-  } = useCanvasInteraction(canvasRef, mapData, geometry, isFocused, viewController, isInSubHex === true, subHexPath ?? null);
+  } = useCanvasInteraction(canvasRef, mapData, geometry, isFocused, viewController, isInSubHex === true, subHexPath ?? null, requestEnterSubHex, requestExitSubHex);
 
   // Register pan/zoom handlers with EventHandlerContext for event coordination
   const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();

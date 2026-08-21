@@ -6,19 +6,23 @@ import type { MapDataUpdater } from '#types/hooks/mapData.types';
 import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import type { PlayerFogClearDetail } from '../../core/windroseEvents';
+import { isForeignInstanceEvent } from '../../core/windroseEvents';
 
 interface UsePlayerFogClearOptions {
   geometry: ExtendedGeometry | null;
   updateMapData: MapDataUpdater;
   addToHistory: (state: LayerHistorySnapshot) => void;
   isApplyingHistory: () => boolean;
+  /** Per-mount instance id — gates the fog-clear event (fail-open). */
+  instanceId?: string;
 }
 
 function usePlayerFogClear({
-  geometry, updateMapData, addToHistory, isApplyingHistory
+  geometry, updateMapData, addToHistory, isApplyingHistory, instanceId
 }: UsePlayerFogClearOptions): void {
   useEffect(() => {
     const handler = (e: CustomEvent<PlayerFogClearDetail>): void => {
+      if (isForeignInstanceEvent(e.detail, instanceId)) return;
       if (geometry == null || isApplyingHistory()) return;
       const { objectId } = e.detail;
 
@@ -92,7 +96,7 @@ function usePlayerFogClear({
 
     activeDocument.addEventListener('windrose:player-fog-clear', handler);
     return () => activeDocument.removeEventListener('windrose:player-fog-clear', handler);
-  }, [geometry, updateMapData, addToHistory, isApplyingHistory]);
+  }, [geometry, updateMapData, addToHistory, isApplyingHistory, instanceId]);
 }
 
 export { usePlayerFogClear };

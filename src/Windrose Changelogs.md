@@ -608,7 +608,21 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
-## Version 2.3.1
+## Version 2.3.2
+
+Emergency-ish patch for three sub-map bugs reported against 2.3.1 — including one data-corruption bug — plus a real fix for the underlying hazard that made it possible.
+
+### Bug Fixes
+- **A sub-map could duplicate itself as its own child.** With the same map open in more than one place (e.g. an embed of a sub-map in another note), diving around in one view could silently write a sub-map inside itself in the other. Two root causes, both fixed:
+	- Sub-map navigation used to broadcast document-wide events that *every* open map block obeyed — diving in one block made every other hex map in the window dive in sympathy, and could even silently create sub-maps on maps you never touched. Navigation is now wired directly per map block; the sympathetic zoom is gone.
+	- The save system replaced a map's whole entry on every save, so two views of the same map silently overwrote each other's work (even just panning in a second pane could do it). Saves now carry a write generation: a save based on an outdated copy is refused instead of clobbering. If that happens to real edits, the affected view shows a "map was changed in another pane" panel with a reload button — at most a couple seconds of edits in that one pane are lost, announced, instead of the other pane's whole session vanishing silently.
+- **The parent-map backdrop no longer disappears when moving between adjacent sub-maps.** Navigating to a neighboring sub-map now carries the backdrop across (re-anchored to the new hex) instead of dropping the world into a void.
+- **The backdrop also survives nested dives now.** Diving into a sub-map inside a sub-map and surfacing back out shows the outer level's backdrop again — each drill level keeps its own snapshot instead of the deepest dive erasing the ones above it.
+- **Undo in one pane can no longer cancel a region you're drawing in another map's pane.** (Same family as the sympathetic zoom: cross-block event leakage, now instance-scoped.)
+- **Deep links into sub-maps no longer freeze the app** when the target map is embedded in several places — exactly one view navigates now, instead of every copy drilling at once.
+
+### Improvements
+- Pressing Escape to exit a sub-map now only affects the map block you're working in, not every drilled-in map in the window.
 
 Follow-up polish for 2.3.0's sub-map rework: this release is mostly about making seamless dives and surfacing actually feel seamless, plus a fix for a nasty iPad pinch bug. Some settings quality-of-life snuck in as well.
 

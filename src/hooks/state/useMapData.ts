@@ -9,7 +9,7 @@ import type {
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
-import { loadMapData, MapDataUnreadableError } from '../../persistence/fileOperations';
+import { loadMapDataWithGeneration, MapDataUnreadableError } from '../../persistence/fileOperations';
 import { getDataFilePath } from '../../core/settingsAccessor';
 import { resolveJournalOnLoad } from '../../persistence/saveJournal';
 import { getCachedImage } from '../../assets/imageOperations';
@@ -34,13 +34,19 @@ function useMapData(
   // to apply a restored journal entry through the normal save path.
   const updateMapDataRef = useRef<MapDataUpdater | null>(null);
 
+  // Write generation this instance's tree is based on (see saveMapData's
+  // stale-base guard). Set at load, advanced by useDebouncedSave on save.
+  const baseGenRef = useRef(0);
+
   // Load map data on mount
   useEffect(() => {
     let cancelled = false;
     async function load(): Promise<void> {
       let data: MapData;
       try {
-        data = await loadMapData(app, mapId, mapName, mapType);
+        const loaded = await loadMapDataWithGeneration(app, mapId, mapName, mapType);
+        data = loaded.data;
+        baseGenRef.current = loaded.generation;
       } catch (error) {
         if (cancelled) return;
         // Unreadable data file: do NOT fall back to a blank map. Surface the
@@ -94,8 +100,8 @@ function useMapData(
   // with the active map and this hook's settingsVersion (windrose-1mc).
   useTilesetBuilder(app, mapData, setMapData, isLoading, settingsVersion);
 
-  const { saveStatus, updateMapData, forceSave, markDeleted } =
-    useDebouncedSave(app, mapId, setMapData);
+  const { saveStatus, updateMapData, forceSave, markDeleted, staleConflict, acknowledgeStaleConflict } =
+    useDebouncedSave(app, mapId, setMapData, baseGenRef);
   updateMapDataRef.current = updateMapData;
 
   return {
@@ -107,6 +113,8 @@ function useMapData(
     updateMapData,
     forceSave,
     markDeleted,
+    staleConflict,
+    acknowledgeStaleConflict,
     settingsVersion,
     getCachedImage,
   };

@@ -127,6 +127,30 @@ export interface MapStateContextValue {
    * encode this into copied deep links so they open at the correct sub-hex.
    */
   subHexPath?: string | null;
+  /**
+   * Per-mount instance id, stamped into map-scoped custom events so other
+   * co-mounted map blocks ignore them (see core/windroseEvents.ts).
+   */
+  instanceId?: string | null;
+  /**
+   * Direct sub-hex entry/exit requests from the canvas interaction layer.
+   * These replaced the windrose:enter/exit-sub-hex DOM events (2.3.2): the
+   * handler always belonged to the same mount as the dispatcher, and the
+   * document-wide broadcast made every co-mounted hex map dive in sympathy.
+   * Shapes mirror SubHexCoordDetail / SubHexExitDetail in core/windroseEvents.
+   */
+  requestEnterSubHex?: (detail: {
+    q: number;
+    r: number;
+    viewOverride?: { zoom: number; center: { x: number; y: number } };
+    anchor?: { worldX: number; worldY: number };
+    canvasSize?: { width: number; height: number };
+  }) => void;
+  requestExitSubHex?: (detail: {
+    childZoom: number;
+    childAnchor: { x: number; y: number };
+    anchorOffset: { dx: number; dy: number };
+  } | null) => void;
   GridGeometry?: new (...args: unknown[]) => ExtendedGeometry;
   HexGeometry?: new (...args: unknown[]) => IGeometry;
   onDrawingStateChange?: (state: DrawingLayerState) => void;

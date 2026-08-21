@@ -41,6 +41,7 @@ import { getSettings } from '../../core/settingsAccessor';
 import { rotateByIncrement } from '../../drawing/rotationOperations';
 import { Z_INDEX } from '../../core/dmtConstants';
 import type { SelectionContextMenuDetail } from '../../core/windroseEvents';
+import { isForeignInstanceEvent } from '../../core/windroseEvents';
 
 
 
@@ -95,7 +96,7 @@ const ObjectLayer = ({
   onDeleteCustomColor,
   freeformPlacementMode = false
 }: ObjectLayerProps): VNode | null => {
-  const { canvasRef, containerRef, mapData, mapId, notePath, geometry, screenToGrid, distanceOverrides, subHexPath } = useMapState();
+  const { canvasRef, containerRef, mapData, mapId, notePath, geometry, screenToGrid, distanceOverrides, subHexPath, instanceId } = useMapState();
   const { getObjectAtPosition, updateObject, onObjectsChange: contextOnObjectsChange, onTextLabelsChange } = useMapOperations();
   const {
     selectedItem, setSelectedItem,
@@ -188,9 +189,14 @@ const ObjectLayer = ({
         onObjectsChange(updatedObjects);
       }
     } else {
-      window.dispatchEvent(new CustomEvent(crossLayerEvent.name, { detail: crossLayerEvent.detail }));
+      // Cross-layer link updates round-trip through a window event handled by
+      // this mount's useCustomEventHandlers — stamp the sender so co-mounted
+      // maps don't apply it too.
+      window.dispatchEvent(new CustomEvent(crossLayerEvent.name, {
+        detail: { ...crossLayerEvent.detail, instanceId: instanceId ?? undefined }
+      }));
     }
-  }, [mapData, onObjectsChange]);
+  }, [mapData, onObjectsChange, instanceId]);
 
   const [showObjectColorPicker, setShowObjectColorPicker] = useState(false);
 
@@ -649,6 +655,8 @@ const ObjectLayer = ({
 
     const handler = (e: CustomEvent<SelectionContextMenuDetail>): void => {
       const detail = e.detail;
+      // Foreign mount's event: don't act on it — and don't claim it either.
+      if (isForeignInstanceEvent(detail, instanceId)) return;
       if (detail.handled === true) return;
 
       const coords = screenToGrid(detail.clientX, detail.clientY);
@@ -695,7 +703,7 @@ const ObjectLayer = ({
 
     activeDocument.addEventListener('windrose:selection-context-menu', handler);
     return () => activeDocument.removeEventListener('windrose:selection-context-menu', handler);
-  }, [mapData, geometry, screenToGrid, isResizeMode]);
+  }, [mapData, geometry, screenToGrid, isResizeMode, instanceId]);
 
   if (showCoordinates || !layerVisibility.objects) {
     return null;

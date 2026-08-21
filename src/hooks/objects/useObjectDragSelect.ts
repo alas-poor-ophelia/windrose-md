@@ -53,7 +53,7 @@ function useObjectDragSelect(
   handleObjectDragging: (e: PointerEvent | MouseEvent | TouchEvent) => boolean;
   stopObjectDragging: () => boolean;
 } {
-  const { mapData, geometry, screenToGrid, screenToWorld, getClientCoords } = useMapState();
+  const { mapData, geometry, screenToGrid, screenToWorld, getClientCoords, instanceId } = useMapState();
 
   const edgeSnapModeRef = useRef(edgeSnapMode);
   edgeSnapModeRef.current = edgeSnapMode;
@@ -461,7 +461,7 @@ function useObjectDragSelect(
               || initialObj.worldPosition?.y !== currentObj.worldPosition?.y;
             if (moved) {
               activeDocument.dispatchEvent(new CustomEvent('windrose:player-fog-clear', {
-                detail: { objectId: fogObjectId }
+                detail: { objectId: fogObjectId, instanceId: instanceId ?? undefined }
               }));
             }
           }
@@ -481,7 +481,7 @@ function useObjectDragSelect(
       return true;
     }
     return false;
-  }, [isDraggingSelection, selectedItem, dragStart, setIsDraggingSelection, setDragStart, onObjectsChange, mapData, geometry, updateObject, setSelectedItem]);
+  }, [isDraggingSelection, selectedItem, dragStart, setIsDraggingSelection, setDragStart, onObjectsChange, mapData, geometry, updateObject, setSelectedItem, instanceId]);
 
   return { handleObjectSelection, handleObjectDragging, stopObjectDragging };
 }

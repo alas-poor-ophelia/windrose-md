@@ -478,13 +478,16 @@ function applyLockedViewState(mapData: MapData): MapData {
  * Serialized through the data-file mutex so it can never observe a write in
  * progress.
  */
-async function loadMapData(app: App, mapId: string, mapName: string = '', mapType: MapType = 'grid'): Promise<MapData> {
+async function loadMapDataWithGeneration(app: App, mapId: string, mapName: string = '', mapType: MapType = 'grid'): Promise<{ data: MapData; generation: number }> {
   const dataPath = getDataFilePath();
   return enqueueDataFileOp(async () => {
+    // Captured INSIDE the mutex: the returned snapshot is exactly the state
+    // at this generation — no save can land between the read and the stamp.
+    const generation = getEntryGeneration(mapId);
     const file = app.vault.getAbstractFileByPath(dataPath);
 
     if (!(file instanceof TFile)) {
-      return createNewMap(mapName, mapType);
+      return { data: createNewMap(mapName, mapType), generation };
     }
 
     let data: DataFile;
@@ -501,7 +504,7 @@ async function loadMapData(app: App, mapId: string, mapName: string = '', mapTyp
     }
 
     if (data.maps[mapId] == null) {
-      return createNewMap(mapName, mapType);
+      return { data: createNewMap(mapName, mapType), generation };
     }
 
     try {
@@ -509,7 +512,7 @@ async function loadMapData(app: App, mapId: string, mapName: string = '', mapTyp
       if (data.maps[mapId].name == null && mapName) {
         data.maps[mapId].name = mapName;
       }
-      return applyLockedViewState(data.maps[mapId]);
+      return { data: applyLockedViewState(data.maps[mapId]), generation };
     } catch (error) {
       // The entry exists but is malformed enough to break migration. Same rule:
       // never hand back a blank map that a later save would merge over it.
@@ -518,6 +521,11 @@ async function loadMapData(app: App, mapId: string, mapName: string = '', mapTyp
       throw new MapDataUnreadableError(dataPath);
     }
   });
+}
+
+/** Convenience wrapper for read-only consumers that don't track generations. */
+async function loadMapData(app: App, mapId: string, mapName: string = '', mapType: MapType = 'grid'): Promise<MapData> {
+  return (await loadMapDataWithGeneration(app, mapId, mapName, mapType)).data;
 }
 
 /**
@@ -624,13 +632,68 @@ function canonicalizeTileIds(mapData: MapData): void {
   }
 }
 
-async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<boolean> {
-  // Tombstoned map: silently drop the write. Returning true (not false) lets a
-  // stale instance's save status settle to 'Saved' instead of flagging an error
-  // for an intentional no-op.
-  if (deletedMapIds.has(mapId)) return true;
+/**
+ * In-process per-mapId write generation. Every successful saveMapData write
+ * increments the map's generation; loadMapDataWithGeneration reports the
+ * generation its snapshot reflects. A save whose caller loaded (or last
+ * saved) at an OLDER generation would replace the whole entry with a stale
+ * tree — silently destroying whatever another mount of the same map has
+ * committed since — so it is refused as 'stale' instead.
+ *
+ * Deliberately in-process, not persisted: a persisted rev field would change
+ * every entry's bytes and perturb the save journal's exact-string comparison.
+ * Cross-process/device conflicts remain out of scope (as they always were);
+ * this guard closes the same-window multi-pane race, which shares one module
+ * realm — the same assumption the save mutex and deletion tombstones already
+ * rely on.
+ *
+ * KNOWN RESIDUAL GAP (windrose-bc7): generations reset on app restart, so a
+ * crash-journal restore accepted after a restart replays its whole tree at
+ * base 0 and is never refused — a stale journal from a second pane can still
+ * clobber a newer pre-crash save. Do NOT read this guard as covering the
+ * journal-restore path across restarts.
+ */
+interface EntryGenerationState {
+  generation: number;
+  /** Per-mount writer id of the last successful save (null = untracked). */
+  writerId: string | null;
+}
+
+const entryGenerations = new Map<string, EntryGenerationState>();
+
+/** Current write generation for a map entry (0 = never written this session). */
+function getEntryGeneration(mapId: string): number {
+  return entryGenerations.get(mapId)?.generation ?? 0;
+}
+
+type SaveMapResult =
+  | { status: 'saved'; generation: number }
+  | { status: 'failed' }
+  | { status: 'stale' };
+
+async function saveMapData(app: App, mapId: string, mapData: MapData, baseGeneration?: number, writerId?: string): Promise<SaveMapResult> {
+  // Tombstoned map: silently drop the write. Reporting 'saved' (not 'failed')
+  // lets a stale instance's save status settle to 'Saved' instead of flagging
+  // an error for an intentional no-op.
+  if (deletedMapIds.has(mapId)) return { status: 'saved', generation: getEntryGeneration(mapId) };
   return enqueueDataFileOp(async () => {
     try {
+      // Stale-base check inside the mutex: refuse to replace an entry that
+      // has been written since this caller's tree was loaded/last saved —
+      // UNLESS the last writer was this same caller. An instance's saves are
+      // dispatched with the base read BEFORE its previous save resolved, so
+      // without the writer exemption an instance whose write outlasts the
+      // debounce window gets refused against ITSELF (spurious conflict
+      // panel). Same-writer payloads are always derived from newer state
+      // than the write they follow, so passing them is safe by construction.
+      const current = entryGenerations.get(mapId);
+      if (
+        baseGeneration != null && current != null && current.generation > baseGeneration &&
+        (writerId == null || current.writerId !== writerId)
+      ) {
+        console.warn(`[saveMapData] Refusing stale save of "${mapId}": base generation ${String(baseGeneration)} < current ${String(current.generation)} last written by ${current.writerId ?? 'untracked'} (map open in another pane?)`);
+        return { status: 'stale' } as const;
+      }
       let allData: DataFile = { maps: {} };
 
       // Load existing data
@@ -648,7 +711,7 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
             parseError
           );
           notifyCorruptedDataFile(dataPath);
-          return false;
+          return { status: 'failed' } as const;
         }
 
         // Backup rotation. `content` has just been proven to parse, so it is
@@ -683,7 +746,7 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
         jsonString = JSON.stringify(allData);
       } catch (serializeError) {
         console.error('[saveMapData] Serialization failed, save aborted:', serializeError);
-        return false;
+        return { status: 'failed' } as const;
       }
 
       if (file) {
@@ -692,10 +755,12 @@ async function saveMapData(app: App, mapId: string, mapData: MapData): Promise<b
         await app.vault.create(dataPath, jsonString);
       }
 
-      return true;
+      const generation = getEntryGeneration(mapId) + 1;
+      entryGenerations.set(mapId, { generation, writerId: writerId ?? null });
+      return { status: 'saved', generation } as const;
     } catch (error) {
       console.error('Error saving map data:', error);
-      return false;
+      return { status: 'failed' } as const;
     }
   });
 }
@@ -899,8 +964,10 @@ async function listMaps(app: App): Promise<MapListEntry[]> {
   });
 }
 
+export type { SaveMapResult };
 export {
-  loadMapData, saveMapData, deleteMapData, createNewMap, listMaps, migrateMapData,
+  loadMapData, loadMapDataWithGeneration, getEntryGeneration,
+  saveMapData, deleteMapData, createNewMap, listMaps, migrateMapData,
   canonicalizeTileIds, applyLockedViewState, enqueueDataFileOp, getSaveQueue,
   notifyCorruptedDataFile, readRawMapEntry, isMapTombstoned, MapDataUnreadableError,
   shouldRotateBak, otherBakSlot, bakPathForSlot, backupTimestamp,
