@@ -5,6 +5,8 @@ nav_order: 1
 permalink: /
 ---
 
+<p align="center"><img src="{{ site.baseurl }}/assets/windrose-compass.svg" width="130" alt="The Windrose compass rose"></p>
+
 # Windrose MapDesigner
 
 A TTRPG dungeon and world map designer that lives inside your Obsidian notes.
