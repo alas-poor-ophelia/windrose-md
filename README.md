@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/assets/windrose-compass.svg" width="130" alt="The Windrose compass rose"></p>
+
 # Windrose MapDesigner
 
 A TTRPG mapping tool that lives in your Obsidian notes. Windrose started as something like graph paper in Obsidian and then... grew. Draw dungeons and world maps on grid or hex, paint them with image tiles, stock them with objects and labels, obscure them with fog of war — and link all of it to your notes, because you never left your text editor.
