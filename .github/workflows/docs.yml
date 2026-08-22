@@ -1,7 +1,7 @@
 # Builds the documentation site (Jekyll source in docs/) and deploys it to
 # GitHub Pages as a workflow artifact — nothing generated is ever committed.
-# Adapted from actions/starter-workflows pages/jekyll.yml; bundler-cache is
-# off because no Gemfile.lock is committed (no local Ruby toolchain).
+# Adapted from actions/starter-workflows pages/jekyll.yml. docs/Gemfile.lock
+# was generated in CI (no local Ruby toolchain) and feeds bundler-cache.
 name: Deploy docs site
 
 on:
@@ -34,16 +34,8 @@ jobs:
         uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
         with:
           ruby-version: '3.3'
-          bundler-cache: false
-      - name: Install dependencies
-        run: bundle install
-      # TEMPORARY: hand the CI-generated lockfile back so it can be committed
-      # (no local Ruby toolchain). Remove once Gemfile.lock is in the repo.
-      - name: Upload lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: gemfile-lock
-          path: docs/Gemfile.lock
+          bundler-cache: true
+          working-directory: docs
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v5
