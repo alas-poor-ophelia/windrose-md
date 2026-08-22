@@ -42,6 +42,12 @@ The code block format is simple YAML:
 
 Maps render in Reading mode, Live Preview, and inside callouts. The drawing data itself is stored separately in `windrose-map-data.json` in your vault, keyed by `id` — plain JSON that travels with your vault and works with Obsidian Sync. Delete a code block and the data remains; paste the block elsewhere and the map comes with it.
 
+### Data safety
+
+The map data file is defended in depth. Writes are guarded by a lock, saves are journaled and hold Obsidian's quit until they finish flushing, and a data file that fails to parse at load is **never overwritten** — loading refuses and surfaces a recovery panel instead of silently substituting a blank map. Windrose also keeps **rolling backups**: two alternating known-good backup slots, written at most once per 15 minutes, with a **Restore from backup** action.
+
+With the same map open in more than one pane, every save carries a write generation, so two views can't silently overwrite each other's work. If real edits collide, the affected view shows a "map was changed in another pane" panel with a reload button — a couple of seconds of edits in one pane are lost and announced, instead of another pane's whole session vanishing silently.
+
 ## Map types
 
 Windrose has two styles of map:
@@ -81,6 +87,7 @@ The following features can each be toggled at any time from the **Features** sec
 - **Note pins**
 - **Shape overlays**
 - **Distance measurement**
+- **Beacon**
 
 Off means **hidden**, never **gone** — flip a toggle back on and the tool, along with any data you made with it, returns. A feature that was never explicitly set reads as enabled, so existing maps upgrade without migration.
 

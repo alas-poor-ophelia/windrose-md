@@ -23,6 +23,28 @@ Sub-maps default to radial at 7 rings, adjustable per sub-map in Map Settings. E
 
 Inside a sub-map, a **breadcrumb** UI above the tool palette shows where you are in the hierarchy and lets you jump back up. A hex containing a sub-map shows a diamond icon in its center.
 
-Zooming in past a threshold on a hex that holds a sub-map descends into it directly, so a world map and its sub-maps read as one continuous zoom rather than separate maps opened by hand.
+### Seamless zoom
+
+Zooming in past a threshold on a hex that holds a sub-map descends into it directly — and the transition is **seamless in both directions**. The sub-map opens occupying the parent hex's exact screen footprint with the point under your cursor held fixed, and zooming back out surfaces to the matching parent view. A world map and its sub-maps read as one continuous zoom rather than separate maps opened by hand.
+
+### The parent-map backdrop
+
+Inside a sub-map, a static snapshot of the **parent map** renders behind the sub-grid, aligned to where you dove in — the world doesn't vanish at the sub-map's edge. Each nesting level keeps its own backdrop, so surfacing from a deep dive re-exposes the outer level's view. The backdrop can be toggled off in settings, and a **recenter view** button (keyboard: **Home**) snaps the view back to the sub-map's fit.
+
+### Adjacent sub-maps
+
+When neighboring hexes also hold sub-maps with content, Windrose can display them as **previews around the current sub-map** — and clicking one navigates directly across, sliding the view over smoothly rather than surfacing and diving again.
+
+{: .note }
+The adjacent display is **off by default**: toggle it with the **layers button beside the breadcrumb** while inside a sub-map. The button appears when at least one neighboring sub-map has content.
+
+### Deleting a sub-map
+
+Right-click (or long-press) a hex that has a sub-map and choose **Delete Sub-Hex**. A confirmation itemizes everything inside — painted cells, shapes, tiles, objects, text labels, and any nested sub-maps — before anything is removed.
+
+{: .warning }
+Deleting a sub-map removes its **whole nested tree** and cannot be undone.
+
+### Embedding a sub-map
 
 A sub-map can also be embedded on its own, without its parent, using the `subhex` key on a `windrose-map` code block (see [windrose-map code blocks]({{ site.baseurl }}/getting-started/#windrose-map-code-blocks)).

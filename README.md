@@ -51,8 +51,8 @@ Maps live in your notes as a small `windrose-map` code block; the drawing data i
 
 ---
 
-> [!alert] FOR A FULLER FEATURE LIST....
-> Check the more exhaustive [Feature List](https://github.com/alas-poor-ophelia/windrose-md/blob/main/docs/FEATURES.md) for a bit more detail on what features Windrose has and how they all work.
+> [!alert] FULL DOCUMENTATION
+> Windrose has a documentation site: **[alas-poor-ophelia.github.io/windrose-md](https://alas-poor-ophelia.github.io/windrose-md/)** — every tool, setting, and feature, organized and searchable. (The single-file [Feature List](https://github.com/alas-poor-ophelia/windrose-md/blob/main/docs/FEATURES.md) also remains, for reading right here on GitHub.)
 
 ## Features
 
@@ -101,6 +101,8 @@ The **Add tiles** wizard walks a Dungeondraft pack (or a plain folder of images)
 - **Radial** (rings from a center) or **rectangular** (offset rows) layouts, sized per map.
 - **Regions** — name and color areas of your world, painted hex-by-hex or drawn as a polygon boundary. Region names float over the map and scale with zoom; a regions sidebar jumps to or hides any of them. Regions can link to notes.
 - **Sub-maps** — double-click a hex to drill into a nested map of its own: a full Windrose instance with its own layers, regions, and settings. Breadcrumbs track where you are. Think clicking a city on your world map to see its streets.
+	- **Seamless zoom** — zooming into a hex that holds a sub-map descends into it directly, and zooming out surfaces back, with the parent map visible as a backdrop behind the nested grid. A world and its sub-maps read as one continuous zoom.
+	- Neighboring sub-maps can display as **previews around the one you're in** — click one to slide directly across. And a sub-map you're done with can be **deleted** from its hex's right-click menu, nested contents and all.
 - **Coordinates**, pointy or flat-top orientation, and up to four objects per hex.
 - **Background images** — lay a map image under the grid and size the hexes to it, with presets or full sub-pixel control. (Grid maps support background images too.)
 
@@ -133,7 +135,7 @@ The **Beacon** is a movable position marker with a configurable range — track 
 - **Travel packs** are importable rule bundles — units, terrain speed multipliers, travel modes, and per-day allowances — for a given system (D&D 5e overland travel, for example). With a pack enabled, measured routes and Beacon results also show **travel times**.
 - The measure tool draws **multi-waypoint routes**, which can be saved as persistent paths on the map with per-segment terrain assignments.
 
-Details in the [feature list](https://github.com/alas-poor-ophelia/windrose-md/blob/main/docs/FEATURES.md).
+Details in [the Beacon](https://alas-poor-ophelia.github.io/windrose-md/beacon/) and [Measurement and travel](https://alas-poor-ophelia.github.io/windrose-md/measurement-and-travel/) docs.
 
 ### Boards, Strata, and Layers
 
@@ -237,6 +239,8 @@ This works the same as any other codeblock in Obsidian. For instance, put it in 
 ![A hex map embedded inline in a note: ordinary note text above, then a "Map of Hexlandia" callout containing the live, fully interactive map block](docs/images/note-callout-docs-screenshot.png)
 
 The drawing data lives in `windrose-map-data.json` in your vault, keyed by `id` — plain JSON that travels with your vault and works with Obsidian Sync and friends. Delete the code block and your data is still there; paste the block somewhere else and the map comes with it.
+
+Your data is defended in depth: saves are journaled and hold Obsidian's quit until flushed, a data file that fails to parse is never overwritten (loading refuses and offers recovery instead), and Windrose keeps two rolling known-good backups with a **Restore from backup** action. With the same map open in two panes, saves are generation-checked so the panes can't silently clobber each other.
 
 ---
 

@@ -115,7 +115,7 @@ Map Settings is a modal opened from the Map Controls. Its settings affect only t
 
 ## Global settings
 
-The plugin's settings page is a single scrolling page of collapsible sections. Some sections only appear when their feature is enabled:
+The plugin's settings page opens on the **Features** switchboard plus a set of navigable sub-pages — settings search still finds everything inside them, and the Objects, Tile sets, and Fog of war entries show their current value at a glance. Some sections only appear when their feature is enabled:
 
 - **Features** — one toggle per feature (see [Feature toggles and onboarding]({{ site.baseurl }}/getting-started/#feature-toggles-and-onboarding)).
 - **Hex Map Settings** (requires *Hex maps*) — orientation and hex defaults.

@@ -7,7 +7,7 @@ permalink: /beacon/
 
 # The Beacon
 
-The **Beacon** is a movable position marker with a **range**. It tracks anything that has a location and a reach — the party is the common case, but a rival faction, an advancing army, or a spreading storm work identically. Wherever it stands, it continuously answers *"what's within reach of this point?"* — visually on the canvas, interactively in a results list, and optionally as a generated note in your vault. One Beacon per map.
+The **Beacon** is a movable position marker with a **range**. It tracks anything that has a location and a reach — the party is the common case, but a rival faction, an advancing army, or a spreading storm work identically. Wherever it stands, it continuously answers *"what's within reach of this point?"* — visually on the canvas, interactively in a results list, and optionally as a generated note in your vault. One Beacon per map. (Requires the *Beacon* feature — like the other session tools, it can be switched off under Features.)
 
 ## Placing the Beacon
 
