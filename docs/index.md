@@ -11,6 +11,8 @@ A TTRPG dungeon and world map designer that lives inside your Obsidian notes.
 Draw grid or hex maps, place linked objects, import tilesets, run fog of war,
 and drill into infinitely nested sub-maps — all without leaving your vault.
 
+![The full Windrose interface in a workspace tab: a hex world map on the canvas, painted with image tiles and stocked with objects, and the tile drawer docked at the right]({{ site.baseurl }}/images/full-pane-hex-docs-screenshot.png)
+
 Use the sidebar to browse: [Getting started]({{ site.baseurl }}/getting-started/)
 covers installation, map embedding, and the first-run feature survey; from there
 the sections walk through every tool — [drawing]({{ site.baseurl }}/drawing/),

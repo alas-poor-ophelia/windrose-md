@@ -14,3 +14,5 @@ Fog controls live in the **Visibility** menu of the Map Controls. Fog can be add
 Fog is a solid color by default, but a tileable image can be chosen globally or per map — from your vault, or from an installed fog texture pack. Fog opacity is adjustable, but fog always hides objects and labels even where the layout beneath is clear. A tileable fog image may carry performance implications on very large maps.
 
 Optional **edge blur** softens fog borders for a more immersive look.
+
+![Fog of war obscuring part of a dungeon]({{ site.baseurl }}/images/docs-fog-of-war-screenshot.png)

@@ -37,6 +37,10 @@ The **dungeon visualizer** updates its live simulation as you tweak these to bet
 
 Each style carries its own default colors for floor, wall, and water, configurable in settings, so a generated cavern and a generated fortress are not produced in the same palette.
 
+| The generator | The result |
+| --- | --- |
+| ![The Generate Random Dungeon modal, with its live layout preview, style and size selectors, and distance settings]({{ site.baseurl }}/images/dungeon-generator-docs-screenshot.png) | ![A generated dungeon: rooms and corridors stocked with monsters, traps, doors, and furniture]({{ site.baseurl }}/images/random-dungeon-docs-screenshot.png) |
+
 ## Dungeon stocking
 
 Windrose can optionally **stock** generated dungeons — populating them with creatures and features including traps, chests, and themed furniture.

@@ -43,6 +43,8 @@ Using the **Draw** sub-tool, lay down **wall segments** and winding **paths** th
 - Edit **vertices** after the fact.
 - Wall and path tiles ("strips") from Dungeondraft packs are detected on import and handled as line assets automatically.
 
+![Drawing walls with the wall/path tool in full-pane view: a room outlined in stone wall segments with draggable vertices and a bowed, curved wall]({{ site.baseurl }}/images/tiles-walls-docs-screenshot.png)
+
 ### Openings
 
 Walls can carry **openings** — doors, windows, and thresholds seated into gaps cut in the wall itself. These belong to the wall tool, not tile painting: with the **Draw** sub-tool active, select a door or window asset (a Dungeondraft pack's *portals* are detected as opening assets on import) and click a wall to seat it into place. Placement is **scale-aware** — the Scale slider multiplies the art's natural width, and the art seats into its gap preserving its aspect.
@@ -71,6 +73,10 @@ The three steps are:
 3. **Tags** — pack-shipped or folder-derived tags appear pre-applied as chips, alongside a frequency-ranked list of tags **suggested from filenames** (each with a sample filename and an Apply toggle). A manual tag input applies to everything being imported.
 
 Finishing extracts the assets into your vault and registers the tileset.
+
+| 1. Source | 2. Tiers | 3. Tags | Importing |
+| --- | --- | --- | --- |
+| ![Add tiles wizard, step 1: choosing a Dungeondraft pack or a folder of images as the source]({{ site.baseurl }}/images/dungeondraft-import-1-docs-screenshot.png) | ![Add tiles wizard, step 2: confirming the auto-guessed strata for each category]({{ site.baseurl }}/images/dungeondraft-import-2-docs-screenshot.png) | ![Add tiles wizard, step 3: tags imported from the pack plus tags suggested from filenames]({{ site.baseurl }}/images/dungeondraft-import-3-docs-screenshot.png) | ![Add tiles wizard extracting tile assets into the vault]({{ site.baseurl }}/images/dungeondraft-import-4-docs-screenshot.png) |
 
 ## Per-tileset settings
 
@@ -104,3 +110,5 @@ Dungeondraft packs are auto-sorted into appropriate strata on import, which you 
 **Layers** are the sub-categorization *within* a stratum. Want a base of grass in the Terrain stratum, plus a separately-editable patch of old cobble soft-brushed on top? Each becomes its own layer, individually toggleable for visibility.
 
 Under the hood, boards, strata, and layers are a *projection* over a single flat list of layers: a board groups layers by a board id, and a stratum groups them by role. A map switches from the simple, single-layer mode into full composited **strata** mode the first time it gains a real board of tile layers.
+
+![The layers menu with several floors]({{ site.baseurl }}/images/docs-layers-screenshot.png)

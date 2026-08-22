@@ -15,6 +15,8 @@ Name a region in the region toolbar that appears while creating or editing it; t
 
 A **regions menu** in the Map Controls lists every region on the map; from there you can toggle a region's visibility or jump to it. Edit a region by clicking it with a region tool, or via a right-click / long-press context menu — to change its name, color, assigned hexes, or delete it. Regions can also link to notes.
 
+![A hex world map named Hexlandia with named regions, objects, and painted terrain tiles, the tile drawer docked at the right]({{ site.baseurl }}/images/hex-map-hexlandia-docs-screenshot.png)
+
 ## Sub-maps (HEX ONLY)
 
 Hex maps can contain **sub-maps** — nested maps of their own (independent of regions). Create one by double-clicking a hex, or via the right-click / long-press context menu → "Create sub-map." (Requires the *Sub-maps* feature.)
@@ -22,6 +24,8 @@ Hex maps can contain **sub-maps** — nested maps of their own (independent of r
 Sub-maps default to radial at 7 rings, adjustable per sub-map in Map Settings. Each is effectively a full Windrose instance and supports all tools and functionality, including further sub-maps — there's no hard nesting limit, though very deep nesting may carry performance or data-size implications.
 
 Inside a sub-map, a **breadcrumb** UI above the tool palette shows where you are in the hierarchy and lets you jump back up. A hex containing a sub-map shows a diamond icon in its center.
+
+![A nested sub-map, "Region of More Volcanos", opened from a hex on the world map — breadcrumbs above the tool palette, terrain strata selected, and volcanic tiles painted from the tile drawer]({{ site.baseurl }}/images/sub-map-tiles-docs-screenshot.png)
 
 ### Seamless zoom
 

@@ -42,6 +42,8 @@ The code block format is simple YAML:
 
 Maps render in Reading mode, Live Preview, and inside callouts. The drawing data itself is stored separately in `windrose-map-data.json` in your vault, keyed by `id` — plain JSON that travels with your vault and works with Obsidian Sync. Delete a code block and the data remains; paste the block elsewhere and the map comes with it.
 
+![A hex map embedded inline in a note: ordinary note text above, then a "Map of Hexlandia" callout containing the live, fully interactive map block]({{ site.baseurl }}/images/note-callout-docs-screenshot.png)
+
 ### Data safety
 
 The map data file is defended in depth. Writes are guarded by a lock, saves are journaled and hold Obsidian's quit until they finish flushing, and a data file that fails to parse at load is **never overwritten** — loading refuses and surfaces a recovery panel instead of silently substituting a blank map. Windrose also keeps **rolling backups**: two alternating known-good backup slots, written at most once per 15 minutes, with a **Restore from backup** action.

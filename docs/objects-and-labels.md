@@ -36,6 +36,8 @@ Clicking an object with the Select tool opens its selection menu:
 - **Resize** it, up to 4× its starting size.
 - **Delete** it (or press **del**).
 
+![A dungeon map inline in a note with objects placed across it, the object browser open on the right and a selected object's menu showing rotate, resize, label, duplicate, color, delete, and link actions]({{ site.baseurl }}/images/objects-inline-docs-screenshot.png)
+
 ## Object sets
 
 **Object sets** define custom categories and objects. Windrose ships with a default set (~40 built-in object types across categories — doors, stairs, portals, traps, chests, altars, monsters, NPCs, markers), and more are available as downloadable [content packs]({{ site.baseurl }}/content-packs/). Object sets can be set globally or per map, and offer:

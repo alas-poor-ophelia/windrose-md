@@ -40,6 +40,8 @@ A series of presets sizes the grid to your image — **sparse** (fewer, larger c
 
 Painting is the primary mode of mapmaking — think filling in squares on graph paper. Use the **Paint Cells** tool and click a cell to fill it with the selected color. Click one at a time, or drag to paint many.
 
+![A grid dungeon painted inline in a note: the color palette open on the left, painted cells, placed objects, and a "Bloody Hallway" text label]({{ site.baseurl }}/images/drawing-palette-docs-screenshot.png)
+
 ## Segment painting (GRID ONLY)
 
 To represent something that isn't a full square, **segments** subdivide a cell into 8 sub-triangles — quarter cells, half cells (alcoves, shallow closets), and true diagonals.

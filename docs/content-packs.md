@@ -16,3 +16,5 @@ Browse and install them from settings:
 - **Travel packs**: the **Travel Packs** tab of the content-pack browser — importable [travel rule bundles]({{ site.baseurl }}/measurement-and-travel/#travel-packs) (units, terrains, travel modes, allowances).
 
 Packs are fetched from a public registry (served over a CDN), extracted into a `windrose-content/` folder in your vault, and are ready to use immediately. (Travel packs are the exception: they're rules rather than files, so they install into the plugin's settings instead.) Installed packs are tracked in the plugin's settings.
+
+![The object drawer showing an installed "Classic Dungeons by Bloated Blowfish" content pack, with Navigation, Hazards, and Features categories]({{ site.baseurl }}/images/content-pack-docs-screenshot.png)
