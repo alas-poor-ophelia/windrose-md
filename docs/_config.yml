@@ -21,10 +21,20 @@ aux_links:
   Releases:
     - "https://github.com/alas-poor-ophelia/windrose-md/releases"
 
+callouts:
+  note:
+    title: Note
+    color: blue
+  warning:
+    title: Warning
+    color: yellow
+
 # docs/ doubles as the repo's dev-docs folder; keep contributor-facing
-# material out of the published site.
+# material out of the published site. FEATURES.md remains the GitHub-facing
+# single-file reference; its content is carved into the site's pages.
 exclude:
   - CONTRIBUTING.md
+  - FEATURES.md
   - proposals/
   - vendor/
   - Gemfile

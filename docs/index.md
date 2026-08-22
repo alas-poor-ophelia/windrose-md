@@ -11,11 +11,16 @@ A TTRPG dungeon and world map designer that lives inside your Obsidian notes.
 Draw grid or hex maps, place linked objects, import tilesets, run fog of war,
 and drill into infinitely nested sub-maps — all without leaving your vault.
 
-{: .note }
-This documentation site is under construction. Until the full guides land here,
-the [feature reference](https://github.com/alas-poor-ophelia/windrose-md/blob/main/docs/FEATURES.md)
-and [README](https://github.com/alas-poor-ophelia/windrose-md#readme) on GitHub
-remain the most complete sources.
+Use the sidebar to browse: [Getting started]({{ site.baseurl }}/getting-started/)
+covers installation, map embedding, and the first-run feature survey; from there
+the sections walk through every tool — [drawing]({{ site.baseurl }}/drawing/),
+[image tiles]({{ site.baseurl }}/image-tiles/),
+[objects and labels]({{ site.baseurl }}/objects-and-labels/),
+[the Beacon]({{ site.baseurl }}/beacon/),
+[measurement and travel]({{ site.baseurl }}/measurement-and-travel/),
+[fog of war]({{ site.baseurl }}/fog-of-war/),
+[regions and sub-maps]({{ site.baseurl }}/hex-maps/), and
+[random dungeons]({{ site.baseurl }}/random-dungeons/).
 
 ## Installing
 
