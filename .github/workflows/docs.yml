@@ -31,12 +31,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Ruby
-        uses: ruby/setup-ruby@4a9ddd6f338a97768b8006bf671dfbad383215f4 # v1.207.0
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
         with:
           ruby-version: '3.3'
           bundler-cache: false
       - name: Install dependencies
         run: bundle install
+      # TEMPORARY: hand the CI-generated lockfile back so it can be committed
+      # (no local Ruby toolchain). Remove once Gemfile.lock is in the repo.
+      - name: Upload lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemfile-lock
+          path: docs/Gemfile.lock
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v5
