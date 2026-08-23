@@ -88,6 +88,44 @@ interface AdjacentEmptySlot {
   exists: boolean;
 }
 
+/**
+ * Pure slot computation for the "+" affordances: the 6 axial neighbors of
+ * `currentHexKey` that (a) aren't already navigable siblings, and (b) fall
+ * within the PARENT map's own bounds — a slot outside the parent grid could
+ * never legally hold a sibling (see the bounds fences in enterSubHex /
+ * navigateToSibling). Exported for unit tests.
+ */
+function computeAdjacentEmptySlots(
+  parentMapData: MapData,
+  currentHexKey: string,
+  navigableKeys: ReadonlySet<string>
+): AdjacentEmptySlot[] {
+  const [cqStr, crStr] = currentHexKey.split(',');
+  const cq = parseInt(cqStr, 10);
+  const cr = parseInt(crStr, 10);
+  const parentGeometry = createGeometry(parentMapData);
+
+  const dirs = [
+    [1, 0], [1, -1], [0, -1],
+    [-1, 0], [-1, 1], [0, 1]
+  ];
+  const slots: AdjacentEmptySlot[] = [];
+  for (const [dq, dr] of dirs) {
+    const nq = cq + dq;
+    const nr = cr + dr;
+    const key = `${nq},${nr}`;
+    if (navigableKeys.has(key)) continue;
+    if (!parentGeometry.isWithinBounds(nq, nr)) continue;
+    slots.push({
+      hexKey: key,
+      dq,
+      dr,
+      exists: parentMapData.subHexMaps?.[key]?.mapData != null
+    });
+  }
+  return slots;
+}
+
 interface UseSubHexNavigationResult {
   activeMapData: MapData | null;
   activeUpdateMapData: MapDataUpdater;
@@ -715,31 +753,11 @@ function useSubHexNavigation({
     if (!isFeatureEnabled('subMaps')) return [];
 
     const topFrame = navStack[navStack.length - 1];
-    const [cqStr, crStr] = topFrame.hexKey.split(',');
-    const cq = parseInt(cqStr, 10);
-    const cr = parseInt(crStr, 10);
-    const navigable = new Set(adjacentSubHexes.map(a => a.hexKey));
-    const parentGeometry = createGeometry(topFrame.parentMapData);
-
-    const dirs = [
-      [1, 0], [1, -1], [0, -1],
-      [-1, 0], [-1, 1], [0, 1]
-    ];
-    const slots: AdjacentEmptySlot[] = [];
-    for (const [dq, dr] of dirs) {
-      const nq = cq + dq;
-      const nr = cr + dr;
-      const key = `${nq},${nr}`;
-      if (navigable.has(key)) continue;
-      if (!parentGeometry.isWithinBounds(nq, nr)) continue;
-      slots.push({
-        hexKey: key,
-        dq,
-        dr,
-        exists: topFrame.parentMapData.subHexMaps?.[key]?.mapData != null
-      });
-    }
-    return slots;
+    return computeAdjacentEmptySlots(
+      topFrame.parentMapData,
+      topFrame.hexKey,
+      new Set(adjacentSubHexes.map(a => a.hexKey))
+    );
   }, [isInSubHex, navStack, adjacentSubHexes]);
 
   // Advance the active sub-hex drill one level per render. enterSubHex reads
@@ -849,4 +867,4 @@ function useSubHexNavigation({
   };
 }
 
-export { useSubHexNavigation, createSubHexMapData };
+export { useSubHexNavigation, createSubHexMapData, computeAdjacentEmptySlots };

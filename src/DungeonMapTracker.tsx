@@ -591,13 +591,20 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // holes at the transition). Sub-map data doesn't carry the root-scoped
   // tileset catalog, so enrich with availableTilesets — the same shape
   // MapCanvas receives.
-  const preloadMapData = useMemo(
+  //
+  // renderMapData is THE mapData the canvas actually renders with: tilesets
+  // enriched from root, and hex maps pinned to northDirection 0 (the compass
+  // shows/persists north without rotating hex maps). Anything that hit-tests
+  // against the rendered canvas MUST read this object, not raw state — the
+  // adjacent-click handler once read raw northDirection and un-rotated
+  // clicks the renderer never rotated.
+  const renderMapData = useMemo(
     () => (mapData != null && availableTilesets.length > 0
-      ? { ...mapData, tilesets: availableTilesets }
+      ? { ...mapData, ...(mapData.mapType === 'hex' ? { northDirection: 0 } : {}), tilesets: availableTilesets }
       : mapData),
     [mapData, availableTilesets]
   );
-  const { tileImagesReady } = useImagePreloading(app, preloadMapData, settingsVersion);
+  const { tileImagesReady } = useImagePreloading(app, renderMapData, settingsVersion);
 
 
   // Stable handlers: TileAssetBrowser is memo()'d, so its props must keep
@@ -975,8 +982,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
   // Adjacent sub-map click-to-navigate
   useEffect((): (() => void) | undefined => {
-    if (!showAdjacentSubMaps || !isInSubHex || (adjacentSubHexes.length === 0 && adjacentEmptySlots.length === 0) || geometry?.type !== 'hex' || !mapData) return undefined;
-    const maxRing = mapData.hexBounds?.maxRing ?? 7;
+    if (!showAdjacentSubMaps || !isInSubHex || (adjacentSubHexes.length === 0 && adjacentEmptySlots.length === 0) || geometry?.type !== 'hex' || !renderMapData) return undefined;
+    const maxRing = renderMapData.hexBounds?.maxRing ?? 7;
     const tileStep = 2 * maxRing + 1;
 
     const handleAdjacentClick = (e: MouseEvent): void => {
@@ -988,10 +995,24 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       if (containerRef.current == null || !containerRef.current.contains(canvas)) return;
 
       const rect = canvas.getBoundingClientRect();
-      const canvasX = (e.clientX - rect.left) * (canvas.width / rect.width);
-      const canvasY = (e.clientY - rect.top) * (canvas.height / rect.height);
+      let canvasX = (e.clientX - rect.left) * (canvas.width / rect.width);
+      let canvasY = (e.clientY - rect.top) * (canvas.height / rect.height);
 
-      const viewState = mapData.viewState;
+      // The renderer draws ghost previews, labels, and "+" markers inside a
+      // northDirection rotation about the canvas center — invert it here so
+      // hit-tests align with what's actually on screen on rotated maps.
+      const northDeg = (renderMapData.northDirection ?? 0) % 360;
+      if (northDeg !== 0) {
+        const theta = (-northDeg * Math.PI) / 180;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const dx = canvasX - cx;
+        const dy = canvasY - cy;
+        canvasX = cx + dx * Math.cos(theta) - dy * Math.sin(theta);
+        canvasY = cy + dx * Math.sin(theta) + dy * Math.cos(theta);
+      }
+
+      const viewState = renderMapData.viewState;
       if (viewState == null) return;
       const oX = canvas.width / 2 - viewState.center.x * viewState.zoom;
       const oY = canvas.height / 2 - viewState.center.y * viewState.zoom;
@@ -1049,7 +1070,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
     activeDocument.addEventListener('click', handleAdjacentClick, true);
     return () => activeDocument.removeEventListener('click', handleAdjacentClick, true);
-  }, [showAdjacentSubMaps, isInSubHex, adjacentSubHexes, adjacentEmptySlots, geometry, mapData, navigateToSibling, containerRef]);
+  }, [showAdjacentSubMaps, isInSubHex, adjacentSubHexes, adjacentEmptySlots, geometry, renderMapData, navigateToSibling, containerRef]);
 
   // Canvas pixel size for view-fitting calculations (recenter-view).
   // querySelector depends on DOM order: the MAIN map canvas must stay the
@@ -1390,9 +1411,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             <MapCanvas
               mapId={mapId}
               notePath={notePath}
-              mapData={availableTilesets.length > 0
-                ? { ...mapData, ...(mapData.mapType === 'hex' ? { northDirection: 0 } : {}), tilesets: availableTilesets }
-                : mapData}
+              mapData={renderMapData ?? mapData}
               onCellsChange={handleCellsChange}
               onCurvesChange={handleCurvesChange}
               onObjectsChange={handleObjectsChange}
