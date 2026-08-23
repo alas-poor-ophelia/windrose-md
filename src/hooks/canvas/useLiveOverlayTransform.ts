@@ -21,7 +21,7 @@ import type { IGeometry } from '#types/core/geometry.types';
 import type { StoredViewState } from '#types/core/map.types';
 import type { ViewController } from '#types/hooks/viewController.types';
 
-import { useEffect } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 
 /** Geometry surface needed for the world→screen transform */
 interface OverlayGeometry extends IGeometry {
@@ -165,12 +165,41 @@ function useLiveOverlayTransform({
   }, [groupRef, canvasRef, geometry, northDirection, viewController]);
 }
 
+/**
+ * Force a rAF-coalesced re-render on live view ticks. For small overlays
+ * whose positioning math is written against committed mapData.viewState and
+ * is too intricate to rebuild in world space: subscribe with this hook and
+ * substitute `viewController.getLive()` as the view basis in the render
+ * body — the overlay then tracks the gesture without an imperative rewrite.
+ * Returns a monotonically increasing tick (unused by callers beyond the
+ * re-render it forces).
+ */
+function useLiveViewTick(viewController: ViewController | null | undefined): number {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (viewController == null) return undefined;
+    let rafId: number | null = null;
+    const unsubscribe = viewController.subscribeLive(() => {
+      rafId ??= window.requestAnimationFrame(() => {
+        rafId = null;
+        setTick(t => t + 1);
+      });
+    });
+    return () => {
+      unsubscribe();
+      if (rafId != null) window.cancelAnimationFrame(rafId);
+    };
+  }, [viewController]);
+  return tick;
+}
+
 export {
   computeCounterScale,
   computeOverlayMetrics,
   computeWorldTransform,
   counterScaleTransform,
   findCanvasContainer,
-  useLiveOverlayTransform
+  useLiveOverlayTransform,
+  useLiveViewTick
 };
 export type { OverlayMetrics };

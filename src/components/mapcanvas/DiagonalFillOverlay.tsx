@@ -17,6 +17,7 @@ import type { MapData } from '#types/core/map.types';
 import type { ExtendedGridGeometry } from '#types/contexts/context.types';
 import { useDiagonalFill } from '../../hooks/drawing/useDiagonalFill';
 import { useMapState } from '../../context/MapContext';
+import { useLiveViewTick } from '../../hooks/canvas/useLiveOverlayTransform';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { createViewportTransform, getCanvasDisplayMetrics } from './viewportTransform';
 import { Z_INDEX } from '../../core/dmtConstants';
@@ -123,8 +124,11 @@ const DiagonalFillOverlay = ({ currentTool }: DiagonalFillOverlayProps): VNode |
   const {
     mapData,
     geometry,
-    canvasRef
+    canvasRef,
+    viewController
   } = useMapState();
+  // Re-render on live pan/zoom ticks so the preview tracks the gesture
+  useLiveViewTick(viewController);
 
   const {
     fillStart,
@@ -141,6 +145,10 @@ const DiagonalFillOverlay = ({ currentTool }: DiagonalFillOverlayProps): VNode |
   if (currentTool !== 'diagonalFill' || !fillStart || !geometry || !mapData || !mapData.viewState || !canvasRef?.current) {
     return null;
   }
+
+  // Live view basis: equals the committed viewState outside a gesture
+  const liveViewState = viewController?.getLive() ?? mapData.viewState;
+  const effMapData = liveViewState === mapData.viewState ? mapData : { ...mapData, viewState: liveViewState };
 
   if (geometry.type !== 'grid') {
     return null;
@@ -162,7 +170,7 @@ const DiagonalFillOverlay = ({ currentTool }: DiagonalFillOverlayProps): VNode |
     fillStart.y,
     fillStart.corner,
     geometry,
-    mapData,
+    effMapData,
     canvasWidth,
     canvasHeight
   );
@@ -179,7 +187,7 @@ const DiagonalFillOverlay = ({ currentTool }: DiagonalFillOverlayProps): VNode |
       displayEnd.y,
       fillStart.corner,
       geometry,
-      mapData,
+      effMapData,
       canvasWidth,
       canvasHeight
     );

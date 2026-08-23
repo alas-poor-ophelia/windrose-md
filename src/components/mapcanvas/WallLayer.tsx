@@ -40,6 +40,7 @@ import {
 } from '../../drawing/wallGapOperations';
 import { DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
 import { useApp } from '../../context/AppContext';
+import { useLiveOverlayRedraw } from '../../hooks/canvas/useLiveOverlayRedraw';
 import { Notice } from 'obsidian';
 
 export interface WallLayerProps {
@@ -174,7 +175,7 @@ const WallLayer = ({
   tileScale,
 }: WallLayerProps): VNode | null => {
   const app = useApp();
-  const { mapData, geometry, screenToWorld, getClientCoords, canvasRef } = useMapState();
+  const { mapData, geometry, screenToWorld, getClientCoords, canvasRef, viewController } = useMapState();
 
   // ---- Draw state ----
   const [vertices, setVertices] = useState<WallVertex[]>([]);
@@ -300,12 +301,15 @@ const WallLayer = ({
 
   const getViewTransform = useCallback((overlay: HTMLCanvasElement): { offsetX: number; offsetY: number; zoom: number } | null => {
     if (mapData == null || geometry == null) return null;
-    const { zoom, center } = mapData.viewState ?? { zoom: 1, center: { x: 0, y: 0 } };
+    // Live basis: during a pan/zoom gesture the ViewController updates
+    // without touching React state; drawing from the committed viewState
+    // froze the edit handles mid-gesture.
+    const { zoom, center } = viewController?.getLive() ?? mapData.viewState ?? { zoom: 1, center: { x: 0, y: 0 } };
     const { offsetX, offsetY } = calculateViewportOffset(
       geometry, center, { width: overlay.width, height: overlay.height }, zoom,
     );
     return { offsetX, offsetY, zoom };
-  }, [mapData, geometry]);
+  }, [mapData, geometry, viewController]);
 
   // ---- Draw-mode preview ----
   const drawPreview = useCallback(() => {
@@ -517,6 +521,19 @@ const WallLayer = ({
     createOverlay();
     drawEditHandles();
   }, [isWallTool, isDrawing, isOpeningMode, selectedWallId, selectedVertexIndex, selectedGapId, mapData, drawEditHandles, createOverlay, removeOverlay]);
+
+  // Redraw selected-wall edit handles on live pan/zoom ticks (getViewTransform
+  // reads getLive(), so the handles track the gesture instead of freezing).
+  // Mid-draw the overlay is pointer-move-owned — leave it alone. Opening mode
+  // is excluded too: its insert ghost shares this overlay and is drawn by
+  // pointermove; drawEditHandles() without { append: true } clears the canvas
+  // and would wipe the ghost until the next pointer move. Frozen-but-intact
+  // beats live-but-erased there.
+  const redrawHandlesLive = useCallback(() => {
+    if (!isWallTool || isDrawing || isOpeningMode || selectedWallId == null || overlayRef.current == null) return;
+    drawEditHandles();
+  }, [isWallTool, isDrawing, isOpeningMode, selectedWallId, drawEditHandles]);
+  useLiveOverlayRedraw(viewController, redrawHandlesLive);
 
   // ---- Wall mutation helpers ----
   const updateWall = useCallback((wallId: string, mutate: (w: WallPath) => WallPath, suppress: boolean) => {

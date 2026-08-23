@@ -17,6 +17,8 @@ import type { EffectiveDistanceSettings } from '#types/hooks/distanceMeasurement
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { cellToScreen } from '../../drawing/cellToScreenConverter';
 import { createViewportTransform } from './viewportTransform';
+import { useMapState } from '../../context/MapContext';
+import { useLiveViewTick } from '../../hooks/canvas/useLiveOverlayTransform';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
 import { Z_INDEX } from '../../core/dmtConstants';
 
@@ -130,8 +132,13 @@ const ShapePreviewOverlay = ({
   distanceSettings,
   isConfirmable = false
 }: ShapePreviewOverlayProps): VNode | null => {
+  const { viewController } = useMapState();
   const textRef = useRef<SVGTextElement | null>(null);
   const [textWidth, setTextWidth] = useState(80);
+
+  // Re-render on live pan/zoom ticks so the preview tracks the gesture
+  // (KBM shape flow is click-then-hover — wheel-zoom mid-preview is common)
+  useLiveViewTick(viewController);
 
   useEffect(() => {
     if (textRef.current) {
@@ -148,6 +155,10 @@ const ShapePreviewOverlay = ({
     return null;
   }
 
+  // Live view basis: equals the committed viewState outside a gesture
+  const liveViewState = viewController?.getLive() ?? mapData.viewState;
+  const effMapData = liveViewState === mapData.viewState ? mapData : { ...mapData, viewState: liveViewState };
+
   const canvas = canvasRef.current;
   const { width: canvasWidth, height: canvasHeight } = canvas;
   const canvasRect = canvas.getBoundingClientRect();
@@ -157,7 +168,7 @@ const ShapePreviewOverlay = ({
   const canvasOffsetX = canvasRect.left - containerRect.left;
   const canvasOffsetY = canvasRect.top - containerRect.top;
 
-  const { zoom } = mapData.viewState;
+  const { zoom } = liveViewState;
   const scaledCellSize = geometry.getScaledCellSize(zoom) * displayScale;
 
   const colors: Record<string, string> = {
@@ -174,7 +185,7 @@ const ShapePreviewOverlay = ({
   let tooltipPosition = { x: 0, y: 0 };
 
   const geo = geometry;
-  const md = mapData as MapData & { viewState: NonNullable<MapData['viewState']> };
+  const md = effMapData as MapData & { viewState: NonNullable<MapData['viewState']> };
 
   if (shapeType === 'rectangle' || shapeType === 'clearArea' || shapeType === 'areaSelect') {
     const minX = Math.min(startPoint.x, endPoint.x);
@@ -204,10 +215,10 @@ const ShapePreviewOverlay = ({
       const wMaxY = Math.max(...cellCenters.map(c => c.worldY)) + hexSize;
 
       corners = [
-        worldToScreen(wMinX, wMinY, geo, mapData, canvasWidth, canvasHeight),
-        worldToScreen(wMaxX, wMinY, geo, mapData, canvasWidth, canvasHeight),
-        worldToScreen(wMaxX, wMaxY, geo, mapData, canvasWidth, canvasHeight),
-        worldToScreen(wMinX, wMaxY, geo, mapData, canvasWidth, canvasHeight),
+        worldToScreen(wMinX, wMinY, geo, effMapData, canvasWidth, canvasHeight),
+        worldToScreen(wMaxX, wMinY, geo, effMapData, canvasWidth, canvasHeight),
+        worldToScreen(wMaxX, wMaxY, geo, effMapData, canvasWidth, canvasHeight),
+        worldToScreen(wMinX, wMaxY, geo, effMapData, canvasWidth, canvasHeight),
       ].map(p => ({
         x: p.x * displayScale + canvasOffsetX,
         y: p.y * displayScale + canvasOffsetY
@@ -223,7 +234,7 @@ const ShapePreviewOverlay = ({
         { wx: minX * geo.cellSize, wy: (maxY + 1) * geo.cellSize },       // BL
       ];
       corners = gridCornerWorlds.map(({ wx, wy }) => {
-        const p = worldToScreen(wx, wy, geo, mapData, canvasWidth, canvasHeight);
+        const p = worldToScreen(wx, wy, geo, effMapData, canvasWidth, canvasHeight);
         return {
           x: p.x * displayScale + canvasOffsetX,
           y: p.y * displayScale + canvasOffsetY
@@ -291,10 +302,10 @@ const ShapePreviewOverlay = ({
     const maxY = Math.max(startPoint.y, endPoint.y);
 
     const corners = [
-      worldToScreen(minX, minY, geo, mapData, canvasWidth, canvasHeight),
-      worldToScreen(maxX, minY, geo, mapData, canvasWidth, canvasHeight),
-      worldToScreen(maxX, maxY, geo, mapData, canvasWidth, canvasHeight),
-      worldToScreen(minX, maxY, geo, mapData, canvasWidth, canvasHeight),
+      worldToScreen(minX, minY, geo, effMapData, canvasWidth, canvasHeight),
+      worldToScreen(maxX, minY, geo, effMapData, canvasWidth, canvasHeight),
+      worldToScreen(maxX, maxY, geo, effMapData, canvasWidth, canvasHeight),
+      worldToScreen(minX, maxY, geo, effMapData, canvasWidth, canvasHeight),
     ].map(p => ({
       x: p.x * displayScale + canvasOffsetX,
       y: p.y * displayScale + canvasOffsetY
@@ -325,8 +336,8 @@ const ShapePreviewOverlay = ({
     );
 
   } else if (shapeType === 'shapeCircle') {
-    const centerScreen = worldToScreen(endPoint.x, endPoint.y, geo, mapData, canvasWidth, canvasHeight);
-    const edgeScreen = worldToScreen(startPoint.x, startPoint.y, geo, mapData, canvasWidth, canvasHeight);
+    const centerScreen = worldToScreen(endPoint.x, endPoint.y, geo, effMapData, canvasWidth, canvasHeight);
+    const edgeScreen = worldToScreen(startPoint.x, startPoint.y, geo, effMapData, canvasWidth, canvasHeight);
 
     const scaledCenter = {
       x: centerScreen.x * displayScale + canvasOffsetX,

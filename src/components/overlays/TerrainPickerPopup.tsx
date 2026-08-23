@@ -24,7 +24,7 @@ interface TerrainPickerOption {
 }
 
 interface TerrainPickerPopupProps {
-  /** Anchor position, container-relative (segment midpoint) */
+  /** Anchor position, container-relative (the clicked point on the segment) */
   x: number;
   y: number;
   options: TerrainPickerOption[];

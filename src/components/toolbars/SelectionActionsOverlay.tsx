@@ -123,7 +123,19 @@ const SelectionActionsOverlay = ({
 }: SelectionActionsOverlayProps): VNode | null => {
   // Per-mount instance id: this overlay always renders inside the MapCanvas
   // provider tree, and must only claim context-menu events from its own mount.
-  const { instanceId } = useMapState();
+  const { instanceId, viewController } = useMapState();
+
+  // Hide (via CSS, in the JSX below) mid pan/zoom gesture; reanchor on
+  // commit. The card's bounds are computed from committed viewState and
+  // would detach from the selection mid-gesture (same design as
+  // usePartyPinCardPosition + PartyPinControls).
+  const [isViewGesturing, setIsViewGesturing] = useState(false);
+  useEffect(() => {
+    if (!viewController) return undefined;
+    return viewController.subscribeLive(() => {
+      setIsViewGesturing(viewController.isGesturing());
+    });
+  }, [viewController]);
 
   const isNotePin = selectedItems.length === 1 && (selectedItems[0].data as MapObject | undefined)?.type === 'note_pin';
   const [linksExpanded, setLinksExpanded] = useState(isNotePin);
@@ -321,8 +333,9 @@ const SelectionActionsOverlay = ({
             left: `${bounds.screenX}px`,
             top: `${linkedNoteY}px`,
             transform: 'translateX(-50%)',
-            pointerEvents: 'auto',
-            zIndex: Z_INDEX.TOOLBAR
+            pointerEvents: isViewGesturing ? 'none' : 'auto',
+            zIndex: Z_INDEX.TOOLBAR,
+            visibility: isViewGesturing ? 'hidden' : 'visible'
           }}
         >
           <div className="windrose-note-display-link">
@@ -348,8 +361,12 @@ const SelectionActionsOverlay = ({
           left: `${toolbarPos.toolbarX}px`,
           top: `${toolbarPos.toolbarY}px`,
           width: `${cardWidth}px`,
-          pointerEvents: 'auto',
-          zIndex: Z_INDEX.TOOLBAR
+          // Hide (never unmount) mid-gesture: unmounting would tear down an
+          // open ColorPicker or the resize slider's pointer capture. Matches
+          // PartyPinControls' hide-during-gesture mechanism.
+          pointerEvents: isViewGesturing ? 'none' : 'auto',
+          zIndex: Z_INDEX.TOOLBAR,
+          visibility: isViewGesturing ? 'hidden' : 'visible'
         }}
       >
         <CornerBrackets classPrefix="windrose-selection-card-bracket" variant="minimal" filterId="sel-bracket" />

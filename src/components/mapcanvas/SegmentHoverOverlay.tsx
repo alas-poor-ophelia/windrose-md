@@ -13,6 +13,8 @@ import type { MapData } from '#types/core/map.types';
 
 import { cellToScreen } from '../../drawing/cellToScreenConverter';
 import { SEGMENT_VERTICES, SEGMENT_TRIANGLES } from '../../core/dmtConstants';
+import { useMapState } from '../../context/MapContext';
+import { useLiveViewTick } from '../../hooks/canvas/useLiveOverlayTransform';
 
 
 
@@ -76,9 +78,17 @@ const SegmentHoverOverlay = ({
   canvasRef,
   containerRef
 }: SegmentHoverOverlayProps): VNode | null => {
+  const { viewController } = useMapState();
+  // Re-render on live pan/zoom ticks: without this the highlight freezes at
+  // the committed view mid-gesture and visibly detaches from its cell.
+  useLiveViewTick(viewController);
+
   if (!hoverInfo || !geometry || !mapData || !mapData.viewState || geometry.type !== 'grid') {
     return null;
   }
+
+  // Live view basis: equals the committed viewState outside a gesture
+  const viewState = viewController?.getLive() ?? mapData.viewState;
 
   const { cellX, cellY, segment } = hoverInfo;
 
@@ -100,7 +110,7 @@ const SegmentHoverOverlay = ({
     cellX,
     cellY,
     geometry,
-    { viewState: mapData.viewState, northDirection: mapData.northDirection },
+    { viewState, northDirection: mapData.northDirection },
     canvasWidth,
     canvasHeight,
     false
@@ -111,7 +121,7 @@ const SegmentHoverOverlay = ({
     y: cellTopLeft.y * displayScale + canvasOffsetY
   };
 
-  const scaledCellSize = geometry.getScaledCellSize(mapData.viewState.zoom) * displayScale;
+  const scaledCellSize = geometry.getScaledCellSize(viewState.zoom) * displayScale;
   const segmentPath = getSegmentPath(segment, scaledCellSize);
 
   return (
