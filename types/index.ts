@@ -421,6 +421,7 @@ export type {
 } from './hooks/textLabelInteraction.types';
 
 export type {
+  AdjacentEmptySlotRenderData,
   AdjacentSubHexRenderData,
   RendererSelectedItem,
   RendererTheme,

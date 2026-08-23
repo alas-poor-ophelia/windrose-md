@@ -75,6 +75,19 @@ interface AdjacentSubHex {
   name: string;
 }
 
+/**
+ * Adjacent slot with no navigable sibling: the sub-map is missing, or exists
+ * but is empty. Surfaced as a "+" create/enter affordance in sub-hex view.
+ */
+interface AdjacentEmptySlot {
+  hexKey: string;
+  /** Delta from current hex in axial coords */
+  dq: number;
+  dr: number;
+  /** True when the sibling sub-map exists but has no content yet. */
+  exists: boolean;
+}
+
 interface UseSubHexNavigationResult {
   activeMapData: MapData | null;
   activeUpdateMapData: MapDataUpdater;
@@ -96,10 +109,12 @@ interface UseSubHexNavigationResult {
    */
   drillToSubHexPath: (path: string | null, onArrive?: () => void) => void;
   navigateToLevel: (depth: number) => void;
-  navigateToSibling: (q: number, r: number) => void;
+  navigateToSibling: (q: number, r: number, opts?: { createIfMissing?: boolean }) => void;
   navigationVersion: number;
   currentHexKey: string | null;
   adjacentSubHexes: AdjacentSubHex[];
+  /** In-bounds neighbor slots with no navigable sibling ("+" affordances). */
+  adjacentEmptySlots: AdjacentEmptySlot[];
   /**
    * Fully-resolved distance settings for the active sub-hex, derived live
    * from the parent chain (each level divides by its sub-grid's cells-across
@@ -254,6 +269,11 @@ function useSubHexNavigation({
       // Feature gate: entering EXISTING sub-maps always works; creating new
       // ones requires the subMaps feature.
       if (!isFeatureEnabled('subMaps')) return;
+      // Bounds fence: never create a sub-map at a hex outside the current
+      // map's own grid. Without this, a double-click over an adjacent-sibling
+      // ghost region resolves (via screenToGrid) to a far-out-of-bounds hex
+      // of the CURRENT map and silently spawns a nested sub-map there.
+      if (!createGeometry(currentMapData).isWithinBounds(q, r)) return;
       subHex = createSubHexMapData(currentMapData, q, r);
       // Write the new sub-hex into the current map's subHexMaps
       const updatedCurrent = {
@@ -495,13 +515,23 @@ function useSubHexNavigation({
     });
   }, [isInSubHex, rootUpdateMapData, propagateToRoot]);
 
-  // Navigate to a sibling sub-hex (atomic exit + enter)
-  const navigateToSibling = useCallback((q: number, r: number): void => {
+  // Navigate to a sibling sub-hex (atomic exit + enter). Navigating to a
+  // sibling that doesn't exist is a no-op unless the caller explicitly opts
+  // into creation (the "+" affordance) — a stray click must never mint maps.
+  const navigateToSibling = useCallback((q: number, r: number, opts?: { createIfMissing?: boolean }): void => {
     if (navStack.length === 0) return;
 
     const currentSubHex = subHexMapData;
     const topFrame = navStack[navStack.length - 1];
     const siblingKey = `${q},${r}`;
+
+    // Creation preconditions, checked BEFORE merging state: explicit opt-in,
+    // the subMaps feature, and the sibling hex inside the parent's bounds.
+    if (topFrame.parentMapData.subHexMaps?.[siblingKey] == null) {
+      if (opts?.createIfMissing !== true) return;
+      if (!isFeatureEnabled('subMaps')) return;
+      if (!createGeometry(topFrame.parentMapData).isWithinBounds(q, r)) return;
+    }
 
     // Merge current sub-hex back into parent
     const restoredParent = {
@@ -516,7 +546,7 @@ function useSubHexNavigation({
       }
     } as MapData;
 
-    // Look up or create sibling sub-hex
+    // Look up or create sibling sub-hex (creation vetted above)
     let siblingSubHex = restoredParent.subHexMaps?.[siblingKey];
     if (!siblingSubHex) {
       siblingSubHex = createSubHexMapData(restoredParent, q, r);
@@ -677,6 +707,41 @@ function useSubHexNavigation({
     return adjacent;
   }, [isInSubHex, navStack]);
 
+  // Neighbor slots WITHOUT a navigable sibling (missing, or existing but
+  // empty), constrained to the parent's own grid bounds. Rendered as "+"
+  // affordances; clicking one calls navigateToSibling(..., { createIfMissing }).
+  const adjacentEmptySlots = useMemo((): AdjacentEmptySlot[] => {
+    if (!isInSubHex || navStack.length === 0) return [];
+    if (!isFeatureEnabled('subMaps')) return [];
+
+    const topFrame = navStack[navStack.length - 1];
+    const [cqStr, crStr] = topFrame.hexKey.split(',');
+    const cq = parseInt(cqStr, 10);
+    const cr = parseInt(crStr, 10);
+    const navigable = new Set(adjacentSubHexes.map(a => a.hexKey));
+    const parentGeometry = createGeometry(topFrame.parentMapData);
+
+    const dirs = [
+      [1, 0], [1, -1], [0, -1],
+      [-1, 0], [-1, 1], [0, 1]
+    ];
+    const slots: AdjacentEmptySlot[] = [];
+    for (const [dq, dr] of dirs) {
+      const nq = cq + dq;
+      const nr = cr + dr;
+      const key = `${nq},${nr}`;
+      if (navigable.has(key)) continue;
+      if (!parentGeometry.isWithinBounds(nq, nr)) continue;
+      slots.push({
+        hexKey: key,
+        dq,
+        dr,
+        exists: topFrame.parentMapData.subHexMaps?.[key]?.mapData != null
+      });
+    }
+    return slots;
+  }, [isInSubHex, navStack, adjacentSubHexes]);
+
   // Advance the active sub-hex drill one level per render. enterSubHex reads
   // state, so each level must commit before the next segment is read; the
   // effect re-fires as navStack catches up. Missing/malformed segments stop
@@ -778,6 +843,7 @@ function useSubHexNavigation({
     navigationVersion,
     currentHexKey,
     adjacentSubHexes,
+    adjacentEmptySlots,
     activeDistanceOverrides,
     subHexPath
   };

@@ -16,7 +16,7 @@ import type {
 } from '#types/index';
 import type { ResolvedTheme } from '#types/settings/settings.types';
 import type { ExtendedGeometry, MapStateContextValue, MapOperationsContextValue } from '#types/contexts/context.types';
-import type { AdjacentSubHexRenderData } from '#types/hooks/canvasRenderer.types';
+import type { AdjacentEmptySlotRenderData, AdjacentSubHexRenderData } from '#types/hooks/canvasRenderer.types';
 import type { MapDistanceOverrides } from '#types/hooks/distanceMeasurement.types';
 import type { TileAssignment } from '#types/tiles/tile.types';
 import type { WallPath } from '#types/core/wallpath.types';
@@ -108,6 +108,7 @@ interface MapCanvasContentProps {
   tileImagesReady?: boolean;
   hiddenTileLayers?: Set<string>;
   adjacentSubHexes?: AdjacentSubHexRenderData[] | null;
+  adjacentEmptySlots?: AdjacentEmptySlotRenderData[] | null;
   onViewStateChange: (viewState: StoredViewState) => void;
   onTextLabelSettingsChange: (settings: TextLabelSettings) => void;
   currentTool: ToolId;
@@ -142,6 +143,7 @@ interface MapCanvasContentProps {
 interface MapCanvasProps extends MapCanvasContentProps {
   layerVisibility: LayerVisibility;
   adjacentSubHexes?: AdjacentSubHexRenderData[] | null;
+  adjacentEmptySlots?: AdjacentEmptySlotRenderData[] | null;
 }
 
 
@@ -180,7 +182,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex, children }: MapCanvasContentProps): VNode => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, adjacentEmptySlots, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex, children }: MapCanvasContentProps): VNode => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -301,7 +303,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
   }, [isAnimating]);
 
   // Render canvas whenever relevant state changes
-  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, hiddenTileLayers, draggingWallId, subHexPath: subHexPath ?? null }, viewController);
+  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, draggingWallId, subHexPath: subHexPath ?? null }, viewController);
 
   // Trigger redraw when canvas dimensions change (from expand/collapse)
   useEffect(() => {
@@ -338,9 +340,9 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
       }
     } else {
       // After animation, do a proper redraw with correct dimensions
-      renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem ?? undefined, { isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, hiddenTileLayers, subHexPath: subHexPath ?? null });
+      renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem ?? undefined, { isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, subHexPath: subHexPath ?? null });
     }
-  }, [canvasDimensions.width, canvasDimensions.height, isAnimating, showCoordinates, layerVisibility, adjacentSubHexes]);
+  }, [canvasDimensions.width, canvasDimensions.height, isAnimating, showCoordinates, layerVisibility, adjacentSubHexes, adjacentEmptySlots]);
 
   // 'C' key handler for coordinate overlay (hex maps only)
   useEffect(() => {
@@ -539,12 +541,12 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
 };
 
 const MapCanvas = (props: MapCanvasProps): VNode => {
-  const { children, layerVisibility, adjacentSubHexes, ...restProps } = props;
+  const { children, layerVisibility, adjacentSubHexes, adjacentEmptySlots, ...restProps } = props;
 
   return (
     <MapSelectionProvider layerVisibility={layerVisibility}>
       <ObjectLinkingProvider>
-        <MapCanvasContent {...restProps} adjacentSubHexes={adjacentSubHexes}>
+        <MapCanvasContent {...restProps} adjacentSubHexes={adjacentSubHexes} adjacentEmptySlots={adjacentEmptySlots}>
           {children}
         </MapCanvasContent>
       </ObjectLinkingProvider>

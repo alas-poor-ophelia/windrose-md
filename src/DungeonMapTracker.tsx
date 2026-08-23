@@ -156,6 +156,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     navigateToSibling,
     navigationVersion,
     adjacentSubHexes,
+    adjacentEmptySlots,
     activeDistanceOverrides,
     subHexPath
   } = useSubHexNavigation({ mapData: rootMapData, updateMapData: rootUpdateMapData, initialSubHexPath, getCanvas: getCanvasEl });
@@ -974,7 +975,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
   // Adjacent sub-map click-to-navigate
   useEffect((): (() => void) | undefined => {
-    if (!showAdjacentSubMaps || !isInSubHex || adjacentSubHexes.length === 0 || geometry?.type !== 'hex' || !mapData) return undefined;
+    if (!showAdjacentSubMaps || !isInSubHex || (adjacentSubHexes.length === 0 && adjacentEmptySlots.length === 0) || geometry?.type !== 'hex' || !mapData) return undefined;
     const maxRing = mapData.hexBounds?.maxRing ?? 7;
     const tileStep = 2 * maxRing + 1;
 
@@ -1023,11 +1024,32 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           return;
         }
       }
+
+      // "+" affordances for empty adjacent slots: hit-test the marker circle
+      // drawn where the sibling's label would sit (useCanvasRenderer keeps
+      // position + radius in sync with this math). A hit creates the sibling
+      // (or enters an existing-but-empty one) and navigates to it.
+      for (const slot of adjacentEmptySlots) {
+        if (geometry.hexToWorld == null) continue;
+        const markerWorld = geometry.hexToWorld(slot.dq * (maxRing + 2), slot.dr * (maxRing + 2));
+        const relX = clickWorldX - markerWorld.worldX;
+        const relY = clickWorldY - markerWorld.worldY;
+        // Drawn radius (screen px, matches the renderer) with a touch-friendly
+        // hit slop, converted to world units at the current zoom.
+        const hitRadiusWorld = (Math.max(12, 14 * viewState.zoom) * 1.6) / viewState.zoom;
+        if (relX * relX + relY * relY < hitRadiusWorld * hitRadiusWorld) {
+          const [aq, ar] = slot.hexKey.split(',').map(Number);
+          navigateToSibling(aq, ar, { createIfMissing: true });
+          e.stopPropagation();
+          e.preventDefault();
+          return;
+        }
+      }
     };
 
     activeDocument.addEventListener('click', handleAdjacentClick, true);
     return () => activeDocument.removeEventListener('click', handleAdjacentClick, true);
-  }, [showAdjacentSubMaps, isInSubHex, adjacentSubHexes, geometry, mapData, navigateToSibling, containerRef]);
+  }, [showAdjacentSubMaps, isInSubHex, adjacentSubHexes, adjacentEmptySlots, geometry, mapData, navigateToSibling, containerRef]);
 
   // Canvas pixel size for view-fitting calculations (recenter-view).
   // querySelector depends on DOM order: the MAIN map canvas must stay the
@@ -1140,7 +1162,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               breadcrumbs={breadcrumbs}
               onNavigate={navigateToLevel}
             />
-            {adjacentSubHexes.length > 0 && (
+            {(adjacentSubHexes.length > 0 || adjacentEmptySlots.length > 0) && (
               <button
                 onClick={() => setShowAdjacentSubMaps(!showAdjacentSubMaps)}
                 ref={tooltipRef(showAdjacentSubMaps ? 'Hide adjacent sub-maps' : 'Show adjacent sub-maps')}
@@ -1397,6 +1419,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               theme={theme}
               layerVisibility={layerVisibility}
               adjacentSubHexes={showAdjacentSubMaps && isInSubHex ? adjacentSubHexes : null}
+              adjacentEmptySlots={showAdjacentSubMaps && isInSubHex ? adjacentEmptySlots : null}
               draggingWallId={draggingWallId}
               distanceOverrides={distanceOverrides}
               isInSubHex={isInSubHex}

@@ -21,6 +21,19 @@ export interface AdjacentSubHexRenderData {
   name: string;
 }
 
+/**
+ * Adjacent sub-hex slot with no navigable sibling yet (missing, or existing
+ * but empty). Rendered as a "+" affordance where the sibling's label would be.
+ */
+export interface AdjacentEmptySlotRenderData {
+  hexKey: string;
+  /** Delta from current hex in axial coords */
+  dq: number;
+  dr: number;
+  /** True when the sibling sub-map exists but has no content yet. */
+  exists: boolean;
+}
+
 // ===========================================
 // Selected Item Types
 // ===========================================
@@ -69,6 +82,8 @@ export interface RenderCanvasOptions {
   showCoordinates?: boolean;
   layerVisibility?: LayerVisibility | null;
   adjacentSubHexes?: AdjacentSubHexRenderData[] | null;
+  /** Empty adjacent slots rendered as "+" create affordances (sub-hex view). */
+  adjacentEmptySlots?: AdjacentEmptySlotRenderData[] | null;
   hiddenTileLayers?: Set<string>;
   /** Flips when async tile images finish loading; part of the static-layer cache key. */
   tileImagesReady?: boolean;

@@ -883,7 +883,11 @@ const useEventCoordinator = ({
     // map is view-locked — picture frame allows navigation, never edits)
     if ((currentTool === 'select' || interactionLocked) && geometry?.type === 'hex' && screenToGrid != null) {
       const coords = screenToGrid(e.clientX, e.clientY);
-      if (coords) {
+      // Out-of-bounds double-clicks (e.g. over an adjacent-sibling ghost
+      // region in sub-hex view) must not dive: screenToGrid happily returns
+      // far-outside coordinates, and diving there would create a sub-map of
+      // the CURRENT map at that stray hex.
+      if (coords && geometry.isWithinBounds(coords.x, coords.y)) {
         // Pass the clicked world point so the listener can open the sub-map
         // centered on it (same anchor-preserving remap as the seamless dive),
         // and the live canvas size so it can fit-zoom against the real pane.

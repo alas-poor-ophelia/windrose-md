@@ -407,7 +407,7 @@ function renderLayerCellsAndEdges(
 }
 
 const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, selectedItems = [], options = {}) => {
-  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null, hiddenTileLayers = undefined, draggingWallId = null, subHexPath = null, liveViewState = null } = options;
+  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null, adjacentEmptySlots = null, hiddenTileLayers = undefined, draggingWallId = null, subHexPath = null, liveViewState = null } = options;
   if (canvas == null) return;
 
   // Normalize selectedItems to array (backward compatibility)
@@ -632,7 +632,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
   // Draw adjacent sub-hex ghost previews (when drilled into a sub-hex)
   const MAX_ADJACENT_COMPLEXITY = 500;
-  if (adjacentSubHexes != null && adjacentSubHexes.length > 0 && geometry.type === 'hex') {
+  if (((adjacentSubHexes != null && adjacentSubHexes.length > 0)
+    || (adjacentEmptySlots != null && adjacentEmptySlots.length > 0)) && geometry.type === 'hex') {
     const hexToWorldFn = geometry.hexToWorld;
     const hexSizeVal = geometry.hexSize;
     const maxRing = mapData.hexBounds?.maxRing ?? 7;
@@ -648,7 +649,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       ? { hexToWorld: hexToWorldFn.bind(geometry), worldToScreen: geometry.worldToScreen.bind(geometry), hexSize: hexSizeVal, orientation: mapData.orientation ?? 'flat' }
       : null;
 
-    for (const adj of adjacentSubHexes) {
+    for (const adj of adjacentSubHexes ?? []) {
       const scaledQ = adj.dq * tileStep;
       const scaledR = adj.dr * tileStep;
       const worldOffset = hexToWorldFn.call(geometry, scaledQ, scaledR);
@@ -714,6 +715,38 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       );
       ctx.fillStyle = '#ffffff';
       ctx.fillText(adj.name, labelScreen.screenX, labelScreen.screenY);
+      ctx.restore();
+    }
+
+    // "+" affordances for empty adjacent slots, drawn where the sibling's
+    // label would sit. Clicking one creates/enters that sibling (hit-tested
+    // in DungeonMapTracker's adjacent-click handler with the same geometry).
+    for (const slot of adjacentEmptySlots ?? []) {
+      const edgeQ = slot.dq * (maxRing + 2);
+      const edgeR = slot.dr * (maxRing + 2);
+      const edgeWorld = hexToWorldFn.call(geometry, edgeQ, edgeR);
+      const markerScreen = geometry.worldToScreen(edgeWorld.worldX, edgeWorld.worldY, offsetX, offsetY, zoom);
+      const markerRadius = Math.max(12, 14 * zoom);
+
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(markerScreen.screenX, markerScreen.screenY, markerRadius, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.fill();
+      ctx.setLineDash([4, 3]);
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const armLen = markerRadius * 0.45;
+      ctx.beginPath();
+      ctx.moveTo(markerScreen.screenX - armLen, markerScreen.screenY);
+      ctx.lineTo(markerScreen.screenX + armLen, markerScreen.screenY);
+      ctx.moveTo(markerScreen.screenX, markerScreen.screenY - armLen);
+      ctx.lineTo(markerScreen.screenX, markerScreen.screenY + armLen);
+      ctx.lineWidth = 2;
+      ctx.stroke();
       ctx.restore();
     }
 
@@ -989,7 +1022,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 };
 
 const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], options = {}, viewController) => {
-  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false, adjacentSubHexes = null, hiddenTileLayers = undefined, draggingWallId = null, subHexPath = null } = options;
+  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false, adjacentSubHexes = null, adjacentEmptySlots = null, hiddenTileLayers = undefined, draggingWallId = null, subHexPath = null } = options;
   // Coalesce renders to at most one per animation frame. Pan/zoom writes viewState
   // (stored on mapData) on EVERY pointermove/touchmove; on a 120Hz touch device that
   // fires far faster than the display refreshes, so rendering synchronously per update
@@ -1006,6 +1039,7 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
     showCoordinates: boolean;
     layerVisibility: typeof layerVisibility;
     adjacentSubHexes: typeof adjacentSubHexes;
+    adjacentEmptySlots: typeof adjacentEmptySlots;
     hiddenTileLayers: typeof hiddenTileLayers;
     tileImagesReady: boolean;
     draggingWallId: typeof draggingWallId;
@@ -1019,7 +1053,7 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
   // useEffect here, that frame painted the OLD map at the NEW view (the
   // "giant grid" ghost frame on surfacing, windrose-1mc trace 2026-08-20).
   useLayoutEffect(() => {
-    renderInputsRef.current = { mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, hiddenTileLayers, tileImagesReady, draggingWallId, subHexPath };
+    renderInputsRef.current = { mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, tileImagesReady, draggingWallId, subHexPath };
     const scheduleRender = (): void => {
       // A frame is already queued — it will pick up the latest inputs from the ref.
       if (rafIdRef.current != null) return;
@@ -1030,7 +1064,7 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
           const fogCanvas = fogCanvasRef?.current ?? null;
           // Read the live viewState at FIRE time so a gesture's setLive→scheduleRender
           // path paints the current pan/zoom even though mapData hasn't changed.
-          renderCanvas(canvasRef.current, fogCanvas, a.mapData, a.geometry, a.selectedItems, { isResizeMode: a.isResizeMode, theme: a.theme, showCoordinates: a.showCoordinates, layerVisibility: a.layerVisibility, adjacentSubHexes: a.adjacentSubHexes, hiddenTileLayers: a.hiddenTileLayers, tileImagesReady: a.tileImagesReady, draggingWallId: a.draggingWallId, subHexPath: a.subHexPath, liveViewState: viewController.getLive() });
+          renderCanvas(canvasRef.current, fogCanvas, a.mapData, a.geometry, a.selectedItems, { isResizeMode: a.isResizeMode, theme: a.theme, showCoordinates: a.showCoordinates, layerVisibility: a.layerVisibility, adjacentSubHexes: a.adjacentSubHexes, adjacentEmptySlots: a.adjacentEmptySlots, hiddenTileLayers: a.hiddenTileLayers, tileImagesReady: a.tileImagesReady, draggingWallId: a.draggingWallId, subHexPath: a.subHexPath, liveViewState: viewController.getLive() });
         }
       });
     };
@@ -1040,7 +1074,7 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
     // The ViewController drives imperative renders on setLive() during a gesture.
     viewController.setRenderCallback(scheduleRender);
     scheduleRender();
-  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, hiddenTileLayers, draggingWallId, subHexPath, viewController]);
+  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, draggingWallId, subHexPath, viewController]);
 
   // Cancel any frame still pending when the component unmounts.
   useEffect(() => () => {
