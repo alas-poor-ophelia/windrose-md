@@ -13,6 +13,7 @@ import type { Curve } from '#types/core/curve.types';
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useMapState, useMapOperations } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
+import { useLiveOverlayRedraw } from '../../hooks/canvas/useLiveOverlayRedraw';
 import { fitPointsToBezier } from '../../geometry/curves/curveFitting';
 import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
 import { getActiveLayer } from '../../persistence/layerAccessor';
@@ -38,7 +39,7 @@ const FreehandLayer = ({
   selectedOpacity = 1
 }: FreehandLayerProps): null => {
 
-  const { mapData, geometry, screenToWorld, getClientCoords, canvasRef } = useMapState();
+  const { mapData, geometry, screenToWorld, getClientCoords, canvasRef, viewController } = useMapState();
   const { onCurvesChange } = useMapOperations();
 
   // Drawing state
@@ -89,7 +90,9 @@ const FreehandLayer = ({
     // Clear overlay
     ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-    const { zoom, center } = mapData.viewState ?? { zoom: 1, center: { x: 0, y: 0 } };
+    // Live basis first: a wheel-pan mid-stroke updates the ViewController
+    // without touching React state, and the preview must follow it.
+    const { zoom, center } = viewController?.getLive() ?? mapData.viewState ?? { zoom: 1, center: { x: 0, y: 0 } };
     const { width, height } = overlay;
 
     const { offsetX, offsetY } = calculateViewportOffset(
@@ -166,7 +169,14 @@ const FreehandLayer = ({
     }
 
     ctx.restore();
-  }, [mapData, geometry, selectedColor, snapDistance]);
+  }, [mapData, geometry, selectedColor, snapDistance, viewController]);
+
+  // Redraw the in-progress stroke when a pan/zoom gesture moves the view
+  // between pointer events (otherwise the preview freezes until commit).
+  const redrawLive = useCallback(() => {
+    if (isDrawingRef.current) drawPreview(pointsRef.current);
+  }, [drawPreview]);
+  useLiveOverlayRedraw(viewController, redrawLive);
 
   const handlePointerDown = useCallback((e: MouseEvent | TouchEvent | PointerEvent, _gridX?: number, _gridY?: number, _isTouch?: boolean) => {
     if (currentTool !== 'freehand') return;

@@ -10,11 +10,12 @@
 
 import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
-import type { Outline } from '#types/core/map.types';
+import type { Outline, StoredViewState } from '#types/core/map.types';
 
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
+import { useLiveOverlayRedraw } from '../../hooks/canvas/useLiveOverlayRedraw';
 import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
 import { useOutlineTools } from '../../hooks/interactions/useOutlineTools';
 import type { MenuItem } from 'obsidian';
@@ -43,7 +44,7 @@ const OutlineLayer = ({
   onOutlinesChange
 }: OutlineLayerProps): VNode | null => {
   const app = useApp();
-  const { canvasRef, mapData, geometry, screenToWorld, instanceId } = useMapState();
+  const { canvasRef, mapData, geometry, screenToWorld, instanceId, viewController } = useMapState();
 
   const isOutlineTool = currentTool === 'outline';
 
@@ -215,8 +216,10 @@ const OutlineLayer = ({
     };
   }, [canvasRef, isOutlineTool]);
 
-  // Render drawing vertices and selected outline vertices on overlay
-  useEffect(() => {
+  // Render drawing vertices and selected outline vertices on overlay.
+  // View basis is a parameter so the live-pan subscription below can
+  // redraw mid-gesture (same fix as RegionLayer/FreehandLayer).
+  const drawOutlineOverlay = useCallback((viewState: StoredViewState) => {
     const overlay = overlayRef.current;
     const mainCanvas = canvasRef.current;
     if (!overlay || !mainCanvas || !geometry || geometry.type !== 'hex' || !mapData) return;
@@ -227,9 +230,6 @@ const OutlineLayer = ({
     const ctx = overlay.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, overlay.width, overlay.height);
-
-    const viewState = mapData.viewState;
-    if (!viewState) return;
 
     const { offsetX, offsetY } = calculateViewportOffset(
       geometry, viewState.center, { width: overlay.width, height: overlay.height }, viewState.zoom
@@ -298,6 +298,13 @@ const OutlineLayer = ({
 
     if (northDirection !== 0) ctx.restore();
   }, [drawingVertices, selectedOutlineId, canvasRef, geometry, mapData, selectedColor, outlineSettings]);
+
+  useEffect(() => {
+    const vs = viewController?.getLive() ?? mapData?.viewState;
+    if (vs) drawOutlineOverlay(vs);
+  }, [drawOutlineOverlay, viewController, mapData?.viewState]);
+
+  useLiveOverlayRedraw(viewController, drawOutlineOverlay);
 
   const btnClass = (active?: boolean): string =>
     `windrose-floating-bar-btn${active === true ? ' is-active' : ''}`;

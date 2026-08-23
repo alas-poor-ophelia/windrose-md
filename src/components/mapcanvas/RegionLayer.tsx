@@ -8,12 +8,13 @@
 
 import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
-import type { Region } from '#types/core/map.types';
+import type { Region, StoredViewState } from '#types/core/map.types';
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
 import { useMapState } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
+import { useLiveOverlayRedraw } from '../../hooks/canvas/useLiveOverlayRedraw';
 import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
 import { useRegionTools } from '../../hooks/interactions/useRegionTools';
 import type { MenuItem } from 'obsidian';
@@ -47,7 +48,7 @@ const RegionLayer = ({
   onRegionsChange
 }: RegionLayerProps): VNode | null => {
   const app = useApp();
-  const { canvasRef, mapData, geometry, screenToWorld, screenToGrid, instanceId } = useMapState();
+  const { canvasRef, mapData, geometry, screenToWorld, screenToGrid, instanceId, viewController } = useMapState();
 
   const isRegionTool = currentTool === 'regionPaint' || currentTool === 'regionBoundary';
 
@@ -188,8 +189,12 @@ const RegionLayer = ({
     };
   }, [canvasRef, isRegionTool]);
 
-  // Render pending/editing hexes on the overlay
-  useEffect(() => {
+  // Render pending/editing hexes on the overlay. The view basis is a
+  // PARAMETER: during a pan/zoom gesture the ViewController's live state
+  // updates without touching React (mapData.viewState only changes at
+  // commit), so the live subscription below re-runs this with getLive()
+  // and the overlay tracks the gesture instead of freezing until release.
+  const drawRegionOverlay = useCallback((viewState: StoredViewState) => {
     const overlay = overlayRef.current;
     const mainCanvas = canvasRef.current;
     if (!overlay || !mainCanvas || !geometry || geometry.type !== 'hex' || !mapData) return;
@@ -208,8 +213,6 @@ const RegionLayer = ({
 
     if (geometry.type !== 'hex') return;
     const hexGeom = geometry;
-    const viewState = mapData.viewState;
-    if (!viewState) return;
 
     const northDirection = mapData.northDirection ?? 0;
 
@@ -270,6 +273,13 @@ const RegionLayer = ({
 
     if (northDirection !== 0) ctx.restore();
   }, [pendingHexes, boundaryVertices, canvasRef, geometry, mapData, selectedColor, editingRegion]);
+
+  useEffect(() => {
+    const vs = viewController?.getLive() ?? mapData?.viewState;
+    if (vs) drawRegionOverlay(vs);
+  }, [drawRegionOverlay, viewController, mapData?.viewState]);
+
+  useLiveOverlayRedraw(viewController, drawRegionOverlay);
 
   // ── Context menu via Obsidian's native Menu API ────────────────────
   useEffect(() => {
