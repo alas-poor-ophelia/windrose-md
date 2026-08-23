@@ -608,6 +608,20 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.3.4
+
+Patch release: content packs with dot-prefixed tags now import fully, adjacent sub-maps can be created in place, and every in-progress drawing overlay now follows the map during pan/zoom instead of freezing mid-gesture.
+
+### New Features
+- **Create adjacent sub-maps without surfacing.** While inside a sub-map (with adjacent previews enabled), empty neighboring regions now show a dashed "+" marker where their label would sit. Clicking it creates that sibling sub-map and moves you into it — no more climbing back to the parent to drill into the next hex over.
+
+### Bug Fixes
+- **Dungeondraft packs that tag content with dot-prefixed categories (e.g. Crosshead's packs) now import fully.** Tags like `.Cave` or `.Garden` were used verbatim as folder names, and Obsidian treats dot-folders as hidden — so most of the pack's art landed on disk but never appeared in the tile browser. Folders and tags are now normalized (`.Cave` → `Cave`). If a pack imported mostly-empty before, re-import it: files re-extract in place into visible folders.
+- **Clicking an empty adjacent region no longer secretly creates a sub-map nested inside the current one.** Double-clicking over a neighboring region's ghost area used to resolve to a far out-of-bounds hex of the *current* map and silently create a stray nested sub-map there. Sub-map creation is now fenced to the map's own grid.
+- **In-progress drawing overlays now ride along during pan/zoom.** The region boundary you're placing, an outline or freehand stroke mid-draw, the measurement ruler and its distance labels, shape and diagonal-fill previews, the segment hover highlight, and a selected wall's edit handles all used to freeze in place during a trackpad pan or zoom and snap into position when the gesture ended. They all track the gesture live now.
+- **The selection card ducks out of the way during pan/zoom.** Instead of detaching from the selection mid-gesture, the card hides and reanchors when the gesture settles (matching the Beacon card's behavior). Anything open on it — color picker, resize slider — survives.
+- **Clicking adjacent sub-map previews now accounts for compass rotation**, so sibling navigation lands on the region you actually clicked on rotated hex maps.
+
 ## Version 2.3.3
 
 Small patch: smooth navigation between adjacent sub-maps, and sub-maps can finally be deleted.
