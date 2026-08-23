@@ -122,10 +122,27 @@ function destFolderOf(
 	if (sourceType != null && STRIP_SOURCE_TYPES.has(sourceType)) return sourceType;
 	if (firstTag != null) {
 		const debracketed = firstTag.replace(/\[[^\]]*\]/g, ' ').replace(/\s+/g, ' ').trim();
-		if (debracketed !== '') return debracketed.replace(/[\\:*?"<>|]/g, '_');
+		if (debracketed !== '') return unhideFolder(debracketed.replace(/[\\:*?"<>|]/g, '_'));
 	}
 	const parts = relativePath.split('/');
-	return parts.length > 2 ? parts.slice(1, -1).join('/') : parts[0] ?? 'misc';
+	return unhideFolder(parts.length > 2 ? parts.slice(1, -1).join('/') : parts[0] ?? 'misc');
+}
+
+/**
+ * Obsidian's vault index skips any path segment that starts with a dot, so a
+ * texture extracted under `.Cave/` exists on disk but is invisible to the tile
+ * scanner. Some packs tag every object with a dot-prefixed category (Crosshead:
+ * ".Cave", ".Garden", ".Tree"), which routed ~90% of their content into hidden
+ * folders. Strip leading dots from every segment; a dots-only segment becomes "misc".
+ */
+function unhideFolder(folder: string): string {
+	return folder
+		.split('/')
+		.map(seg => {
+			const visible = seg.replace(/^\.+/, '');
+			return visible === '' ? 'misc' : visible;
+		})
+		.join('/');
 }
 
 /** Texture entries eligible for import (webp/png under the known source dirs). */
@@ -147,7 +164,11 @@ async function buildPackTagIndex(
 	const tags = await parseDungeondraftTags(source, archive);
 	const isBracketOnly = (t: string): boolean => /^\s*\[[^\]]*\]\s*$/.test(t);
 	if (tags != null) {
-		for (const [tag, paths] of Object.entries(tags.tags)) {
+		for (const [rawTag, paths] of Object.entries(tags.tags)) {
+			// A dot-prefixed pack tag (".Cave") is a category-naming convention,
+			// not part of the name — keep it browsable as "Cave".
+			const tag = rawTag.replace(/^\.+/, '');
+			if (tag === '') continue;
 			for (const p of paths) {
 				// First tag wins, except a bracket-only pack prefix ("[EA]")
 				// yields to the first real tag that comes along.

@@ -244,6 +244,17 @@ describe('destFolderOf', () => {
 		expect(destFolderOf('textures/objects/Chair_01.webp', 'objects', '[EA] Chairs')).toBe('Chairs');
 	});
 
+	it('strips leading dots so tagged folders are never hidden from the vault index (Crosshead ".Cave")', () => {
+		expect(destFolderOf('textures/objects/rock_01.png', 'objects', '.Cave')).toBe('Cave');
+		expect(destFolderOf('textures/objects/rock_01.png', 'objects', '...Cave')).toBe('Cave');
+		expect(destFolderOf('textures/objects/rock_01.png', 'objects', '.')).toBe('misc');
+	});
+
+	it('strips leading dots from untagged subpath segments too', () => {
+		expect(destFolderOf('textures/objects/.hidden/Sub/X.png', 'objects', undefined))
+			.toBe('objects/hidden/Sub');
+	});
+
 	it('ignores a bracket-only tag and falls through to the subpath', () => {
 		expect(destFolderOf('textures/objects/Furniture/Chair_01.webp', 'objects', '[EA]'))
 			.toBe('objects/Furniture');
@@ -307,6 +318,23 @@ describe('analyzePckForWizard', () => {
 		expect(analysis.cellTiles).toHaveLength(1);
 		expect(analysis.cellTiles[0].category).toBe('objects');
 		expect(analysis.packTags).toEqual([]);
+	});
+
+	it('normalizes dot-prefixed pack tags (Crosshead ".Cave") to visible tag + folder names', async () => {
+		const tagsJson = JSON.stringify({
+			tags: {
+				'.Cave': ['textures/objects/rock_01.png'],
+				'Colorable': ['textures/objects/rock_01.png'],
+			},
+		});
+		const source = buildPckSource([
+			{ path: 'res://packs/t4/data/default.dungeondraft_tags', data: enc(tagsJson) },
+			{ path: 'res://packs/t4/textures/objects/rock_01.png', data: px },
+		]);
+		const analysis = await analyzePckForWizard(source, await parsePck(source));
+		expect(analysis.cellTiles[0].category).toBe('Cave');
+		expect(analysis.cellTiles[0].tags).toEqual(['Cave', 'Colorable']);
+		expect(analysis.packTags).toEqual([{ tag: 'Cave', count: 1 }, { tag: 'Colorable', count: 1 }]);
 	});
 
 	it('counts portals as cell tiles, not strips (no sidecar, no strip metadata)', async () => {
