@@ -29,7 +29,6 @@ hooks/
 │   ├── useObjectResize.ts       # Object resize
 │   ├── useObjectHover.ts        # Object hover feedback
 │   ├── useObjectModifications.ts # Object property changes
-│   ├── useObjectUIPositions.ts  # Object UI positioning
 │   ├── useObjectModals.ts       # Object-related modals
 │   ├── useEdgeSnapModifiers.ts  # Edge snap logic
 │   └── useGroupDrag.ts          # Multi-object dragging

@@ -127,7 +127,6 @@ const MODULE_MAP: Record<string, string> = {
   'useObjectResize.ts': './hooks/objects/useObjectResize.ts',
   'useObjectHover.ts': './hooks/objects/useObjectHover.ts',
   'useObjectModifications.ts': './hooks/objects/useObjectModifications.ts',
-  'useObjectUIPositions.ts': './hooks/objects/useObjectUIPositions.ts',
   'useObjectModals.ts': './hooks/objects/useObjectModals.ts',
   'useEdgeSnapModifiers.ts': './hooks/objects/useEdgeSnapModifiers.ts',
   'useGroupDrag.ts': './hooks/objects/useGroupDrag.ts',

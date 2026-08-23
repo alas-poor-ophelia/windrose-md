@@ -368,7 +368,6 @@ export type {
   ResizeCorner,
   ResizeInitialState,
   ObjectDragStart,
-  ButtonPosition,
   ObjectInteractionStateValues,
   ObjectColorBtnRef,
   PendingObjectCustomColorRef,
@@ -382,7 +381,6 @@ export type {
   StopObjectDragging,
   StopObjectResizing,
   HandleObjectKeyDown,
-  CalculateButtonPosition,
   HandleNoteSubmit,
   HandleObjectColorSelect,
   HandleObjectColorReset,
@@ -401,7 +399,6 @@ export type {
 
 export type {
   PendingTextPosition,
-  TextButtonPosition,
   TextDragStart,
   TextLabelModalData,
   HandleTextPlacement,
@@ -416,7 +413,6 @@ export type {
   HandleRotateClick,
   HandleEditClick,
   HandleCanvasDoubleClick,
-  CalculateTextButtonPosition,
   UseTextLabelInteractionResult,
 } from './hooks/textLabelInteraction.types';
 

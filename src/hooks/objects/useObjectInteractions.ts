@@ -8,7 +8,6 @@
  * - useObjectResize: corner handle resizing
  * - useObjectDragSelect: selection + drag (coupled by longPressTimerRef)
  * - useObjectModifications: color, rotation, deletion, duplication
- * - useObjectUIPositions: button position calculations
  */
 
 // Type-only imports
@@ -19,7 +18,6 @@ import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { getNextRotation } from '../../drawing/rotationOperations';
 import { useEdgeSnapModifiers } from './useEdgeSnapModifiers';
 import { useObjectModifications } from './useObjectModifications';
-import { useObjectUIPositions } from './useObjectUIPositions';
 import { useObjectHover } from './useObjectHover';
 import { useObjectPlacement } from './useObjectPlacement';
 import { useObjectResize } from './useObjectResize';
@@ -48,11 +46,6 @@ const useObjectInteractions = (
     handleObjectWheel, handleNoteSubmit, handleObjectColorSelect, handleObjectColorReset,
     handleObjectRotation, handleObjectDeletion, handleObjectDuplicate
   } = useObjectModifications();
-
-  const {
-    calculateLabelButtonPosition, calculateLinkNoteButtonPosition,
-    calculateResizeButtonPosition, calculateObjectColorButtonPosition
-  } = useObjectUIPositions();
 
   const { handleHoverUpdate } = useObjectHover();
 
@@ -151,10 +144,6 @@ const useObjectInteractions = (
     handleObjectDeletion,
     handleObjectDuplicate,
 
-    calculateLabelButtonPosition,
-    calculateLinkNoteButtonPosition,
-    calculateResizeButtonPosition,
-    calculateObjectColorButtonPosition,
 
     handleNoteSubmit,
     handleObjectColorSelect,

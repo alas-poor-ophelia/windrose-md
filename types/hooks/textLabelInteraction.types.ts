@@ -19,11 +19,6 @@ export interface PendingTextPosition {
 }
 
 /** Button position on screen */
-export interface TextButtonPosition {
-  x: number;
-  y: number;
-}
-
 /** Drag start state for text labels */
 export interface TextDragStart {
   x: number;
@@ -90,7 +85,6 @@ export type HandleCanvasDoubleClick = (e: MouseEvent) => void;
 // ===========================================
 
 /** Calculate button position */
-export type CalculateTextButtonPosition = () => TextButtonPosition;
 
 // ===========================================
 // Hook Result Type
@@ -115,8 +109,4 @@ export interface UseTextLabelInteractionResult {
   handleRotateClick: HandleRotateClick;
   handleEditClick: HandleEditClick;
   handleCanvasDoubleClick: HandleCanvasDoubleClick;
-
-  // Position calculators
-  calculateRotateButtonPosition: CalculateTextButtonPosition;
-  calculateEditButtonPosition: CalculateTextButtonPosition;
 }

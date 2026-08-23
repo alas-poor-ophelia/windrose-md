@@ -41,11 +41,6 @@ export interface ObjectDragStart {
 // ===========================================
 
 /** Screen position for UI buttons */
-export interface ButtonPosition {
-  x: number;
-  y: number;
-}
-
 // ===========================================
 // Mouse Position Types
 // ===========================================
@@ -134,7 +129,6 @@ export type HandleObjectKeyDown = (e: KeyboardEvent) => boolean;
 // ===========================================
 
 /** Button position calculator */
-export type CalculateButtonPosition = () => ButtonPosition;
 
 // ===========================================
 // Modal Handlers
@@ -196,10 +190,6 @@ export interface UseObjectInteractionsResult {
   handleObjectDuplicate: () => void;
 
   // Button position calculators
-  calculateLabelButtonPosition: CalculateButtonPosition;
-  calculateLinkNoteButtonPosition: CalculateButtonPosition;
-  calculateResizeButtonPosition: CalculateButtonPosition;
-  calculateObjectColorButtonPosition: CalculateButtonPosition;
 
   // Modal handlers
   handleNoteSubmit: HandleNoteSubmit;

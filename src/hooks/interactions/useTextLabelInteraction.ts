@@ -19,7 +19,6 @@ import type { HexColor } from '#types/core/common.types';
 import type {
   UseTextLabelInteractionResult,
   PendingTextPosition,
-  TextButtonPosition,
   TextLabelModalData
 } from '#types/hooks/textLabelInteraction.types';
 
@@ -353,103 +352,6 @@ const useTextLabelInteraction = (
   };
 
   /**
-   * Calculate rotate button position
-   */
-  const calculateRotateButtonPosition = (): TextButtonPosition => {
-    if (selectedItem?.type !== 'text' || !mapData || !canvasRef.current) {
-      return { x: 0, y: 0 };
-    }
-
-    const label = getActiveLayer(mapData).textLabels.find(l => l.id === selectedItem.id);
-    if (!label) return { x: 0, y: 0 };
-
-    const canvas = canvasRef.current;
-    const viewState = mapData.viewState;
-    if (!viewState) return { x: 0, y: 0 };
-    const { zoom, center } = viewState;
-    const gridSize = mapData.gridSize ?? 1;
-    const northDirection = mapData.northDirection ?? 0;
-    const scaledGridSize = gridSize * zoom;
-
-    // Calculate offsets accounting for map rotation
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    const offsetX = centerX - center.x * scaledGridSize;
-    const offsetY = centerY - center.y * scaledGridSize;
-
-    // Get label position in world space, then convert to screen space
-    let screenX = offsetX + label.position.x * zoom;
-    let screenY = offsetY + label.position.y * zoom;
-
-    // Apply canvas rotation if present
-    if (northDirection !== 0) {
-      // Translate to canvas center
-      const relX = screenX - centerX;
-      const relY = screenY - centerY;
-
-      // Apply rotation
-      const angleRad = (northDirection * Math.PI) / 180;
-      const rotatedX = relX * Math.cos(angleRad) - relY * Math.sin(angleRad);
-      const rotatedY = relX * Math.sin(angleRad) + relY * Math.cos(angleRad);
-
-      // Translate back
-      screenX = centerX + rotatedX;
-      screenY = centerY + rotatedY;
-    }
-
-    // Measure text to get bounding box (same as selection box calculation)
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return { x: 0, y: 0 };
-
-    const fontSize = label.fontSize * zoom;
-    ctx.font = `${fontSize}px sans-serif`;
-    const metrics = ctx.measureText(label.content);
-    const textWidth = metrics.width;
-    const textHeight = fontSize * 1.2; // Same as selection box
-
-    // Calculate rotated bounding box for the label itself
-    const labelAngle = ((label.rotation ?? 0) * Math.PI) / 180;
-    const cos = Math.abs(Math.cos(labelAngle));
-    const sin = Math.abs(Math.sin(labelAngle));
-    const rotatedWidth = textWidth * cos + textHeight * sin;
-    const rotatedHeight = textWidth * sin + textHeight * cos;
-
-    // Position button at top-right corner of selection box
-    // Selection box has 4px padding on sides and 2px on top/bottom
-    const selectionPaddingX = 4;
-    const selectionPaddingY = 2;
-    const buttonOffset = 4; // Small gap between selection box and button
-    const buttonHeight = 32;
-
-    // Return canvas-relative coordinates for absolute positioning
-    const buttonX = screenX + (rotatedWidth / 2) + selectionPaddingX + buttonOffset;
-    const buttonY = screenY - (rotatedHeight / 2) - selectionPaddingY - buttonOffset - buttonHeight;
-
-    const rect = canvas.getBoundingClientRect();
-    const containerRect = canvas.parentElement?.getBoundingClientRect();
-    if (!containerRect) return { x: 0, y: 0 };
-
-    // Calculate canvas offset within container (due to flex centering)
-    const canvasOffsetX = rect.left - containerRect.left;
-    const canvasOffsetY = rect.top - containerRect.top;
-
-    // Scale from canvas internal coordinates to displayed coordinates
-    const scaleX = rect.width / canvas.width;
-    const scaleY = rect.height / canvas.height;
-
-    return { x: (buttonX * scaleX) + canvasOffsetX, y: (buttonY * scaleY) + canvasOffsetY };
-  };
-
-  /**
-   * Calculate edit button position (to the left of rotate button)
-   */
-  const calculateEditButtonPosition = (): TextButtonPosition => {
-    const rotatePos = calculateRotateButtonPosition();
-    // Position edit button 40px to the left of rotate button (32px button + 8px gap)
-    return { x: rotatePos.x - 40, y: rotatePos.y };
-  };
-
-  /**
    * Stop text label dragging and finalize history
    */
   const stopTextDragging = (): boolean => {
@@ -484,11 +386,7 @@ const useTextLabelInteraction = (
     handleTextCancel,
     handleRotateClick,
     handleEditClick,
-    handleCanvasDoubleClick,
-
-    // Position calculators
-    calculateRotateButtonPosition,
-    calculateEditButtonPosition
+    handleCanvasDoubleClick
   };
 };
 
