@@ -33,7 +33,7 @@ Several tools are grouped: a group shows one button, and long-pressing (or right
   - **Fill Circle**: fill a circle from center to radius.
   - **Diagonal Fill**: place segments along a staggered row of painted cells to smooth a staircase edge into a clean diagonal.
 - **Eraser** tool group
-  - **Erase**: erase a single thing — cells, objects, labels, tiles, and so on.
+  - **Erase**: erase a single thing — cells, objects, labels, tiles, and so on. For image tiles, this works across strata: erasing a tile on any stratum of the active board switches you to that stratum, and undo restores the one you were on (see [Boards, strata, and layers]({{ site.baseurl }}/image-tiles/#boards-strata-and-layers)).
   - **Clear Area** (**GRID ONLY**): delete everything within a rectangle.
 - **Region** tool group (**HEX ONLY**, requires the *Regions* feature)
   - **Paint Region**: define a region cell by cell.
@@ -128,3 +128,4 @@ The plugin's settings page opens on the **Features** switchboard plus a set of n
 - **Tile Sets** (requires *Image tiles*) — the **Add tiles** wizard and your list of tileset folders.
 - **Object Types** — customize objects and categories, and a **Browse content packs** button for downloadable object sets.
 - **Keyboard Shortcuts** — view and rebind shortcuts.
+- **Developer** — a **Developer mode** toggle (off by default) that shows diagnostic commands — performance telemetry, input event probe, zoom trace, canvas capability report — in the command palette.

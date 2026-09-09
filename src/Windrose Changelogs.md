@@ -608,6 +608,24 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.3.5
+
+Patch release: cross-band erasing, a smoother region color picker, several shape overlay fixes, and a new Developer mode setting.
+
+### New Features
+- **Developer mode setting.** Off by default. When enabled, the four diagnostic commands (performance telemetry, input event probe, zoom trace, canvas capability report) show up in the command palette; otherwise they stay out of the way.
+
+### Bug Fixes
+- **The Universal Eraser now erases image tiles on any depth band of the active board**, not just the currently armed one. Erasing a tile on another band switches you to that band, and undo restores it.
+- **Dragging in the region and outline color pickers no longer stutters or floods the undo history.** One color change is now one undo step.
+- **Outline fill opacity sliders no longer flood the undo history while dragging.** The value commits once when you release.
+- **Shape overlays: circle placement now goes center first, then edge**, matching the circle draw tool. Placement snaps to the grid by default — hold Alt+Shift, or switch to freeform placement mode, to place freely.
+- **The Snap to Grid / freeform toggle on a placed shape now actually converts it** between the two, instead of doing nothing.
+- **The selection card and its Color picker for a selected shape now appear next to the shape on grid maps**, instead of rendering off-screen. Text-label selection cards on hex maps were fixed in the same pass.
+
+### Improvements
+- Docs site: the `windrose-map` code block example now lives on the Getting started page.
+
 ## Version 2.3.4
 
 Patch release: content packs with dot-prefixed tags now import fully, adjacent sub-maps can be created in place, and every in-progress drawing overlay now follows the map during pan/zoom instead of freezing mid-gesture.

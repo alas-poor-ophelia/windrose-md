@@ -105,6 +105,8 @@ When painting with image tiles there are four fixed **strata**, from the ground 
 
 Dungeondraft packs are auto-sorted into appropriate strata on import, which you can adjust during import or later. You can place anything on any stratum regardless of its default.
 
+Erasing isn't limited to the active stratum either: the Erase tool removes a tile on whichever stratum of the current board it's clicked on, switching the active stratum to match. Undo restores the stratum you were on.
+
 ### Layers
 
 **Layers** are the sub-categorization *within* a stratum. Want a base of grass in the Terrain stratum, plus a separately-editable patch of old cobble soft-brushed on top? Each becomes its own layer, individually toggleable for visibility.

@@ -94,7 +94,7 @@ Several tools are grouped: a group shows one button, and long-pressing (or right
 	- **Fill Circle**: fill a circle from center to radius.
 	- **Diagonal Fill**: place segments along a staggered row of painted cells to smooth a staircase edge into a clean diagonal.
 - **Eraser** tool group
-	- **Erase**: erase a single thing — cells, objects, labels, tiles, and so on.
+	- **Erase**: erase a single thing — cells, objects, labels, tiles, and so on. For image tiles, this works across strata: erasing a tile on any stratum of the active board switches you to that stratum, and undo restores the one you were on (see [Boards, Strata, and Layers](#boards-strata-and-layers)).
 	- **Clear Area** (**GRID ONLY**): delete everything within a rectangle.
 - **Region** tool group (**HEX ONLY**, requires the *Regions* feature)
 	- **Paint Region**: define a region cell by cell.
@@ -171,6 +171,7 @@ The plugin's settings page is a single scrolling page of collapsible sections. S
 - **Tile Sets** (requires *Image tiles*) — the **Add tiles** wizard and your list of tileset folders.
 - **Object Types** — customize objects and categories, and a **Browse content packs** button for downloadable object sets.
 - **Keyboard Shortcuts** — view and rebind shortcuts.
+- **Developer** — a **Developer mode** toggle (off by default) that shows diagnostic commands — performance telemetry, input event probe, zoom trace, canvas capability report — in the command palette.
 
 # Map Functionality
 ## Modifying the Grid
@@ -297,6 +298,8 @@ When painting with image tiles there are four fixed **strata**, from the ground 
 
 Dungeondraft packs are auto-sorted into appropriate strata on import, which you can adjust during import or later. You can place anything on any stratum regardless of its default.
 
+Erasing isn't limited to the active stratum either: the Erase tool removes a tile on whichever stratum of the current board it's clicked on, switching the active stratum to match. Undo restores the stratum you were on.
+
 ### Layers
 **Layers** are the sub-categorization *within* a stratum. Want a base of grass in the Terrain stratum, plus a separately-editable patch of old cobble soft-brushed on top? Each becomes its own layer, individually toggleable for visibility.
 
@@ -402,7 +405,9 @@ Each Beacon can expand its results with **related notes**: **off**, **by tags** 
 Optionally, the Beacon can generate a **beacon note** — a markdown note in a vault folder you choose, holding the current nearby results as a table of note links with distances (and travel times, when configured). Updates are debounced and change-detected: if the results didn't change, the file isn't rewritten. The note carries an ownership marker, so Windrose will never overwrite a note it didn't generate; a manually deleted beacon note is recreated on the next update; and removing the Beacon offers to delete its note (the Beacon is removed either way).
 
 ## Shape Overlays
-**Shape overlays** (requires the *Shape overlays* feature) place decorative shapes on the map for annotation and embellishment, independent of the painted grid.
+**Shape overlays** (requires the *Shape overlays* feature) place decorative shapes — squares and circles — on the map for annotation and embellishment, independent of the painted grid.
+
+Placing a square is corner to corner. A circle is placed center first, then a second click sets the edge, matching the Fill Circle tool. Placement snaps to the grid by default; hold **Alt+Shift**, or switch on **freeform placement mode**, to place freely instead. Selecting a placed shape shows a **Snap to Grid**/freeform toggle that converts it between the two.
 
 ## Measurement, Routes, and Travel
 The **Measure Distance** tool (requires the *Distance measurement* feature) measures **multi-waypoint routes**, not just single segments — and with [travel packs](#travel-packs), it turns distance into travel time.

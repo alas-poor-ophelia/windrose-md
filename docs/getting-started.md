@@ -40,6 +40,26 @@ The code block format is simple YAML:
 - **type**: `grid` or `hex`.
 - **subhex**: Sub-map key. Renders that sub-map in place of the root map (see [Sub-maps]({{ site.baseurl }}/hex-maps/#sub-maps-hex-only)).
 
+A map in a note is just a code block:
+
+````
+```windrose-map
+id: your-map-id
+name: My Map
+type: grid
+```
+````
+
+This works the same as any other codeblock in Obsidian. For instance, put it in a callout like this:
+````
+> [!INFO]
+> ```windrose-map
+> id: your-map-id
+> name: My Map
+> type: grid
+```
+````
+
 Maps render in Reading mode, Live Preview, and inside callouts. The drawing data itself is stored separately in `windrose-map-data.json` in your vault, keyed by `id` — plain JSON that travels with your vault and works with Obsidian Sync. Delete a code block and the data remains; paste the block elsewhere and the map comes with it.
 
 ![A hex map embedded inline in a note: ordinary note text above, then a "Map of Hexlandia" callout containing the live, fully interactive map block]({{ site.baseurl }}/images/note-callout-docs-screenshot.png)
