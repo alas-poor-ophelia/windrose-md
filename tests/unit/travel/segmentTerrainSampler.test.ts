@@ -16,10 +16,12 @@ import type { TravelTerrain } from "#types/settings/travelPack.types";
 
 import {
   classifyCell,
+  buildLayerCellMaps,
   sampleSegmentTerrain,
   sampleRouteTerrains,
   type TerrainSampleContext,
 } from "../../../src/travel/segmentTerrainSampler";
+import { findTileHitInLayers } from "../../../src/assets/tileFootprint";
 import { GridGeometry } from "../../../src/geometry/core/GridGeometry";
 import { HexGeometry } from "../../../src/geometry/core/HexGeometry";
 import { makeLayer } from "../helpers/fixtures";
@@ -40,6 +42,18 @@ function paint(x: number, y: number, color: string): Cell {
 /** A snapped tile placement whose tags come from the test's tag table */
 function tile(col: number, row: number, tileId: string): TileAssignment {
   return { col, row, tilesetId: "ts", tileId };
+}
+
+/** A snapped multi-cell tile placement (top-left anchored, extends right/down) */
+function spanTile(
+  col: number,
+  row: number,
+  tileId: string,
+  spanW: number,
+  spanH: number,
+  overrides: Partial<Pick<TileAssignment, "placement" | "rotation">> = {}
+): TileAssignment {
+  return { col, row, tilesetId: "ts", tileId, spanW, spanH, ...overrides };
 }
 
 const TAGS: Record<string, string[]> = {
@@ -143,6 +157,63 @@ describe("segmentTerrainSampler", () => {
         makeLayer({ id: "top", order: 1, tiles: [tile(0, 0, "road-tile")] }),
       ]);
       expect(classifyCell({ x: 0, y: 0 }, ctx)).toBe("road");
+    });
+  });
+
+  // ===========================================
+  // tile hit index (buildLayerCellMaps) parity with findTileHitInLayers
+  // ===========================================
+
+  describe("tile hit index", () => {
+    it("finds a multi-cell footprint tile on every covered cell, matching findTileHitInLayers", () => {
+      // A 3x2 footprint anchored at (2, 1): covers cols 2-4, rows 1-2.
+      const layer = makeLayer({ tiles: [spanTile(2, 1, "road-tile", 3, 2)] });
+      const ctx = makeCtx([layer]);
+      const cellMaps = buildLayerCellMaps(ctx);
+
+      // Grid of cells spanning the footprint plus a one-cell border outside it.
+      for (let x = 1; x <= 5; x++) {
+        for (let y = 0; y <= 3; y++) {
+          const cell = { x, y };
+          const viaIndex = classifyCell(cell, ctx, cellMaps);
+          const viaLinearScan = findTileHitInLayers(ctx.layers, cell.x, cell.y);
+          const viaLinear = classifyCell(cell, ctx);
+          expect(viaIndex).toBe(viaLinear);
+          // Sanity: the covered cells actually hit, the border cells don't.
+          const inFootprint = x >= 2 && x <= 4 && y >= 1 && y <= 2;
+          expect(viaLinearScan != null).toBe(inFootprint);
+          if (inFootprint) expect(viaIndex).toBe("road");
+        }
+      }
+    });
+
+    it("prefers the topmost layer's tile via the index, matching the unindexed scan", () => {
+      const ctx = makeCtx([
+        makeLayer({ id: "bottom", order: 0, tiles: [spanTile(0, 0, "forest-tile", 2, 2)] }),
+        makeLayer({ id: "top", order: 1, tiles: [tile(1, 1, "road-tile")] }),
+      ]);
+      const cellMaps = buildLayerCellMaps(ctx);
+
+      // (1,1) is covered by both layers' tiles; the top layer's road tile wins.
+      expect(classifyCell({ x: 1, y: 1 }, ctx, cellMaps)).toBe("road");
+      expect(classifyCell({ x: 1, y: 1 }, ctx, cellMaps)).toBe(classifyCell({ x: 1, y: 1 }, ctx));
+
+      // (0,0) is only covered by the bottom layer's forest tile.
+      expect(classifyCell({ x: 0, y: 0 }, ctx, cellMaps)).toBe("forest");
+      expect(classifyCell({ x: 0, y: 0 }, ctx, cellMaps)).toBe(classifyCell({ x: 0, y: 0 }, ctx));
+    });
+
+    it("resolves overlay-over-fill precedence identically via the index", () => {
+      const layer = makeLayer({
+        tiles: [
+          tile(0, 0, "forest-tile"),
+          { ...tile(0, 0, "road-tile"), placement: "overlay" as const },
+        ],
+      });
+      const ctx = makeCtx([layer]);
+      const cellMaps = buildLayerCellMaps(ctx);
+      expect(classifyCell({ x: 0, y: 0 }, ctx, cellMaps)).toBe("road");
+      expect(classifyCell({ x: 0, y: 0 }, ctx, cellMaps)).toBe(classifyCell({ x: 0, y: 0 }, ctx));
     });
   });
 

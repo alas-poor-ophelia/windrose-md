@@ -24,11 +24,12 @@
 // Type-only imports
 import type { Point, IGeometry } from '#types/core/geometry.types';
 import type { MapLayer } from '#types/core/map.types';
-import type { CellMap } from '#types/core/cell.types';
+import type { CellMap, CellKey } from '#types/core/cell.types';
 import type { TileAssignment } from '#types/tiles/tile.types';
 import type { TravelTerrain } from '#types/settings/travelPack.types';
+import type { TileLayerHit } from '../assets/tileFootprint';
 
-import { findTileHitInLayers } from '../assets/tileFootprint';
+import { findTileHitInLayers, cellsCoveredByAssignment } from '../assets/tileFootprint';
 import { buildCellMap, cellKey } from '../geometry/core/cellAccessor';
 import { colorsMatch } from '../drawing/colorOperations';
 
@@ -56,15 +57,82 @@ interface TerrainSampleContext {
 
 /**
  * Per-layer cell lookups, parallel to `ctx.layers`. Building these once and
- * threading them through turns the paint-color scan from a linear search
- * per cell per layer into a map hit; a long route over a busy map is
- * otherwise quadratic.
+ * threading them through turns both the paint-color scan and the tile scan
+ * from a linear search per cell per layer into a map hit; a long route over
+ * a busy map is otherwise quadratic (cells x tiles per layer).
+ *
+ * `tiles[i]` maps a cell key to the same `TileLayerHit` that
+ * `findTileHitInLayers` would report for that cell within `ctx.layers[i]`
+ * alone (see `buildTileHitIndexForLayer`); the topmost-layer-wins scan then
+ * walks this array in reverse exactly like `findTileHitInLayers` walks
+ * `ctx.layers` in reverse.
  */
-type LayerCellMaps = readonly CellMap[];
+interface LayerCellMaps {
+  readonly color: readonly CellMap[];
+  readonly tiles: readonly ReadonlyMap<CellKey, TileLayerHit>[];
+}
 
-/** Build the per-layer cell lookups for a context. */
+/**
+ * Per-cell tile-hit index for one layer, matching `findTileHitInLayers`'s
+ * within-layer semantics: an `overlay`-placed tile covering the cell wins
+ * over a `fill` one regardless of placement order, and within either group
+ * the earliest-placed (lowest array index) tile wins — `findIndex`, not
+ * last-placed. A tile's covered cells come from `cellsCoveredByAssignment`
+ * (rotation-aware, multi-cell for snapped tiles) or, for a freeform stamp,
+ * its single drop cell — the same coverage `tileHitsCell` tests.
+ */
+function buildTileHitIndexForLayer(
+  layer: MapLayer,
+  geometry: IGeometry
+): ReadonlyMap<CellKey, TileLayerHit> {
+  const result = new Map<CellKey, TileLayerHit>();
+  const tiles = layer.tiles;
+  if (tiles == null || tiles.length === 0) return result;
+
+  const overlaySeen = new Set<CellKey>();
+  for (let i = 0; i < tiles.length; i++) {
+    const t = tiles[i];
+    const cells = t.freeform === true
+      ? [{ col: t.col, row: t.row }]
+      : cellsCoveredByAssignment(t);
+    for (const c of cells) {
+      const key = cellKey({ x: c.col, y: c.row }, geometry);
+      if (t.placement === 'overlay') {
+        if (!overlaySeen.has(key)) {
+          overlaySeen.add(key);
+          result.set(key, { layer, index: i });
+        }
+      } else if (!overlaySeen.has(key) && !result.has(key)) {
+        result.set(key, { layer, index: i });
+      }
+    }
+  }
+  return result;
+}
+
+/** Build the per-layer cell and tile lookups for a context. */
 function buildLayerCellMaps(ctx: TerrainSampleContext): LayerCellMaps {
-  return ctx.layers.map(layer => buildCellMap(layer.cells, ctx.geometry));
+  return {
+    color: ctx.layers.map(layer => buildCellMap(layer.cells, ctx.geometry)),
+    tiles: ctx.layers.map(layer => buildTileHitIndexForLayer(layer, ctx.geometry)),
+  };
+}
+
+/**
+ * Topmost-layer tile hit at a cell via the prebuilt per-layer index —
+ * the indexed equivalent of `findTileHitInLayers(ctx.layers, cell.x, cell.y)`.
+ */
+function findTileHitViaIndex(
+  cell: Point,
+  ctx: TerrainSampleContext,
+  cellMaps: LayerCellMaps
+): TileLayerHit | null {
+  const key = cellKey(cell, ctx.geometry);
+  for (let i = cellMaps.tiles.length - 1; i >= 0; i--) {
+    const hit = cellMaps.tiles[i].get(key);
+    if (hit != null) return hit;
+  }
+  return null;
 }
 
 /** Case-insensitive tag membership; tags keep their authored casing. */
@@ -115,8 +183,8 @@ function visibleCellColor(
   cellMaps: LayerCellMaps
 ): string | null {
   const key = cellKey(cell, ctx.geometry);
-  for (let i = cellMaps.length - 1; i >= 0; i--) {
-    const found = cellMaps[i].get(key);
+  for (let i = cellMaps.color.length - 1; i >= 0; i--) {
+    const found = cellMaps.color[i].get(key);
     if (found != null) return found.color ?? null;
   }
   return null;
@@ -130,14 +198,18 @@ function visibleCellColor(
  * vote. Paint color is the fallback, never an override.
  *
  * `cellMaps` is an optional prebuilt lookup — pass the one from a route
- * sample to avoid rebuilding it per cell.
+ * sample to avoid rebuilding it per cell. When supplied, the tile hit comes
+ * from its per-layer index (`findTileHitViaIndex`) instead of the linear
+ * `findTileHitInLayers` scan; both report the same hit for the same cell.
  */
 function classifyCell(
   cell: Point,
   ctx: TerrainSampleContext,
   cellMaps?: LayerCellMaps
 ): string | null {
-  const hit = findTileHitInLayers(ctx.layers, cell.x, cell.y);
+  const hit = cellMaps != null
+    ? findTileHitViaIndex(cell, ctx, cellMaps)
+    : findTileHitInLayers(ctx.layers, cell.x, cell.y);
   if (hit != null) {
     const tile = hit.layer.tiles?.[hit.index];
     if (tile != null) {
