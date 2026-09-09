@@ -218,7 +218,7 @@ const ShapeOverlayLayer = ({
             gap: '4px'
           }}
         >
-          <Icon icon="lucide-square" />
+          <Icon icon="lucide-rectangle-horizontal" />
         </button>
         <button
           onClick={() => setActiveShape('circle')}
