@@ -1,7 +1,7 @@
 /**
  * ShapeOverlayLayer.tsx
  *
- * Interaction layer for placing shape overlays (square/circle).
+ * Interaction layer for placing shape overlays (rectangle/circle).
  * Registers handlers with EventHandlerContext and renders
  * a preview overlay canvas during 2-click placement.
  */
@@ -18,6 +18,7 @@ import { useMapSelection } from '../../context/MapSelectionContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useShapeOverlayTools } from '../../hooks/interactions/useShapeOverlayTools';
 import { snapShapeOverlayToGrid } from '../../objects/shapeOverlayOperations';
+import { getNextRotation } from '../../drawing/rotationOperations';
 import { buildShapeOverlayActions } from '../../hooks/interactions/useSelectionActions';
 import { SelectionActionsOverlay } from '../toolbars/SelectionActionsOverlay';
 import { ShapePreviewOverlay } from './ShapePreviewOverlay';
@@ -129,10 +130,15 @@ const ShapeOverlayLayer = ({
       // Snapping back onto the grid needs geometry; without it, leave the
       // shape freeform rather than writing a no-op update.
       if (!geometry) return;
-      const snapped = snapShapeOverlayToGrid({ worldPosition: shape.worldPosition, size: shape.size }, geometry);
+      const snapped = snapShapeOverlayToGrid(
+        { worldPosition: shape.worldPosition, size: shape.size, halfWidth: shape.halfWidth, halfHeight: shape.halfHeight },
+        geometry
+      );
       updateShapeOverlay(selectedItem.id, {
         worldPosition: snapped.worldPosition,
         size: snapped.size,
+        halfWidth: snapped.halfWidth,
+        halfHeight: snapped.halfHeight,
         freeform: false
       });
       return;
@@ -140,6 +146,14 @@ const ShapeOverlayLayer = ({
 
     updateShapeOverlay(selectedItem.id, { freeform: true });
   }, [selectedItem, mapData, geometry, updateShapeOverlay]);
+
+  // Rotation cycles the shared 45-degree steps; circles never expose the action
+  const handleShapeRotate = useCallback(() => {
+    if (selectedItem?.type !== 'shapeOverlay') return;
+    const shape = mapData?.shapeOverlays?.find(s => s.id === selectedItem.id);
+    if (!shape) return;
+    updateShapeOverlay(selectedItem.id, { rotation: getNextRotation(shape.rotation ?? 0) });
+  }, [selectedItem, mapData, updateShapeOverlay]);
 
   // Shape tool options bar (follows region toolbar pattern) + preview overlay
   if (isShapeTool) {
@@ -189,7 +203,7 @@ const ShapeOverlayLayer = ({
         <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Shape:</span>
         <button
           onClick={() => setActiveShape('square')}
-          ref={tooltipRef('Square')}
+          ref={tooltipRef('Rectangle')}
           style={{
             padding: '4px 12px',
             background: activeShape === 'square' ? 'var(--interactive-accent)' : 'transparent',
@@ -243,7 +257,8 @@ const ShapeOverlayLayer = ({
   const shapeActions = buildShapeOverlayActions(selectedItem, {
     onColorClick: handleShapeColorClick,
     onDelete: handleShapeDelete,
-    onFreeformToggle: handleShapeFreeformToggle
+    onFreeformToggle: handleShapeFreeformToggle,
+    onRotate: handleShapeRotate
   });
 
   const selectedShape = mapData?.shapeOverlays?.find(s => s.id === selectedItem.id);

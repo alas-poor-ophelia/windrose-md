@@ -7,7 +7,15 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { snapShapeOverlayToGrid, snapSizeToWholeCells, getCellWorldSize } from '../../../src/objects/shapeOverlayOperations';
+import {
+  snapShapeOverlayToGrid,
+  snapSizeToWholeCells,
+  getCellWorldSize,
+  getShapeHalfExtents,
+  getShapeBoundingHalfExtents,
+  hitTestShapeOverlay
+} from '../../../src/objects/shapeOverlayOperations';
+import type { ShapeOverlay } from '../../../types/core/map.types';
 import { GridGeometry } from '../../../src/geometry/core/GridGeometry';
 import { HexGeometry } from '../../../src/geometry/core/HexGeometry';
 
@@ -125,5 +133,118 @@ describe('snapShapeOverlayToGrid (hex geometry)', () => {
     expect(result.worldPosition.x).toBeCloseTo(centre.worldX, 6);
     expect(result.worldPosition.y).toBeCloseTo(centre.worldY, 6);
     expect(result.size).toBe(40);
+  });
+});
+
+describe('getShapeHalfExtents', () => {
+  it('falls back to size on both axes for a pre-2.4.0 square', () => {
+    expect(getShapeHalfExtents({ size: 40 })).toEqual({ halfWidth: 40, halfHeight: 40 });
+  });
+
+  it('prefers the per-axis half-extents when present', () => {
+    expect(getShapeHalfExtents({ size: 60, halfWidth: 60, halfHeight: 20 }))
+      .toEqual({ halfWidth: 60, halfHeight: 20 });
+  });
+});
+
+describe('snapShapeOverlayToGrid (rectangles)', () => {
+  it('snaps each axis independently', () => {
+    const result = snapShapeOverlayToGrid(
+      // full extents 120 (3.75 cells -> 4) and 40 (1.25 cells -> 1)
+      { worldPosition: { x: 0, y: 0 }, size: 60, halfWidth: 60, halfHeight: 20 },
+      grid
+    );
+    expect(result.halfWidth).toBe(64);
+    expect(result.halfHeight).toBe(16);
+  });
+
+  it('keeps size as the larger half-extent so older builds stay sane', () => {
+    const result = snapShapeOverlayToGrid(
+      { worldPosition: { x: 0, y: 0 }, size: 60, halfWidth: 60, halfHeight: 20 },
+      grid
+    );
+    expect(result.size).toBe(64);
+  });
+});
+
+describe('hitTestShapeOverlay', () => {
+  const rect = (over: Partial<ShapeOverlay> = {}): ShapeOverlay => ({
+    id: 'shape-1',
+    shape: 'square',
+    worldPosition: { x: 100, y: 100 },
+    size: 60,
+    halfWidth: 60,
+    halfHeight: 20,
+    color: '#ffffff',
+    opacity: 0.5,
+    freeform: true,
+    visible: true,
+    ...over
+  });
+
+  it('uses per-axis half-extents when unrotated', () => {
+    expect(hitTestShapeOverlay(rect(), 155, 100)).toBe(true);   // inside the long axis
+    expect(hitTestShapeOverlay(rect(), 165, 100)).toBe(false);  // past the long axis
+    expect(hitTestShapeOverlay(rect(), 100, 115)).toBe(true);   // inside the short axis
+    expect(hitTestShapeOverlay(rect(), 100, 125)).toBe(false);  // past the short axis
+  });
+
+  it('swaps the axes at 90 degrees', () => {
+    const rotated = rect({ rotation: 90 });
+    expect(hitTestShapeOverlay(rotated, 155, 100)).toBe(false);
+    expect(hitTestShapeOverlay(rotated, 100, 155)).toBe(true);
+    expect(hitTestShapeOverlay(rotated, 115, 100)).toBe(true);
+    expect(hitTestShapeOverlay(rotated, 125, 100)).toBe(false);
+  });
+
+  it('hits along the rotated long axis at 45 degrees', () => {
+    const rotated = rect({ rotation: 45 });
+    // 50 world units along the rotated long axis is still inside (< 60)
+    const d = 50 / Math.SQRT2;
+    expect(hitTestShapeOverlay(rotated, 100 + d, 100 + d)).toBe(true);
+    // the same distance along the unrotated long axis now falls outside
+    expect(hitTestShapeOverlay(rotated, 150, 100)).toBe(false);
+  });
+
+  it('ignores rotation for circles', () => {
+    const circle = rect({ shape: 'circle', size: 30, rotation: 45 });
+    expect(hitTestShapeOverlay(circle, 125, 100)).toBe(true);
+    expect(hitTestShapeOverlay(circle, 135, 100)).toBe(false);
+  });
+
+  it('treats a legacy square with no half-extents as size on both axes', () => {
+    const legacy = rect({ halfWidth: undefined, halfHeight: undefined });
+    expect(hitTestShapeOverlay(legacy, 155, 155)).toBe(true);
+    expect(hitTestShapeOverlay(legacy, 165, 100)).toBe(false);
+  });
+});
+
+describe('getShapeBoundingHalfExtents', () => {
+  it('returns the half-extents unchanged when unrotated', () => {
+    expect(getShapeBoundingHalfExtents({ shape: 'square', size: 60, halfWidth: 60, halfHeight: 20 }))
+      .toEqual({ halfWidth: 60, halfHeight: 20 });
+  });
+
+  it('swaps them at 90 degrees', () => {
+    const b = getShapeBoundingHalfExtents({ shape: 'square', size: 60, halfWidth: 60, halfHeight: 20, rotation: 90 });
+    expect(b.halfWidth).toBeCloseTo(20, 6);
+    expect(b.halfHeight).toBeCloseTo(60, 6);
+  });
+
+  it('grows the box at 45 degrees', () => {
+    const b = getShapeBoundingHalfExtents({ shape: 'square', size: 60, halfWidth: 60, halfHeight: 20, rotation: 45 });
+    expect(b.halfWidth).toBeCloseTo(80 / Math.SQRT2, 6);
+    expect(b.halfHeight).toBeCloseTo(80 / Math.SQRT2, 6);
+  });
+
+  it('folds in the extra (north) rotation', () => {
+    const b = getShapeBoundingHalfExtents({ shape: 'square', size: 60, halfWidth: 60, halfHeight: 20, rotation: 45 }, 45);
+    expect(b.halfWidth).toBeCloseTo(20, 6);
+    expect(b.halfHeight).toBeCloseTo(60, 6);
+  });
+
+  it('never grows a circle, whatever the rotation', () => {
+    const b = getShapeBoundingHalfExtents({ shape: 'circle', size: 30, rotation: 45 }, 90);
+    expect(b).toEqual({ halfWidth: 30, halfHeight: 30 });
   });
 });

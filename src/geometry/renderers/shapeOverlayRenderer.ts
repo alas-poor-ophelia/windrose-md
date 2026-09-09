@@ -1,11 +1,13 @@
 /**
  * shapeOverlayRenderer.ts
  *
- * Canvas renderer for shape overlays (square/circle).
+ * Canvas renderer for shape overlays (rectangle/circle).
  * Renders smooth geometric shapes in world-space.
  */
 
 import type { ShapeOverlay } from '#types/core/map.types';
+
+import { getShapeHalfExtents } from '../../objects/shapeOverlayOperations';
 
 interface ViewState {
   x: number;
@@ -28,7 +30,6 @@ function renderShapeOverlay(
   if (!shape.visible) return;
 
   const { sx, sy } = worldToScreen(shape.worldPosition.x, shape.worldPosition.y, viewState);
-  const screenSize = shape.size * viewState.zoom;
 
   ctx.save();
   ctx.globalAlpha = shape.opacity;
@@ -37,15 +38,28 @@ function renderShapeOverlay(
   ctx.lineWidth = 2;
 
   if (shape.shape === 'circle') {
+    const screenSize = shape.size * viewState.zoom;
     ctx.beginPath();
     ctx.arc(sx, sy, screenSize, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = Math.min(shape.opacity * 2, 1);
     ctx.stroke();
   } else {
-    ctx.fillRect(sx - screenSize, sy - screenSize, screenSize * 2, screenSize * 2);
+    const { halfWidth, halfHeight } = getShapeHalfExtents(shape);
+    const screenHalfWidth = halfWidth * viewState.zoom;
+    const screenHalfHeight = halfHeight * viewState.zoom;
+    const rotation = shape.rotation ?? 0;
+
+    // Rotate about the shape centre; the surrounding save/restore undoes it
+    if (rotation !== 0) {
+      ctx.translate(sx, sy);
+      ctx.rotate(rotation * Math.PI / 180);
+      ctx.translate(-sx, -sy);
+    }
+
+    ctx.fillRect(sx - screenHalfWidth, sy - screenHalfHeight, screenHalfWidth * 2, screenHalfHeight * 2);
     ctx.globalAlpha = Math.min(shape.opacity * 2, 1);
-    ctx.strokeRect(sx - screenSize, sy - screenSize, screenSize * 2, screenSize * 2);
+    ctx.strokeRect(sx - screenHalfWidth, sy - screenHalfHeight, screenHalfWidth * 2, screenHalfHeight * 2);
   }
 
   ctx.restore();

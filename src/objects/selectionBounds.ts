@@ -10,6 +10,7 @@ import type { MapObject } from '#types/objects/object.types';
 import type { IGeometry } from '#types/core/geometry.types';
 
 import { calculateObjectScreenPosition } from './screenPositionUtils';
+import { getShapeBoundingHalfExtents } from './shapeOverlayOperations';
 import { calculateViewportOffset } from '../geometry/core/BaseGeometry';
 import { getActiveLayer } from '../persistence/layerAccessor';
 
@@ -192,7 +193,11 @@ function getSelectionBounds(
       );
       const screenX = rotated.x;
       const screenY = rotated.y;
-      const screenSize = shape.size * zoom;
+      // The canvas is turned by northDirection, so the card must bound the
+      // shape at its own rotation PLUS north's
+      const bounding = getShapeBoundingHalfExtents(shape, northDirection ?? 0);
+      const screenHalfWidth = bounding.halfWidth * zoom;
+      const screenHalfHeight = bounding.halfHeight * zoom;
       const rect = canvas.getBoundingClientRect();
       const containerRect = containerRef.current.getBoundingClientRect();
       const canvasOffsetX = rect.left - containerRect.left;
@@ -204,10 +209,10 @@ function getSelectionBounds(
       return {
         screenX: screenX * scaleX + canvasOffsetX,
         screenY: screenY * scaleY + canvasOffsetY,
-        left: (screenX - screenSize) * scaleX + canvasOffsetX,
-        top: (screenY - screenSize) * scaleY + canvasOffsetY,
-        width: screenSize * 2 * scaleX,
-        height: screenSize * 2 * scaleY
+        left: (screenX - screenHalfWidth) * scaleX + canvasOffsetX,
+        top: (screenY - screenHalfHeight) * scaleY + canvasOffsetY,
+        width: screenHalfWidth * 2 * scaleX,
+        height: screenHalfHeight * 2 * scaleY
       };
     }
 

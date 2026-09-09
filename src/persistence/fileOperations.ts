@@ -5,7 +5,7 @@
  * Handles loading/saving map data to the Obsidian vault.
  */
 
-import type { MapData, MapLayer, MapType } from '#types/core/map.types';
+import type { MapData, MapLayer, MapType, ShapeOverlay } from '#types/core/map.types';
 import type { WallPath } from '#types/core/wallpath.types';
 import type { App } from 'obsidian';
 import { TFile, Notice } from 'obsidian';
@@ -291,6 +291,19 @@ function sanitizeWallGaps(w: WallPath): void {
   else delete (w as { gaps?: unknown }).gaps;
 }
 
+/**
+ * Backfill a shape overlay's per-axis half-extents. Saves written before 2.4.0
+ * only carry the single `size` half-extent (every rectangle was a square), so
+ * both axes default to it. Rotation is dropped when it is not a finite number.
+ */
+function normalizeShapeOverlays(shapes: ShapeOverlay[]): void {
+  for (const shape of shapes) {
+    if (!Number.isFinite(shape.halfWidth) || (shape.halfWidth as number) <= 0) shape.halfWidth = shape.size;
+    if (!Number.isFinite(shape.halfHeight) || (shape.halfHeight as number) <= 0) shape.halfHeight = shape.size;
+    if (shape.rotation != null && !Number.isFinite(shape.rotation)) delete shape.rotation;
+  }
+}
+
 function migrateMapData(mapData: MapData): MapData {
   mapData.objects ??= [];
   mapData.textLabels ??= [];
@@ -299,6 +312,7 @@ function migrateMapData(mapData: MapData): MapData {
   mapData.regions ??= [];
   mapData.outlines ??= [];
   mapData.shapeOverlays ??= [];
+  normalizeShapeOverlays(mapData.shapeOverlays);
   mapData.partyPins ??= [];
   mapData.savedRoutes ??= [];
   // Legacy measurement route shape (bare waypoint array, pre-terrain)
@@ -442,6 +456,7 @@ function migrateMapData(mapData: MapData): MapData {
         subHex.mapData.regions ??= [];
         subHex.mapData.outlines ??= [];
         subHex.mapData.shapeOverlays ??= [];
+        normalizeShapeOverlays(subHex.mapData.shapeOverlays);
         subHex.mapData.partyPins ??= [];
         // Sub-hex maps get their own implicit board too (Parallax: don't leave
         // sub-hex layers boardless or board filters would drop them).

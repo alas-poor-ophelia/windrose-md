@@ -192,6 +192,7 @@ interface ShapeOverlayHandlers {
   onColorClick: () => void;
   onDelete: () => void;
   onFreeformToggle: () => void;
+  onRotate: () => void;
 }
 
 function buildShapeOverlayActions(
@@ -200,6 +201,11 @@ function buildShapeOverlayActions(
 ): SelectionAction[] {
   const isFreeform = item.data?.freeform === true;
   return [
+    {
+      // Rotation only shows on rectangles — a rotated circle looks identical
+      id: 'rotate', label: 'Rotate', icon: 'lucide-rotate-cw',
+      group: 'transform', visible: item.data?.shape !== 'circle', invoke: handlers.onRotate
+    },
     {
       id: 'freeform', label: isFreeform ? 'Snap to Grid' : 'Freeform',
       icon: 'lucide-diamond', group: 'transform', visible: true,

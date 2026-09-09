@@ -1,8 +1,8 @@
 /**
  * useShapeOverlayTools.ts
  *
- * Hook for placing and managing shape overlays (square/circle).
- * Uses a 2-click placement pattern: squares take two opposite corners,
+ * Hook for placing and managing shape overlays (rectangle/circle).
+ * Uses a 2-click placement pattern: rectangles take two opposite corners,
  * circles take the center and then a point on the edge.
  *
  * Placement snaps to the grid by default (cell centers, whole-cell extents);
@@ -15,7 +15,7 @@ import type { MapData, ShapeOverlay, ShapeOverlayType } from '#types/core/map.ty
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { formatDistance } from '../../drawing/distanceOperations';
-import { snapShapeOverlayToGrid } from '../../objects/shapeOverlayOperations';
+import { snapShapeOverlayToGrid, hitTestShapeOverlay } from '../../objects/shapeOverlayOperations';
 import { useMapSelection } from '../../context/MapSelectionContext';
 
 
@@ -111,7 +111,7 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
   }, [geometry, mapData]);
 
   /**
-   * Turn the two click points into a shape. Squares take opposite corners;
+   * Turn the two click points into a shape. Rectangles take opposite corners;
    * circles take the first click as the center and the second as a point on
    * the edge. Unless placement is freeform, the result is snapped to the grid.
    */
@@ -119,32 +119,41 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
     p1: Point,
     p2: Point,
     freeform: boolean
-  ): { center: Point; size: number; freeform: boolean } | null => {
+  ): { center: Point; halfWidth: number; halfHeight: number; freeform: boolean } | null => {
     let center: Point;
-    let size: number;
+    let halfWidth: number;
+    let halfHeight: number;
 
     if (activeShape === 'square') {
       center = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
-      size = Math.max(Math.abs(p2.x - p1.x), Math.abs(p2.y - p1.y)) / 2;
+      halfWidth = Math.abs(p2.x - p1.x) / 2;
+      halfHeight = Math.abs(p2.y - p1.y) / 2;
     } else {
       const dx = p2.x - p1.x;
       const dy = p2.y - p1.y;
       center = { x: p1.x, y: p1.y };
-      size = Math.sqrt(dx * dx + dy * dy);
+      halfWidth = Math.sqrt(dx * dx + dy * dy);
+      halfHeight = halfWidth;
     }
 
-    // Two clicks in the same spot cancel placement, snapped or not
-    if (size < 1) return null;
+    // Two clicks in the same spot (or on the same row/column, which would give a
+    // zero-area rectangle) cancel placement, snapped or not
+    if (halfWidth < 1 || halfHeight < 1) return null;
 
     if (!freeform) {
       // Snapped placement needs geometry; never fall back to a freeform shape
       // the user did not ask for.
       if (!geometry) return null;
-      const snapped = snapShapeOverlayToGrid({ worldPosition: center, size }, geometry);
-      return { center: snapped.worldPosition, size: snapped.size, freeform: false };
+      const snapped = snapShapeOverlayToGrid({ worldPosition: center, size: halfWidth, halfWidth, halfHeight }, geometry);
+      return {
+        center: snapped.worldPosition,
+        halfWidth: snapped.halfWidth ?? snapped.size,
+        halfHeight: snapped.halfHeight ?? snapped.size,
+        freeform: false
+      };
     }
 
-    return { center, size, freeform: true };
+    return { center, halfWidth, halfHeight, freeform: true };
   }, [activeShape, geometry]);
 
   // The ghost is derived from the committed result, so it shows exactly what
@@ -153,15 +162,16 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
     if (!firstClick || !currentWorldPos) return null;
     const result = computeShapeFromClicks(firstClick, currentWorldPos, isFreeformPlacement);
     if (!result) return null;
-    const { center, size } = result;
+    const { center, halfWidth, halfHeight } = result;
+    const size = Math.max(halfWidth, halfHeight);
     return {
       center,
       currentSize: size,
       shape: activeShape,
-      formattedDistance: sizeToFormattedDistance(activeShape === 'square' ? size * 2 : size),
-      corner1: activeShape === 'square' ? { x: center.x - size, y: center.y - size } : undefined,
-      corner2: activeShape === 'square' ? { x: center.x + size, y: center.y + size } : undefined,
-      circleEdge: activeShape === 'circle' ? { x: center.x + size, y: center.y } : undefined,
+      formattedDistance: sizeToFormattedDistance(activeShape === 'square' ? halfWidth * 2 : halfWidth),
+      corner1: activeShape === 'square' ? { x: center.x - halfWidth, y: center.y - halfHeight } : undefined,
+      corner2: activeShape === 'square' ? { x: center.x + halfWidth, y: center.y + halfHeight } : undefined,
+      circleEdge: activeShape === 'circle' ? { x: center.x + halfWidth, y: center.y } : undefined,
       circleCenter: activeShape === 'circle' ? center : undefined,
       freeform: result.freeform
     };
@@ -189,7 +199,11 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
         id: generateShapeId(),
         shape: activeShape,
         worldPosition: result.center,
-        size: result.size,
+        // `size` stays the circle radius / the larger rectangle half-extent so
+        // pre-2.4.0 builds still draw something sensible
+        size: Math.max(result.halfWidth, result.halfHeight),
+        halfWidth: result.halfWidth,
+        halfHeight: result.halfHeight,
         color: selectedColor,
         opacity: selectedOpacity,
         freeform: result.freeform,
@@ -235,13 +249,7 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
     for (let i = mapData.shapeOverlays.length - 1; i >= 0; i--) {
       const shape = mapData.shapeOverlays[i];
       if (!shape.visible) continue;
-      const dx = worldX - shape.worldPosition.x;
-      const dy = worldY - shape.worldPosition.y;
-      if (shape.shape === 'circle') {
-        if (dx * dx + dy * dy <= shape.size * shape.size) return shape;
-      } else {
-        if (Math.abs(dx) <= shape.size && Math.abs(dy) <= shape.size) return shape;
-      }
+      if (hitTestShapeOverlay(shape, worldX, worldY)) return shape;
     }
     return null;
   }, [mapData?.shapeOverlays]);

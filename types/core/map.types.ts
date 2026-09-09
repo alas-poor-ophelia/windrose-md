@@ -486,7 +486,17 @@ export interface ShapeOverlay {
   id: string;
   shape: ShapeOverlayType;
   worldPosition: Point;
+  /**
+   * Half-extent. Circles use it as the radius; rectangles keep it as the larger
+   * of the two half-extents so builds older than 2.4.0 still draw a square.
+   */
   size: number;
+  /** Rectangle half-width. Absent on pre-2.4.0 saves; load defaults it to `size`. */
+  halfWidth?: number;
+  /** Rectangle half-height. Absent on pre-2.4.0 saves; load defaults it to `size`. */
+  halfHeight?: number;
+  /** Rotation in degrees (45-degree steps). Absent or 0 means unrotated; ignored for circles. */
+  rotation?: number;
   color: string;
   opacity: number;
   freeform: boolean;
