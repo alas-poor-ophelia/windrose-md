@@ -1,5 +1,5 @@
 diff --git a/node_modules/obsidian-testing-framework/lib/index.js b/node_modules/obsidian-testing-framework/lib/index.js
-index 5c02743..f6604bd 100644
+index 5c02743..d1c34e9 100644
 --- a/node_modules/obsidian-testing-framework/lib/index.js
 +++ b/node_modules/obsidian-testing-framework/lib/index.js
 @@ -7,7 +7,8 @@ import { randomBytes } from "crypto";
@@ -37,7 +37,7 @@ index 5c02743..f6604bd 100644
  // @ts-ignore some error about a string type now having `undefined` as part of it's union
  export const test = base.extend({
      electronApp: [
-@@ -70,16 +89,29 @@ export const test = base.extend({
+@@ -70,20 +89,41 @@ export const test = base.extend({
              const vault = inject("vault");
              process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = "true";
              console.log("asar located at:", getExe());
@@ -75,7 +75,19 @@ index 5c02743..f6604bd 100644
              });
              electronApp.on("console", async (msg) => {
                  console.log(...(await Promise.all(msg.args().map((a) => a.jsonValue()))));
-@@ -95,6 +127,35 @@ export const test = base.extend({
+             });
++            // Electron 41+ closes JavaScript dialogs (the beforeunload prompt on
++            // app close) before Playwright's default auto-accept reaches them,
++            // which surfaces as an unhandled 'No dialog is showing' rejection.
++            // Owning the dialog here lets the late protocol error be swallowed.
++            electronApp.context().on("dialog", (dialog) => {
++                console.log("[e2e] dialog:", dialog.type(), dialog.message());
++                dialog.accept().catch(() => { });
++            });
+             await electronApp.firstWindow();
+             await run(electronApp);
+             await electronApp.close();
+@@ -95,6 +135,35 @@ export const test = base.extend({
              // console.log("windows", windows);
              let page = windows[windows.length - 1];
              await page.waitForLoadState("domcontentloaded");
