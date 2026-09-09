@@ -17,13 +17,16 @@ MapCanvas.tsx (orchestrator)
 ├── FreehandLayer.tsx         # Freehand curve drawing
 ├── RegionLayer.tsx           # Named regions
 ├── NotePinLayer.tsx          # Note link indicators
-├── MeasurementLayer.tsx      # Multi-waypoint distance measurement tool
+├── PartyPinLayer.tsx         # Resolves shared Beacon settings once, renders one PartyPinInstance per pin
+├── PartyPinInstance.tsx      # One Beacon: its range query, ring overlay, and controls card when selected
+├── MeasurementLayer.tsx      # Measure tool, terrain picker, automatic segment terrain via useTerrainSampling
 ├── RouteLayer.tsx            # Saved measurement routes (always visible)
 ├── AreaSelectLayer.tsx       # Multi-select rectangle
 ├── HexCoordinateLayer.tsx    # Hex coordinate display
 ├── TilePlacementLayer.tsx    # Tile placement tool
 ├── WallLayer.tsx             # Wall/path strips: draw along polylines, drag-to-bow curves, edit mode
 ├── DiagonalFillOverlay.tsx   # Diagonal fill preview
+├── ShapeOverlayLayer.tsx     # Shape overlay tools and rendering: rectangles/circles, rotate action
 ├── ShapePreviewOverlay.tsx   # Shape tool preview
 ├── SegmentHoverOverlay.tsx   # Segment hover feedback
 ├── SegmentPickerOverlay.tsx  # Segment picker UI

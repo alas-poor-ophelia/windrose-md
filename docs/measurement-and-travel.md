@@ -24,7 +24,7 @@ Finishing a measurement (or its **Save as route** button) converts it into a per
 A **travel pack** is a named bundle of travel rules for an RPG system (say, D&D 5e overland travel). A pack can contain:
 
 - **Custom units** — name, abbreviation, and a conversion factor (a "league" defined in miles, a "hex" defined as six miles).
-- **Terrain types** — each with a speed multiplier (above 1 faster, below 1 slower), a color, and an optional tile tag. The color is pickable from a one-click strip of your own map palette, so a route's segments match the paint they cross without copying hex codes around; the tile tag names the tag a placed tile must carry to count as that terrain. Both are what [automatic categorization](#automatic-categorization) matches against.
+- **Terrain types** — each with a speed multiplier (above 1 faster, below 1 slower), a color, and an optional tile tag. The color is pickable from a one-click strip of your own map palette, so a route's segments match the paint they cross without copying hex codes around; the strip's ellipsis expands to every palette color with labels, plus an **Add color** shortcut that creates a new global palette color, usable everywhere, on the spot. The tile tag names the tag a placed tile must carry to count as that terrain. Both are what [automatic categorization](#automatic-categorization) matches against.
 - **Travel modes** — each with a speed as distance per time (24 miles per 8 hours; 3 hexes per day).
 - **Per-day allowances** — how much travel time counts as one day (8 hours/day forced march vs. 6 hours/day normal).
 
@@ -32,7 +32,7 @@ Packs are created and edited in the **Travel Packs** section of settings, indivi
 
 ## Travel times
 
-With an enabled pack, the measurement readout grows a **Travel** block: a live travel time for each of the map's selected travel modes, updating with the route as you measure. Which modes appear — and which per-day allowance applies — is chosen per map from a collapsible selector in the readout itself, so a world map and a dungeon map keep different clutter. With an allowance selected, times render as whole days plus a remainder (say, "3 days + 2.5 h"). If a mode's time base and the allowance don't line up, the readout says so explicitly rather than showing a wrong number.
+With an enabled pack, the measurement readout grows a **Travel** block: a live travel time for each of the map's selected travel modes, updating with the route as you measure. Which modes appear — and which per-day allowance applies — is chosen per map from a collapsible selector in the readout itself, so a world map and a dungeon map keep different clutter; the day-length selector's last option, "No day length," turns day chunking off entirely. With an allowance selected, times render as whole days plus a remainder (say, "3 days + 2.5 h"). If a mode's time base and the allowance don't line up, the readout says so explicitly rather than showing a wrong number.
 
 ## Per-segment terrain
 

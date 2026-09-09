@@ -50,7 +50,7 @@ The release pipeline (`scripts/release/index.ts`) performs these steps:
 1. **Bump version** (if `--bump` provided) - updates `manifest.json`, `package.json`, `versions.json` atomically
 2. **Check prerequisites** - correct branch, no existing tag, verify gitignore
 3. **Build production** - `npm run build:prod` (esbuild minified + SCSS compilation)
-4. **Run tests** - unit tests always run; E2E optional via `--include-e2e`
+4. **Run tests** - unit tests always run; E2E runs BY DEFAULT (20-30+ min, boots Obsidian) - pass `--skip-e2e` to run unit tests only
 5. **Commit version bump** - only if files changed (manifest.json, package.json, versions.json)
 6. **Tag and push** - creates annotated `X.Y.Z` tag (NO v prefix - the Obsidian store requires the tag to exactly match the manifest.json version), pushes branch + tag to origin
 7. **Verify release** - polls GitHub for release with correct assets (main.js, styles.css, manifest.json)
@@ -77,7 +77,7 @@ git push origin main
 
 | Flag | Effect |
 |------|--------|
-| `--dry-run` | Build + test only, no commit/tag/push |
+| `--dry-run` | Build + test only, no commit/tag/push (NOTE: `--bump` still writes the version files under `--dry-run`) |
 | `--bump X.Y.Z` | Bump version in manifest.json, package.json, versions.json before building |
 | `--skip-tests` | Skip the test step entirely |
 | `--skip-e2e` | Skip E2E tests (unit tests only) |
@@ -91,7 +91,7 @@ git push origin main
 
 The workflow:
 1. Checks out the tagged commit
-2. Installs dependencies (`npm ci`)
+2. Installs dependencies (`bun install --frozen-lockfile`; bun.lock is the single lockfile)
 3. Builds production bundle (`npm run build:prod`)
 4. Verifies `main.js`, `styles.css`, `manifest.json` exist
 5. Creates a GitHub Release with those three files attached

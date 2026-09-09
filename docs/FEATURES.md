@@ -9,7 +9,7 @@ The plugin has a rich settings menu, offering many global defaults and customiza
 Windrose registers a handful of global commands, available from Obsidian's command palette:
 
 - **Insert map** — creates a new `windrose-map` code block in the current note.
-- **Generate random dungeon** — opens the dungeon generator.
+- **Generate random dungeon** — opens the dungeon generator and inserts the result as a code block.
 - **Open map in full pane** — opens a map in a dedicated workspace tab.
 
 Additional commands (telemetry, map picker, etc.) may appear depending on enabled features.
@@ -155,7 +155,7 @@ Map Settings is a modal opened from the Map Controls. Its settings affect only t
 - Remember the **drawer** open/closed state.
 - Remember the **expanded** state.
 - Keep **map controls** always open, versus showing them on hover.
-- **Export** the map as a PNG to your vault — captures the entire currently visible layer, including the background image and any peeking layers.
+- **Export** the map as a PNG to your vault. The export dialog lets you pick exactly what lands in the image: choose which layers to include and set each one's opacity, and toggle the grid, objects, text labels, and (on hex maps) regions and outlines. Toggles start from whatever the map is currently showing. The image is sized from the content of the selected layers plus a small margin; routes and the Beacon are never drawn into the export.
 
 ## Global Settings
 The plugin's settings page is a single scrolling page of collapsible sections. Some sections only appear when their feature is enabled:
@@ -362,16 +362,20 @@ Selecting a label with the Select tool lets you drag it to reposition, and:
 A **note pin** (requires the *Note pins* feature) links a spot on the map directly to a vault note and displays as a pin icon. It's a lighter-weight alternative to an object for when the note *is* the point of interest. Pin color and icon are configurable.
 
 ## The Beacon
-The **Beacon** is a movable position marker with a **range**. It tracks anything that has a location and a reach — the party is the common case, but a rival faction, an advancing army, or a spreading storm work identically. Wherever it stands, it continuously answers *"what's within reach of this point?"* — visually on the canvas, interactively in a results list, and optionally as a generated note in your vault. One Beacon per map.
+The **Beacon** is a movable position marker with a **range**. It tracks anything that has a location and a reach — the party is the common case, but a rival faction, an advancing army, or a spreading storm work identically. Wherever it stands, it continuously answers *"what's within reach of this point?"* — visually on the canvas, interactively in a results list, and optionally as a generated note in your vault. A map can hold as many Beacons as you like, each with its own range, filters, and note.
 
-### Placing the Beacon
-The Beacon shares the pin tool group in the palette with note pins — long-press (or right-click) the pin button and choose **Beacon**. Click a cell to place it (it snaps to the grid, square or hex); drag it to move it, and the range ring follows live.
+### Placing Beacons
+The Beacon shares the pin tool group in the palette with note pins — long-press (or right-click) the pin button and choose **Beacon**. Click an empty cell to place a Beacon there (it snaps to the grid, square or hex); every click on empty ground places another one. The first Beacon is labeled "The Party" in the default color; each one after that gets its own numbered label ("Beacon 2," "Beacon 3," ...) and a distinct color, so a glance at the canvas tells them apart. Clicking a Beacon selects it instead of placing a new one, and dragging it moves it, range ring following live. Two Beacons never share a cell.
+
+The selected Beacon is the one whose card is on screen. With the select tool, clicking a Beacon selects it too, so you can adjust one without leaving the tool you were using.
 
 ### The Range Ring
 The Beacon's range is set in the map's configured distance units — the same per-cell distance and unit the measure tool uses, so no calibration is ever needed. The ring renders whenever the Beacon exists, in either of two styles:
 
 - **Circle** — a clean geometric ring at the range radius.
 - **Cells** — a highlight of the actual cells within range under the map's distance rules (diagonal rule on square grids, true hex distance on hex maps). On a hex map this is the classic hex-crawl "range bloom."
+
+Every Beacon draws its own ring, in its own color, and answers its own range query — overlapping rings simply overlap.
 
 Markers currently in range get a subtle glow on the canvas, so "what's in reach" reads at a glance.
 
@@ -402,12 +406,12 @@ Scoping and filters, per Beacon:
 Each Beacon can expand its results with **related notes**: **off**, **by tags** (other vault notes sharing an in-range note's tags), or **by backlinks** (notes that link to an in-range note). Related lists are capped per entry with an explicit "+N more" overflow.
 
 ### The Beacon Note
-Optionally, the Beacon can generate a **beacon note** — a markdown note in a vault folder you choose, holding the current nearby results as a table of note links with distances (and travel times, when configured). Updates are debounced and change-detected: if the results didn't change, the file isn't rewritten. The note carries an ownership marker, so Windrose will never overwrite a note it didn't generate; a manually deleted beacon note is recreated on the next update; and removing the Beacon offers to delete its note (the Beacon is removed either way).
+Optionally, the Beacon can generate a **beacon note** — a markdown note in a vault folder you choose, holding the current nearby results as a table of note links with distances (and travel times, when configured). Updates are debounced and change-detected: if the results didn't change, the file isn't rewritten. The note carries an ownership marker, so Windrose will never overwrite a note it didn't generate; a manually deleted beacon note is recreated on the next update; and removing a Beacon offers to delete its note (the Beacon is removed either way). Each Beacon owns its own note, so several Beacons on one map generate several notes.
 
 ## Shape Overlays
-**Shape overlays** (requires the *Shape overlays* feature) place decorative shapes — squares and circles — on the map for annotation and embellishment, independent of the painted grid.
+**Shape overlays** (requires the *Shape overlays* feature) place decorative shapes — rectangles and circles — on the map for annotation and embellishment, independent of the painted grid.
 
-Placing a square is corner to corner. A circle is placed center first, then a second click sets the edge, matching the Fill Circle tool. Placement snaps to the grid by default; hold **Alt+Shift**, or switch on **freeform placement mode**, to place freely instead. Selecting a placed shape shows a **Snap to Grid**/freeform toggle that converts it between the two.
+Placing a rectangle is corner to corner, so it can be any proportion, square included. A circle is placed center first, then a second click sets the edge, matching the Fill Circle tool. Placement snaps to the grid by default; hold **Alt+Shift**, or switch on **freeform placement mode**, to place freely instead. Selecting a placed shape shows a **Snap to Grid**/freeform toggle that converts it between the two, and a selected rectangle also gets a **Rotate** action that turns it in 45-degree steps around its center.
 
 ## Measurement, Routes, and Travel
 The **Measure Distance** tool (requires the *Distance measurement* feature) measures **multi-waypoint routes**, not just single segments — and with [travel packs](#travel-packs), it turns distance into travel time.
@@ -418,23 +422,28 @@ Each click (or tap) adds a waypoint; the route renders as a connected path on th
 While measuring, **Backspace** removes the last waypoint and **Escape** clears the route. An in-progress route persists with the map, so a half-measured hex crawl survives closing and reopening the view. **Double-click** the end cell (double-tap on touch) or press **Enter** to finish the route by saving it.
 
 ### Saved Routes
-Finishing a measurement (or its **Save as route** button) converts it into a permanent, styled path on the map, with a name, color, width, and an optional distance label — labels stay hidden until you hover (or tap, on touch). While the measure tool is active, clicking a saved route opens a menu to **edit** its name and style or **delete** it; saving, editing, and deleting all participate in undo history. A **saved routes** toggle in the Visibility controls shows or hides them all.
+Finishing a measurement (or its **Save as route** button) converts it into a permanent, styled path on the map, with a name, color, width, and an optional distance label — labels stay hidden until you hover (or tap, on touch). While the measure tool is active, clicking a saved route opens a menu to **edit** its name and style, **recategorize** its terrain from the map, or **delete** it; saving, editing, and deleting all participate in undo history. A **saved routes** toggle in the Visibility controls shows or hides them all.
 
 ### Travel Packs
 A **travel pack** is a named bundle of travel rules for an RPG system (say, D&D 5e overland travel). A pack can contain:
 
 - **Custom units** — name, abbreviation, and a conversion factor (a "league" defined in miles, a "hex" defined as six miles).
-- **Terrain types** — each with a speed multiplier (above 1 faster, below 1 slower).
+- **Terrain types** — each with a speed multiplier (above 1 faster, below 1 slower), a color, and an optional tile tag. The color is pickable from a one-click strip of your own map palette, so a route's segments match the paint they cross without copying hex codes around; the tile tag names the tag a placed tile must carry to count as that terrain. Both are what [automatic categorization](#automatic-categorization) matches against.
 - **Travel modes** — each with a speed as distance per time (24 miles per 8 hours; 3 hexes per day).
 - **Per-day allowances** — how much travel time counts as one day (8 hours/day forced march vs. 6 hours/day normal).
 
 Packs are created and edited in the **Travel Packs** section of settings, individually enabled or disabled (only enabled packs surface in map UI), and exportable and importable as files. They're also distributed as [content packs](#content-packs) for one-click install. Custom units from enabled packs are selectable as a map's distance unit — globally or per map — so a hex-crawl map can display "hexes" everywhere.
 
 ### Travel Times
-With an enabled pack, the measurement readout grows a **Travel** block: a live travel time for each of the map's selected travel modes, updating with the route as you measure. Which modes appear — and which per-day allowance applies — is chosen per map from a collapsible selector in the readout itself, so a world map and a dungeon map keep different clutter. With an allowance selected, times render as whole days plus a remainder (say, "3 days + 2.5 h"). If a mode's time base and the allowance don't line up, the readout says so explicitly rather than showing a wrong number.
+With an enabled pack, the measurement readout grows a **Travel** block: a live travel time for each of the map's selected travel modes, updating with the route as you measure. Which modes appear — and which per-day allowance applies — is chosen per map from a collapsible selector in the readout itself, so a world map and a dungeon map keep different clutter; the allowance selector always sorts its **No day length** option last, so turning day chunking off is never the default choice. With an allowance selected, times render as whole days plus a remainder (say, "3 days + 2.5 h"). If a mode's time base and the allowance don't line up, the readout says so explicitly rather than showing a wrong number.
 
 ### Per-Segment Terrain
-With a pack enabled, each route segment can be assigned a **terrain**: click a segment and pick from a popup anchored right at the segment. A segment's effective speed is the travel mode's speed times the terrain's multiplier; unassigned segments travel at plain mode speed. Terrain assignments are preserved when the route is saved.
+With a pack enabled, each route segment can be assigned a **terrain**: click a segment and pick from a popup anchored right at the segment. Pick again to change it, or use the popup's **Clear** button to unassign it. A segment's effective speed is the travel mode's speed times the terrain's multiplier; unassigned segments travel at plain mode speed. Terrain assignments are preserved when the route is saved.
+
+### Automatic Categorization
+You rarely have to assign anything by hand. As each waypoint lands, Windrose reads the map underneath the new segment and categorizes it for you: a cell whose paint color matches a terrain's color counts as a vote for that terrain, as does a cell holding a tile that carries the terrain's tile tag (tiles win over paint on the same cell). The majority of the cells along the segment decides, and a segment that crosses nothing recognizable simply keeps the terrain it inherited. Only terrains that define a color or a tile tag can be matched — a pack whose terrains define neither behaves exactly as it did before.
+
+Anything you pick by hand is left alone from then on: the automatic pass never overwrites a hand-picked segment. When you *want* a clean sweep — you repainted the region, or edited the pack's colors — use **Recategorize terrain**: the wand button in the measurement readout re-samples the in-progress route, and the same item in a saved route's right-click menu re-samples that route. That command is explicit, so it does overwrite hand-picked segments too.
 
 ## Note Linking and Deeplinking
 ### Linking from Map to Notes
@@ -497,7 +506,7 @@ The current viewport can be **locked** as the frame's default view, fixing which
 Frame dimensions are set in settings, with separate desktop and mobile values for height and width, and per-map overrides in [Map Settings](#appearance). Width is optional: left unset, the frame spans the note's content column; set narrower, the frame is that width and is centered in the column. Width is capped at the column width, so a value wider than the column has no effect.
 
 # Random Dungeons
-Windrose can **generate random dungeon layouts** (grid maps only) via the **Generate random dungeon** command (Ctrl/Cmd+P, or swipe down from the top on mobile). This works from a note in edit mode. (Requires the *Dungeon generator* feature.)
+Windrose can **generate random dungeon layouts** (grid maps only) via the **Generate random dungeon** command (Ctrl/Cmd+P, or swipe down from the top on mobile), which works from a note in edit mode and inserts the new map as a code block. In the full-pane map view, the die button beside the create-new-map control opens the same generator, saves the result as a new map, and switches to it. (Requires the *Dungeon generator* feature.)
 
 The generation is pure procedural math and graph work — no AI is involved; the animation you watch is an approximation of the algorithm at work. Generated dungeons come with doors and an entrance/exit staircase, and can optionally be stocked with other content.
 
