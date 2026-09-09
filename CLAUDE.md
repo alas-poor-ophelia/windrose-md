@@ -10,7 +10,8 @@
 **Single-repo standalone structure:**
 - `src/` is a **real, tracked directory** in this repo (≈264 source files) — the actual plugin source. It is **NOT a symlink**; the source was migrated out of the Obsidian vault into the repo (single-repo unification).
 - Build here; `npm run deploy` copies `main.js`/`styles.css`/`manifest.json` into the vault plugin folder for live testing.
-- An old copy still exists at `C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker` as a **preserved backup, pending deletion** — it is stale; do not read or edit it.
+- An old source copy is archived at `C:\Users\whipl\OneDrive\Documents\MiniSheet Dev\_windrose-dev\Projects-dungeon-map-tracker-backup` — stale; do not read or edit it.
+- **Dev/test vault is `MiniSheet Dev`** (`C:\Users\whipl\OneDrive\Documents\MiniSheet Dev`) as of 2026-08-25: deploy, MCP, dev-loop, telemetry dumps and test maps all live there. `Absalom` is a play vault (prod build, curated campaign maps only) — never deploy dev builds or write test data into it.
 
 ## Structure
 

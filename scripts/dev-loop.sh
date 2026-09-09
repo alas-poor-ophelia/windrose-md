@@ -10,8 +10,8 @@
 set -euo pipefail
 
 OBSIDIAN_CLI="$LOCALAPPDATA/Programs/obsidian/Obsidian.com"
-VAULT="Absalom"
-PLUGIN_ID="dungeon-map-tracker-settings"
+VAULT="MiniSheet Dev"
+PLUGIN_ID="windrose-md"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SCREENSHOT_DIR="$PROJECT_ROOT/tests/e2e/screenshots"

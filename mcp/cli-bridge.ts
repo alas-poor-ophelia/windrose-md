@@ -46,7 +46,7 @@ const OBSIDIAN_CLI = path.join(
   "Obsidian.com"
 );
 
-const VAULT = "Absalom";
+const VAULT = "MiniSheet Dev";
 // Current plugin id. The legacy "dungeon-map-tracker-settings" id left
 // windrose_reload targeting a non-existent plugin, which forced callers to
 // hand-roll a raw disablePlugin/enablePlugin via windrose_eval — and a raw

@@ -15,7 +15,7 @@ async function main() {
     // Launch Obsidian with debugging flag
     obsidianProcess = spawn(
       OBSIDIAN_PATH,
-      [`--remote-debugging-port=${DEBUG_PORT}`, "obsidian://open?vault=Absalom"],
+      [`--remote-debugging-port=${DEBUG_PORT}`, "obsidian://open?vault=MiniSheet%20Dev"],
       {
         stdio: ["ignore", "pipe", "pipe"],
         detached: false,

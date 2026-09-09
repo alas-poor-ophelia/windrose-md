@@ -7,7 +7,7 @@ description: Perform thorough code review of staged changes in the src directory
 
 Performs a principal-level code review of staged changes in the **source repo** (the Obsidian vault).
 
-**Important:** `src/` is a symlink to `C:\Users\whipl\OneDrive\Documents\Absalom\Projects\dungeon-map-tracker`. Changes must be staged *there* (not in the dev harness at `C:\Dev\windrose`). The `git diff` below operates on the source repo's staging area.
+**Important:** `src/` is a real tracked directory in this repo (single-repo unification; no symlink). Stage and diff here in `C:\Dev\windrose`.
 
 ## Instructions
 

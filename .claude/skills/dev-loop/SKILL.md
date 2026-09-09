@@ -50,7 +50,7 @@ If you're changing settings-plugin source (anything in `src/settingsplugin/`):
 
 1. Bump `PACKAGED_PLUGIN_VERSION` in `src/components/settings/SettingsPluginInstaller.tsx`
 2. Recompile (`dev-loop.sh`)
-3. Reload Obsidian: `"$OBSIDIAN_CLI" "vault=Absalom" command "id=app:reload"` (plain `plugin:reload` is not enough — the main.js is a fresh file on disk)
+3. Reload Obsidian: `"$OBSIDIAN_CLI" "vault=MiniSheet Dev" command "id=app:reload"` (plain `plugin:reload` is not enough — the main.js is a fresh file on disk)
 4. Eval-click the Update button (see cookbook below)
 
 **Always static-verify** before debugging behavior: `adapter.read` the plugin main.js and `indexOf` your new symbol. If it's absent, no amount of runtime debugging will help — the running binary is stale.
@@ -61,7 +61,7 @@ All eval/command/screenshot calls use this shape:
 
 ```bash
 OBSIDIAN_CLI="$LOCALAPPDATA/Programs/obsidian/Obsidian.com"
-"$OBSIDIAN_CLI" "vault=Absalom" <subcommand> <args>
+"$OBSIDIAN_CLI" "vault=MiniSheet Dev" <subcommand> <args>
 ```
 
 Subcommands: `eval "code=..."`, `command "id=..."`, `dev:screenshot "path=..."`, `dev:errors`, `plugin:reload "id=..."`, `open "path=..."`, `version`.
@@ -72,44 +72,44 @@ Paste-ready snippets for common probes. Each is one line (the CLI rejects multi-
 
 ### Static verify: did my new symbol reach the running file?
 ```bash
-"$OBSIDIAN_CLI" "vault=Absalom" eval "code=(async () => { const c = await app.vault.adapter.read('.obsidian/plugins/dungeon-map-tracker-settings/main.js'); return { len: c.length, hasSymbol: c.indexOf('MyNewThing') >= 0 }; })()"
+"$OBSIDIAN_CLI" "vault=MiniSheet Dev" eval "code=(async () => { const c = await app.vault.adapter.read('.obsidian/plugins/dungeon-map-tracker-settings/main.js'); return { len: c.length, hasSymbol: c.indexOf('MyNewThing') >= 0 }; })()"
 ```
 
 ### Workspace state: what view, what mode, what file?
 ```bash
-"$OBSIDIAN_CLI" "vault=Absalom" eval "code=(() => { const v = app.workspace.getActiveViewOfType(window.__windrose.obsidian.MarkdownView); return { mode: v?.getMode?.(), path: v?.file?.path }; })()"
+"$OBSIDIAN_CLI" "vault=MiniSheet Dev" eval "code=(() => { const v = app.workspace.getActiveViewOfType(window.__windrose.obsidian.MarkdownView); return { mode: v?.getMode?.(), path: v?.file?.path }; })()"
 ```
 
 ### Bridge state: is my plugin loaded, is its API exposed?
 ```bash
-"$OBSIDIAN_CLI" "vault=Absalom" eval "code=({ bridge: !!window.__windrose?.ready, version: window.__windrose?.version, apis: Object.keys(window.__windrose || {}) })"
+"$OBSIDIAN_CLI" "vault=MiniSheet Dev" eval "code=({ bridge: !!window.__windrose?.ready, version: window.__windrose?.version, apis: Object.keys(window.__windrose || {}) })"
 ```
 
 ### DOM query: find elements by text content
 ```bash
-"$OBSIDIAN_CLI" "vault=Absalom" eval "code=Array.from(document.querySelectorAll('.cm-link')).filter(el => /MyTarget/.test(el.textContent || '')).map(el => ({ text: el.textContent, rect: el.getBoundingClientRect().toJSON() }))"
+"$OBSIDIAN_CLI" "vault=MiniSheet Dev" eval "code=Array.from(document.querySelectorAll('.cm-link')).filter(el => /MyTarget/.test(el.textContent || '')).map(el => ({ text: el.textContent, rect: el.getBoundingClientRect().toJSON() }))"
 ```
 
 ### Simulated event: trigger a handler without real input
 ```bash
-"$OBSIDIAN_CLI" "vault=Absalom" eval "code=(() => { const el = document.querySelector('.my-target'); const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: r.left+5, clientY: r.top+5, view: window })); return 'dispatched'; })()"
+"$OBSIDIAN_CLI" "vault=MiniSheet Dev" eval "code=(() => { const el = document.querySelector('.my-target'); const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: r.left+5, clientY: r.top+5, view: window })); return 'dispatched'; })()"
 ```
 
 ### Bypass test: call the leaf API directly (the highest-leverage debug move)
 ```bash
-"$OBSIDIAN_CLI" "vault=Absalom" eval "code=(async () => { const div = document.body.appendChild(document.createElement('div')); div.style.cssText='position:fixed;top:100px;left:100px;z-index:9999;background:white;border:1px solid red;'; await window.__windrose.renderPreview(div, { mapId: 'my-map', cellX: 5, cellY: 5 }); return 'rendered'; })()"
+"$OBSIDIAN_CLI" "vault=MiniSheet Dev" eval "code=(async () => { const div = document.body.appendChild(document.createElement('div')); div.style.cssText='position:fixed;top:100px;left:100px;z-index:9999;background:white;border:1px solid red;'; await window.__windrose.renderPreview(div, { mapId: 'my-map', cellX: 5, cellY: 5 }); return 'rendered'; })()"
 ```
 
 When integration is broken and you don't know whether the fault is in the plumbing or the leaf, **call the leaf directly**. If it works, everything failing is plumbing. If it doesn't, the leaf is broken. One probe, half the hypothesis space eliminated.
 
 ### Simulated click on an in-UI button
 ```bash
-"$OBSIDIAN_CLI" "vault=Absalom" eval "code=(() => { const btn = Array.from(document.querySelectorAll('button')).find(b => /Update/i.test(b.textContent || '')); btn?.click(); return btn ? 'clicked' : 'not found'; })()"
+"$OBSIDIAN_CLI" "vault=MiniSheet Dev" eval "code=(() => { const btn = Array.from(document.querySelectorAll('button')).find(b => /Update/i.test(b.textContent || '')); btn?.click(); return btn ? 'clicked' : 'not found'; })()"
 ```
 
 ### Reload Obsidian (survives the reload — eval context would die mid-call)
 ```bash
-"$OBSIDIAN_CLI" "vault=Absalom" command "id=app:reload"
+"$OBSIDIAN_CLI" "vault=MiniSheet Dev" command "id=app:reload"
 sleep 8
 ```
 
@@ -117,7 +117,7 @@ Use `app:reload` when `plugin:reload` is insufficient (e.g. main.js on disk chan
 
 ### Grep the vault for a string
 ```bash
-"$OBSIDIAN_CLI" "vault=Absalom" eval "code=(async () => { const files = app.vault.getMarkdownFiles(); const hits = []; for (const f of files) { const c = await app.vault.cachedRead(f); if (c.includes('windrose:')) hits.push(f.path); } return hits.slice(0, 20); })()"
+"$OBSIDIAN_CLI" "vault=MiniSheet Dev" eval "code=(async () => { const files = app.vault.getMarkdownFiles(); const hits = []; for (const f of files) { const c = await app.vault.cachedRead(f); if (c.includes('windrose:')) hits.push(f.path); } return hits.slice(0, 20); })()"
 ```
 
 ## Iteration Discipline
