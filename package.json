@@ -68,10 +68,9 @@
     "minimatch": "^10.2.6",
     "picomatch": "^4.0.5"
   },
-  "//overrides": "Security pins for transitive dev/test tooling flagged by the Obsidian store dependency scan. None of these ship in main.js (esbuild externalizes obsidian/electron/codemirror; the mermaid subtree comes from obsidian-typings for type annotations only and is never imported at runtime). preact is the sole runtime-bundled package and is pinned separately in devDependencies.",
+  "//overrides": "brace-expansion is deliberately NOT overridden: minimatch 3.x/8.x/9.x (eslint, glob, asar) can only load the 1.x/2.x lines, and the patched 1.1.12+/2.0.2+ releases are advisory-clean, so each minimatch resolves its own compatible copy. Security pins for transitive dev/test tooling flagged by the Obsidian store dependency scan. None of these ship in main.js (esbuild externalizes obsidian/electron/codemirror; the mermaid subtree comes from obsidian-typings for type annotations only and is never imported at runtime). preact is the sole runtime-bundled package and is pinned separately in devDependencies.",
   "overrides": {
     "esbuild": "^0.28.1",
-    "brace-expansion": "^5.0.9",
     "mermaid": "^11.16.0",
     "dompurify": "^3.4.11",
     "uuid": "^11.1.1",
