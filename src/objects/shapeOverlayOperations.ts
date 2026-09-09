@@ -7,9 +7,15 @@
  * swapping to a second, cell-based representation.
  *
  * Snapping rules (shared by the freeform toggle and by placement):
- * - the anchor moves to the centre of the cell that contains it
  * - each full extent (the rectangle's side, the circle's diameter) becomes a
  * whole number of cells, never fewer than one
+ * - on grid maps, the anchor snaps PER AXIS: an axis whose snapped extent is
+ * an odd number of cells anchors to that axis's cell centre; an even number
+ * of cells anchors to the nearest grid line (a cell corner), since an
+ * even-cell extent centred on a cell centre would otherwise land its edges
+ * half a cell off the grid
+ * - hex maps have no square grid lines to align to, so the anchor always
+ * snaps to the containing hex's centre on both axes
  *
  * Everything goes through IGeometry, so grid and hex maps both work.
  */
@@ -48,17 +54,35 @@ function getCellWorldSize(geometry: IGeometry): number {
 }
 
 /**
+ * Number of whole cells a full extent (2x the half-extent) snaps to.
+ * Minimum one cell, so a snapped shape is always visible.
+ */
+function cellsForHalfExtent(halfExtent: number, cellWorldSize: number): number {
+  return Math.max(1, Math.round((halfExtent * 2) / cellWorldSize));
+}
+
+/**
  * Round a half-extent so the full extent spans a whole number of cells.
  * Minimum one cell, so a snapped shape is always visible.
  */
 function snapSizeToWholeCells(size: number, cellWorldSize: number): number {
-  const cells = Math.max(1, Math.round((size * 2) / cellWorldSize));
+  const cells = cellsForHalfExtent(size, cellWorldSize);
   return (cells * cellWorldSize) / 2;
 }
 
 /**
- * Snap a shape overlay's geometry to the grid: anchor to the containing
- * cell's centre, full extent to a whole number of cells.
+ * Nearest grid line to a world coordinate, i.e. the corner shared by
+ * adjacent cells along that axis. Grid-only: hex has no square grid lines.
+ */
+function snapToCellCorner(worldCoord: number, cellWorldSize: number): number {
+  return Math.round(worldCoord / cellWorldSize) * cellWorldSize;
+}
+
+/**
+ * Snap a shape overlay's geometry to the grid: full extent to a whole
+ * number of cells per axis, anchor snapped per axis (cell centre for an odd
+ * cell count, cell corner/grid line for an even one on grid maps; hex maps
+ * always anchor to the containing hex's centre).
  *
  * @param shape - Current world position and half-extent
  * @param geometry - Grid or hex geometry for the map
@@ -66,14 +90,24 @@ function snapSizeToWholeCells(size: number, cellWorldSize: number): number {
  */
 function snapShapeOverlayToGrid(shape: ShapeOverlayGeometry, geometry: IGeometry): ShapeOverlayGeometry {
   const cellWorldSize = getCellWorldSize(geometry);
-  const cell = geometry.worldToGrid(shape.worldPosition.x, shape.worldPosition.y);
+  const { x: worldX, y: worldY } = shape.worldPosition;
+  const cell = geometry.worldToGrid(worldX, worldY);
   const center = geometry.getCellCenter(cell.x, cell.y);
   const { halfWidth, halfHeight } = getShapeHalfExtents(shape);
-  const snappedHalfWidth = snapSizeToWholeCells(halfWidth, cellWorldSize);
-  const snappedHalfHeight = snapSizeToWholeCells(halfHeight, cellWorldSize);
+  const cellsX = cellsForHalfExtent(halfWidth, cellWorldSize);
+  const cellsY = cellsForHalfExtent(halfHeight, cellWorldSize);
+  const snappedHalfWidth = (cellsX * cellWorldSize) / 2;
+  const snappedHalfHeight = (cellsY * cellWorldSize) / 2;
+
+  let anchorX = center.worldX;
+  let anchorY = center.worldY;
+  if (geometry.type !== 'hex') {
+    anchorX = cellsX % 2 === 0 ? snapToCellCorner(worldX, cellWorldSize) : center.worldX;
+    anchorY = cellsY % 2 === 0 ? snapToCellCorner(worldY, cellWorldSize) : center.worldY;
+  }
 
   return {
-    worldPosition: { x: center.worldX, y: center.worldY },
+    worldPosition: { x: anchorX, y: anchorY },
     // `size` stays the larger half-extent so older builds draw a sane square
     size: Math.max(snappedHalfWidth, snappedHalfHeight),
     halfWidth: snappedHalfWidth,

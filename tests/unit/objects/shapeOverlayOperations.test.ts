@@ -55,10 +55,11 @@ describe('snapSizeToWholeCells', () => {
 });
 
 describe('snapShapeOverlayToGrid (grid geometry)', () => {
-  it('moves the anchor to the containing cell centre', () => {
+  it('moves the anchor to the containing cell corner when the extent is an even number of cells', () => {
+    // size 30 -> half-extent both axes -> full extent 60 -> 1.875 cells -> 2 cells (even)
     const result = snapShapeOverlayToGrid({ worldPosition: { x: 70, y: 10 }, size: 30 }, grid);
-    // (70, 10) is in cell (2, 0); centre is (2.5 * 32, 0.5 * 32)
-    expect(result.worldPosition).toEqual({ x: 80, y: 16 });
+    // even cell count anchors to the nearest grid line, not the cell centre
+    expect(result.worldPosition).toEqual({ x: 64, y: 0 });
   });
 
   it('quantises the size so the full extent spans whole cells', () => {
@@ -164,6 +165,64 @@ describe('snapShapeOverlayToGrid (rectangles)', () => {
       grid
     );
     expect(result.size).toBe(64);
+  });
+});
+
+describe('snapShapeOverlayToGrid (per-axis anchor parity)', () => {
+  it('anchors a 4x2 rectangle (both axes even) to grid-line corners, not cell centres', () => {
+    // halfWidth 60 -> full extent 120 -> 3.75 cells -> 4 cells (even)
+    // halfHeight 30 -> full extent 60 -> 1.875 cells -> 2 cells (even)
+    const result = snapShapeOverlayToGrid(
+      { worldPosition: { x: 500, y: 310 }, size: 60, halfWidth: 60, halfHeight: 30 },
+      grid
+    );
+    expect(result.worldPosition).toEqual({ x: 512, y: 320 });
+    expect(result.halfWidth).toBe(64);
+    expect(result.halfHeight).toBe(32);
+  });
+
+  it('anchors a 3x1 rectangle (both axes odd) to cell centres', () => {
+    // halfWidth 45 -> full extent 90 -> 2.8125 cells -> 3 cells (odd)
+    // halfHeight 15 -> full extent 30 -> 0.9375 cells -> 1 cell (odd)
+    const result = snapShapeOverlayToGrid(
+      { worldPosition: { x: 70, y: 10 }, size: 45, halfWidth: 45, halfHeight: 15 },
+      grid
+    );
+    // (70, 10) is in cell (2, 0); centre is (2.5 * 32, 0.5 * 32)
+    expect(result.worldPosition).toEqual({ x: 80, y: 16 });
+    expect(result.halfWidth).toBe(48);
+    expect(result.halfHeight).toBe(16);
+  });
+
+  it('anchors a 2x2 square (both axes even) to a grid-line corner', () => {
+    // size 30 on both axes -> full extent 60 -> 1.875 cells -> 2 cells (even)
+    const result = snapShapeOverlayToGrid({ worldPosition: { x: 70, y: 10 }, size: 30 }, grid);
+    expect(result.worldPosition).toEqual({ x: 64, y: 0 });
+  });
+
+  it('snaps mixed parity per axis: even width to a grid line, odd height to a cell centre', () => {
+    // halfWidth 60 -> 4 cells (even); halfHeight 15 -> 1 cell (odd)
+    const result = snapShapeOverlayToGrid(
+      { worldPosition: { x: 500, y: 10 }, size: 60, halfWidth: 60, halfHeight: 15 },
+      grid
+    );
+    // x snaps to the grid line at round(500/32)*32 = 512
+    // y snaps to the centre of the cell containing y=10, i.e. cell 0 -> 16
+    expect(result.worldPosition).toEqual({ x: 512, y: 16 });
+  });
+
+  it('leaves hex anchoring unchanged (always the containing hex centre) regardless of cell-count parity', () => {
+    const start = { x: 133, y: 71 };
+    const cell = hex.worldToGrid(start.x, start.y);
+    const centre = hex.getCellCenter(cell.x, cell.y);
+    // full extent 110 -> 2.75 hex -> 3 hex (odd)
+    const odd = snapShapeOverlayToGrid({ worldPosition: start, size: 55 }, hex);
+    expect(odd.worldPosition.x).toBeCloseTo(centre.worldX, 6);
+    expect(odd.worldPosition.y).toBeCloseTo(centre.worldY, 6);
+    // full extent 80 -> 2 hex (even) -- still anchors to the hex centre, no grid-line concept on hex
+    const even = snapShapeOverlayToGrid({ worldPosition: start, size: 40 }, hex);
+    expect(even.worldPosition.x).toBeCloseTo(centre.worldX, 6);
+    expect(even.worldPosition.y).toBeCloseTo(centre.worldY, 6);
   });
 });
 
