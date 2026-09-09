@@ -574,6 +574,14 @@ export interface PartyPin {
 export interface MeasurementRoute {
   points: Point[];
   segmentTerrains: (string | null)[];
+  /**
+   * Per-segment "this terrain was assigned automatically" flag, parallel to
+   * segmentTerrains. True = written by the terrain sampler and safe to
+   * overwrite on a re-sample; false/undefined = the user picked (or cleared)
+   * it by hand and automatic categorization must leave it alone. Absent
+   * array = every segment is manual-or-empty (pre-2.4.0 saves).
+   */
+  segmentTerrainAuto?: boolean[];
 }
 
 /**
@@ -604,6 +612,11 @@ export interface SavedRoute {
   showLabel: boolean;
   /** Terrain id per segment (index i = points[i] → points[i+1]); reserved for travel packs */
   segmentTerrains?: (string | null)[];
+  /**
+   * Per-segment "assigned automatically" flag, parallel to segmentTerrains.
+   * See MeasurementRoute.segmentTerrainAuto. Absent = all manual.
+   */
+  segmentTerrainAuto?: boolean[];
 }
 
 // ===========================================

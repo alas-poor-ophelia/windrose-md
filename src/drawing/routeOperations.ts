@@ -53,10 +53,58 @@ function removeLastWaypoint(points: Point[]): Point[] {
 // ===========================================
 
 /**
+ * The shape every terrain-aware route operation needs: a waypoint list plus
+ * the two parallel per-segment arrays. Both MeasurementRoute (in-progress)
+ * and SavedRoute satisfy it, so one set of helpers serves both.
+ */
+type TerrainRouteLike = {
+  points: Point[];
+  segmentTerrains?: (string | null)[];
+  segmentTerrainAuto?: boolean[];
+};
+
+/**
+ * Read a route's per-segment auto flags, normalized to one entry per
+ * segment. A missing array (every pre-2.4.0 save) reads as all-manual —
+ * automatic categorization must never clobber terrain it did not write.
+ */
+function getSegmentTerrainAuto(route: TerrainRouteLike): boolean[] {
+  const flags = route.segmentTerrainAuto ?? [];
+  return (route.segmentTerrains ?? []).map((_, i) => flags[i] === true);
+}
+
+/**
+ * Rebuild a route with new segment arrays. `segmentTerrainAuto` is only
+ * written when at least one segment is auto, so hand-categorized routes
+ * keep saving exactly the bytes 2.3.5 wrote (undefined === all false).
+ */
+function withSegmentTerrains<T extends TerrainRouteLike>(
+  route: T,
+  segmentTerrains: (string | null)[],
+  autoFlags: boolean[]
+): T & TerrainRouteLike {
+  const next = { ...route, segmentTerrains } as T & TerrainRouteLike;
+  const mutable = next as TerrainRouteLike;
+  if (autoFlags.some(flag => flag)) {
+    mutable.segmentTerrainAuto = autoFlags;
+  } else {
+    delete mutable.segmentTerrainAuto;
+  }
+  return next;
+}
+
+/**
  * Append a waypoint to a measurement route, defaulting the new segment's
  * terrain to the previous segment's terrain — or `firstSegmentTerrainId`
  * for the route's first segment (TM-21). A repeat click on the last
  * waypoint is a no-op.
+ *
+ * The new segment inherits the previous segment's auto flag: a route the
+ * sampler owns stays re-sampleable as it grows, while a hand-categorized
+ * route keeps its carried-forward pick manual. The route's first segment
+ * is always manual — `firstSegmentTerrainId` is a user setting, not a
+ * sample. Callers that sample immediately after appending should overwrite
+ * with setSegmentTerrainAuto.
  */
 function appendRouteWaypoint(
   route: MeasurementRoute,
@@ -69,32 +117,95 @@ function appendRouteWaypoint(
     return { points: nextPoints, segmentTerrains: [] };
   }
   const previous = route.segmentTerrains[route.segmentTerrains.length - 1];
-  const newTerrain = route.segmentTerrains.length > 0 ? (previous ?? null) : firstSegmentTerrainId;
-  return { points: nextPoints, segmentTerrains: [...route.segmentTerrains, newTerrain] };
+  const hadSegments = route.segmentTerrains.length > 0;
+  const newTerrain = hadSegments ? (previous ?? null) : firstSegmentTerrainId;
+  const flags = getSegmentTerrainAuto(route);
+  const inheritedFlag = hadSegments ? flags[flags.length - 1] === true : false;
+  return withSegmentTerrains(
+    { ...route, points: nextPoints },
+    [...route.segmentTerrains, newTerrain],
+    [...flags, inheritedFlag]
+  );
 }
 
 /**
  * Remove the last waypoint and its segment's terrain assignment.
  */
 function removeLastRouteWaypoint(route: MeasurementRoute): MeasurementRoute {
-  return {
-    points: route.points.slice(0, -1),
-    segmentTerrains: route.segmentTerrains.slice(0, -1),
-  };
+  return withSegmentTerrains(
+    { ...route, points: route.points.slice(0, -1) },
+    route.segmentTerrains.slice(0, -1),
+    getSegmentTerrainAuto(route).slice(0, -1)
+  );
 }
 
 /**
- * Assign a terrain (or null = unassigned) to one segment by index.
+ * Assign a terrain (or null = unassigned) to one segment by index. This is
+ * the manual path — the picker and its Clear action — so the segment is
+ * marked NOT auto and later automatic passes will leave it alone.
  */
-function setSegmentTerrain(
-  route: MeasurementRoute,
+function setSegmentTerrain<T extends TerrainRouteLike>(
+  route: T,
   segmentIndex: number,
   terrainId: string | null
-): MeasurementRoute {
-  if (segmentIndex < 0 || segmentIndex >= route.segmentTerrains.length) return route;
-  const segmentTerrains = [...route.segmentTerrains];
+): T & TerrainRouteLike {
+  const current = route.segmentTerrains ?? [];
+  if (segmentIndex < 0 || segmentIndex >= current.length) return route;
+  const segmentTerrains = [...current];
   segmentTerrains[segmentIndex] = terrainId;
-  return { points: route.points, segmentTerrains };
+  const flags = getSegmentTerrainAuto(route);
+  flags[segmentIndex] = false;
+  return withSegmentTerrains(route, segmentTerrains, flags);
+}
+
+/**
+ * Assign a terrain to one segment on behalf of the automatic sampler and
+ * mark it auto, so a later re-categorization may replace it. A null id
+ * ("sampled, matched nothing") still counts as auto-owned.
+ */
+function setSegmentTerrainAuto<T extends TerrainRouteLike>(
+  route: T,
+  segmentIndex: number,
+  terrainId: string | null
+): T & TerrainRouteLike {
+  const current = route.segmentTerrains ?? [];
+  if (segmentIndex < 0 || segmentIndex >= current.length) return route;
+  const segmentTerrains = [...current];
+  segmentTerrains[segmentIndex] = terrainId;
+  const flags = getSegmentTerrainAuto(route);
+  flags[segmentIndex] = true;
+  return withSegmentTerrains(route, segmentTerrains, flags);
+}
+
+/**
+ * Write a whole pass of sampled terrains onto a route.
+ *
+ * A segment is only overwritten when the sampler already owns it (auto
+ * flag true) or when it has no terrain at all; anything the user picked by
+ * hand survives unless `overwriteManual` is set (the route card's explicit
+ * "recategorize everything" action). `results` entries past the segment
+ * count are ignored, and a shorter `results` leaves the tail untouched.
+ * Returns the original route when nothing changed.
+ */
+function applyAutoTerrains<T extends TerrainRouteLike>(
+  route: T,
+  results: (string | null)[],
+  overwriteManual = false
+): T & TerrainRouteLike {
+  const current = route.segmentTerrains ?? [];
+  if (current.length === 0) return route;
+  const flags = getSegmentTerrainAuto(route);
+  const segmentTerrains = [...current];
+  let changed = false;
+  for (let i = 0; i < segmentTerrains.length && i < results.length; i++) {
+    const eligible = overwriteManual || flags[i] || segmentTerrains[i] == null;
+    if (!eligible) continue;
+    if (segmentTerrains[i] !== results[i] || !flags[i]) changed = true;
+    segmentTerrains[i] = results[i];
+    flags[i] = true;
+  }
+  if (!changed) return route;
+  return withSegmentTerrains(route, segmentTerrains, flags);
 }
 
 /**
@@ -220,6 +331,9 @@ export {
   appendRouteWaypoint,
   removeLastRouteWaypoint,
   setSegmentTerrain,
+  setSegmentTerrainAuto,
+  applyAutoTerrains,
+  getSegmentTerrainAuto,
   computeSegmentDistances,
   sumDistances,
   computeEuclideanPathLength,

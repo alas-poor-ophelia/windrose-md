@@ -69,6 +69,7 @@ function createTravelTerrain(overrides: Partial<Omit<TravelTerrain, 'id'>> = {})
     name: overrides.name ?? 'New terrain',
     multiplier: overrides.multiplier ?? 1,
     ...(overrides.color !== undefined ? { color: overrides.color } : {}),
+    ...(overrides.tileTag !== undefined ? { tileTag: overrides.tileTag } : {}),
   };
 }
 

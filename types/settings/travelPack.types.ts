@@ -35,6 +35,12 @@ export interface TravelTerrain {
   multiplier: number;
   /** Segment coloring for terrain-aware routes */
   color?: string;
+  /**
+   * Tile tag that identifies this terrain during automatic segment
+   * categorization: a cell holding a tile carrying this tag counts as a
+   * vote for this terrain. Absent/empty means tags never match it.
+   */
+  tileTag?: string;
 }
 
 /** Time base for mode speeds and allowances */

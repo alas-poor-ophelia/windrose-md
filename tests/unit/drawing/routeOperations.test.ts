@@ -14,6 +14,9 @@ import {
   appendRouteWaypoint,
   removeLastRouteWaypoint,
   setSegmentTerrain,
+  setSegmentTerrainAuto,
+  applyAutoTerrains,
+  getSegmentTerrainAuto,
   computeSegmentDistances,
   sumDistances,
   computeEuclideanPathLength,
@@ -445,6 +448,150 @@ describe("routeOperations", () => {
       const routes = [a];
       removeSavedRoute(routes, a.id);
       expect(routes).toHaveLength(1);
+    });
+  });
+  // ===========================================
+  // Automatic-categorization bookkeeping
+  // ===========================================
+
+  describe("segmentTerrainAuto flags", () => {
+    const twoSegmentRoute = () => ({
+      points: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }],
+      segmentTerrains: ["t-forest", "t-road"] as (string | null)[],
+    });
+
+    it("reads a missing flag array as all-manual", () => {
+      expect(getSegmentTerrainAuto(twoSegmentRoute())).toEqual([false, false]);
+    });
+
+    it("pads a short flag array to the segment count", () => {
+      const route = { ...twoSegmentRoute(), segmentTerrainAuto: [true] };
+      expect(getSegmentTerrainAuto(route)).toEqual([true, false]);
+    });
+
+    it("omits the flag array entirely when no segment is auto", () => {
+      const route = setSegmentTerrain(twoSegmentRoute(), 0, "t-swamp");
+      expect(route.segmentTerrainAuto).toBeUndefined();
+      expect("segmentTerrainAuto" in route).toBe(false);
+    });
+
+    it("setSegmentTerrainAuto writes the id and marks the segment auto", () => {
+      const route = setSegmentTerrainAuto(twoSegmentRoute(), 1, "t-swamp");
+      expect(route.segmentTerrains).toEqual(["t-forest", "t-swamp"]);
+      expect(route.segmentTerrainAuto).toEqual([false, true]);
+    });
+
+    it("setSegmentTerrainAuto accepts a null result and still marks it auto", () => {
+      const route = setSegmentTerrainAuto(twoSegmentRoute(), 0, null);
+      expect(route.segmentTerrains).toEqual([null, "t-road"]);
+      expect(route.segmentTerrainAuto).toEqual([true, false]);
+    });
+
+    it("a manual pick clears the auto flag for that segment", () => {
+      const auto = setSegmentTerrainAuto(twoSegmentRoute(), 0, "t-swamp");
+      const manual = setSegmentTerrain(auto, 0, "t-road");
+      expect(manual.segmentTerrains).toEqual(["t-road", "t-road"]);
+      expect(getSegmentTerrainAuto(manual)).toEqual([false, false]);
+    });
+
+    it("Clear (null) is a manual action and clears the auto flag", () => {
+      const auto = setSegmentTerrainAuto(twoSegmentRoute(), 1, "t-swamp");
+      const cleared = setSegmentTerrain(auto, 1, null);
+      expect(cleared.segmentTerrains).toEqual(["t-forest", null]);
+      expect(getSegmentTerrainAuto(cleared)).toEqual([false, false]);
+    });
+
+    it("an out-of-range index is a no-op for both setters", () => {
+      const route = twoSegmentRoute();
+      expect(setSegmentTerrainAuto(route, 5, "t-swamp")).toBe(route);
+      expect(setSegmentTerrainAuto(route, -1, "t-swamp")).toBe(route);
+      expect(setSegmentTerrain(route, 5, "t-swamp")).toBe(route);
+    });
+
+    it("appending inherits the previous segment's auto flag", () => {
+      const auto = setSegmentTerrainAuto(twoSegmentRoute(), 1, "t-swamp");
+      const grown = appendRouteWaypoint(auto, { x: 3, y: 0 }, null);
+      expect(grown.segmentTerrains).toEqual(["t-forest", "t-swamp", "t-swamp"]);
+      expect(getSegmentTerrainAuto(grown)).toEqual([false, true, true]);
+    });
+
+    it("appending onto a hand-categorized route stays manual", () => {
+      const grown = appendRouteWaypoint(twoSegmentRoute(), { x: 3, y: 0 }, null);
+      expect(getSegmentTerrainAuto(grown)).toEqual([false, false, false]);
+      expect(grown.segmentTerrainAuto).toBeUndefined();
+    });
+
+    it("the first segment is manual even with a default terrain", () => {
+      let route = appendRouteWaypoint({ points: [], segmentTerrains: [] }, { x: 0, y: 0 }, "t-plains");
+      route = appendRouteWaypoint(route, { x: 1, y: 0 }, "t-plains");
+      expect(route.segmentTerrains).toEqual(["t-plains"]);
+      expect(getSegmentTerrainAuto(route)).toEqual([false]);
+    });
+
+    it("removing the last waypoint trims the flag array too", () => {
+      const auto = setSegmentTerrainAuto(twoSegmentRoute(), 1, "t-swamp");
+      const shrunk = removeLastRouteWaypoint(auto);
+      expect(shrunk.segmentTerrains).toEqual(["t-forest"]);
+      expect(shrunk.segmentTerrainAuto).toBeUndefined();
+    });
+  });
+
+  describe("applyAutoTerrains", () => {
+    const route = () => ({
+      points: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }],
+      segmentTerrains: ["t-forest", null, "t-road"] as (string | null)[],
+      segmentTerrainAuto: [false, false, true],
+    });
+
+    it("fills empty segments and overwrites auto ones, sparing manual picks", () => {
+      const result = applyAutoTerrains(route(), ["t-swamp", "t-swamp", "t-swamp"]);
+      expect(result.segmentTerrains).toEqual(["t-forest", "t-swamp", "t-swamp"]);
+      expect(result.segmentTerrainAuto).toEqual([false, true, true]);
+    });
+
+    it("overwrites manual picks only when asked", () => {
+      const result = applyAutoTerrains(route(), ["t-swamp", "t-swamp", "t-swamp"], true);
+      expect(result.segmentTerrains).toEqual(["t-swamp", "t-swamp", "t-swamp"]);
+      expect(result.segmentTerrainAuto).toEqual([true, true, true]);
+    });
+
+    it("leaves the tail untouched when results are short", () => {
+      const result = applyAutoTerrains(route(), ["t-swamp"], true);
+      expect(result.segmentTerrains).toEqual(["t-swamp", null, "t-road"]);
+    });
+
+    it("ignores results past the segment count", () => {
+      const result = applyAutoTerrains(route(), ["a", "b", "c", "d", "e"], true);
+      expect(result.segmentTerrains).toHaveLength(3);
+    });
+
+    it("writes a null sample onto an auto segment", () => {
+      const result = applyAutoTerrains(route(), [null, null, null]);
+      expect(result.segmentTerrains).toEqual(["t-forest", null, null]);
+      expect(result.segmentTerrainAuto).toEqual([false, true, true]);
+    });
+
+    it("returns the original route when nothing is eligible", () => {
+      const manual = {
+        points: [{ x: 0, y: 0 }, { x: 1, y: 0 }],
+        segmentTerrains: ["t-forest"] as (string | null)[],
+      };
+      expect(applyAutoTerrains(manual, ["t-swamp"])).toBe(manual);
+    });
+
+    it("returns the original route when it has no segments", () => {
+      const empty = { points: [{ x: 0, y: 0 }], segmentTerrains: [] as (string | null)[] };
+      expect(applyAutoTerrains(empty, ["t-swamp"])).toBe(empty);
+    });
+
+    it("preserves a saved route's other fields", () => {
+      const saved = createSavedRoute([{ x: 0, y: 0 }, { x: 1, y: 0 }], { name: "Kings road" });
+      const result = applyAutoTerrains({ ...saved, segmentTerrains: [null] }, ["t-road"]);
+      expect(result.id).toBe(saved.id);
+      expect(result.name).toBe("Kings road");
+      expect(result.color).toBe(saved.color);
+      expect(result.segmentTerrains).toEqual(["t-road"]);
+      expect(result.segmentTerrainAuto).toEqual([true]);
     });
   });
 });

@@ -8843,6 +8843,56 @@ button.windrose-breadcrumb-link {
   flex: 0 1 80px;
   min-width: 60px;
 }
+.windrose-travel-pack-modal {
+  /* Second line of a terrain row: palette swatches + tile tag */
+}
+.windrose-travel-pack-modal .windrose-travel-terrain-details {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--size-4-3);
+  padding: 0 0 var(--size-4-3) var(--size-4-2);
+  margin-top: calc(-1 * var(--size-4-2));
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.windrose-travel-pack-modal .windrose-travel-terrain-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-2-2);
+  align-items: center;
+}
+.windrose-travel-pack-modal button.windrose-travel-terrain-swatch {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  padding: 0;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: none;
+  cursor: pointer;
+}
+.windrose-travel-pack-modal button.windrose-travel-terrain-swatch:hover {
+  border-color: var(--interactive-accent);
+}
+.windrose-travel-pack-modal button.windrose-travel-terrain-swatch.is-selected {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+.windrose-travel-pack-modal .windrose-travel-terrain-tag {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-1);
+  flex: 1 1 200px;
+  min-width: 160px;
+}
+.windrose-travel-pack-modal input.windrose-travel-terrain-tag-input {
+  width: 100%;
+}
+.windrose-travel-pack-modal .windrose-travel-terrain-hint {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  line-height: 1.3;
+}
 
 .windrose-content-pack-modal .windrose-content-pack-tabs {
   display: flex;

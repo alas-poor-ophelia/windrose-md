@@ -15,7 +15,7 @@
  */
 
 import type { App } from 'obsidian';
-import { Modal, Notice, Setting } from 'obsidian';
+import { Modal, Notice, Setting, setTooltip } from 'obsidian';
 import type {
   TravelPack,
   TravelUnit,
@@ -37,6 +37,7 @@ import {
   upsertPackItem,
   upsertTravelPack,
 } from '../../travel/travelPackOperations';
+import { colorsMatch, getColorPalette } from '../../drawing/colorOperations';
 
 const DEFAULT_TERRAIN_COLOR = '#a8a29e';
 const MODE_TIME_UNITS: TravelTimeUnit[] = ['minutes', 'hours', 'days'];
@@ -306,7 +307,61 @@ class TravelPackEditModal extends Modal {
           const current = this.getPack();
           if (current) this.commit(removePackItem(current, 'terrains', terrain.id), true);
         }));
+      this.renderTerrainDetails(containerEl, terrain);
     }
+  }
+
+  /**
+   * The second line of a terrain row: a one-click strip of the user's own
+   * map palette (so route colors match the paint they describe without
+   * copying hex codes through the OS color dialog), and the tile tag that
+   * automatic categorization matches placed tiles against.
+   *
+   * This is a plain block rather than a Setting because the modal hides
+   * `.setting-item-info` on pack rows — setName/setDesc would render nothing.
+   */
+  private renderTerrainDetails(containerEl: HTMLElement, terrain: TravelTerrain): void {
+    const details = containerEl.createDiv({ cls: 'windrose-travel-terrain-details' });
+
+    const swatches = details.createDiv({ cls: 'windrose-travel-terrain-swatches' });
+    const activeColor = terrain.color ?? DEFAULT_TERRAIN_COLOR;
+    for (const entry of getColorPalette()) {
+      const swatch = swatches.createEl('button', {
+        cls: 'windrose-travel-terrain-swatch',
+        attr: { type: 'button' },
+      });
+      swatch.setCssStyles({ backgroundColor: entry.color });
+      setTooltip(swatch, entry.label);
+      swatch.setAttribute('aria-label', entry.label);
+      if (colorsMatch(entry.color, activeColor)) swatch.addClass('is-selected');
+      swatch.onclick = () => {
+        this.patchItem('terrains', terrain.id, { color: entry.color }, true);
+      };
+    }
+
+    const tagField = details.createDiv({ cls: 'windrose-travel-terrain-tag' });
+    const input = tagField.createEl('input', {
+      cls: 'windrose-travel-terrain-tag-input',
+      attr: { type: 'text', placeholder: 'Tile tag', 'aria-label': 'Tile tag' },
+    });
+    input.value = terrain.tileTag ?? '';
+    input.addEventListener('input', () => {
+      const trimmed = input.value.trim();
+      const current = this.getPack();
+      if (!current) return;
+      if (trimmed === '') {
+        const item = current.terrains.find(t => t.id === terrain.id);
+        if (!item) return;
+        const { tileTag: _removed, ...rest } = item;
+        this.commit(upsertPackItem(current, 'terrains', rest), false);
+      } else {
+        this.patchItem('terrains', terrain.id, { tileTag: trimmed });
+      }
+    });
+    tagField.createDiv({
+      cls: 'windrose-travel-terrain-hint',
+      text: 'Cells holding a tile with this tag count as this terrain.',
+    });
   }
 
   // ===========================================
