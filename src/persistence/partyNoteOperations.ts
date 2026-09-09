@@ -91,6 +91,8 @@ export interface PartyNoteTravelLabels {
   linked: Map<string, string>;
   /** Keyed by unlinked result object id */
   unlinked: Map<string, string>;
+  /** Keyed by in-range beacon pin id */
+  beacons?: Map<string, string>;
 }
 
 /**
@@ -121,7 +123,7 @@ function buildPartyNoteContent(
   lines.push(`Within **${rangeLabel}** of the beacon${mapClause}.`);
   lines.push('');
 
-  if (results.linked.length === 0 && results.unlinked.length === 0) {
+  if (results.linked.length === 0 && results.unlinked.length === 0 && results.beacons.length === 0) {
     lines.push('*Nothing in range.*');
     lines.push('');
     return lines.join('\n');
@@ -173,6 +175,36 @@ function buildPartyNoteContent(
       for (const result of results.unlinked) {
         lines.push(`| ${escapeTableCell(result.label)} | ${escapeTableCell(result.distanceLabel)} |`);
       }
+    }
+    lines.push('');
+  }
+
+  if (results.beacons.length > 0) {
+    lines.push('## Beacons');
+    lines.push('');
+    const hasDeepLinks = context.mapNotePath !== '';
+    const hasTravel = travel != null;
+    const header = ['Beacon', 'Distance', ...(hasTravel ? ['Travel'] : []), ...(hasDeepLinks ? ['Map'] : [])];
+    lines.push(`| ${header.join(' | ')} |`);
+    lines.push(`|${header.map(() => ' --- ').join('|')}|`);
+    for (const result of results.beacons) {
+      // A beacon with a generated note links to it; the rest are plain labels
+      const name = result.notePath != null
+        ? `[[${escapeTableCell(result.notePath.replace(/\.md$/, ''))}\\|${escapeTableCell(result.label)}]]`
+        : escapeTableCell(result.label);
+      const cells = [name, escapeTableCell(result.distanceLabel)];
+      if (hasTravel) {
+        cells.push(escapeTableCell(travel.beacons?.get(result.pinId) ?? '—'));
+      }
+      if (hasDeepLinks) {
+        const url = generateDeepLink(
+          context.mapNotePath, context.mapId,
+          result.position.x, result.position.y,
+          NOTE_DEEP_LINK_ZOOM, ''
+        );
+        cells.push(`[show](${url})`);
+      }
+      lines.push(`| ${cells.join(' | ')} |`);
     }
     lines.push('');
   }

@@ -560,6 +560,8 @@ export interface PartyPin {
   filters?: PartyQueryFilters;
   /** Related-notes expansion; absent means off */
   relatedMode?: PartyRelatedMode;
+  /** When false, other beacons' range queries skip this beacon; absent means discoverable */
+  discoverable?: boolean;
 }
 
 // ===========================================

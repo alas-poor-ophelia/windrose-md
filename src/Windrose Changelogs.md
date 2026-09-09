@@ -608,6 +608,14 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.4.2
+
+Patch release: completes the 2.4.0 multi-Beacon feature — Beacons can share a cell, and Beacons see each other.
+
+### New Features
+- **Up to four Beacons per cell.** Beacons placed or dragged into an occupied cell now arrange themselves around it the way stacked objects do, shrinking as the cell fills; each keeps its own range ring centred on the cell, and clicking picks the Beacon under the pointer. A full cell refuses a fifth.
+- **Beacons see each other.** Other Beacons in range appear in a Beacon's nearby results under their own Beacons list, with distance and travel time, and in its generated beacon note; a Beacon with a beacon note is linked, and show on map pans to it. Every Beacon is visible to the others by default — switch off **Visible to other beacons** in a Beacon's Filters & related section to hide it.
+
 ## Version 2.4.1
 
 Patch release: dragging a snapped shape overlay keeps it on the grid.

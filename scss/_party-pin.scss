@@ -352,6 +352,33 @@
     letter-spacing: 0.05em;
   }
 
+  /* Colour dot inside an in-range beacon's label (nested so the row's
+     first-child rule keeps sizing the label, not the dot) */
+  &-nearby-swatch {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    margin-right: 6px;
+    border: 1px solid oklch(20% 0 0deg / 0.6);
+    border-radius: 50%;
+    vertical-align: -1px;
+  }
+
+  /* Checkbox field: the box keeps its native size instead of stretching
+     like the text inputs, and the trailing caption takes the slack */
+  &-field.windrose-party-controls-check input {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+  }
+
+  &-field .windrose-party-controls-check-text {
+    flex: 1;
+    width: auto;
+    opacity: 0.85;
+  }
+
   &-nearby-empty {
     padding: 4px 2px 2px;
     color: var(--windrose-text-primary);

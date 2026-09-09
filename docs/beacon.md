@@ -11,7 +11,7 @@ The **Beacon** is a movable position marker with a **range**. It tracks anything
 
 ## Placing Beacons
 
-The Beacon shares the pin tool group in the palette with note pins — long-press (or right-click) the pin button and choose **Beacon**. Click an empty cell to place a Beacon there (it snaps to the grid, square or hex); every click on empty ground places another one. The first Beacon is labeled "The Party" in the default color; each one after that gets its own numbered label ("Beacon 2", "Beacon 3", ...) and a distinct color, so a glance at the canvas tells them apart. Clicking a Beacon selects it instead of placing a new one, and dragging it moves it, range ring following live. Two Beacons never share a cell.
+The Beacon shares the pin tool group in the palette with note pins — long-press (or right-click) the pin button and choose **Beacon**. Click an empty cell to place a Beacon there (it snaps to the grid, square or hex); every click on empty ground places another one. The first Beacon is labeled "The Party" in the default color; each one after that gets its own numbered label ("Beacon 2", "Beacon 3", ...) and a distinct color, so a glance at the canvas tells them apart. Clicking a Beacon selects it instead of placing a new one, and dragging it moves it, range ring following live. Up to four Beacons can share a cell: they arrange themselves around the cell the way stacked objects do, each keeps its own range ring centred on the cell, and clicking picks the one under the pointer. A full cell refuses a fifth.
 
 The selected Beacon is the one whose card is on screen. With the select tool, clicking a Beacon selects it too, so you can adjust one without leaving the tool you were using.
 
@@ -45,6 +45,8 @@ The Beacon's candidates are the map's linkable markers: note pins and objects wi
 Results are sorted by distance and show the note name and formatted distance — plus a **travel time** per active travel mode, when [travel packs]({{ site.baseurl }}/measurement-and-travel/#travel-packs) are configured for the map. Activating a row opens its note; a **show on map** button navigates to the source marker and flashes it. An empty result set says so explicitly ("Nothing in range").
 
 Results stay current as the Beacon moves, its range changes, or nearby markers are added, moved, or removed — including through undo/redo.
+
+Other Beacons in range appear in their own **Beacons** list, with the same distance and travel time as any marker; a Beacon that generates a beacon note is linked, and **show on map** pans to it. Every Beacon is visible to the others by default. To hide one (a rival faction the party should not see coming), switch off **Visible to other beacons** in that Beacon's Filters & related section.
 
 Scoping and filters, per Beacon:
 

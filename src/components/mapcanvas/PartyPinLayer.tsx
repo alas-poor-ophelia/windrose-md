@@ -46,7 +46,7 @@ const FLASH_DURATION_MS = 1800;
 
 const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): VNode | null => {
   const app = useApp();
-  const { mapData, geometry, mapId, notePath, distanceOverrides } = useMapState();
+  const { mapData, geometry, mapId, notePath, distanceOverrides, screenToWorld } = useMapState();
 
   // Transient highlight for "show on map" — cleared after the pulse finishes
   const [flashMarker, setFlashMarker] = useState<Point | null>(null);
@@ -79,8 +79,11 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     setSelectedViaSelect(viaSelect && pinId != null);
   }, []);
 
+  // Presses resolve against pin icons in world space, so stacked pins in
+  // one cell can each be grabbed
+  const pinLocator = useMemo(() => ({ geometry, screenToWorld }), [geometry, screenToWorld]);
   const { handlePartyPinPointerDown, handlePartyPinSelectPointerDown, handlePartyPinMove, stopPartyPinDrag, isPartyPinDragging } =
-    usePartyPinInteraction(mapData?.partyPins, onPartyPinsChange, handleActivePinChange);
+    usePartyPinInteraction(mapData?.partyPins, onPartyPinsChange, handleActivePinChange, pinLocator);
 
   useLayerHandlers('partyPin', { handlePartyPinPointerDown, handlePartyPinSelectPointerDown, handlePartyPinMove, stopPartyPinDrag, isPartyPinDragging });
 

@@ -84,6 +84,10 @@ const PartyPinControlsFilters = ({ pin, layers, updatePin }: PartyPinControlsFil
     updatePin({ relatedMode });
   };
 
+  const setDiscoverable = (discoverable: boolean): void => {
+    updatePin({ discoverable });
+  };
+
   return (
     <div className="windrose-party-controls-filters">
       <button
@@ -156,6 +160,19 @@ const PartyPinControlsFilters = ({ pin, layers, updatePin }: PartyPinControlsFil
               <option value="tags">By tags</option>
               <option value="backlinks">By backlinks</option>
             </select>
+          </label>
+
+          <label
+            className="windrose-party-controls-field windrose-party-controls-check"
+            ref={tooltipRef('Let other beacons list this one in their nearby results')}
+          >
+            <span>Visible</span>
+            <input
+              type="checkbox"
+              checked={pin.discoverable !== false}
+              onChange={(e) => setDiscoverable((e.target as HTMLInputElement).checked)}
+            />
+            <span className="windrose-party-controls-check-text">To other beacons</span>
           </label>
         </>
       )}
@@ -249,9 +266,9 @@ const PartyPinControlsNearby = ({ results, travelLabelFor, travelHint, onShowOnM
     <div className="windrose-party-controls-nearby-header">
       <Icon icon="lucide-locate" size={12} />
       <span>Nearby</span>
-      {results.linked.length + results.unlinked.length > 0 && (
+      {results.linked.length + results.unlinked.length + results.beacons.length > 0 && (
         <span className="windrose-party-controls-nearby-count">
-          {results.linked.length + results.unlinked.length}
+          {results.linked.length + results.unlinked.length + results.beacons.length}
         </span>
       )}
       <button
@@ -271,7 +288,7 @@ const PartyPinControlsNearby = ({ results, travelLabelFor, travelHint, onShowOnM
       </div>
     )}
 
-    {results.linked.length === 0 && results.unlinked.length === 0 && (
+    {results.linked.length === 0 && results.unlinked.length === 0 && results.beacons.length === 0 && (
       <div className="windrose-party-controls-nearby-empty">Nothing in range</div>
     )}
 
@@ -320,6 +337,51 @@ const PartyPinControlsNearby = ({ results, travelLabelFor, travelHint, onShowOnM
               <div key={result.objectId} className="windrose-party-controls-nearby-item">
                 <div className="windrose-party-controls-nearby-row is-static">
                   <span>{result.label}</span>
+                  <span className="windrose-party-controls-nearby-distance">{result.distanceLabel}</span>
+                  {onShowOnMap && (
+                    <button
+                      className="windrose-party-controls-locate"
+                      ref={tooltipRef('Show on map')}
+                      aria-label={`Show ${result.label} on map`}
+                      onClick={() => onShowOnMap(result.position)}
+                    >
+                      <Icon icon="lucide-crosshair" size={12} />
+                    </button>
+                  )}
+                </div>
+                {travel != null && (
+                  <div className="windrose-party-controls-nearby-travel">{travel}</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </>
+    )}
+
+    {results.beacons.length > 0 && (
+      <>
+        <div className="windrose-party-controls-nearby-subheader">Beacons</div>
+        <div className="windrose-party-controls-nearby-list">
+          {results.beacons.map(result => {
+            const travel = travelLabelFor?.(result.distanceInCells) ?? null;
+            const noteLink = result.notePath?.replace(/\.md$/, '');
+            return (
+              <div key={result.pinId} className="windrose-party-controls-nearby-item">
+                <div className={`windrose-party-controls-nearby-row ${noteLink == null ? 'is-static' : ''}`}>
+                  {noteLink != null
+                    ? (
+                      <InternalLink link={noteLink}>
+                        <span className="windrose-party-controls-nearby-swatch" style={{ background: result.color }} />
+                        {result.label}
+                      </InternalLink>
+                    )
+                    : (
+                      <span>
+                        <span className="windrose-party-controls-nearby-swatch" style={{ background: result.color }} />
+                        {result.label}
+                      </span>
+                    )}
                   <span className="windrose-party-controls-nearby-distance">{result.distanceLabel}</span>
                   {onShowOnMap && (
                     <button

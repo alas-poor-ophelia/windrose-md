@@ -19,7 +19,8 @@ import type { MapData, PartyPin } from '#types/core/map.types';
 import type { DiagonalRule } from '#types/settings/settings.types';
 import type { ViewController } from '#types/hooks/viewController.types';
 import { getCellsWithinRange } from '../../drawing/rangeOperations';
-import { resolvePinIconGlyph } from '../../objects/partyPinOperations';
+import { getPartyPinIconScale, resolvePinIconGlyph } from '../../objects/partyPinOperations';
+import type { PartyPinIconPlacement } from '../../objects/partyPinOperations';
 import {
   computeCounterScale,
   computeOverlayMetrics,
@@ -37,6 +38,10 @@ interface PartyPinGeometry extends IGeometry {
 
 interface PartyPinOverlayProps {
   pin: PartyPin;
+  /** Icon offset from the cell centre and shrink when pins share the cell */
+  iconPlacement?: PartyPinIconPlacement;
+  /** Draw the label; a shared cell shows only the selected pin's label */
+  labelVisible?: boolean;
   /** Pin range converted to cells via the map's distance-per-cell */
   rangeInCells: number;
   diagonalRule: DiagonalRule;
@@ -51,9 +56,13 @@ interface PartyPinOverlayProps {
   viewController?: ViewController;
 }
 
-/** Classic map-pin silhouette: tip at the origin, head circle above */
+/**
+ * Classic map-pin silhouette: tip at the origin, head circle above. Its
+ * native extent (22 wide, 30 tall) is mirrored by PIN_ICON_NATIVE in
+ * partyPinOperations, which the icon hit test reads.
+ */
 const PIN_PATH = 'M0 0C-5-7-11-11.5-11-19a11 11 0 1 1 22 0C11-11.5 5-7 0 0Z';
-const PIN_NATIVE_HEIGHT = 30;
+const NO_PLACEMENT: PartyPinIconPlacement = { offsetX: 0, offsetY: 0, scale: 1, sharesCell: false };
 
 /**
  * World-space distance between adjacent cell centers — converts a radius in
@@ -69,6 +78,8 @@ function getCellSpacing(geometry: PartyPinGeometry, position: Point): number {
 
 const PartyPinOverlay = ({
   pin,
+  iconPlacement = NO_PLACEMENT,
+  labelVisible = true,
   rangeInCells,
   diagonalRule,
   inRangeMarkers = [],
@@ -108,7 +119,12 @@ const PartyPinOverlay = ({
   const pinCenter = geo.getCellCenter(pin.position.x, pin.position.y);
   const cellSpacing = getCellSpacing(geo, pin.position);
   const circleRadius = rangeInCells * cellSpacing;
-  const pinScale = (geo.cellSize * 0.9) / PIN_NATIVE_HEIGHT;
+  // The ring and range cells stay on the cell; only the icon and its label
+  // take the slot offset when pins share the cell
+  const iconX = pinCenter.worldX + iconPlacement.offsetX;
+  const iconY = pinCenter.worldY + iconPlacement.offsetY;
+  const pinScale = getPartyPinIconScale(geo) * iconPlacement.scale;
+  const labelY = iconY + geo.cellSize * 0.42 * iconPlacement.scale;
 
   return (
     <svg
@@ -215,7 +231,7 @@ const PartyPinOverlay = ({
         })()}
 
         {/* Pin marker; an icon glyph replaces the head dot when set (PP-2) */}
-        <g transform={`translate(${pinCenter.worldX} ${pinCenter.worldY}) scale(${pinScale})`}>
+        <g transform={`translate(${iconX} ${iconY}) scale(${pinScale})`}>
           <path
             d={PIN_PATH}
             fill={pin.color}
@@ -250,11 +266,11 @@ const PartyPinOverlay = ({
 
         {/* Label — counter-scaled so it holds a constant on-screen size at
             every zoom (the ring strokes get the same via non-scaling-stroke) */}
-        {pin.label !== '' && (
+        {pin.label !== '' && labelVisible && (
           <g
-            data-counter-scale-x={pinCenter.worldX}
-            data-counter-scale-y={pinCenter.worldY + geo.cellSize * 0.42}
-            transform={counterScaleTransform(pinCenter.worldX, pinCenter.worldY + geo.cellSize * 0.42, counterScale)}
+            data-counter-scale-x={iconX}
+            data-counter-scale-y={labelY}
+            transform={counterScaleTransform(iconX, labelY, counterScale)}
           >
             <text
               className="windrose-party-pin-label"

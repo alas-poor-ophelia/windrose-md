@@ -217,3 +217,54 @@ describe('queryPartyRange', () => {
     expect(linked.map(r => r.displayName)).toEqual(['TwoAway']);
   });
 });
+
+describe('queryPartyRange beacons', () => {
+  function makeBeacon(id: string, x: number, y: number, extra: Partial<PartyPin> = {}): PartyPin {
+    return { id, position: { x, y }, label: id, color: '#7ba8c4', range: 30, rangeStyle: 'circle', ...extra };
+  }
+
+  it('lists discoverable beacons within range nearest first, never itself', () => {
+    const self = makePin(10, 10);
+    const mapData = {
+      ...makeMapData([]),
+      partyPins: [
+        self,
+        makeBeacon('far', 30, 10),
+        makeBeacon('near', 12, 10),
+        makeBeacon('nearer', 11, 10),
+        makeBeacon('hidden', 11, 11, { discoverable: false })
+      ]
+    };
+    const results = queryPartyRange(mapData, geometry, self, settings(5));
+    expect(results.beacons.map(b => b.pinId)).toEqual(['nearer', 'near']);
+    expect(results.beacons[0]).toMatchObject({ label: 'nearer', color: '#7ba8c4', distanceInCells: 1, position: { x: 11, y: 10 } });
+    expect(results.beacons[0].notePath).toBeUndefined();
+  });
+
+  it('links the other beacon\'s generated note when it has one', () => {
+    const self = makePin(0, 0);
+    const mapData = {
+      ...makeMapData([]),
+      partyPins: [self, makeBeacon('scouts', 1, 0, { partyNote: { enabled: true, path: 'Beacons/Scouts - Nearby.md' } })]
+    };
+    const results = queryPartyRange(mapData, geometry, self, settings(5));
+    expect(results.beacons[0].notePath).toBe('Beacons/Scouts - Nearby.md');
+  });
+
+  it('ignores layer scope and note filters for beacons', () => {
+    const self: PartyPin = {
+      ...makePin(0, 0),
+      layerScope: { mode: 'selected', layerIds: ['layer-two'] },
+      filters: { tags: ['visited'] }
+    };
+    const mapData = { ...makeMapData([]), partyPins: [self, makeBeacon('other', 2, 0)] };
+    const results = queryPartyRange(mapData, geometry, self, { ...settings(5), noteMetadata: () => null });
+    expect(results.beacons.map(b => b.pinId)).toEqual(['other']);
+  });
+
+  it('returns an empty beacon list when the map has no other beacons', () => {
+    const self = makePin(0, 0);
+    expect(queryPartyRange(makeMapData([]), geometry, self, settings(5)).beacons).toEqual([]);
+    expect(queryPartyRange({ ...makeMapData([]), partyPins: [self] }, geometry, self, settings(5)).beacons).toEqual([]);
+  });
+});

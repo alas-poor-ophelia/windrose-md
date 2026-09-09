@@ -17,8 +17,8 @@ import { Notice } from 'obsidian';
 import { useCallback, useEffect, useMemo, useRef } from 'preact/hooks';
 import type { ResolvedDistanceSettings } from '../../drawing/distanceOperations';
 import { rangeUnitsToCells } from '../../drawing/rangeOperations';
-import { removePartyPin, upsertPartyPin } from '../../objects/partyPinOperations';
-import { queryPartyRange } from '../../objects/partyRangeQuery';
+import { getPartyPinIconPlacement, removePartyPin, upsertPartyPin } from '../../objects/partyPinOperations';
+import { queryPartyBeacons, queryPartyRange } from '../../objects/partyRangeQuery';
 import type { NoteMetadataAccessor, PartyRangeResults } from '../../objects/partyRangeQuery';
 import type { RelatedNotes, RelatedNotesSource } from '../../objects/partyRelatedNotes';
 import { extractCacheTags, getRelatedByBacklinks, getRelatedByTags } from '../../objects/partyRelatedNotes';
@@ -36,7 +36,7 @@ import { PartyPinControls } from '../overlays/PartyPinControls';
 import { useApp } from '../../context/AppContext';
 import { useMapState } from '../../context/MapContext';
 
-const EMPTY_RESULTS: PartyRangeResults = { linked: [], unlinked: [] };
+const EMPTY_RESULTS: PartyRangeResults = { linked: [], unlinked: [], beacons: [] };
 
 /** Note writes coalesce bursts of edits into one file operation */
 const PARTY_NOTE_SAVE_DELAY_MS = 2000;
@@ -90,11 +90,14 @@ const PartyPinInstance = ({
   pinsRef.current = mapData?.partyPins ?? [];
 
   const rangeInCells = rangeUnitsToCells(pin.range, distanceSettings.distancePerCell);
-  // The query only reads layers; depending on that alone keeps this beacon's
-  // results cached while other beacons churn the map object.
+  // The marker scan only reads layers; depending on that alone keeps this
+  // beacon's results cached while other beacons churn the map object. The
+  // pin list changes on every drag tick of any beacon, so the cheap
+  // beacon-to-beacon check is a separate memo and the two merge below.
   const layers = mapData?.layers ?? null;
+  const partyPins = mapData?.partyPins;
 
-  const results = useMemo((): PartyRangeResults => {
+  const markerResults = useMemo((): PartyRangeResults => {
     if (!layers || !geometry) return EMPTY_RESULTS;
     return queryPartyRange({ layers }, geometry, pin, {
       rangeInCells,
@@ -105,6 +108,28 @@ const PartyPinInstance = ({
       noteMetadata
     });
   }, [layers, geometry, pin, rangeInCells, distanceSettings, noteMetadata]);
+
+  const beaconResults = useMemo(() => {
+    if (!geometry) return EMPTY_RESULTS.beacons;
+    return queryPartyBeacons(partyPins, geometry, pin, {
+      rangeInCells,
+      distancePerCell: distanceSettings.distancePerCell,
+      distanceUnit: distanceSettings.distanceUnit,
+      diagonalRule: distanceSettings.gridDiagonalRule,
+      displayFormat: distanceSettings.displayFormat
+    });
+  }, [partyPins, geometry, pin, rangeInCells, distanceSettings]);
+
+  const results = useMemo(
+    (): PartyRangeResults => ({ linked: markerResults.linked, unlinked: markerResults.unlinked, beacons: beaconResults }),
+    [markerResults, beaconResults]
+  );
+
+  // Where this beacon's icon sits when it shares its cell with others
+  const iconPlacement = useMemo(
+    () => geometry ? getPartyPinIconPlacement(partyPins, pin, geometry) : undefined,
+    [partyPins, pin, geometry]
+  );
 
   /** Per-result travel labels for the beacon note's Travel column */
   const travelLabels = useMemo((): PartyNoteTravelLabels | undefined => {
@@ -119,13 +144,21 @@ const PartyPinInstance = ({
       const label = travelLabelFor(result.distanceInCells);
       if (label != null) unlinked.set(result.objectId, label);
     }
-    return { linked, unlinked };
+    const beacons = new Map<string, string>();
+    for (const result of results.beacons) {
+      const label = travelLabelFor(result.distanceInCells);
+      if (label != null) beacons.set(result.pinId, label);
+    }
+    return { linked, unlinked, beacons };
   }, [hasTravelModes, results, travelLabelFor]);
 
-  // Related notes per result (tags or backlinks), for the beacon note table
+  // Related notes per result (tags or backlinks), for the beacon note table.
+  // Keyed on the marker scan, not the merged results: beacon churn must
+  // never re-run the vault-wide tag table below.
+  const linkedResults = markerResults.linked;
   const relatedMap = useMemo((): Map<string, RelatedNotes> | undefined => {
     const mode = pin.relatedMode ?? 'off';
-    if (mode === 'off' || results.linked.length === 0) return undefined;
+    if (mode === 'off' || linkedResults.length === 0) return undefined;
     // Materialize the vault-wide tag table ONCE per recompute: getRelatedByTags
     // iterates noteTags() fully per result, so a per-call generator would
     // rescan every markdown file for every in-range note (O(results × vault)).
@@ -139,16 +172,16 @@ const PartyPinInstance = ({
     };
     const excludePaths = pin.partyNote?.path != null && pin.partyNote.path !== '' ? [pin.partyNote.path] : [];
     const map = new Map<string, RelatedNotes>();
-    for (const result of results.linked) {
+    for (const result of linkedResults) {
       map.set(result.notePath, mode === 'tags'
         ? getRelatedByTags(source, result.notePath, { cap: PARTY_RELATED_CAP, excludeTags: pin.filters?.tags, excludePaths })
         : getRelatedByBacklinks(source, result.notePath, { cap: PARTY_RELATED_CAP, excludePaths }));
     }
     return map;
-  }, [pin, results, app]);
+  }, [pin, linkedResults, app]);
 
   const inRangeMarkers = useMemo(
-    () => [...results.linked, ...results.unlinked].map(r => r.position),
+    () => [...results.linked, ...results.unlinked, ...results.beacons].map(r => r.position),
     [results]
   );
 
@@ -245,6 +278,8 @@ const PartyPinInstance = ({
     <>
       <PartyPinOverlay
         pin={pin}
+        iconPlacement={iconPlacement}
+        labelVisible={iconPlacement?.sharesCell !== true || showControls}
         rangeInCells={rangeInCells}
         diagonalRule={distanceSettings.gridDiagonalRule}
         inRangeMarkers={inRangeMarkers}

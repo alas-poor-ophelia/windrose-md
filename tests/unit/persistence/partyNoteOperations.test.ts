@@ -33,7 +33,7 @@ function makePin(overrides: Partial<PartyPin> = {}): PartyPin {
 const context = { mapId: 'map-1', mapName: 'Overworld', mapNotePath: 'Maps/Overworld.md' };
 
 function makeResults(overrides: Partial<PartyRangeResults> = {}): PartyRangeResults {
-  return { linked: [], unlinked: [], ...overrides };
+  return { linked: [], unlinked: [], beacons: [], ...overrides };
 }
 
 describe('sanitizePartyNoteFileName', () => {
@@ -252,5 +252,29 @@ describe('isOwnedPartyNoteContent', () => {
   it('handles CRLF frontmatter', () => {
     const content = `---\r\n${PARTY_NOTE_MARKER_KEY}: party-test-1\r\n---\r\nBody`;
     expect(isOwnedPartyNoteContent(content, 'party-test-1')).toBe(true);
+  });
+});
+
+describe('buildPartyNoteContent beacons table', () => {
+  const beacons = [
+    { pinId: 'party-b', label: 'Scouts', color: '#7ba8c4', distanceInCells: 2, distanceLabel: '10 ft', position: { x: 12, y: 10 }, notePath: 'Beacons/Scouts - Nearby.md' },
+    { pinId: 'party-c', label: 'Rival | Band', color: '#8ac47b', distanceInCells: 4, distanceLabel: '20 ft', position: { x: 14, y: 10 } }
+  ];
+
+  it('lists in-range beacons in their own table, linking those with a note', () => {
+    const content = buildPartyNoteContent(makePin(), makeResults({ beacons }), context);
+    expect(content).toContain('## Beacons');
+    expect(content).toContain('| Beacon | Distance | Map |');
+    expect(content).toContain('| [[Beacons/Scouts - Nearby\\|Scouts]] | 10 ft | [show](');
+    expect(content).toContain('| Rival \\| Band | 20 ft | [show](');
+    expect(content).not.toContain('*Nothing in range.*');
+  });
+
+  it('adds the Travel column from beacon labels', () => {
+    const travel = { linked: new Map(), unlinked: new Map(), beacons: new Map([['party-b', '2h on foot']]) };
+    const content = buildPartyNoteContent(makePin(), makeResults({ beacons }), context, undefined, travel);
+    expect(content).toContain('| Beacon | Distance | Travel | Map |');
+    expect(content).toContain('| [[Beacons/Scouts - Nearby\\|Scouts]] | 10 ft | 2h on foot | [show](');
+    expect(content).toContain('| Rival \\| Band | 20 ft | — | [show](');
   });
 });

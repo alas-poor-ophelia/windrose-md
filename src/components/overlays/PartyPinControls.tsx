@@ -102,7 +102,7 @@ const PartyPinControls = ({
     setRangeInvalid(false);
   }, [pin.id, pin.label, pin.range]);
 
-  const resultCount = results.linked.length + results.unlinked.length;
+  const resultCount = results.linked.length + results.unlinked.length + results.beacons.length;
   const { toolbarPos, isViewGesturing } = usePartyPinCardPosition({
     pin, geometry, mapData, canvasRef, viewController, resultCount
   });

@@ -225,7 +225,7 @@ const useEventCoordinator = ({
         // (and starts a drag); a miss deselects and falls through
         const partyPinSelectHandlers = getHandlers('partyPin');
         if (partyPinSelectHandlers?.handlePartyPinSelectPointerDown) {
-          const pinHandled = partyPinSelectHandlers.handlePartyPinSelectPointerDown(gridX, gridY);
+          const pinHandled = partyPinSelectHandlers.handlePartyPinSelectPointerDown(gridX, gridY, clientX, clientY);
           if (pinHandled) return;
         }
 
@@ -340,7 +340,7 @@ const useEventCoordinator = ({
 
         const partyPinHandlers = getHandlers('partyPin');
         if (partyPinHandlers?.handlePartyPinPointerDown) {
-          partyPinHandlers.handlePartyPinPointerDown(gridX, gridY);
+          partyPinHandlers.handlePartyPinPointerDown(gridX, gridY, clientX, clientY);
         }
 
       } else if (currentTool === 'diagonalFill') {

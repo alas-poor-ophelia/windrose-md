@@ -7,13 +7,19 @@
  *
  * A map can hold any number of pins; every pin carries its own range,
  * filters and note, so all lookups here are by id or by cell position.
+ *
+ * Up to four pins share a cell. They arrange themselves with the same slot
+ * table map objects use (hexSlotPositioner); a pin's slot is its order
+ * among the pins in its cell, so nothing extra is stored.
  */
 
 // Type-only imports
 import type { PartyPin, PartyRangeStyle } from '#types/core/map.types';
-import type { Point } from '#types/core/geometry.types';
+import type { IGeometry, Point } from '#types/core/geometry.types';
+import type { HexOrientation } from '#types/settings/settings.types';
 
 import { getIconInfo } from '../assets/rpgAwesomeIcons';
+import { getMaxObjectsPerCell, getMultiObjectScale, getSlotOffset } from './hexSlotPositioner';
 
 /** Defaults for a freshly placed party pin */
 const PARTY_PIN_DEFAULTS = {
@@ -52,11 +58,115 @@ function isValidRange(value: number): boolean {
 }
 
 /**
- * Find the pin occupying a cell, or null when the cell is free.
- * One pin per cell is an invariant of placement and dragging.
+ * Find the first pin occupying a cell, or null when the cell is free.
  */
 function findPartyPinAt(partyPins: PartyPin[] | undefined, position: Point): PartyPin | null {
   return partyPins?.find(p => p.position.x === position.x && p.position.y === position.y) ?? null;
+}
+
+/** Every pin in a cell, in array (draw) order */
+function getPartyPinsAt(partyPins: PartyPin[] | undefined, position: Point): PartyPin[] {
+  return (partyPins ?? []).filter(p => p.position.x === position.x && p.position.y === position.y);
+}
+
+/**
+ * Whether a cell can take one more pin. A pin already in the cell never
+ * counts against itself, so dragging within a full cell stays legal.
+ */
+function canAddPartyPinToCell(partyPins: PartyPin[] | undefined, position: Point, excludePinId?: string): boolean {
+  const occupants = getPartyPinsAt(partyPins, position).filter(p => p.id !== excludePinId);
+  return occupants.length < getMaxObjectsPerCell();
+}
+
+/** Where a pin's icon sits relative to its cell centre, and how large */
+interface PartyPinIconPlacement {
+  /** World-space offset from the cell centre */
+  offsetX: number;
+  offsetY: number;
+  /** Icon scale multiplier; shrinks as the cell fills */
+  scale: number;
+  /** True when other pins share the cell */
+  sharesCell: boolean;
+}
+
+/** Half-width and height of the pin silhouette in its native units (tip at the origin) */
+const PIN_ICON_NATIVE = { halfWidth: 11, height: 30 };
+
+/** World size of one cell (hex size on hex maps) */
+function getCellWorldSize(geometry: IGeometry): number {
+  const cellSize = geometry.cellSize ?? geometry.getScaledCellSize(1);
+  return Number.isFinite(cellSize) && cellSize > 0 ? cellSize : 1;
+}
+
+/** Native-to-world scale of the pin icon before any multi-pin shrink */
+function getPartyPinIconScale(geometry: IGeometry): number {
+  return (getCellWorldSize(geometry) * 0.9) / PIN_ICON_NATIVE.height;
+}
+
+/**
+ * A pin's icon placement among the pins sharing its cell: the slot offset
+ * table scaled to the cell (full hex width on hex maps, one cell on grids)
+ * plus the multi-object shrink. A pin alone in its cell sits dead centre.
+ */
+function getPartyPinIconPlacement(partyPins: PartyPin[] | undefined, pin: PartyPin, geometry: IGeometry): PartyPinIconPlacement {
+  const cellPins = getPartyPinsAt(partyPins, pin.position);
+  const count = cellPins.length;
+  if (count <= 1) return { offsetX: 0, offsetY: 0, scale: 1, sharesCell: false };
+  const slot = Math.max(0, cellPins.findIndex(p => p.id === pin.id));
+  const isHex = geometry.type === 'hex';
+  const orientation: HexOrientation = isHex
+    ? ((geometry as { orientation?: HexOrientation }).orientation ?? 'flat')
+    : 'flat';
+  const cellWidth = getCellWorldSize(geometry) * (isHex ? 2 : 1);
+  const { offsetX, offsetY } = getSlotOffset(slot, count, orientation);
+  return { offsetX: offsetX * cellWidth, offsetY: offsetY * cellWidth, scale: getMultiObjectScale(count), sharesCell: true };
+}
+
+/** The pin head: a circle of the silhouette's half-width, centred above the tip */
+const PIN_HEAD_CENTER_Y = -19;
+
+/**
+ * Whether a point in the icon's native units (tip at the origin, y up is
+ * negative) lies on the pin silhouette: the round head, or the body that
+ * tapers from the head's width down to the tip. `pad` widens both.
+ */
+function isOnPinSilhouette(dx: number, dy: number, pad: number): boolean {
+  const r = PIN_ICON_NATIVE.halfWidth + pad;
+  const headDx = dx;
+  const headDy = dy - PIN_HEAD_CENTER_Y;
+  if (headDx * headDx + headDy * headDy <= r * r) return true;
+  if (dy > pad || dy < PIN_HEAD_CENTER_Y) return false;
+  const bodyHalfWidth = PIN_ICON_NATIVE.halfWidth * (-dy / -PIN_HEAD_CENTER_Y);
+  return Math.abs(dx) <= bodyHalfWidth + pad;
+}
+
+/**
+ * The pin whose icon covers a world point, or null when the point misses
+ * every icon. Pins sharing a cell overlap once shrunk, so among the icons
+ * under the point the one whose head is nearest wins (a later, topmost
+ * pin breaks ties). The test uses the pin silhouette at its placed scale,
+ * padded a little for fat fingers.
+ */
+function findPartyPinAtWorld(partyPins: PartyPin[] | undefined, worldX: number, worldY: number, geometry: IGeometry): PartyPin | null {
+  const pins = partyPins ?? [];
+  const baseScale = getPartyPinIconScale(geometry);
+  const pad = 2;
+  let best: PartyPin | null = null;
+  let bestDistance = Infinity;
+  for (const pin of pins) {
+    const placement = getPartyPinIconPlacement(pins, pin, geometry);
+    const center = geometry.getCellCenter(pin.position.x, pin.position.y);
+    const s = baseScale * placement.scale;
+    const dx = (worldX - (center.worldX + placement.offsetX)) / s;
+    const dy = (worldY - (center.worldY + placement.offsetY)) / s;
+    if (!isOnPinSilhouette(dx, dy, pad)) continue;
+    const headDistance = Math.hypot(dx, dy - PIN_HEAD_CENTER_Y);
+    if (headDistance <= bestDistance) {
+      best = pin;
+      bestDistance = headDistance;
+    }
+  }
+  return best;
 }
 
 /**
@@ -233,11 +343,17 @@ function formatPropertyFilters(properties: Record<string, string[]> | undefined)
     .join('; ');
 }
 
+export type { PartyPinIconPlacement };
 export {
   PARTY_PIN_DEFAULTS,
   PARTY_PIN_PALETTE,
   isValidRange,
   findPartyPinAt,
+  getPartyPinsAt,
+  canAddPartyPinToCell,
+  getPartyPinIconScale,
+  getPartyPinIconPlacement,
+  findPartyPinAtWorld,
   getPartyPinById,
   createPartyPin,
   nextPartyPinDefaults,

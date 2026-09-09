@@ -9,7 +9,10 @@
  * Candidates are markers across all layers: objects carrying a linked note
  * form the primary results (keyed by note, deduplicated at minimum
  * distance); markers with only a label/tooltip form a separate unlinked
- * list. Everything here is in-memory map data — no vault scans.
+ * list. The map's other beacons form a third list — every beacon is
+ * discoverable unless it opted out — and ignore layer scope and note
+ * filters, since a beacon sits on no layer and links no note of its own.
+ * Everything here is in-memory map data — no vault scans.
  */
 
 // Type-only imports
@@ -52,9 +55,22 @@ export interface PartyRangeUnlinkedResult {
   position: Point;
 }
 
+/** Another beacon within range of this one */
+export interface PartyRangeBeaconResult {
+  pinId: string;
+  label: string;
+  color: string;
+  distanceInCells: number;
+  distanceLabel: string;
+  position: Point;
+  /** That beacon's generated note, when it has one */
+  notePath?: string;
+}
+
 export interface PartyRangeResults {
   linked: PartyRangeNoteResult[];
   unlinked: PartyRangeUnlinkedResult[];
+  beacons: PartyRangeBeaconResult[];
 }
 
 interface PartyRangeQuerySettings {
@@ -69,11 +85,11 @@ interface PartyRangeQuerySettings {
 
 /**
  * The slice of map data the query reads. Narrower than MapData on purpose:
- * callers hold one memoized query per beacon, and depending on `layers`
- * alone keeps a beacon's results cached while unrelated map edits (another
- * beacon moving, a label change) churn the map object.
+ * callers hold one memoized query per beacon, and depending on these two
+ * fields alone keeps a beacon's results cached while unrelated map edits
+ * (a cell painted, a view change) churn the map object.
  */
-export type PartyRangeMapData = Pick<MapData, 'layers'>;
+export type PartyRangeMapData = Pick<MapData, 'layers' | 'partyPins'>;
 
 const RANGE_EPSILON = 1e-6;
 
@@ -139,10 +155,47 @@ function passesFilters(pin: PartyPin, notePath: string, noteMetadata?: NoteMetad
   return true;
 }
 
+/** The distance settings the beacon-to-beacon query needs */
+type PartyBeaconQuerySettings = Omit<PartyRangeQuerySettings, 'noteMetadata'>;
+
+/**
+ * The other beacons within range of this one, nearest first. Cheap on its
+ * own, so callers can key it on the pin list alone and leave the marker
+ * scan cached while a beacon drags.
+ */
+function queryPartyBeacons(
+  partyPins: PartyPin[] | undefined,
+  geometry: IGeometry,
+  pin: PartyPin,
+  settings: PartyBeaconQuerySettings
+): PartyRangeBeaconResult[] {
+  const { rangeInCells, distancePerCell, distanceUnit, diagonalRule, displayFormat } = settings;
+  const beacons: PartyRangeBeaconResult[] = [];
+  for (const other of partyPins ?? []) {
+    if (other.id === pin.id || other.discoverable === false) continue;
+    const distance = geometry.getCellDistance(
+      pin.position.x, pin.position.y, other.position.x, other.position.y, { diagonalRule }
+    );
+    if (distance > rangeInCells + RANGE_EPSILON) continue;
+    const notePath = other.partyNote?.path;
+    beacons.push({
+      pinId: other.id,
+      label: other.label,
+      color: other.color,
+      distanceInCells: distance,
+      distanceLabel: formatDistance(distance, distancePerCell, distanceUnit, displayFormat),
+      position: other.position,
+      ...(notePath != null && notePath !== '' ? { notePath } : {})
+    });
+  }
+  beacons.sort((a, b) => a.distanceInCells - b.distanceInCells);
+  return beacons;
+}
+
 /**
  * Collect the markers within range of the party pin.
- * @returns Linked notes (deduplicated, min distance first) and labeled
- *          unlinked markers, both sorted nearest-first.
+ * @returns Linked notes (deduplicated, min distance first), labeled
+ *          unlinked markers and discoverable beacons, all sorted nearest-first.
  */
 function queryPartyRange(
   mapData: PartyRangeMapData,
@@ -194,7 +247,8 @@ function queryPartyRange(
 
   const linked = Array.from(byNote.values()).sort((a, b) => a.distanceInCells - b.distanceInCells);
   unlinked.sort((a, b) => a.distanceInCells - b.distanceInCells);
-  return { linked, unlinked };
+  const beacons = queryPartyBeacons(mapData.partyPins, geometry, pin, settings);
+  return { linked, unlinked, beacons };
 }
 
-export { queryPartyRange, noteDisplayName };
+export { queryPartyRange, queryPartyBeacons, noteDisplayName };

@@ -9,6 +9,10 @@ import {
   PARTY_PIN_PALETTE,
   isValidRange,
   findPartyPinAt,
+  getPartyPinsAt,
+  canAddPartyPinToCell,
+  getPartyPinIconPlacement,
+  findPartyPinAtWorld,
   getPartyPinById,
   createPartyPin,
   nextPartyPinDefaults,
@@ -22,6 +26,8 @@ import {
   parsePropertyFilters,
   formatPropertyFilters,
 } from '../../../src/objects/partyPinOperations';
+import { GridGeometry } from '../../../src/geometry/core/GridGeometry';
+import { HexGeometry } from '../../../src/geometry/core/HexGeometry';
 
 describe('isValidRange', () => {
   it('accepts positive finite numbers', () => {
@@ -266,5 +272,66 @@ describe('removePartyPin', () => {
     const a = createPartyPin({ x: 0, y: 0 });
     const b = createPartyPin({ x: 1, y: 1 });
     expect(removePartyPin([a, b], a.id)).toEqual([b]);
+  });
+});
+
+describe('stacked pins per cell', () => {
+  const grid = new GridGeometry(32);
+  const flatHex = new HexGeometry(40, 'flat');
+  const pinAt = (id: string, x: number, y: number) => createPartyPin({ x, y }, { label: id });
+  const withId = (pin: ReturnType<typeof createPartyPin>, id: string) => ({ ...pin, id });
+
+  it('lists the pins in a cell in array order and counts free slots', () => {
+    const a = withId(pinAt('a', 2, 2), 'a');
+    const b = withId(pinAt('b', 2, 2), 'b');
+    const c = withId(pinAt('c', 5, 5), 'c');
+    const pins = [a, b, c];
+    expect(getPartyPinsAt(pins, { x: 2, y: 2 }).map(p => p.id)).toEqual(['a', 'b']);
+    expect(canAddPartyPinToCell(pins, { x: 2, y: 2 })).toBe(true);
+    expect(canAddPartyPinToCell(pins, { x: 9, y: 9 })).toBe(true);
+  });
+
+  it('refuses a fifth pin but lets a pin already in the cell move within it', () => {
+    const pins = ['a', 'b', 'c', 'd'].map(id => withId(pinAt(id, 2, 2), id));
+    expect(canAddPartyPinToCell(pins, { x: 2, y: 2 })).toBe(false);
+    expect(canAddPartyPinToCell(pins, { x: 2, y: 2 }, 'c')).toBe(true);
+    expect(canAddPartyPinToCell(pins, { x: 2, y: 2 }, 'zzz')).toBe(false);
+  });
+
+  it('places a lone pin dead centre at full size', () => {
+    const a = withId(pinAt('a', 2, 2), 'a');
+    expect(getPartyPinIconPlacement([a], a, grid)).toEqual({ offsetX: 0, offsetY: 0, scale: 1, sharesCell: false });
+  });
+
+  it('offsets shared-cell pins by the slot table scaled to the cell', () => {
+    const a = withId(pinAt('a', 2, 2), 'a');
+    const b = withId(pinAt('b', 2, 2), 'b');
+    // Grid: one cell wide (32) — two pins sit ±0.22 cells apart, shrunk to 0.7
+    const gridA = getPartyPinIconPlacement([a, b], a, grid);
+    const gridB = getPartyPinIconPlacement([a, b], b, grid);
+    expect(gridA.offsetX).toBeCloseTo(-0.22 * 32);
+    expect(gridB.offsetX).toBeCloseTo(0.22 * 32);
+    expect(gridA.offsetY).toBe(0);
+    expect(gridA.scale).toBe(0.7);
+    expect(gridA.sharesCell).toBe(true);
+    // Flat hex: full hex width (2 × size) is the unit, as for objects
+    const hexA = getPartyPinIconPlacement([a, b], a, flatHex);
+    expect(hexA.offsetX).toBeCloseTo(-0.22 * 80);
+    expect(hexA.scale).toBe(0.7);
+  });
+
+  it('hit-tests pin icons individually inside a shared cell', () => {
+    const a = withId(pinAt('a', 2, 2), 'a');
+    const b = withId(pinAt('b', 2, 2), 'b');
+    const solo = withId(pinAt('solo', 5, 5), 'solo');
+    const pins = [a, b, solo];
+    // Cell (2,2) centre is (80,80); a sits at x≈72.96, b at x≈87.04, icons rising ~20px above the tip
+    expect(findPartyPinAtWorld(pins, 87, 70, grid)?.id).toBe('b');
+    expect(findPartyPinAtWorld(pins, 73, 70, grid)?.id).toBe('a');
+    // Below the tips: nothing
+    expect(findPartyPinAtWorld(pins, 80, 95, grid)).toBeNull();
+    // A lone pin's icon spans the full 0.9-cell height above its cell centre
+    expect(findPartyPinAtWorld(pins, 176, 160, grid)?.id).toBe('solo');
+    expect(findPartyPinAtWorld(pins, 300, 300, grid)).toBeNull();
   });
 });

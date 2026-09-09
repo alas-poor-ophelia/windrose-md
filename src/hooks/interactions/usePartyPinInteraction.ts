@@ -1,20 +1,34 @@
 /**
  * usePartyPinInteraction.ts
  *
- * Party pin tool behavior. Pressing an empty cell places a NEW pin there;
- * pressing a cell that already holds one grabs that pin and dragging carries
- * it live so its range ring follows. Two pins never share a cell — placement
- * on an occupied cell targets the pin already there, and a drag refuses cells
- * held by another pin. Intermediate drag positions suppress history; release
- * commits the gesture as a single undo step.
+ * Party pin tool behavior. Pressing a pin's icon grabs that pin and dragging
+ * carries it live so its range ring follows; pressing anywhere else places
+ * a NEW pin in that cell while the cell has a free slot (up to four pins
+ * share a cell, arranged like stacked objects), and grabs the topmost pin
+ * once the cell is full. A drag refuses cells that are already full.
+ * Intermediate drag positions suppress history; release commits the
+ * gesture as a single undo step.
+ *
+ * Icon hit-testing needs the press in world space; without a screen-to-
+ * world converter (or the client position) the hook falls back to the
+ * cell: a cell holding exactly one pin counts as a hit on that pin.
  */
 
 // Type-only imports
 import type { PartyPin } from '#types/core/map.types';
-import type { Point } from '#types/core/geometry.types';
+import type { IGeometry, Point } from '#types/core/geometry.types';
 
 import { useCallback, useRef } from 'preact/hooks';
-import { createPartyPin, findPartyPinAt, getPartyPinById, movePartyPin, nextPartyPinDefaults, upsertPartyPin } from '../../objects/partyPinOperations';
+import {
+  canAddPartyPinToCell,
+  createPartyPin,
+  findPartyPinAtWorld,
+  getPartyPinById,
+  getPartyPinsAt,
+  movePartyPin,
+  nextPartyPinDefaults,
+  upsertPartyPin
+} from '../../objects/partyPinOperations';
 
 type PartyPinsChangeHandler = (partyPins: PartyPin[], suppressHistory?: boolean) => void;
 
@@ -25,9 +39,15 @@ type PartyPinsChangeHandler = (partyPins: PartyPin[], suppressHistory?: boolean)
  */
 type ActivePinChangeHandler = (pinId: string | null, viaSelect: boolean) => void;
 
+/** What the hook needs to hit-test pin icons rather than whole cells */
+interface PartyPinLocator {
+  geometry: IGeometry | null;
+  screenToWorld: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
+}
+
 interface UsePartyPinInteractionResult {
-  handlePartyPinPointerDown: (gridX: number, gridY: number) => void;
-  handlePartyPinSelectPointerDown: (gridX: number, gridY: number) => boolean;
+  handlePartyPinPointerDown: (gridX: number, gridY: number, clientX?: number, clientY?: number) => void;
+  handlePartyPinSelectPointerDown: (gridX: number, gridY: number, clientX?: number, clientY?: number) => boolean;
   handlePartyPinMove: (gridX: number, gridY: number) => void;
   stopPartyPinDrag: () => void;
   isPartyPinDragging: () => boolean;
@@ -36,11 +56,14 @@ interface UsePartyPinInteractionResult {
 function usePartyPinInteraction(
   partyPins: PartyPin[] | undefined,
   onPartyPinsChange: PartyPinsChangeHandler,
-  onActivePinChange?: ActivePinChangeHandler
+  onActivePinChange?: ActivePinChangeHandler,
+  locator?: PartyPinLocator
 ): UsePartyPinInteractionResult {
   // Latest pins without re-registering handlers each render
   const pinsRef = useRef<PartyPin[]>([]);
   pinsRef.current = partyPins ?? [];
+  const locatorRef = useRef<PartyPinLocator | undefined>(undefined);
+  locatorRef.current = locator;
 
   const isDraggingRef = useRef(false);
   // Pin currently under the gesture — a map can hold many
@@ -52,39 +75,65 @@ function usePartyPinInteraction(
   // pins prop can lag one render behind the final suppressed move.
   const dragPositionRef = useRef<Point | null>(null);
 
-  const handlePartyPinPointerDown = useCallback((gridX: number, gridY: number): void => {
+  /**
+   * The pin a press lands on: its icon in world space when the press
+   * position is known. Null is a miss. `cellFallback` lets a miss inside a
+   * cell holding exactly one pin count as that pin — right for selecting,
+   * wrong for the beacon tool, where a miss beside a lone pin must place
+   * the next one. Without a world position the cell rule is all there is.
+   */
+  const resolvePressedPin = useCallback((gridX: number, gridY: number, clientX: number | undefined, clientY: number | undefined, cellFallback: boolean): PartyPin | null => {
     const pins = pinsRef.current;
-    const existing = findPartyPinAt(pins, { x: gridX, y: gridY });
+    const cellPins = getPartyPinsAt(pins, { x: gridX, y: gridY });
+    const solePin = cellPins.length === 1 ? cellPins[0] : null;
+    const geometry = locatorRef.current?.geometry ?? null;
+    const world = (clientX != null && clientY != null) ? locatorRef.current?.screenToWorld(clientX, clientY) ?? null : null;
+    if (!geometry || !world) return solePin;
+    const hit = findPartyPinAtWorld(pins, world.worldX, world.worldY, geometry);
+    if (hit) return hit;
+    return cellFallback ? solePin : null;
+  }, []);
 
-    if (!existing) {
-      const pin = createPartyPin({ x: gridX, y: gridY }, nextPartyPinDefaults(pins));
+  const beginDrag = useCallback((pin: PartyPin, gridX: number, gridY: number, viaSelect: boolean): void => {
+    isDraggingRef.current = true;
+    dragPinIdRef.current = pin.id;
+    dragPositionRef.current = { x: gridX, y: gridY };
+    didDragMoveRef.current = false;
+    onActivePinChange?.(pin.id, viaSelect);
+  }, [onActivePinChange]);
+
+  const handlePartyPinPointerDown = useCallback((gridX: number, gridY: number, clientX?: number, clientY?: number): void => {
+    const pins = pinsRef.current;
+    const cell = { x: gridX, y: gridY };
+    const pressed = resolvePressedPin(gridX, gridY, clientX, clientY, false);
+    if (pressed) {
+      beginDrag(pressed, gridX, gridY, false);
+      return;
+    }
+
+    if (canAddPartyPinToCell(pins, cell)) {
+      const pin = createPartyPin(cell, nextPartyPinDefaults(pins));
       onPartyPinsChange(upsertPartyPin(pins, pin));
       onActivePinChange?.(pin.id, false);
       return;
     }
 
-    isDraggingRef.current = true;
-    dragPinIdRef.current = existing.id;
-    dragPositionRef.current = { x: gridX, y: gridY };
-    didDragMoveRef.current = false;
-    onActivePinChange?.(existing.id, false);
-  }, [onPartyPinsChange, onActivePinChange]);
+    // Full cell: the press grabs the topmost pin rather than doing nothing
+    const cellPins = getPartyPinsAt(pins, cell);
+    beginDrag(cellPins[cellPins.length - 1], gridX, gridY, false);
+  }, [resolvePressedPin, beginDrag, onPartyPinsChange, onActivePinChange]);
 
-  // Select-tool grab: only a press on a pin's own cell counts. A hit selects
+  // Select-tool grab: a press on a pin's icon (or a cell's sole pin) selects
   // that pin and starts a drag from its current cell; a miss deselects.
-  const handlePartyPinSelectPointerDown = useCallback((gridX: number, gridY: number): boolean => {
-    const pin = findPartyPinAt(pinsRef.current, { x: gridX, y: gridY });
+  const handlePartyPinSelectPointerDown = useCallback((gridX: number, gridY: number, clientX?: number, clientY?: number): boolean => {
+    const pin = resolvePressedPin(gridX, gridY, clientX, clientY, true);
     if (!pin) {
       onActivePinChange?.(null, true);
       return false;
     }
-    isDraggingRef.current = true;
-    dragPinIdRef.current = pin.id;
-    dragPositionRef.current = { x: gridX, y: gridY };
-    didDragMoveRef.current = false;
-    onActivePinChange?.(pin.id, true);
+    beginDrag(pin, gridX, gridY, true);
     return true;
-  }, [onActivePinChange]);
+  }, [resolvePressedPin, beginDrag, onActivePinChange]);
 
   const handlePartyPinMove = useCallback((gridX: number, gridY: number): void => {
     if (!isDraggingRef.current) return;
@@ -99,9 +148,8 @@ function usePartyPinInteraction(
 
     const previous = dragPositionRef.current;
     if (previous && previous.x === gridX && previous.y === gridY) return;
-    // Never stack pins: a cell held by another pin refuses the move
-    const occupant = findPartyPinAt(pins, { x: gridX, y: gridY });
-    if (occupant && occupant.id !== pin.id) return;
+    // A full cell refuses the move; a cell with a free slot takes the pin
+    if (!canAddPartyPinToCell(pins, { x: gridX, y: gridY }, pin.id)) return;
 
     dragPositionRef.current = { x: gridX, y: gridY };
     didDragMoveRef.current = true;
