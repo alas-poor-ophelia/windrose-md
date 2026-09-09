@@ -2146,6 +2146,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           currentObjects={mapData.mapType === 'hex' ? getActiveLayer(mapData).objects : []}
           mapData={mapData}
           geometry={geometry}
+          layerVisibility={layerVisibility}
           isInSubHex={isInSubHex}
           subMapName={isInSubHex ? (mapData?.name ?? undefined) : undefined}
           mapId={isInSubHex ? undefined : mapId}

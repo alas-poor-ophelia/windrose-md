@@ -8,6 +8,7 @@
 import type { RefObject } from 'preact';
 import type { MapData, StoredViewState } from '../core/map.types';
 import type { ExtendedGeometry, LayerVisibility, SelectedItem } from '../contexts/context.types';
+import type { ExportLayerOption } from '../core/export.types';
 import type { ViewController } from './viewController.types';
 export type { LayerVisibility };
 
@@ -105,6 +106,12 @@ export interface RenderCanvasOptions {
    * the canvas follows the gesture without setMapData reconciling the tree.
    */
   liveViewState?: StoredViewState | null;
+  /**
+   * Image export only: the exact set of map layers to composite, each at its own
+   * opacity. Overrides the live layer stack (getRenderLayers), which shows only
+   * the active layer on simple maps and the active board's layers on strata maps.
+   */
+  exportLayers?: ExportLayerOption[] | null;
 }
 
 /** Main render function */

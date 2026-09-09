@@ -111,7 +111,11 @@ Map Settings is a modal opened from the Map Controls. Its settings affect only t
 - Remember the **drawer** open/closed state.
 - Remember the **expanded** state.
 - Keep **map controls** always open, versus showing them on hover.
-- **Export** the map as a PNG to your vault — captures the entire currently visible layer, including the background image and any peeking layers.
+- **Export** the map as a PNG to your vault. The export dialog lets you pick exactly what lands in the image:
+  - **Content** — turn the grid, objects, text labels and (on hex maps) regions and outlines on or off. These start from whatever the map is currently showing.
+  - **Layers** — include or exclude each layer of the map, and set the opacity each one is drawn at. A simple map starts with just its active layer selected; a multi-floor map starts with the layers the current floor is showing.
+
+  The image is sized from the content of the layers you selected, plus a small margin. Objects, text labels and fog come from the active layer; saved routes and the party beacon are not drawn into the exported image.
 
 ## Global settings
 

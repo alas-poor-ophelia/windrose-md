@@ -13,13 +13,14 @@ import type { TextLabel } from '#types/objects/note.types';
 import type {
   RenderParams,
   ExportResult,
-  ExportTheme
+  ExportTheme,
+  ExportImageOptions
 } from '#types/core/export.types';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { App } from 'obsidian';
 import { TFile } from 'obsidian';
 
-import { getActiveLayer } from './layerAccessor';
+import { getActiveLayer, getExportLayers } from './layerAccessor';
 import { getFontCss } from '../text/fontOptions';
 import { renderCanvas } from '../hooks/canvas/useCanvasRenderer';
 import { getSettings } from '../core/settingsAccessor';
@@ -130,7 +131,8 @@ function calculateContentBounds(
  */
 function renderMapToCanvas(
   ctx: CanvasRenderingContext2D,
-  params: RenderParams
+  params: RenderParams,
+  options: ExportImageOptions
 ): void {
   const { mapData, geometry, width, height } = params;
 
@@ -169,7 +171,13 @@ function renderMapToCanvas(
     mapData,
     geometry,
     [],
-    { isResizeMode: false, theme, showCoordinates: false, layerVisibility: { grid: true, objects: true, textLabels: true, hexCoordinates: false, regions: true, outlines: true } }
+    {
+      isResizeMode: false,
+      theme,
+      showCoordinates: false,
+      layerVisibility: options.visibility,
+      exportLayers: options.layers
+    }
   );
 
   ctx.drawImage(tempCanvas, 0, 0);
@@ -185,17 +193,40 @@ function renderMapToCanvas(
 async function exportMapAsImage(
   mapData: MapData,
   geometry: ExtendedGeometry,
-  buffer: number = 20
+  options: ExportImageOptions
 ): Promise<Blob> {
+  const buffer = options.buffer ?? 20;
+  const exportLayers = getExportLayers(mapData, options.layers);
+
+  if (exportLayers.length === 0) {
+    throw new Error('No layers selected to export');
+  }
+
+  // Objects, text labels and fog always come from the active layer. When the
+  // active layer is excluded, re-point the export at the topmost selected layer
+  // so an unselected layer's content can never leak into the image.
   const activeLayer = getActiveLayer(mapData);
-  
-  // Calculate content bounds
-  const bounds = calculateContentBounds(activeLayer, geometry);
-  
+  const exportMapData: MapData = exportLayers.some(layer => layer.id === activeLayer.id)
+    ? mapData
+    : { ...mapData, activeLayerId: exportLayers[exportLayers.length - 1].id };
+
+  // Calculate content bounds across every selected layer
+  let bounds: BoundingBox | null = null;
+  for (const layer of exportLayers) {
+    const layerBounds = calculateContentBounds(layer, geometry);
+    if (!layerBounds) continue;
+    bounds = bounds === null ? layerBounds : {
+      minX: Math.min(bounds.minX, layerBounds.minX),
+      minY: Math.min(bounds.minY, layerBounds.minY),
+      maxX: Math.max(bounds.maxX, layerBounds.maxX),
+      maxY: Math.max(bounds.maxY, layerBounds.maxY)
+    };
+  }
+
   if (!bounds) {
     throw new Error('No content to export');
   }
-  
+
   // Add buffer
   const exportBounds: BoundingBox = {
     minX: bounds.minX - buffer,
@@ -220,12 +251,12 @@ async function exportMapAsImage(
   
   // Render map to canvas
   renderMapToCanvas(ctx, {
-    mapData,
+    mapData: exportMapData,
     geometry,
     bounds: exportBounds,
     width,
     height
-  });
+  }, options);
   
   // Convert to blob
   return new Promise((resolve, reject) => {
@@ -246,10 +277,11 @@ async function saveMapImageToVault(
   app: App,
   mapData: MapData,
   geometry: ExtendedGeometry,
+  options: ExportImageOptions,
   filename?: string
 ): Promise<ExportResult> {
   try {
-    const blob = await exportMapAsImage(mapData, geometry);
+    const blob = await exportMapAsImage(mapData, geometry, options);
     
     // Convert blob to array buffer
     const arrayBuffer = await blob.arrayBuffer();

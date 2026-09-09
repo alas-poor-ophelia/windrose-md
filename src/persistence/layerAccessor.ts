@@ -21,6 +21,7 @@ import type {
 } from '#types/core/map.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { TileLayerRole } from '#types/tiles/tile.types';
+import type { ExportLayerOption } from '#types/core/export.types';
 
 import { DEFAULT_TILE_LAYERS } from '#types/tiles/tile.types';
 import { SCHEMA_VERSION } from '../core/dmtConstants';
@@ -210,6 +211,38 @@ function getRenderLayers(mapData: MapData | null | undefined): MapLayer[] {
   }
   // getActiveLayer always resolves to a layer (legacy fallback included).
   return [getActiveLayer(mapData)];
+}
+
+/**
+ * Resolve the layers an image export should composite, from the dialog's
+ * selection. Unknown ids are dropped and the result is sorted by layer order
+ * (ascending) so the export draws bottom-to-top like the live canvas.
+ */
+function getExportLayers(
+  mapData: MapData | null | undefined,
+  selections: ExportLayerOption[]
+): MapLayer[] {
+  if (!mapData?.layers) return [];
+  const byId = new Map<LayerId, MapLayer>(mapData.layers.map(l => [l.id, l]));
+  const resolved: MapLayer[] = [];
+  const seen = new Set<LayerId>();
+  for (const selection of selections) {
+    if (seen.has(selection.id)) continue;
+    const layer = byId.get(selection.id);
+    if (layer) {
+      resolved.push(layer);
+      seen.add(selection.id);
+    }
+  }
+  return resolved.sort((a, b) => a.order - b.order);
+}
+
+/**
+ * Default export selection: the layers the live canvas is currently drawing,
+ * each at full opacity.
+ */
+function getDefaultExportLayers(mapData: MapData | null | undefined): ExportLayerOption[] {
+  return getRenderLayers(mapData).map(layer => ({ id: layer.id, opacity: 1 }));
 }
 
 /**
@@ -1080,7 +1113,7 @@ export {
   migrateToLayerSchema, needsMigration,
   // Board (floor) projection
   DEFAULT_BOARD_ID, generateBoardId, layerBoardId, getBoardsOrdered, getActiveBoardId,
-  getBoardLayers, getActiveBoardLayers, getBoardBelow, updateBoard, getRenderLayers, ensureBoards, addBoard, removeBoard, setActiveBoard,
+  getBoardLayers, getActiveBoardLayers, getBoardBelow, updateBoard, getRenderLayers, getExportLayers, getDefaultExportLayers, ensureBoards, addBoard, removeBoard, setActiveBoard,
   promoteToStrata, setLayerMode,
   initializeFogOfWar, isCellFogged, fogCell, revealCell,
   fogRectangle, revealRectangle, fogAll, fogPaintedCells, revealAll,

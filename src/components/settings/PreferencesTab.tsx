@@ -20,6 +20,7 @@ import type { VNode } from 'preact';
 import { useModalShell, useAppearance } from '../../context/MapSettingsContext';
 import { useApp } from '../../context/AppContext';
 import { saveMapImageToVault } from '../../persistence/exportOperations';
+import { ExportImageModal } from '../modals/ExportImageModal';
 import { SettingItem, SettingHeading } from './SettingItem';
 import { NativeToggle } from './NativeControls';
 interface ExportResult {
@@ -32,7 +33,7 @@ interface ExportResult {
  * Preferences tab content
  */
 function PreferencesTab(): VNode {
-  const { preferences, handlePreferenceToggle, mapData, geometry } = useModalShell();
+  const { preferences, handlePreferenceToggle, mapData, geometry, layerVisibility } = useModalShell();
   const { overrides, globalSettings, handleColorChange } = useAppearance();
   const app = useApp();
 
@@ -46,12 +47,15 @@ function PreferencesTab(): VNode {
       return;
     }
 
+    const options = await new ExportImageModal(app, { mapData, visibility: layerVisibility }).openAndGetValue();
+    if (options == null) return;
+
     setIsExporting(true);
     setExportError(null);
     setExportSuccess(null);
 
     try {
-      const result: ExportResult = await saveMapImageToVault(app, mapData, geometry);
+      const result: ExportResult = await saveMapImageToVault(app, mapData, geometry, options);
 
       if (result.success) {
         setExportSuccess(`Map saved to: ${result.path}`);
@@ -115,7 +119,7 @@ function PreferencesTab(): VNode {
 
       <SettingItem
         name="Export as image"
-        description="Save your map as a PNG file"
+        description="Choose layers and content, then save your map as a PNG file"
       >
         <button
           class="mod-cta"

@@ -53,7 +53,7 @@ import { buildMergeIndex } from '../../geometry/curves/curveCellOverlap';
 import { getCachedImage, getImageCacheVersion } from '../../assets/imageOperations';
 import { getSlotOffset, getMultiObjectScale, getObjectsInCell } from '../../objects/hexSlotPositioner';
 import { offsetToAxial, axialToOffset } from '../../geometry/core/offsetCoordinates';
-import { getActiveLayer, getLayerBelow, getRenderLayers, isCellFogged, getActiveBoardId, getBoardBelow, getBoardLayers } from '../../persistence/layerAccessor';
+import { getActiveLayer, getLayerBelow, getRenderLayers, getExportLayers, isCellFogged, getActiveBoardId, getBoardBelow, getBoardLayers } from '../../persistence/layerAccessor';
 
 interface Renderer {
   // Polymorphic properties
@@ -407,7 +407,7 @@ function renderLayerCellsAndEdges(
 }
 
 const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, selectedItems = [], options = {}) => {
-  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null, adjacentEmptySlots = null, hiddenTileLayers = undefined, draggingWallId = null, subHexPath = null, liveViewState = null } = options;
+  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null, adjacentEmptySlots = null, hiddenTileLayers = undefined, draggingWallId = null, subHexPath = null, liveViewState = null, exportLayers = null } = options;
   if (canvas == null) return;
 
   // Normalize selectedItems to array (backward compatibility)
@@ -424,7 +424,12 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // layers whose cells/curves/tiles get COMPOSITED (strata maps = the active
   // board's visible layers; all other maps = just the active layer).
   const activeLayer = getActiveLayer(mapData);
-  const renderLayers = getRenderLayers(mapData);
+  // Image export overrides the live stack with an explicit layer selection and
+  // per-layer opacity; everything else composites the live stack at full opacity.
+  const renderLayers = exportLayers != null ? getExportLayers(mapData, exportLayers) : getRenderLayers(mapData);
+  const exportOpacityById = exportLayers != null
+    ? new Map(exportLayers.map(sel => [sel.id, sel.opacity]))
+    : null;
   const isStrata = mapData.layerMode === 'strata';
 
   // Board-below ghost: when the ACTIVE board opts in, render the floor beneath it
@@ -762,6 +767,9 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     ? { cellSize: geometry.cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth ?? 1, interiorRatio: 0.5 }
     : undefined;
   for (const drawLayer of renderLayers) {
+    // Per-layer opacity only ever comes from an image export selection.
+    const layerOpacity = exportOpacityById?.get(drawLayer.id) ?? 1;
+
     // Build curve-cell merge index for this layer (grid maps only)
     let mergeIndex: CurveCellMergeIndex | null = null;
     if (geometry.type === 'grid' &&
@@ -775,6 +783,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
     // Cells and edges
     renderLayerCellsAndEdges(ctx, drawLayer, geometry, rendererViewState, THEME, renderer, {
+      opacity: layerOpacity,
       showGrid: visibility.grid !== false,
       mergeIndex,
       northDirection: northDirection ?? 0
@@ -783,6 +792,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     // Freehand curves (between cells and tiles)
     if (drawLayer.curves.length > 0) {
       renderCurves(ctx, drawLayer.curves, rendererViewState, THEME, {
+        opacity: layerOpacity,
         mergeIndex,
         gridConfig: curveGridConfig
       });
@@ -797,7 +807,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       if (wallsToRender.length > 0) {
         const wallCellSize = geometry.type === 'grid' ? geometry.cellSize : geometry.hexSize;
         renderWallPaths(ctx, wallsToRender, mapData.tilesets, rendererViewState, wallCellSize, {
-          getCachedImage
+          getCachedImage,
+          opacity: layerOpacity
         });
       }
     }
@@ -813,7 +824,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
         mapData.tilesets,
         tileGeomShim,
         rendererViewState,
-        { getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers: hiddenTileLayers, terrainStrokes: drawLayer.terrainStrokes }
+        { opacity: layerOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers: hiddenTileLayers, terrainStrokes: drawLayer.terrainStrokes }
       );
     }
   }

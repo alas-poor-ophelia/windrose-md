@@ -17,7 +17,7 @@ import type {
 } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
 import type { MapObject } from '#types/objects/object.types';
-import type { ExtendedGeometry } from '#types/contexts/context.types';
+import type { ExtendedGeometry, LayerVisibility } from '#types/contexts/context.types';
 import type { HexColor } from '#types/core/common.types';
 import type {
   PluginSettings,
@@ -225,6 +225,8 @@ export interface ModalShellContextValue {
   // Export (PreferencesTab)
   mapData: MapData | null;
   geometry: ExtendedGeometry | null;
+  /** Live content visibility; seeds the image export dialog */
+  layerVisibility: LayerVisibility;
   // Sub-hex context
   isInSubHex: boolean;
   subMapName: string | null;
@@ -345,6 +347,7 @@ export interface MapSettingsProviderProps {
   currentObjectSetId?: string | null;
   mapData?: MapData | null;
   geometry?: ExtendedGeometry | null;
+  layerVisibility?: LayerVisibility;
   isInSubHex?: boolean;
   subMapName?: string | null;
   mapId?: string;
@@ -354,6 +357,19 @@ export interface MapSettingsProviderProps {
 // ===========================================
 // Contexts
 // ===========================================
+
+/**
+ * Fallback content visibility for hosts that do not pass the live state.
+ * Module scope so the provider's default prop keeps a stable identity.
+ */
+const DEFAULT_EXPORT_VISIBILITY: LayerVisibility = {
+  grid: true,
+  objects: true,
+  textLabels: true,
+  hexCoordinates: false,
+  regions: true,
+  outlines: true
+};
 
 const ModalShellContext = createContext<ModalShellContextValue | null>(null);
 const AppearanceContext = createContext<AppearanceContextValue | null>(null);
@@ -407,6 +423,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   currentObjectSetId = null,
   mapData = null,
   geometry = null,
+  layerVisibility = DEFAULT_EXPORT_VISIBILITY,
   isInSubHex = false,
   subMapName = null,
   mapId,
@@ -807,11 +824,11 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     setDistanceSettings: handlers.setDistanceSettings,
     preferences: state.preferences,
     handlePreferenceToggle: handlers.handlePreferenceToggle,
-    mapData, geometry,
+    mapData, geometry, layerVisibility,
     isInSubHex, subMapName,
     mapId, onDeleteMap
   }), [isOpen, state.activeTab, state.isLoading, state.distanceSettings, state.preferences, isInSubHex, subMapName,
-    geometry, isHexMap, mapData, mapType, tabs, stableHandleSave, mapId, onDeleteMap,
+    geometry, isHexMap, mapData, layerVisibility, mapType, tabs, stableHandleSave, mapId, onDeleteMap,
     handlers.handleCancel, handlers.handlePreferenceToggle, handlers.setActiveTab, handlers.setDistanceSettings]);
 
   const appearanceValue = useMemo((): AppearanceContextValue => ({

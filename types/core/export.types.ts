@@ -6,9 +6,9 @@
  */
 
 import type { BoundingBox } from './geometry.types';
-import type { MapData } from './map.types';
+import type { LayerId, MapData } from './map.types';
 import type { HexColor } from './common.types';
-import type { ExtendedGeometry } from '../contexts/context.types';
+import type { ExtendedGeometry, LayerVisibility } from '../contexts/context.types';
 
 // ===========================================
 // Render Parameters
@@ -70,4 +70,25 @@ export interface ExportVisibilityOptions {
   objects: boolean;
   textLabels: boolean;
   hexCoordinates: boolean;
+}
+
+// ===========================================
+// Image Export Options
+// ===========================================
+
+/** A map layer chosen for image export, with the opacity it composites at */
+export interface ExportLayerOption {
+  id: LayerId;
+  /** 0-1 multiplier applied to the layer's cells, curves, wall paths and tiles */
+  opacity: number;
+}
+
+/** Everything the image export dialog collects */
+export interface ExportImageOptions {
+  /** Layers to composite; resolved and drawn bottom-to-top by layer order */
+  layers: ExportLayerOption[];
+  /** Content categories the canvas renderer gates */
+  visibility: LayerVisibility;
+  /** Padding in world units added around the content bounds */
+  buffer?: number;
 }
