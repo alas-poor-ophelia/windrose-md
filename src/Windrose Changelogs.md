@@ -608,6 +608,24 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.4.0
+
+Feature release: multiple Beacons per map, random dungeon generation from the full-pane view, rectangular and rotatable shape overlays, an image export dialog, and travel picker cleanups.
+
+### New Features
+- **Multiple Beacons.** The Beacon tool places a new Beacon on every click on empty ground; clicking an existing Beacon selects it, and dragging moves it. Each Beacon has its own range ring, filters and beacon note, and two Beacons never share a cell.
+- **Generate a random dungeon from the full-pane view.** A die button beside the create-new-map control opens the generator, saves the result as a new map and switches to it. The command-palette version still inserts a code block into the current note.
+- **Rectangular shape overlays, with rotation.** The square shape tool now places rectangles of any proportion (click two corners), and a selected rectangle gains a Rotate action in 45-degree steps. Maps saved by older versions load unchanged.
+- **Image export dialog.** Export as image now opens a dialog to choose which map layers to include and at what opacity, and to toggle the grid, objects, text labels and (on hex maps) regions and outlines. The toggles start from the current live visibility.
+
+### Bug Fixes
+- **Exported images now frame the whole map content** instead of a crop of the current viewport at the current zoom.
+
+### Improvements
+- **Segment terrain picker:** the None entry is gone; a Clear button appears at the bottom of the popup when the segment already has a terrain.
+- **Day length selector:** None is now labelled "No day length" and sorted last.
+- The Rectangle shape tool uses a rectangle icon.
+
 ## Version 2.3.5
 
 Patch release: cross-band erasing, a smoother region color picker, several shape overlay fixes, and a new Developer mode setting.

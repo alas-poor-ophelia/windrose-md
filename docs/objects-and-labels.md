@@ -65,9 +65,9 @@ A **note pin** (requires the *Note pins* feature) links a spot on the map direct
 
 ## Shape overlays
 
-**Shape overlays** (requires the *Shape overlays* feature) place decorative shapes — squares and circles — on the map for annotation and embellishment, independent of the painted grid.
+**Shape overlays** (requires the *Shape overlays* feature) place decorative shapes — rectangles and circles — on the map for annotation and embellishment, independent of the painted grid.
 
-Placing a square is corner to corner. A circle is placed center first, then a second click sets the edge, matching the Fill Circle tool. Placement snaps to the grid by default; hold **Alt+Shift**, or switch on **freeform placement mode**, to place freely instead. Selecting a placed shape shows a **Snap to Grid**/freeform toggle that converts it between the two.
+Placing a rectangle is corner to corner, so it can be any proportion, square included. A circle is placed center first, then a second click sets the edge, matching the Fill Circle tool. Placement snaps to the grid by default; hold **Alt+Shift**, or switch on **freeform placement mode**, to place freely instead. Selecting a placed shape shows a **Snap to Grid**/freeform toggle that converts it between the two, and a selected rectangle also gets a **Rotate** action that turns it in 45-degree steps around its center.
 
 ## Note linking and deeplinking
 

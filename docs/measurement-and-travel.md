@@ -36,4 +36,4 @@ With an enabled pack, the measurement readout grows a **Travel** block: a live t
 
 ## Per-segment terrain
 
-With a pack enabled, each route segment can be assigned a **terrain**: click a segment and pick from a popup anchored right at the segment. A segment's effective speed is the travel mode's speed times the terrain's multiplier; unassigned segments travel at plain mode speed. Terrain assignments are preserved when the route is saved.
+With a pack enabled, each route segment can be assigned a **terrain**: click a segment and pick from a popup anchored right at the segment. Pick again to change it, or use the popup's **Clear** button to unassign it. A segment's effective speed is the travel mode's speed times the terrain's multiplier; unassigned segments travel at plain mode speed. Terrain assignments are preserved when the route is saved.

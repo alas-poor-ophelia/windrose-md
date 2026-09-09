@@ -7,7 +7,7 @@ permalink: /random-dungeons/
 
 # Random dungeons
 
-Windrose can **generate random dungeon layouts** (grid maps only) via the **Generate random dungeon** command (Ctrl/Cmd+P, or swipe down from the top on mobile). This works from a note in edit mode. (Requires the *Dungeon generator* feature.)
+Windrose can **generate random dungeon layouts** (grid maps only) via the **Generate random dungeon** command (Ctrl/Cmd+P, or swipe down from the top on mobile), which works from a note in edit mode and inserts the new map as a code block. In the full-pane map view, the die button beside the create-new-map control opens the same generator, saves the result as a new map and switches to it. (Requires the *Dungeon generator* feature.)
 
 The generation is pure procedural math and graph work — no AI is involved; the animation you watch is an approximation of the algorithm at work. Generated dungeons come with doors and an entrance/exit staircase, and can optionally be stocked with other content.
 
