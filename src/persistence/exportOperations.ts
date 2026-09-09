@@ -8,7 +8,7 @@
 
 // Type-only imports
 import type { BoundingBox } from '#types/core/geometry.types';
-import type { MapData, MapLayer } from '#types/core/map.types';
+import type { MapData, MapLayer, StoredViewState } from '#types/core/map.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type {
   RenderParams,
@@ -127,6 +127,26 @@ function calculateContentBounds(
 // ===========================================
 
 /**
+ * View state that frames `bounds` on a canvas sized exactly to them.
+ *
+ * renderCanvas positions content from a center + zoom (calculateViewportOffset),
+ * so exporting with the map's live viewState produced a crop of whatever the
+ * user was looking at. Zoom is fixed at 1 (bounds are in unzoomed world px);
+ * grid centers are expressed in cell units, hex centers in world px.
+ */
+function exportViewStateForBounds(
+  geometry: { type: string; cellSize: number },
+  bounds: BoundingBox
+): StoredViewState {
+  const cx = (bounds.minX + bounds.maxX) / 2;
+  const cy = (bounds.minY + bounds.maxY) / 2;
+  if (geometry.type !== 'hex') {
+    return { zoom: 1, center: { x: cx / geometry.cellSize, y: cy / geometry.cellSize } };
+  }
+  return { zoom: 1, center: { x: cx, y: cy } };
+}
+
+/**
  * Render map content to a canvas context using the same rendering logic as the main canvas.
  */
 function renderMapToCanvas(
@@ -134,7 +154,7 @@ function renderMapToCanvas(
   params: RenderParams,
   options: ExportImageOptions
 ): void {
-  const { mapData, geometry, width, height } = params;
+  const { mapData, geometry, bounds, width, height } = params;
 
   const tempCanvas = activeWindow.createEl('canvas');
   tempCanvas.width = width;
@@ -176,7 +196,8 @@ function renderMapToCanvas(
       theme,
       showCoordinates: false,
       layerVisibility: options.visibility,
-      exportLayers: options.layers
+      exportLayers: options.layers,
+      liveViewState: exportViewStateForBounds(geometry, bounds)
     }
   );
 
@@ -308,4 +329,4 @@ async function saveMapImageToVault(
 // Exports
 // ===========================================
 
-export { calculateContentBounds, renderMapToCanvas, exportMapAsImage, saveMapImageToVault };
+export { calculateContentBounds, exportViewStateForBounds, renderMapToCanvas, exportMapAsImage, saveMapImageToVault };
