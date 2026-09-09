@@ -617,17 +617,17 @@ Feature release: multiple Beacons per map, random dungeon generation from the fu
 - **Generate a random dungeon from the full-pane view.** A die button beside the create-new-map control opens the generator, saves the result as a new map and switches to it. The command-palette version still inserts a code block into the current note.
 - **Rectangular shape overlays, with rotation.** The square shape tool now places rectangles of any proportion (click two corners), and a selected rectangle gains a Rotate action in 45-degree steps. Maps saved by older versions load unchanged.
 - **Image export dialog.** Export as image now opens a dialog to choose which map layers to include and at what opacity, and to toggle the grid, objects, text labels and (on hex maps) regions and outlines. The toggles start from the current live visibility.
-- **Automatic segment terrain.** With a travel pack enabled, every new route segment is categorized from the map: cells painted in a terrain's swatch color, or holding a tile with the terrain's tile tag, vote for that terrain (tile tag wins). Segments you set by hand are left alone; a Recategorize terrain action on the measurement card and on a saved route's menu re-samples the whole route. The travel pack editor gains a palette swatch strip per terrain (expandable to every colour with labels, plus an Add colour shortcut that mints a global palette colour) and a tile tag field.
+- **Automatic segment terrain.** With a travel pack enabled, every new route segment is categorized from the map: cells painted in a terrain's swatch color, or holding a tile with the terrain's tile tag, vote for that terrain (tile tag wins). Segments you set by hand are left alone; a Recategorize terrain action on the measurement card and on a saved route's menu re-samples the whole route. The travel pack editor gains a palette swatch strip per terrain (expandable to every color with labels, plus an Add color shortcut that mints a global palette color) and a tile tag field.
 
 ### Bug Fixes
 - **Exported images now frame the whole map content** instead of a crop of the current viewport at the current zoom.
 - **Snapped shape overlays with an even number of cells now sit on the grid lines** instead of straddling them by half a cell.
-- **The colour picker's right-click edit popup is no longer clipped** by the sidebar in the full-pane view.
-- **Travel pack number fields no longer spam errors while you type**; an invalid value is flagged and reported once when you leave the field. The terrain colour input's focus ring is no longer clipped.
+- **The color picker's right-click edit popup is no longer clipped** by the sidebar in the full-pane view.
+- **Travel pack number fields no longer spam errors while you type**; an invalid value is flagged and reported once when you leave the field. The terrain color input's focus ring is no longer clipped.
 
 ### Improvements
 - **Segment terrain picker:** the None entry is gone; a Clear button appears at the bottom of the popup when the segment already has a terrain.
-- **Day length selector:** None is now labelled "No day length" and sorted last.
+- **Day length selector:** None is now labeled "No day length" and sorted last.
 - The Rectangle shape tool uses a rectangle icon.
 
 ## Version 2.3.5

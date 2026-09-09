@@ -8858,7 +8858,7 @@ button.windrose-breadcrumb-link {
 .windrose-travel-pack-modal .windrose-travel-pack-row .setting-item-control {
   /* Obsidian sizes the colour input to exactly --swatch-height, so the 2px
      focus ring painted on the inner swatch is clipped top and bottom by the
-     UA sheet's overflow: clip !important. Give the ring room instead. */
+     UA sheet's forced overflow clip (which author rules cannot override). Give the ring room instead. */
 }
 .windrose-travel-pack-modal .windrose-travel-pack-row .setting-item-control input[type=color] {
   height: calc(var(--swatch-height) + 2 * var(--input-border-width-focus, 2px));
