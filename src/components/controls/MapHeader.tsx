@@ -18,12 +18,13 @@ interface MapHeaderProps {
   mapList?: MapListEntry[];
   onMapSelect?: (entry: MapListEntry) => void;
   onNewMap?: () => void;
+  onGenerateDungeon?: () => void;
   onDeleteMap?: () => void;
   /** Current sub-hex drill path; when set, the copied embed block opens this sub-map. */
   subHexPath?: string | null;
 }
 
-const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFooter, fullPane, mapId, mapList, onMapSelect, onNewMap, onDeleteMap, subHexPath }: MapHeaderProps): VNode => {
+const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFooter, fullPane, mapId, mapList, onMapSelect, onNewMap, onGenerateDungeon, onDeleteMap, subHexPath }: MapHeaderProps): VNode => {
   const getStatusIcon = (): string => {
     if (saveStatus === 'Unsaved changes') return '○';
     if (saveStatus === 'Saving...') return '⟳';
@@ -91,6 +92,15 @@ const MapHeader = ({ mapData, onNameChange, saveStatus, showFooter, onToggleFoot
               ref={tooltipRef('Create new map')}
             >
               <Icon icon="lucide-plus" />
+            </button>
+          )}
+          {onGenerateDungeon && (
+            <button
+              className="windrose-header-action-btn interactive-child"
+              onClick={onGenerateDungeon}
+              ref={tooltipRef('Generate random dungeon')}
+            >
+              <Icon icon="lucide-dices" />
             </button>
           )}
         </div>

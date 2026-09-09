@@ -195,8 +195,7 @@ export default class WindrosePlugin extends Plugin {
         if (!isFeatureEnabled('dungeonGenerator')) return false;
         if (checking) return true;
         new InsertDungeonModal(this.app, this, async (mapName, cells, objects, edges, options) => {
-          const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
-          await this.saveDungeonToJson(mapId, mapName, cells as DungeonCell[], objects, edges, options as DungeonGenOptions);
+          const mapId = await this.createRandomDungeonMap(mapName, cells, objects, edges, options as DungeonGenOptions);
 
           const codeBlock = [
             '```windrose-map',
@@ -529,6 +528,19 @@ export default class WindrosePlugin extends Plugin {
       .map((c) => ({ col: c.x, row: c.y }));
 
     return { enabled: true, foggedCells };
+  }
+
+  /**
+   * Mint a new mapId, generate + save a dungeon into it, and return the id.
+   * The reusable "generate a new map" half of dungeon generation — no editor,
+   * no code block. Shared by the command-palette generator (which inserts a
+   * code block into the active note) and the full-pane view's generate action
+   * (which navigates to the new map instead).
+   */
+  async createRandomDungeonMap(mapName: string, cells: Record<string, unknown>[], objects: unknown[], edges: unknown[], options: DungeonGenOptions): Promise<string> {
+    const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+    await this.saveDungeonToJson(mapId, mapName, cells as DungeonCell[], objects, edges, options);
+    return mapId;
   }
 
   /**

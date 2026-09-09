@@ -81,6 +81,8 @@ import type { MapListEntry } from './persistence/fileOperations';
 import { ConfirmModal } from './settings/modals/ConfirmModal';
 import { loadTileMetadata, setTileMetadataForRender, getTileMetadataForRender } from './persistence/tileMetadata';
 import { NewMapModal } from './components/modals/NewMapModal';
+import { InsertDungeonModal } from './settings/modals/InsertDungeonModal';
+import type { DungeonInsertOptions } from './settings/modals/InsertDungeonModal';
 
 // ============================================================================
 // LOCAL TYPE DEFINITIONS
@@ -445,6 +447,29 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleNewMap = useCallback(() => {
     new NewMapModal(app, (newId, newName, newType) => {
       onMapChange?.(newId, newName, newType);
+    }).open();
+  }, [app, onMapChange]);
+
+  // Generates a brand-new map (not the currently open one) and navigates to
+  // it — mirrors the "insert-random-dungeon" command's generate+save step,
+  // minus the editor/code-block half that has no equivalent in full-pane view.
+  const handleGenerateDungeon = useCallback(() => {
+    const plugin = app.plugins.plugins['windrose-md'] as unknown as
+      {
+        loadDungeonGenerator(): Promise<{ generateDungeon(...args: unknown[]): unknown }>;
+        loadObjectPlacer(): Promise<{ stockDungeon(...args: unknown[]): unknown }>;
+        createRandomDungeonMap(
+          mapName: string,
+          cells: Record<string, unknown>[],
+          objects: unknown[],
+          edges: unknown[],
+          options: DungeonInsertOptions
+        ): Promise<string>;
+      } | undefined;
+    if (plugin == null) return;
+    new InsertDungeonModal(app, plugin, async (newMapName, cells, objects, edges, options) => {
+      const newId = await plugin.createRandomDungeonMap(newMapName, cells, objects, edges, options);
+      onMapChange?.(newId, newMapName, 'grid');
     }).open();
   }, [app, onMapChange]);
 
@@ -1168,6 +1193,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           mapList={mapListEntries}
           onMapSelect={handleMapSelect}
           onNewMap={fullPane ? handleNewMap : undefined}
+          onGenerateDungeon={fullPane && isFeatureEnabled('dungeonGenerator') ? handleGenerateDungeon : undefined}
           onDeleteMap={fullPane ? () => { void handleDeleteMap(); } : undefined}
           subHexPath={subHexPath}
         />}
