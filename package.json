@@ -50,7 +50,7 @@
     "preact": "^10.28.2",
     "sass": "^1.100.0",
     "typescript": "^5.7.0",
-    "vitest": "^3.2.6"
+    "vitest": "^4.1.11"
   },
   "keywords": [
     "obsidian",
@@ -68,22 +68,23 @@
     "minimatch": "^10.2.6",
     "picomatch": "^4.0.5"
   },
-  "//overrides": "brace-expansion is deliberately NOT overridden: minimatch 3.x/8.x/9.x (eslint, glob, asar) can only load the 1.x/2.x lines, and the patched 1.1.12+/2.0.2+ releases are advisory-clean, so each minimatch resolves its own compatible copy. Security pins for transitive dev/test tooling flagged by the Obsidian store dependency scan. None of these ship in main.js (esbuild externalizes obsidian/electron/codemirror; the mermaid subtree comes from obsidian-typings for type annotations only and is never imported at runtime). preact is the sole runtime-bundled package and is pinned separately in devDependencies.",
+  "//overrides": "electron is the E2E chassis only (obsidian-testing-framework runs the installed Obsidian app.asar on the npm electron via Playwright; Obsidian itself ships on the 39 line) and is held at the first line the advisory scan accepts. brace-expansion is deliberately NOT overridden: minimatch 3.x/8.x/9.x (eslint, glob, asar) can only load the 1.x/2.x lines, and the patched 1.1.12+/2.0.2+ releases are advisory-clean, so each minimatch resolves its own compatible copy. Security pins for transitive dev/test tooling flagged by the Obsidian store dependency scan. None of these ship in main.js (esbuild externalizes obsidian/electron/codemirror; the mermaid subtree comes from obsidian-typings for type annotations only and is never imported at runtime). preact is the sole runtime-bundled package and is pinned separately in devDependencies.",
   "overrides": {
     "esbuild": "^0.28.1",
+    "electron": "^41.10.3",
     "mermaid": "^11.16.0",
     "dompurify": "^3.4.11",
     "uuid": "^11.1.1",
     "lodash-es": "^4.18.0",
     "qs": "^6.15.2",
-    "postcss": "^8.5.18",
+    "postcss": "^8.5.28",
     "rollup": "^4.59.0",
     "ws": "^8.21.0",
     "tmp": "^0.2.6",
     "yaml": "^2.8.3",
-    "js-yaml": "^4.2.0",
+    "js-yaml": "^4.3.1",
     "flatted": "^3.4.2",
-    "fast-uri": "^3.1.5"
+    "fast-uri": "^3.1.6"
   },
   "resolutions": {
     "mermaid": "^11.16.0",
@@ -91,13 +92,13 @@
     "uuid": "^11.1.1",
     "lodash-es": "^4.18.0",
     "qs": "^6.15.2",
-    "postcss": "^8.5.18",
+    "postcss": "^8.5.28",
     "rollup": "^4.59.0",
     "ws": "^8.21.0",
     "tmp": "^0.2.6",
     "yaml": "^2.8.3",
-    "js-yaml": "^4.2.0",
+    "js-yaml": "^4.3.1",
     "flatted": "^3.4.2",
-    "fast-uri": "^3.1.5"
+    "fast-uri": "^3.1.6"
   }
 }

@@ -15,13 +15,11 @@ export default defineConfig({
     outputFile: "test-results.json",
     // Retry flaky tests (Obsidian sometimes doesn't render)
     retry: 1,
-    // Run tests sequentially since each launches Obsidian
+    // Run tests sequentially since each launches Obsidian (vitest 4: the old
+    // poolOptions.forks.singleFork is maxWorkers 1 without module isolation)
     pool: "forks",
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    maxWorkers: 1,
+    isolate: false,
     // Setup symlinks before tests run
     globalSetup: ["tests/e2e/setup.ts"],
     // Inject test vault path for obsidian-testing-framework

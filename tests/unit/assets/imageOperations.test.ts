@@ -66,10 +66,11 @@ async function seedCache(vaultPath: string, width = 100, height = 100): Promise<
     onerror: null as (() => void) | null,
   };
 
-  vi.stubGlobal('Image', vi.fn(() => mockImg));
+  // vitest 4 honors `new` semantics: only a `function` (not an arrow) is constructible
+  vi.stubGlobal('Image', vi.fn(function () { return mockImg; }));
 
   // Mock Blob constructor
-  vi.stubGlobal('Blob', vi.fn(() => ({})));
+  vi.stubGlobal('Blob', vi.fn(function () { return {}; }));
 
   const loadPromise = preloadImage((globalThis as any).app, vaultPath);
 
