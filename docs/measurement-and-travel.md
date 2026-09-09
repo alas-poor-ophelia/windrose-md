@@ -17,14 +17,14 @@ While measuring, **Backspace** removes the last waypoint and **Escape** clears t
 
 ## Saved routes
 
-Finishing a measurement (or its **Save as route** button) converts it into a permanent, styled path on the map, with a name, color, width, and an optional distance label — labels stay hidden until you hover (or tap, on touch). While the measure tool is active, clicking a saved route opens a menu to **edit** its name and style or **delete** it; saving, editing, and deleting all participate in undo history. A **saved routes** toggle in the Visibility controls shows or hides them all.
+Finishing a measurement (or its **Save as route** button) converts it into a permanent, styled path on the map, with a name, color, width, and an optional distance label — labels stay hidden until you hover (or tap, on touch). While the measure tool is active, clicking a saved route opens a menu to **edit** its name and style, **recategorize** its terrain from the map, or **delete** it; saving, editing, and deleting all participate in undo history. A **saved routes** toggle in the Visibility controls shows or hides them all.
 
 ## Travel packs
 
 A **travel pack** is a named bundle of travel rules for an RPG system (say, D&D 5e overland travel). A pack can contain:
 
 - **Custom units** — name, abbreviation, and a conversion factor (a "league" defined in miles, a "hex" defined as six miles).
-- **Terrain types** — each with a speed multiplier (above 1 faster, below 1 slower).
+- **Terrain types** — each with a speed multiplier (above 1 faster, below 1 slower), a color, and an optional tile tag. The color is pickable from a one-click strip of your own map palette, so a route's segments match the paint they cross without copying hex codes around; the tile tag names the tag a placed tile must carry to count as that terrain. Both are what [automatic categorization](#automatic-categorization) matches against.
 - **Travel modes** — each with a speed as distance per time (24 miles per 8 hours; 3 hexes per day).
 - **Per-day allowances** — how much travel time counts as one day (8 hours/day forced march vs. 6 hours/day normal).
 
@@ -37,3 +37,9 @@ With an enabled pack, the measurement readout grows a **Travel** block: a live t
 ## Per-segment terrain
 
 With a pack enabled, each route segment can be assigned a **terrain**: click a segment and pick from a popup anchored right at the segment. Pick again to change it, or use the popup's **Clear** button to unassign it. A segment's effective speed is the travel mode's speed times the terrain's multiplier; unassigned segments travel at plain mode speed. Terrain assignments are preserved when the route is saved.
+
+### Automatic categorization
+
+You rarely have to assign anything by hand. As each waypoint lands, Windrose reads the map underneath the new segment and categorizes it for you: a cell whose paint color matches a terrain's color counts as a vote for that terrain, as does a cell holding a tile that carries the terrain's tile tag (tiles win over paint on the same cell). The majority of the cells along the segment decides, and a segment that crosses nothing recognizable simply keeps the terrain it inherited. Only terrains that define a color or a tile tag can be matched — a pack whose terrains define neither behaves exactly as it did before.
+
+Anything you pick by hand is left alone from then on: the automatic pass never overwrites a hand-picked segment. When you *want* a clean sweep — you repainted the region, or edited the pack's colors — use **Recategorize terrain**: the wand button in the measurement readout re-samples the in-progress route, and the same item in a saved route's right-click menu re-samples that route. That command is explicit, so it does overwrite hand-picked segments too.

@@ -5,7 +5,7 @@
  * measured. Sits statically at the top-center of the canvas container (the
  * route's live end chases the cursor, so anchoring to it would too) and
  * offers the editing affordances touch input needs on-screen:
- * remove last waypoint, clear all, and save-as-route.
+ * remove last waypoint, clear all, recategorize terrain, and save-as-route.
  *
  * When enabled travel packs offer travel modes, the card grows a Travel
  * block: live travel times for the map's selected modes (explicit guidance
@@ -62,6 +62,11 @@ interface MeasurementControlsProps {
   onRemoveLast: () => void;
   onClear: () => void;
   onSaveRoute: () => void;
+  /**
+   * Re-sample every segment's terrain from the map, hand-picked segments
+   * included. Undefined hides the action (no terrains, or nothing to sample).
+   */
+  onRecategorize?: () => void;
 }
 
 const MeasurementControls = ({
@@ -76,7 +81,8 @@ const MeasurementControls = ({
   onSetAsDefault,
   onRemoveLast,
   onClear,
-  onSaveRoute
+  onSaveRoute,
+  onRecategorize
 }: MeasurementControlsProps): VNode | null => {
   const [travelExpanded, setTravelExpanded] = useState(false);
 
@@ -116,6 +122,17 @@ const MeasurementControls = ({
           >
             <Icon icon="lucide-x" size={14} />
           </button>
+          {onRecategorize != null && (
+            <button
+              type="button"
+              className="windrose-measure-controls-btn"
+              ref={tooltipRef('Recategorize terrain from the map')}
+              aria-label="Recategorize terrain"
+              onClick={onRecategorize}
+            >
+              <Icon icon="lucide-wand-2" size={14} />
+            </button>
+          )}
           <button
             type="button"
             className="windrose-measure-controls-btn windrose-measure-controls-save"

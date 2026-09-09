@@ -181,9 +181,11 @@ function setSegmentTerrainAuto<T extends TerrainRouteLike>(
  * Write a whole pass of sampled terrains onto a route.
  *
  * A segment is only overwritten when the sampler already owns it (auto
- * flag true) or when it has no terrain at all; anything the user picked by
- * hand survives unless `overwriteManual` is set (the route card's explicit
- * "recategorize everything" action). `results` entries past the segment
+ * flag true). A cleared segment (null, flag false) is indistinguishable
+ * from an untouched one in the saved data, so neither is filled here:
+ * anything without the auto flag survives unless `overwriteManual` is set
+ * (the route card's explicit "recategorize everything" action). `results`
+ * entries past the segment
  * count are ignored, and a shorter `results` leaves the tail untouched.
  * Returns the original route when nothing changed.
  */
@@ -198,7 +200,7 @@ function applyAutoTerrains<T extends TerrainRouteLike>(
   const segmentTerrains = [...current];
   let changed = false;
   for (let i = 0; i < segmentTerrains.length && i < results.length; i++) {
-    const eligible = overwriteManual || flags[i] || segmentTerrains[i] == null;
+    const eligible = overwriteManual || flags[i];
     if (!eligible) continue;
     if (segmentTerrains[i] !== results[i] || !flags[i]) changed = true;
     segmentTerrains[i] = results[i];
@@ -295,6 +297,11 @@ function createSavedRoute(
     width: overrides.width ?? SAVED_ROUTE_DEFAULTS.width,
     showLabel: overrides.showLabel ?? SAVED_ROUTE_DEFAULTS.showLabel,
     ...(overrides.segmentTerrains !== undefined ? { segmentTerrains: [...overrides.segmentTerrains] } : {}),
+    // Only written when the sampler owns a segment, so a hand-categorized
+    // route still saves exactly the bytes 2.3.5 wrote.
+    ...(overrides.segmentTerrainAuto?.some(flag => flag) === true
+      ? { segmentTerrainAuto: [...overrides.segmentTerrainAuto] }
+      : {}),
   };
 }
 

@@ -355,6 +355,23 @@ describe("routeOperations", () => {
       expect(route.segmentTerrains).toEqual(["forest"]);
     });
 
+    it("carries the sampler's auto flags onto the save", () => {
+      const route = createSavedRoute(points, {
+        segmentTerrains: ["forest"],
+        segmentTerrainAuto: [true],
+      });
+      expect(route.segmentTerrainAuto).toEqual([true]);
+      expect(route.segmentTerrainAuto).not.toBe(undefined);
+    });
+
+    it("omits the auto flags for a hand-categorized route", () => {
+      const route = createSavedRoute(points, {
+        segmentTerrains: ["forest"],
+        segmentTerrainAuto: [false],
+      });
+      expect("segmentTerrainAuto" in route).toBe(false);
+    });
+
     it("deep-copies the waypoints", () => {
       const route = createSavedRoute(points);
       expect(route.points).not.toBe(points);
@@ -543,10 +560,17 @@ describe("routeOperations", () => {
       segmentTerrainAuto: [false, false, true],
     });
 
-    it("fills empty segments and overwrites auto ones, sparing manual picks", () => {
+    it("overwrites auto segments only, sparing manual picks and cleared segments", () => {
       const result = applyAutoTerrains(route(), ["t-swamp", "t-swamp", "t-swamp"]);
-      expect(result.segmentTerrains).toEqual(["t-forest", "t-swamp", "t-swamp"]);
-      expect(result.segmentTerrainAuto).toEqual([false, true, true]);
+      expect(result.segmentTerrains).toEqual(["t-forest", null, "t-swamp"]);
+      expect(result.segmentTerrainAuto).toEqual([false, false, true]);
+    });
+
+    it("never refills a segment the user cleared (null + manual flag)", () => {
+      const cleared = setSegmentTerrain(route(), 2, null);
+      // No auto flag left, so the array is omitted from the saved shape
+      expect(cleared.segmentTerrainAuto).toBeUndefined();
+      expect(applyAutoTerrains(cleared, ["t-swamp", "t-swamp", "t-swamp"])).toBe(cleared);
     });
 
     it("overwrites manual picks only when asked", () => {
@@ -568,7 +592,7 @@ describe("routeOperations", () => {
     it("writes a null sample onto an auto segment", () => {
       const result = applyAutoTerrains(route(), [null, null, null]);
       expect(result.segmentTerrains).toEqual(["t-forest", null, null]);
-      expect(result.segmentTerrainAuto).toEqual([false, true, true]);
+      expect(result.segmentTerrainAuto).toEqual([false, false, true]);
     });
 
     it("returns the original route when nothing is eligible", () => {
@@ -586,7 +610,7 @@ describe("routeOperations", () => {
 
     it("preserves a saved route's other fields", () => {
       const saved = createSavedRoute([{ x: 0, y: 0 }, { x: 1, y: 0 }], { name: "Kings road" });
-      const result = applyAutoTerrains({ ...saved, segmentTerrains: [null] }, ["t-road"]);
+      const result = applyAutoTerrains({ ...saved, segmentTerrains: [null] }, ["t-road"], true);
       expect(result.id).toBe(saved.id);
       expect(result.name).toBe("Kings road");
       expect(result.color).toBe(saved.color);

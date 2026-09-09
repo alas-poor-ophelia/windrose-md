@@ -7,8 +7,8 @@
  * the canvas itself. Name/distance labels are hidden by default and revealed
  * on hover (mouse) or tap (touch) via container-level hit-testing, so routes
  * never intercept pointer events meant for the canvas. While the measure tool
- * is active, clicking a route opens a menu to edit its name/style or delete
- * it; both changes participate in undo history.
+ * is active, clicking a route opens a menu to edit its name/style, recategorize
+ * its terrain from the map, or delete it; all three participate in undo history.
  */
 
 import type { VNode } from 'preact';
@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { Menu } from 'obsidian';
 import { formatDistance, getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
 import {
+  applyAutoTerrains,
   computeSegmentDistances,
   distanceToSegment,
   removeSavedRoute,
@@ -28,7 +29,8 @@ import {
 } from '../../drawing/routeOperations';
 import { SaveRouteModal } from '../modals/SaveRouteModal';
 import { getEnabledTravelPacks } from '../../travel/travelPackOperations';
-import { findTerrainById } from '../../travel/travelTimeOperations';
+import { collectEnabledTerrains, findTerrainById } from '../../travel/travelTimeOperations';
+import { useTerrainSampling } from '../../hooks/interactions/useTerrainSampling';
 import {
   computeCounterScale,
   computeOverlayMetrics,
@@ -76,6 +78,18 @@ const RouteLayer = ({ currentTool, onSavedRoutesChange }: RouteLayerProps): VNod
   const savedRoutes = mapData?.savedRoutes;
   const routes = useMemo(() => savedRoutes ?? [], [savedRoutes]);
   const northDirection = mapData?.northDirection ?? 0;
+
+  // Terrain colors resolve against enabled packs; a vanished terrain simply
+  // falls back to the route's own color. The same list feeds the automatic
+  // categorization the route menu offers (x5l.4).
+  const travelPacks = getSettings().travelPacks;
+  const enabledPacks = useMemo(() => getEnabledTravelPacks(travelPacks), [travelPacks]);
+  const samplerTerrains = useMemo(
+    () => collectEnabledTerrains(enabledPacks).map(e => e.terrain),
+    [enabledPacks]
+  );
+  const firstSegmentTerrainId = samplerTerrains.length > 0 ? samplerTerrains[0].id : null;
+  const terrainSampling = useTerrainSampling(samplerTerrains, currentTool === 'measure');
 
   // Mid-gesture pan/zoom ticks rewrite the group transform imperatively
   useLiveOverlayTransform({ groupRef: worldGroupRef, canvasRef, geometry: geo, northDirection, viewController });
@@ -155,10 +169,6 @@ const RouteLayer = ({ currentTool, onSavedRoutesChange }: RouteLayerProps): VNod
     (distanceOverrides ?? null)
   );
 
-  // Terrain colors resolve against enabled packs; a vanished terrain simply
-  // falls back to the route's own color
-  const enabledPacks = getEnabledTravelPacks(getSettings().travelPacks);
-
   const interactive = currentTool === 'measure';
 
   const handleEditRoute = (route: SavedRoute): void => {
@@ -189,12 +199,38 @@ const RouteLayer = ({ currentTool, onSavedRoutesChange }: RouteLayerProps): VNod
     });
   };
 
+  /**
+   * Re-sample every segment of a saved route from the map. Explicit command,
+   * so hand-picked segments are overwritten too.
+   */
+  const handleRecategorizeRoute = (route: SavedRoute): void => {
+    // A route saved before per-segment terrain existed carries no
+    // segmentTerrains array; seed one so the command is never a dead click.
+    const segmentCount = route.points.length - 1;
+    const seeded: SavedRoute = route.segmentTerrains?.length === segmentCount
+      ? route
+      : { ...route, segmentTerrains: Array.from({ length: segmentCount }, (_, i) => route.segmentTerrains?.[i] ?? null) };
+    const next = applyAutoTerrains(
+      seeded,
+      terrainSampling.sampleRoute(route.points, firstSegmentTerrainId),
+      true
+    );
+    if (next === route) return;
+    onSavedRoutesChange?.((mapData.savedRoutes ?? []).map(r => (r.id === route.id ? next : r)));
+  };
+
   const handleRouteClick = (route: SavedRoute, event: MouseEvent): void => {
     const menu = new Menu();
     menu.addItem(item => item
       .setTitle('Edit route…')
       .setIcon('pencil')
       .onClick(() => handleEditRoute(route)));
+    if (terrainSampling.available && route.points.length >= 2) {
+      menu.addItem(item => item
+        .setTitle('Recategorize terrain')
+        .setIcon('wand-2')
+        .onClick(() => handleRecategorizeRoute(route)));
+    }
     menu.addItem(item => item
       .setTitle('Delete route')
       .setIcon('trash')

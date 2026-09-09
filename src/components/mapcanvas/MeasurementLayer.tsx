@@ -18,6 +18,7 @@ import type { TravelTimeLine, TravelModeOption, TravelAllowanceOption } from '..
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useDistanceMeasurement } from '../../hooks/interactions/useDistanceMeasurement';
+import { useTerrainSampling } from '../../hooks/interactions/useTerrainSampling';
 import { getSettings } from '../../core/settingsAccessor';
 import { createSavedRoute } from '../../drawing/routeOperations';
 import { getEnabledTravelPacks, getEffectiveTravelSettings } from '../../travel/travelPackOperations';
@@ -97,9 +98,16 @@ const MeasurementLayer = ({
   // enabled pack defines (later segments inherit their predecessor)
   const firstSegmentTerrainId = enabledTerrains.length > 0 ? enabledTerrains[0].terrain.id : null;
 
+  // x5l.4: every new segment is categorized from the map underneath it.
+  // Parked unless the measure tool is active — the context assembly reads
+  // the map's render layers, and an idle map has nothing to sample.
+  const samplerTerrains = useMemo(() => enabledTerrains.map(e => e.terrain), [enabledTerrains]);
+  const terrainSampling = useTerrainSampling(samplerTerrains, currentTool === 'measure');
+
   const {
     waypoints,
     segmentTerrains,
+    segmentTerrainAuto,
     previewTarget,
     segmentDistances,
     previewDistance,
@@ -111,7 +119,8 @@ const MeasurementLayer = ({
     handleMeasureMove,
     removeLastWaypoint,
     clearMeasurement,
-    assignSegmentTerrain
+    assignSegmentTerrain,
+    recategorizeRoute
   } = useDistanceMeasurement(
     currentTool,
     geometry,
@@ -120,18 +129,19 @@ const MeasurementLayer = ({
     (mapDistanceOverrides ?? null),
     mapData?.measurementRoute,
     onMeasurementRouteChange,
-    firstSegmentTerrainId
+    firstSegmentTerrainId,
+    terrainSampling
   );
 
   const handleSaveRoute = useCallback((): void => {
     if (waypoints.length < 2 || !mapData) return;
     void new SaveRouteModal(app).openAndGetValue().then(options => {
       if (options == null) return;
-      const route = createSavedRoute(waypoints, { ...options, segmentTerrains });
+      const route = createSavedRoute(waypoints, { ...options, segmentTerrains, segmentTerrainAuto });
       onSavedRoutesChange?.([...(mapData.savedRoutes ?? []), route]);
       clearMeasurement();
     });
-  }, [waypoints, segmentTerrains, mapData, app, onSavedRoutesChange, clearMeasurement]);
+  }, [waypoints, segmentTerrains, segmentTerrainAuto, mapData, app, onSavedRoutesChange, clearMeasurement]);
 
   // Double-click (double-tap on touch) on the end cell finishes the route:
   // the first click commits the final waypoint, the repeat click on the same
@@ -327,6 +337,11 @@ const MeasurementLayer = ({
         onRemoveLast={removeLastWaypoint}
         onClear={clearMeasurement}
         onSaveRoute={handleSaveRoute}
+        onRecategorize={
+          terrainAssignmentAvailable && terrainSampling.available && waypoints.length >= 2
+            ? recategorizeRoute
+            : undefined
+        }
       />
       {terrainPicker != null && terrainAssignmentAvailable && (
         <TerrainPickerPopup

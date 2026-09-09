@@ -8,6 +8,12 @@
  * assignment (new segments inherit the previous segment's terrain; the
  * first segment takes the caller-provided default).
  *
+ * When the caller supplies a sampler, each new segment is also categorized
+ * from what the map holds under it — the sampled terrain replaces the
+ * inherited one and is marked auto, so a later pass may revise it. A
+ * segment the sampler cannot read keeps the inherited terrain and stays
+ * manual, and recategorizeRoute re-samples the whole route on demand.
+ *
  * The committed route is reported to the caller via onRouteChange so it can
  * persist with the map (one current route per map); when the tool activates,
  * the persisted route is restored.
@@ -20,6 +26,7 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type {
   MeasurementPoint,
+  RouteTerrainSampling,
   EffectiveDistanceSettings,
   MapDistanceOverrides,
   UseDistanceMeasurementResult,
@@ -29,11 +36,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { formatDistance, formatEuclideanDistance, getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
 import {
   appendRouteWaypoint,
+  applyAutoTerrains,
   computeEuclideanPathLength,
   computeSegmentDistances,
   getCellPitchPixels,
+  getSegmentTerrainAuto,
   removeLastRouteWaypoint,
   setSegmentTerrain,
+  setSegmentTerrainAuto,
   sumDistances,
 } from '../../drawing/routeOperations';
 
@@ -58,7 +68,9 @@ const useDistanceMeasurement = (
   persistedRoute?: MeasurementRoute,
   onRouteChange?: (route: MeasurementRoute) => void,
   /** Terrain the route's FIRST segment defaults to (TM-21); null = unassigned */
-  firstSegmentTerrainId: string | null = null
+  firstSegmentTerrainId: string | null = null,
+  /** Automatic terrain categorization for new/recategorized segments */
+  terrainSampling?: RouteTerrainSampling
 ): UseDistanceMeasurementResult => {
   const [route, setRoute] = useState<MeasurementRoute>(EMPTY_ROUTE);
   const [previewTarget, setPreviewTarget] = useState<MeasurementPoint | null>(null);
@@ -83,6 +95,7 @@ const useDistanceMeasurement = (
       if (!didRestoreRef.current && restored != null && restored.points.length > 0) {
         didRestoreRef.current = true;
         setRoute({
+          ...restored,
           points: restored.points.map(p => ({ x: p.x, y: p.y })),
           segmentTerrains: [...restored.segmentTerrains],
         });
@@ -101,14 +114,32 @@ const useDistanceMeasurement = (
   }, [onRouteChange]);
 
   /**
+   * Categorize the segment a fresh waypoint just created. A null sample
+   * ("the map says nothing here") leaves the inherited terrain in place but
+   * explicitly marks the segment manual: appendRouteWaypoint copies the
+   * previous segment's auto flag, and a segment the sampler abstained on
+   * must not claim to be sampler-owned.
+   */
+  const sampleNewSegment = useCallback((next: MeasurementRoute): MeasurementRoute => {
+    if (terrainSampling == null || !terrainSampling.available) return next;
+    const index = next.segmentTerrains.length - 1;
+    if (index < 0) return next;
+    const previous = index > 0 ? next.segmentTerrains[index - 1] : firstSegmentTerrainId;
+    const sampled = terrainSampling.sampleSegment(next.points[index], next.points[index + 1], previous);
+    if (sampled == null) return setSegmentTerrain(next, index, next.segmentTerrains[index] ?? null);
+    return setSegmentTerrainAuto(next, index, sampled);
+  }, [terrainSampling, firstSegmentTerrainId]);
+
+  /**
    * Handle click/tap - append a waypoint (same-cell repeat is a no-op)
    */
   const handleMeasureClick = useCallback(
     (cellX: number, cellY: number, _isTouch: boolean = false): void => {
       const next = appendRouteWaypoint(route, { x: cellX, y: cellY }, firstSegmentTerrainId);
-      if (next !== route) commitRoute(next);
+      if (next === route) return;
+      commitRoute(sampleNewSegment(next));
     },
-    [route, firstSegmentTerrainId, commitRoute]
+    [route, firstSegmentTerrainId, commitRoute, sampleNewSegment]
   );
 
   /**
@@ -145,6 +176,17 @@ const useDistanceMeasurement = (
     const next = setSegmentTerrain(route, segmentIndex, terrainId);
     if (next !== route) commitRoute(next);
   }, [route, commitRoute]);
+
+  /**
+   * Re-sample every segment from the map. This is the explicit command, so
+   * hand-picked segments are overwritten too (the ruling: the automatic pass
+   * never touches manual picks, this button does).
+   */
+  const recategorizeRoute = useCallback((): void => {
+    if (terrainSampling == null || !terrainSampling.available || route.points.length < 2) return;
+    const next = applyAutoTerrains(route, terrainSampling.sampleRoute(route.points, firstSegmentTerrainId), true);
+    if (next !== route) commitRoute(next);
+  }, [terrainSampling, route, firstSegmentTerrainId, commitRoute]);
 
   /** Per-committed-segment distances in cells */
   const segmentDistances = useMemo((): number[] => {
@@ -211,6 +253,7 @@ const useDistanceMeasurement = (
   return {
     waypoints,
     segmentTerrains: route.segmentTerrains,
+    segmentTerrainAuto: getSegmentTerrainAuto(route),
     previewTarget,
     segmentDistances,
     previewDistance,
@@ -223,7 +266,8 @@ const useDistanceMeasurement = (
     handleMeasureMove,
     removeLastWaypoint,
     clearMeasurement,
-    assignSegmentTerrain
+    assignSegmentTerrain,
+    recategorizeRoute
   };
 };
 

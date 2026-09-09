@@ -617,6 +617,7 @@ Feature release: multiple Beacons per map, random dungeon generation from the fu
 - **Generate a random dungeon from the full-pane view.** A die button beside the create-new-map control opens the generator, saves the result as a new map and switches to it. The command-palette version still inserts a code block into the current note.
 - **Rectangular shape overlays, with rotation.** The square shape tool now places rectangles of any proportion (click two corners), and a selected rectangle gains a Rotate action in 45-degree steps. Maps saved by older versions load unchanged.
 - **Image export dialog.** Export as image now opens a dialog to choose which map layers to include and at what opacity, and to toggle the grid, objects, text labels and (on hex maps) regions and outlines. The toggles start from the current live visibility.
+- **Automatic segment terrain.** With a travel pack enabled, every new route segment is categorized from the map: cells painted in a terrain's swatch color, or holding a tile with the terrain's tile tag, vote for that terrain (tile tag wins). Segments you set by hand are left alone; a Recategorize terrain action on the measurement card and on a saved route's menu re-samples the whole route. The travel pack editor gains a palette swatch strip and a tile tag field per terrain.
 
 ### Bug Fixes
 - **Exported images now frame the whole map content** instead of a crop of the current viewport at the current zoom.

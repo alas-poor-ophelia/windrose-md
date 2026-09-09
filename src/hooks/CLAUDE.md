@@ -51,6 +51,7 @@ hooks/
     ├── useRegionTools.ts          # Region management tools
     ├── useImageAlignment.ts       # Background image positioning
     ├── useDistanceMeasurement.ts  # Distance measuring tool
+    ├── useTerrainSampling.ts      # Automatic route-segment terrain categorization (map → sampler context)
     ├── useSubHexNavigation.ts     # Sub-hex map navigation
     ├── useAlignmentMode.ts        # Alignment mode
     ├── useKeyboardShortcuts.ts    # Global keyboard shortcuts (undo/redo, layer nav)
