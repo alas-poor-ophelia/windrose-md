@@ -233,11 +233,13 @@ input.windrose-color-input-as-button {
 }
 
 .windrose-color-edit {
+  /* Portalled to document.body (ColorPicker.tsx) and positioned in JS via
+     position: fixed left/top computed from the swatch's bounding rect, so it
+     escapes any clipping ancestor (e.g. the docked sidebar) instead of being
+     cut off. z-index sits above the color picker's own 2100/2099 (picker +
+     overlay) since it's no longer a descendant of the picker's stacking
+     context once portalled. */
   &-panel {
-    position: absolute;
-    left: calc(100% + 4px);
-    top: 50%;
-    transform: translateY(-50%);
     background: var(--windrose-bg-secondary);
     border: 1px solid var(--windrose-border-secondary);
     border-radius: 6px;
@@ -245,7 +247,7 @@ input.windrose-color-input-as-button {
     display: flex;
     align-items: center;
     gap: 8px;
-    z-index: 150;
+    z-index: 2150;
     box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.3);
     white-space: nowrap;
   }

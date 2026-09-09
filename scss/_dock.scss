@@ -695,11 +695,6 @@ button.windrose-dock-panel-collapse {
     height: 34px;
   }
 
-  .windrose-color-edit-panel {
-    left: auto;
-    right: calc(100% + 4px);
-  }
-
   /* Flatten opacity into single compact row: Label ──── Value */
   .windrose-color-opacity-section {
     display: flex;
