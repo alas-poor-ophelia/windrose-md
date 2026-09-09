@@ -268,6 +268,11 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
   }, [screenToWorld, hitTestShape, selectItem, setIsDraggingSelection, setDragStart]);
 
   const dragPrevRef = useRef<{ worldX: number; worldY: number } | null>(null);
+  // Unsnapped position of the dragged shape. A snapped shape follows the
+  // pointer through this anchor and writes only the grid-quantised position,
+  // so a small drag that never crosses a cell boundary leaves it in place
+  // instead of accumulating sub-cell drift.
+  const dragAnchorRef = useRef<Point | null>(null);
 
   const handleShapeDragging = useCallback((e: MouseEvent | TouchEvent) => {
     if (!mapData || !currentSelectedItem || currentSelectedItem.type !== 'shapeOverlay') return;
@@ -276,8 +281,13 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
     const world = screenToWorld(clientX, clientY);
     if (!world) return;
 
-    if (!dragPrevRef.current) {
+    const selectedId = currentSelectedItem.id;
+    const shape = (mapData.shapeOverlays ?? []).find(s => s.id === selectedId);
+    if (!shape) return;
+
+    if (!dragPrevRef.current || !dragAnchorRef.current) {
       dragPrevRef.current = { worldX: world.worldX, worldY: world.worldY };
+      dragAnchorRef.current = { x: shape.worldPosition.x, y: shape.worldPosition.y };
       return;
     }
 
@@ -285,16 +295,27 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
     const dy = world.worldY - dragPrevRef.current.worldY;
     dragPrevRef.current = { worldX: world.worldX, worldY: world.worldY };
 
-    const selectedId = currentSelectedItem.id;
+    const anchor = { x: dragAnchorRef.current.x + dx, y: dragAnchorRef.current.y + dy };
+    dragAnchorRef.current = anchor;
+
+    // The shape's own flag decides: freeform shapes track the pointer exactly,
+    // snapped shapes keep landing on the grid while they move.
+    const worldPosition = (shape.freeform !== true && geometry)
+      ? snapShapeOverlayToGrid(
+          { worldPosition: anchor, size: shape.size, halfWidth: shape.halfWidth, halfHeight: shape.halfHeight },
+          geometry
+        ).worldPosition
+      : anchor;
+    if (worldPosition.x === shape.worldPosition.x && worldPosition.y === shape.worldPosition.y) return;
+
     onShapeOverlaysChange((mapData.shapeOverlays ?? []).map(s =>
-      s.id === selectedId
-        ? { ...s, worldPosition: { x: s.worldPosition.x + dx, y: s.worldPosition.y + dy } }
-        : s
+      s.id === selectedId ? { ...s, worldPosition } : s
     ));
-  }, [screenToWorld, mapData, currentSelectedItem, onShapeOverlaysChange]);
+  }, [screenToWorld, mapData, geometry, currentSelectedItem, onShapeOverlaysChange]);
 
   const stopShapeDragging = useCallback(() => {
     dragPrevRef.current = null;
+    dragAnchorRef.current = null;
     setIsDraggingSelection(false);
   }, [setIsDraggingSelection]);
 

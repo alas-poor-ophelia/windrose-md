@@ -608,6 +608,13 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.4.1
+
+Patch release: dragging a snapped shape overlay keeps it on the grid.
+
+### Bug Fixes
+- **Dragging a shape overlay now respects its Snap to Grid / Freeform setting.** A snapped shape stays on the grid while you move it, the way grid-placed objects do, instead of drifting freely after the first snap. Freeform shapes still follow the pointer exactly.
+
 ## Version 2.4.0
 
 Feature release: multiple Beacons per map, random dungeon generation from the full-pane view, rectangular and rotatable shape overlays, an image export dialog, and travel picker cleanups.
