@@ -169,6 +169,6 @@ E2E tests are configured in `vitest.config.ts`:
 | Test timeout | 60s |
 | Hook timeout | 60s |
 | Retry | 1 (flaky test recovery) |
-| Pool | forks (singleFork, sequential) |
+| Pool | forks (maxWorkers 1, sequential) |
 | Container timeout | 10s |
 | Autosave wait | 3s |
