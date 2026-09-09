@@ -14,7 +14,7 @@ import type { PartyPin } from '#types/core/map.types';
 import type { Point } from '#types/core/geometry.types';
 
 import { useCallback, useRef } from 'preact/hooks';
-import { createPartyPin, findPartyPinAt, getPartyPinById, movePartyPin, upsertPartyPin } from '../../objects/partyPinOperations';
+import { createPartyPin, findPartyPinAt, getPartyPinById, movePartyPin, nextPartyPinDefaults, upsertPartyPin } from '../../objects/partyPinOperations';
 
 type PartyPinsChangeHandler = (partyPins: PartyPin[], suppressHistory?: boolean) => void;
 
@@ -57,7 +57,7 @@ function usePartyPinInteraction(
     const existing = findPartyPinAt(pins, { x: gridX, y: gridY });
 
     if (!existing) {
-      const pin = createPartyPin({ x: gridX, y: gridY });
+      const pin = createPartyPin({ x: gridX, y: gridY }, nextPartyPinDefaults(pins));
       onPartyPinsChange(upsertPartyPin(pins, pin));
       onActivePinChange?.(pin.id, false);
       return;

@@ -613,7 +613,7 @@ That is also now linked from the top of the README, just so itâ€™s findable. Iâ€
 Feature release: multiple Beacons per map, random dungeon generation from the full-pane view, rectangular and rotatable shape overlays, an image export dialog, and travel picker cleanups.
 
 ### New Features
-- **Multiple Beacons.** The Beacon tool places a new Beacon on every click on empty ground; clicking an existing Beacon selects it, and dragging moves it. Each Beacon has its own range ring, filters and beacon note, and two Beacons never share a cell.
+- **Multiple Beacons.** The Beacon tool places a new Beacon on every click on empty ground; clicking an existing Beacon selects it, and dragging moves it. Each Beacon has its own range ring, filters and beacon note, and two Beacons never share a cell. Additional Beacons arrive numbered and in their own color.
 - **Generate a random dungeon from the full-pane view.** A die button beside the create-new-map control opens the generator, saves the result as a new map and switches to it. The command-palette version still inserts a code block into the current note.
 - **Rectangular shape overlays, with rotation.** The square shape tool now places rectangles of any proportion (click two corners), and a selected rectangle gains a Rotate action in 45-degree steps. Maps saved by older versions load unchanged.
 - **Image export dialog.** Export as image now opens a dialog to choose which map layers to include and at what opacity, and to toggle the grid, objects, text labels and (on hex maps) regions and outlines. The toggles start from the current live visibility.
@@ -621,6 +621,7 @@ Feature release: multiple Beacons per map, random dungeon generation from the fu
 
 ### Bug Fixes
 - **Exported images now frame the whole map content** instead of a crop of the current viewport at the current zoom.
+- **Snapped shape overlays with an even number of cells now sit on the grid lines** instead of straddling them by half a cell.
 
 ### Improvements
 - **Segment terrain picker:** the None entry is gone; a Clear button appears at the bottom of the popup when the segment already has a terrain.

@@ -24,6 +24,19 @@ const PARTY_PIN_DEFAULTS = {
 };
 
 /**
+ * Fixed color cycle for additional pins beyond the first. Starts with the
+ * default pin color, then five more readable, mutually distinct hues.
+ */
+const PARTY_PIN_PALETTE = [
+  PARTY_PIN_DEFAULTS.color,
+  '#7ba8c4', // blue
+  '#8ac47b', // green
+  '#c47b9e', // rose
+  '#a57bc4', // purple
+  '#c4a03b', // amber
+];
+
+/**
  * Generate a unique party pin ID
  */
 function generatePartyPinId(): string {
@@ -73,6 +86,36 @@ function createPartyPin(position: Point, overrides: Partial<Omit<PartyPin, 'id' 
     range,
     rangeStyle: overrides.rangeStyle ?? PARTY_PIN_DEFAULTS.rangeStyle,
   };
+}
+
+/**
+ * Derive label/color defaults for the next pin to be placed, based on pins
+ * already on the map. The first pin on a map keeps "The Party" and the
+ * default color. Each additional pin gets "Beacon N" (N counted from the
+ * existing pin count, skipping any label already in use so deleting and
+ * re-adding a pin never produces a duplicate label) and the first palette
+ * color not already used by an existing pin — once the palette is
+ * exhausted, colors cycle by pin count.
+ *
+ * Pure and read-only; callers pass the result as `createPartyPin` overrides.
+ */
+function nextPartyPinDefaults(existingPins: PartyPin[] | undefined): { label: string; color: string } {
+  const pins = existingPins ?? [];
+  if (pins.length === 0) {
+    return { label: PARTY_PIN_DEFAULTS.label, color: PARTY_PIN_DEFAULTS.color };
+  }
+
+  const usedLabels = new Set(pins.map(p => p.label));
+  let n = pins.length + 1;
+  while (usedLabels.has(`Beacon ${n}`)) {
+    n++;
+  }
+
+  const usedColors = new Set(pins.map(p => p.color));
+  const unusedColor = PARTY_PIN_PALETTE.find(c => !usedColors.has(c));
+  const color = unusedColor ?? PARTY_PIN_PALETTE[pins.length % PARTY_PIN_PALETTE.length];
+
+  return { label: `Beacon ${n}`, color };
 }
 
 /**
@@ -192,10 +235,12 @@ function formatPropertyFilters(properties: Record<string, string[]> | undefined)
 
 export {
   PARTY_PIN_DEFAULTS,
+  PARTY_PIN_PALETTE,
   isValidRange,
   findPartyPinAt,
   getPartyPinById,
   createPartyPin,
+  nextPartyPinDefaults,
   upsertPartyPin,
   movePartyPin,
   updatePartyPin,

@@ -11,7 +11,7 @@ The **Beacon** is a movable position marker with a **range**. It tracks anything
 
 ## Placing Beacons
 
-The Beacon shares the pin tool group in the palette with note pins — long-press (or right-click) the pin button and choose **Beacon**. Click an empty cell to place a Beacon there (it snaps to the grid, square or hex); every click on empty ground places another one. Clicking a Beacon selects it instead of placing a new one, and dragging it moves it, range ring following live. Two Beacons never share a cell.
+The Beacon shares the pin tool group in the palette with note pins — long-press (or right-click) the pin button and choose **Beacon**. Click an empty cell to place a Beacon there (it snaps to the grid, square or hex); every click on empty ground places another one. The first Beacon is labeled "The Party" in the default color; each one after that gets its own numbered label ("Beacon 2", "Beacon 3", ...) and a distinct color, so a glance at the canvas tells them apart. Clicking a Beacon selects it instead of placing a new one, and dragging it moves it, range ring following live. Two Beacons never share a cell.
 
 The selected Beacon is the one whose card is on screen. With the select tool, clicking a Beacon selects it too, so you can adjust one without leaving the tool you were using.
 

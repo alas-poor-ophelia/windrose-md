@@ -6,10 +6,12 @@ import { describe, it, expect } from 'vitest';
 
 import {
   PARTY_PIN_DEFAULTS,
+  PARTY_PIN_PALETTE,
   isValidRange,
   findPartyPinAt,
   getPartyPinById,
   createPartyPin,
+  nextPartyPinDefaults,
   upsertPartyPin,
   movePartyPin,
   updatePartyPin,
@@ -64,6 +66,50 @@ describe('createPartyPin', () => {
     const a = createPartyPin({ x: 0, y: 0 });
     const b = createPartyPin({ x: 0, y: 0 });
     expect(a.id).not.toBe(b.id);
+  });
+});
+
+describe('nextPartyPinDefaults', () => {
+  it('gives the first pin "The Party" and the default color', () => {
+    expect(nextPartyPinDefaults([])).toEqual({
+      label: PARTY_PIN_DEFAULTS.label,
+      color: PARTY_PIN_DEFAULTS.color,
+    });
+    expect(nextPartyPinDefaults(undefined)).toEqual({
+      label: PARTY_PIN_DEFAULTS.label,
+      color: PARTY_PIN_DEFAULTS.color,
+    });
+  });
+
+  it('gives the second pin "Beacon 2" and the second palette color', () => {
+    const first = createPartyPin({ x: 0, y: 0 });
+    expect(nextPartyPinDefaults([first])).toEqual({
+      label: 'Beacon 2',
+      color: PARTY_PIN_PALETTE[1],
+    });
+  });
+
+  it('skips labels already in use, so re-adding after a delete never duplicates', () => {
+    const first = createPartyPin({ x: 0, y: 0 });
+    const beacon3 = createPartyPin({ x: 1, y: 1 }, { label: 'Beacon 3' });
+    // Only two pins remain, but "Beacon 2" is free and "Beacon 3" is taken.
+    const defaults = nextPartyPinDefaults([first, beacon3]);
+    expect(defaults.label).toBe('Beacon 4');
+  });
+
+  it('avoids colors already used by existing pins', () => {
+    const first = createPartyPin({ x: 0, y: 0 });
+    const second = createPartyPin({ x: 1, y: 1 }, { label: 'Beacon 2', color: PARTY_PIN_PALETTE[1] });
+    const defaults = nextPartyPinDefaults([first, second]);
+    expect(defaults.color).toBe(PARTY_PIN_PALETTE[2]);
+  });
+
+  it('cycles colors by pin count once the palette is exhausted', () => {
+    const pins = PARTY_PIN_PALETTE.map((color, i) =>
+      createPartyPin({ x: i, y: 0 }, { label: `Pin ${i}`, color })
+    );
+    const defaults = nextPartyPinDefaults(pins);
+    expect(defaults.color).toBe(PARTY_PIN_PALETTE[pins.length % PARTY_PIN_PALETTE.length]);
   });
 });
 
