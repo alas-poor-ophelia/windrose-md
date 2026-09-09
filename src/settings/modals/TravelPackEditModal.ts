@@ -15,7 +15,7 @@
  */
 
 import type { App } from 'obsidian';
-import { Modal, Notice, Setting, setTooltip } from 'obsidian';
+import { Modal, Notice, Setting, setIcon, setTooltip } from 'obsidian';
 import type {
   TravelPack,
   TravelUnit,
@@ -38,6 +38,7 @@ import {
   upsertTravelPack,
 } from '../../travel/travelPackOperations';
 import { colorsMatch, getColorPalette } from '../../drawing/colorOperations';
+import { ColorEditModal } from './ColorEditModal';
 
 const DEFAULT_TERRAIN_COLOR = '#a8a29e';
 const MODE_TIME_UNITS: TravelTimeUnit[] = ['minutes', 'hours', 'days'];
@@ -55,6 +56,14 @@ class TravelPackEditModal extends Modal {
   private packId: string;
   private onChanged: () => void;
   private notifyTimer: number | null = null;
+  /** Terrain ids whose full palette list is open, kept across re-renders */
+  private expandedTerrains = new Set<string>();
+  /** Live palette container per terrain id, so a palette change repaints in
+   *  place instead of re-rendering (and unfocusing) the whole modal */
+  private terrainPaletteEls = new Map<string, HTMLElement>();
+  /** Fingerprint of the palette the strips were last drawn from */
+  private paletteSignature = '';
+  private settingsListener: (() => void) | null = null;
 
   constructor(app: App, plugin: WindrosePlugin, packId: string, onChanged: () => void) {
     super(app);
@@ -114,24 +123,88 @@ class TravelPackEditModal extends Modal {
     this.commit(upsertPackItem(current, key, { ...item, ...patch }), rerender);
   }
 
-  /** Parse a positive number from an input; returns null (and notices) when invalid */
-  private parsePositive(raw: string, label: string): number | null {
+  /** Parse a positive number from an input; returns null when invalid */
+  private parsePositive(raw: string): number | null {
+    if (raw.trim() === '') return null;
     const value = Number(raw);
-    if (!Number.isFinite(value) || value <= 0) {
-      new Notice(`${label} must be a number greater than zero`);
-      return null;
-    }
+    if (!Number.isFinite(value) || value <= 0) return null;
     return value;
+  }
+
+  /**
+   * Bind a numeric field so half-typed values ('', '0', '0.') never nag.
+   *
+   * Typing an invalid value only marks the input (silent, per keystroke);
+   * the Notice fires once on commit — blur or Enter — and the last valid
+   * value is restored. Valid keystrokes still apply live, as before.
+   */
+  private bindPositiveNumber(
+    input: HTMLInputElement,
+    label: string,
+    initial: number,
+    apply: (value: number) => void
+  ): void {
+    let lastValid = initial;
+    const clearInvalid = (): void => {
+      input.removeClass('is-invalid');
+      input.removeAttribute('aria-invalid');
+    };
+    input.addEventListener('input', () => {
+      const value = this.parsePositive(input.value);
+      if (value == null) {
+        input.addClass('is-invalid');
+        input.setAttribute('aria-invalid', 'true');
+        return;
+      }
+      clearInvalid();
+      lastValid = value;
+      apply(value);
+    });
+    input.addEventListener('change', () => {
+      if (this.parsePositive(input.value) != null) return;
+      // Settings still hold lastValid (invalid keystrokes never applied), so
+      // restoring the text is enough to put the field back in sync.
+      new Notice(`${label} must be a number greater than zero`);
+      input.value = String(lastValid);
+      clearInvalid();
+    });
   }
 
   onOpen(): void {
     this.modalEl.addClass('windrose-travel-pack-modal');
+    this.settingsListener = () => { this.handleSettingsChanged(); };
+    window.addEventListener('windrose-settings-changed', this.settingsListener);
     this.render();
+  }
+
+  /** Fingerprint of the palette: identity, colour and label of every entry */
+  private computePaletteSignature(): string {
+    return getColorPalette().map(entry => `${entry.id}:${entry.color}:${entry.label}`).join('|');
+  }
+
+  /**
+   * Repaint terrain palettes when the palette itself changed (a colour added
+   * or edited elsewhere). Every settings save fires this event — including
+   * this modal's own debounced text saves — so the signature check is what
+   * keeps typing from being interrupted by a repaint.
+   */
+  private handleSettingsChanged(): void {
+    const signature = this.computePaletteSignature();
+    if (signature === this.paletteSignature) return;
+    this.paletteSignature = signature;
+    const pack = this.getPack();
+    if (!pack) return;
+    for (const [terrainId, paletteEl] of this.terrainPaletteEls) {
+      const terrain = pack.terrains.find(t => t.id === terrainId);
+      if (terrain) this.fillTerrainPalette(paletteEl, terrain);
+    }
   }
 
   private render(): void {
     const { contentEl } = this;
     contentEl.empty();
+    this.terrainPaletteEls.clear();
+    this.paletteSignature = this.computePaletteSignature();
     const pack = this.getPack();
     if (!pack) {
       contentEl.createEl('p', { text: 'This travel pack no longer exists.' });
@@ -211,9 +284,8 @@ class TravelPackEditModal extends Modal {
         text.setValue(String(unit.factor));
         text.inputEl.type = 'number';
         text.inputEl.addClass('windrose-travel-pack-input-small');
-        text.onChange(value => {
-          const factor = this.parsePositive(value, 'Conversion factor');
-          if (factor != null) this.patchItem('units', unit.id, { factor });
+        this.bindPositiveNumber(text.inputEl, 'Conversion factor', unit.factor, factor => {
+          this.patchItem('units', unit.id, { factor });
         });
       });
       row.addText(text => {
@@ -289,9 +361,8 @@ class TravelPackEditModal extends Modal {
         text.setValue(String(terrain.multiplier));
         text.inputEl.type = 'number';
         text.inputEl.addClass('windrose-travel-pack-input-small');
-        text.onChange(value => {
-          const multiplier = this.parsePositive(value, 'Speed multiplier');
-          if (multiplier != null) this.patchItem('terrains', terrain.id, { multiplier });
+        this.bindPositiveNumber(text.inputEl, 'Speed multiplier', terrain.multiplier, multiplier => {
+          this.patchItem('terrains', terrain.id, { multiplier });
         });
       });
       row.addColorPicker(picker => {
@@ -323,21 +394,9 @@ class TravelPackEditModal extends Modal {
   private renderTerrainDetails(containerEl: HTMLElement, terrain: TravelTerrain): void {
     const details = containerEl.createDiv({ cls: 'windrose-travel-terrain-details' });
 
-    const swatches = details.createDiv({ cls: 'windrose-travel-terrain-swatches' });
-    const activeColor = terrain.color ?? DEFAULT_TERRAIN_COLOR;
-    for (const entry of getColorPalette()) {
-      const swatch = swatches.createEl('button', {
-        cls: 'windrose-travel-terrain-swatch',
-        attr: { type: 'button' },
-      });
-      swatch.setCssStyles({ backgroundColor: entry.color });
-      setTooltip(swatch, entry.label);
-      swatch.setAttribute('aria-label', entry.label);
-      if (colorsMatch(entry.color, activeColor)) swatch.addClass('is-selected');
-      swatch.onclick = () => {
-        this.patchItem('terrains', terrain.id, { color: entry.color }, true);
-      };
-    }
+    const palette = details.createDiv({ cls: 'windrose-travel-terrain-palette' });
+    this.terrainPaletteEls.set(terrain.id, palette);
+    this.fillTerrainPalette(palette, terrain);
 
     const tagField = details.createDiv({ cls: 'windrose-travel-terrain-tag' });
     const input = tagField.createEl('input', {
@@ -362,6 +421,98 @@ class TravelPackEditModal extends Modal {
       cls: 'windrose-travel-terrain-hint',
       text: 'Cells holding a tile with this tag count as this terrain.',
     });
+  }
+
+  /**
+   * The palette region of a terrain row: the compact one-click strip, an
+   * ellipsis toggle, and (when open) the same palette spelled out with
+   * labels plus an "Add color" entry. Repainted in place so an added colour
+   * shows up without re-rendering the modal.
+   */
+  private fillTerrainPalette(paletteEl: HTMLElement, terrain: TravelTerrain): void {
+    paletteEl.empty();
+    const entries = getColorPalette();
+    const activeColor = terrain.color ?? DEFAULT_TERRAIN_COLOR;
+    const expanded = this.expandedTerrains.has(terrain.id);
+
+    const swatches = paletteEl.createDiv({ cls: 'windrose-travel-terrain-swatches' });
+    for (const entry of entries) {
+      const swatch = swatches.createEl('button', {
+        cls: 'windrose-travel-terrain-swatch',
+        attr: { type: 'button' },
+      });
+      swatch.setCssStyles({ backgroundColor: entry.color });
+      setTooltip(swatch, entry.label);
+      swatch.setAttribute('aria-label', entry.label);
+      if (colorsMatch(entry.color, activeColor)) swatch.addClass('is-selected');
+      swatch.onclick = () => {
+        this.patchItem('terrains', terrain.id, { color: entry.color }, true);
+      };
+    }
+
+    const moreBtn = swatches.createEl('button', {
+      cls: 'windrose-travel-terrain-more',
+      attr: { type: 'button', 'aria-label': 'More colors', 'aria-expanded': String(expanded) },
+    });
+    setIcon(moreBtn, 'more-horizontal');
+    setTooltip(moreBtn, 'More colors');
+    if (expanded) moreBtn.addClass('is-active');
+    moreBtn.onclick = () => {
+      if (expanded) {
+        this.expandedTerrains.delete(terrain.id);
+      } else {
+        this.expandedTerrains.add(terrain.id);
+      }
+      this.fillTerrainPalette(paletteEl, terrain);
+    };
+
+    if (!expanded) return;
+
+    const list = paletteEl.createDiv({ cls: 'windrose-travel-terrain-expanded' });
+    for (const entry of entries) {
+      const option = list.createEl('button', {
+        cls: 'windrose-travel-terrain-option',
+        attr: { type: 'button', 'aria-label': entry.label },
+      });
+      const chip = option.createSpan({ cls: 'windrose-travel-terrain-option-swatch' });
+      chip.setCssStyles({ backgroundColor: entry.color });
+      option.createSpan({ cls: 'windrose-travel-terrain-option-label', text: entry.label });
+      if (colorsMatch(entry.color, activeColor)) option.addClass('is-selected');
+      option.onclick = () => {
+        this.patchItem('terrains', terrain.id, { color: entry.color }, true);
+      };
+    }
+
+    const addBtn = list.createEl('button', {
+      cls: 'windrose-travel-terrain-add',
+      attr: { type: 'button', 'aria-label': 'Add color' },
+    });
+    const addIcon = addBtn.createSpan({ cls: 'windrose-travel-terrain-add-icon' });
+    setIcon(addIcon, 'plus');
+    addBtn.createSpan({ cls: 'windrose-travel-terrain-option-label', text: 'Add color' });
+    setTooltip(addBtn, 'Add color');
+    addBtn.onclick = () => { this.addPaletteColor(terrain.id); };
+  }
+
+  /**
+   * Open the shared colour editor in create mode; whatever the user adds
+   * becomes this terrain's colour. The new entry is identified by diffing
+   * the custom-colour ids, so a cancelled dialog changes nothing.
+   */
+  private addPaletteColor(terrainId: string): void {
+    const beforeIds = new Set((this.plugin.settings.customPaletteColors ?? []).map(c => c.id));
+    new ColorEditModal(this.app, this.plugin, null, () => {
+      const added = (this.plugin.settings.customPaletteColors ?? []).find(c => !beforeIds.has(c.id));
+      this.expandedTerrains.add(terrainId);
+      if (added) this.patchItem('terrains', terrainId, { color: added.color });
+      // ColorEditModal only mutates settings — persist here, which also fires
+      // windrose-settings-changed for every other palette consumer.
+      this.flushNotify();
+      this.paletteSignature = this.computePaletteSignature();
+      const paletteEl = this.terrainPaletteEls.get(terrainId);
+      const terrain = this.getPack()?.terrains.find(t => t.id === terrainId);
+      if (paletteEl && terrain) this.fillTerrainPalette(paletteEl, terrain);
+    }).open();
   }
 
   // ===========================================
@@ -393,9 +544,8 @@ class TravelPackEditModal extends Modal {
         text.setValue(String(mode.distance));
         text.inputEl.type = 'number';
         text.inputEl.addClass('windrose-travel-pack-input-small');
-        text.onChange(value => {
-          const distance = this.parsePositive(value, 'Distance');
-          if (distance != null) this.patchItem('modes', mode.id, { distance });
+        this.bindPositiveNumber(text.inputEl, 'Distance', mode.distance, distance => {
+          this.patchItem('modes', mode.id, { distance });
         });
       });
 
@@ -434,9 +584,8 @@ class TravelPackEditModal extends Modal {
         text.setValue(String(mode.timeValue));
         text.inputEl.type = 'number';
         text.inputEl.addClass('windrose-travel-pack-input-small');
-        text.onChange(value => {
-          const timeValue = this.parsePositive(value, 'Time span');
-          if (timeValue != null) this.patchItem('modes', mode.id, { timeValue });
+        this.bindPositiveNumber(text.inputEl, 'Time span', mode.timeValue, timeValue => {
+          this.patchItem('modes', mode.id, { timeValue });
         });
       });
       row.addDropdown(dropdown => {
@@ -488,9 +637,8 @@ class TravelPackEditModal extends Modal {
         text.setValue(String(allowance.timeValue));
         text.inputEl.type = 'number';
         text.inputEl.addClass('windrose-travel-pack-input-small');
-        text.onChange(value => {
-          const timeValue = this.parsePositive(value, 'Time per day');
-          if (timeValue != null) this.patchItem('allowances', allowance.id, { timeValue });
+        this.bindPositiveNumber(text.inputEl, 'Time per day', allowance.timeValue, timeValue => {
+          this.patchItem('allowances', allowance.id, { timeValue });
         });
       });
       row.addDropdown(dropdown => {
@@ -516,6 +664,11 @@ class TravelPackEditModal extends Modal {
     // Flush any debounced text-edit save so closing the modal never drops
     // the last keystrokes.
     if (this.notifyTimer != null) this.flushNotify();
+    if (this.settingsListener) {
+      window.removeEventListener('windrose-settings-changed', this.settingsListener);
+      this.settingsListener = null;
+    }
+    this.terrainPaletteEls.clear();
     this.contentEl.empty();
   }
 }

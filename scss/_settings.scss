@@ -847,6 +847,20 @@
         flex: 0 1 80px;
         min-width: 60px;
       }
+
+      /* Invalid numeric entry is flagged while typing; the notice waits for
+         the commit (blur/Enter) */
+      input.is-invalid {
+        border-color: var(--text-error);
+        box-shadow: 0 0 0 1px var(--text-error);
+      }
+
+      /* Obsidian sizes the colour input to exactly --swatch-height, so the 2px
+         focus ring painted on the inner swatch is clipped top and bottom by the
+         UA sheet's overflow: clip !important. Give the ring room instead. */
+      input[type='color'] {
+        height: calc(var(--swatch-height) + 2 * var(--input-border-width-focus, 2px));
+      }
     }
   }
 
@@ -861,11 +875,117 @@
     border-bottom: 1px solid var(--background-modifier-border);
   }
 
+  /* Compact strip + (when open) the labelled full palette */
+  .windrose-travel-terrain-palette {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-2-2);
+    flex: 1 1 280px;
+    min-width: 220px;
+  }
+
   .windrose-travel-terrain-swatches {
     display: flex;
     flex-wrap: wrap;
     gap: var(--size-2-2);
     align-items: center;
+  }
+
+  button.windrose-travel-terrain-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    padding: 0;
+    border-radius: var(--radius-s);
+    border: 1px solid var(--background-modifier-border);
+    background-color: transparent;
+    box-shadow: none;
+    color: var(--text-muted);
+    cursor: pointer;
+
+    .svg-icon {
+      width: 14px;
+      height: 14px;
+    }
+
+    &:hover {
+      border-color: var(--interactive-accent);
+      color: var(--text-normal);
+    }
+
+    &.is-active {
+      border-color: var(--interactive-accent);
+      color: var(--text-accent);
+    }
+  }
+
+  .windrose-travel-terrain-expanded {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: var(--size-2-2);
+    padding: var(--size-4-2);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background-color: var(--background-secondary);
+  }
+
+  button.windrose-travel-terrain-option,
+  button.windrose-travel-terrain-add {
+    display: flex;
+    align-items: center;
+    gap: var(--size-2-2);
+    width: 100%;
+    padding: var(--size-2-1) var(--size-2-2);
+    border: 1px solid transparent;
+    border-radius: var(--radius-s);
+    background-color: transparent;
+    box-shadow: none;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-normal);
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--interactive-accent);
+      background-color: var(--background-modifier-hover);
+    }
+  }
+
+  button.windrose-travel-terrain-option.is-selected {
+    border-color: var(--interactive-accent);
+    background-color: var(--background-modifier-hover);
+  }
+
+  .windrose-travel-terrain-option-swatch {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    border-radius: var(--radius-s);
+    border: 1px solid var(--background-modifier-border);
+  }
+
+  .windrose-travel-terrain-option-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .windrose-travel-terrain-add-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    color: var(--text-muted);
+
+    .svg-icon {
+      width: 14px;
+      height: 14px;
+    }
   }
 
   button.windrose-travel-terrain-swatch {

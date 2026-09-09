@@ -6048,11 +6048,15 @@ input.windrose-color-input-as-button {
   transform: translateY(-50%) scale(0.95);
 }
 
+.windrose-color-edit {
+  /* Portalled to document.body (ColorPicker.tsx) and positioned in JS via
+     position: fixed left/top computed from the swatch's bounding rect, so it
+     escapes any clipping ancestor (e.g. the docked sidebar) instead of being
+     cut off. z-index sits above the color picker's own 2100/2099 (picker +
+     overlay) since it's no longer a descendant of the picker's stacking
+     context once portalled. */
+}
 .windrose-color-edit-panel {
-  position: absolute;
-  left: calc(100% + 4px);
-  top: 50%;
-  transform: translateY(-50%);
   background: var(--windrose-bg-secondary);
   border: 1px solid var(--windrose-border-secondary);
   border-radius: 6px;
@@ -6060,7 +6064,7 @@ input.windrose-color-input-as-button {
   display: flex;
   align-items: center;
   gap: 8px;
-  z-index: 150;
+  z-index: 2150;
   box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.3);
   white-space: nowrap;
 }
@@ -8843,6 +8847,22 @@ button.windrose-breadcrumb-link {
   flex: 0 1 80px;
   min-width: 60px;
 }
+.windrose-travel-pack-modal .windrose-travel-pack-row .setting-item-control {
+  /* Invalid numeric entry is flagged while typing; the notice waits for
+     the commit (blur/Enter) */
+}
+.windrose-travel-pack-modal .windrose-travel-pack-row .setting-item-control input.is-invalid {
+  border-color: var(--text-error);
+  box-shadow: 0 0 0 1px var(--text-error);
+}
+.windrose-travel-pack-modal .windrose-travel-pack-row .setting-item-control {
+  /* Obsidian sizes the colour input to exactly --swatch-height, so the 2px
+     focus ring painted on the inner swatch is clipped top and bottom by the
+     UA sheet's overflow: clip !important. Give the ring room instead. */
+}
+.windrose-travel-pack-modal .windrose-travel-pack-row .setting-item-control input[type=color] {
+  height: calc(var(--swatch-height) + 2 * var(--input-border-width-focus, 2px));
+}
 .windrose-travel-pack-modal {
   /* Second line of a terrain row: palette swatches + tile tag */
 }
@@ -8855,11 +8875,107 @@ button.windrose-breadcrumb-link {
   margin-top: calc(-1 * var(--size-4-2));
   border-bottom: 1px solid var(--background-modifier-border);
 }
+.windrose-travel-pack-modal {
+  /* Compact strip + (when open) the labelled full palette */
+}
+.windrose-travel-pack-modal .windrose-travel-terrain-palette {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-2);
+  flex: 1 1 280px;
+  min-width: 220px;
+}
 .windrose-travel-pack-modal .windrose-travel-terrain-swatches {
   display: flex;
   flex-wrap: wrap;
   gap: var(--size-2-2);
   align-items: center;
+}
+.windrose-travel-pack-modal button.windrose-travel-terrain-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  padding: 0;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--background-modifier-border);
+  background-color: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.windrose-travel-pack-modal button.windrose-travel-terrain-more .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+.windrose-travel-pack-modal button.windrose-travel-terrain-more:hover {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+.windrose-travel-pack-modal button.windrose-travel-terrain-more.is-active {
+  border-color: var(--interactive-accent);
+  color: var(--text-accent);
+}
+.windrose-travel-pack-modal .windrose-travel-terrain-expanded {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: var(--size-2-2);
+  padding: var(--size-4-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background-color: var(--background-secondary);
+}
+.windrose-travel-pack-modal button.windrose-travel-terrain-option,
+.windrose-travel-pack-modal button.windrose-travel-terrain-add {
+  display: flex;
+  align-items: center;
+  gap: var(--size-2-2);
+  width: 100%;
+  padding: var(--size-2-1) var(--size-2-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+  background-color: transparent;
+  box-shadow: none;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-normal);
+  text-align: left;
+  cursor: pointer;
+}
+.windrose-travel-pack-modal button.windrose-travel-terrain-option:hover,
+.windrose-travel-pack-modal button.windrose-travel-terrain-add:hover {
+  border-color: var(--interactive-accent);
+  background-color: var(--background-modifier-hover);
+}
+.windrose-travel-pack-modal button.windrose-travel-terrain-option.is-selected {
+  border-color: var(--interactive-accent);
+  background-color: var(--background-modifier-hover);
+}
+.windrose-travel-pack-modal .windrose-travel-terrain-option-swatch {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--background-modifier-border);
+}
+.windrose-travel-pack-modal .windrose-travel-terrain-option-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.windrose-travel-pack-modal .windrose-travel-terrain-add-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  color: var(--text-muted);
+}
+.windrose-travel-pack-modal .windrose-travel-terrain-add-icon .svg-icon {
+  width: 14px;
+  height: 14px;
 }
 .windrose-travel-pack-modal button.windrose-travel-terrain-swatch {
   width: 20px;
@@ -10844,10 +10960,6 @@ button.windrose-dock-panel-collapse:hover {
 :is(.windrose-dock-right, .windrose-floating-panel-content, .windrose-edge-rail-drawer-body) .windrose-color-picker .windrose-color-swatch {
   width: 34px;
   height: 34px;
-}
-:is(.windrose-dock-right, .windrose-floating-panel-content, .windrose-edge-rail-drawer-body) .windrose-color-picker .windrose-color-edit-panel {
-  left: auto;
-  right: calc(100% + 4px);
 }
 :is(.windrose-dock-right, .windrose-floating-panel-content, .windrose-edge-rail-drawer-body) .windrose-color-picker {
   /* Flatten opacity into single compact row: Label ──── Value */
