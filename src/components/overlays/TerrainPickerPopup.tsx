@@ -3,8 +3,9 @@
  *
  * Small transient popup for assigning a terrain to a measurement route
  * segment, anchored at the clicked segment's midpoint. Lists every terrain
- * from enabled travel packs plus an explicit "None" (unassigned = plain
- * mode speed). Click-outside dismisses.
+ * from enabled travel packs, plus a Clear button (shown only when the
+ * segment already has a terrain) that unassigns it back to plain mode
+ * speed. Click-outside dismisses.
  */
 
 import type { VNode } from 'preact';
@@ -70,15 +71,6 @@ const TerrainPickerPopup = ({
       <CornerBrackets classPrefix="windrose-selection-card-bracket" variant="minimal" filterId="terrain-picker-bracket" />
       <div className="windrose-selection-card-content">
         <div className="windrose-terrain-picker-title">Segment terrain</div>
-        <button
-          type="button"
-          className={`windrose-terrain-picker-item ${currentTerrainId == null ? 'is-active' : ''}`}
-          onClick={() => onPick(null)}
-        >
-          <span className="windrose-terrain-picker-swatch windrose-terrain-picker-swatch-none" />
-          <span>None</span>
-          <span className="windrose-terrain-picker-mult">×1</span>
-        </button>
         {options.map(option => (
           <button
             key={option.id}
@@ -94,6 +86,15 @@ const TerrainPickerPopup = ({
             <span className="windrose-terrain-picker-mult">×{option.multiplier}</span>
           </button>
         ))}
+        {currentTerrainId != null && (
+          <button
+            type="button"
+            className="windrose-terrain-picker-clear"
+            onClick={() => onPick(null)}
+          >
+            Clear
+          </button>
+        )}
       </div>
     </div>
   );

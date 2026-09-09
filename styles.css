@@ -5354,12 +5354,28 @@ button.windrose-sel-icon-btn,
   height: 12px;
   border-radius: 2px;
 }
-.windrose-terrain-picker-swatch-none {
-  border: 1px dashed oklch(from var(--windrose-border-primary) l c h/0.6);
-}
 .windrose-terrain-picker-mult {
   font-size: 10px;
   opacity: 0.6;
+}
+.is-tablet button.windrose-terrain-picker-clear, button.windrose-terrain-picker-clear, .windrose-terrain-picker-clear {
+  width: 100%;
+  min-height: unset;
+  margin-top: 4px;
+  padding: 4px 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-top: 1px solid oklch(from var(--windrose-border-primary) l c h/0.3);
+  border-radius: 3px;
+  color: var(--windrose-text-secondary);
+  font-size: 11px;
+  text-align: center;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+}
+.is-tablet button.windrose-terrain-picker-clear:hover, button.windrose-terrain-picker-clear:hover, .windrose-terrain-picker-clear:hover {
+  border-color: oklch(from var(--windrose-border-primary) l c h/0.5);
+  color: var(--windrose-text-primary);
 }
 
 /* ============================================

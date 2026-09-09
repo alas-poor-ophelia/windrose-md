@@ -181,10 +181,10 @@ const MeasurementControls = ({
                         onAllowanceChange?.(value === '' ? null : value);
                       }}
                     >
-                      <option value="">None</option>
                       {allowanceOptions.map(option => (
                         <option key={option.id} value={option.id}>{option.name}</option>
                       ))}
+                      <option value="">No day length</option>
                     </select>
                   </label>
                 )}
