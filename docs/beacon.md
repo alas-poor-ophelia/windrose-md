@@ -7,11 +7,13 @@ permalink: /beacon/
 
 # The Beacon
 
-The **Beacon** is a movable position marker with a **range**. It tracks anything that has a location and a reach — the party is the common case, but a rival faction, an advancing army, or a spreading storm work identically. Wherever it stands, it continuously answers *"what's within reach of this point?"* — visually on the canvas, interactively in a results list, and optionally as a generated note in your vault. One Beacon per map. (Requires the *Beacon* feature — like the other session tools, it can be switched off under Features.)
+The **Beacon** is a movable position marker with a **range**. It tracks anything that has a location and a reach — the party is the common case, but a rival faction, an advancing army, or a spreading storm work identically. Wherever it stands, it continuously answers *"what's within reach of this point?"* — visually on the canvas, interactively in a results list, and optionally as a generated note in your vault. A map can hold as many Beacons as you like, each with its own range, filters and note. (Requires the *Beacon* feature — like the other session tools, it can be switched off under Features.)
 
-## Placing the Beacon
+## Placing Beacons
 
-The Beacon shares the pin tool group in the palette with note pins — long-press (or right-click) the pin button and choose **Beacon**. Click a cell to place it (it snaps to the grid, square or hex); drag it to move it, and the range ring follows live.
+The Beacon shares the pin tool group in the palette with note pins — long-press (or right-click) the pin button and choose **Beacon**. Click an empty cell to place a Beacon there (it snaps to the grid, square or hex); every click on empty ground places another one. Clicking a Beacon selects it instead of placing a new one, and dragging it moves it, range ring following live. Two Beacons never share a cell.
+
+The selected Beacon is the one whose card is on screen. With the select tool, clicking a Beacon selects it too, so you can adjust one without leaving the tool you were using.
 
 ## The range ring
 
@@ -19,6 +21,8 @@ The Beacon's range is set in the map's configured distance units — the same pe
 
 - **Circle** — a clean geometric ring at the range radius.
 - **Cells** — a highlight of the actual cells within range under the map's distance rules (diagonal rule on square grids, true hex distance on hex maps). On a hex map this is the classic hex-crawl "range bloom."
+
+Every Beacon draws its own ring, in its own color, and answers its own range query — overlapping rings simply overlap.
 
 Markers currently in range get a subtle glow on the canvas, so "what's in reach" reads at a glance.
 
@@ -54,4 +58,4 @@ Each Beacon can expand its results with **related notes**: **off**, **by tags** 
 
 ## The Beacon note
 
-Optionally, the Beacon can generate a **beacon note** — a markdown note in a vault folder you choose, holding the current nearby results as a table of note links with distances (and travel times, when configured). Updates are debounced and change-detected: if the results didn't change, the file isn't rewritten. The note carries an ownership marker, so Windrose will never overwrite a note it didn't generate; a manually deleted beacon note is recreated on the next update; and removing the Beacon offers to delete its note (the Beacon is removed either way).
+Optionally, the Beacon can generate a **beacon note** — a markdown note in a vault folder you choose, holding the current nearby results as a table of note links with distances (and travel times, when configured). Updates are debounced and change-detected: if the results didn't change, the file isn't rewritten. The note carries an ownership marker, so Windrose will never overwrite a note it didn't generate; a manually deleted beacon note is recreated on the next update; and removing a Beacon offers to delete its note (the Beacon is removed either way). Each Beacon owns its own note, so several Beacons on one map generate several notes.

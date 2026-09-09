@@ -5,8 +5,8 @@
  * removal. All functions return new arrays/objects (immutable updates) so
  * they compose with handlePartyPinsChange and history tracking.
  *
- * The UI exposes a single party pin per map; these operations work on the
- * pins array so storage can hold more in the future without a migration.
+ * A map can hold any number of pins; every pin carries its own range,
+ * filters and note, so all lookups here are by id or by cell position.
  */
 
 // Type-only imports
@@ -39,10 +39,19 @@ function isValidRange(value: number): boolean {
 }
 
 /**
- * Get the map's party pin (the UI-visible single pin), or null if none placed
+ * Find the pin occupying a cell, or null when the cell is free.
+ * One pin per cell is an invariant of placement and dragging.
  */
-function getPartyPin(partyPins: PartyPin[] | undefined): PartyPin | null {
-  return partyPins?.[0] ?? null;
+function findPartyPinAt(partyPins: PartyPin[] | undefined, position: Point): PartyPin | null {
+  return partyPins?.find(p => p.position.x === position.x && p.position.y === position.y) ?? null;
+}
+
+/**
+ * Look a pin up by id, or null when the id is absent (removed, undone)
+ */
+function getPartyPinById(partyPins: PartyPin[] | undefined, pinId: string | null | undefined): PartyPin | null {
+  if (pinId == null || pinId === '') return null;
+  return partyPins?.find(p => p.id === pinId) ?? null;
 }
 
 /**
@@ -184,7 +193,8 @@ function formatPropertyFilters(properties: Record<string, string[]> | undefined)
 export {
   PARTY_PIN_DEFAULTS,
   isValidRange,
-  getPartyPin,
+  findPartyPinAt,
+  getPartyPinById,
   createPartyPin,
   upsertPartyPin,
   movePartyPin,

@@ -1,35 +1,25 @@
 /**
  * PartyPinLayer.tsx
  *
- * Layer component for the party pin. Registers the placement/drag tool
- * handlers, resolves the map's distance settings, converts the pin's range
- * from map units to cells, and renders the pin with its range ring. The
- * ring is visible whenever a pin exists, independent of the active tool.
+ * Layer component for the map's beacons. Registers the placement/drag tool
+ * handlers, resolves the map's distance and travel settings once, tracks
+ * which beacon is selected, and renders one PartyPinInstance per pin — each
+ * of which computes its own range and travel independently. Range rings are
+ * visible whenever a pin exists, independent of the active tool.
  */
 
 import type { VNode } from 'preact';
 import type { PartyPin } from '#types/core/map.types';
 import type { Point } from '#types/core/geometry.types';
 import type { ToolId } from '#types/tools/tool.types';
-import type { PartyRangeResults } from '../../objects/partyRangeQuery';
 
-import { Notice, TFile } from 'obsidian';
+import { TFile } from 'obsidian';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
-import { rangeUnitsToCells } from '../../drawing/rangeOperations';
-import { getPartyPin, removePartyPin, upsertPartyPin } from '../../objects/partyPinOperations';
-import { queryPartyRange } from '../../objects/partyRangeQuery';
+import { getPartyPinById } from '../../objects/partyPinOperations';
 import type { NoteMetadataAccessor } from '../../objects/partyRangeQuery';
-import type { RelatedNotes, RelatedNotesSource } from '../../objects/partyRelatedNotes';
-import { extractCacheTags, getRelatedByBacklinks, getRelatedByTags } from '../../objects/partyRelatedNotes';
-import type { PartyNoteTravelLabels } from '../../persistence/partyNoteOperations';
-import {
-  buildPartyNoteContent,
-  buildPartyNotePath,
-  deletePartyNote,
-  upsertPartyNote
-} from '../../persistence/partyNoteOperations';
-import { openNoteInNewTab } from '../../persistence/noteOperations';
+import { extractCacheTags } from '../../objects/partyRelatedNotes';
+import type { PartyNoteContext } from '../../persistence/partyNoteOperations';
 import { getEnabledTravelPacks } from '../../travel/travelPackOperations';
 import {
   findTravelMismatch,
@@ -38,15 +28,11 @@ import {
   resolveSelectedModes,
 } from '../../travel/travelTimeOperations';
 import { getSettings } from '../../core/settingsAccessor';
-import { ConfirmModal } from '../../settings/modals/ConfirmModal';
-import { PartyPinOverlay } from '../overlays/PartyPinOverlay';
-import { PartyPinControls } from '../overlays/PartyPinControls';
+import { PartyPinInstance } from './PartyPinInstance';
 import { useApp } from '../../context/AppContext';
 import { useMapState } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { usePartyPinInteraction } from '../../hooks/interactions/usePartyPinInteraction';
-
-const EMPTY_RESULTS: PartyRangeResults = { linked: [], unlinked: [] };
 
 /** Props for PartyPinLayer component */
 export interface PartyPinLayerProps {
@@ -57,14 +43,10 @@ export interface PartyPinLayerProps {
 }
 
 const FLASH_DURATION_MS = 1800;
-/** Note writes coalesce bursts of edits into one file operation */
-const PARTY_NOTE_SAVE_DELAY_MS = 2000;
-/** Related notes shown per result before the "+N more" overflow */
-const PARTY_RELATED_CAP = 5;
 
 const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): VNode | null => {
   const app = useApp();
-  const { mapData, geometry, canvasRef, mapId, notePath, viewController, distanceOverrides } = useMapState();
+  const { mapData, geometry, mapId, notePath, distanceOverrides } = useMapState();
 
   // Transient highlight for "show on map" — cleared after the pulse finishes
   const [flashMarker, setFlashMarker] = useState<Point | null>(null);
@@ -83,19 +65,33 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     flashTimerRef.current = window.setTimeout(() => setFlashMarker(null), FLASH_DURATION_MS);
   }, [mapId, zoom]);
 
-  // Pin selected via the select tool (shows the controls card without
-  // switching to the party pin tool); cleared on any select-tool miss
+  // The beacon the last gesture targeted — its card is the one on screen.
+  // `viaSelect` marks a selection made with the select tool, which shows the
+  // card without switching to the beacon tool; it clears on any select miss.
+  const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [selectedViaSelect, setSelectedViaSelect] = useState(false);
   useEffect(() => {
     if (currentTool !== 'select') setSelectedViaSelect(false);
   }, [currentTool]);
 
+  const handleActivePinChange = useCallback((pinId: string | null, viaSelect: boolean): void => {
+    setSelectedPinId(pinId);
+    setSelectedViaSelect(viaSelect && pinId != null);
+  }, []);
+
   const { handlePartyPinPointerDown, handlePartyPinSelectPointerDown, handlePartyPinMove, stopPartyPinDrag, isPartyPinDragging } =
-    usePartyPinInteraction(mapData?.partyPins, onPartyPinsChange, setSelectedViaSelect);
+    usePartyPinInteraction(mapData?.partyPins, onPartyPinsChange, handleActivePinChange);
 
   useLayerHandlers('partyPin', { handlePartyPinPointerDown, handlePartyPinSelectPointerDown, handlePartyPinMove, stopPartyPinDrag, isPartyPinDragging });
 
-  const pin = getPartyPin(mapData?.partyPins);
+  const pins = mapData?.partyPins ?? [];
+  const selectedPin = getPartyPinById(pins, selectedPinId);
+  // With a single beacon the tool needs no click to reveal its card; with
+  // several, the card belongs to the beacon last placed or clicked.
+  const activePin = selectedPin ?? (pins.length === 1 ? pins[0] : null);
+  const controlsPinId = currentTool === 'partyPin'
+    ? activePin?.id ?? null
+    : (currentTool === 'select' && selectedViaSelect ? selectedPin?.id ?? null : null);
 
   // Tags/frontmatter for filter checks, straight from Obsidian's in-memory
   // metadata cache — no file reads per query
@@ -107,27 +103,6 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     return { tags: extractCacheTags(cache), frontmatter: cache.frontmatter ?? {} };
   }, [app]);
 
-  const results = useMemo((): PartyRangeResults => {
-    if (!pin || !mapData || !geometry) return EMPTY_RESULTS;
-    const distanceSettings = getEffectiveDistanceSettings(
-      mapData.mapType,
-      getSettings(),
-      (distanceOverrides ?? null)
-    );
-    return queryPartyRange(mapData, geometry, pin, {
-      rangeInCells: rangeUnitsToCells(pin.range, distanceSettings.distancePerCell),
-      distancePerCell: distanceSettings.distancePerCell,
-      distanceUnit: distanceSettings.distanceUnit,
-      diagonalRule: distanceSettings.gridDiagonalRule,
-      displayFormat: distanceSettings.displayFormat,
-      noteMetadata: noteMetadataAccessor
-    });
-  }, [pin, mapData, geometry, noteMetadataAccessor, distanceOverrides]);
-
-  // ===========================================
-  // Travel times per result (PP-35)
-  // ===========================================
-
   // Travel packs come from plugin settings; re-read when settings change
   const [settingsVersion, setSettingsVersion] = useState(0);
   useEffect(() => {
@@ -135,6 +110,14 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
     window.addEventListener('windrose-settings-changed', handler);
     return () => window.removeEventListener('windrose-settings-changed', handler);
   }, []);
+
+  // Resolved once for the whole layer: a stable object keeps every beacon's
+  // range query memoized across unrelated map edits
+  const mapType = mapData?.mapType;
+  const distanceSettings = useMemo(
+    () => getEffectiveDistanceSettings(mapType ?? 'grid', getSettings(), distanceOverrides ?? null),
+    [mapType, distanceOverrides, settingsVersion]
+  );
 
   const enabledPacks = useMemo(
     () => getEnabledTravelPacks(getSettings().travelPacks),
@@ -151,228 +134,49 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
 
   /** Compact "mode time · mode time" label for a result's distance, or null */
   const travelLabelFor = useCallback((distanceInCells: number): string | null => {
-    if (selectedTravelModes.length === 0 || !mapData) return null;
-    const distanceSettings = getEffectiveDistanceSettings(
-      mapData.mapType,
-      getSettings(),
-      (distanceOverrides ?? null)
-    );
+    if (selectedTravelModes.length === 0) return null;
     return formatTravelTimesLabel(
       distanceInCells * distanceSettings.distancePerCell,
       distanceSettings.distanceUnit,
       selectedTravelModes,
       travelAllowance
     );
-  }, [selectedTravelModes, travelAllowance, mapData, distanceOverrides]);
+  }, [selectedTravelModes, travelAllowance, distanceSettings]);
 
   /** One explicit unit-guidance line when a selected mode cannot compute */
   const travelHint = useMemo((): string | null => {
-    if (selectedTravelModes.length === 0 || !mapData) return null;
-    const distanceSettings = getEffectiveDistanceSettings(
-      mapData.mapType,
-      getSettings(),
-      (distanceOverrides ?? null)
-    );
+    if (selectedTravelModes.length === 0) return null;
     return findTravelMismatch(distanceSettings.distanceUnit, selectedTravelModes);
-  }, [selectedTravelModes, mapData, distanceOverrides]);
-
-  /** Per-result travel labels for the party note's Travel column */
-  const travelLabels = useMemo((): PartyNoteTravelLabels | undefined => {
-    if (selectedTravelModes.length === 0) return undefined;
-    const linked = new Map<string, string>();
-    for (const result of results.linked) {
-      const label = travelLabelFor(result.distanceInCells);
-      if (label != null) linked.set(result.notePath, label);
-    }
-    const unlinked = new Map<string, string>();
-    for (const result of results.unlinked) {
-      const label = travelLabelFor(result.distanceInCells);
-      if (label != null) unlinked.set(result.objectId, label);
-    }
-    return { linked, unlinked };
-  }, [selectedTravelModes.length, results, travelLabelFor]);
-
-  // Related notes per result (tags or backlinks), for the party note table
-  const relatedMap = useMemo((): Map<string, RelatedNotes> | undefined => {
-    const mode = pin?.relatedMode ?? 'off';
-    if (mode === 'off' || pin == null || results.linked.length === 0) return undefined;
-    // Materialize the vault-wide tag table ONCE per recompute: getRelatedByTags
-    // iterates noteTags() fully per result, so a per-call generator would
-    // rescan every markdown file for every in-range note (O(results × vault)).
-    const noteTagsTable: Array<[string, string[]]> = mode === 'tags'
-      ? app.vault.getMarkdownFiles().map(file =>
-        [file.path, extractCacheTags(app.metadataCache.getFileCache(file))])
-      : [];
-    const source: RelatedNotesSource = {
-      noteTags: () => noteTagsTable,
-      resolvedLinks: () => app.metadataCache.resolvedLinks
-    };
-    const excludePaths = pin.partyNote?.path != null && pin.partyNote.path !== '' ? [pin.partyNote.path] : [];
-    const map = new Map<string, RelatedNotes>();
-    for (const result of results.linked) {
-      map.set(result.notePath, mode === 'tags'
-        ? getRelatedByTags(source, result.notePath, { cap: PARTY_RELATED_CAP, excludeTags: pin.filters?.tags, excludePaths })
-        : getRelatedByBacklinks(source, result.notePath, { cap: PARTY_RELATED_CAP, excludePaths }));
-    }
-    return map;
-  }, [pin, results, app]);
-
-  const inRangeMarkers = useMemo(
-    () => [...results.linked, ...results.unlinked].map(r => r.position),
-    [results]
-  );
+  }, [selectedTravelModes, distanceSettings]);
 
   const mapName = mapData?.name ?? '';
-  const noteDistanceUnit = useMemo(() => {
-    if (!mapData) return '';
-    return getEffectiveDistanceSettings(
-      mapData.mapType,
-      getSettings(),
-      (distanceOverrides ?? null)
-    ).distanceUnit;
-  }, [mapData, distanceOverrides]);
-  const noteContext = useMemo(
-    () => ({ mapId: mapId ?? '', mapName, mapNotePath: notePath ?? '', distanceUnit: noteDistanceUnit }),
-    [mapId, mapName, notePath, noteDistanceUnit]
+  const noteContext = useMemo<PartyNoteContext>(
+    () => ({ mapId: mapId ?? '', mapName, mapNotePath: notePath ?? '', distanceUnit: distanceSettings.distanceUnit }),
+    [mapId, mapName, notePath, distanceSettings]
   );
 
-  // Note content doubles as the change signal: the debounced write below
-  // only re-arms when the rendered content actually differs
-  const noteContent = useMemo(() => {
-    if (pin?.partyNote?.enabled !== true) return null;
-    return buildPartyNoteContent(pin, results, noteContext, relatedMap, travelLabels);
-  }, [pin, results, noteContext, relatedMap, travelLabels]);
-
-  // Pin removal must not race the debounced writer: a timer firing between
-  // the note's trashing and the removal commit would resurrect the file via
-  // upsert's recreate-on-manual-delete path. The flag suppresses in-flight
-  // writes during removal and resets whenever a live pin re-arms the writer
-  // (undo of a removal included).
-  const suppressNoteWritesRef = useRef(false);
-  // Guards the reset below: while a removal awaits its confirm dialog
-  // (unbounded), dep changes (another in-range marker moving, say) re-run the
-  // writer effect — without this flag that re-run would clear the suppression
-  // and a timer firing between deletePartyNote and the removal commit would
-  // resurrect the just-trashed note.
-  const removalInFlightRef = useRef(false);
-
-  useEffect(() => {
-    if (noteContent == null || pin?.partyNote == null) return undefined;
-    if (!removalInFlightRef.current) suppressNoteWritesRef.current = false;
-    const pinForWrite = pin;
-    const timer = window.setTimeout(() => {
-      if (suppressNoteWritesRef.current) return;
-      void upsertPartyNote(app, pinForWrite, noteContent);
-    }, PARTY_NOTE_SAVE_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, [noteContent, pin, app]);
-
-  const handleCreatePartyNote = useCallback(async (folder: string): Promise<void> => {
-    const currentPin = getPartyPin(mapData?.partyPins);
-    if (!currentPin || !mapData) return;
-    const path = buildPartyNotePath(folder, currentPin.label);
-    const updatedPin: PartyPin = { ...currentPin, partyNote: { enabled: true, path } };
-    const outcome = await upsertPartyNote(app, updatedPin, buildPartyNoteContent(updatedPin, results, noteContext, relatedMap, travelLabels));
-    if (outcome === 'blocked') {
-      new Notice(`A note already exists at ${path} — choose another folder or rename the beacon.`);
-      return;
-    }
-    onPartyPinsChange(upsertPartyPin(mapData.partyPins ?? [], updatedPin));
-  }, [mapData, results, noteContext, relatedMap, travelLabels, app, onPartyPinsChange]);
-
-  const handleOpenPartyNote = useCallback(async (): Promise<void> => {
-    const currentPin = getPartyPin(mapData?.partyPins);
-    const path = currentPin?.partyNote?.path;
-    if (currentPin == null || path == null || path === '') return;
-    // Flush the pending debounced write first, so the tab never opens a
-    // missing or stale file (upsert is change-detected — no churn)
-    if (currentPin.partyNote?.enabled === true) {
-      await upsertPartyNote(app, currentPin, buildPartyNoteContent(currentPin, results, noteContext, relatedMap, travelLabels));
-    }
-    await openNoteInNewTab(path);
-  }, [mapData, results, noteContext, relatedMap, travelLabels, app]);
-
-  const handleRecalculate = useCallback((): void => {
-    const currentPin = getPartyPin(mapData?.partyPins);
-    if (currentPin?.partyNote?.enabled !== true || !mapData || !geometry) return;
-    void upsertPartyNote(app, currentPin, buildPartyNoteContent(currentPin, results, noteContext, relatedMap, travelLabels))
-      .then(outcome => {
-        if (outcome === 'blocked') new Notice('Beacon note is blocked by an unrelated file at its path.');
-      });
-  }, [mapData, geometry, results, noteContext, relatedMap, travelLabels, app]);
-
-  const handleRemovePin = useCallback(async (): Promise<void> => {
-    const currentPin = getPartyPin(mapData?.partyPins);
-    if (!currentPin || !mapData) return;
-    suppressNoteWritesRef.current = true;
-    removalInFlightRef.current = true;
-    try {
-      if (currentPin.partyNote?.path != null && currentPin.partyNote.path !== '') {
-        const alsoDeleteNote = await new ConfirmModal(app, {
-          message: `Also delete the beacon note at "${currentPin.partyNote.path}"?\nThe beacon is removed either way.`,
-          confirmText: 'Delete note',
-          cancelText: 'Keep note',
-          isDestructive: true
-        }).openAndGetValue();
-        if (alsoDeleteNote) {
-          const outcome = await deletePartyNote(app, currentPin);
-          if (outcome === 'not-owned') {
-            new Notice('The file at the note path was not generated by this beacon — leaving it untouched.');
-          }
-        }
-      }
-      onPartyPinsChange(removePartyPin(mapData.partyPins ?? [], currentPin.id));
-    } finally {
-      // Suppression itself stays armed — the writer effect clears it when a
-      // live pin (undo of this removal included) re-arms the writer.
-      removalInFlightRef.current = false;
-    }
-  }, [mapData, app, onPartyPinsChange]);
-
-  if (!pin || !mapData || !geometry) {
+  if (pins.length === 0 || !mapData || !geometry) {
     return null;
   }
 
-  const distanceSettings = getEffectiveDistanceSettings(
-    mapData.mapType,
-    getSettings(),
-    (distanceOverrides ?? null)
-  );
-  const rangeInCells = rangeUnitsToCells(pin.range, distanceSettings.distancePerCell);
-
   return (
     <>
-      <PartyPinOverlay
-        pin={pin}
-        rangeInCells={rangeInCells}
-        diagonalRule={distanceSettings.gridDiagonalRule}
-        inRangeMarkers={inRangeMarkers}
-        flashMarker={flashMarker}
-        geometry={geometry}
-        mapData={mapData}
-        canvasRef={canvasRef}
-        viewController={viewController}
-      />
-      {(currentTool === 'partyPin' || (currentTool === 'select' && selectedViaSelect)) && (
-        <PartyPinControls
+      {pins.map(pin => (
+        <PartyPinInstance
+          key={pin.id}
           pin={pin}
-          partyPins={mapData.partyPins ?? []}
-          distanceUnit={distanceSettings.distanceUnit}
-          results={results}
+          showControls={pin.id === controlsPinId}
+          distanceSettings={distanceSettings}
+          noteMetadata={noteMetadataAccessor}
+          noteContext={noteContext}
+          hasTravelModes={selectedTravelModes.length > 0}
           travelLabelFor={travelLabelFor}
           travelHint={travelHint}
-          geometry={geometry}
-          mapData={mapData}
-          canvasRef={canvasRef}
-          viewController={viewController}
-          onPartyPinsChange={onPartyPinsChange}
+          flashMarker={pin.id === controlsPinId ? flashMarker : null}
           onShowOnMap={handleShowOnMap}
-          onCreatePartyNote={handleCreatePartyNote}
-          onOpenPartyNote={() => { void handleOpenPartyNote(); }}
-          onRecalculate={handleRecalculate}
-          onRemovePin={() => { void handleRemovePin(); }}
+          onPartyPinsChange={onPartyPinsChange}
         />
-      )}
+      ))}
     </>
   );
 };

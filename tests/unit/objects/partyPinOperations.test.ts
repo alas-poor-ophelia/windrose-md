@@ -7,7 +7,8 @@ import { describe, it, expect } from 'vitest';
 import {
   PARTY_PIN_DEFAULTS,
   isValidRange,
-  getPartyPin,
+  findPartyPinAt,
+  getPartyPinById,
   createPartyPin,
   upsertPartyPin,
   movePartyPin,
@@ -66,12 +67,34 @@ describe('createPartyPin', () => {
   });
 });
 
-describe('getPartyPin', () => {
-  it('returns the first pin or null', () => {
+describe('findPartyPinAt', () => {
+  it('returns the pin occupying a cell', () => {
+    const first = createPartyPin({ x: 1, y: 2 });
+    const second = createPartyPin({ x: 4, y: 5 });
+    expect(findPartyPinAt([first, second], { x: 4, y: 5 })).toBe(second);
+  });
+
+  it('returns null for a free cell or an empty map', () => {
+    const pin = createPartyPin({ x: 1, y: 2 });
+    expect(findPartyPinAt([pin], { x: 2, y: 1 })).toBeNull();
+    expect(findPartyPinAt([], { x: 0, y: 0 })).toBeNull();
+    expect(findPartyPinAt(undefined, { x: 0, y: 0 })).toBeNull();
+  });
+});
+
+describe('getPartyPinById', () => {
+  it('returns the pin with the given id', () => {
+    const first = createPartyPin({ x: 0, y: 0 });
+    const second = createPartyPin({ x: 3, y: 3 });
+    expect(getPartyPinById([first, second], second.id)).toBe(second);
+  });
+
+  it('returns null for unknown, empty, or missing ids', () => {
     const pin = createPartyPin({ x: 0, y: 0 });
-    expect(getPartyPin([pin])).toBe(pin);
-    expect(getPartyPin([])).toBeNull();
-    expect(getPartyPin(undefined)).toBeNull();
+    expect(getPartyPinById([pin], 'party-nope')).toBeNull();
+    expect(getPartyPinById([pin], '')).toBeNull();
+    expect(getPartyPinById([pin], null)).toBeNull();
+    expect(getPartyPinById(undefined, pin.id)).toBeNull();
   });
 });
 

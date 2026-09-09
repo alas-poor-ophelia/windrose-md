@@ -67,6 +67,14 @@ interface PartyRangeQuerySettings {
   noteMetadata?: NoteMetadataAccessor;
 }
 
+/**
+ * The slice of map data the query reads. Narrower than MapData on purpose:
+ * callers hold one memoized query per beacon, and depending on `layers`
+ * alone keeps a beacon's results cached while unrelated map edits (another
+ * beacon moving, a label change) churn the map object.
+ */
+export type PartyRangeMapData = Pick<MapData, 'layers'>;
+
 const RANGE_EPSILON = 1e-6;
 
 /** Strip folders and extension for display, matching note-link conventions */
@@ -88,7 +96,7 @@ function objectCellPosition(obj: MapObject, geometry: IGeometry): Point {
  * no longer exist on the map degrades gracefully to all layers rather than
  * silently returning nothing.
  */
-function resolveScopedLayers(mapData: MapData, pin: PartyPin): MapLayer[] {
+function resolveScopedLayers(mapData: PartyRangeMapData, pin: PartyPin): MapLayer[] {
   const scope = pin.layerScope;
   if (scope == null || scope.mode !== 'selected') return mapData.layers;
   const selected = mapData.layers.filter(layer => scope.layerIds.includes(layer.id));
@@ -137,7 +145,7 @@ function passesFilters(pin: PartyPin, notePath: string, noteMetadata?: NoteMetad
  *          unlinked markers, both sorted nearest-first.
  */
 function queryPartyRange(
-  mapData: MapData,
+  mapData: PartyRangeMapData,
   geometry: IGeometry,
   pin: PartyPin,
   settings: PartyRangeQuerySettings
