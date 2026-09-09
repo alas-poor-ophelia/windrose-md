@@ -9,7 +9,7 @@
 import type { ToolId } from '#types/tools/tool.types';
 import type { Point } from '#types/core/geometry.types';
 import type { Cell } from '#types/core/cell.types';
-import type { MapData } from '#types/core/map.types';
+import type { MapData, LayerId, MapLayer } from '#types/core/map.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { Curve } from '#types/core/curve.types';
 import type { TextLabel } from '#types/objects/note.types';
@@ -25,8 +25,8 @@ import { setCell as accessorSetCell, removeCell as accessorRemoveCell, getCellIn
 import { removeEdge, getEdgeAt } from '../../drawing/edgeOperations';
 import { eraseObjectAt } from '../../objects/objectOperations';
 import { eraseCellFromCurves, eraseWorldPolygonFromCurves } from '../../geometry/curves/curveBoolean';
-import { getActiveLayer } from '../../persistence/layerAccessor';
-import { assignmentCoversCell } from '../../assets/tileFootprint';
+import { getActiveLayer, getActiveBoardLayers } from '../../persistence/layerAccessor';
+import { findTileHitInLayers } from '../../assets/tileFootprint';
 import { distanceToWallPath } from '../../drawing/wallPathOperations';
 import { distancePointToPolyline } from '../../geometry/strokes/terrainStrokeGeometry';
 
@@ -57,6 +57,12 @@ interface UsePaintToolOptions {
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
   onTilesChange?: (tiles: TileAssignment[], suppressHistory?: boolean) => void;
+  /**
+   * Arms a layer (the real layer-select handler: saves the outgoing layer's
+   * history, sets the active layer, swaps in the incoming layer's stack).
+   * Required for cross-stratum tile erase — see toggleCell.
+   */
+  onLayerSelect?: (layerId: LayerId) => void;
   onWallPathsChange?: (wallPaths: WallPath[], suppressHistory?: boolean) => void;
   onTerrainStrokesChange?: (strokes: TerrainStroke[], suppressHistory?: boolean) => void;
   getTextLabelAtPosition: (labels: TextLabel[], worldX: number, worldY: number, ctx: CanvasRenderingContext2D | null) => TextLabel | null;
@@ -82,7 +88,7 @@ function usePaintTool({
   currentTool, mapData, geometry, selectedColor, selectedOpacity,
   canvasRef, screenToGrid, screenToWorld, getClientCoords,
   onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
-  onTilesChange, onWallPathsChange, onTerrainStrokesChange,
+  onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange,
   getTextLabelAtPosition, removeTextLabel, getObjectAtPosition
 }: UsePaintToolOptions): UsePaintToolResult {
 
@@ -96,6 +102,50 @@ function usePaintTool({
   const strokeInitialTilesRef = useRef<TileAssignment[] | null>(null);
   const strokeInitialWallPathsRef = useRef<WallPath[] | null>(null);
   const strokeInitialTerrainStrokesRef = useRef<TerrainStroke[] | null>(null);
+
+  /**
+   * Commit history for whatever this stroke touched on `layer`, then clear the
+   * snapshots. Every call passes the layer's CURRENT arrays, so the writes are
+   * data-identical and only exist to record one undo entry per stroke.
+   */
+  const flushStrokeHistory = (layer: MapLayer): void => {
+    if (strokeInitialStateRef.current !== null) {
+      if (strokeChanged(layer.cells, strokeInitialStateRef.current)) {
+        onCellsChange(layer.cells, false);
+      }
+      strokeInitialStateRef.current = null;
+    }
+    if (strokeInitialEdgesRef.current !== null) {
+      if (strokeChanged(layer.edges, strokeInitialEdgesRef.current)) {
+        onEdgesChange(layer.edges, false);
+      }
+      strokeInitialEdgesRef.current = null;
+    }
+    if (strokeInitialCurvesRef.current !== null) {
+      if (strokeChanged(layer.curves, strokeInitialCurvesRef.current)) {
+        onCurvesChange(layer.curves, false);
+      }
+      strokeInitialCurvesRef.current = null;
+    }
+    if (strokeInitialTilesRef.current !== null && onTilesChange != null) {
+      if (strokeChanged(layer.tiles ?? [], strokeInitialTilesRef.current)) {
+        onTilesChange(layer.tiles ?? [], false);
+      }
+      strokeInitialTilesRef.current = null;
+    }
+    if (strokeInitialWallPathsRef.current !== null && onWallPathsChange != null) {
+      if (strokeChanged(layer.wallPaths ?? [], strokeInitialWallPathsRef.current)) {
+        onWallPathsChange(layer.wallPaths ?? [], false);
+      }
+      strokeInitialWallPathsRef.current = null;
+    }
+    if (strokeInitialTerrainStrokesRef.current !== null && onTerrainStrokesChange != null) {
+      if (strokeChanged(layer.terrainStrokes ?? [], strokeInitialTerrainStrokesRef.current)) {
+        onTerrainStrokesChange(layer.terrainStrokes ?? [], false);
+      }
+      strokeInitialTerrainStrokesRef.current = null;
+    }
+  };
 
   const toggleCell = (coords: Point, shouldFill: boolean, dragStart: DragStartContext | null = null): void => {
     if (!mapData || !geometry) return;
@@ -161,24 +211,47 @@ function usePaintTool({
           onObjectsChange(result.objects);
         }
       } else {
-        // Erase tile at cell coords (overlay first, then fill)
+        // Erase tile at cell coords. In strata mode every depth band is its own
+        // layer, so the search spans the whole active board (top stratum first,
+        // overlay before fill) — otherwise only the armed band could be erased.
+        // Hidden layers are excluded, except the active one: erasing into a
+        // layer you hid yourself is long-standing behaviour.
         let tileErased = false;
-        if (onTilesChange != null && activeLayer.tiles != null && activeLayer.tiles.length > 0) {
-          const tiles = activeLayer.tiles;
-          // Footprint-aware: a click anywhere inside a multi-cell prop erases it;
-          // freeform stamps still erase by their drop cell.
-          const covers = (t: TileAssignment): boolean =>
-            t.freeform === true ? (t.col === coordX && t.row === coordY) : assignmentCoversCell(t, coordX, coordY);
-          const overlayIdx = tiles.findIndex((t: TileAssignment) => covers(t) && t.placement === 'overlay');
-          if (overlayIdx >= 0) {
-            strokeInitialTilesRef.current ??= [...tiles];
-            onTilesChange(tiles.filter((_: TileAssignment, i: number) => i !== overlayIdx), isBatchedStroke);
-            tileErased = true;
-          } else {
-            const baseIdx = tiles.findIndex((t: TileAssignment) => covers(t));
-            if (baseIdx >= 0) {
-              strokeInitialTilesRef.current ??= [...tiles];
-              onTilesChange(tiles.filter((_: TileAssignment, i: number) => i !== baseIdx), isBatchedStroke);
+        if (onTilesChange != null) {
+          const searchLayers = getActiveBoardLayers(mapData)
+            .filter(l => l.visible !== false || l.id === activeLayer.id);
+          const hit = findTileHitInLayers(searchLayers, coordX, coordY);
+          if (hit != null) {
+            const layerTiles = hit.layer.tiles ?? [];
+            const nextTiles = layerTiles.filter((_: TileAssignment, i: number) => i !== hit.index);
+            if (hit.layer.id === activeLayer.id) {
+              strokeInitialTilesRef.current ??= [...layerTiles];
+              onTilesChange(nextTiles, isBatchedStroke);
+              tileErased = true;
+            } else if (onLayerSelect != null) {
+              // Cross-stratum: history stacks are per layer and undo restores
+              // into the ACTIVE layer, so arm the owning layer through the real
+              // select handler FIRST (it saves the outgoing stack and restores
+              // the incoming one), then commit. handleTilesChange's functional
+              // updater then sees the owning layer as active and snapshots the
+              // erase into that layer's stack.
+              //
+              // The erase is committed immediately rather than batched into the
+              // stroke, and every stroke snapshot is re-armed against the newly
+              // active layer so stopDrawing cannot commit an old layer's array
+              // into the new one. Anything this stroke already did to the
+              // outgoing layer keeps its data but loses its pending undo entry:
+              // it cannot be flushed here, because saveCurrentLayerHistory reads
+              // the history state from a closure that a same-tick write has not
+              // updated yet, so the entry would be cached away and dropped.
+              onLayerSelect(hit.layer.id);
+              onTilesChange(nextTiles, false);
+              strokeInitialStateRef.current = isBatchedStroke ? [...hit.layer.cells] : null;
+              strokeInitialEdgesRef.current = null;
+              strokeInitialCurvesRef.current = null;
+              strokeInitialTilesRef.current = null;
+              strokeInitialWallPathsRef.current = null;
+              strokeInitialTerrainStrokesRef.current = null;
               tileErased = true;
             }
           }
@@ -288,44 +361,7 @@ function usePaintTool({
 
     if (mapData == null) return;
 
-    const activeLayer = getActiveLayer(mapData);
-
-    if (strokeInitialStateRef.current !== null) {
-      if (strokeChanged(activeLayer.cells, strokeInitialStateRef.current)) {
-        onCellsChange(activeLayer.cells, false);
-      }
-      strokeInitialStateRef.current = null;
-    }
-    if (strokeInitialEdgesRef.current !== null) {
-      if (strokeChanged(activeLayer.edges, strokeInitialEdgesRef.current)) {
-        onEdgesChange(activeLayer.edges, false);
-      }
-      strokeInitialEdgesRef.current = null;
-    }
-    if (strokeInitialCurvesRef.current !== null) {
-      if (strokeChanged(activeLayer.curves, strokeInitialCurvesRef.current)) {
-        onCurvesChange(activeLayer.curves, false);
-      }
-      strokeInitialCurvesRef.current = null;
-    }
-    if (strokeInitialTilesRef.current !== null && onTilesChange != null) {
-      if (strokeChanged(activeLayer.tiles ?? [], strokeInitialTilesRef.current)) {
-        onTilesChange(activeLayer.tiles ?? [], false);
-      }
-      strokeInitialTilesRef.current = null;
-    }
-    if (strokeInitialWallPathsRef.current !== null && onWallPathsChange != null) {
-      if (strokeChanged(activeLayer.wallPaths ?? [], strokeInitialWallPathsRef.current)) {
-        onWallPathsChange(activeLayer.wallPaths ?? [], false);
-      }
-      strokeInitialWallPathsRef.current = null;
-    }
-    if (strokeInitialTerrainStrokesRef.current !== null && onTerrainStrokesChange != null) {
-      if (strokeChanged(activeLayer.terrainStrokes ?? [], strokeInitialTerrainStrokesRef.current)) {
-        onTerrainStrokesChange(activeLayer.terrainStrokes ?? [], false);
-      }
-      strokeInitialTerrainStrokesRef.current = null;
-    }
+    flushStrokeHistory(getActiveLayer(mapData));
   };
 
   const cancelPaintDrawing = (): void => {

@@ -232,6 +232,11 @@ export interface PluginSettings {
   // (set on dismiss or after a successful import; absent = show while
   // the old plugin's data file exists)
   oldImportBannerDismissed?: boolean;
+
+  // Show debug/diagnostic commands (perf telemetry, input event probe, zoom
+  // trace, canvas capability report) in the command palette. Absent = off;
+  // does not affect the vault-root WINDROSE-DEBUG.json mechanism.
+  developerMode?: boolean;
 }
 
 // ===========================================

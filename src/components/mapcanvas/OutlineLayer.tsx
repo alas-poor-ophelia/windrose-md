@@ -12,7 +12,7 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
 import type { Outline, StoredViewState } from '#types/core/map.types';
 
-import { useCallback, useEffect, useRef } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useLiveOverlayRedraw } from '../../hooks/canvas/useLiveOverlayRedraw';
@@ -35,6 +35,107 @@ export interface OutlineLayerProps {
   selectedColor: string;
   onColorChange: (color: string) => void;
   onOutlinesChange: (outlines: Outline[]) => void;
+}
+
+interface LiveInputCommit {
+  /** `onInput` handler — records the live value, touches no shared state. */
+  handleInput: (e: Event) => void;
+  /** Ref callback — capture the element and protect an in-flight drag. */
+  attachRef: (el: HTMLInputElement | null) => void;
+  /** Live value while a drag is in flight, null otherwise. */
+  pendingRef: { current: string | null };
+}
+
+/**
+ * Keeps a continuously-firing <input> off the per-move commit path.
+ *
+ * `input` fires on every pointer move — for the native colour dialog's
+ * hue/saturation square that is hundreds of events per second, and a range
+ * slider is no better. Routing each one into updateOutline() replaced the
+ * whole mapData object (rebroadcast to every layer) AND pushed a full
+ * active-layer snapshot onto the undo stack, which addToHistory dedupes with
+ * two JSON.stringify passes over that snapshot. One drag therefore cost
+ * hundreds of whole-layer serialisations and buried the user's real undo
+ * history under itself.
+ *
+ * A drag now only records its live value in a ref — optionally repainting the
+ * overlay once per animation frame, the useLiveOverlayRedraw gate, so canvas
+ * feedback still tracks it — and commits exactly once, on the native `change`
+ * event. That event carries the authoritative final value, so no last sample
+ * is dropped, and an unchanged value commits nothing. Clicking is unchanged.
+ *
+ * Two DOM details this leans on:
+ * - The commit MUST be a native listener. preact/compat is in this bundle and
+ *   its global vnode hook rewrites an `onChange` prop on any non-checkbox
+ *   <input> — colour and range included — to `oninput`, which would put the
+ *   commit straight back on the per-move path this exists to remove.
+ * - Preact force-syncs the `value` prop onto the DOM node whenever it differs
+ *   from the live DOM value, so a re-render from anywhere else mid-drag would
+ *   snap the control back to the last committed value. Refs are applied after
+ *   props are diffed, so restoring the in-flight value there undoes that.
+ */
+function useLiveInputCommit(
+  commit: (value: string) => void,
+  onPreviewFrame?: () => void
+): LiveInputCommit {
+  const elementRef = useRef<HTMLInputElement | null>(null);
+  const pendingRef = useRef<string | null>(null);
+  const frameRef = useRef<number | null>(null);
+  const commitRef = useRef(commit);
+  const previewRef = useRef(onPreviewFrame);
+
+  commitRef.current = commit;
+  previewRef.current = onPreviewFrame;
+
+  const handleInput = useCallback((e: Event) => {
+    pendingRef.current = (e.target as HTMLInputElement).value;
+    if (previewRef.current == null || frameRef.current != null) return;
+    frameRef.current = window.requestAnimationFrame(() => {
+      frameRef.current = null;
+      previewRef.current?.();
+    });
+  }, []);
+
+  const attachRef = useCallback((el: HTMLInputElement | null) => {
+    // Composed ref callbacks are re-invoked with null on every render (see
+    // tooltipRef); only a real element is worth recording.
+    if (el == null) return;
+    elementRef.current = el;
+    if (pendingRef.current != null) el.value = pendingRef.current;
+  }, []);
+
+  useEffect((): (() => void) | undefined => {
+    const el = elementRef.current;
+    if (!el) return undefined;
+
+    const handleCommit = (): void => {
+      if (frameRef.current != null) {
+        window.cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+      const value = el.value;
+      pendingRef.current = null;
+      // Repaint from committed data — the last preview frame would otherwise
+      // stay on the overlay when the value comes back unchanged.
+      previewRef.current?.();
+      commitRef.current(value);
+    };
+
+    el.addEventListener('change', handleCommit);
+    el.addEventListener('blur', handleCommit);
+    return () => {
+      el.removeEventListener('change', handleCommit);
+      el.removeEventListener('blur', handleCommit);
+    };
+  });
+
+  // Stable identity: this object is a dependency of the overlay draw callback,
+  // and a fresh one per render would make that callback (and the effect that
+  // repaints from it) churn on every render.
+  return useMemo(
+    () => ({ handleInput, attachRef, pendingRef }),
+    [handleInput, attachRef]
+  );
 }
 
 const OutlineLayer = ({
@@ -188,6 +289,37 @@ const OutlineLayer = ({
     return () => activeDocument.removeEventListener('windrose:hex-context-menu', handler);
   }, [isOutlineTool, mapData?.outlines, geometry, screenToWorld, deleteOutline, updateOutline, onOutlinesChange, instanceId]);
 
+  // ── Live-drag inputs (colour dialog, fill-opacity sliders) ────────
+  // See useLiveInputCommit: each of these fires `input` on every pointer move
+  // and used to commit — with a history push — on every one of them.
+  const selectedOutline = mapData?.outlines?.find(o => o.id === selectedOutlineId) ?? null;
+
+  const repaintOverlayRef = useRef<() => void>(() => undefined);
+  const repaintOverlayFrame = useCallback(() => { repaintOverlayRef.current(); }, []);
+
+  const commitOutlineColor = useCallback((value: string) => {
+    if (!selectedOutline || value === '' || value === selectedOutline.color) return;
+    updateOutline(selectedOutline.id, { color: value });
+  }, [selectedOutline, updateOutline]);
+
+  const commitOutlineFillOpacity = useCallback((value: string) => {
+    const parsed = parseFloat(value);
+    if (!selectedOutline || Number.isNaN(parsed) || parsed === selectedOutline.fillOpacity) return;
+    updateOutline(selectedOutline.id, { fillOpacity: parsed });
+  }, [selectedOutline, updateOutline]);
+
+  const commitSettingsFillOpacity = useCallback((value: string) => {
+    const parsed = parseFloat(value);
+    if (Number.isNaN(parsed) || parsed === outlineSettings.fillOpacity) return;
+    setOutlineSettings({ fillOpacity: parsed });
+  }, [outlineSettings.fillOpacity, setOutlineSettings]);
+
+  // Only the colour drag has anything to preview per frame: the overlay draws
+  // the selected outline's vertex handles stroked in its colour.
+  const outlineColorDrag = useLiveInputCommit(commitOutlineColor, repaintOverlayFrame);
+  const outlineFillOpacityDrag = useLiveInputCommit(commitOutlineFillOpacity);
+  const settingsFillOpacityDrag = useLiveInputCommit(commitSettingsFillOpacity);
+
   // ── Overlay canvas for in-progress drawing ────────────────────────
   const overlayRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -285,7 +417,7 @@ const OutlineLayer = ({
 
         const handleRadius = Math.max(outline.lineWidth * 1.2, 3);
         ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = outline.color;
+        ctx.strokeStyle = outlineColorDrag.pendingRef.current ?? outline.color;
         ctx.lineWidth = 1.5;
         for (const sv of screenVerts) {
           ctx.beginPath();
@@ -297,12 +429,20 @@ const OutlineLayer = ({
     }
 
     if (northDirection !== 0) ctx.restore();
-  }, [drawingVertices, selectedOutlineId, canvasRef, geometry, mapData, selectedColor, outlineSettings]);
+  }, [drawingVertices, selectedOutlineId, canvasRef, geometry, mapData, selectedColor, outlineSettings, outlineColorDrag]);
 
-  useEffect(() => {
+  const repaintOverlay = useCallback(() => {
     const vs = viewController?.getLive() ?? mapData?.viewState;
     if (vs) drawOutlineOverlay(vs);
   }, [drawOutlineOverlay, viewController, mapData?.viewState]);
+
+  // Colour-drag frames repaint through this ref, so a drag never has to
+  // re-render the component to get the preview colour onto the overlay.
+  repaintOverlayRef.current = repaintOverlay;
+
+  useEffect(() => {
+    repaintOverlay();
+  }, [repaintOverlay]);
 
   useLiveOverlayRedraw(viewController, drawOutlineOverlay);
 
@@ -361,8 +501,11 @@ const OutlineLayer = ({
               type="range"
               min="0.05" max="1" step="0.05"
               value={outlineSettings.fillOpacity}
-              onInput={(e: Event) => setOutlineSettings({ fillOpacity: parseFloat((e.target as HTMLInputElement).value) })}
-              ref={tooltipRef(`Fill opacity: ${Math.round(outlineSettings.fillOpacity * 100)}%`)}
+              onInput={settingsFillOpacityDrag.handleInput}
+              ref={(el: HTMLInputElement | null) => {
+                settingsFillOpacityDrag.attachRef(el);
+                tooltipRef(`Fill opacity: ${Math.round(outlineSettings.fillOpacity * 100)}%`)(el);
+              }}
               style={{ width: '60px', minHeight: '28px' }}
             />
           )}
@@ -416,8 +559,11 @@ const OutlineLayer = ({
             <input
               type="color"
               value={outline.color}
-              onInput={(e: Event) => updateOutline(outline.id, { color: (e.target as HTMLInputElement).value })}
-              ref={tooltipRef('Outline color')}
+              onInput={outlineColorDrag.handleInput}
+              ref={(el: HTMLInputElement | null) => {
+                outlineColorDrag.attachRef(el);
+                tooltipRef('Outline color')(el);
+              }}
               className="windrose-color-swatch-btn"
             />
 
@@ -435,8 +581,11 @@ const OutlineLayer = ({
                 type="range"
                 min="0.05" max="1" step="0.05"
                 value={outline.fillOpacity}
-                onInput={(e: Event) => updateOutline(outline.id, { fillOpacity: parseFloat((e.target as HTMLInputElement).value) })}
-                ref={tooltipRef(`Fill opacity: ${Math.round(outline.fillOpacity * 100)}%`)}
+                onInput={outlineFillOpacityDrag.handleInput}
+                ref={(el: HTMLInputElement | null) => {
+                  outlineFillOpacityDrag.attachRef(el);
+                  tooltipRef(`Fill opacity: ${Math.round(outline.fillOpacity * 100)}%`)(el);
+                }}
                 style={{ width: '60px', minHeight: '28px' }}
               />
             )}

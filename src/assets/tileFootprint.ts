@@ -17,11 +17,18 @@
  */
 
 import type { TileAssignment } from '#types/tiles/tile.types';
+import type { MapLayer } from '#types/core/map.types';
 import { MAX_TILE_SPAN } from './tileRenderResolution';
 
 export interface CellCoord {
   col: number;
   row: number;
+}
+
+/** A tile hit resolved across several layers: the owning layer and the tile's index in it. */
+export interface TileLayerHit {
+  layer: MapLayer;
+  index: number;
 }
 
 function clampSpan(n: number | undefined): number {
@@ -91,4 +98,43 @@ export function findAssignmentAt(
     if (assignmentCoversCell(t, col, row)) return t;
   }
   return undefined;
+}
+
+/**
+ * Whether an assignment claims the given cell for hit-testing purposes.
+ * Snapped tiles use their (rotation-aware) footprint; freeform stamps are
+ * world-positioned and only ever match their drop cell.
+ */
+export function tileHitsCell(t: TileAssignment, col: number, row: number): boolean {
+  return t.freeform === true
+    ? (t.col === col && t.row === row)
+    : assignmentCoversCell(t, col, row);
+}
+
+/**
+ * Topmost tile hit at (col, row) across a stack of layers.
+ *
+ * `layers` must be in ASCENDING draw order (as returned by
+ * `getActiveBoardLayers`); the scan runs in reverse so the TOP stratum wins,
+ * and within a layer an `overlay` tile wins over a `fill` tile. Layers are
+ * taken as given — visibility filtering belongs to the caller, which knows
+ * whether the active layer should be searched even when hidden.
+ */
+export function findTileHitInLayers(
+  layers: readonly MapLayer[],
+  col: number,
+  row: number,
+): TileLayerHit | null {
+  for (let i = layers.length - 1; i >= 0; i--) {
+    const layer = layers[i];
+    const tiles = layer.tiles;
+    if (tiles == null || tiles.length === 0) continue;
+
+    const overlayIdx = tiles.findIndex(t => tileHitsCell(t, col, row) && t.placement === 'overlay');
+    if (overlayIdx >= 0) return { layer, index: overlayIdx };
+
+    const baseIdx = tiles.findIndex(t => tileHitsCell(t, col, row));
+    if (baseIdx >= 0) return { layer, index: baseIdx };
+  }
+  return null;
 }

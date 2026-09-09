@@ -154,12 +154,81 @@ const RegionLayer = ({
     }
   }, [handleConfirmName, handleCancelName]);
 
-  // Color change handler for the inline <input type="color">
-  const handleColorChange = useCallback((e: Event) => {
-    if (!editingRegion) return;
-    const newColor = (e.target as HTMLInputElement).value;
-    updateRegion(editingRegion.id, { color: newColor, borderColor: newColor });
-  }, [editingRegion, updateRegion]);
+  // ── Region colour drag (inline <input type="color">) ───────────────
+  // The native colour dialog fires `input` on every pointer move inside its
+  // hue/saturation square — hundreds per second on a high-poll mouse. Routing
+  // each one straight to updateRegion() replaced the entire mapData object
+  // (broadcast to every layer) AND pushed a full active-layer snapshot onto
+  // the undo stack per move, and addToHistory compares snapshots with a pair
+  // of JSON.stringify calls. One drag therefore cost hundreds of whole-map
+  // serialisations and buried the user's real undo history under itself.
+  //
+  // The drag now repaints the overlay from a preview colour held in a REF,
+  // coalesced to one repaint per animation frame (the useLiveOverlayRedraw
+  // gate), and commits to map data exactly once — when the dialog commits the
+  // value. Holding the preview outside Preact state matters twice over: no
+  // layer re-renders mid-drag, and Preact never re-syncs a stale `value` back
+  // into the input that the open dialog is driving. Clicking is unchanged —
+  // `change` fires there too and commits the exact final value.
+  const previewColorRef = useRef<string | null>(null);
+  const previewFrameRef = useRef<number | null>(null);
+  const repaintOverlayRef = useRef<() => void>(() => undefined);
+
+  const cancelPreviewFrame = useCallback(() => {
+    if (previewFrameRef.current != null) {
+      window.cancelAnimationFrame(previewFrameRef.current);
+      previewFrameRef.current = null;
+    }
+  }, []);
+
+  const handleColorInput = useCallback((e: Event) => {
+    previewColorRef.current = (e.target as HTMLInputElement).value;
+    if (previewFrameRef.current != null) return;
+    previewFrameRef.current = window.requestAnimationFrame(() => {
+      previewFrameRef.current = null;
+      repaintOverlayRef.current();
+    });
+  }, []);
+
+  const commitColor = useCallback((finalColor: string) => {
+    cancelPreviewFrame();
+    previewColorRef.current = null;
+    // Repaint once from committed data — the last preview frame is otherwise
+    // left on the overlay when the colour comes back unchanged (no re-render).
+    repaintOverlayRef.current();
+    if (!editingRegion || finalColor === '' || finalColor === editingRegion.color) return;
+    updateRegion(editingRegion.id, { color: finalColor, borderColor: finalColor });
+  }, [editingRegion, updateRegion, cancelPreviewFrame]);
+
+  // The commit MUST hang off a native `change` listener: preact/compat is in
+  // this bundle, and its global vnode hook rewrites an `onChange` prop on a
+  // non-checkbox <input> to `oninput` — which would put the commit straight
+  // back on the per-move path this fix exists to remove. (ColorPicker.tsx does
+  // the same thing for the same reason.) `blur` is a backstop for a dialog
+  // dismissed without committing; commitColor is a no-op when nothing changed.
+  const colorInputRef = useRef<HTMLInputElement | null>(null);
+  const commitColorRef = useRef(commitColor);
+  commitColorRef.current = commitColor;
+
+  useEffect((): (() => void) | undefined => {
+    const input = colorInputRef.current;
+    if (!input || !editingRegion) return undefined;
+
+    const handleCommit = (): void => commitColorRef.current(input.value);
+
+    input.addEventListener('change', handleCommit);
+    input.addEventListener('blur', handleCommit);
+    return () => {
+      input.removeEventListener('change', handleCommit);
+      input.removeEventListener('blur', handleCommit);
+    };
+  });
+
+  // Abandon an uncommitted preview when the edit target changes or goes away.
+  useEffect(() => {
+    previewColorRef.current = null;
+    return cancelPreviewFrame;
+  }, [editingRegionId, cancelPreviewFrame]);
 
   // ── Overlay canvas (same as FreehandLayer pattern) ─────────────────
   const overlayRef = useRef<HTMLCanvasElement | null>(null);
@@ -207,7 +276,7 @@ const RegionLayer = ({
     ctx.clearRect(0, 0, overlay.width, overlay.height);
 
     const hexesToHighlight = editingRegion ? editingRegion.hexes : pendingHexes;
-    const highlightColor = editingRegion ? editingRegion.color : selectedColor;
+    const highlightColor = editingRegion ? (previewColorRef.current ?? editingRegion.color) : selectedColor;
 
     if (hexesToHighlight.length === 0 && boundaryVertices.length === 0) return;
 
@@ -274,10 +343,18 @@ const RegionLayer = ({
     if (northDirection !== 0) ctx.restore();
   }, [pendingHexes, boundaryVertices, canvasRef, geometry, mapData, selectedColor, editingRegion]);
 
-  useEffect(() => {
+  const repaintOverlay = useCallback(() => {
     const vs = viewController?.getLive() ?? mapData?.viewState;
     if (vs) drawRegionOverlay(vs);
   }, [drawRegionOverlay, viewController, mapData?.viewState]);
+
+  // Colour-drag frames repaint through this ref, so a drag never has to
+  // re-render the component to get the preview colour onto the overlay.
+  repaintOverlayRef.current = repaintOverlay;
+
+  useEffect(() => {
+    repaintOverlay();
+  }, [repaintOverlay]);
 
   useLiveOverlayRedraw(viewController, drawRegionOverlay);
 
@@ -443,8 +520,16 @@ const RegionLayer = ({
           <input
             type="color"
             value={editingRegion.color}
-            onInput={handleColorChange}
-            ref={tooltipRef('Change region color')}
+            onInput={handleColorInput}
+            ref={(el: HTMLInputElement | null) => {
+              if (el != null) {
+                colorInputRef.current = el;
+                // Preact force-syncs the value prop onto the DOM on any re-render;
+                // restore the in-flight drag value so an open dialog never snaps back.
+                if (previewColorRef.current != null) el.value = previewColorRef.current;
+              }
+              tooltipRef('Change region color')(el);
+            }}
             className="windrose-color-swatch-btn"
           />
           <span className="windrose-floating-bar-name">

@@ -89,22 +89,44 @@ export default class WindrosePlugin extends Plugin {
     this.addCommand({
       id: 'record-perf-telemetry',
       name: 'Record performance telemetry (60s)',
-      callback: () => { void recordPerfTelemetry(this.app); },
+      // checkCallback form: re-evaluated every palette open, so toggling
+      // developerMode takes effect without a plugin reload.
+      checkCallback: (checking) => {
+        if (this.settings.developerMode !== true) return false;
+        if (checking) return true;
+        void recordPerfTelemetry(this.app);
+        return true;
+      },
     });
     this.addCommand({
       id: 'input-event-probe',
       name: 'Record input event probe (15s)',
-      callback: () => { void recordInputEventProbe(this.app); },
+      checkCallback: (checking) => {
+        if (this.settings.developerMode !== true) return false;
+        if (checking) return true;
+        void recordInputEventProbe(this.app);
+        return true;
+      },
     });
     this.addCommand({
       id: 'zoom-trace-probe',
       name: 'Record zoom trace (25s)',
-      callback: () => { void recordZoomTrace(this.app); },
+      checkCallback: (checking) => {
+        if (this.settings.developerMode !== true) return false;
+        if (checking) return true;
+        void recordZoomTrace(this.app);
+        return true;
+      },
     });
     this.addCommand({
       id: 'canvas-capability-report',
       name: 'Write canvas capability report',
-      callback: () => { void writeCanvasCapabilityReport(this.app); },
+      checkCallback: (checking) => {
+        if (this.settings.developerMode !== true) return false;
+        if (checking) return true;
+        void writeCanvasCapabilityReport(this.app);
+        return true;
+      },
     });
 
     this.registerMarkdownCodeBlockProcessor('windrose-map', (source, el, ctx) => {

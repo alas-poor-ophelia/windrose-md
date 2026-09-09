@@ -1418,6 +1418,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onTextLabelsChange={handleTextLabelsChange}
               onEdgesChange={handleEdgesChange}
               onTilesChange={handleTilesChange}
+              onLayerSelect={handleLayerSelect}
               onWallPathsChange={handleWallPathsChange}
               onTerrainStrokesChange={handleTerrainStrokesChange}
               tileImagesReady={tileImagesReady}
@@ -1564,6 +1565,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 currentTool={currentTool}
                 selectedColor={selectedColor}
                 selectedOpacity={selectedOpacity}
+                freeformPlacementMode={freeformPlacementMode}
                 onShapeOverlaysChange={handleShapeOverlaysChange}
               />
 
@@ -2088,7 +2090,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             Map ID: {mapId} | Color: {getColorDisplayName()} | {
               currentTool === 'select' ? 'Click to select text/objects | Drag to move | Press R to rotate | Press Delete to remove' :
                 currentTool === 'draw' ? 'Click/drag to draw' :
-                  currentTool === 'erase' ? 'Click/drag to erase (text first, then objects, then cells)' :
+                  currentTool === 'erase' ? 'Click/drag to erase (text first, then objects, tiles, walls, then cells)' :
                     currentTool === 'rectangle' ? 'Click two corners to fill rectangle' :
                       currentTool === 'circle' ? 'Click edge point, then center to fill circle' :
                         currentTool === 'clearArea' ? 'Click two corners to clear area' :

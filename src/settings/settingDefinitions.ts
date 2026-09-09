@@ -57,7 +57,8 @@ type DirectSettingKey =
   | 'distanceUnitHex'
   | 'gridDiagonalRule'
   | 'distanceDisplayFormat'
-  | 'showSubHexBackdrop';
+  | 'showSubHexBackdrop'
+  | 'developerMode';
 
 const DIRECT_KEYS = new Set<string>([
   'hexOrientation', 'coordinateKeyMode', 'coordinateTextColor', 'coordinateTextShadow',
@@ -66,7 +67,7 @@ const DIRECT_KEYS = new Set<string>([
   'canvasHeight', 'canvasHeightMobile', 'pictureFrameHeight', 'pictureFrameHeightMobile',
   'pictureFrameWidth', 'pictureFrameWidthMobile',
   'distancePerCellGrid', 'distanceUnitGrid', 'distancePerCellHex', 'distanceUnitHex',
-  'gridDiagonalRule', 'distanceDisplayFormat', 'showSubHexBackdrop',
+  'gridDiagonalRule', 'distanceDisplayFormat', 'showSubHexBackdrop', 'developerMode',
 ] satisfies DirectSettingKey[]);
 
 // Sliders present percentages; settings store fractions. These virtual keys
@@ -722,6 +723,20 @@ function buildKeyboardShortcutsGroup(tab: SettingsTabThis): SettingDefinitionIte
   };
 }
 
+function buildAdvancedGroup(): SettingDefinitionItem {
+  return {
+    type: 'group',
+    heading: 'Developer',
+    items: [
+      {
+        name: 'Developer mode',
+        desc: 'Show debug and diagnostic commands in the command palette.',
+        control: { type: 'toggle', key: 'developerMode' }
+      }
+    ]
+  };
+}
+
 /**
  * Full declarative definition set. The root page stays short — the import
  * banner, the Features switchboard, and one navigable sub-page
@@ -804,7 +819,8 @@ function buildSettingDefinitions(tab: SettingsTabThis): SettingDefinitionItem[] 
       name: 'Keyboard shortcuts',
       desc: 'Rebind map tool shortcuts',
       items: [buildKeyboardShortcutsGroup(tab)]
-    }
+    },
+    buildAdvancedGroup()
   ];
 }
 

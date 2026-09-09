@@ -9,7 +9,7 @@ import type { MapObject, ObjectUpdate } from '../objects/object.types';
 import type { TextLabel, NotePin } from '../objects/note.types';
 import type { IGeometry, Point } from '../core/geometry.types';
 import type { Curve } from '../core/curve.types';
-import type { MapData, MapType, ShapeOverlay, StoredViewState, TextLabelSettings } from '../core/map.types';
+import type { LayerId, MapData, MapType, ShapeOverlay, StoredViewState, TextLabelSettings } from '../core/map.types';
 import type { GroupDragInitialState } from '../hooks/groupDrag.types';
 import type { Cell } from '../core/cell.types';
 import type { BorderSide, Edge } from '../core/rendering.types';
@@ -189,6 +189,13 @@ export interface MapOperationsContextValue {
 
   // Tile operations
   onTilesChange?: (tiles: TileAssignment[], suppressHistory?: boolean) => void;
+  /**
+   * Arm a layer (real layer-select: saves the outgoing layer's history stack,
+   * sets the active layer, restores the incoming one's). Tools need this when
+   * an edit targets a layer other than the active one — history is per layer
+   * and undo always restores into whichever layer is active.
+   */
+  onLayerSelect?: (layerId: LayerId) => void;
 
   // Wall/path strip and terrain stroke operations (whole-entry erase)
   onWallPathsChange?: (wallPaths: WallPath[], suppressHistory?: boolean) => void;

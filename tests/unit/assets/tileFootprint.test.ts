@@ -5,8 +5,11 @@ import {
   assignmentCoversCell,
   assignmentsOverlap,
   findAssignmentAt,
+  tileHitsCell,
+  findTileHitInLayers,
 } from '../../../src/assets/tileFootprint';
 import type { TileAssignment } from '../../../types/tiles/tile.types';
+import type { MapLayer } from '../../../types/core/map.types';
 
 function tile(p: Partial<TileAssignment> & { col: number; row: number }): TileAssignment {
   return { tilesetId: 'ts', tileId: 't', ...p } as TileAssignment;
@@ -107,5 +110,81 @@ describe('findAssignmentAt', () => {
 
   it('returns undefined when no footprint covers the cell', () => {
     expect(findAssignmentAt([tile({ col: 0, row: 0 })], 5, 5)).toBeUndefined();
+  });
+});
+
+function layer(p: Partial<MapLayer> & { id: string }): MapLayer {
+  return {
+    name: p.id, order: 0, visible: true,
+    cells: [], curves: [], edges: [], objects: [], textLabels: [], fogOfWar: null,
+    ...p,
+  } as MapLayer;
+}
+
+describe('tileHitsCell', () => {
+  it('matches a snapped tile anywhere inside its footprint', () => {
+    const t = tile({ col: 2, row: 2, spanW: 2, spanH: 2 });
+    expect(tileHitsCell(t, 3, 3)).toBe(true);
+    expect(tileHitsCell(t, 4, 2)).toBe(false);
+  });
+
+  it('matches a freeform stamp only on its drop cell', () => {
+    const t = tile({ col: 2, row: 2, spanW: 3, spanH: 3, freeform: true, worldX: 9, worldY: 9 });
+    expect(tileHitsCell(t, 2, 2)).toBe(true);
+    expect(tileHitsCell(t, 3, 3)).toBe(false);
+  });
+});
+
+describe('findTileHitInLayers', () => {
+  it('returns null when nothing covers the cell', () => {
+    const layers = [layer({ id: 'ground', tiles: [tile({ col: 0, row: 0 })] })];
+    expect(findTileHitInLayers(layers, 5, 5)).toBeNull();
+  });
+
+  it('finds a tile on a non-active stratum and reports its owning layer + index', () => {
+    const layers = [
+      layer({ id: 'ground', order: 0, tiles: [] }),
+      layer({ id: 'structure', order: 1, tiles: [tile({ col: 1, row: 1 }), tile({ col: 3, row: 3 })] }),
+    ];
+    expect(findTileHitInLayers(layers, 3, 3)).toEqual({ layer: layers[1], index: 1 });
+  });
+
+  it('scans the TOP stratum first (input is ascending draw order)', () => {
+    const layers = [
+      layer({ id: 'ground', order: 0, tiles: [tile({ col: 1, row: 1, tileId: 'low' })] }),
+      layer({ id: 'props', order: 1, tiles: [tile({ col: 1, row: 1, tileId: 'high' })] }),
+    ];
+    const hit = findTileHitInLayers(layers, 1, 1);
+    expect(hit?.layer.id).toBe('props');
+    expect(hit?.layer.tiles?.[hit.index].tileId).toBe('high');
+  });
+
+  it('prefers an overlay tile over a fill tile within the same layer', () => {
+    const tiles = [
+      tile({ col: 1, row: 1, tileId: 'fill', placement: 'fill' }),
+      tile({ col: 1, row: 1, tileId: 'over', placement: 'overlay' }),
+    ];
+    const hit = findTileHitInLayers([layer({ id: 'ground', tiles })], 1, 1);
+    expect(hit?.index).toBe(1);
+  });
+
+  it('is footprint-aware for multi-cell props on other strata', () => {
+    const layers = [
+      layer({ id: 'ground', order: 0, tiles: [] }),
+      layer({ id: 'props', order: 1, tiles: [tile({ col: 2, row: 2, spanW: 2, spanH: 3 })] }),
+    ];
+    expect(findTileHitInLayers(layers, 3, 4)?.layer.id).toBe('props');
+    expect(findTileHitInLayers(layers, 4, 4)).toBeNull();
+  });
+
+  it('skips layers with no tiles array', () => {
+    const layers = [layer({ id: 'a' }), layer({ id: 'b', order: 1, tiles: [tile({ col: 0, row: 0 })] })];
+    expect(findTileHitInLayers(layers, 0, 0)?.layer.id).toBe('b');
+  });
+
+  it('takes the layer list as given (visibility filtering belongs to the caller)', () => {
+    const layers = [layer({ id: 'hidden', visible: false, tiles: [tile({ col: 0, row: 0 })] })];
+    expect(findTileHitInLayers(layers, 0, 0)?.layer.id).toBe('hidden');
+    expect(findTileHitInLayers(layers.filter(l => l.visible !== false), 0, 0)).toBeNull();
   });
 });

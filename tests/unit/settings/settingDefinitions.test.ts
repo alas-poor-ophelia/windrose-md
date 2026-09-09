@@ -88,7 +88,8 @@ describe('buildSettingDefinitions', () => {
       'page:Measurement & travel',
       'page:Tile sets',
       'page:Objects',
-      'page:Keyboard shortcuts'
+      'page:Keyboard shortcuts',
+      'group:Developer'
     ]);
   });
 
@@ -113,7 +114,8 @@ describe('buildSettingDefinitions', () => {
     // no hidden-objects group on default settings.
     const rest = named.slice(fixedPrefix.length);
     expect(rest.length).toBeGreaterThan(1);
-    expect(rest[rest.length - 1]).toBe('Keyboard shortcuts');
+    expect(rest[rest.length - 2]).toBe('Keyboard shortcuts');
+    expect(rest[rest.length - 1]).toBe('Developer');
     expect(rest.some(h => h.startsWith('Hidden objects'))).toBe(false);
   });
 

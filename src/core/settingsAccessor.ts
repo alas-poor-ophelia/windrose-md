@@ -100,7 +100,10 @@ const FALLBACK_SETTINGS: PluginSettings = {
   
   // Shape preview settings
   shapePreviewKbm: true,
-  shapePreviewTouch: false
+  shapePreviewTouch: false,
+
+  // Debug/diagnostic command palette entries hidden by default
+  developerMode: false
 };
 
 /** Default object customization settings */

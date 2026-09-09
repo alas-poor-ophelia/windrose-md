@@ -326,7 +326,7 @@ const toolGroups: ToolGroup[] = [
     shortcut: 'e',
     actionId: 'eraseTool',
     subTools: [
-      { id: 'erase', label: 'Erase', title: 'Erase (remove text/objects/cells/edges)', icon: 'lucide-eraser' },
+      { id: 'erase', label: 'Erase', title: 'Erase (remove text/objects/tiles/cells/edges)', icon: 'lucide-eraser' },
       { id: 'clearArea', label: 'Clear Area', title: 'Clear Area (click two corners to erase)', icon: 'lucide-square-x', gridOnly: true }
     ]
   },

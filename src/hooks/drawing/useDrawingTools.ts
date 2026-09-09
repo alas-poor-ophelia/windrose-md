@@ -70,6 +70,7 @@ const useDrawingTools = (
     onTextLabelsChange,
     onEdgesChange,
     onTilesChange,
+    onLayerSelect,
     onWallPathsChange,
     onTerrainStrokesChange,
     getTextLabelAtPosition,
@@ -83,7 +84,7 @@ const useDrawingTools = (
     currentTool, mapData, geometry, selectedColor, selectedOpacity,
     canvasRef, screenToGrid, screenToWorld, getClientCoords,
     onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
-    onTilesChange, onWallPathsChange, onTerrainStrokesChange,
+    onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange,
     getTextLabelAtPosition, removeTextLabel, getObjectAtPosition
   });
 

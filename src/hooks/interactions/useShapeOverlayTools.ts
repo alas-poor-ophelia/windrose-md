@@ -2,7 +2,11 @@
  * useShapeOverlayTools.ts
  *
  * Hook for placing and managing shape overlays (square/circle).
- * Uses a 2-click placement pattern: click center, then click to set size.
+ * Uses a 2-click placement pattern: squares take two opposite corners,
+ * circles take the center and then a point on the edge.
+ *
+ * Placement snaps to the grid by default (cell centers, whole-cell extents);
+ * holding Alt+Shift or enabling the sidebar freeform mode places freely.
  */
 
 import type { ToolId } from '#types/tools/tool.types';
@@ -11,6 +15,7 @@ import type { MapData, ShapeOverlay, ShapeOverlayType } from '#types/core/map.ty
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { formatDistance } from '../../drawing/distanceOperations';
+import { snapShapeOverlayToGrid } from '../../objects/shapeOverlayOperations';
 import { useMapSelection } from '../../context/MapSelectionContext';
 
 
@@ -22,6 +27,8 @@ interface ShapeOverlayToolsOptions {
   geometry: IGeometry | null;
   screenToWorld: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
   onShapeOverlaysChange: (shapeOverlays: ShapeOverlay[]) => void;
+  /** Sidebar freeform toggle: places at exact world coordinates when on */
+  freeformPlacementMode?: boolean;
 }
 
 interface ShapePreviewState {
@@ -33,6 +40,7 @@ interface ShapePreviewState {
   corner2?: Point;
   circleEdge?: Point;
   circleCenter?: Point;
+  freeform: boolean;
 }
 
 interface UseShapeOverlayToolsResult {
@@ -48,6 +56,7 @@ interface UseShapeOverlayToolsResult {
   stopShapeDragging: () => void;
   activeShape: ShapeOverlayType;
   setActiveShape: (shape: ShapeOverlayType) => void;
+  isFreeformPlacement: boolean;
 }
 
 function generateShapeId(): string {
@@ -62,7 +71,8 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
     mapData,
     geometry,
     screenToWorld,
-    onShapeOverlaysChange
+    onShapeOverlaysChange,
+    freeformPlacementMode = false
   } = options;
 
   const { selectItem, selectedItem: currentSelectedItem, setIsDraggingSelection, setDragStart } = useMapSelection();
@@ -72,11 +82,17 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
 
   const [firstClick, setFirstClick] = useState<Point | null>(null);
   const [currentWorldPos, setCurrentWorldPos] = useState<Point | null>(null);
+  // Alt+Shift held on the most recent pointer event (mirrors object placement)
+  const [modifierFreeform, setModifierFreeform] = useState(false);
+
+  // Freeform when the modifier is held or the sidebar toggle is on; otherwise snap
+  const isFreeformPlacement = modifierFreeform || freeformPlacementMode;
 
   useEffect(() => {
     if (!isShapeTool) {
       setFirstClick(null);
       setCurrentWorldPos(null);
+      setModifierFreeform(false);
     }
   }, [isShapeTool]);
 
@@ -94,50 +110,76 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
     return formatDistance(cellDistance, distancePerCell, distanceUnit, 'both');
   }, [geometry, mapData]);
 
-  const computeShapeFromClicks = useCallback((p1: Point, p2: Point): { center: Point; size: number } | null => {
+  /**
+   * Turn the two click points into a shape. Squares take opposite corners;
+   * circles take the first click as the center and the second as a point on
+   * the edge. Unless placement is freeform, the result is snapped to the grid.
+   */
+  const computeShapeFromClicks = useCallback((
+    p1: Point,
+    p2: Point,
+    freeform: boolean
+  ): { center: Point; size: number; freeform: boolean } | null => {
+    let center: Point;
+    let size: number;
+
     if (activeShape === 'square') {
-      const cx = (p1.x + p2.x) / 2;
-      const cy = (p1.y + p2.y) / 2;
-      const halfW = Math.abs(p2.x - p1.x) / 2;
-      const halfH = Math.abs(p2.y - p1.y) / 2;
-      const size = Math.max(halfW, halfH);
-      if (size < 1) return null;
-      return { center: { x: cx, y: cy }, size };
+      center = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+      size = Math.max(Math.abs(p2.x - p1.x), Math.abs(p2.y - p1.y)) / 2;
     } else {
       const dx = p2.x - p1.x;
       const dy = p2.y - p1.y;
-      const radius = Math.sqrt(dx * dx + dy * dy);
-      if (radius < 1) return null;
-      return { center: { x: p2.x, y: p2.y }, size: radius };
+      center = { x: p1.x, y: p1.y };
+      size = Math.sqrt(dx * dx + dy * dy);
     }
-  }, [activeShape]);
 
+    // Two clicks in the same spot cancel placement, snapped or not
+    if (size < 1) return null;
+
+    if (!freeform) {
+      // Snapped placement needs geometry; never fall back to a freeform shape
+      // the user did not ask for.
+      if (!geometry) return null;
+      const snapped = snapShapeOverlayToGrid({ worldPosition: center, size }, geometry);
+      return { center: snapped.worldPosition, size: snapped.size, freeform: false };
+    }
+
+    return { center, size, freeform: true };
+  }, [activeShape, geometry]);
+
+  // The ghost is derived from the committed result, so it shows exactly what
+  // placement will store (including the snap).
   const preview = useMemo((): ShapePreviewState | null => {
     if (!firstClick || !currentWorldPos) return null;
-    const result = computeShapeFromClicks(firstClick, currentWorldPos);
+    const result = computeShapeFromClicks(firstClick, currentWorldPos, isFreeformPlacement);
     if (!result) return null;
+    const { center, size } = result;
     return {
-      center: result.center,
-      currentSize: result.size,
+      center,
+      currentSize: size,
       shape: activeShape,
-      formattedDistance: sizeToFormattedDistance(activeShape === 'square' ? result.size * 2 : result.size),
-      corner1: activeShape === 'square' ? firstClick : undefined,
-      corner2: activeShape === 'square' ? currentWorldPos : undefined,
-      circleEdge: activeShape === 'circle' ? firstClick : undefined,
-      circleCenter: activeShape === 'circle' ? currentWorldPos : undefined
+      formattedDistance: sizeToFormattedDistance(activeShape === 'square' ? size * 2 : size),
+      corner1: activeShape === 'square' ? { x: center.x - size, y: center.y - size } : undefined,
+      corner2: activeShape === 'square' ? { x: center.x + size, y: center.y + size } : undefined,
+      circleEdge: activeShape === 'circle' ? { x: center.x + size, y: center.y } : undefined,
+      circleCenter: activeShape === 'circle' ? center : undefined,
+      freeform: result.freeform
     };
-  }, [firstClick, currentWorldPos, activeShape, computeShapeFromClicks, sizeToFormattedDistance]);
+  }, [firstClick, currentWorldPos, activeShape, computeShapeFromClicks, isFreeformPlacement, sizeToFormattedDistance]);
 
   const handlePointerDown = useCallback((e: PointerEvent) => {
     if (!isShapeTool) return;
     const world = getWorldCoords(e);
     if (!world || !mapData) return;
 
+    const freeform = (e.altKey && e.shiftKey) || freeformPlacementMode;
+    setModifierFreeform(e.altKey && e.shiftKey);
+
     if (!firstClick) {
       setFirstClick({ x: world.worldX, y: world.worldY });
       setCurrentWorldPos({ x: world.worldX, y: world.worldY });
     } else {
-      const result = computeShapeFromClicks(firstClick, { x: world.worldX, y: world.worldY });
+      const result = computeShapeFromClicks(firstClick, { x: world.worldX, y: world.worldY }, freeform);
       if (!result) {
         cancelPlacement();
         return;
@@ -150,7 +192,7 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
         size: result.size,
         color: selectedColor,
         opacity: selectedOpacity,
-        freeform: true,
+        freeform: result.freeform,
         visible: true
       };
 
@@ -158,18 +200,20 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
       setFirstClick(null);
       setCurrentWorldPos(null);
     }
-  }, [isShapeTool, getWorldCoords, mapData, firstClick, activeShape, selectedColor, selectedOpacity, computeShapeFromClicks, onShapeOverlaysChange]);
+  }, [isShapeTool, getWorldCoords, mapData, firstClick, activeShape, selectedColor, selectedOpacity, computeShapeFromClicks, freeformPlacementMode, onShapeOverlaysChange]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     if (!isShapeTool || !firstClick) return;
     const world = getWorldCoords(e);
     if (!world) return;
+    setModifierFreeform(e.altKey && e.shiftKey);
     setCurrentWorldPos({ x: world.worldX, y: world.worldY });
   }, [isShapeTool, firstClick, getWorldCoords]);
 
   const cancelPlacement = useCallback(() => {
     setFirstClick(null);
     setCurrentWorldPos(null);
+    setModifierFreeform(false);
   }, []);
 
   const deleteShapeOverlay = useCallback((id: string) => {
@@ -258,7 +302,8 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
     handleShapeDragging,
     stopShapeDragging,
     activeShape,
-    setActiveShape
+    setActiveShape,
+    isFreeformPlacement
   };
 }
 

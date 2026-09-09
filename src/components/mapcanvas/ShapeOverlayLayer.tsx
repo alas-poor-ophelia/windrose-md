@@ -17,6 +17,7 @@ import { getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useShapeOverlayTools } from '../../hooks/interactions/useShapeOverlayTools';
+import { snapShapeOverlayToGrid } from '../../objects/shapeOverlayOperations';
 import { buildShapeOverlayActions } from '../../hooks/interactions/useSelectionActions';
 import { SelectionActionsOverlay } from '../toolbars/SelectionActionsOverlay';
 import { ShapePreviewOverlay } from './ShapePreviewOverlay';
@@ -30,13 +31,16 @@ export interface ShapeOverlayLayerProps {
   selectedColor: string;
   selectedOpacity: number;
   onShapeOverlaysChange: (shapeOverlays: ShapeOverlay[]) => void;
+  /** Sidebar freeform toggle: placement skips the grid snap when on */
+  freeformPlacementMode?: boolean;
 }
 
 const ShapeOverlayLayer = ({
   currentTool,
   selectedColor,
   selectedOpacity,
-  onShapeOverlaysChange
+  onShapeOverlaysChange,
+  freeformPlacementMode = false
 }: ShapeOverlayLayerProps): VNode | null => {
   const { canvasRef, containerRef, mapData, geometry, screenToWorld, distanceOverrides } = useMapState();
   const { selectedItem, isDraggingSelection } = useMapSelection();
@@ -55,7 +59,8 @@ const ShapeOverlayLayer = ({
     deleteShapeOverlay,
     updateShapeOverlay,
     activeShape,
-    setActiveShape
+    setActiveShape,
+    isFreeformPlacement
   } = useShapeOverlayTools({
     currentTool,
     selectedColor,
@@ -63,7 +68,8 @@ const ShapeOverlayLayer = ({
     mapData,
     geometry,
     screenToWorld,
-    onShapeOverlaysChange
+    onShapeOverlaysChange,
+    freeformPlacementMode
   });
 
   // Always expose handleShapeSelection so the select tool can hit shapes
@@ -112,20 +118,34 @@ const ShapeOverlayLayer = ({
     }
   }, [selectedItem, deleteShapeOverlay]);
 
+  // Snapping quantises the stored world geometry (cell center + whole-cell
+  // extent); going freeform keeps the geometry and only clears the flag.
   const handleShapeFreeformToggle = useCallback(() => {
-    if (selectedItem?.type === 'shapeOverlay') {
-      const shape = mapData?.shapeOverlays?.find(s => s.id === selectedItem.id);
-      if (shape) {
-        updateShapeOverlay(selectedItem.id, { freeform: !shape.freeform });
-      }
+    if (selectedItem?.type !== 'shapeOverlay') return;
+    const shape = mapData?.shapeOverlays?.find(s => s.id === selectedItem.id);
+    if (!shape) return;
+
+    if (shape.freeform === true) {
+      // Snapping back onto the grid needs geometry; without it, leave the
+      // shape freeform rather than writing a no-op update.
+      if (!geometry) return;
+      const snapped = snapShapeOverlayToGrid({ worldPosition: shape.worldPosition, size: shape.size }, geometry);
+      updateShapeOverlay(selectedItem.id, {
+        worldPosition: snapped.worldPosition,
+        size: snapped.size,
+        freeform: false
+      });
+      return;
     }
-  }, [selectedItem, mapData, updateShapeOverlay]);
+
+    updateShapeOverlay(selectedItem.id, { freeform: true });
+  }, [selectedItem, mapData, geometry, updateShapeOverlay]);
 
   // Shape tool options bar (follows region toolbar pattern) + preview overlay
   if (isShapeTool) {
     return (
       <>
-      {preview && preview.corner1 && preview.corner2 && (
+      {preview && preview.shape === 'square' && preview.corner1 && preview.corner2 && (
         <ShapePreviewOverlay
           shapeType="shapeSquare"
           startPoint={preview.corner1}
@@ -137,7 +157,7 @@ const ShapeOverlayLayer = ({
           distanceSettings={distanceSettings}
         />
       )}
-      {preview && !preview.corner1 && (
+      {preview && preview.shape === 'circle' && (
         <ShapePreviewOverlay
           shapeType="shapeCircle"
           startPoint={preview.circleEdge ?? preview.center}
@@ -207,7 +227,10 @@ const ShapeOverlayLayer = ({
         </button>
         <span style={{ color: 'var(--text-faint)', fontSize: '11px', margin: '0 4px' }}>|</span>
         <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
-          {activeShape === 'square' ? 'Click two corners' : 'Click edge, then center'}
+          {activeShape === 'square' ? 'Click two corners' : 'Click center, then edge'}
+        </span>
+        <span style={{ color: 'var(--text-faint)', fontSize: '11px' }}>
+          {isFreeformPlacement ? 'Freeform placement' : 'Snapping to grid — hold Alt+Shift for freeform'}
         </span>
       </div>
       </>
