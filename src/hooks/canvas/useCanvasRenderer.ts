@@ -54,6 +54,8 @@ import { getCachedImage, getImageCacheVersion } from '../../assets/imageOperatio
 import { getSlotOffset, getMultiObjectScale, getObjectsInCell } from '../../objects/hexSlotPositioner';
 import { offsetToAxial, axialToOffset } from '../../geometry/core/offsetCoordinates';
 import { getActiveLayer, getLayerBelow, getRenderLayers, getExportLayers, isCellFogged, getActiveBoardId, getBoardBelow, getBoardLayers } from '../../persistence/layerAccessor';
+import { pickDriftSource } from './levelSurfaces';
+import { registerSurface, touchSurface, releaseSurface, evictIfNeeded } from './surfaceBudget';
 
 interface Renderer {
   // Polymorphic properties
@@ -120,6 +122,14 @@ interface CurveCellMergeIndex {
 // and hex, so the blit transform is exact: scale = zoom/cachedZoom,
 // translate = offset − cachedOffset·scale.
 
+// The cache is keyed by LEVEL for the lattice ladder: at a given zoom one rung
+// of the ladder is active, and each rung needs its own baked surface. A level
+// CROSSING is a drift, not a rebuild (design .claude/lod-rd/06-integration-design.md
+// section 3.1, decision D17): the new level has never been baked, so the nearest
+// coarser surface is scale-blitted exactly as a stale snapshot is today and the
+// fresh bake is scheduled at settle — zero synchronous bakes in a crossing frame.
+// Classic maps only ever use level 0, where this is the shipped behaviour.
+
 interface StaticLayerCacheEntry {
   off: HTMLCanvasElement;
   /** Zoom the offscreen was rendered at. */
@@ -130,17 +140,33 @@ interface StaticLayerCacheEntry {
   key: readonly unknown[];
   /** Image-cache version the offscreen was rendered with (soft invalidation). */
   imageVersion: number;
+}
+
+/**
+ * Every baked surface for one canvas.
+ *
+ * `byLevel` insertion order is the LRU order (oldest first) — a blit re-inserts
+ * the level it used, the same idiom as the image cache in
+ * `src/assets/imageOperations.ts`. ONE settle timer lives here rather than on
+ * each entry: N live levels must not mean N independent full re-renders.
+ */
+interface CanvasSurfaceSet {
+  byLevel: Map<number, StaticLayerCacheEntry>;
   settleTimer: number | null;
 }
 
 type DrawStaticFn = (tctx: CanvasRenderingContext2D, ox: number, oy: number, w: number, h: number) => void;
 
-const staticLayerCaches = new WeakMap<HTMLCanvasElement, StaticLayerCacheEntry>();
+const staticLayerCaches = new WeakMap<HTMLCanvasElement, CanvasSurfaceSet>();
 const staticSettleCallbacks = new WeakMap<HTMLCanvasElement, () => void>();
 /** Extra rendered area on each side, as a fraction of the viewport. */
 const STATIC_PAD_RATIO = 0.5;
 /** Crisp re-render fires this long after the last zoom change. */
 const ZOOM_SETTLE_MS = 150;
+/** Steady state is one surface; a crossing is a transient two (design 3.1). */
+const MAX_SURFACES_PER_CANVAS = 2;
+/** Bytes held by one offscreen: RGBA, and Windrose never scales by DPR. */
+const SURFACE_BYTES_PER_PX = 4;
 
 /** Registered by the hook so the cache can request a follow-up render after a zoom settles. */
 function setStaticSettleCallback(canvas: HTMLCanvasElement, cb: () => void): void {
@@ -155,6 +181,29 @@ function staticKeysEqual(a: readonly unknown[], b: readonly unknown[]): boolean 
   return true;
 }
 
+/** Free an offscreen's backing store and forget it. */
+function releaseSurfaceEntry(canvas: HTMLCanvasElement, set: CanvasSurfaceSet, level: number): void {
+  const entry = set.byLevel.get(level);
+  if (entry === undefined) return;
+  entry.off.width = 0;
+  entry.off.height = 0;
+  set.byLevel.delete(level);
+  releaseSurface(canvas, level);
+}
+
+/**
+ * Mark every level stale so the next render re-bakes the ACTIVE level (other
+ * levels re-bake lazily, when they next become active). One timer per canvas.
+ */
+function scheduleStaticSettle(canvas: HTMLCanvasElement, set: CanvasSurfaceSet): void {
+  if (set.settleTimer != null) window.clearTimeout(set.settleTimer);
+  set.settleTimer = window.setTimeout(() => {
+    set.settleTimer = null;
+    for (const entry of set.byLevel.values()) entry.key = ['__settle-stale__'];
+    staticSettleCallbacks.get(canvas)?.();
+  }, ZOOM_SETTLE_MS);
+}
+
 function blitStaticContent(
   canvas: HTMLCanvasElement,
   ctx: CanvasRenderingContext2D,
@@ -165,15 +214,32 @@ function blitStaticContent(
   width: number,
   height: number,
   key: readonly unknown[],
-  imageVersion: number
+  imageVersion: number,
+  level = 0
 ): void {
-  let entry = staticLayerCaches.get(canvas);
+  let set = staticLayerCaches.get(canvas);
+  if (set === undefined) {
+    set = { byLevel: new Map(), settleTimer: null };
+    staticLayerCaches.set(canvas, set);
+  }
+
+  // On a level miss, drift from the nearest coarser surface (D17). `sourceLevel`
+  // is always `level` for a classic map, which only ever renders level 0.
+  let entry = set.byLevel.get(level);
+  let sourceLevel = level;
+  if (entry === undefined) {
+    const drift = pickDriftSource(set.byLevel, level);
+    if (drift !== null) {
+      entry = drift.entry;
+      sourceLevel = drift.level;
+    }
+  }
 
   let scale = 1;
   let tx = 0;
   let ty = 0;
   let usable = false;
-  if (entry && staticKeysEqual(entry.key, key)) {
+  if (entry !== undefined && staticKeysEqual(entry.key, key)) {
     scale = zoom / entry.zoom;
     tx = offsetX - entry.vOx * scale;
     ty = offsetY - entry.vOy * scale;
@@ -185,10 +251,18 @@ function blitStaticContent(
     usable = pMinX >= 0 && pMinY >= 0 && pMaxX <= entry.off.width && pMaxY <= entry.off.height;
   }
 
-  if (!usable) {
+  if (usable && sourceLevel !== level) {
+    // Crossing frame: the new level has never been baked, so blit the coarser
+    // surface at scale (the lattice itself is stroked live elsewhere) and bake
+    // the new level once things settle. No synchronous draw happens here.
+    scheduleStaticSettle(canvas, set);
+  } else if (!usable) {
     const padX = Math.ceil(width * STATIC_PAD_RATIO);
     const padY = Math.ceil(height * STATIC_PAD_RATIO);
-    const off = entry?.off ?? activeWindow.createEl('canvas');
+    // Only this level's own offscreen may be re-used — a coarser level's
+    // surface is a drift source and must survive the bake.
+    const ownEntry = sourceLevel === level ? entry : undefined;
+    const off = ownEntry?.off ?? activeWindow.createEl('canvas');
     const ow = width + padX * 2;
     const oh = height + padY * 2;
     if (off.width !== ow) off.width = ow;
@@ -199,37 +273,76 @@ function blitStaticContent(
       draw(ctx, offsetX, offsetY, width, height);
       return;
     }
-    if (entry?.settleTimer != null) window.clearTimeout(entry.settleTimer);
+    if (set.settleTimer != null) {
+      window.clearTimeout(set.settleTimer);
+      set.settleTimer = null;
+    }
     octx.save();
     octx.clearRect(0, 0, ow, oh);
     draw(octx, offsetX + padX, offsetY + padY, ow, oh);
     octx.restore();
-    entry = { off, zoom, vOx: offsetX + padX, vOy: offsetY + padY, key, imageVersion, settleTimer: null };
-    staticLayerCaches.set(canvas, entry);
+    entry = { off, zoom, vOx: offsetX + padX, vOy: offsetY + padY, key, imageVersion };
+    if (ownEntry === undefined) evictSurfacesForCanvas(canvas, set, level);
+    set.byLevel.delete(level);
+    set.byLevel.set(level, entry);
+    registerSurface(canvas, level, ow * oh * SURFACE_BYTES_PER_PX);
+    enforceSurfaceBudget(canvas, level);
+    sourceLevel = level;
     scale = 1;
     tx = offsetX - entry.vOx;
     ty = offsetY - entry.vOy;
-  } else if (entry && (scale !== 1 || imageVersion !== entry.imageVersion)) {
+  } else if (entry !== undefined && (scale !== 1 || imageVersion !== entry.imageVersion)) {
     // Soft invalidation: mid-zoom, or async images finished decoding since the
     // snapshot was taken. Keep blitting the (slightly stale) snapshot and
     // schedule ONE crisp re-render after things settle — the timer resets on
     // every further change, so a burst of tile-image loads coalesces into a
     // single rebuild instead of one ~full-repaint per image.
-    if (entry.settleTimer != null) window.clearTimeout(entry.settleTimer);
-    const settleEntry = entry;
-    entry.settleTimer = window.setTimeout(() => {
-      settleEntry.settleTimer = null;
-      settleEntry.key = ['__settle-stale__'];
-      staticSettleCallbacks.get(canvas)?.();
-    }, ZOOM_SETTLE_MS);
+    scheduleStaticSettle(canvas, set);
   }
 
-  if (!entry) return;
+  if (entry === undefined) return;
+  // Insertion order is the per-canvas LRU: the level actually blitted is newest.
+  if (set.byLevel.get(sourceLevel) === entry) {
+    set.byLevel.delete(sourceLevel);
+    set.byLevel.set(sourceLevel, entry);
+    touchSurface(canvas, sourceLevel);
+  }
   ctx.save();
   // Pixel-exact at scale 1; smooth when scale-blitting mid-zoom.
   ctx.imageSmoothingEnabled = scale !== 1;
   ctx.drawImage(entry.off, tx, ty, entry.off.width * scale, entry.off.height * scale);
   ctx.restore();
+}
+
+/** Keep at most two surfaces per canvas: drop this canvas's LRU other level. */
+function evictSurfacesForCanvas(canvas: HTMLCanvasElement, set: CanvasSurfaceSet, keepLevel: number): void {
+  while (set.byLevel.size >= MAX_SURFACES_PER_CANVAS) {
+    let victim: number | null = null;
+    for (const cached of set.byLevel.keys()) {
+      if (cached !== keepLevel) {
+        victim = cached;
+        break;
+      }
+    }
+    if (victim === null) return;
+    releaseSurfaceEntry(canvas, set, victim);
+  }
+}
+
+/**
+ * Apply the global byte budget. The surface just baked for this frame is never
+ * released — dropping it here would re-bake it on the very next frame.
+ */
+function enforceSurfaceBudget(protectedCanvas: HTMLCanvasElement, protectedLevel: number): void {
+  for (const victim of evictIfNeeded()) {
+    if (victim.canvas === protectedCanvas && victim.level === protectedLevel) continue;
+    const set = staticLayerCaches.get(victim.canvas);
+    if (set === undefined) {
+      releaseSurface(victim.canvas, victim.level);
+      continue;
+    }
+    releaseSurfaceEntry(victim.canvas, set, victim.level);
+  }
 }
 
 /**
@@ -965,7 +1078,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     // with the cached snapshot isn't worth the complexity — draw directly.
     drawStaticContent(ctx, offsetX, offsetY, width, height);
   } else {
-    blitStaticContent(canvas, ctx, drawStaticContent, offsetX, offsetY, zoom, width, height, staticKey, getImageCacheVersion());
+    // Level 0 until the ladder integration passes the active level here.
+    blitStaticContent(canvas, ctx, drawStaticContent, offsetX, offsetY, zoom, width, height, staticKey, getImageCacheVersion(), 0);
   }
 
   // =========================================================================
