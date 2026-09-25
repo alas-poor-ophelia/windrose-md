@@ -86,3 +86,10 @@ backups/
 docs/_site/
 docs/.jekyll-cache/
 docs/vendor/
+
+# LOD spike build + capture artifacts
+spikes/**/dist/
+spikes/**/out/
+
+# LOD R&D design handoffs (maintainer-only, stay local)
+.claude/lod-rd/

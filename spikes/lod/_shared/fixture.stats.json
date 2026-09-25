@@ -1,0 +1,258 @@
+{
+  "seed": 1,
+  "hexSize": 80,
+  "orientation": "flat",
+  "childScale": 0.06666666666666667,
+  "cellsAcross": 15,
+  "docs": 6,
+  "cellsTotal": 1314,
+  "cellsPerDepth": {
+    "0": 469,
+    "1": 676,
+    "2": 169
+  },
+  "perDoc": {
+    "root": {
+      "depth": 0,
+      "parentId": null,
+      "parentHex": null,
+      "rings": 12,
+      "cells": 469,
+      "transformToWorld": {
+        "scale": 1,
+        "tx": 0,
+        "ty": 0
+      },
+      "terrains": {
+        "forest": 42,
+        "plains": 251,
+        "hills": 44,
+        "mountains": 39,
+        "coast": 15,
+        "ocean": 78
+      }
+    },
+    "forestA": {
+      "depth": 1,
+      "parentId": "root",
+      "parentHex": {
+        "q": 3,
+        "r": -1
+      },
+      "rings": 7,
+      "cells": 169,
+      "transformToWorld": {
+        "scale": 0.06666666666666667,
+        "tx": 360,
+        "ty": 69.28203230275511
+      },
+      "terrains": {
+        "lake": 19,
+        "forest": 150
+      }
+    },
+    "forestB": {
+      "depth": 1,
+      "parentId": "root",
+      "parentHex": {
+        "q": 4,
+        "r": -1
+      },
+      "rings": 7,
+      "cells": 169,
+      "transformToWorld": {
+        "scale": 0.06666666666666667,
+        "tx": 480,
+        "ty": 138.56406460551017
+      },
+      "terrains": {
+        "forest": 162,
+        "town": 7
+      }
+    },
+    "shore": {
+      "depth": 1,
+      "parentId": "root",
+      "parentHex": {
+        "q": -8,
+        "r": 4
+      },
+      "rings": 7,
+      "cells": 169,
+      "transformToWorld": {
+        "scale": 0.06666666666666667,
+        "tx": -960,
+        "ty": 0
+      },
+      "terrains": {
+        "ocean": 145,
+        "town": 1,
+        "coast": 23
+      }
+    },
+    "range": {
+      "depth": 1,
+      "parentId": "root",
+      "parentHex": {
+        "q": 0,
+        "r": 5
+      },
+      "rings": 7,
+      "cells": 169,
+      "transformToWorld": {
+        "scale": 0.06666666666666667,
+        "tx": 0,
+        "ty": 692.8203230275508
+      },
+      "terrains": {
+        "mountains": 92,
+        "plains": 19,
+        "hills": 58
+      }
+    },
+    "grand": {
+      "depth": 2,
+      "parentId": "range",
+      "parentHex": {
+        "q": 2,
+        "r": -3
+      },
+      "rings": 7,
+      "cells": 169,
+      "transformToWorld": {
+        "scale": 0.0044444444444444444,
+        "tx": 16,
+        "ty": 674.3451144134827
+      },
+      "terrains": {
+        "town": 7,
+        "plains": 30,
+        "mountains": 132
+      }
+    }
+  },
+  "fiducial": {
+    "x": 13.866666666666667,
+    "y": 674.3451144134827
+  },
+  "secret": {
+    "docId": "shore",
+    "q": -3,
+    "r": 1,
+    "x": -984,
+    "y": -4.618802153517008,
+    "text": "Drowned Beacon"
+  },
+  "labels": [
+    {
+      "docId": "root",
+      "depth": 0,
+      "x": -240,
+      "y": -1108.5125168440813,
+      "text": "THORNMERE REACH",
+      "fontSize": 110
+    },
+    {
+      "docId": "forestB",
+      "depth": 1,
+      "x": 488,
+      "y": 124.70765814495915,
+      "text": "Ashford",
+      "fontSize": 7.333333333333333
+    },
+    {
+      "docId": "grand",
+      "depth": 2,
+      "x": 16,
+      "y": 674.3451144134827,
+      "text": "Cairn Hold",
+      "fontSize": 0.4888888888888889
+    }
+  ],
+  "roadPoints": [
+    {
+      "x": 298,
+      "y": 21.282032302755113
+    },
+    {
+      "x": 352,
+      "y": 75.28203230275511
+    },
+    {
+      "x": 414,
+      "y": 93.92304845413264
+    },
+    {
+      "x": 470,
+      "y": 142.56406460551017
+    },
+    {
+      "x": 534,
+      "y": 190.56406460551017
+    }
+  ],
+  "worldRadius": 2000,
+  "sampleResolves": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "hit": {
+        "docId": "root",
+        "depth": 0,
+        "q": 0,
+        "r": 0,
+        "terrain": "forest",
+        "color": "#265230",
+        "secret": false
+      }
+    },
+    {
+      "at": [
+        13.866666666666667,
+        674.3451144134827
+      ],
+      "hit": {
+        "docId": "grand",
+        "depth": 2,
+        "q": -4,
+        "r": 2,
+        "terrain": "mountains",
+        "color": "#716e76",
+        "secret": false
+      }
+    },
+    {
+      "at": [
+        13.866666666666667,
+        674.3451144134827
+      ],
+      "maxDepth": 0,
+      "hit": {
+        "docId": "root",
+        "depth": 0,
+        "q": 0,
+        "r": 5,
+        "terrain": "mountains",
+        "color": "#625f67",
+        "secret": false
+      }
+    },
+    {
+      "at": [
+        -1100,
+        0
+      ],
+      "hit": {
+        "docId": "root",
+        "depth": 0,
+        "q": -9,
+        "r": 5,
+        "terrain": "ocean",
+        "color": "#15324e",
+        "secret": false
+      }
+    }
+  ]
+}

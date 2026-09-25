@@ -254,6 +254,10 @@ export default [
       ".claude/**",
       ".wt/**",
       "internal/**",
+      // R&D spikes: standalone prototypes, never shipped. They live outside every
+      // typed-lint `files` glob, so the obsidianmd preset's type-aware rules would
+      // crash on them ("rule requires type information").
+      "spikes/**",
       // Data / output / config dirs (not plugin source)
       "objects/**",
       "test-results/**",
