@@ -290,6 +290,24 @@ describe("materialiseLevelLayer", () => {
       expect(afterCosmetic.layer).toBe(first.layer);
     });
 
+    it("misses when the ladder changes over the same cells and rect: fills never survive a bounds change", () => {
+      const fixture = makeFixture("memo-ladder", new HexGeometry(HEX_SIZE, "flat", { maxCol: 6, maxRow: 5 }));
+      const rect = rectAroundRootCell(fixture, fixture.anchor.q, fixture.anchor.r);
+      const wide = materialiseLevelLayer(fixture.layer, fixture.ladder, 1, rect, 1);
+      expect(wide.stats.missReason).toBe("no-entry");
+
+      // Same cells array, same rect, same epoch: only the ladder (its root bounds) differs.
+      const shrunk = createGeometryLadder(new HexGeometry(HEX_SIZE, "flat", { maxCol: 2, maxRow: 2 }));
+      const narrow = materialiseLevelLayer(fixture.layer, shrunk, 1, rect, 1);
+      expect(narrow.stats.missReason).toBe("no-entry");
+      expect(narrow.layer).not.toBe(wide.layer);
+      expect(narrow.stats.cells).toBeLessThan(wide.stats.cells);
+
+      // Each ladder keeps its own memo; returning to the first one still hits.
+      expect(materialiseLevelLayer(fixture.layer, fixture.ladder, 1, rect, 1).stats.missReason).toBe("hit");
+      expect(materialiseLevelLayer(fixture.layer, shrunk, 1, rect, 1).stats.missReason).toBe("hit");
+    });
+
     it("keeps at most four entries per cells array, dropping the oldest", () => {
       const fixture = makeFixture("evict", new HexGeometry(HEX_SIZE, "flat", { maxCol: 6, maxRow: 5 }));
       const rect = rectAroundRootCell(fixture, fixture.anchor.q, fixture.anchor.r);

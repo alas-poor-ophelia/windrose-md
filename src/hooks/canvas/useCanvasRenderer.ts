@@ -55,7 +55,12 @@ import { getSlotOffset, getMultiObjectScale, getObjectsInCell } from '../../obje
 import { offsetToAxial, axialToOffset } from '../../geometry/core/offsetCoordinates';
 import { getActiveLayer, getLayerBelow, getRenderLayers, getExportLayers, isCellFogged, getActiveBoardId, getBoardBelow, getBoardLayers } from '../../persistence/layerAccessor';
 import { pickDriftSource } from './levelSurfaces';
-import { registerSurface, touchSurface, releaseSurface, evictIfNeeded } from './surfaceBudget';
+import { registerSurface, touchSurface, releaseSurface, evictIfNeeded, setActiveCanvas } from './surfaceBudget';
+import { recordFrame, recordRebuild } from './ladderTelemetry';
+import { materialiseLevelLayer } from '../../geometry/core/materialiseLevel';
+import { createLatticeClipCache, drawLadderLattice } from '../../geometry/renderers/latticeRenderer';
+import type { LatticeClipCache } from '../../geometry/renderers/latticeRenderer';
+import type { GeometryLadder } from '../../geometry/core/createGeometryLadder';
 
 interface Renderer {
   // Polymorphic properties
@@ -167,6 +172,30 @@ const ZOOM_SETTLE_MS = 150;
 const MAX_SURFACES_PER_CANVAS = 2;
 /** Bytes held by one offscreen: RGBA, and Windrose never scales by DPR. */
 const SURFACE_BYTES_PER_PX = 4;
+
+/**
+ * The lattice clip path must live as long as the canvas: rebuilding it per frame
+ * would enumerate every cell in a padded viewport on every pan step, which is
+ * exactly the cost the cache exists to avoid. Keyed by canvas and re-created
+ * when the ladder IDENTITY changes (a new map on the same canvas).
+ */
+const latticeClipCaches = new WeakMap<HTMLCanvasElement, { ladder: GeometryLadder; cache: LatticeClipCache }>();
+/** Last active level painted per canvas, for the crossing flag in telemetry. */
+const lastLadderLevels = new WeakMap<HTMLCanvasElement, number>();
+/**
+ * Lattice epoch: bumped only when cell EXISTENCE changes. In Phase 1 existence is
+ * a pure function of the root bounds, which live in the ladder itself, so a new
+ * bounds means a new ladder identity and the epoch never has to move.
+ */
+const LADDER_EPOCH = 0;
+
+function clipCacheFor(canvas: HTMLCanvasElement, ladder: GeometryLadder): LatticeClipCache {
+  const held = latticeClipCaches.get(canvas);
+  if (held !== undefined && held.ladder === ladder) return held.cache;
+  const cache = createLatticeClipCache();
+  latticeClipCaches.set(canvas, { ladder, cache });
+  return cache;
+}
 
 /** Registered by the hook so the cache can request a follow-up render after a zoom settles. */
 function setStaticSettleCallback(canvas: HTMLCanvasElement, cb: () => void): void {
@@ -520,8 +549,14 @@ function renderLayerCellsAndEdges(
 }
 
 const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, selectedItems = [], options = {}) => {
-  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null, adjacentEmptySlots = null, hiddenTileLayers = undefined, draggingWallId = null, subHexPath = null, liveViewState = null, exportLayers = null } = options;
+  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null, adjacentEmptySlots = null, hiddenTileLayers = undefined, draggingWallId = null, subHexPath = null, liveViewState = null, exportLayers = null, ladder = null } = options;
   if (canvas == null) return;
+
+  // Every ladder branch in this function is guarded by `ladder !== null`, which is
+  // null for classic maps, hover previews and image export — those paths are
+  // byte-identical to the shipped renderer.
+  const ladderOn = ladder !== null;
+  const frameStart = ladderOn ? performance.now() : 0;
 
   // Normalize selectedItems to array (backward compatibility)
   const itemsArray: RendererSelectedItem[] = Array.isArray(selectedItems) ? selectedItems : (selectedItems != null ? [selectedItems] : []);
@@ -562,6 +597,17 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   const viewState = liveViewState ?? mapData.viewState;
   if (!viewState) return;
   const { zoom, center } = viewState;
+
+  // Lattice ladder: which rung this zoom paints. `level` stays 0 on every classic
+  // path, which is the level the static cache has always used.
+  const level = ladder !== null ? ladder.activeLevel(zoom) : 0;
+  const crossing = ladder !== null && lastLadderLevels.get(canvas) !== level;
+  if (ladder !== null) {
+    lastLadderLevels.set(canvas, level);
+    // Only a real map canvas ever claims the surface budget's active slot;
+    // previews and export never pass a ladder, so they never displace it.
+    setActiveCanvas(canvas);
+  }
 
   traceZoom('paint', {
     zoom,
@@ -658,12 +704,16 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   ctx.clip();
   ctx.restore();
 
-  // Draw grid lines
-  renderer.renderGrid(ctx, geometry, rendererViewState, { width, height }, visibility.grid !== false, {
-    lineColor: THEME.grid.lines,
-    lineWidth: THEME.grid.lineWidth ?? 1,
-    rotated: (northDirection ?? 0) % 360 !== 0
-  });
+  // Draw grid lines. Under the ladder the grid is NOT baked at any level: a baked
+  // lattice thickens under the crossing scale-blit, so `drawLadderLattice` strokes
+  // it live in screen space after the blit instead.
+  if (ladder === null) {
+    renderer.renderGrid(ctx, geometry, rendererViewState, { width, height }, visibility.grid !== false, {
+      lineColor: THEME.grid.lines,
+      lineWidth: THEME.grid.lineWidth ?? 1,
+      rotated: (northDirection ?? 0) % 360 !== 0
+    });
+  }
 
   // Draw board-below ghost (floor beneath the active board) if enabled. Works in
   // both simple and strata modes: renders every visible layer of the board below,
@@ -879,6 +929,14 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   const curveGridConfig = geometry.type === 'grid'
     ? { cellSize: geometry.cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth ?? 1, interiorRatio: 0.5 }
     : undefined;
+
+  // At level >= 1 the cells pass draws INHERITED fills on the active rung instead
+  // of the authored level-0 cells. The rect is this offscreen's own area in world
+  // coords, UNDILATED — the materialiser dilates by a ring itself so its boundary
+  // cells still see their neighbours and grow no phantom borders. Every other pass
+  // below keeps the root geometry and the real layer.
+  const levelRect = { x0: -offsetX / zoom, y0: -offsetY / zoom, x1: (width - offsetX) / zoom, y1: (height - offsetY) / zoom };
+
   for (const drawLayer of renderLayers) {
     // Per-layer opacity only ever comes from an image export selection.
     const layerOpacity = exportOpacityById?.get(drawLayer.id) ?? 1;
@@ -895,12 +953,22 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     }
 
     // Cells and edges
-    renderLayerCellsAndEdges(ctx, drawLayer, geometry, rendererViewState, THEME, renderer, {
-      opacity: layerOpacity,
-      showGrid: visibility.grid !== false,
-      mergeIndex,
-      northDirection: northDirection ?? 0
-    });
+    if (ladder !== null && level >= 1) {
+      const coarse = materialiseLevelLayer(drawLayer, ladder, level, levelRect, LADDER_EPOCH);
+      renderLayerCellsAndEdges(ctx, coarse.layer, ladder.geometryForLevel(level), rendererViewState, THEME, renderer, {
+        opacity: layerOpacity,
+        showGrid: visibility.grid !== false,
+        mergeIndex,
+        northDirection: northDirection ?? 0
+      });
+    } else {
+      renderLayerCellsAndEdges(ctx, drawLayer, geometry, rendererViewState, THEME, renderer, {
+        opacity: layerOpacity,
+        showGrid: visibility.grid !== false,
+        mergeIndex,
+        northDirection: northDirection ?? 0
+      });
+    }
 
     // Freehand curves (between cells and tiles)
     if (drawLayer.curves.length > 0) {
@@ -1071,15 +1139,46 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     geometry, hiddenTileLayers, adjacentSubHexes, showCoordinates,
     width, height, draggingWallId,
     JSON.stringify(THEME), JSON.stringify(visibility),
+    // The ladder by IDENTITY only. Deliberately NOT the level or an epoch: the key
+    // is compared against the DRIFT SOURCE's key at a crossing, so a per-level term
+    // would miss on every crossing and force the synchronous bake D17 forbids.
+    // `byLevel` already carries the level.
+    ladder,
   ];
+
+  // A bake is the one part of a frame worth attributing separately, and it happens
+  // inside the draw callback — both the first bake of a level and the settle bake.
+  const staticDraw: DrawStaticFn = ladder === null
+    ? drawStaticContent
+    : (tctx, ox, oy, w, h): void => {
+        const bakeStart = performance.now();
+        drawStaticContent(tctx, ox, oy, w, h);
+        recordRebuild(performance.now() - bakeStart);
+      };
 
   if (((northDirection ?? 0) % 360) !== 0) {
     // Rotated maps draw under a canvas rotation transform whose interaction
     // with the cached snapshot isn't worth the complexity — draw directly.
+    // A rotated map never gets a ladder, so this branch needs no level.
     drawStaticContent(ctx, offsetX, offsetY, width, height);
   } else {
-    // Level 0 until the ladder integration passes the active level here.
-    blitStaticContent(canvas, ctx, drawStaticContent, offsetX, offsetY, zoom, width, height, staticKey, getImageCacheVersion(), 0);
+    blitStaticContent(canvas, ctx, staticDraw, offsetX, offsetY, zoom, width, height, staticKey, getImageCacheVersion(), level);
+  }
+
+  // The live lattice, stroked in screen space straight after the blit so line
+  // widths never scale with the crossing blit. Level 0 gets it too: the baked grid
+  // is skipped at every level under the flag. `visibility.grid` still hides it —
+  // it is the same user-facing grid, drawn a different way.
+  if (ladder !== null && visibility.grid !== false) {
+    drawLadderLattice(
+      ctx,
+      ladder,
+      level,
+      { offsetX, offsetY, zoom, width, height },
+      LADDER_EPOCH,
+      clipCacheFor(canvas, ladder),
+      { active: THEME.grid.lines, district: THEME.grid.lines }
+    );
   }
 
   // =========================================================================
@@ -1144,6 +1243,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
   // Restore context
   ctx.restore();
+
+  if (ladderOn) recordFrame(performance.now() - frameStart, level, crossing);
 };
 
 const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], options = {}, viewController) => {

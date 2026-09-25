@@ -58,11 +58,13 @@ interface MemoEntry {
 const MEMO_LIMIT = 4;
 
 /**
- * Keyed on `layer.cells` identity, never on the layer object: the layer is
- * re-spread on every cosmetic change, the cells array is the stable sub-array
- * that only a cell edit replaces (H-1478).
+ * Keyed on the ladder identity, then on `layer.cells` identity, never on the
+ * layer object: the layer is re-spread on every cosmetic change, the cells
+ * array is the stable sub-array that only a cell edit replaces (H-1478). The
+ * ladder is part of the key because existence and ownership are its functions:
+ * a bounds change builds a new ladder, and the old fills must not survive it.
  */
-const memo = new WeakMap<Cell[], Map<string, MemoEntry>>();
+const memo = new WeakMap<GeometryLadder, WeakMap<Cell[], Map<string, MemoEntry>>>();
 
 const SQRT3 = Math.sqrt(3);
 
@@ -163,7 +165,8 @@ function materialiseLevelLayer(
   const y1 = Math.max(rect.y0, rect.y1) + pad;
 
   const key = memoKey(level, epoch, x0, y0, x1, y1);
-  const entries = memo.get(layer.cells);
+  const byCells = memo.get(ladder);
+  const entries = byCells === undefined ? undefined : byCells.get(layer.cells);
   const cached = entries === undefined ? undefined : entries.get(key);
   if (cached !== undefined) {
     return { layer: cached.layer, stats: { cells: cached.cells, enumerated: 0, missReason: 'hit' } };
@@ -206,7 +209,9 @@ function materialiseLevelLayer(
     if (oldest.done === true) break;
     bucket.delete(oldest.value);
   }
-  memo.set(layer.cells, bucket);
+  const ladderBucket = byCells ?? new WeakMap<Cell[], Map<string, MemoEntry>>();
+  ladderBucket.set(layer.cells, bucket);
+  memo.set(ladder, ladderBucket);
 
   return { layer: result, stats: { cells: synthetic.length, enumerated, missReason } };
 }
