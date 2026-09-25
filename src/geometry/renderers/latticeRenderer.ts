@@ -329,7 +329,12 @@ function drawLadderLattice(
   // A crossing is a drift (D17): nothing heavy may run in the crossing frame. When the
   // footprint clip for the new rung is not cached yet, the district pass waits one frame
   // rather than building the path now; the active lattice still draws.
-  if (deferClipBuild && !hasClipFor(cache, level, epoch, viewWorldRect(view))) {
+  // District rungs are the coarser PAINTABLE lattices, and the root is the
+  // coarsest one there is: nothing above level 0 is ever stroked. At the root
+  // itself there is no district pass, so no footprint clip is resolved either.
+  if (level < 1) {
+    // nothing coarser to show
+  } else if (deferClipBuild && !hasClipFor(cache, level, epoch, viewWorldRect(view))) {
     if (onPhase !== undefined) onPhase('clipDeferred', 0);
   } else {
     if (onPhase !== undefined) {
@@ -342,7 +347,7 @@ function drawLadderLattice(
     }
     const t1 = now();
     withMapClip(ctx, ladder, level, view, epoch, cache, () => {
-      strokeLattice(ctx, ladder, level - 2, view, { ...DISTRICT_FAR, colour: colours.district });
+      if (level >= 2) strokeLattice(ctx, ladder, level - 2, view, { ...DISTRICT_FAR, colour: colours.district });
       strokeLattice(ctx, ladder, level - 1, view, { ...DISTRICT_NEAR, colour: colours.district });
     });
     if (onPhase !== undefined) onPhase('district', now() - t1);

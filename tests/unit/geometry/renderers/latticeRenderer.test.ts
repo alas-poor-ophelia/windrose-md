@@ -409,6 +409,40 @@ describe("latticeRenderer: withMapClip", () => {
 });
 
 describe("latticeRenderer: drawLadderLattice", () => {
+  it.each(ORIENTATIONS)("%s: at the root there is no district pass and no clip: nothing coarser than level 0 is ever stroked", (orientation) => {
+    const ladder = createGeometryLadder(rectRoot(orientation));
+    const rec = createRecordingCtx();
+    drawLadderLattice(
+      rec.ctx,
+      ladder,
+      0,
+      { offsetX: 150, offsetY: 150, zoom: 1, width: 300, height: 300 },
+      0,
+      createLatticeClipCache(),
+      { active: "rgba(8,11,16,0.55)", district: "rgba(232,216,168,0.9)" }
+    );
+    expect(rec.passes).toHaveLength(1);
+    expect(rec.passes[0].alpha).toBe(1);
+    expect(rec.calls.filter((c) => c === "clip")).toHaveLength(0);
+  });
+
+  it.each(ORIENTATIONS)("%s: at level 1 only the root is a district rung", (orientation) => {
+    const ladder = createGeometryLadder(rectRoot(orientation));
+    const rec = createRecordingCtx();
+    drawLadderLattice(
+      rec.ctx,
+      ladder,
+      1,
+      { offsetX: 150, offsetY: 150, zoom: 1, width: 300, height: 300 },
+      0,
+      createLatticeClipCache(),
+      { active: "rgba(8,11,16,0.55)", district: "rgba(232,216,168,0.9)" }
+    );
+    expect(rec.passes).toHaveLength(2);
+    expect(rec.passes[0].alpha).toBeCloseTo(0.42, 10);
+    expect(rec.passes[1].alpha).toBe(1);
+  });
+
   it.each(ORIENTATIONS)("%s: two district passes under one clip, then the active level", (orientation) => {
     const ladder = createGeometryLadder(rectRoot(orientation));
     const rec = createRecordingCtx();
