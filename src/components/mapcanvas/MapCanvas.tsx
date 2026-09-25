@@ -359,8 +359,13 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
         ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
       }
     } else {
-      // After animation, do a proper redraw with correct dimensions
-      renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem ?? undefined, { isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, subHexPath: subHexPath ?? null, ladder });
+      // After animation, do a proper redraw with correct dimensions. Paint at the
+      // LIVE view: this effect also re-fires whenever a parent re-render hands
+      // down fresh prop identities (layerVisibility, adjacent ghosts), which can
+      // happen mid-gesture (tile image arrival, a save-status tick), and a paint
+      // at the committed viewState then flashes one whole frame at the pre-
+      // gesture zoom. Outside a gesture the live view IS the committed one.
+      renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem ?? undefined, { isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, subHexPath: subHexPath ?? null, ladder, liveViewState: viewController.getLive() });
     }
   }, [canvasDimensions.width, canvasDimensions.height, isAnimating, showCoordinates, layerVisibility, adjacentSubHexes, adjacentEmptySlots]);
 
