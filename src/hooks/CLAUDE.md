@@ -10,6 +10,7 @@ Encapsulate complex stateful logic, side effects, and event handling. Hooks are 
 hooks/
 ├── canvas/          # Canvas infrastructure
 │   ├── useCanvasRenderer.ts     # Coordinates all canvas rendering
+│   ├── levelSurfaces.ts         # Per-level surface selection for the lattice ladder (crossing is a drift)
 │   ├── useCanvasInteraction.ts  # Mouse/touch event handling
 │   ├── useEventCoordinator.ts   # Centralizes event handling across layers
 │   └── usePanZoomCoordinator.ts # Pan and zoom state, transforms

@@ -105,6 +105,7 @@ src/
 ├── core/                  # App infrastructure
 │   ├── dmtConstants.ts    # Constants, theme, defaults
 │   ├── settingsAccessor.ts # Plugin settings read/write
+│   ├── lodFlags.ts        # Lattice ladder capability flag (developer setting, default off)
 │   ├── deepLinkRegistration.ts # Deep link system (4-layer)
 │   └── interactjs.ts      # interact.js wrapper
 ├── objects/               # Map object domain

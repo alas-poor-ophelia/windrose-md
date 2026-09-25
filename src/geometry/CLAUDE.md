@@ -15,6 +15,7 @@ geometry/
 │   ├── createGeometry.ts  # Factory: MapData → Grid/HexGeometry with defaults
 │   ├── cellAccessor.ts    # Cell data access, manipulation, queries
 │   ├── hexMeasurements.ts # Hex-specific calculations
+│   ├── lattice.ts         # Lattice ladder math: rung ownership, zoom crossings, existsAt (LOD, flag-gated)
 │   └── offsetCoordinates.ts # Coordinate system conversions
 ├── renderers/             # Canvas draw functions
 │   ├── gridRenderer.ts, hexRenderer.ts, backgroundRenderer.ts

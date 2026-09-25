@@ -58,7 +58,8 @@ type DirectSettingKey =
   | 'gridDiagonalRule'
   | 'distanceDisplayFormat'
   | 'showSubHexBackdrop'
-  | 'developerMode';
+  | 'developerMode'
+  | 'lodLadder';
 
 const DIRECT_KEYS = new Set<string>([
   'hexOrientation', 'coordinateKeyMode', 'coordinateTextColor', 'coordinateTextShadow',
@@ -68,6 +69,7 @@ const DIRECT_KEYS = new Set<string>([
   'pictureFrameWidth', 'pictureFrameWidthMobile',
   'distancePerCellGrid', 'distanceUnitGrid', 'distancePerCellHex', 'distanceUnitHex',
   'gridDiagonalRule', 'distanceDisplayFormat', 'showSubHexBackdrop', 'developerMode',
+  'lodLadder',
 ] satisfies DirectSettingKey[]);
 
 // Sliders present percentages; settings store fractions. These virtual keys
@@ -732,6 +734,11 @@ function buildAdvancedGroup(): SettingDefinitionItem {
         name: 'Developer mode',
         desc: 'Show debug and diagnostic commands in the command palette.',
         control: { type: 'toggle', key: 'developerMode' }
+      },
+      {
+        name: 'Lattice ladder (experimental)',
+        desc: 'Allow hex maps to use the zoom-native lattice ladder. Developer preview, off by default; classic maps are unaffected.',
+        control: { type: 'toggle', key: 'lodLadder' }
       }
     ]
   };

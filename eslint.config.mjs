@@ -245,6 +245,24 @@ export default [
   // ===========================================
   // Ignore patterns
   // ===========================================
+  // Lattice ladder (design .claude/lod-rd/06-integration-design.md, section 2.2 invariant 8):
+  // authored cells above level 0 live in `layer.levels[L]`, and every reader that indexes
+  // it directly is a reader that silently under-reports depth. The ONLY module allowed to
+  // touch `.levels[...]` is the accessor; everything else goes through
+  // `authoredCells()` / `allAuthoredCells()` from src/persistence/layerAccessor.ts.
+  {
+    files: ["src/**/*.ts", "src/**/*.tsx"],
+    ignores: ["src/persistence/layerAccessor.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: 'MemberExpression[computed=true] > MemberExpression.object[property.name="levels"]',
+          message: "Do not index layer.levels directly; use authoredCells()/allAuthoredCells() from src/persistence/layerAccessor.ts."
+        }
+      ]
+    }
+  },
   {
     ignores: [
       "node_modules/**",
