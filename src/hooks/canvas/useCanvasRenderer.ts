@@ -159,6 +159,8 @@ interface CanvasSurfaceSet {
   settleTimer: number | null;
   /** The rung most recently requested for this canvas; the only one a settle marks stale. */
   lastLevel: number;
+  /** Level whose crisp bake a settle asked for; honoured by the next non-crossing frame at that level. */
+  bakeRequested: number | null;
 }
 
 type DrawStaticFn = (tctx: CanvasRenderingContext2D, ox: number, oy: number, w: number, h: number) => void;
@@ -234,6 +236,9 @@ function scheduleStaticSettle(canvas: HTMLCanvasElement, set: CanvasSurfaceSet):
     set.settleTimer = null;
     const active = set.byLevel.get(set.lastLevel);
     if (active !== undefined) active.key = ['__settle-stale__'];
+    // A rung that has never been baked has no entry to stamp; the request is what
+    // makes the next non-crossing frame at that level bake instead of drifting.
+    set.bakeRequested = set.lastLevel;
     staticSettleCallbacks.get(canvas)?.();
   }, ZOOM_SETTLE_MS);
 }
@@ -253,10 +258,11 @@ function blitStaticContent(
 ): void {
   let set = staticLayerCaches.get(canvas);
   if (set === undefined) {
-    set = { byLevel: new Map(), settleTimer: null, lastLevel: level };
+    set = { byLevel: new Map(), settleTimer: null, lastLevel: level, bakeRequested: null };
     staticLayerCaches.set(canvas, set);
   }
 
+  const crossingFrame = set.lastLevel !== level;
   set.lastLevel = level;
 
   // A surface is usable when its key still matches and the viewport, mapped into
@@ -281,7 +287,12 @@ function blitStaticContent(
   let entry = set.byLevel.get(level);
   let sourceLevel = level;
   let { scale, tx, ty, usable } = entry === undefined ? { scale: 1, tx: 0, ty: 0, usable: false } : usability(entry);
-  if (!usable && level > 0) {
+  // A settle asked for THIS level to bake crisp: honour it with a bake, never a
+  // drift, or the crisp rebuild is starved by an ever-usable coarser surface. A
+  // crossing frame is the exception (D17): drift now; the settle re-asks.
+  const honourBake = set.bakeRequested === level && !crossingFrame;
+  if (honourBake) set.bakeRequested = null;
+  if (!usable && level > 0 && !honourBake) {
     for (let coarser = level - 1; coarser >= 0; coarser--) {
       const candidate = set.byLevel.get(coarser);
       if (candidate === undefined) continue;
