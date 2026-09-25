@@ -178,16 +178,8 @@ function liveClipPath(
   cache: LatticeClipCache
 ): Path2D | null {
   const held = cache.entry;
-  if (
-    held !== null
-    && held.level === level
-    && held.epoch === epoch
-    && rect.x0 >= held.x0
-    && rect.y0 >= held.y0
-    && rect.x1 <= held.x1
-    && rect.y1 <= held.y1
-  ) {
-    return held.path;
+  if (hasClipFor(cache, level, epoch, rect)) {
+    return held === null ? null : held.path;
   }
 
   const s = ladder.cellSizeAt(level);
@@ -198,22 +190,39 @@ function liveClipPath(
   const ax1 = rect.x1 + padX;
   const ay1 = rect.y1 + padY;
 
+  // The path is assembled as ONE SVG path string and parsed natively: thousands
+  // of tiny hexagons through moveTo/lineTo bindings cost ~3 us per call (a fine
+  // rung over a padded viewport ran to 100 ms), while string concatenation is
+  // cheap and the parse is a single native pass. Existence is counted in the same
+  // loop so a view deep inside the map never constructs a path at all.
   const corners = cornerOffsets(ladder, level);
-  const path = new Path2D();
+  const segments: string[] = [];
   let missing = 0;
   forEachCellInWorldRect(ladder.root.orientation, s, ax0, ay0, ax1, ay1, (q, r, wx, wy) => {
     if (!ladder.existsAt(level, q, r)) {
       missing += 1;
       return;
     }
-    path.moveTo(wx + corners[0].x, wy + corners[0].y);
-    for (let i = 1; i < 6; i++) path.lineTo(wx + corners[i].x, wy + corners[i].y);
-    path.closePath();
+    let d = `M${(wx + corners[0].x).toFixed(3)} ${(wy + corners[0].y).toFixed(3)}`;
+    for (let i = 1; i < 6; i++) d += `L${(wx + corners[i].x).toFixed(3)} ${(wy + corners[i].y).toFixed(3)}`;
+    segments.push(d + 'Z');
   });
 
-  const out = missing === 0 ? null : path;
+  const out = missing === 0 ? null : new Path2D(segments.join(''));
   cache.entry = { level, epoch, x0: ax0, y0: ay0, x1: ax1, y1: ay1, path: out };
   return out;
+}
+
+/** True when the cache already answers for this level, epoch and rect (no build needed). */
+function hasClipFor(cache: LatticeClipCache, level: number, epoch: number, rect: WorldRect): boolean {
+  const held = cache.entry;
+  return held !== null
+    && held.level === level
+    && held.epoch === epoch
+    && rect.x0 >= held.x0
+    && rect.y0 >= held.y0
+    && rect.x1 <= held.x1
+    && rect.y1 <= held.y1;
 }
 
 /**
@@ -312,13 +321,35 @@ function drawLadderLattice(
   view: LatticeView,
   epoch: number,
   cache: LatticeClipCache,
-  colours: { active: string; district: string }
+  colours: { active: string; district: string },
+  onPhase?: (name: string, ms: number) => void,
+  deferClipBuild = false
 ): void {
-  withMapClip(ctx, ladder, level, view, epoch, cache, () => {
-    strokeLattice(ctx, ladder, level - 2, view, { ...DISTRICT_FAR, colour: colours.district });
-    strokeLattice(ctx, ladder, level - 1, view, { ...DISTRICT_NEAR, colour: colours.district });
-  });
+  const now = (): number => (typeof performance === 'undefined' ? 0 : performance.now());
+  // A crossing is a drift (D17): nothing heavy may run in the crossing frame. When the
+  // footprint clip for the new rung is not cached yet, the district pass waits one frame
+  // rather than building the path now; the active lattice still draws.
+  if (deferClipBuild && !hasClipFor(cache, level, epoch, viewWorldRect(view))) {
+    if (onPhase !== undefined) onPhase('clipDeferred', 0);
+  } else {
+    if (onPhase !== undefined) {
+      // Resolve the clip first so its build cost is attributed on its own; withMapClip
+      // below then hits the cache.
+      const before = cache.entry;
+      const t0 = now();
+      liveClipPath(ladder, level, viewWorldRect(view), epoch, cache);
+      onPhase(cache.entry === before ? 'clipHit' : 'clipBuild', now() - t0);
+    }
+    const t1 = now();
+    withMapClip(ctx, ladder, level, view, epoch, cache, () => {
+      strokeLattice(ctx, ladder, level - 2, view, { ...DISTRICT_FAR, colour: colours.district });
+      strokeLattice(ctx, ladder, level - 1, view, { ...DISTRICT_NEAR, colour: colours.district });
+    });
+    if (onPhase !== undefined) onPhase('district', now() - t1);
+  }
+  const t2 = now();
   strokeLattice(ctx, ladder, level, view, { ...ACTIVE, colour: colours.active });
+  if (onPhase !== undefined) onPhase('active', now() - t2);
 }
 
 export {

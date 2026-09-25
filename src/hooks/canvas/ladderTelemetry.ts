@@ -21,6 +21,8 @@ interface LadderFrame {
   crossing: boolean;
   /** Milliseconds spent baking a static surface inside this frame, else null. */
   rebuildMs: number | null;
+  /** Named phase timings inside this frame (blit, lattice), for attributing a slow crossing. */
+  phases: Record<string, number>;
 }
 
 interface LadderCrossingStats {
@@ -52,6 +54,7 @@ let written = 0;
  * through the frame that is still being timed; the frame record claims it.
  */
 let pendingRebuildMs: number | null = null;
+let pendingPhases: Record<string, number> = {};
 let bridgePublished = false;
 
 /** Frames in chronological order, oldest first. */
@@ -96,12 +99,15 @@ function recordFrame(frameMs: number, level: number, crossing: boolean, rebuildM
   publishBridge();
   const bake = rebuildMs === undefined ? pendingRebuildMs : rebuildMs;
   pendingRebuildMs = null;
+  const phases = pendingPhases;
+  pendingPhases = {};
   ring[writeIndex] = {
     t: typeof performance === 'undefined' ? 0 : performance.now(),
     frameMs,
     level,
     crossing,
-    rebuildMs: bake
+    rebuildMs: bake,
+    phases
   };
   writeIndex = (writeIndex + 1) % CAPACITY;
   written++;
@@ -110,6 +116,11 @@ function recordFrame(frameMs: number, level: number, crossing: boolean, rebuildM
 /** Report the cost of a static surface bake; claimed by the frame around it. */
 function recordRebuild(ms: number): void {
   pendingRebuildMs = ms;
+}
+
+/** Report a named phase's cost (ms) inside the frame being timed; claimed by that frame. */
+function recordPhase(name: string, ms: number): void {
+  pendingPhases[name] = (pendingPhases[name] ?? 0) + ms;
 }
 
 function crossingStats(): LadderCrossingStats {
@@ -148,7 +159,8 @@ function reset(): void {
   writeIndex = 0;
   written = 0;
   pendingRebuildMs = null;
+  pendingPhases = {};
 }
 
 export type { LadderFrame, LadderCrossingStats, LadderSnapshot };
-export { CAPACITY, recordFrame, recordRebuild, crossingStats, snapshot, reset };
+export { CAPACITY, recordFrame, recordRebuild, recordPhase, crossingStats, snapshot, reset };

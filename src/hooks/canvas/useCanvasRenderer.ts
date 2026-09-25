@@ -54,9 +54,8 @@ import { getCachedImage, getImageCacheVersion } from '../../assets/imageOperatio
 import { getSlotOffset, getMultiObjectScale, getObjectsInCell } from '../../objects/hexSlotPositioner';
 import { offsetToAxial, axialToOffset } from '../../geometry/core/offsetCoordinates';
 import { getActiveLayer, getLayerBelow, getRenderLayers, getExportLayers, isCellFogged, getActiveBoardId, getBoardBelow, getBoardLayers } from '../../persistence/layerAccessor';
-import { pickDriftSource } from './levelSurfaces';
 import { registerSurface, touchSurface, releaseSurface, evictIfNeeded, setActiveCanvas } from './surfaceBudget';
-import { recordFrame, recordRebuild } from './ladderTelemetry';
+import { recordFrame, recordRebuild, recordPhase } from './ladderTelemetry';
 import { materialiseLevelLayer } from '../../geometry/core/materialiseLevel';
 import { createLatticeClipCache, drawLadderLattice } from '../../geometry/renderers/latticeRenderer';
 import type { LatticeClipCache } from '../../geometry/renderers/latticeRenderer';
@@ -158,6 +157,8 @@ interface StaticLayerCacheEntry {
 interface CanvasSurfaceSet {
   byLevel: Map<number, StaticLayerCacheEntry>;
   settleTimer: number | null;
+  /** The rung most recently requested for this canvas; the only one a settle marks stale. */
+  lastLevel: number;
 }
 
 type DrawStaticFn = (tctx: CanvasRenderingContext2D, ox: number, oy: number, w: number, h: number) => void;
@@ -221,14 +222,18 @@ function releaseSurfaceEntry(canvas: HTMLCanvasElement, set: CanvasSurfaceSet, l
 }
 
 /**
- * Mark every level stale so the next render re-bakes the ACTIVE level (other
- * levels re-bake lazily, when they next become active). One timer per canvas.
+ * Mark the last-requested level stale so the next render re-bakes it crisp. Other
+ * levels keep their (scaled, still valid) surfaces: they are the drift sources the
+ * next crossing blits from, and they re-bake at their own settle when active
+ * again. Edits never rely on this stamp; the content terms of the key catch them.
+ * One timer per canvas.
  */
 function scheduleStaticSettle(canvas: HTMLCanvasElement, set: CanvasSurfaceSet): void {
   if (set.settleTimer != null) window.clearTimeout(set.settleTimer);
   set.settleTimer = window.setTimeout(() => {
     set.settleTimer = null;
-    for (const entry of set.byLevel.values()) entry.key = ['__settle-stale__'];
+    const active = set.byLevel.get(set.lastLevel);
+    if (active !== undefined) active.key = ['__settle-stale__'];
     staticSettleCallbacks.get(canvas)?.();
   }, ZOOM_SETTLE_MS);
 }
@@ -248,36 +253,45 @@ function blitStaticContent(
 ): void {
   let set = staticLayerCaches.get(canvas);
   if (set === undefined) {
-    set = { byLevel: new Map(), settleTimer: null };
+    set = { byLevel: new Map(), settleTimer: null, lastLevel: level };
     staticLayerCaches.set(canvas, set);
   }
 
-  // On a level miss, drift from the nearest coarser surface (D17). `sourceLevel`
-  // is always `level` for a classic map, which only ever renders level 0.
+  set.lastLevel = level;
+
+  // A surface is usable when its key still matches and the viewport, mapped into
+  // the snapshot's pixel space at the current scale, falls inside it.
+  const usability = (candidate: StaticLayerCacheEntry): { scale: number; tx: number; ty: number; usable: boolean } => {
+    if (!staticKeysEqual(candidate.key, key)) return { scale: 1, tx: 0, ty: 0, usable: false };
+    const s = zoom / candidate.zoom;
+    const cx = offsetX - candidate.vOx * s;
+    const cy = offsetY - candidate.vOy * s;
+    // Viewport corners in offscreen pixel space must fall inside the snapshot.
+    const pMinX = (0 - cx) / s;
+    const pMaxX = (width - cx) / s;
+    const pMinY = (0 - cy) / s;
+    const pMaxY = (height - cy) / s;
+    const ok = pMinX >= 0 && pMinY >= 0 && pMaxX <= candidate.off.width && pMaxY <= candidate.off.height;
+    return { scale: s, tx: cx, ty: cy, usable: ok };
+  };
+
+  // The level's own surface if usable; otherwise, on any level above 0, the nearest
+  // coarser USABLE surface as a drift source (D17). A classic map only ever asks for
+  // level 0, so for it `sourceLevel` is always `level` and nothing below changes.
   let entry = set.byLevel.get(level);
   let sourceLevel = level;
-  if (entry === undefined) {
-    const drift = pickDriftSource(set.byLevel, level);
-    if (drift !== null) {
-      entry = drift.entry;
-      sourceLevel = drift.level;
+  let { scale, tx, ty, usable } = entry === undefined ? { scale: 1, tx: 0, ty: 0, usable: false } : usability(entry);
+  if (!usable && level > 0) {
+    for (let coarser = level - 1; coarser >= 0; coarser--) {
+      const candidate = set.byLevel.get(coarser);
+      if (candidate === undefined) continue;
+      const fit = usability(candidate);
+      if (!fit.usable) continue;
+      entry = candidate;
+      sourceLevel = coarser;
+      ({ scale, tx, ty, usable } = fit);
+      break;
     }
-  }
-
-  let scale = 1;
-  let tx = 0;
-  let ty = 0;
-  let usable = false;
-  if (entry !== undefined && staticKeysEqual(entry.key, key)) {
-    scale = zoom / entry.zoom;
-    tx = offsetX - entry.vOx * scale;
-    ty = offsetY - entry.vOy * scale;
-    // Viewport corners in offscreen pixel space must fall inside the snapshot.
-    const pMinX = (0 - tx) / scale;
-    const pMaxX = (width - tx) / scale;
-    const pMinY = (0 - ty) / scale;
-    const pMaxY = (height - ty) / scale;
-    usable = pMinX >= 0 && pMinY >= 0 && pMaxX <= entry.off.width && pMaxY <= entry.off.height;
   }
 
   if (usable && sourceLevel !== level) {
@@ -1162,7 +1176,9 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     // A rotated map never gets a ladder, so this branch needs no level.
     drawStaticContent(ctx, offsetX, offsetY, width, height);
   } else {
+    const blitStart = ladderOn ? performance.now() : 0;
     blitStaticContent(canvas, ctx, staticDraw, offsetX, offsetY, zoom, width, height, staticKey, getImageCacheVersion(), level);
+    if (ladderOn) recordPhase('blit', performance.now() - blitStart);
   }
 
   // The live lattice, stroked in screen space straight after the blit so line
@@ -1170,6 +1186,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // is skipped at every level under the flag. `visibility.grid` still hides it —
   // it is the same user-facing grid, drawn a different way.
   if (ladder !== null && visibility.grid !== false) {
+    const latticeStart = performance.now();
     drawLadderLattice(
       ctx,
       ladder,
@@ -1177,8 +1194,11 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       { offsetX, offsetY, zoom, width, height },
       LADDER_EPOCH,
       clipCacheFor(canvas, ladder),
-      { active: THEME.grid.lines, district: THEME.grid.lines }
+      { active: THEME.grid.lines, district: THEME.grid.lines },
+      recordPhase,
+      crossing
     );
+    recordPhase('lattice', performance.now() - latticeStart);
   }
 
   // =========================================================================
@@ -1248,7 +1268,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 };
 
 const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], options = {}, viewController) => {
-  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false, adjacentSubHexes = null, adjacentEmptySlots = null, hiddenTileLayers = undefined, draggingWallId = null, subHexPath = null } = options;
+  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false, adjacentSubHexes = null, adjacentEmptySlots = null, hiddenTileLayers = undefined, draggingWallId = null, subHexPath = null, ladder = null } = options;
   // Coalesce renders to at most one per animation frame. Pan/zoom writes viewState
   // (stored on mapData) on EVERY pointermove/touchmove; on a 120Hz touch device that
   // fires far faster than the display refreshes, so rendering synchronously per update
@@ -1270,6 +1290,7 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
     tileImagesReady: boolean;
     draggingWallId: typeof draggingWallId;
     subHexPath: typeof subHexPath;
+    ladder: typeof ladder;
   } | null>(null);
 
   // useLayoutEffect (not useEffect): the inputs ref must refresh at COMMIT,
@@ -1279,7 +1300,7 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
   // useEffect here, that frame painted the OLD map at the NEW view (the
   // "giant grid" ghost frame on surfacing, windrose-1mc trace 2026-08-20).
   useLayoutEffect(() => {
-    renderInputsRef.current = { mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, tileImagesReady, draggingWallId, subHexPath };
+    renderInputsRef.current = { mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, tileImagesReady, draggingWallId, subHexPath, ladder };
     const scheduleRender = (): void => {
       // A frame is already queued — it will pick up the latest inputs from the ref.
       if (rafIdRef.current != null) return;
@@ -1290,7 +1311,7 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
           const fogCanvas = fogCanvasRef?.current ?? null;
           // Read the live viewState at FIRE time so a gesture's setLive→scheduleRender
           // path paints the current pan/zoom even though mapData hasn't changed.
-          renderCanvas(canvasRef.current, fogCanvas, a.mapData, a.geometry, a.selectedItems, { isResizeMode: a.isResizeMode, theme: a.theme, showCoordinates: a.showCoordinates, layerVisibility: a.layerVisibility, adjacentSubHexes: a.adjacentSubHexes, adjacentEmptySlots: a.adjacentEmptySlots, hiddenTileLayers: a.hiddenTileLayers, tileImagesReady: a.tileImagesReady, draggingWallId: a.draggingWallId, subHexPath: a.subHexPath, liveViewState: viewController.getLive() });
+          renderCanvas(canvasRef.current, fogCanvas, a.mapData, a.geometry, a.selectedItems, { isResizeMode: a.isResizeMode, theme: a.theme, showCoordinates: a.showCoordinates, layerVisibility: a.layerVisibility, adjacentSubHexes: a.adjacentSubHexes, adjacentEmptySlots: a.adjacentEmptySlots, hiddenTileLayers: a.hiddenTileLayers, tileImagesReady: a.tileImagesReady, draggingWallId: a.draggingWallId, subHexPath: a.subHexPath, ladder: a.ladder, liveViewState: viewController.getLive() });
         }
       });
     };
@@ -1300,7 +1321,7 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
     // The ViewController drives imperative renders on setLive() during a gesture.
     viewController.setRenderCallback(scheduleRender);
     scheduleRender();
-  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, draggingWallId, subHexPath, viewController]);
+  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, draggingWallId, subHexPath, ladder, viewController]);
 
   // Cancel any frame still pending when the component unmounts.
   useEffect(() => () => {
