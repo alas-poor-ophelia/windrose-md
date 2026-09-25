@@ -27,6 +27,7 @@ import type { SubHexCoordDetail, SubHexExitDetail } from '../../core/windroseEve
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULTS } from '../../core/dmtConstants';
 import { getApp } from '../../core/settingsAccessor';
+import { getMaxZoom, isLadderMap } from '../../core/lodFlags';
 import { captureSubHexBackdrop } from '../../core/subHexBackdropStore';
 import { prewarmMapAssets } from '../state/useImagePreloading';
 import { traceZoom } from '../../utils/zoomTraceProbe';
@@ -53,8 +54,13 @@ const PINCH_ZOOM_RATE = 0.005;
 const PINCH_ZOOM_FACTOR_MIN = 0.8;
 const PINCH_ZOOM_FACTOR_MAX = 1.25;
 
-/** Upper zoom clamp for wheel and pinch zooming. */
-const MAX_WHEEL_ZOOM = 4;
+/**
+ * Zoom at which a hex with a sub-map dives into it. This is the CLASSIC
+ * camera ceiling: the dive fires exactly where the wheel used to stop. The
+ * live clamps go through `getMaxZoom(mapData)` instead, which is the same
+ * number on a classic map and the ladder's ceiling on a ladder map.
+ */
+const SEAMLESS_DIVE_ZOOM = DEFAULTS.maxZoom;
 
 /**
  * Mouse-wheel notch zoom step, multiplicative (~12% per notch). A multiplicative
@@ -483,11 +489,18 @@ function useCanvasInteraction(
     if (Date.now() - seamlessTransitionAtRef.current < SEAMLESS_COOLDOWN_MS) return false;
 
     if (zoomingIn) {
+      // Under the lattice ladder there is no document to dive into: the whole
+      // world is one map that subdivides as you zoom, so the zoom simply keeps
+      // climbing on the root map to the ladder's ceiling. Bailing here also
+      // skips the approach-band prewarm below — nothing to prewarm. The
+      // zoom-OUT surface branch is deliberately NOT gated: a map entered through
+      // a legacy sub-hex link must still be able to surface by zooming out.
+      if (isLadderMap(mapData)) return false;
       // Approach band: prewarm the target child's image assets while the
       // zoom is still climbing toward the ceiling, so the dive's first frame
       // paints complete instead of with cold-image holes. Fire-and-forget,
       // deduped per hex key; preloadImage itself dedupes in-flight loads.
-      if (newZoom >= SEAMLESS_PREWARM_ZOOM && newZoom < MAX_WHEEL_ZOOM - SEAMLESS_DIVE_EPSILON) {
+      if (newZoom >= SEAMLESS_PREWARM_ZOOM && newZoom < SEAMLESS_DIVE_ZOOM - SEAMLESS_DIVE_EPSILON) {
         const warmCoords = screenToGrid(anchorClientX, anchorClientY);
         const warmKey = warmCoords != null ? `${warmCoords.x},${warmCoords.y}` : null;
         const warmTarget = warmKey != null ? mapData.subHexMaps?.[warmKey] : undefined;
@@ -498,7 +511,7 @@ function useCanvasInteraction(
       }
       // Fire on the tick that REACHES the ceiling (not the one after it), so
       // there are no dead ticks pinned at max zoom before the dive.
-      if (newZoom < MAX_WHEEL_ZOOM - SEAMLESS_DIVE_EPSILON) return false;
+      if (newZoom < SEAMLESS_DIVE_ZOOM - SEAMLESS_DIVE_EPSILON) return false;
       const coords = screenToGrid(anchorClientX, anchorClientY);
       if (!coords) return false;
       const subHex = mapData.subHexMaps?.[`${coords.x},${coords.y}`];
@@ -518,7 +531,7 @@ function useCanvasInteraction(
       // child above max zoom.
       const childZoom = Math.max(
         DEFAULTS.minZoom,
-        Math.min(MAX_WHEEL_ZOOM, subHexContinuityZoom(currentZoom, parentHexSize, childHexSize, rings))
+        Math.min(SEAMLESS_DIVE_ZOOM, subHexContinuityZoom(currentZoom, parentHexSize, childHexSize, rings))
       );
 
       // The anchor point, mapped into the child map's extent…
@@ -588,7 +601,7 @@ function useCanvasInteraction(
     let surfaceThreshold: number;
     if (ownRings != null && ownRings > 0) {
       surfaceThreshold = SEAMLESS_SURFACE_CONTINUITY_FRACTION *
-        subHexContinuityZoom(MAX_WHEEL_ZOOM, 1, 1, ownRings);
+        subHexContinuityZoom(SEAMLESS_DIVE_ZOOM, 1, 1, ownRings);
     } else {
       if (mapData.hexBounds == null) return false;
       surfaceThreshold = SEAMLESS_SURFACE_FIT_FRACTION * calculateFitZoom(
@@ -738,10 +751,10 @@ function useCanvasInteraction(
         PINCH_ZOOM_FACTOR_MAX,
         Math.max(PINCH_ZOOM_FACTOR_MIN, Math.exp(-e.deltaY * PINCH_ZOOM_RATE))
       );
-      newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, viewState.zoom * factor));
+      newZoom = Math.max(DEFAULTS.minZoom, Math.min(getMaxZoom(mapData), viewState.zoom * factor));
     } else {
       const factor = e.deltaY > 0 ? 1 / WHEEL_ZOOM_STEP_FACTOR : WHEEL_ZOOM_STEP_FACTOR;
-      newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, viewState.zoom * factor));
+      newZoom = Math.max(DEFAULTS.minZoom, Math.min(getMaxZoom(mapData), viewState.zoom * factor));
     }
 
     traceZoom('wheel', { mode, pinch: isPinch, dY: e.deltaY, zoom: viewState.zoom, newZoom });
@@ -801,7 +814,7 @@ function useCanvasInteraction(
     }
     const ge = e as WebKitGestureEvent;
     const currentZoom = viewController.getLive().zoom;
-    const newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, startZoom * ge.scale));
+    const newZoom = Math.max(DEFAULTS.minZoom, Math.min(getMaxZoom(mapData), startZoom * ge.scale));
     traceZoom('gestChange', { scale: ge.scale, startZoom, zoom: currentZoom, newZoom });
 
     // Seamless sub-hex dive/surface: end the pinch cleanly when it fires —
@@ -969,7 +982,7 @@ function useCanvasInteraction(
     let newZoom = zoom;
     if (initialPinchDistanceRef.current != null) {
       const scale = distance / initialPinchDistanceRef.current;
-      newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, zoom * scale));
+      newZoom = Math.max(DEFAULTS.minZoom, Math.min(getMaxZoom(mapData), zoom * scale));
       traceZoom('touchTick', { d: distance, d0: initialPinchDistanceRef.current, scale, zoom, newZoom });
 
       // Seamless sub-hex dive/surface: the pinch rides through the swap.

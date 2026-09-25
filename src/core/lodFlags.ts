@@ -11,7 +11,10 @@
  * nothing here touches `DEFAULTS`, and the unflagged paths stay byte-identical.
  * Design: .claude/lod-rd/06-integration-design.md, sections 10 and 13.
  */
+import type { MapData } from '#types/core/map.types';
 import { getSettings } from './settingsAccessor';
+import { DEFAULTS } from './dmtConstants';
+import { crossingZoom, LADDER_DEFAULTS, type LadderParams } from '../geometry/core/lattice';
 import type { LadderOverrides } from '../geometry/core/createGeometryLadder';
 
 /** True when the lattice ladder capability is switched on in plugin settings. */
@@ -37,4 +40,43 @@ function getLadderOverrides(): LadderOverrides {
   return out;
 }
 
-export { isLodLadderEnabled, getLadderOverrides };
+/**
+ * Is THIS map a ladder map? The single definition, shared by the ladder memo,
+ * the camera clamps and the seamless-dive bail, so they can never disagree.
+ *
+ * Hex only, and never a rotated map: the rotated branch of the renderer
+ * bypasses the surface cache the ladder's per-rung bake lives in.
+ */
+function isLadderMap(mapData: MapData | null | undefined): boolean {
+  if (mapData === null || mapData === undefined) return false;
+  if (!isLodLadderEnabled()) return false;
+  if (mapData.mapType !== 'hex') return false;
+  return ((mapData.northDirection ?? 0) % 360) === 0;
+}
+
+/** Ladder parameters for a map: defaults, then the developer override. */
+function ladderParamsFor(mapData: MapData): LadderParams {
+  return {
+    hexSize: mapData.hexSize ?? DEFAULTS.hexSize,
+    ...LADDER_DEFAULTS,
+    ...getLadderOverrides(),
+  };
+}
+
+/**
+ * Upper zoom clamp for a map. `DEFAULTS.maxZoom` on every classic path — the
+ * constant itself is never touched, so unflagged maps clamp at exactly 4.
+ *
+ * A ladder map instead climbs to the ladder's CEILING: the crossing zoom one
+ * rung past `maxLevel`, i.e. the zoom at which the deepest rung's cells have
+ * grown to `m * minCellPx` on screen and there is nothing finer to cross into.
+ * 1638.4 at the shipped defaults (hexSize 80, m 4, minCellPx 64, maxLevel 5).
+ */
+function getMaxZoom(mapData: MapData | null | undefined): number {
+  if (mapData === null || mapData === undefined) return DEFAULTS.maxZoom;
+  if (!isLadderMap(mapData)) return DEFAULTS.maxZoom;
+  const params = ladderParamsFor(mapData);
+  return crossingZoom(params.maxLevel + 1, params);
+}
+
+export { isLodLadderEnabled, getLadderOverrides, isLadderMap, getMaxZoom };

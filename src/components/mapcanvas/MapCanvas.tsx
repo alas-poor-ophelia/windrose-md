@@ -36,7 +36,7 @@ import { HexGeometry } from '../../geometry/core/HexGeometry';
 import { createGeometry } from '../../geometry/core/createGeometry';
 import { createGeometryLadder } from '../../geometry/core/createGeometryLadder';
 import type { GeometryLadder } from '../../geometry/core/createGeometryLadder';
-import { isLodLadderEnabled, getLadderOverrides } from '../../core/lodFlags';
+import { isLadderMap, getLadderOverrides } from '../../core/lodFlags';
 import { LinkedNoteHoverOverlays } from '../overlays/LinkedNoteHoverOverlays';
 import { MapStateProvider, MapOperationsProvider } from '../../context/MapContext';
 import { MapSelectionProvider, useMapSelection } from '../../context/MapSelectionContext';
@@ -245,17 +245,17 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
 
   // Lattice ladder for this map, or null on every classic path. Built ONCE per
   // geometry: the static surface cache keys on the ladder's identity, so a ladder
-  // rebuilt per render would invalidate every baked surface every frame. Hex only,
-  // and never on a rotated map — the rotated branch of the renderer bypasses the
-  // surface cache altogether. The capability flag is read per render so toggling
-  // the developer setting takes effect on the next paint.
-  const ladderOn = isLodLadderEnabled();
+  // rebuilt per render would invalidate every baked surface every frame. Whether
+  // this map is a ladder map at all (hex, unrotated, capability on) is decided in
+  // ONE place — `isLadderMap` — shared with the camera clamps and the dive bail.
+  // It is read per render so toggling the developer setting takes effect on the
+  // next paint.
+  const ladderOn = isLadderMap(mapData);
   const ladder = useMemo((): GeometryLadder | null => {
     if (!ladderOn) return null;
     if (geometry?.type !== 'hex') return null;
-    if (((mapData?.northDirection ?? 0) % 360) !== 0) return null;
     return createGeometryLadder(geometry as unknown as HexGeometry, getLadderOverrides());
-  }, [ladderOn, geometry, mapData?.northDirection]);
+  }, [ladderOn, geometry]);
 
   // Shared live pan/zoom controller. Holds viewState off the React path during a
   // gesture and commits to mapData once at gesture end (sink = onViewStateChange).

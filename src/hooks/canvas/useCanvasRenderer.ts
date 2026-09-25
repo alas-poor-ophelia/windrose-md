@@ -823,9 +823,12 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     }
   }
 
-  // Draw adjacent sub-hex ghost previews (when drilled into a sub-hex)
+  // Draw adjacent sub-hex ghost previews (when drilled into a sub-hex).
+  // Never under the ladder: one world has no sibling DOCUMENTS to ghost, so
+  // the whole pass (and its "+" create-sibling affordances) is dead there.
   const MAX_ADJACENT_COMPLEXITY = 500;
-  if (((adjacentSubHexes != null && adjacentSubHexes.length > 0)
+  if (ladder === null
+    && ((adjacentSubHexes != null && adjacentSubHexes.length > 0)
     || (adjacentEmptySlots != null && adjacentEmptySlots.length > 0)) && geometry.type === 'hex') {
     const hexToWorldFn = geometry.hexToWorld;
     const hexSizeVal = geometry.hexSize;
