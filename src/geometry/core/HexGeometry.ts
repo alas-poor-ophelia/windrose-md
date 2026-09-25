@@ -366,10 +366,30 @@ class HexGeometry extends BaseGeometry {
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
 
-    // Radial mode: iterate by rings instead of rectangular grid
+    // Radial mode: iterate by rings instead of rectangular grid.
+    // Viewport culling mirrors the rectangular branch below — a hex whose
+    // bounding box lies wholly outside the (rotation-padded) canvas rect
+    // contributes nothing, so skipping it is output-identical. Without this a
+    // radial map drew every one of its cells (6 polygon fills each) on every
+    // static rebuild regardless of viewport; every sub-hex map is radial.
     if (this.renderingMode === 'radial') {
       const cells = this.getAllRadialCells(this.bounds?.maxRing ?? 0);
+      if (cells.length > 50000) {
+        console.warn(`[HexGeometry.drawGrid] Too many hexes to draw (${cells.length}), aborting`);
+        return;
+      }
+      const radialPad = rotated ? Math.sqrt(width * width + height * height) / 2 : 0;
+      // Half-extent of a hex's bounding box on screen, plus the line width.
+      const margin = this.hexSize * zoom + lineWidth + radialPad;
+      const minX = -margin;
+      const maxX = width + margin;
+      const minY = -margin;
+      const maxY = height + margin;
       for (const { q, r } of cells) {
+        const { worldX, worldY } = this.hexToWorld(q, r);
+        const sx = offsetX + worldX * zoom;
+        const sy = offsetY + worldY * zoom;
+        if (sx < minX || sx > maxX || sy < minY || sy > maxY) continue;
         this.drawHexOutline(ctx, q, r, offsetX, offsetY, zoom, lineWidth);
       }
       return;
