@@ -17,8 +17,14 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { Cell } from '#types/core/cell.types';
 import type { TileAssignment, TileRotation, TileLayerRole, TileForm } from '#types/tiles/tile.types';
 import type { MapObject } from '#types/objects/object.types';
-import type { WindroseWallGapDebug, WindroseRawGap } from '#types/core/global.types';
-import { getActiveLayer, getActiveBoardLayers } from '../../persistence/layerAccessor';
+import type { WindroseWallGapDebug, WindroseRawGap, WindroseLevelWriteResult } from '#types/core/global.types';
+import type { HandleLevelCellsChange } from '#types/hooks/dataHandlers.types';
+import { getActiveLayer, getActiveBoardLayers, authoredCells, authoredLevels } from '../../persistence/layerAccessor';
+import { MAX_CELLS_PER_DEPTH_OP } from '../../persistence/depthAuthoring';
+import { isLadderView, ladderParamsFor } from '../../core/lodFlags';
+import { HexGeometry } from '../../geometry/core/HexGeometry';
+import { createGeometryLadder, type GeometryLadder } from '../../geometry/core/createGeometryLadder';
+import { withCellsPainted, withCellsErased } from '../../drawing/depthCellOps';
 import { getDataFilePath } from '../../core/settingsAccessor';
 import { setCell as accessorSetCell, removeCell as accessorRemoveCell, cellToPoint } from '../../geometry/core/cellAccessor';
 import { assignmentsOverlap } from '../../assets/tileFootprint';
@@ -55,6 +61,12 @@ interface UseMcpBridgeParams {
   setSelectedColor: (color: string) => void;
   handleOpacityChange: (opacity: number) => void;
   handleCellsChange: (cells: Cell[]) => void;
+  /**
+   * Rung (level >= 1) writer: maps the LATEST rung content to its next content
+   * inside updateMapData's functional updater, through writeDepthCells, with
+   * an undo snapshot. Level 0 keeps handleCellsChange.
+   */
+  handleLevelCellsChange: HandleLevelCellsChange;
   wrappedHandleUndo: () => void;
   handleRedo: () => void;
   handleLayerSelect: (layerId: string) => void;
@@ -76,7 +88,7 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
     currentTool, selectedColor, selectedOpacity,
     canUndo, canRedo, saveStatus, isExpanded,
     setCurrentTool, setSelectedColor, handleOpacityChange,
-    handleCellsChange, wrappedHandleUndo, handleRedo, handleLayerSelect, forceSave,
+    handleCellsChange, handleLevelCellsChange, wrappedHandleUndo, handleRedo, handleLayerSelect, forceSave,
     handleViewStateChange, availableTilesets, handleTileSelect, setSelectedTileForm,
     handleTilesChange, handleObjectsChange, selectPane, setTileBrowserCollapsed,
     setRailOpenId, getCachedImage,
@@ -99,6 +111,75 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
       wallPathCount += layer.wallPaths?.length ?? 0;
       textLabelCount += layer.textLabels.length;
     }
+
+    // Ladder rungs (design 06 s11 "MCP", s19 item 10). The default level is
+    // always 0, never the camera's active level, so existing scripts never
+    // become zoom-dependent. Built per registration from this render's map.
+    let ladder: GeometryLadder | null = null;
+    if (isLadderView(mapData) && geometry instanceof HexGeometry) {
+      const { m, minCellPx, maxLevel } = ladderParamsFor(mapData);
+      ladder = createGeometryLadder(geometry, { m, minCellPx, maxLevel });
+    }
+    const cellCountByLevel: Record<string, number> = { '0': cellCount };
+    if (activeLayer != null) {
+      for (const level of authoredLevels(activeLayer)) {
+        if (level >= 1) cellCountByLevel[String(level)] = authoredCells(activeLayer, level).length;
+      }
+    }
+    const isRung = (level: number | undefined): level is number => level !== undefined && level !== 0;
+    const levelFail = (level: number, error: string, skipped = 0): WindroseLevelWriteResult =>
+      ({ ok: false, level, count: 0, skipped, error });
+
+    /**
+     * Rung write: drop coords that do not exist at `level`, then commit through
+     * handleLevelCellsChange, whose functional updater re-applies `next` to the
+     * LATEST rung content (so consecutive calls compose instead of overwriting
+     * each other) and hands back the guard's verdict against that live map.
+     */
+    const writeRung = (
+      level: number,
+      coords: ReadonlyArray<{ x: number; y: number }>,
+      next: (current: Cell[], kept: ReadonlyArray<{ x: number; y: number; i: number }>) => Cell[],
+    ): WindroseLevelWriteResult => {
+      if (!Number.isInteger(level) || level < 0) return levelFail(level, 'invalid-level');
+      if (activeLayer == null) return levelFail(level, 'no-active-layer');
+      if (ladder == null) return levelFail(level, 'not-a-ladder');
+      const rungLadder = ladder;
+      if (level > rungLadder.params.maxLevel) return levelFail(level, 'level-out-of-range');
+      const kept = coords
+        .map((c, i) => ({ x: c.x, y: c.y, i }))
+        .filter(c => Number.isInteger(c.x) && Number.isInteger(c.y) && rungLadder.existsAt(level, c.x, c.y));
+      const skipped = coords.length - kept.length;
+      if (kept.length === 0) return { ok: true, level, count: 0, skipped };
+      // The handler guards against the LIVE map inside the updater and hands
+      // the verdict back; a pre-check against this closure's render snapshot
+      // would report stale results when several writes land in one tick.
+      const outcome = handleLevelCellsChange(level, (current) => next(current, kept));
+      if (outcome === null) return levelFail(level, 'history-applying', skipped);
+      if (!outcome.ok) return levelFail(level, outcome.reason, skipped);
+      return { ok: true, level, count: kept.length, skipped };
+    };
+
+    /** Paint `kept` coords, last request per coordinate wins, batched per colour/opacity. */
+    const paintKept = (
+      current: Cell[],
+      kept: ReadonlyArray<{ x: number; y: number; i: number }>,
+      styleOf: (i: number) => { color: string; opacity: number },
+    ): Cell[] => {
+      const last = new Map<string, { x: number; y: number; i: number }>();
+      for (const k of kept) last.set(`${k.x},${k.y}`, k);
+      const groups = new Map<string, { color: string; opacity: number; coords: Array<{ x: number; y: number }> }>();
+      for (const k of last.values()) {
+        const style = styleOf(k.i);
+        const gk = `${style.color}|${style.opacity}`;
+        let g = groups.get(gk);
+        if (g == null) { g = { ...style, coords: [] }; groups.set(gk, g); }
+        g.coords.push({ x: k.x, y: k.y });
+      }
+      let out = current;
+      for (const g of groups.values()) out = withCellsPainted(out, g.coords, g.color, g.opacity);
+      return out;
+    };
 
     // Capture canUndo/canRedo at registration time so honest return values are
     // available. The handler is always called (never gated) to avoid stale-closure
@@ -130,6 +211,8 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
       timestamp: Date.now(),
       cellCount,
       layerCellCounts,
+      cellCountByLevel,
+      getActiveLevel: (): number => (ladder != null ? ladder.activeLevel(mapData.viewState?.zoom ?? 1) : 0),
       objectCount,
       wallPathCount,
       textLabelCount,
@@ -138,7 +221,11 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
         setTool: (toolId: string) => setCurrentTool(toolId as ToolId),
         setColor: (color: string) => setSelectedColor(color),
         setOpacity: (opacity: number) => handleOpacityChange(opacity),
-        paintCell: (x: number, y: number, color?: string, opacity?: number): boolean => {
+        paintCell: (x: number, y: number, color?: string, opacity?: number, level?: number): boolean | WindroseLevelWriteResult => {
+          if (isRung(level)) {
+            const style = { color: color ?? selectedColor, opacity: opacity ?? selectedOpacity };
+            return writeRung(level, [{ x, y }], (current, kept) => paintKept(current, kept, () => style));
+          }
           if (activeLayer == null) return false;
           const c = color ?? selectedColor;
           const o = opacity ?? selectedOpacity;
@@ -146,7 +233,15 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
           handleCellsChange(newCells);
           return true;
         },
-        paintCells: (cells: Array<{ x: number; y: number; color?: string; opacity?: number }>): number => {
+        paintCells: (cells: Array<{ x: number; y: number; color?: string; opacity?: number }>, level?: number): number | WindroseLevelWriteResult => {
+          // The per-op depth refusal is enforced at the MCP layer at every level.
+          if (cells.length > MAX_CELLS_PER_DEPTH_OP) return levelFail(level ?? 0, 'too-many-cells');
+          if (isRung(level)) {
+            return writeRung(level, cells, (current, kept) => paintKept(current, kept, (i) => ({
+              color: cells[i].color ?? selectedColor,
+              opacity: cells[i].opacity ?? selectedOpacity,
+            })));
+          }
           if (activeLayer == null) return 0;
           let currentCells = activeLayer.cells;
           for (const cell of cells) {
@@ -157,15 +252,20 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
           handleCellsChange(currentCells);
           return cells.length;
         },
-        eraseCell: (x: number, y: number): boolean => {
+        eraseCell: (x: number, y: number, level?: number): boolean | WindroseLevelWriteResult => {
+          if (isRung(level)) {
+            return writeRung(level, [{ x, y }], (current, kept) => withCellsErased(current, kept.map(k => ({ x: k.x, y: k.y }))));
+          }
           if (activeLayer == null) return false;
           const newCells = accessorRemoveCell(activeLayer.cells, { x, y }, geometry);
           handleCellsChange(newCells);
           return true;
         },
-        getCells: (bbox?: { x0: number; y0: number; x1: number; y1: number }): Array<{ x: number; y: number; color: string; opacity: number }> => {
+        getCells: (bbox?: { x0: number; y0: number; x1: number; y1: number }, level?: number): Array<{ x: number; y: number; color: string; opacity: number }> => {
           if (activeLayer == null) return [];
-          const mapped = activeLayer.cells.map((cell: Cell) => ({
+          if (level !== undefined && (!Number.isInteger(level) || level < 0)) return [];
+          const source = isRung(level) ? authoredCells(activeLayer, level) : activeLayer.cells;
+          const mapped = source.map((cell: Cell) => ({
             ...cellToPoint(cell),
             color: cell.color,
             opacity: cell.opacity ?? 1,
@@ -374,7 +474,7 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
     currentTool, selectedColor, selectedOpacity,
     canUndo, canRedo, saveStatus, isExpanded,
     setCurrentTool, setSelectedColor, handleOpacityChange,
-    handleCellsChange, wrappedHandleUndo, handleRedo, handleLayerSelect, forceSave,
+    handleCellsChange, handleLevelCellsChange, wrappedHandleUndo, handleRedo, handleLayerSelect, forceSave,
     handleViewStateChange, availableTilesets, handleTileSelect, setSelectedTileForm,
     handleTilesChange, handleObjectsChange, selectPane, setTileBrowserCollapsed,
     setRailOpenId, getCachedImage,

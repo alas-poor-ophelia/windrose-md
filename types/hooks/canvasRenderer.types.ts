@@ -117,10 +117,23 @@ export interface RenderCanvasOptions {
    * Lattice ladder for this map, or null (the default) for every classic path.
    * Non-null only when the capability flag is on AND the map is an unrotated hex
    * map; built once per map in MapCanvas's geometry memo, because the static
-   * cache keys on its identity. Hover previews and image export never pass one:
-   * they must not touch the per-level surface cache.
+   * cache keys on its identity. Hover previews and image export pass one only
+   * together with `bypassSurfaceCache` and an explicit `level` (phase 3c), so
+   * they never touch the per-level surface cache.
    */
   ladder?: GeometryLadder | null;
+  /**
+   * Ladder rung to paint, overriding `ladder.activeLevel(zoom)`. Ignored without
+   * a ladder. Export and hover previews pass the deepest authored rung so deep
+   * content shows regardless of their zoom.
+   */
+  level?: number;
+  /**
+   * Draw the static content straight onto the canvas: no per-level surface, no
+   * surface-budget entry, no active-canvas claim and no ladder telemetry. For
+   * one-shot canvases (hover previews, image export) that carry a ladder.
+   */
+  bypassSurfaceCache?: boolean;
 }
 
 /** Main render function */

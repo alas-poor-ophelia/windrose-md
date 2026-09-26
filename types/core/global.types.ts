@@ -34,14 +34,34 @@ interface WindroseRawGap {
   flip: boolean;
 }
 
+/**
+ * Result of a cell write addressed to a ladder rung (level >= 1), or of a
+ * refused paintCells request at any level. Level-0 writes keep their legacy
+ * boolean / number returns.
+ */
+interface WindroseLevelWriteResult {
+  ok: boolean;
+  level: number;
+  /** Cells written (painted or erased) on the rung. */
+  count: number;
+  /** Requested cells dropped because they do not exist at this rung (outside the root bounds). */
+  skipped: number;
+  /** Refusal reason (a DepthWriteRefusal, 'no-active-layer', 'no-ladder', 'too-many-cells', 'invalid-level'). */
+  error?: string;
+}
+
 interface WindroseMcpOps {
   setTool: (toolId: string) => void;
   setColor: (color: string) => void;
   setOpacity: (opacity: number) => void;
-  paintCell: (x: number, y: number, color?: string, opacity?: number) => boolean;
-  paintCells: (cells: Array<{ x: number; y: number; color?: string; opacity?: number }>) => number;
-  eraseCell: (x: number, y: number) => boolean;
-  getCells: (bbox?: { x0: number; y0: number; x1: number; y1: number }) => Array<{ x: number; y: number; color: string; opacity: number }>;
+  /** Level omitted or 0: legacy boolean. Level >= 1: rung write result. */
+  paintCell: (x: number, y: number, color?: string, opacity?: number, level?: number) => boolean | WindroseLevelWriteResult;
+  /** Level omitted or 0: legacy count (a request over MAX_CELLS_PER_DEPTH_OP is refused with a result object). Level >= 1: rung write result. */
+  paintCells: (cells: Array<{ x: number; y: number; color?: string; opacity?: number }>, level?: number) => number | WindroseLevelWriteResult;
+  /** Level omitted or 0: legacy boolean. Level >= 1: rung write result. */
+  eraseCell: (x: number, y: number, level?: number) => boolean | WindroseLevelWriteResult;
+  /** Level omitted or 0: the root lattice. Rung cells are in the rung's own axial coordinates. */
+  getCells: (bbox?: { x0: number; y0: number; x1: number; y1: number }, level?: number) => Array<{ x: number; y: number; color: string; opacity: number }>;
   undo: () => boolean;
   redo: () => boolean;
   selectLayer: (layerId: string) => void;
@@ -97,8 +117,12 @@ interface WindroseMcpInstance {
   timestamp: number;
   /** Number of cells in the active layer */
   cellCount: number;
-  /** Cell count per layer id */
+  /** Cell count per layer id (level 0 only) */
   layerCellCounts: Record<string, number>;
+  /** Active layer cell count per ladder level; keys are level numbers as strings, '0' always present */
+  cellCountByLevel: Record<string, number>;
+  /** Ladder rung the current zoom shows; 0 on classic (non-ladder) maps */
+  getActiveLevel: () => number;
   /** Total objects across all layers */
   objectCount: number;
   /** Total wall paths across all layers */
@@ -123,4 +147,4 @@ declare global {
   }
 }
 
-export type { WindroseMcpOps, WindroseMcpInstance, WindroseGlobal, WindroseWallGapDebug, WindroseRawGap };
+export type { WindroseMcpOps, WindroseMcpInstance, WindroseGlobal, WindroseWallGapDebug, WindroseRawGap, WindroseLevelWriteResult };

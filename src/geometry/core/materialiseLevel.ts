@@ -17,12 +17,21 @@
  * exists to prevent, because its boundary cells see absent neighbours. The
  * outer ring is culled at draw by the renderer's existing visibility filter.
  *
+ * Phase 3c (design 06 D3/D4): a cell resolves as `authored[L] ?? resolve(L-1,
+ * parentOf)` (section 1 "Resolve"). The rung's own authored cells REPLACE the
+ * inherited fill at their (q,r) and draw even over an unfilled ancestor; an
+ * authored cell on an intermediate rung 1..L-1 is inherited like a root fill.
+ * Rungs deeper than L are never read (D4: a level's cells render only when that
+ * level is active). With no `levels` on the layer the output is byte-identical to
+ * the Phase 1 inherit-only materialiser, memo key included.
+ *
  * Every non-cell collection on the synthetic layer is emptied — curves, edges,
  * objects, labels, tiles, wall paths, terrain strokes and fog stay on the
  * level-0 pass and must never be drawn twice.
  */
 import { hasSegments, isHexCell } from '#types/core/cell.types';
 import { cellKey } from './lattice';
+import { authoredCells } from '../../persistence/layerAccessor';
 
 import type { Cell, HexCell } from '#types/core/cell.types';
 import type { MapLayer } from '#types/core/map.types';
@@ -44,7 +53,7 @@ export interface MaterialiseStats {
   /**
    * 'hit' — the memo answered, `layer` is the same object as last time.
    * 'no-entry' — nothing memoised for this `cells` array (first call, or the array was replaced by an edit).
-   * 'key-changed' — this `cells` array is memoised, but for a different level, epoch or rect.
+   * 'key-changed' — this `cells` array is memoised, but for a different level, epoch, rect or rung array.
    */
   missReason: 'hit' | 'no-entry' | 'key-changed';
 }
@@ -67,6 +76,31 @@ const MEMO_LIMIT = 4;
 const memo = new WeakMap<GeometryLadder, WeakMap<Cell[], Map<string, MemoEntry>>>();
 
 const SQRT3 = Math.sqrt(3);
+
+/**
+ * Identity ids for rung arrays. A deep edit replaces a RUNG array through
+ * `setLevelCells`, never `layer.cells`, so the cells-keyed memo alone would
+ * serve stale fills; each rung 1..L contributes its array identity to the key.
+ */
+const rungIds = new WeakMap<Cell[], number>();
+let nextRungId = 1;
+
+function rungId(cells: Cell[]): number {
+  // An absent rung reads as a fresh `[]` on every call: all empties are id 0.
+  if (cells.length === 0) return 0;
+  let id = rungIds.get(cells);
+  if (id === undefined) {
+    id = nextRungId++;
+    rungIds.set(cells, id);
+  }
+  return id;
+}
+
+/** Key term for the rung arrays 1..level; '' when none holds cells, so a classic layer's key is unchanged. */
+function rungKeyTerm(rungs: Cell[][]): string {
+  const ids = rungs.map(rungId);
+  return ids.some(id => id !== 0) ? `|r${ids.join('.')}` : '';
+}
 
 /**
  * Every cell centre of a hex lattice of size `cellSize` in the band covering
@@ -164,7 +198,10 @@ function materialiseLevelLayer(
   const x1 = Math.max(rect.x0, rect.x1) + pad;
   const y1 = Math.max(rect.y0, rect.y1) + pad;
 
-  const key = memoKey(level, epoch, x0, y0, x1, y1);
+  // rungs[k - 1] is rung k, for k = 1..level. Deeper rungs are never read (D4).
+  const rungs: Cell[][] = [];
+  for (let k = 1; k <= level; k++) rungs.push(authoredCells(layer, k));
+  const key = memoKey(level, epoch, x0, y0, x1, y1) + rungKeyTerm(rungs);
   const byCells = memo.get(ladder);
   const entries = byCells === undefined ? undefined : byCells.get(layer.cells);
   const cached = entries === undefined ? undefined : entries.get(key);
@@ -175,6 +212,17 @@ function materialiseLevelLayer(
     entries === undefined || entries.size === 0 ? 'no-entry' : 'key-changed';
 
   const fills = buildRootFillLookup(layer.cells);
+  // The rung's own authored hex cells, drawn as authored in place of any inherited fill.
+  const own = new Map<string, HexCell>();
+  for (const cell of rungs[level - 1]) {
+    if (isHexCell(cell) === true) own.set(cellKey(cell.q, cell.r), cell);
+  }
+  // Intermediate rungs 1..level-1 with plain fills; null where the rung is empty.
+  const between: Array<Map<string, string> | null> = rungs.slice(0, level - 1).map(cells => {
+    const lookup = buildRootFillLookup(cells);
+    return lookup.size > 0 ? lookup : null;
+  });
+  const walkRungs = between.some(lookup => lookup !== null);
   const synthetic: HexCell[] = [];
   let enumerated = 0;
 
@@ -183,8 +231,27 @@ function materialiseLevelLayer(
     enumerated++;
     // existsAt is the ONLY existence gate: rung geometries carry no bounds.
     if (ladder.existsAt(level, q, r) === false) return;
-    const ancestor = ladder.ladder.ancestorAt(level, q, r);
-    const color = fills.get(cellKey(ancestor.q, ancestor.r));
+    const authored = own.size > 0 ? own.get(cellKey(q, r)) : undefined;
+    if (authored !== undefined) {
+      synthetic.push(authored);
+      return;
+    }
+    let color: string | undefined;
+    if (walkRungs === true) {
+      // Nearest authored ancestor wins: rung level-1 first, the root last.
+      let Q = q;
+      let R = r;
+      for (let k = level - 1; k >= 0 && color === undefined; k--) {
+        const p = ladder.ladder.parentOf(Q, R);
+        Q = p.Q;
+        R = p.R;
+        const lookup = k === 0 ? fills : between[k - 1];
+        if (lookup !== null) color = lookup.get(cellKey(Q, R));
+      }
+    } else {
+      const ancestor = ladder.ladder.ancestorAt(level, q, r);
+      color = fills.get(cellKey(ancestor.q, ancestor.r));
+    }
     if (color === undefined) return;
     synthetic.push({ q, r, color });
   });

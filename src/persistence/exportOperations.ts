@@ -20,9 +20,12 @@ import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { App } from 'obsidian';
 import { TFile } from 'obsidian';
 
-import { allAuthoredCells, getActiveLayer, getExportLayers } from './layerAccessor';
+import { allAuthoredCells, authoredLevels, getActiveLayer, getExportLayers } from './layerAccessor';
 import { ladderForAuthoredRungs } from './resizeOperations';
 import { HexGeometry } from '../geometry/core/HexGeometry';
+import { crossingZoom } from '../geometry/core/lattice';
+import type { LadderParams } from '../geometry/core/lattice';
+import { isDepthQuarantined, isLadderView } from '../core/lodFlags';
 import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
 import { getFontCss } from '../text/fontOptions';
 import { renderCanvas } from '../hooks/canvas/useCanvasRenderer';
@@ -143,14 +146,46 @@ function calculateContentBounds(
  */
 function exportViewStateForBounds(
   geometry: { type: string; cellSize: number },
-  bounds: BoundingBox
+  bounds: BoundingBox,
+  zoom = 1
 ): StoredViewState {
   const cx = (bounds.minX + bounds.maxX) / 2;
   const cy = (bounds.minY + bounds.maxY) / 2;
   if (geometry.type !== 'hex') {
-    return { zoom: 1, center: { x: cx / geometry.cellSize, y: cy / geometry.cellSize } };
+    return { zoom, center: { x: cx / geometry.cellSize, y: cy / geometry.cellSize } };
   }
-  return { zoom: 1, center: { x: cx, y: cy } };
+  return { zoom, center: { x: cx, y: cy } };
+}
+
+/** Deepest rung >= 1 holding authored cells across `layers`; 0 when none. */
+function deepestAuthoredLevel(layers: readonly MapLayer[]): number {
+  let deepest = 0;
+  for (const layer of layers) {
+    const levels = authoredLevels(layer);
+    const last = levels.length > 0 ? levels[levels.length - 1] : 0;
+    if (last > deepest) deepest = last;
+  }
+  return deepest;
+}
+
+/** Render params plus the deep-export terms; all absent on a classic export. */
+type LadderRenderParams = RenderParams & { ladder?: GeometryLadder | null; level?: number; zoom?: number };
+
+/** Longest side of a ladder export canvas, in px; well under every browser's canvas limit. */
+const MAX_LADDER_EXPORT_SIDE = 8192;
+
+/**
+ * Export zoom for rung `level`: the rung's crossing zoom, so its cells are at
+ * least `minCellPx` wide and crisp, never below 1 (the classic export scale),
+ * and scaled back so neither canvas side exceeds MAX_LADDER_EXPORT_SIDE. When
+ * the cap bites the rung still renders (the `level` option forces it); only its
+ * crispness is lost. Level 0 is always exactly 1.
+ */
+function exportZoomForLevel(level: number, params: LadderParams, worldWidth: number, worldHeight: number): number {
+  if (level <= 0) return 1;
+  const wanted = Math.max(1, crossingZoom(level, params));
+  const longest = Math.max(worldWidth, worldHeight, 1);
+  return Math.max(1, Math.min(wanted, MAX_LADDER_EXPORT_SIDE / longest));
 }
 
 /**
@@ -158,10 +193,10 @@ function exportViewStateForBounds(
  */
 function renderMapToCanvas(
   ctx: CanvasRenderingContext2D,
-  params: RenderParams,
+  params: LadderRenderParams,
   options: ExportImageOptions
 ): void {
-  const { mapData, geometry, bounds, width, height } = params;
+  const { mapData, geometry, bounds, width, height, ladder = null, level = 0, zoom = 1 } = params;
 
   const tempCanvas = activeWindow.createEl('canvas');
   tempCanvas.width = width;
@@ -204,7 +239,9 @@ function renderMapToCanvas(
       showCoordinates: false,
       layerVisibility: options.visibility,
       exportLayers: options.layers,
-      liveViewState: exportViewStateForBounds(geometry, bounds)
+      liveViewState: exportViewStateForBounds(geometry, bounds, zoom),
+      // Only a deep export carries a ladder; it draws straight to the canvas.
+      ...(ladder !== null ? { ladder, level, bypassSurfaceCache: true } : {})
     }
   );
 
@@ -264,9 +301,19 @@ async function exportMapAsImage(
     maxY: bounds.maxY + buffer
   };
   
+  // Deep export (design 06 s19 item 8): paint the deepest authored rung of the
+  // exported layers. A quarantined or non-ladder map renders level 0 as usual.
+  const deepLevel = ladder !== null && isLadderView(mapData) && !isDepthQuarantined(mapData).quarantined
+    ? deepestAuthoredLevel(exportLayers)
+    : 0;
+  const renderLadder = deepLevel > 0 ? ladder : null;
+  const worldWidth = exportBounds.maxX - exportBounds.minX;
+  const worldHeight = exportBounds.maxY - exportBounds.minY;
+  const zoom = renderLadder !== null ? exportZoomForLevel(deepLevel, renderLadder.params, worldWidth, worldHeight) : 1;
+
   // Calculate canvas dimensions
-  const width = Math.ceil(exportBounds.maxX - exportBounds.minX);
-  const height = Math.ceil(exportBounds.maxY - exportBounds.minY);
+  const width = Math.ceil(worldWidth * zoom);
+  const height = Math.ceil(worldHeight * zoom);
   
   // Create offscreen canvas
   const canvas = activeWindow.createEl('canvas');
@@ -284,7 +331,10 @@ async function exportMapAsImage(
     geometry,
     bounds: exportBounds,
     width,
-    height
+    height,
+    ladder: renderLadder,
+    level: deepLevel,
+    zoom
   }, options);
   
   // Convert to blob
@@ -337,4 +387,4 @@ async function saveMapImageToVault(
 // Exports
 // ===========================================
 
-export { calculateContentBounds, exportViewStateForBounds, renderMapToCanvas, exportMapAsImage, saveMapImageToVault };
+export { calculateContentBounds, deepestAuthoredLevel, exportZoomForLevel, exportViewStateForBounds, renderMapToCanvas, exportMapAsImage, saveMapImageToVault };

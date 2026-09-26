@@ -28,7 +28,7 @@ export function registerInteractTools(server: McpServer): void {
     {
       x: z.number().describe("World X coordinate for the viewport center"),
       y: z.number().describe("World Y coordinate for the viewport center"),
-      zoom: z.number().min(0.1).max(8).optional().describe("Zoom level 0.1–8 (default: current zoom unchanged)"),
+      zoom: z.number().min(0.1).max(2048).optional().describe("Zoom level 0.1–2048; the app clamps to the map's own ceiling (8 on classic maps, higher on ladder maps). Default: current zoom unchanged"),
     },
     async ({ x, y, zoom }) => {
       const zoomArg = zoom !== undefined ? `,${zoom}` : "";

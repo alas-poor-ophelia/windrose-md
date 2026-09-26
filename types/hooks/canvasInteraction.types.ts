@@ -65,6 +65,8 @@ export interface CoordinateHelpers {
   getTouchCenter: (touches: TouchList) => TouchCenter | null;
   getTouchDistance: (touches: TouchList) => number | null;
   screenToGrid: (clientX: number, clientY: number) => Point | null;
+  /** Cell under the pointer on ladder rung `level`; level 0 equals screenToGrid. */
+  screenToLevelCell: (clientX: number, clientY: number, level: number) => Point | null;
   screenToWorld: (clientX: number, clientY: number) => WorldCoords | null;
 }
 

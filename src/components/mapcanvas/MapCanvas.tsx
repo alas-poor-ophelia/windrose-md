@@ -28,6 +28,7 @@ import { useCanvasRenderer, renderCanvas } from '../../hooks/canvas/useCanvasRen
 import { useCanvasInteraction } from '../../hooks/canvas/useCanvasInteraction';
 import { useViewController } from '../../hooks/canvas/useViewController';
 import type { ViewController } from '#types/hooks/viewController.types';
+import type { HandleLevelCellsChange } from '#types/hooks/dataHandlers.types';
 import { GridGeometry } from '../../geometry/core/GridGeometry';
 import { DEFAULTS } from '../../core/dmtConstants';
 import { getObjectAtPosition, addObject, removeObject, removeObjectAtPosition, removeObjectsInRectangle, updateObject, isAreaFree, canResizeObject } from '../../objects/objectOperations';
@@ -102,6 +103,8 @@ interface MapCanvasContentProps {
   notePath?: string;
   mapData: MapData | null;
   onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
+  /** Deep (ladder rung >= 1) cell write; absent on hosts without depth authoring. */
+  onLevelCellsChange?: HandleLevelCellsChange;
   onCurvesChange: (curves: Curve[], skipHistory?: boolean) => void;
   onObjectsChange: (objects: MapObject[], suppressHistory?: boolean) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
@@ -188,7 +191,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, adjacentEmptySlots, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex, children }: MapCanvasContentProps): VNode => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, adjacentEmptySlots, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex, children }: MapCanvasContentProps): VNode => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -289,8 +292,17 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
   const {
     screenToGrid,
     screenToWorld,
-    getClientCoords
-  } = useCanvasInteraction(canvasRef, mapData, geometry, isFocused, viewController);
+    getClientCoords,
+    screenToLevelCell
+  } = useCanvasInteraction(canvasRef, mapData, geometry, isFocused, viewController, false, null, undefined, undefined, ladder);
+
+  // The camera's ladder rung, read LIVE from the view controller at call time
+  // (design section 4.1: a function, not a value, so no per-tick re-render).
+  // Tools latch it once at pointerdown. Level 0 on every classic path.
+  const getActiveLevel = useCallback(
+    (): number => (ladder ? ladder.activeLevel(viewController.getLive().zoom) : 0),
+    [ladder, viewController]
+  );
 
   useEffect(() => {
     const container = containerRef.current;
@@ -474,6 +486,9 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     screenToWorld,
     getClientCoords,
     viewController,
+    ladder,
+    getActiveLevel,
+    screenToLevelCell,
     GridGeometry,
     HexGeometry,
     distanceOverrides,
@@ -487,7 +502,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     onPanZoomStateChange: handlePanZoomStateChange
   } as MapStateContextValue), [mapData, mapId, notePath, geometry, currentTool, selectedColor,
     selectedObjectType, screenToGrid, screenToWorld, getClientCoords, viewController,
-    distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex,
+    ladder, getActiveLevel, screenToLevelCell, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex,
     handleDrawingStateChange, handlePanZoomStateChange]);
 
   const mapOperationsValue = useMemo(() => ({
@@ -509,6 +524,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
 
     // Callbacks
     onCellsChange,
+    onLevelCellsChange,
     onCurvesChange,
     onObjectsChange,
     onTextLabelsChange,
@@ -518,7 +534,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     onWallPathsChange,
     onTerrainStrokesChange,
     onMapDataUpdate
-  } as MapOperationsContextValue), [onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange, onMapDataUpdate]);
+  } as MapOperationsContextValue), [onCellsChange, onLevelCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange, onMapDataUpdate]);
 
   return (
     <EventHandlerProvider>

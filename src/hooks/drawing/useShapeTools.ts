@@ -23,11 +23,17 @@ import type {
 } from '#types/hooks/drawingTools.types';
 import type { Edge } from '#types/core/rendering.types';
 import type { MapStateContextValue } from '#types/contexts/context.types';
+import type { HandleLevelCellsChange } from '#types/hooks/dataHandlers.types';
+import type { GeometryLadder } from '../../geometry/core/createGeometryLadder';
 
 import { useCallback, useState } from 'preact/hooks';
 import { setCells, removeCellsInBounds } from '../../geometry/core/cellAccessor';
 import { generateEdgeLine, mergeEdges } from '../../drawing/edgeOperations';
 import { eraseRectangleFromCurves } from '../../geometry/curves/curveBoolean';
+import { Notice } from 'obsidian';
+import { authoredCells } from '../../persistence/layerAccessor';
+import { canBeginDepthAuthoring, guardDepthWrite } from '../../persistence/depthAuthoring';
+import { withCellsPainted, withCellsErased, depthRefusalMessage } from '../../drawing/depthCellOps';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 
 
@@ -64,6 +70,11 @@ interface UseShapeToolsOptions {
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
   removeObjectsInRectangle: (objects: MapObject[], x1: number, y1: number, x2: number, y2: number) => MapObject[];
+  /** Lattice ladder (null/absent on classic maps). Deep shapes need all four ladder options. */
+  ladder?: GeometryLadder | null;
+  getActiveLevel?: () => number;
+  screenToLevelCell?: MapStateContextValue['screenToLevelCell'];
+  onLevelCellsChange?: HandleLevelCellsChange;
 }
 
 interface UseShapeToolsResult {
@@ -73,9 +84,9 @@ interface UseShapeToolsResult {
   shapeHoverPosition: ShapeHoverPosition;
   touchConfirmPending: boolean;
   pendingEndPoint: PendingEndPoint | null;
-  fillRectangle: (x1: number, y1: number, x2: number, y2: number) => void;
-  fillCircle: (edgeX: number, edgeY: number, centerX: number, centerY: number) => void;
-  clearRectangle: (x1: number, y1: number, x2: number, y2: number) => void;
+  fillRectangle: (x1: number, y1: number, x2: number, y2: number, level?: number) => void;
+  fillCircle: (edgeX: number, edgeY: number, centerX: number, centerY: number, level?: number) => void;
+  clearRectangle: (x1: number, y1: number, x2: number, y2: number, level?: number) => void;
   fillEdgeLine: (x1: number, y1: number, x2: number, y2: number) => void;
   updateShapeHover: (gridX: number, gridY: number) => void;
   updateEdgeLineHover: (intX: number, intY: number) => void;
@@ -101,7 +112,8 @@ function useShapeTools({
   currentTool, selectedColor, selectedOpacity, edgeWidth = null, previewSettings,
   mapData, geometry, screenToWorld, getClientCoords,
   onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
-  removeObjectsInRectangle
+  removeObjectsInRectangle,
+  ladder = null, getActiveLevel, screenToLevelCell, onLevelCellsChange
 }: UseShapeToolsOptions): UseShapeToolsResult {
 
   const [rectangleStart, setRectangleStart] = useState<RectangleStart | null>(null);
@@ -111,7 +123,40 @@ function useShapeTools({
   const [touchConfirmPending, setTouchConfirmPending] = useState<boolean>(false);
   const [pendingEndPoint, setPendingEndPoint] = useState<PendingEndPoint | null>(null);
 
-  const fillRectangle = useCallback((x1: number, y1: number, x2: number, y2: number): void => {
+  // Rung for a NEW shape, read once at its first pointerdown. 0 whenever the
+  // map cannot take deep edits (flag off, classic map, quarantine).
+  const latchShapeLevel = (): number =>
+    (ladder !== null && getActiveLevel !== undefined && canBeginDepthAuthoring(mapData) ? getActiveLevel() : 0);
+
+  // Write rung `level` through the guarded deep handler (one undo entry). A
+  // refusal shows one notice and changes nothing.
+  const writeRung = useCallback((level: number, next: (cells: Cell[]) => Cell[]): void => {
+    if (!mapData || onLevelCellsChange === undefined) return;
+    const layer = getActiveLayer(mapData);
+    const current = authoredCells(layer, level);
+    const proposed = next(current);
+    if (proposed === current) return;
+    const refusal = guardDepthWrite(mapData, layer.id, level, proposed);
+    if (refusal !== null) {
+      new Notice(depthRefusalMessage(refusal));
+      return;
+    }
+    onLevelCellsChange(level, next, false);
+  }, [mapData, onLevelCellsChange]);
+
+  // Existing cells of a shape on rung `level`, from that rung's geometry.
+  const deepShapeCells = useCallback((level: number, cells: Point[]): Point[] =>
+    (ladder === null ? [] : cells.filter((c: Point) => ladder.existsAt(level, c.x, c.y))), [ladder]);
+
+  const fillRectangle = useCallback((x1: number, y1: number, x2: number, y2: number, level: number = 0): void => {
+    if (level > 0) {
+      if (ladder === null) return;
+      const coords = deepShapeCells(level, ladder.geometryForLevel(level).getCellsInRectangle(x1, y1, x2, y2));
+      const color = selectedColor;
+      const opacity = selectedOpacity;
+      writeRung(level, (cells: Cell[]) => withCellsPainted(cells, coords, color, opacity));
+      return;
+    }
     if (!mapData || !geometry) return;
 
     const activeLayer = getActiveLayer(mapData);
@@ -123,13 +168,21 @@ function useShapeTools({
     }));
     const newCells = setCells(activeLayer.cells, cellUpdates, geometry);
     onCellsChange(newCells);
-  }, [mapData, geometry, selectedColor, selectedOpacity, onCellsChange]);
+  }, [mapData, geometry, selectedColor, selectedOpacity, onCellsChange, ladder, deepShapeCells, writeRung]);
 
-  const fillCircle = useCallback((edgeX: number, edgeY: number, centerX: number, centerY: number): void => {
+  const fillCircle = useCallback((edgeX: number, edgeY: number, centerX: number, centerY: number, level: number = 0): void => {
+    const radius = Math.max(Math.abs(edgeX - centerX), Math.abs(edgeY - centerY));
+    if (level > 0) {
+      if (ladder === null) return;
+      const coords = deepShapeCells(level, ladder.geometryForLevel(level).getCellsInCircle(centerX, centerY, radius));
+      const color = selectedColor;
+      const opacity = selectedOpacity;
+      writeRung(level, (cells: Cell[]) => withCellsPainted(cells, coords, color, opacity));
+      return;
+    }
     if (!mapData || !geometry) return;
 
     const activeLayer = getActiveLayer(mapData);
-    const radius = Math.max(Math.abs(edgeX - centerX), Math.abs(edgeY - centerY));
     const cellsInCircle = geometry.getCellsInCircle(centerX, centerY, radius);
     const cellUpdates: CellUpdate[] = cellsInCircle.map((cellCoords: Point) => ({
       coords: cellCoords,
@@ -138,9 +191,17 @@ function useShapeTools({
     }));
     const newCells = setCells(activeLayer.cells, cellUpdates, geometry);
     onCellsChange(newCells);
-  }, [mapData, geometry, selectedColor, selectedOpacity, onCellsChange]);
+  }, [mapData, geometry, selectedColor, selectedOpacity, onCellsChange, ladder, deepShapeCells, writeRung]);
 
-  const clearRectangle = useCallback((x1: number, y1: number, x2: number, y2: number): void => {
+  const clearRectangle = useCallback((x1: number, y1: number, x2: number, y2: number, level: number = 0): void => {
+    // At depth the erase touches ONLY the rung's authored cells (design
+    // section 19 item 4): no objects, text, edges or curves, never layer.cells.
+    if (level > 0) {
+      if (ladder === null) return;
+      const coords = ladder.geometryForLevel(level).getCellsInRectangle(x1, y1, x2, y2);
+      writeRung(level, (cells: Cell[]) => withCellsErased(cells, coords));
+      return;
+    }
     if (!mapData || !geometry) return;
 
     const activeLayer = getActiveLayer(mapData);
@@ -184,7 +245,7 @@ function useShapeTools({
         onCurvesChange(newCurves);
       }
     }
-  }, [mapData, geometry, removeObjectsInRectangle, onObjectsChange, onTextLabelsChange, onCellsChange, onEdgesChange, onCurvesChange]);
+  }, [mapData, geometry, removeObjectsInRectangle, onObjectsChange, onTextLabelsChange, onCellsChange, onEdgesChange, onCurvesChange, ladder, writeRung]);
 
   const fillEdgeLine = useCallback((x1: number, y1: number, x2: number, y2: number): void => {
     if (!mapData) return;
@@ -210,6 +271,9 @@ function useShapeTools({
 
   const updateShapeHover = useCallback((gridX: number, gridY: number): void => {
     if (touchConfirmPending) return;
+    // The preview draws with the root geometry and receives root-level coords;
+    // a shape started on a deeper rung shows no drag preview (not threaded yet).
+    if ((rectangleStart?.level ?? 0) > 0 || (circleStart?.level ?? 0) > 0) return;
 
     const hasStart = (currentTool === 'circle' && circleStart != null) ||
                      ((currentTool === 'rectangle' || currentTool === 'clearArea') && rectangleStart != null) ||
@@ -263,13 +327,13 @@ function useShapeTools({
     if (!touchConfirmPending || !pendingEndPoint) return;
 
     if (currentTool === 'circle' && circleStart) {
-      fillCircle(pendingEndPoint.x, pendingEndPoint.y, circleStart.x, circleStart.y);
+      fillCircle(pendingEndPoint.x, pendingEndPoint.y, circleStart.x, circleStart.y, circleStart.level ?? 0);
       setCircleStart(null);
     } else if (currentTool === 'rectangle' && rectangleStart) {
-      fillRectangle(rectangleStart.x, rectangleStart.y, pendingEndPoint.x, pendingEndPoint.y);
+      fillRectangle(rectangleStart.x, rectangleStart.y, pendingEndPoint.x, pendingEndPoint.y, rectangleStart.level ?? 0);
       setRectangleStart(null);
     } else if (currentTool === 'clearArea' && rectangleStart) {
-      clearRectangle(rectangleStart.x, rectangleStart.y, pendingEndPoint.x, pendingEndPoint.y);
+      clearRectangle(rectangleStart.x, rectangleStart.y, pendingEndPoint.x, pendingEndPoint.y, rectangleStart.level ?? 0);
       setRectangleStart(null);
     } else if (currentTool === 'edgeLine' && edgeLineStart) {
       fillEdgeLine(edgeLineStart.x, edgeLineStart.y, pendingEndPoint.x, pendingEndPoint.y);
@@ -303,8 +367,21 @@ function useShapeTools({
     const touchPreviewEnabled = previewSettings.touchEnabled && isTouch;
 
     if (currentTool === 'rectangle' || currentTool === 'clearArea' || currentTool === 'circle') {
+      // Edit level: the stored start's rung, else latched now. At depth the
+      // caller's root-level cell is replaced by the latched rung's cell.
+      const activeStart = currentTool === 'circle' ? circleStart : rectangleStart;
+      const shapeLevel = activeStart != null ? (activeStart.level ?? 0) : latchShapeLevel();
+      let sx = gridX;
+      let sy = gridY;
+      if (shapeLevel > 0) {
+        const { clientX, clientY } = getClientCoords(e);
+        const deep = screenToLevelCell?.(clientX, clientY, shapeLevel) ?? null;
+        if (deep === null) return true;
+        sx = deep.x;
+        sy = deep.y;
+      }
       if (touchConfirmPending && pendingEndPoint) {
-        if (isPointInShapeBounds(gridX, gridY)) {
+        if (isPointInShapeBounds(sx, sy)) {
           confirmTouchShape();
         } else {
           cancelShapePreview();
@@ -314,29 +391,29 @@ function useShapeTools({
 
       if (currentTool === 'circle') {
         if (!circleStart) {
-          setCircleStart({ x: gridX, y: gridY });
+          setCircleStart({ x: sx, y: sy, level: shapeLevel });
           setShapeHoverPosition(null);
         } else if (touchPreviewEnabled) {
-          setPendingEndPoint({ x: gridX, y: gridY });
+          setPendingEndPoint({ x: sx, y: sy });
           setTouchConfirmPending(true);
-          setShapeHoverPosition({ x: gridX, y: gridY });
+          setShapeHoverPosition({ x: sx, y: sy });
         } else {
-          fillCircle(gridX, gridY, circleStart.x, circleStart.y);
+          fillCircle(sx, sy, circleStart.x, circleStart.y, shapeLevel);
           setCircleStart(null);
           setShapeHoverPosition(null);
         }
       } else if (!rectangleStart) {
-        setRectangleStart({ x: gridX, y: gridY });
+        setRectangleStart({ x: sx, y: sy, level: shapeLevel });
         setShapeHoverPosition(null);
       } else if (touchPreviewEnabled) {
-        setPendingEndPoint({ x: gridX, y: gridY });
+        setPendingEndPoint({ x: sx, y: sy });
         setTouchConfirmPending(true);
-        setShapeHoverPosition({ x: gridX, y: gridY });
+        setShapeHoverPosition({ x: sx, y: sy });
       } else {
         if (currentTool === 'rectangle') {
-          fillRectangle(rectangleStart.x, rectangleStart.y, gridX, gridY);
+          fillRectangle(rectangleStart.x, rectangleStart.y, sx, sy, shapeLevel);
         } else {
-          clearRectangle(rectangleStart.x, rectangleStart.y, gridX, gridY);
+          clearRectangle(rectangleStart.x, rectangleStart.y, sx, sy, shapeLevel);
         }
         setRectangleStart(null);
         setShapeHoverPosition(null);

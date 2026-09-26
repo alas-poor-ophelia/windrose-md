@@ -19,6 +19,8 @@ import type { TerrainStroke } from '../core/terrainstroke.types';
 import type { ToolId } from '../tools/tool.types';
 import type { ViewController } from '../hooks/viewController.types';
 import type { MapDistanceOverrides } from '../hooks/distanceMeasurement.types';
+import type { HandleLevelCellsChange } from '../hooks/dataHandlers.types';
+import type { GeometryLadder } from '../../src/geometry/core/createGeometryLadder';
 
 // ===========================================
 // Shared Helper Types
@@ -114,6 +116,16 @@ export interface MapStateContextValue {
   selectedObjectType?: string;
   /** Shared live pan/zoom controller — overlays subscribe to track gestures. */
   viewController?: ViewController;
+  /** Lattice ladder for this map; null on every classic (non-ladder) path. */
+  ladder: GeometryLadder | null;
+  /**
+   * The camera's ladder rung, read from the LIVE zoom at call time (a function,
+   * not a value: design section 4.1). 0 when there is no ladder. Tools latch it
+   * at pointerdown; nothing should read it per render.
+   */
+  getActiveLevel: () => number;
+  /** Cell under the pointer on ladder rung `level`; level 0 equals screenToGrid. */
+  screenToLevelCell: (clientX: number, clientY: number, level: number) => Point | null;
   /**
    * Resolved distance overrides for the active map. Sub-hex-aware: inside a
    * sub-hex these are live-derived from the parent chain. Null/undefined means
@@ -166,6 +178,8 @@ export interface MapStateContextValue {
 export interface MapOperationsContextValue {
   // Cell operations
   onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
+  /** Deep (ladder rung >= 1) cell write on the active layer; absent on hosts without depth authoring. */
+  onLevelCellsChange?: HandleLevelCellsChange;
   onCurvesChange: (curves: Curve[], skipHistory?: boolean) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
 

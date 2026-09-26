@@ -86,7 +86,7 @@ const TilePlacementLayer = ({
   tileDepth,
   onTilesChange
 }: TilePlacementLayerProps): VNode | null => {
-  const { mapData, geometry, screenToGrid, screenToWorld } = useMapState();
+  const { mapData, geometry, screenToGrid, screenToWorld, getActiveLevel } = useMapState();
   const app = useApp();
 
   const isTileTool = currentTool === 'tilePaint';
@@ -112,6 +112,9 @@ const TilePlacementLayer = ({
   const strokeTilesRef = useRef<TileAssignment[] | null>(null);
   const lastGridPosRef = useRef<{ col: number; row: number } | null>(null);
   const scatterLastDropRef = useRef<{ x: number; y: number } | null>(null);
+  // Tiles are root-level only in phase 3c (design section 19 item 10): one
+  // notice per visit to a deeper rung, re-armed by a root-level pointerdown.
+  const depthNoticeShownRef = useRef(false);
 
   const placeTilesInBrush = useCallback((col: number, row: number) => {
     if (!mapData || selectedTilesetId == null || selectedTilesetId === '' || selectedTileId == null || selectedTileId === '') return;
@@ -368,6 +371,16 @@ const TilePlacementLayer = ({
     // the 'line'/'brush' subtool no-ops below).
     if (isOpeningAsset) return;
 
+    // Zoomed onto a ladder rung: no tile placement or erase (0 on classic maps).
+    if (getActiveLevel() > 0) {
+      if (!depthNoticeShownRef.current) {
+        depthNoticeShownRef.current = true;
+        new Notice('Tiles can only be placed at the root level for now.');
+      }
+      return;
+    }
+    depthNoticeShownRef.current = false;
+
     const coords = screenToGrid(e.clientX, e.clientY);
     if (!coords) return;
 
@@ -424,7 +437,7 @@ const TilePlacementLayer = ({
     } else {
       eraseTilesInBrush(coords.x, coords.y);
     }
-  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, isOpeningAsset, activeSubtool, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, scatterAdvance, floodFillAtCell, mapData]);
+  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, isOpeningAsset, activeSubtool, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, scatterAdvance, floodFillAtCell, mapData, getActiveLevel]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     // Only the paint/erase grid stroke sets isDraggingRef; the click-only

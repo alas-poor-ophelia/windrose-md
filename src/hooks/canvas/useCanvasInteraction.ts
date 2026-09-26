@@ -23,11 +23,13 @@ import type {
 } from '#types/hooks/canvasInteraction.types';
 import type { ViewController } from '#types/hooks/viewController.types';
 import type { SubHexCoordDetail, SubHexExitDetail } from '../../core/windroseEvents';
+import type { GeometryLadder } from '../../geometry/core/createGeometryLadder';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULTS } from '../../core/dmtConstants';
 import { getApp } from '../../core/settingsAccessor';
 import { getMaxZoom, isLadderView } from '../../core/lodFlags';
+import { levelCellAtWorld } from '../../drawing/depthCellOps';
 import { captureSubHexBackdrop } from '../../core/subHexBackdropStore';
 import { prewarmMapAssets } from '../state/useImagePreloading';
 import { traceZoom } from '../../utils/zoomTraceProbe';
@@ -149,7 +151,10 @@ function useCanvasInteraction(
   // map obeyed). Absent on the coordinate-utility instantiation in MapCanvas
   // when unwired — seamless transitions simply don't fire there.
   requestEnterSubHex?: (detail: SubHexCoordDetail) => void,
-  requestExitSubHex?: (detail: SubHexExitDetail | null) => void
+  requestExitSubHex?: (detail: SubHexExitDetail | null) => void,
+  // Lattice ladder (null on every classic path). Only screenToLevelCell reads
+  // it; screenToGrid stays level 0 (design section 19 item 5).
+  ladder: GeometryLadder | null = null
 ): UseCanvasInteractionResult {
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [isTouchPanning, setIsTouchPanning] = useState<boolean>(false);
@@ -366,7 +371,9 @@ function useCanvasInteraction(
     return Math.sqrt(dx * dx + dy * dy);
   };
 
-  const screenToGrid = (clientX: number, clientY: number): Point | null => {
+  // The canvas-to-world affine shared by screenToGrid and screenToLevelCell.
+  // Its only level dependence is the final worldToGrid (design section 4.1).
+  const screenToGridWorld = (clientX: number, clientY: number): WorldCoords | null => {
     if (!mapData) return null;
     if (!geometry) return null;
     if (!canvasRef.current) return null;
@@ -413,7 +420,21 @@ function useCanvasInteraction(
     const worldX = (x - offsetX) / zoom;
     const worldY = (y - offsetY) / zoom;
 
-    return geometry.worldToGrid(worldX, worldY);
+    return { worldX, worldY };
+  };
+
+  const screenToGrid = (clientX: number, clientY: number): Point | null => {
+    const world = screenToGridWorld(clientX, clientY);
+    if (world === null || !geometry) return null;
+    return geometry.worldToGrid(world.worldX, world.worldY);
+  };
+
+  // Cell under the pointer on ladder rung `level`. Level 0 (or no ladder) is
+  // exactly screenToGrid; deeper rungs swap only the final worldToGrid.
+  const screenToLevelCell = (clientX: number, clientY: number, level: number): Point | null => {
+    const world = screenToGridWorld(clientX, clientY);
+    if (world === null || !geometry) return null;
+    return levelCellAtWorld(ladder, geometry, level, world.worldX, world.worldY);
   };
 
   const screenToWorld = (clientX: number, clientY: number): WorldCoords | null => {
@@ -1100,6 +1121,7 @@ function useCanvasInteraction(
     getTouchCenter,
     getTouchDistance,
     screenToGrid,
+    screenToLevelCell,
     screenToWorld,
 
     handleWheel,

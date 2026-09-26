@@ -32,11 +32,20 @@ export interface ShapeStart {
   y: number;
 }
 
-/** Alias for rectangle start point */
-export type RectangleStart = ShapeStart;
+/**
+ * Ladder rung a rectangle/circle was started on, latched at the first
+ * pointerdown (design section 19 item 5). Absent or 0 means the root level;
+ * a start at level >= 1 holds that rung's cell coordinates.
+ */
+interface ShapeLevel {
+  level?: number;
+}
 
-/** Alias for circle start point (center) */
-export type CircleStart = ShapeStart;
+/** Rectangle start point (+ latched ladder rung) */
+export type RectangleStart = ShapeStart & ShapeLevel;
+
+/** Circle start point (center, + latched ladder rung) */
+export type CircleStart = ShapeStart & ShapeLevel;
 
 /** Start point for edge line tool */
 export type EdgeLineStart = ShapeStart;

@@ -326,4 +326,93 @@ describe("materialiseLevelLayer", () => {
       expect(resident.stats.missReason).toBe("hit");
     });
   });
+
+  describe("rung overlay (D3/D4)", () => {
+    const AUTHORED = "#abcdef";
+    const DEEP = "#fedcba";
+
+    function withLevels(fixture: Fixture, levels: Record<number, Cell[]>): MapLayer {
+      return { ...fixture.layer, levels };
+    }
+
+    function colourAt(layer: MapLayer, q: number, r: number): string | undefined {
+      return asHexCells(layer.cells).find(c => c.q === q && c.r === r)?.color;
+    }
+
+    it("an authored rung cell replaces the inherited fill at its (q,r) and nowhere else", () => {
+      const fixture = makeFixture("overlay", new HexGeometry(HEX_SIZE, "flat", { maxCol: 6, maxRow: 5 }));
+      const rect = rectAroundRootCell(fixture, fixture.anchor.q, fixture.anchor.r);
+      const child = centreChild(fixture, 1, fixture.anchor.q, fixture.anchor.r);
+      const plain = materialiseLevelLayer(fixture.layer, fixture.ladder, 1, rect, 1).layer;
+      expect(colourAt(plain, child.q, child.r)).toBe(fixture.anchor.color);
+
+      const layer = withLevels(fixture, { 1: [{ q: child.q, r: child.r, color: AUTHORED }] });
+      const out = materialiseLevelLayer(layer, fixture.ladder, 1, rect, 1).layer;
+      expect(colourAt(out, child.q, child.r)).toBe(AUTHORED);
+      expect(out.cells.length).toBe(plain.cells.length);
+      const changed = asHexCells(out.cells).filter(c => c.color !== colourAt(plain, c.q, c.r));
+      expect(changed).toEqual([{ q: child.q, r: child.r, color: AUTHORED }]);
+    });
+
+    it("an authored rung cell draws even when its root ancestor has no fill", () => {
+      const fixture = makeFixture("overlay-blank", new HexGeometry(HEX_SIZE, "flat", { maxCol: 6, maxRow: 5 }));
+      const rect = rectAroundRootCell(fixture, fixture.blank.q, fixture.blank.r);
+      const child = centreChild(fixture, 1, fixture.blank.q, fixture.blank.r);
+      expect(colourAt(materialiseLevelLayer(fixture.layer, fixture.ladder, 1, rect, 1).layer, child.q, child.r)).toBeUndefined();
+
+      const layer = withLevels(fixture, { 1: [{ q: child.q, r: child.r, color: AUTHORED }] });
+      expect(colourAt(materialiseLevelLayer(layer, fixture.ladder, 1, rect, 1).layer, child.q, child.r)).toBe(AUTHORED);
+    });
+
+    it("a deeper rung is not drawn at a coarser active level, and is drawn at its own", () => {
+      const fixture = makeFixture("overlay-deep", new HexGeometry(HEX_SIZE, "pointy", { maxCol: 6, maxRow: 5 }));
+      const rect = rectAroundRootCell(fixture, fixture.anchor.q, fixture.anchor.r);
+      const deep = centreChild(fixture, 2, fixture.anchor.q, fixture.anchor.r);
+      const layer = withLevels(fixture, { 2: [{ q: deep.q, r: deep.r, color: DEEP }] });
+
+      const atOne = materialiseLevelLayer(layer, fixture.ladder, 1, rect, 1).layer;
+      expect(asHexCells(atOne.cells).some(c => c.color === DEEP)).toBe(false);
+      expect(atOne.cells).toEqual(materialiseLevelLayer(fixture.layer, fixture.ladder, 1, rect, 1).layer.cells);
+
+      const atTwo = materialiseLevelLayer(layer, fixture.ladder, 2, rect, 1).layer;
+      expect(colourAt(atTwo, deep.q, deep.r)).toBe(DEEP);
+    });
+
+    it("an intermediate rung's fill is inherited by the finer rung below it", () => {
+      const fixture = makeFixture("overlay-mid", new HexGeometry(HEX_SIZE, "flat", { maxCol: 6, maxRow: 5 }));
+      const rect = rectAroundRootCell(fixture, fixture.anchor.q, fixture.anchor.r);
+      const mid = centreChild(fixture, 1, fixture.anchor.q, fixture.anchor.r);
+      const fine = centreChild(fixture, 2, fixture.anchor.q, fixture.anchor.r);
+      const layer = withLevels(fixture, { 1: [{ q: mid.q, r: mid.r, color: AUTHORED }] });
+      expect(colourAt(materialiseLevelLayer(layer, fixture.ladder, 2, rect, 1).layer, fine.q, fine.r)).toBe(AUTHORED);
+    });
+
+    it("memo: a new rung array misses, the same rung array hits, an empty levels record keys like none", () => {
+      const fixture = makeFixture("overlay-memo", new HexGeometry(HEX_SIZE, "flat", { maxCol: 6, maxRow: 5 }));
+      const rect = rectAroundRootCell(fixture, fixture.anchor.q, fixture.anchor.r);
+      const child = centreChild(fixture, 1, fixture.anchor.q, fixture.anchor.r);
+      const rung: Cell[] = [{ q: child.q, r: child.r, color: AUTHORED }];
+
+      const classic = materialiseLevelLayer(fixture.layer, fixture.ladder, 1, rect, 1);
+      expect(classic.stats.missReason).toBe("no-entry");
+      // No rung content: same key as the classic layer, so the classic entry answers.
+      const emptyLevels = materialiseLevelLayer(withLevels(fixture, {}), fixture.ladder, 1, rect, 1);
+      expect(emptyLevels.stats.missReason).toBe("hit");
+
+      const first = materialiseLevelLayer(withLevels(fixture, { 1: rung }), fixture.ladder, 1, rect, 1);
+      expect(first.stats.missReason).toBe("key-changed");
+      expect(colourAt(first.layer, child.q, child.r)).toBe(AUTHORED);
+
+      // A re-spread layer holding the SAME rung array hits.
+      const same = materialiseLevelLayer(withLevels(fixture, { 1: rung }), fixture.ladder, 1, rect, 1);
+      expect(same.stats.missReason).toBe("hit");
+      expect(same.layer).toBe(first.layer);
+
+      // A deep edit replaces the rung array but not layer.cells: must miss, and see the edit.
+      const edited: Cell[] = [{ q: child.q, r: child.r, color: DEEP }];
+      const after = materialiseLevelLayer(withLevels(fixture, { 1: edited }), fixture.ladder, 1, rect, 1);
+      expect(after.stats.missReason).toBe("key-changed");
+      expect(colourAt(after.layer, child.q, child.r)).toBe(DEEP);
+    });
+  });
 });

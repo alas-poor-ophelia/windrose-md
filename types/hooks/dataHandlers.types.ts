@@ -16,6 +16,7 @@ import type { HexColor } from '../core/common.types';
 import type { Edge } from '../core/rendering.types';
 import type { TileAssignment } from '../tiles/tile.types';
 import type { MapDataUpdater } from '../hooks/mapData.types';
+import type { DepthWriteResult } from '../../src/persistence/depthAuthoring';
 import type { LayerHistorySnapshot } from '../hooks/layerHistory.types';
 
 // ===========================================
@@ -97,6 +98,12 @@ export type HandleRegionsChange = (regions: Region[]) => void;
 // ===========================================
 
 /** Layer data handlers group */
+/**
+ * Deep (ladder rung >= 1) cell write on the active layer. `update` maps the
+ * rung's current cells to its next content; refused writes change nothing.
+ */
+export type HandleLevelCellsChange = (level: number, update: (current: Cell[]) => Cell[], suppressHistory?: boolean) => DepthWriteResult | null;
+
 export interface LayerDataHandlers {
   handleCellsChange: HandleCellsChange;
   handleCurvesChange: HandleCurvesChange;
@@ -139,6 +146,8 @@ export interface UseDataHandlersResult {
 
   // Direct access
   handleNameChange: HandleNameChange;
+  /** Rewrite one ladder rung (level >= 1) of the active layer through writeDepthCells. */
+  handleLevelCellsChange: HandleLevelCellsChange;
   handleCellsChange: HandleCellsChange;
   handleCurvesChange: HandleCurvesChange;
   handleObjectsChange: HandleObjectsChange;

@@ -910,6 +910,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const {
     handleNameChange,
     handleCellsChange,
+    handleLevelCellsChange,
     handleCurvesChange,
     handleObjectsChange,
     handleTextLabelsChange,
@@ -1127,7 +1128,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     currentTool, selectedColor, selectedOpacity,
     canUndo, canRedo, saveStatus, isExpanded,
     setCurrentTool, setSelectedColor, handleOpacityChange,
-    handleCellsChange, wrappedHandleUndo, handleRedo, handleLayerSelect, forceSave,
+    handleCellsChange, handleLevelCellsChange, wrappedHandleUndo, handleRedo, handleLayerSelect, forceSave,
     handleViewStateChange, availableTilesets, handleTileSelect, setSelectedTileForm,
     handleTilesChange, handleObjectsChange, selectPane, setTileBrowserCollapsed,
     setRailOpenId, getCachedImage,
@@ -1439,6 +1440,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               notePath={notePath}
               mapData={renderMapData ?? mapData}
               onCellsChange={handleCellsChange}
+              onLevelCellsChange={handleLevelCellsChange}
               onCurvesChange={handleCurvesChange}
               onObjectsChange={handleObjectsChange}
               onTextLabelsChange={handleTextLabelsChange}

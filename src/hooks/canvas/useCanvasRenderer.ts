@@ -183,6 +183,9 @@ const SURFACE_BYTES_PER_PX = 4;
  * when the ladder IDENTITY changes (a new map on the same canvas).
  */
 const latticeClipCaches = new WeakMap<HTMLCanvasElement, { ladder: GeometryLadder; cache: LatticeClipCache }>();
+/** Phase recorder for one-shot ladder canvases: their timings must not pollute the live telemetry. */
+const ignorePhase: typeof recordPhase = () => undefined;
+
 /** Last active level painted per canvas, for the crossing flag in telemetry. */
 const lastLadderLevels = new WeakMap<HTMLCanvasElement, number>();
 /**
@@ -574,13 +577,15 @@ function renderLayerCellsAndEdges(
 }
 
 const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, selectedItems = [], options = {}) => {
-  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null, adjacentEmptySlots = null, hiddenTileLayers = undefined, draggingWallId = null, subHexPath = null, liveViewState = null, exportLayers = null, ladder = null } = options;
+  const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null, adjacentEmptySlots = null, hiddenTileLayers = undefined, draggingWallId = null, subHexPath = null, liveViewState = null, exportLayers = null, ladder = null, level: levelOverride = undefined, bypassSurfaceCache = false } = options;
   if (canvas == null) return;
 
   // Every ladder branch in this function is guarded by `ladder !== null`, which is
-  // null for classic maps, hover previews and image export — those paths are
-  // byte-identical to the shipped renderer.
-  const ladderOn = ladder !== null;
+  // null for classic maps and for previews/export of maps with no authored rung —
+  // those paths are byte-identical to the shipped renderer. A one-shot canvas that
+  // does carry a ladder also sets `bypassSurfaceCache`, which keeps it out of the
+  // surface cache, the budget's active slot and the live telemetry.
+  const ladderOn = ladder !== null && !bypassSurfaceCache;
   const frameStart = ladderOn ? performance.now() : 0;
 
   // Normalize selectedItems to array (backward compatibility)
@@ -625,12 +630,13 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
   // Lattice ladder: which rung this zoom paints. `level` stays 0 on every classic
   // path, which is the level the static cache has always used.
-  const level = ladder !== null ? ladder.activeLevel(zoom) : 0;
-  const crossing = ladder !== null && lastLadderLevels.get(canvas) !== level;
-  if (ladder !== null) {
+  // An explicit `level` (export, previews) overrides the zoom's rung.
+  const level = ladder !== null ? (levelOverride ?? ladder.activeLevel(zoom)) : 0;
+  const crossing = ladderOn && lastLadderLevels.get(canvas) !== level;
+  if (ladderOn) {
     lastLadderLevels.set(canvas, level);
     // Only a real map canvas ever claims the surface budget's active slot;
-    // previews and export never pass a ladder, so they never displace it.
+    // previews and export bypass the cache, so they never displace it.
     setActiveCanvas(canvas);
   }
 
@@ -1168,6 +1174,11 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     geometry, hiddenTileLayers, adjacentSubHexes, showCoordinates,
     width, height, draggingWallId,
     JSON.stringify(THEME), JSON.stringify(visibility),
+    // The levels-aware term (design 06 s18/s19 item 10) is `mapData.layers` above:
+    // `setLevelCells`, the one writer of rungs >= 1, returns a new mapData whose
+    // `layers` array is a new array holding the re-spread layer, so a deep write
+    // always changes this identity and the baked surface re-bakes. Its no-op
+    // returns the same mapData, which correctly keeps the surface.
     // The ladder by IDENTITY only. Deliberately NOT the level or an epoch: the key
     // is compared against the DRIFT SOURCE's key at a crossing, so a per-level term
     // would miss on every crossing and force the synchronous bake D17 forbids.
@@ -1177,7 +1188,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
   // A bake is the one part of a frame worth attributing separately, and it happens
   // inside the draw callback — both the first bake of a level and the settle bake.
-  const staticDraw: DrawStaticFn = ladder === null
+  const staticDraw: DrawStaticFn = !ladderOn
     ? drawStaticContent
     : (tctx, ox, oy, w, h): void => {
         const bakeStart = performance.now();
@@ -1185,10 +1196,11 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
         recordRebuild(performance.now() - bakeStart);
       };
 
-  if (((northDirection ?? 0) % 360) !== 0) {
+  if (((northDirection ?? 0) % 360) !== 0 || (ladder !== null && bypassSurfaceCache)) {
     // Rotated maps draw under a canvas rotation transform whose interaction
     // with the cached snapshot isn't worth the complexity — draw directly.
     // A rotated map never gets a ladder, so this branch needs no level.
+    // A one-shot ladder canvas (preview, export) draws directly too: no surface.
     drawStaticContent(ctx, offsetX, offsetY, width, height);
   } else {
     const blitStart = ladderOn ? performance.now() : 0;
@@ -1201,7 +1213,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // is skipped at every level under the flag. `visibility.grid` still hides it —
   // it is the same user-facing grid, drawn a different way.
   if (ladder !== null && visibility.grid !== false) {
-    const latticeStart = performance.now();
+    const latticeStart = ladderOn ? performance.now() : 0;
     drawLadderLattice(
       ctx,
       ladder,
@@ -1210,10 +1222,10 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       LADDER_EPOCH,
       clipCacheFor(canvas, ladder),
       { active: THEME.grid.lines, district: THEME.grid.lines },
-      recordPhase,
+      ladderOn ? recordPhase : ignorePhase,
       crossing
     );
-    recordPhase('lattice', performance.now() - latticeStart);
+    if (ladderOn) recordPhase('lattice', performance.now() - latticeStart);
   }
 
   // =========================================================================

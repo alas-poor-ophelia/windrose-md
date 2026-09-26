@@ -29,8 +29,9 @@ import type {
 import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 
 import { useCallback, useMemo } from 'preact/hooks';
-import { getActiveLayer, updateActiveLayer, promoteToStrata, getActiveBoardLayers, setActiveLayer } from '../../persistence/layerAccessor';
+import { getActiveLayer, updateActiveLayer, promoteToStrata, getActiveBoardLayers, setActiveLayer, authoredCells } from '../../persistence/layerAccessor';
 import { snapshotLevelsOf } from './layerHistoryOps';
+import { writeDepthCells, type DepthWriteResult } from '../../persistence/depthAuthoring';
 
 
 /**
@@ -103,6 +104,46 @@ function useDataHandlers({
       });
     };
   }, [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot]);
+
+  // =========================================================================
+  // Ladder rung handler (level >= 1)
+  // =========================================================================
+
+  // The level-aware sibling of createLayerDataHandler: `update` maps the active
+  // layer's CURRENT rung to its next content inside the functional updater, and
+  // the write goes through writeDepthCells (the only sanctioned deep writer; it
+  // refuses over budget and stamps `lod` on the first deep write). A refusal
+  // leaves the map untouched and records nothing. The history snapshot is taken
+  // from the WRITTEN layer so it carries the whole new `levels` record, plus the
+  // UI-only `level` (design section 19 item 10: undo restores the record).
+  const handleLevelCellsChange = useCallback(
+    (level: number, update: (current: Cell[]) => Cell[], suppressHistory = false): DepthWriteResult | null => {
+      if (isApplyingHistory()) return null;
+
+      // Preact applies a functional update synchronously inside the setter, so
+      // the guard's verdict against the LIVE map can be handed back to the
+      // caller. Callers must report this, never a pre-check against their own
+      // (possibly stale) snapshot (review finding, phase 3c).
+      let outcome: DepthWriteResult | null = null;
+      updateMapData((currentMapData) => {
+        if (currentMapData == null) return currentMapData;
+
+        const layer = getActiveLayer(currentMapData);
+        const result = writeDepthCells(currentMapData, layer.id, level, update(authoredCells(layer, level)));
+        outcome = result;
+        if (!result.ok) return currentMapData;
+
+        if (!suppressHistory) {
+          const written = getActiveLayer(result.mapData);
+          addToHistory(buildLayerHistorySnapshot(written, result.mapData.name ?? '', { ...snapshotLevelsOf(written), level }, result.mapData.regions ?? [], result.mapData.outlines ?? [], result.mapData.shapeOverlays ?? [], written.fogOfWar, result.mapData.partyPins ?? [], result.mapData.savedRoutes ?? []));
+        }
+
+        return result.mapData;
+      });
+      return outcome;
+    },
+    [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot]
+  );
 
   // =========================================================================
   // Layer Data Handlers (using factory)
@@ -428,6 +469,7 @@ function useDataHandlers({
     // Direct access
     handleNameChange,
     handleCellsChange,
+    handleLevelCellsChange,
     handleCurvesChange,
     handleObjectsChange,
     handleTextLabelsChange,
