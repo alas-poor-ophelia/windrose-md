@@ -26,6 +26,7 @@ import type {
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useHistory } from './useHistory';
 import { getActiveLayer, getLayerById, updateActiveLayer, updateLayer, addLayer, cloneLayer, removeLayer, reorderLayers, setActiveLayer } from '../../persistence/layerAccessor';
+import { snapshotLevelsOf, restoreSnapshotLevels, layerHistorySnapshotsEqual } from './layerHistoryOps';
 
 
 /**
@@ -67,7 +68,7 @@ function useLayerHistory({
     resetHistory,
     getHistoryState,
     restoreHistoryState
-  } = useHistory<LayerHistorySnapshot>(initialSnapshot);
+  } = useHistory<LayerHistorySnapshot>(initialSnapshot, layerHistorySnapshotsEqual);
 
   // =========================================================================
   // Refs for History Management
@@ -105,15 +106,25 @@ function useLayerHistory({
         shapeOverlays: mapData.shapeOverlays ?? [],
         fogOfWar: activeLayer.fogOfWar,
         partyPins: mapData.partyPins ?? [],
-        savedRoutes: mapData.savedRoutes ?? []
+        savedRoutes: mapData.savedRoutes ?? [],
+        ...snapshotLevelsOf(activeLayer)
       });
       historyInitialized.current = true;
     }
   }, [mapData, isLoading, resetHistory]);
 
+  // A map that IS a ladder (it carries `lod`) has no sub-hex navigation: a
+  // level change is a camera move, so the reset below must never fire on one
+  // (design 06 s5). The test is the map's own `lod`, NOT the capability flag:
+  // a flag-on install still navigates legacy sub-hex maps, and their history
+  // must keep resetting per level (review finding, phase 3b). Read through a
+  // ref so the effect stays keyed on navigationVersion alone.
+  const isLadderMapRef = useRef<boolean>(false);
+  isLadderMapRef.current = mapData?.lod !== undefined;
+
   // Reset history when sub-hex navigation changes level
   useEffect(() => {
-    if (navigationVersion > 0) {
+    if (navigationVersion > 0 && !isLadderMapRef.current) {
       layerHistoryCache.current = {};
       historyInitialized.current = false;
     }
@@ -142,7 +153,8 @@ function useLayerHistory({
       regions: regions,
       outlines: outlines,
       partyPins: partyPins,
-      savedRoutes: savedRoutes
+      savedRoutes: savedRoutes,
+      ...snapshotLevelsOf(layer)
     }),
     []
   );
@@ -338,7 +350,8 @@ function useLayerHistory({
           fogOfWar: previousState.fogOfWar !== undefined ? previousState.fogOfWar : undefined
         }
       );
-      updateMapData(newMapData);
+      // Whole `levels` record back (or stripped); `level` never selects the rung.
+      updateMapData(restoreSnapshotLevels(newMapData, previousState));
       // Use setTimeout to ensure state update completes before re-enabling history
       window.setTimeout(() => {
         isApplyingHistoryRef.current = false;
@@ -365,7 +378,8 @@ function useLayerHistory({
           fogOfWar: nextState.fogOfWar !== undefined ? nextState.fogOfWar : undefined
         }
       );
-      updateMapData(newMapData);
+      // Whole `levels` record back (or stripped); `level` never selects the rung.
+      updateMapData(restoreSnapshotLevels(newMapData, nextState));
       // Use setTimeout to ensure state update completes before re-enabling history
       window.setTimeout(() => {
         isApplyingHistoryRef.current = false;

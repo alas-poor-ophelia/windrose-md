@@ -30,6 +30,7 @@ import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 
 import { useCallback, useMemo } from 'preact/hooks';
 import { getActiveLayer, updateActiveLayer, promoteToStrata, getActiveBoardLayers, setActiveLayer } from '../../persistence/layerAccessor';
+import { snapshotLevelsOf } from './layerHistoryOps';
 
 
 /**
@@ -71,7 +72,11 @@ function useDataHandlers({
     shapeOverlays: overrides.shapeOverlays ?? shapeOverlays,
     fogOfWar: overrides.fogOfWar ?? fogOfWar,
     partyPins: overrides.partyPins ?? partyPins,
-    savedRoutes: overrides.savedRoutes ?? savedRoutes
+    savedRoutes: overrides.savedRoutes ?? savedRoutes,
+    // Ladder rungs by reference, only when present (an override that names
+    // `levels` wins, including one that removes them); `level` is UI-only.
+    ...snapshotLevelsOf('levels' in overrides ? overrides : layer),
+    ...(overrides.level !== undefined ? { level: overrides.level } : {})
   }), []);
 
   // =========================================================================

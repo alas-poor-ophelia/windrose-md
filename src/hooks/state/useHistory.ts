@@ -18,14 +18,22 @@ import { useCallback, useState } from 'preact/hooks';
 import { DEFAULTS } from '../../core/dmtConstants';
 
 
+/** Default dedupe rule: structural equality via JSON.stringify. */
+function stringifyEqual<T>(a: T, b: T): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 /**
  * Hook for managing undo/redo history of any state type.
  *
  * @template T - The type of state being tracked
  * @param initialState - Initial state to start history with
+ * @param isEqual - Optional dedupe comparator (a new state equal to the current
+ *   one is not recorded). Defaults to JSON.stringify equality. Must be a stable
+ *   reference (module-level function).
  * @returns History management interface
  */
-function useHistory<T>(initialState: T): UseHistoryResult<T> {
+function useHistory<T>(initialState: T, isEqual: (a: T, b: T) => boolean = stringifyEqual): UseHistoryResult<T> {
   // Combine history and index into single state for better synchronization
   const [historyState, setHistoryState] = useState<HistoryState<T>>({
     history: [initialState],
@@ -37,7 +45,7 @@ function useHistory<T>(initialState: T): UseHistoryResult<T> {
     setHistoryState((prev: HistoryState<T>) => {
       // Skip if identical to current state
       const currentState = prev.history[prev.currentIndex];
-      if (JSON.stringify(newState) === JSON.stringify(currentState)) {
+      if (isEqual(newState, currentState)) {
         return prev;
       }
 
@@ -59,7 +67,7 @@ function useHistory<T>(initialState: T): UseHistoryResult<T> {
         currentIndex: newIndex
       };
     });
-  }, []);
+  }, [isEqual]);
 
   // Undo to previous state
   const undo = useCallback((): T | null => {

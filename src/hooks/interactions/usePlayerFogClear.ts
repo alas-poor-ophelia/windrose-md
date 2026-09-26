@@ -7,6 +7,7 @@ import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import type { PlayerFogClearDetail } from '../../core/windroseEvents';
 import { isForeignInstanceEvent } from '../../core/windroseEvents';
+import { snapshotLevelsOf } from '../state/layerHistoryOps';
 
 interface UsePlayerFogClearOptions {
   geometry: ExtendedGeometry | null;
@@ -82,7 +83,8 @@ function usePlayerFogClear({
           regions: current.regions ?? [],
           outlines: current.outlines ?? [],
           shapeOverlays: current.shapeOverlays ?? [],
-          fogOfWar: newFog
+          fogOfWar: newFog,
+          ...snapshotLevelsOf(activeLayer)
         });
 
         const layers = current.layers.map(l =>
