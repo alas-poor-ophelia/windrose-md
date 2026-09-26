@@ -1,0 +1,76 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { MapData } from '#types/core/map.types';
+
+const getSettings = vi.fn(() => ({} as Record<string, unknown>));
+vi.mock('../../../src/core/settingsAccessor', () => ({ getSettings }));
+
+const { createNewMap } = await import('../../../src/persistence/fileOperations');
+const { authoredCells } = await import('../../../src/persistence/layerAccessor');
+const {
+  canBeginDepthAuthoring, withLod, guardDepthWrite, writeDepthCells, MAX_CELLS_PER_DEPTH_OP, DEPTH_BUDGET_BYTES,
+} = await import('../../../src/persistence/depthAuthoring');
+
+function hexMap(): MapData {
+  return createNewMap('Depth', 'hex');
+}
+
+describe('depthAuthoring', () => {
+  beforeEach(() => { getSettings.mockReset(); getSettings.mockReturnValue({ lodLadder: true }); });
+
+  it('refuses every deep write while the capability is off', () => {
+    getSettings.mockReturnValue({});
+    const m = hexMap();
+    expect(canBeginDepthAuthoring(m)).toBe(false);
+    const r = writeDepthCells(m, m.layers[0].id, 1, [{ q: 4, r: 0, color: '#123456' }]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('not-a-ladder');
+    expect(r.mapData).toBe(m);
+  });
+
+  it('the first deep write stamps lod from the defaults in the same update', () => {
+    const m = hexMap();
+    expect(m.lod).toBeUndefined();
+    const r = writeDepthCells(m, m.layers[0].id, 1, [{ q: 4, r: 0, color: '#123456' }]);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.mapData.lod).toEqual({ m: 4, minCellPx: 64, maxLevel: 3 });
+      expect(authoredCells(r.mapData.layers[0], 1)).toHaveLength(1);
+    }
+    expect(withLod(r.mapData)).toBe(r.mapData);
+  });
+
+  it('refuses a level above maxLevel or below 1', () => {
+    const m = hexMap();
+    expect(guardDepthWrite(m, m.layers[0].id, 0, [])).toBe('level-out-of-range');
+    expect(guardDepthWrite(m, m.layers[0].id, 4, [])).toBe('level-out-of-range');
+    expect(guardDepthWrite(m, m.layers[0].id, 3, [])).toBeNull();
+  });
+
+  it('refuses a single operation adding more than the per-op cap', () => {
+    const m = hexMap();
+    const many = Array.from({ length: MAX_CELLS_PER_DEPTH_OP + 1 }, (_, i) => ({ q: i, r: 0, color: '#abcdef' }));
+    expect(guardDepthWrite(m, m.layers[0].id, 1, many)).toBe('too-many-cells');
+    expect(guardDepthWrite(m, m.layers[0].id, 1, many.slice(0, MAX_CELLS_PER_DEPTH_OP))).toBeNull();
+  });
+
+  it('refuses a write that would cross the byte budget, and a shrinking write never does', () => {
+    const m = hexMap();
+    const padded: MapData = { ...m, name: 'x'.repeat(DEPTH_BUDGET_BYTES - 500) };
+    expect(guardDepthWrite(padded, m.layers[0].id, 1, Array.from({ length: 100 }, (_, i) => ({ q: i, r: 0, color: '#abcdef' })))).toBe('over-budget');
+    const stamped = writeDepthCells(m, m.layers[0].id, 1, [{ q: 4, r: 0, color: '#123456' }, { q: 5, r: 0, color: '#123456' }]);
+    expect(stamped.ok).toBe(true);
+    if (stamped.ok) {
+      const fat: MapData = { ...stamped.mapData, name: 'x'.repeat(DEPTH_BUDGET_BYTES + 10) };
+      expect(guardDepthWrite(fat, m.layers[0].id, 1, [{ q: 4, r: 0, color: '#123456' }])).toBeNull();
+    }
+  });
+
+  it('refuses when quarantined and leaves the map untouched', () => {
+    const m = hexMap();
+    const bad: MapData = { ...m, lod: { m: 7, minCellPx: 64, maxLevel: 3 } };
+    const r = writeDepthCells(bad, m.layers[0].id, 1, [{ q: 4, r: 0, color: '#123456' }]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('quarantined');
+    expect(r.mapData).toBe(bad);
+  });
+});

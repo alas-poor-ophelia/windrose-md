@@ -31,6 +31,8 @@ function isLodLadderEnabled(): boolean {
  */
 function getLadderOverrides(): LadderOverrides {
   if (!isLodLadderEnabled()) return {};
+  // `activeWindow` is an Obsidian global; absent on node (unit tests) and in any headless caller.
+  if (typeof activeWindow === 'undefined') return {};
   const raw: unknown = (activeWindow as unknown as { __windroseLadder?: unknown }).__windroseLadder;
   if (raw === null || raw === undefined || typeof raw !== 'object') return {};
   const o = raw as Record<string, unknown>;
