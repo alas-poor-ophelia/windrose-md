@@ -131,6 +131,8 @@ export type ObjectId = string;
 
 export interface MapObject {
   id: ObjectId;
+  /** Ladder rung this entity was placed at. Inert: no reader uses it yet (design 06, s19 item 3). */
+  homeLevel?: number;
   type: ObjectTypeId;     // typeId reference
   position: Point;
   size: ObjectSize;

@@ -19,6 +19,7 @@ import type {
   FogBounds,
   MigrationValidation
 } from '#types/core/map.types';
+import type { Cell } from '#types/core/cell.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { TileLayerRole } from '#types/tiles/tile.types';
 import type { ExportLayerOption } from '#types/core/export.types';
@@ -558,6 +559,119 @@ function removeLayer(mapData: MapData, layerId: LayerId): MapData {
   };
 }
 
+// ============================================================================
+// LADDER LEVELS (design 06, s2.1 and s19 items 1 and 6)
+// This section is the ONLY place `levels[...]` may be indexed (eslint enforces
+// it). `cells` is level 0; `levels` holds rungs >= 1, sparse, string keys on
+// disk, never an empty container.
+// ============================================================================
+
+function assertLevel(level: number, min: number): void {
+  if (!Number.isInteger(level) || level < min) {
+    throw new RangeError(`Invalid ladder level ${String(level)} (expected an integer >= ${String(min)})`);
+  }
+}
+
+/** Parse a `levels` record key; null for key "0" and anything that is not a positive integer. */
+function rungFromKey(key: string): number | null {
+  if (!/^[1-9]\d*$/.test(key)) return null;
+  const level = Number(key);
+  return Number.isSafeInteger(level) ? level : null;
+}
+
+/** Valid rung numbers present in `levels` (any content), ascending numerically. */
+function rungKeys(levels: Record<number, Cell[]> | undefined): number[] {
+  if (levels === undefined || levels === null) return [];
+  const out: number[] = [];
+  for (const key of Object.keys(levels)) {
+    const level = rungFromKey(key);
+    if (level !== null) out.push(level);
+  }
+  return out.sort((a, b) => a - b);
+}
+
+/** Authored cells of `layer` at `level`. Level 0 is `layer.cells`; an absent rung is `[]`. */
+function authoredCells(layer: MapLayer, level: number): Cell[] {
+  assertLevel(level, 0);
+  if (level === 0) return layer.cells;
+  return layer.levels?.[level] ?? [];
+}
+
+/** Every authored cell on the layer: level 0 first, then rungs in ascending numeric order. */
+function allAuthoredCells(layer: MapLayer): Array<{ level: number; cell: Cell }> {
+  const out: Array<{ level: number; cell: Cell }> = [];
+  for (const cell of layer.cells) out.push({ level: 0, cell });
+  for (const level of rungKeys(layer.levels)) {
+    const cells = layer.levels?.[level];
+    if (!Array.isArray(cells)) continue;
+    for (const cell of cells) out.push({ level, cell });
+  }
+  return out;
+}
+
+/** Levels that hold at least one authored cell, ascending (0 included iff `cells` is non-empty). */
+function authoredLevels(layer: MapLayer): number[] {
+  const out: number[] = layer.cells.length > 0 ? [0] : [];
+  for (const level of rungKeys(layer.levels)) {
+    const cells = layer.levels?.[level];
+    if (Array.isArray(cells) && cells.length > 0) out.push(level);
+  }
+  return out;
+}
+
+/**
+ * THE writer for rungs >= 1 (level 0 goes through `updateLayer({ cells })`).
+ * Empty `cells` deletes the rung key; an emptied container deletes `levels`.
+ * A no-op (same array reference stored, or absent and `cells` empty) returns
+ * the SAME `mapData` reference.
+ */
+function setLevelCells(mapData: MapData, layerId: LayerId, level: number, cells: Cell[]): MapData {
+  assertLevel(level, 1);
+  const layer = getLayerById(mapData, layerId);
+  if (!layer) return mapData;
+
+  const stored = layer.levels?.[level];
+  if (cells.length === 0 ? stored === undefined : stored === cells) return mapData;
+
+  const nextLevels: Record<number, Cell[]> = { ...(layer.levels ?? {}) };
+  if (cells.length === 0) delete nextLevels[level];
+  else nextLevels[level] = cells;
+
+  const { levels: _dropped, ...rest } = layer;
+  void _dropped;
+  const nextLayer: MapLayer = Object.keys(nextLevels).length > 0 ? { ...rest, levels: nextLevels } : rest;
+
+  return {
+    ...mapData,
+    layers: mapData.layers.map(l => (l.id === layerId ? nextLayer : l))
+  };
+}
+
+/**
+ * Remove empty containers only: empty rung arrays, key "0", non-integer keys,
+ * and `levels` itself when nothing remains. Never invents or moves content.
+ * Returns the same layer when there is nothing to fix.
+ */
+function normaliseLevels(layer: MapLayer): MapLayer {
+  if (!('levels' in layer)) return layer;
+  const levels = layer.levels as Record<string, unknown> | null | undefined;
+  const kept: Record<number, Cell[]> = {};
+  let dirty = levels === null || levels === undefined || typeof levels !== 'object' || Array.isArray(levels);
+  if (!dirty && levels) {
+    for (const key of Object.keys(levels)) {
+      const level = rungFromKey(key);
+      const value = levels[key];
+      if (level !== null && Array.isArray(value) && value.length > 0) kept[level] = value as Cell[];
+      else dirty = true;
+    }
+  }
+  if (Object.keys(kept).length === 0) dirty = true;
+  if (!dirty) return layer;
+  const { levels: _dropped, ...rest } = layer;
+  void _dropped;
+  return Object.keys(kept).length > 0 ? { ...rest, levels: kept } : rest;
+}
+
 /**
  * Clone a layer and insert it directly above the source layer.
  * @param mode 'all' copies everything; 'mapOnly' copies cells, curves, edges, tiles only
@@ -600,6 +714,10 @@ function cloneLayer(mapData: MapData, layerId: LayerId, mode: 'all' | 'mapOnly')
     fogOfWar: mode === 'all' && sourceLayer.fogOfWar ? deepCopy(sourceLayer.fogOfWar) : null,
     tiles: deepCopy(sourceLayer.tiles ?? []),
   };
+
+  // Ladder rungs travel with the map content in both modes. Conditional: a
+  // classic layer's clone must never carry a `levels` key at all.
+  if (sourceLayer.levels !== undefined) clonedLayer.levels = deepCopy(sourceLayer.levels);
 
   // Clone stays on the same board (and same stratum, if any).
   if (sourceLayer.boardId != null) clonedLayer.boardId = sourceLayer.boardId;
@@ -1110,6 +1228,8 @@ export {
   generateLayerId,
   getActiveLayer, getLayersOrdered, getLayerById, getLayerIndex, getLayerBelow,
   updateLayer, updateActiveLayer, setActiveLayer, addLayer, cloneLayer, removeLayer, reorderLayers,
+  // Ladder levels (the only `levels` reader/writer)
+  authoredCells, allAuthoredCells, authoredLevels, setLevelCells, normaliseLevels,
   migrateToLayerSchema, needsMigration,
   // Board (floor) projection
   DEFAULT_BOARD_ID, generateBoardId, layerBoardId, getBoardsOrdered, getActiveBoardId,

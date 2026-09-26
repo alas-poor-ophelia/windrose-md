@@ -14,7 +14,7 @@ import { DEFAULTS, SCHEMA_VERSION } from '../core/dmtConstants';
 import { getDataFilePath } from '../core/settingsAccessor';
 import { offsetToAxial } from '../geometry/core/offsetCoordinates';
 import { getSettings } from '../core/settingsAccessor';
-import { migrateToLayerSchema, needsMigration, generateLayerId, ensureBoards, DEFAULT_BOARD_ID } from './layerAccessor';
+import { migrateToLayerSchema, needsMigration, generateLayerId, ensureBoards, DEFAULT_BOARD_ID, normaliseLevels } from './layerAccessor';
 import { calculateFitZoom } from '../geometry/core/hexMeasurements';
 import { resolveTileEntry } from '../assets/tilesetOperations';
 
@@ -428,6 +428,16 @@ function migrateMapData(mapData: MapData): MapData {
         delete (curve as unknown as Record<string, unknown>).holes;
       }
     }
+  }
+
+  // Ladder levels (design 06, s19 item 1): validation NEVER destroys. `lod`
+  // (m / minCellPx / maxLevel) is left exactly as stored, and `levels` is kept
+  // even when `lod` is absent — both cases are depth quarantine, a derived
+  // read-time state (isDepthQuarantined), not a load-time rewrite. Only empty
+  // containers are removed.
+  for (let i = 0; i < mapData.layers.length; i++) {
+    const normalised = normaliseLevels(mapData.layers[i]);
+    if (normalised !== mapData.layers[i]) mapData.layers[i] = normalised;
   }
 
   // Board (floor) projection: ensure every layer has a boardId, the boards registry

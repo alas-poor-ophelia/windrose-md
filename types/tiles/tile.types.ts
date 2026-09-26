@@ -187,6 +187,8 @@ export const DEFAULT_TILE_LAYERS: ReadonlyArray<{
 
 /** Shared fields for all tile assignments */
 interface TileAssignmentBase {
+  /** Ladder rung this entity was placed at. Inert: no reader uses it yet (design 06, s19 item 3). */
+  homeLevel?: number;
   /** Grid position: col/row for grid maps, q/r for hex maps */
   col: number;
   row: number;

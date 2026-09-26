@@ -20,6 +20,7 @@ vi.mock('../../../src/core/settingsAccessor', async (importOriginal) => {
 
 const { createNewMap, loadMapData, saveMapData } = await import('../../../src/persistence/fileOperations');
 const { isLodLadderEnabled } = await import('../../../src/core/lodFlags');
+const { setLevelCells } = await import('../../../src/persistence/layerAccessor');
 
 const DATA_PATH = 'windrose-md-data.json';
 
@@ -103,5 +104,39 @@ describe('ladder byte oracle: a classic map is byte-identical with the capabilit
     const on = await loadEditSave(initial);
     expect(on).not.toMatch(/"lod"\s*:/);
     expect(on).not.toMatch(/"levels"\s*:/);
+  });
+});
+
+describe('ladder byte oracle: a LADDER map round-trips byte-identically', () => {
+  beforeEach(() => {
+    getSettings.mockReset();
+    getSettings.mockReturnValue({ lodLadder: true });
+  });
+
+  it('save -> load -> save is byte-identical, and erasing the last rung removes levels', async () => {
+    const fresh = createNewMap('Oracle', 'hex');
+    const withLod = { ...fresh, lod: { m: 4, minCellPx: 64, maxLevel: 3 } };
+    const ladder = setLevelCells(withLod, withLod.layers[0].id, 2, [{ x: 16, y: 0, color: '#8b5a2b' }]);
+
+    // First save, then one load/save so load-time defaults (tiles, wallPaths,
+    // ...) settle; that settled file is the oracle's reference bytes.
+    const h1 = makeApp();
+    expect((await saveMapData(h1.app, 'oracle', ladder)).status).toBe('saved');
+    const settled = await loadMapData(h1.app, 'oracle', 'Oracle', 'hex');
+    expect((await saveMapData(h1.app, 'oracle', settled)).status).toBe('saved');
+    const first = h1.read();
+    expect(first).toMatch(/"lod"\s*:/);
+    expect(first).toMatch(/"levels"\s*:\s*\{\s*"2"\s*:/);
+
+    const h2 = makeApp(first);
+    const loaded = await loadMapData(h2.app, 'oracle', 'Oracle', 'hex');
+    expect((await saveMapData(h2.app, 'oracle', loaded)).status).toBe('saved');
+    expect(h2.read()).toBe(first);
+
+    const erased = setLevelCells(loaded, loaded.layers[0].id, 2, []);
+    expect('levels' in erased.layers[0]).toBe(false);
+    expect((await saveMapData(h2.app, 'oracle', erased)).status).toBe('saved');
+    expect(h2.read()).not.toContain('"levels"');
+    expect(h2.read()).toMatch(/"lod"\s*:/);
   });
 });

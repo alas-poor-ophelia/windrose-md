@@ -35,7 +35,8 @@ export const LADDER_M_ALLOWLIST: readonly number[] = [2, 4, 15];
 export const LADDER_DEFAULTS: Readonly<Omit<LadderParams, 'hexSize'>> = Object.freeze({
   m: 4,
   minCellPx: 64,
-  maxLevel: 5,
+  // 3, not 5: one L4 root hex is ~2 MB of JSON (design 06, s19 item 9).
+  maxLevel: 3,
 });
 
 export interface AxialCell {

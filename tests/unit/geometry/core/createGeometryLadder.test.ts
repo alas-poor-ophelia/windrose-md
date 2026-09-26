@@ -20,7 +20,7 @@ describe("createGeometryLadder: params", () => {
     expect(ladder.params).toEqual({ hexSize: 80, ...LADDER_DEFAULTS });
     expect(ladder.params.m).toBe(4);
     expect(ladder.params.minCellPx).toBe(64);
-    expect(ladder.params.maxLevel).toBe(5);
+    expect(ladder.params.maxLevel).toBe(3);
   });
 
   it("applies overrides on top of the defaults", () => {

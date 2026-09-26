@@ -19,6 +19,8 @@ export type NotePinId = string;
 /** Note pin placed on the map */
 export interface NotePin {
   id: NotePinId;
+  /** Ladder rung this entity was placed at. Inert: no reader uses it yet (design 06, s19 item 3). */
+  homeLevel?: number;
   position: Point;
   linkedNote?: string;  // Obsidian note path
   label?: string;
@@ -53,6 +55,8 @@ export type FontWeight = 'normal' | 'bold';
 /** Text label on the map */
 export interface TextLabel {
   id: TextLabelId;
+  /** Ladder rung this entity was placed at. Inert: no reader uses it yet (design 06, s19 item 3). */
+  homeLevel?: number;
   position: Point;
   content: string;
   fontSize: number;
