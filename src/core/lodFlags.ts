@@ -57,9 +57,6 @@ function isLadderView(mapData: MapData | null | undefined): boolean {
   return mapData.lod !== undefined || isLodLadderEnabled();
 }
 
-/** Alias of `isLadderView`, kept so existing callers compile; removed by a later wave. */
-const isLadderMap = isLadderView;
-
 /** Deepest rung >= 1 holding authored cells on any layer; 0 when none. */
 function deepestAuthoredRung(mapData: MapData): number {
   let deepest = 0;
@@ -69,6 +66,15 @@ function deepestAuthoredRung(mapData: MapData): number {
     if (last > deepest) deepest = last;
   }
   return deepest;
+}
+
+/**
+ * Does any layer hold authored cells on a rung >= 1? Such content is laid out
+ * on the unrotated lattice, so rotating the map would misplace it (design 06,
+ * s19 item 2). False on every classic map, including one with `levels: {}`.
+ */
+function hasDepthContent(mapData: MapData): boolean {
+  return deepestAuthoredRung(mapData) > 0;
 }
 
 /**
@@ -140,6 +146,6 @@ function getMaxZoom(mapData: MapData | null | undefined): number {
 }
 
 export {
-  isLodLadderEnabled, getLadderOverrides, isLadderView, isLadderMap, isDepthQuarantined, canAuthorDepth,
-  ladderParamsFor, getMaxZoom
+  isLodLadderEnabled, getLadderOverrides, isLadderView, isDepthQuarantined, canAuthorDepth,
+  ladderParamsFor, getMaxZoom, hasDepthContent
 };

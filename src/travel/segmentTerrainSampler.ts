@@ -110,7 +110,10 @@ function buildTileHitIndexForLayer(
   return result;
 }
 
-/** Build the per-layer cell and tile lookups for a context. */
+/**
+ * Build the per-layer cell and tile lookups for a context.
+ * Ladder: samples level 0 only on purpose until distance-at-depth (phase 5).
+ */
 function buildLayerCellMaps(ctx: TerrainSampleContext): LayerCellMaps {
   return {
     color: ctx.layers.map(layer => buildCellMap(layer.cells, ctx.geometry)),

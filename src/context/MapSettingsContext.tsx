@@ -50,6 +50,8 @@ import { createContext } from 'preact';
 import type { MutableRef } from 'preact/hooks';
 import { useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'preact/hooks';
 import { Actions, GRID_DENSITY_PRESETS, settingsReducer, buildInitialState, calculateBoundsFromSettings, getOrphanedContentInfo } from '../components/settings/settingsReducer';
+import { getActiveLayer } from '../persistence/layerAccessor';
+import { countLevelOrphansForBounds } from '../persistence/resizeOperations';
 import type { CurrentSettings, CurrentBackgroundImage, CurrentDistanceSettings } from '../components/settings/settingsReducer';
 import { getSettings } from '../core/settingsAccessor';
 import { THEME } from '../core/dmtConstants';
@@ -683,7 +685,10 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       );
 
       if (isRectReduction || isRadialReduction) {
-        const orphans = getOrphanedContentInfo(state.hexBounds, mapType, currentCells, currentObjects, orientation);
+        // Scope is the ACTIVE layer only (currentCells/currentObjects are the active
+        // layer's level 0); rung cells are counted for that same layer.
+        const levelOrphans = mapData !== null ? countLevelOrphansForBounds(mapData, getActiveLayer(mapData), state.hexBounds) : 0;
+        const orphans = getOrphanedContentInfo(state.hexBounds, mapType, currentCells, currentObjects, orientation, levelOrphans);
         if (orphans.cells > 0 || orphans.objects > 0) {
           dispatch({
             type: Actions.SHOW_RESIZE_CONFIRM,

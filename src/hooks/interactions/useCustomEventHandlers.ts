@@ -115,6 +115,8 @@ function useCustomEventHandlers({
   const requestEnterSubHex = useCallback((detail: SubHexCoordDetail): void => {
     const { q, r, viewOverride, anchor, canvasSize } = detail;
     if (mapData?.mapType !== 'hex') return;
+    // A map carrying `lod` never dives: depth is the ladder (design 06, s19 item 2).
+    if (mapData.lod !== undefined) return;
 
     // Seamless dives supply a full viewOverride. The double-click path
     // instead supplies the clicked world point (`anchor`) and the live

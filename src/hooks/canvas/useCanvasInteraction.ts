@@ -27,7 +27,7 @@ import type { SubHexCoordDetail, SubHexExitDetail } from '../../core/windroseEve
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULTS } from '../../core/dmtConstants';
 import { getApp } from '../../core/settingsAccessor';
-import { getMaxZoom, isLadderMap } from '../../core/lodFlags';
+import { getMaxZoom, isLadderView } from '../../core/lodFlags';
 import { captureSubHexBackdrop } from '../../core/subHexBackdropStore';
 import { prewarmMapAssets } from '../state/useImagePreloading';
 import { traceZoom } from '../../utils/zoomTraceProbe';
@@ -495,7 +495,7 @@ function useCanvasInteraction(
       // skips the approach-band prewarm below — nothing to prewarm. The
       // zoom-OUT surface branch is deliberately NOT gated: a map entered through
       // a legacy sub-hex link must still be able to surface by zooming out.
-      if (isLadderMap(mapData)) return false;
+      if (isLadderView(mapData)) return false;
       // Approach band: prewarm the target child's image assets while the
       // zoom is still climbing toward the ceiling, so the dive's first frame
       // paints complete instead of with cold-image holes. Fire-and-forget,

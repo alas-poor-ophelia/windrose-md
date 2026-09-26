@@ -41,7 +41,7 @@ import { DataFileRecoveryPanel } from './components/overlays/DataFileRecoveryPan
 import { StaleMapConflictPanel } from './components/overlays/StaleMapConflictPanel';
 import { useAlignmentMode } from './hooks/interactions/useAlignmentMode';
 import { ModalPortal } from './components/modals/ModalPortal';
-import { getActiveLayer, getLayerById, getActiveBoardLayers, getBoardsOrdered, updateBoard, addBoard, setActiveBoard, removeBoard, setLayerMode, addLayer, updateActiveLayer } from './persistence/layerAccessor';
+import { allAuthoredCells, getActiveLayer, getLayerById, getActiveBoardLayers, getBoardsOrdered, updateBoard, addBoard, setActiveBoard, removeBoard, setLayerMode, addLayer, updateActiveLayer } from './persistence/layerAccessor';
 import { copyDeepLinkToClipboard } from './persistence/deepLinkHandler';
 import type { TileLayerRole } from '#types/tiles/tile.types';
 import { resolveTileEntry } from './assets/tilesetOperations';
@@ -2124,7 +2124,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                             currentTool === 'addNote' ? 'Click to place note pin' :
                             currentTool === 'addText' ? 'Click to add text label' :
                               'Select a tool'
-            } | Undo/redo available | Middle-click, two-finger drag, or trackpad scroll to pan | Wheel or pinch to zoom | Click compass to rotate | {getActiveLayer(mapData).cells.length} cells filled | {getActiveLayer(mapData).objects.length} objects placed | {getActiveLayer(mapData).textLabels.length} text labels
+            } | Undo/redo available | Middle-click, two-finger drag, or trackpad scroll to pan | Wheel or pinch to zoom | Click compass to rotate | {allAuthoredCells(getActiveLayer(mapData)).length} cells filled | {getActiveLayer(mapData).objects.length} objects placed | {getActiveLayer(mapData).textLabels.length} text labels
           </div>
         )}
 

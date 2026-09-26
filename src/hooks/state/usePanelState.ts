@@ -19,6 +19,9 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { getLayerById } from '../../persistence/layerAccessor';
 
 import { axialToOffset, offsetToAxial, isWithinOffsetBounds } from '../../geometry/core/offsetCoordinates';
+import { HexGeometry } from '../../geometry/core/HexGeometry';
+import { DEFAULTS } from '../../core/dmtConstants';
+import { filterLevelsToBounds, ladderForAuthoredRungs } from '../../persistence/resizeOperations';
 
 
 
@@ -96,7 +99,7 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
   ): void => {
     if (!mapData) return;
 
-    const newMapData: MapData = {
+    let newMapData: MapData = {
       ...mapData,
       settings: settingsData,
       uiPreferences: preferencesData,
@@ -151,6 +154,14 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
             };
           });
         }
+
+        // Rung (>= 1) cells: keep only those whose lattice ancestor exists under
+        // the NEW bounds. Written through setLevelCells, so emptied rungs go away.
+        const ladder = ladderForAuthoredRungs(
+          newMapData,
+          new HexGeometry(hexSize ?? mapData.hexSize ?? DEFAULTS.hexSize, orientation, hexBounds)
+        );
+        if (ladder !== null) newMapData = filterLevelsToBounds(newMapData, ladder);
       }
     }
 

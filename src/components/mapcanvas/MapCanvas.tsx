@@ -36,7 +36,7 @@ import { HexGeometry } from '../../geometry/core/HexGeometry';
 import { createGeometry } from '../../geometry/core/createGeometry';
 import { createGeometryLadder } from '../../geometry/core/createGeometryLadder';
 import type { GeometryLadder } from '../../geometry/core/createGeometryLadder';
-import { isLadderMap, getLadderOverrides } from '../../core/lodFlags';
+import { isLadderView, ladderParamsFor } from '../../core/lodFlags';
 import { LinkedNoteHoverOverlays } from '../overlays/LinkedNoteHoverOverlays';
 import { MapStateProvider, MapOperationsProvider } from '../../context/MapContext';
 import { MapSelectionProvider, useMapSelection } from '../../context/MapSelectionContext';
@@ -247,15 +247,24 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
   // geometry: the static surface cache keys on the ladder's identity, so a ladder
   // rebuilt per render would invalidate every baked surface every frame. Whether
   // this map is a ladder map at all (hex, unrotated, capability on) is decided in
-  // ONE place — `isLadderMap` — shared with the camera clamps and the dive bail.
+  // ONE place — `isLadderView` — shared with the camera clamps and the dive bail.
   // It is read per render so toggling the developer setting takes effect on the
-  // next paint.
-  const ladderOn = isLadderMap(mapData);
+  // next paint. Parameters come from `ladderParamsFor`, the same source as
+  // `getMaxZoom`: a map carrying `lod` uses its own m / minCellPx / maxLevel
+  // (the dev override can never re-partition it by setting m).
+  const ladderOn = isLadderView(mapData);
+  const ladderParams = ladderOn && mapData ? ladderParamsFor(mapData) : null;
+  const ladderM = ladderParams?.m;
+  const ladderMinCellPx = ladderParams?.minCellPx;
+  const ladderMaxLevel = ladderParams?.maxLevel;
   const ladder = useMemo((): GeometryLadder | null => {
     if (!ladderOn) return null;
     if (geometry?.type !== 'hex') return null;
-    return createGeometryLadder(geometry as unknown as HexGeometry, getLadderOverrides());
-  }, [ladderOn, geometry]);
+    if (ladderM === undefined || ladderMinCellPx === undefined || ladderMaxLevel === undefined) return null;
+    return createGeometryLadder(geometry as unknown as HexGeometry, {
+      m: ladderM, minCellPx: ladderMinCellPx, maxLevel: ladderMaxLevel
+    });
+  }, [ladderOn, geometry, ladderM, ladderMinCellPx, ladderMaxLevel]);
 
   // Shared live pan/zoom controller. Holds viewState off the React path during a
   // gesture and commits to mapData once at gesture end (sink = onViewStateChange).

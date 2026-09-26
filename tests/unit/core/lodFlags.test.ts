@@ -4,7 +4,7 @@ import type { MapData } from '#types/core/map.types';
 const getSettings = vi.fn(() => ({} as Record<string, unknown>));
 vi.mock('../../../src/core/settingsAccessor', () => ({ getSettings }));
 
-const { isLodLadderEnabled, isLadderMap, isLadderView, isDepthQuarantined, canAuthorDepth, ladderParamsFor, getMaxZoom } =
+const { isLodLadderEnabled, isLadderView, isDepthQuarantined, canAuthorDepth, ladderParamsFor, getMaxZoom, hasDepthContent } =
   await import('../../../src/core/lodFlags');
 const { DEFAULTS } = await import('../../../src/core/dmtConstants');
 
@@ -41,37 +41,37 @@ describe('lodFlags: lattice ladder capability', () => {
   });
 });
 
-describe('lodFlags: isLadderMap', () => {
+describe('lodFlags: isLadderView (capability path)', () => {
   beforeEach(() => { getSettings.mockReset(); withLadderOverride(undefined); });
   afterEach(() => { clearLadderGlobal(); });
 
   it('is false for every map while the capability is off', () => {
     getSettings.mockReturnValue({});
-    expect(isLadderMap(hexMap())).toBe(false);
+    expect(isLadderView(hexMap())).toBe(false);
   });
 
   it('is true for an unrotated hex map with the capability on', () => {
     getSettings.mockReturnValue({ lodLadder: true });
-    expect(isLadderMap(hexMap())).toBe(true);
-    expect(isLadderMap(hexMap({ northDirection: 0 }))).toBe(true);
-    expect(isLadderMap(hexMap({ northDirection: 360 }))).toBe(true);
+    expect(isLadderView(hexMap())).toBe(true);
+    expect(isLadderView(hexMap({ northDirection: 0 }))).toBe(true);
+    expect(isLadderView(hexMap({ northDirection: 360 }))).toBe(true);
   });
 
   it('is false for a grid map', () => {
     getSettings.mockReturnValue({ lodLadder: true });
-    expect(isLadderMap({ mapType: 'grid' } as MapData)).toBe(false);
+    expect(isLadderView({ mapType: 'grid' } as MapData)).toBe(false);
   });
 
   it('is false for a rotated hex map', () => {
     getSettings.mockReturnValue({ lodLadder: true });
-    expect(isLadderMap(hexMap({ northDirection: 90 }))).toBe(false);
-    expect(isLadderMap(hexMap({ northDirection: 270 }))).toBe(false);
+    expect(isLadderView(hexMap({ northDirection: 90 }))).toBe(false);
+    expect(isLadderView(hexMap({ northDirection: 270 }))).toBe(false);
   });
 
   it('is false for a missing map', () => {
     getSettings.mockReturnValue({ lodLadder: true });
-    expect(isLadderMap(null)).toBe(false);
-    expect(isLadderMap(undefined)).toBe(false);
+    expect(isLadderView(null)).toBe(false);
+    expect(isLadderView(undefined)).toBe(false);
   });
 });
 
@@ -151,7 +151,6 @@ describe('lodFlags: isLadderView, canAuthorDepth, ladderParamsFor', () => {
     expect(isLadderView(withLayers({ lod: LOD }))).toBe(true);
     expect(isLadderView(withLayers({ lod: LOD, northDirection: 90 }))).toBe(false);
     expect(isLadderView({ mapType: 'grid', lod: LOD } as MapData)).toBe(false);
-    expect(isLadderMap).toBe(isLadderView);
   });
 
   it('canAuthorDepth needs lod, the capability, and no quarantine', () => {
@@ -169,5 +168,18 @@ describe('lodFlags: isLadderView, canAuthorDepth, ladderParamsFor', () => {
     const p = ladderParamsFor(withLayers({ lod: { m: 15, minCellPx: 50, maxLevel: 1 } }));
     expect(p).toEqual({ hexSize: 80, m: 15, minCellPx: 40, maxLevel: 2 });
     expect(ladderParamsFor(withLayers({})).m).toBe(2);
+  });
+});
+
+describe('lodFlags: hasDepthContent', () => {
+  it('is true when any layer holds a rung >= 1 cell', () => {
+    expect(hasDepthContent(withLayers({ lod: LOD }, { 2: [cell(1, 1)] }))).toBe(true);
+  });
+
+  it('is false on a classic map and on an empty levels container', () => {
+    expect(hasDepthContent(withLayers({}))).toBe(false);
+    expect(hasDepthContent(withLayers({}, {}))).toBe(false);
+    expect(hasDepthContent(withLayers({ lod: LOD }, { 1: [] }))).toBe(false);
+    expect(hasDepthContent(hexMap())).toBe(false);
   });
 });

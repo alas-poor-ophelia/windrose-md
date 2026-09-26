@@ -538,7 +538,8 @@ function getOrphanedContentInfo(
   mapType: MapType,
   currentCells: Cell[] | null | undefined,
   currentObjects: MapObject[] | null | undefined,
-  orientation: HexOrientation
+  orientation: HexOrientation,
+  levelOrphans: number = 0
 ): OrphanInfo {
   if (mapType !== 'hex') return { cells: 0, objects: 0 };
 
@@ -552,7 +553,9 @@ function getOrphanedContentInfo(
     return !isWithinOffsetBounds(col, row, newBounds);
   };
 
-  let orphanedCells = 0;
+  // Rung (>= 1) cells that would be removed are counted by the caller (they need
+  // the map's ladder) and folded into the painted-cell total.
+  let orphanedCells = levelOrphans;
   let orphanedObjects = 0;
 
   if (currentCells && currentCells.length > 0) {

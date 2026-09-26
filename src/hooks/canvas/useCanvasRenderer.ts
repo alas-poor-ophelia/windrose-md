@@ -858,6 +858,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       const adjLayers = adj.mapData.layers ?? [];
 
       // Skip detailed rendering for dense neighbors to cap render cost
+      // (ladder: level-0 cells only on purpose; this is a neighbour-preview cost cap, not a content statement)
       const totalItems = adjLayers.reduce((sum: number, l: MapLayer) =>
         sum + (l.cells?.length ?? 0) + (l.tiles?.length ?? 0), 0);
       const isDense = totalItems > MAX_ADJACENT_COMPLEXITY;

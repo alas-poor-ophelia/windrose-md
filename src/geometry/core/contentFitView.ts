@@ -16,8 +16,12 @@ import type { ExtendedGeometry } from '#types/contexts/context.types';
 import { isGridCell } from '#types/core/cell.types';
 
 import { DEFAULTS } from '../../core/dmtConstants';
+import { allAuthoredCells } from '../../persistence/layerAccessor';
+import { ladderForAuthoredRungs } from '../../persistence/resizeOperations';
+import { HexGeometry } from './HexGeometry';
+import type { GeometryLadder } from './createGeometryLadder';
 
-/** A single occupied grid coordinate (hex: axial q/r; hex objects/tiles have no footprint). */
+/** A single occupied point in world space (hex: cell/object/tile centre; no footprint). */
 interface OccupiedPoint {
   x: number;
   y: number;
@@ -34,17 +38,32 @@ interface GridSpan {
 /** Comfort factor applied before zoom clamping, so fit content isn't edge-to-edge. */
 const FIT_COMFORT_FACTOR = 0.9;
 
-function collectHexPointsFromLayer(layer: MapLayer): OccupiedPoint[] {
+/**
+ * World-space centres of a hex layer's content. Level-0 cells, objects and
+ * tiles use the root geometry; rung (>= 1) cells use their rung's own geometry
+ * and are only collected when a `ladder` is supplied (classic maps: none).
+ */
+function collectHexPointsFromLayer(
+  layer: MapLayer,
+  geometry: ExtendedGeometry,
+  ladder: GeometryLadder | null
+): OccupiedPoint[] {
   const points: OccupiedPoint[] = [];
+  const toWorld = (x: number, y: number, levelGeometry: { gridToWorld(x: number, y: number): { worldX: number; worldY: number } }): OccupiedPoint => {
+    const { worldX, worldY } = levelGeometry.gridToWorld(x, y);
+    return { x: worldX, y: worldY };
+  };
 
-  for (const cell of layer.cells) {
-    points.push(isGridCell(cell) ? { x: cell.x, y: cell.y } : { x: cell.q, y: cell.r });
+  for (const { level, cell } of allAuthoredCells(layer)) {
+    if (level > 0 && ladder === null) continue;
+    const levelGeometry = level === 0 || ladder === null ? geometry : ladder.geometryForLevel(level);
+    points.push(isGridCell(cell) ? toWorld(cell.x, cell.y, levelGeometry) : toWorld(cell.q, cell.r, levelGeometry));
   }
   for (const obj of layer.objects) {
-    points.push({ x: obj.position.x, y: obj.position.y });
+    points.push(toWorld(obj.position.x, obj.position.y, geometry));
   }
   for (const tile of layer.tiles ?? []) {
-    points.push({ x: tile.col, y: tile.row });
+    points.push(toWorld(tile.col, tile.row, geometry));
   }
 
   return points;
@@ -99,9 +118,12 @@ function calculateContentFitView(
   const activeLayer = findActiveLayer(mapData);
 
   if (geometry.type === 'hex') {
-    let points = activeLayer ? collectHexPointsFromLayer(activeLayer) : [];
+    const ladder = geometry instanceof HexGeometry ? ladderForAuthoredRungs(mapData, geometry) : null;
+    let points = activeLayer ? collectHexPointsFromLayer(activeLayer, geometry, ladder) : [];
     if (points.length === 0) {
-      points = mapData.layers.filter(layer => layer.visible).flatMap(collectHexPointsFromLayer);
+      points = mapData.layers
+        .filter(layer => layer.visible)
+        .flatMap(layer => collectHexPointsFromLayer(layer, geometry, ladder));
     }
     if (points.length === 0) return null;
 
@@ -109,11 +131,10 @@ function calculateContentFitView(
 
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const point of points) {
-      const { worldX, worldY } = geometry.gridToWorld(point.x, point.y);
-      minX = Math.min(minX, worldX);
-      maxX = Math.max(maxX, worldX);
-      minY = Math.min(minY, worldY);
-      maxY = Math.max(maxY, worldY);
+      minX = Math.min(minX, point.x);
+      maxX = Math.max(maxX, point.x);
+      minY = Math.min(minY, point.y);
+      maxY = Math.max(maxY, point.y);
     }
     minX -= hexSize;
     maxX += hexSize;

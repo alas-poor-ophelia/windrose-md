@@ -20,7 +20,10 @@ import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { App } from 'obsidian';
 import { TFile } from 'obsidian';
 
-import { getActiveLayer, getExportLayers } from './layerAccessor';
+import { allAuthoredCells, getActiveLayer, getExportLayers } from './layerAccessor';
+import { ladderForAuthoredRungs } from './resizeOperations';
+import { HexGeometry } from '../geometry/core/HexGeometry';
+import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
 import { getFontCss } from '../text/fontOptions';
 import { renderCanvas } from '../hooks/canvas/useCanvasRenderer';
 import { getSettings } from '../core/settingsAccessor';
@@ -65,27 +68,31 @@ function getTextLabelBounds(label: TextLabel, ctx: CanvasRenderingContext2D): Bo
 // ===========================================
 
 /**
- * Calculate the world-coordinate bounding box of all content on a layer
+ * Calculate the world-coordinate bounding box of all content on a layer.
+ * Rung (>= 1) cells are measured with their rung's own geometry and are only
+ * included when a `ladder` is supplied; classic maps have none.
  */
 function calculateContentBounds(
   layer: MapLayer,
-  geometry: ExtendedGeometry
+  geometry: ExtendedGeometry,
+  ladder: GeometryLadder | null = null
 ): BoundingBox | null {
   let minX = Infinity, minY = Infinity;
   let maxX = -Infinity, maxY = -Infinity;
   
   let hasContent = false;
   
-  // 1. Painted cells
-  if (layer.cells.length > 0) {
-    for (const cell of layer.cells) {
-      hasContent = true;
-      const bounds = geometry.getCellBounds(cell);
-      minX = Math.min(minX, bounds.minX);
-      minY = Math.min(minY, bounds.minY);
-      maxX = Math.max(maxX, bounds.maxX);
-      maxY = Math.max(maxY, bounds.maxY);
-    }
+  // 1. Painted cells (level 0, then every authored rung)
+  for (const { level, cell } of allAuthoredCells(layer)) {
+    if (level > 0 && ladder === null) continue;
+    hasContent = true;
+    const bounds = level === 0 || ladder === null
+      ? geometry.getCellBounds(cell)
+      : ladder.geometryForLevel(level).getCellBounds(cell);
+    minX = Math.min(minX, bounds.minX);
+    minY = Math.min(minY, bounds.minY);
+    maxX = Math.max(maxX, bounds.maxX);
+    maxY = Math.max(maxY, bounds.maxY);
   }
 
   // 2. Objects
@@ -233,8 +240,9 @@ async function exportMapAsImage(
 
   // Calculate content bounds across every selected layer
   let bounds: BoundingBox | null = null;
+  const ladder = geometry instanceof HexGeometry ? ladderForAuthoredRungs(mapData, geometry) : null;
   for (const layer of exportLayers) {
-    const layerBounds = calculateContentBounds(layer, geometry);
+    const layerBounds = calculateContentBounds(layer, geometry, ladder);
     if (!layerBounds) continue;
     bounds = bounds === null ? layerBounds : {
       minX: Math.min(bounds.minX, layerBounds.minX),

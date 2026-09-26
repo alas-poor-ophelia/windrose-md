@@ -32,6 +32,7 @@ interface UseHexContextMenuOptions {
  * Tally a sub-hex map's contents across its ENTIRE subtree (the entry is
  * recursive, so deleting it removes every descendant too) — the confirm
  * dialog itemizes what the user is about to lose.
+ * Ladder: counts level 0 on purpose; legacy sub-hex trees never carry rungs.
  */
 function summarizeSubHexTree(subHex: SubHexMapData): {
   cells: number; curves: number; tiles: number; objects: number; labels: number; nested: number;
@@ -85,8 +86,9 @@ function useHexContextMenu({
       const menu = new Menu();
 
       // Entering existing sub-hexes always works; creating new ones is
-      // gated behind the subMaps feature.
-      if (hasSubHex || isFeatureEnabled('subMaps')) {
+      // gated behind the subMaps feature. A map carrying `lod` never dives:
+      // depth is the ladder (design 06, s19 item 2).
+      if (mapData.lod === undefined && (hasSubHex || isFeatureEnabled('subMaps'))) {
         menu.addItem((item: MenuItem) => {
           item.setTitle(hasSubHex ? `Enter Sub-Hex (${q}, ${r})` : `Create Sub-Hex (${q}, ${r})`);
           item.setIcon(hasSubHex ? 'lucide-arrow-down-right' : 'lucide-plus-circle');
