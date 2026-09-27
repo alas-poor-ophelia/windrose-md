@@ -12,6 +12,7 @@ import type { Cell } from '#types/core/cell.types';
 import { isGridCell } from '#types/core/cell.types';
 import type { BuildCellLookupFn, CalculateBordersFn } from '#types/core/rendering.types';
 import type { MapObject } from '#types/objects/object.types';
+import type { TileAssignment } from '#types/tiles/tile.types';
 import type {
   RenderCanvas,
   UseCanvasRenderer,
@@ -36,6 +37,7 @@ import { renderGridFog } from '../../geometry/fog/gridFogRenderer';
 import { renderHexFog } from '../../geometry/fog/hexFogRenderer';
 import { getFogSettings, clearFogCanvas, renderFog } from '../../geometry/fog/fogRenderer';
 import { renderObjects } from '../../geometry/renderers/objectRenderer';
+import { OBJECT_FLOOR_PX, LABEL_FLOOR_PX, objectVisible, labelVisible, objectRenderedPx, scaledSizeForRung } from '../../geometry/renderers/elementBands';
 import { renderSelections } from '../../geometry/renderers/selectionRenderer';
 import { segmentRenderer } from '../../geometry/renderers/segmentRenderer';
 import { getFontCss } from '../../text/fontOptions';
@@ -686,6 +688,22 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     zoom
   );
 
+  // Object renderer dependencies, shared by the baked pass (classic maps) and the
+  // live element pass (ladder maps).
+  const objectMapType = mapData.mapType ?? 'grid';
+  const objectDeps: Parameters<typeof renderObjects>[5] = {
+    getObjectType: (typeId: string): ReturnType<typeof getObjectType> => getObjectType(typeId, objectMapType, mapData.objectSetId),
+    getRenderChar,
+    isCellFogged,
+    getObjectsInCell,
+    getSlotOffset,
+    getMultiObjectScale,
+    renderNoteLinkBadge,
+    renderTooltipIndicator,
+    renderObjectLinkIndicator,
+    getCachedImage,
+  };
+
   // ---- Static content (everything that only depends on map data + viewport
   // transform). The parameters deliberately SHADOW the outer ctx/offsetX/
   // offsetY/width/height so the pass bodies below run unchanged whether they
@@ -1034,14 +1052,45 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     const hasTiles = drawLayer.tiles != null && drawLayer.tiles.length > 0;
     const hasStrokes = drawLayer.terrainStrokes != null && drawLayer.terrainStrokes.length > 0;
     if ((hasTiles || hasStrokes) && mapData.tilesets != null && mapData.tilesets.length > 0) {
-      renderTiles(
-        ctx,
-        drawLayer.tiles ?? [],
-        mapData.tilesets,
-        tileGeomShim,
-        rendererViewState,
-        { opacity: layerOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers: hiddenTileLayers, terrainStrokes: drawLayer.terrainStrokes }
-      );
+      if (ladder !== null && level >= 1) {
+        // Tiles at depth (kgc.6): each tile draws ONCE at its HOME rung (world-
+        // anchored at the parent's rect), clipped to the parent hexagon - that
+        // single draw, baked into the per-level surface, is the parent art every
+        // fine cell under it inherits. `tilesets` stay the root list. Groups run
+        // sequentially (renderTiles' scratch canvases are not reentrant); the
+        // root-anchored terrain strokes ride with the home-0 group only.
+        const byHome = new Map<number, TileAssignment[]>([[0, []]]);
+        for (const t of drawLayer.tiles ?? []) {
+          const home = t.homeLevel ?? 0;
+          const group = byHome.get(home);
+          if (group != null) group.push(t);
+          else byHome.set(home, [t]);
+        }
+        for (const [home, homeTiles] of byHome) {
+          // Snapped tiles band is home..home plus inheritance (design s8): a tile
+          // homed on a FINER rung than the active one does not draw.
+          if (home > level) continue;
+          const homeGeom = ladder.geometryForLevel(home);
+          const homeShim = { hexToWorld: homeGeom.hexToWorld.bind(homeGeom), worldToScreen: homeGeom.worldToScreen.bind(homeGeom), hexSize: homeGeom.hexSize, orientation: mapData.orientation ?? 'flat' };
+          renderTiles(
+            ctx,
+            homeTiles,
+            mapData.tilesets,
+            homeShim,
+            rendererViewState,
+            { opacity: layerOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers: hiddenTileLayers, terrainStrokes: home === 0 ? drawLayer.terrainStrokes : undefined, clipToHex: true }
+          );
+        }
+      } else {
+        renderTiles(
+          ctx,
+          drawLayer.tiles ?? [],
+          mapData.tilesets,
+          tileGeomShim,
+          rendererViewState,
+          { opacity: layerOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers: hiddenTileLayers, terrainStrokes: drawLayer.terrainStrokes }
+        );
+      }
     }
   }
 
@@ -1118,34 +1167,21 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     ctx.restore();
   }
 
-  // Draw objects
-  if (activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
-    const isHexMap = geometry.type === 'hex';
-    const mapType = mapData.mapType ?? 'grid';
-    const getObjectTypeForMap = (typeId: string): ReturnType<typeof getObjectType> => getObjectType(typeId, mapType, mapData.objectSetId);
+  // Draw objects. Under the ladder objects are drawn LIVE after the lattice
+  // instead (per home rung, sized from it), never baked into a rung surface.
+  if (ladder === null && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
     renderObjects(
       activeLayer,
       { ctx, offsetX, offsetY, zoom, scaledSize },
       geometry,
-      isHexMap,
+      geometry.type === 'hex',
       mapData.orientation ?? 'flat',
-      {
-        getObjectType: getObjectTypeForMap,
-        getRenderChar,
-        isCellFogged,
-        getObjectsInCell,
-        getSlotOffset,
-        getMultiObjectScale,
-        renderNoteLinkBadge,
-        renderTooltipIndicator,
-        renderObjectLinkIndicator,
-        getCachedImage,
-      }
+      objectDeps
     );
   }
 
-  // Draw text labels
-  if (activeLayer.textLabels.length > 0 && !showCoordinates && visibility.textLabels) {
+  // Draw text labels (live under the ladder, like objects)
+  if (ladder === null && activeLayer.textLabels.length > 0 && !showCoordinates && visibility.textLabels) {
     renderTextLabels(
       activeLayer.textLabels,
       { ctx, zoom, getFontCss },
@@ -1226,6 +1262,45 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       crossing
     );
     if (ladderOn) recordPhase('lattice', performance.now() - latticeStart);
+  }
+
+  // Elements at depth (design 06 section 8), LIVE after the blit (or the direct
+  // draw of a one-shot preview/export canvas) so they stay crisp under the
+  // crossing scale-blit. Same layer and draw order as the classic bake: the
+  // active layer's objects, then its text labels.
+  if (ladder !== null && !showCoordinates) {
+    if (visibility.objects && activeLayer.objects.length > 0) {
+      const byHome = new Map<number, MapObject[]>();
+      for (const obj of activeLayer.objects) {
+        const home = obj.homeLevel ?? 0;
+        const group = byHome.get(home);
+        if (group !== undefined) group.push(obj);
+        else byHome.set(home, [obj]);
+      }
+      for (const [home, grouped] of byHome) {
+        if (!objectVisible(home, level)) continue;
+        // The floor judges each object's own rendered width, not the cell's.
+        const objects = grouped.filter((o) => objectRenderedPx(ladder, home, zoom, o.size?.width ?? 1) >= OBJECT_FLOOR_PX);
+        if (objects.length === 0) continue;
+        renderObjects(
+          { ...activeLayer, objects },
+          { ctx, offsetX, offsetY, zoom, scaledSize: scaledSizeForRung(ladder, home, zoom) },
+          ladder.geometryForLevel(home),
+          true,
+          mapData.orientation ?? 'flat',
+          // Fog is level-0 cell data: it cannot hide an object homed on a finer rung.
+          home === 0 ? objectDeps : { ...objectDeps, isCellFogged: (): boolean => false }
+        );
+      }
+    }
+    if (visibility.textLabels && activeLayer.textLabels.length > 0) {
+      const labels = activeLayer.textLabels.filter(label =>
+        labelVisible(label.homeLevel ?? 0, level) && label.fontSize * zoom >= LABEL_FLOOR_PX
+      );
+      if (labels.length > 0) {
+        renderTextLabels(labels, { ctx, zoom, getFontCss }, geometry, { offsetX, offsetY, zoom });
+      }
+    }
   }
 
   // =========================================================================

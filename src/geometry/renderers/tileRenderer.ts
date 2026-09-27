@@ -46,6 +46,11 @@ interface TileRenderOptions {
   /** Terrain brush strokes for the layer — join the region-fill pass so strokes
    *  and cell fills of the same texture share one mask (and one feather). */
   terrainStrokes?: TerrainStroke[];
+  /** Ladder depth (level >= 1): clip each snapped hex tile's art to its own
+   *  home-rung hexagon, so a parent tile re-drawn under its fine cells reads as
+   *  the parent's texture cut to the parent hex. Ignored on grid geometry and
+   *  for freeform stamps. Absent/false = today's unclipped draw. */
+  clipToHex?: boolean;
 }
 
 // ===========================================
@@ -53,6 +58,22 @@ interface TileRenderOptions {
 // ===========================================
 
 const SQRT3 = Math.sqrt(3);
+
+/**
+ * Pure: SVG path string for one hexagon in SCREEN space - centre (cx, cy),
+ * circumradius `radius` (hexSize * zoom). Corner angles match
+ * HexGeometry.getHexVertices (flat: 0deg + 60i, pointy: 30deg + 60i), so the clip
+ * lines up with the lattice. Built as one string for a single `new Path2D(d)`.
+ */
+function hexClipPathString(cx: number, cy: number, radius: number, orientation: string): string {
+  const angleOffset = orientation === 'flat' ? 0 : 30;
+  let d = '';
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 180) * (60 * i + angleOffset);
+    d += (i === 0 ? 'M' : 'L') + (cx + radius * Math.cos(a)).toFixed(3) + ' ' + (cy + radius * Math.sin(a)).toFixed(3);
+  }
+  return d + 'Z';
+}
 
 /** Default cells-per-texture-span for region (terrain) fills. Used only as the
  *  pattern-transform fallback; per-tile resolution supplies the live value. */
@@ -931,6 +952,7 @@ function renderTiles(
   const opacity = options?.opacity ?? 1;
   const canvasW = options?.canvasWidth ?? 4000;
   const canvasH = options?.canvasHeight ?? 4000;
+  const clipToHex = options?.clipToHex === true && !isGrid;
 
   const drawCellTile = (tile: TileAssignment): void => {
     const lookup = entryMap.get(tile.tilesetId + ':' + tile.tileId);
@@ -1036,6 +1058,16 @@ function renderTiles(
       rect = { drawX: cx - w / 2, drawY: cy - h / 2, drawWidth: w, drawHeight: h };
     }
 
+    // Ladder depth: clip the snapped tile to its home-rung hexagon (screen space,
+    // before the rotation transform so the hexagon stays upright). Hex tiles have
+    // no multi-cell span (spans resolve on grid only), so one hexagon is the
+    // whole footprint.
+    const clipHex = clipToHex && tile.freeform !== true;
+    if (clipHex) {
+      ctx.save();
+      ctx.clip(new Path2D(hexClipPathString(screen.screenX, screen.screenY, geometry.hexSize * viewState.zoom, geometry.orientation)));
+    }
+
     // Apply opacity (per-tile and layer-level)
     const tileOpacity = tile.opacity ?? 1;
     if (opacity < 1 || tileOpacity < 1) {
@@ -1070,6 +1102,10 @@ function renderTiles(
     if (opacity < 1 || tileOpacity < 1) {
       ctx.globalAlpha = previousAlpha;
     }
+
+    if (clipHex) {
+      ctx.restore();
+    }
   };
 
   // Render in depth order. Within each tier: region fills (back) → cell fills
@@ -1092,4 +1128,4 @@ function renderTiles(
   }
 }
 
-export { renderTiles, sortTilesForRendering, calculateTileDrawRect, computeRegionPatternTransform, regionFeatherPx, shadowBlurImage, pyramidLevels, pyramidBlurImage, canvasBlurCapabilities, tileOrientationAdaptation };
+export { renderTiles, hexClipPathString, sortTilesForRendering, calculateTileDrawRect, computeRegionPatternTransform, regionFeatherPx, shadowBlurImage, pyramidLevels, pyramidBlurImage, canvasBlurCapabilities, tileOrientationAdaptation };

@@ -5,12 +5,13 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { vi } from 'vitest';
+import { vi, afterEach } from 'vitest';
 
 import {
   sortTilesForRendering,
   calculateTileDrawRect,
   renderTiles,
+  hexClipPathString,
   computeRegionPatternTransform,
   regionFeatherPx,
   shadowBlurImage,
@@ -1258,6 +1259,100 @@ describe('tileRenderer', () => {
 
     it('returns 0 for a non-positive cell size', () => {
       expect(regionFeatherPx(0, 0.25)).toBe(0);
+    });
+  });
+});
+
+describe('tiles at depth: hexagon clip (kgc.6)', () => {
+  const parse = (d: string): Array<[number, number]> =>
+    [...d.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+
+  describe('hexClipPathString', () => {
+    it('is one closed subpath of exactly six vertices', () => {
+      const d = hexClipPathString(100, 50, 10, 'flat');
+      expect(d.startsWith('M')).toBe(true);
+      expect(d.endsWith('Z')).toBe(true);
+      expect((d.match(/M/g) ?? []).length).toBe(1);
+      expect((d.match(/L/g) ?? []).length).toBe(5);
+      expect(parse(d)).toHaveLength(6);
+    });
+
+    it('puts every vertex at the circumradius, flat corners at 0deg + 60i', () => {
+      const pts = parse(hexClipPathString(100, 50, 10, 'flat'));
+      for (const [x, y] of pts) expect(Math.hypot(x - 100, y - 50)).toBeCloseTo(10, 2);
+      expect(pts[0][0]).toBeCloseTo(110, 3);
+      expect(pts[0][1]).toBeCloseTo(50, 3);
+    });
+
+    it('rotates pointy corners by 30deg', () => {
+      const pts = parse(hexClipPathString(0, 0, 10, 'pointy'));
+      expect(pts[0][0]).toBeCloseTo(10 * Math.cos(Math.PI / 6), 2);
+      expect(pts[0][1]).toBeCloseTo(5, 2);
+    });
+  });
+
+  describe('renderTiles clipToHex', () => {
+    const paths: string[] = [];
+    class Path2DStub {
+      constructor(d?: string) { paths.push(d ?? ''); }
+    }
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      paths.length = 0;
+    });
+
+    const ts = {
+      source: 'folder', id: 'ts1', name: 'Test', folderPath: '/test',
+      tileWidth: 64, tileHeight: 64, hexHeight: 64, overflowTop: 0, overflowBottom: 0,
+      tiles: [{ id: 'base1', filename: 'base1.png', vaultPath: '/test/base1.png' }],
+    } as TilesetDef;
+    const geom = (orientation: string) => ({
+      hexToWorld: (q: number, r: number) => ({ worldX: q * 100, worldY: r * 100 }),
+      worldToScreen: (wx: number, wy: number, ox: number, oy: number, zoom: number) => ({
+        screenX: (wx + ox) * zoom, screenY: (wy + oy) * zoom,
+      }),
+      hexSize: 32,
+      orientation,
+    });
+    const makeCtx = () => ({
+      drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), clip: vi.fn(),
+      translate: vi.fn(), rotate: vi.fn(), scale: vi.fn(), globalAlpha: 1,
+    });
+    const img = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
+    const tiles: TileAssignment[] = [
+      { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1' },
+      { col: 1, row: 1, tilesetId: 'ts1', tileId: 'base1', placement: 'overlay' },
+    ];
+    const run = (ctx: ReturnType<typeof makeCtx>, orientation: string, clipToHex?: boolean): void => {
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [ts], geom(orientation), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => img, canvasWidth: 800, canvasHeight: 600, clipToHex,
+      });
+    };
+
+    it('issues exactly one clip per drawn tile, balanced save/restore', () => {
+      vi.stubGlobal('Path2D', Path2DStub);
+      const ctx = makeCtx();
+      run(ctx, 'flat', true);
+      expect(ctx.drawImage).toHaveBeenCalledTimes(2);
+      expect(ctx.clip).toHaveBeenCalledTimes(2);
+      expect(ctx.save.mock.calls.length).toBe(ctx.restore.mock.calls.length);
+      expect(paths).toEqual([hexClipPathString(0, 0, 32, 'flat'), hexClipPathString(100, 100, 32, 'flat')]);
+    });
+
+    it('never clips without the option (dormant path)', () => {
+      vi.stubGlobal('Path2D', Path2DStub);
+      const ctx = makeCtx();
+      run(ctx, 'flat');
+      expect(ctx.drawImage).toHaveBeenCalledTimes(2);
+      expect(ctx.clip).not.toHaveBeenCalled();
+      expect(paths).toHaveLength(0);
+    });
+
+    it('ignores clipToHex on grid geometry', () => {
+      vi.stubGlobal('Path2D', Path2DStub);
+      const ctx = makeCtx();
+      run(ctx, 'grid', true);
+      expect(ctx.clip).not.toHaveBeenCalled();
     });
   });
 });

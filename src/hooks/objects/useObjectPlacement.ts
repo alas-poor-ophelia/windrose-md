@@ -9,6 +9,7 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { ObjectAlignment } from '#types/objects/object.types';
 
 import { useCallback } from 'preact/hooks';
+import { Notice } from 'obsidian';
 import { useMapState } from '../../context/MapContext';
 import { useMapOperations } from '../../context/MapContext';
 import { calculateEdgeAlignment, placeObject, placeObjectFreeform, canPlaceObjectAt } from '../../objects/objectOperations';
@@ -35,7 +36,7 @@ function useObjectPlacement(
 ): {
   handleObjectPlacement: (gridX: number, gridY: number, clientX: number, clientY: number) => boolean;
 } {
-  const { mapData, geometry, screenToWorld } = useMapState();
+  const { mapData, geometry, screenToWorld, getActiveLevel } = useMapState();
   const { onObjectsChange } = useMapOperations();
 
   const handleObjectPlacement = useCallback((
@@ -49,6 +50,12 @@ function useObjectPlacement(
     }
 
     if (geometry == null || mapData == null) return false;
+
+    // Zoomed onto a ladder rung: objects are root-level only this phase (0 on classic maps).
+    if (getActiveLevel() > 0) {
+      new Notice('Objects can only be placed at the root level for now.');
+      return true;
+    }
 
     if (!geometry.isWithinBounds(gridX, gridY)) {
       return true;
@@ -105,7 +112,7 @@ function useObjectPlacement(
       onObjectsChange(result.objects);
     }
     return true;
-  }, [currentTool, selectedObjectType, mapData, geometry, edgeSnapMode, onObjectsChange, screenToWorld, altKeyPressedRef, freeformPlacementModeRef, shiftKeyPressedRef]);
+  }, [currentTool, selectedObjectType, mapData, geometry, getActiveLevel, edgeSnapMode, onObjectsChange, screenToWorld, altKeyPressedRef, freeformPlacementModeRef, shiftKeyPressedRef]);
 
   return { handleObjectPlacement };
 }
