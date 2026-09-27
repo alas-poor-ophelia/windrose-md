@@ -26,7 +26,7 @@ import type {
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useHistory } from './useHistory';
 import { getActiveLayer, getLayerById, updateActiveLayer, updateLayer, addLayer, cloneLayer, removeLayer, reorderLayers, setActiveLayer } from '../../persistence/layerAccessor';
-import { snapshotLevelsOf, restoreSnapshotLevels, layerHistorySnapshotsEqual } from './layerHistoryOps';
+import { snapshotLevelsOf, restoreSnapshotLevels, layerHistorySnapshotsEqual, viewStateForRung } from './layerHistoryOps';
 
 
 /**
@@ -60,6 +60,7 @@ function useLayerHistory({
   };
 
   const {
+    currentState,
     addToHistory: addToHistoryInternal,
     undo: undoInternal,
     redo: redoInternal,
@@ -332,6 +333,9 @@ function useLayerHistory({
   // =========================================================================
 
   const handleUndo = useCallback((): void => {
+    // The change being undone lives on the rung of the entry we are LEAVING
+    // (the current top), not of the snapshot we restore.
+    const leavingLevel = currentState?.level;
     const previousState = undoInternal();
     if (previousState && mapData) {
       isApplyingHistoryRef.current = true;
@@ -351,13 +355,16 @@ function useLayerHistory({
         }
       );
       // Whole `levels` record back (or stripped); `level` never selects the rung.
-      updateMapData(restoreSnapshotLevels(newMapData, previousState));
+      const restored = restoreSnapshotLevels(newMapData, previousState);
+      // Cross-rung undo: bring the camera to the rung the change lives on.
+      const view = viewStateForRung(restored, leavingLevel);
+      updateMapData(view !== null ? { ...restored, viewState: view } : restored);
       // Use setTimeout to ensure state update completes before re-enabling history
       window.setTimeout(() => {
         isApplyingHistoryRef.current = false;
       }, 0);
     }
-  }, [undoInternal, mapData, updateMapData]);
+  }, [undoInternal, currentState, mapData, updateMapData]);
 
   const handleRedo = useCallback((): void => {
     const nextState = redoInternal();
@@ -379,7 +386,10 @@ function useLayerHistory({
         }
       );
       // Whole `levels` record back (or stripped); `level` never selects the rung.
-      updateMapData(restoreSnapshotLevels(newMapData, nextState));
+      const restored = restoreSnapshotLevels(newMapData, nextState);
+      // Cross-rung redo: the re-applied change lives on the entry's own rung.
+      const view = viewStateForRung(restored, nextState.level);
+      updateMapData(view !== null ? { ...restored, viewState: view } : restored);
       // Use setTimeout to ensure state update completes before re-enabling history
       window.setTimeout(() => {
         isApplyingHistoryRef.current = false;

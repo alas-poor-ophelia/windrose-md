@@ -18,6 +18,11 @@
 import type { MapData, MapLayer } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
 import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
+import type { StoredViewState } from '#types/core/map.types';
+
+import { DEFAULTS } from '../../core/dmtConstants';
+import { isLadderView, ladderParamsFor, getMaxZoom } from '../../core/lodFlags';
+import { chooseLevel, crossingZoom } from '../../geometry/core/lattice';
 
 type LevelsRecord = Record<number, Cell[]>;
 
@@ -81,4 +86,24 @@ function layerHistorySnapshotsEqual(a: LayerHistorySnapshot, b: LayerHistorySnap
   return JSON.stringify(aRest) === JSON.stringify(bRest);
 }
 
-export { snapshotLevelsOf, applySnapshotLevels, restoreSnapshotLevels, layerHistorySnapshotsEqual };
+/**
+ * Cross-rung undo (design 06 s5, council KA-9): a history entry edited on rung
+ * `level` is invisible unless that rung is the ACTIVE one, so applying it while
+ * the camera sits on another rung looks like a dead undo. Returns the view that
+ * makes `level` active (same centre, zoom at the geometric middle of the rung's
+ * band), or null when no move is needed: not a ladder view, a root-level entry
+ * (root fills show through every rung by inheritance), or the rung is already
+ * active.
+ */
+function viewStateForRung(mapData: MapData, level: number | undefined): StoredViewState | null {
+  if (level === undefined || level < 1) return null;
+  if (!isLadderView(mapData)) return null;
+  const params = ladderParamsFor(mapData);
+  if (level > params.maxLevel) return null;
+  const view = mapData.viewState ?? { zoom: DEFAULTS.initialZoom, center: { x: 0, y: 0 } };
+  if (chooseLevel(view.zoom, params) === level) return null;
+  const zoom = Math.min(getMaxZoom(mapData), crossingZoom(level, params) * Math.sqrt(params.m));
+  return { ...view, zoom };
+}
+
+export { snapshotLevelsOf, applySnapshotLevels, restoreSnapshotLevels, layerHistorySnapshotsEqual, viewStateForRung };

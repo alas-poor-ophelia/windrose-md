@@ -5,7 +5,9 @@
  * comparing rungs by reference once `levels` is present.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('../../../../src/core/settingsAccessor', () => ({ getSettings: () => ({}) }));
 import type { MapData, MapLayer } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
 import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
@@ -16,6 +18,7 @@ import {
   layerHistorySnapshotsEqual,
 } from '../../../../src/hooks/state/layerHistoryOps';
 import { setLevelCells, authoredCells } from '../../../../src/persistence/layerAccessor';
+import { viewStateForRung } from '../../../../src/hooks/state/layerHistoryOps';
 
 const cell = (x: number, y: number): Cell => ({ x, y, color: '#4a7c59' } as Cell);
 
@@ -122,5 +125,45 @@ describe('layerHistorySnapshotsEqual', () => {
     expect(a.cells).not.toBe(b.cells);
     expect(layerHistorySnapshotsEqual(a, b)).toBe(true);
     expect(layerHistorySnapshotsEqual(a, snap(layer({ cells: [cell(1, 0)] })))).toBe(false);
+  });
+});
+
+describe('viewStateForRung: cross-rung undo moves the camera to the rung the change lives on', () => {
+  const ladderMap = (zoom: number): MapData => ({
+    schemaVersion: 2,
+    mapType: 'hex',
+    hexSize: 80,
+    orientation: 'flat',
+    activeLayerId: 'l1',
+    layerPanelVisible: false,
+    layers: [],
+    lod: { m: 4, minCellPx: 64, maxLevel: 3 },
+    viewState: { zoom, center: { x: 10, y: 20 } },
+  } as unknown as MapData);
+
+  it('returns null for a root-level or undefined entry', () => {
+    expect(viewStateForRung(ladderMap(1), 0)).toBeNull();
+    expect(viewStateForRung(ladderMap(1), undefined)).toBeNull();
+  });
+
+  it('returns null when the rung is already active', () => {
+    // crossings at 0.4, 1.6, 6.4, 25.6: zoom 8 is inside level 2's band
+    expect(viewStateForRung(ladderMap(8), 2)).toBeNull();
+  });
+
+  it('moves to the middle of the rung band, keeping the centre', () => {
+    const view = viewStateForRung(ladderMap(1), 2);
+    expect(view).not.toBeNull();
+    if (view === null) return;
+    expect(view.center).toEqual({ x: 10, y: 20 });
+    expect(view.zoom).toBeCloseTo(6.4 * 2, 9);
+    expect(view.zoom).toBeGreaterThanOrEqual(6.4);
+    expect(view.zoom).toBeLessThan(25.6);
+  });
+
+  it('returns null on a classic map (no lod, flag off) and for a rung past maxLevel', () => {
+    const classic = { ...ladderMap(1), lod: undefined } as unknown as MapData;
+    expect(viewStateForRung(classic, 2)).toBeNull();
+    expect(viewStateForRung(ladderMap(1), 4)).toBeNull();
   });
 });
