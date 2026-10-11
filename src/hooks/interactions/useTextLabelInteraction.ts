@@ -27,6 +27,7 @@ import { getNextRotation } from '../../drawing/rotationOperations';
 import { useMapState, useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { getActiveLayer } from '../../persistence/layerAccessor';
+import { toggledDepthMode } from '../../geometry/renderers/elementBands';
 
 
 // Inline context types for not-yet-migrated contexts
@@ -321,6 +322,21 @@ const useTextLabelInteraction = (
   };
 
   /**
+   * Ladder depth mode (kgc.13): pop at the next rung, or hold the on-screen font size.
+   */
+  const handleDepthModeToggle = (e?: Event): void => {
+    if (!selectedItem || selectedItem.type !== 'text' || !selectedItem.data || !mapData) return;
+    e?.preventDefault();
+    e?.stopPropagation();
+
+    const selectedData = selectedItem.data;
+    const depthMode = toggledDepthMode(selectedData);
+    const updatedLabels = updateTextLabel(getActiveLayer(mapData).textLabels, selectedItem.id, { depthMode });
+    onTextLabelsChange(updatedLabels);
+    setSelectedItem({ ...selectedItem, data: { ...selectedData, depthMode } });
+  };
+
+  /**
    * Handle edit button click
    */
   const handleEditClick = (e?: Event): void => {
@@ -385,6 +401,7 @@ const useTextLabelInteraction = (
     handleTextSubmit,
     handleTextCancel,
     handleRotateClick,
+    handleDepthModeToggle,
     handleEditClick,
     handleCanvasDoubleClick
   };

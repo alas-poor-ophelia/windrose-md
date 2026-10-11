@@ -55,8 +55,14 @@ export type FontWeight = 'normal' | 'bold';
 /** Text label on the map */
 export interface TextLabel {
   id: TextLabelId;
-  /** Ladder rung this entity was placed at. Inert: no reader uses it yet (design 06, s19 item 3). */
+  /** Ladder rung this entity was placed at (absent = 0). Read by the ladder's live element pass. */
   homeLevel?: number;
+  /**
+   * Ladder depth mode (absent = persist). `pop`: hidden once the camera is finer
+   * than the home rung. `persist`: drawn at every finer rung, font held at the
+   * size it had when the next rung activated.
+   */
+  depthMode?: 'pop' | 'persist';
   position: Point;
   content: string;
   fontSize: number;

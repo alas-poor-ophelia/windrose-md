@@ -131,8 +131,14 @@ export type ObjectId = string;
 
 export interface MapObject {
   id: ObjectId;
-  /** Ladder rung this entity was placed at. Inert: no reader uses it yet (design 06, s19 item 3). */
+  /** Ladder rung this entity was placed at (absent = 0). Read by the ladder's live element pass. */
   homeLevel?: number;
+  /**
+   * Ladder depth mode (absent = persist). `pop`: hidden once the camera is finer
+   * than the home rung. `persist`: drawn at every finer rung, held at the on-screen
+   * size it had when the next rung activated.
+   */
+  depthMode?: 'pop' | 'persist';
   type: ObjectTypeId;     // typeId reference
   position: Point;
   size: ObjectSize;

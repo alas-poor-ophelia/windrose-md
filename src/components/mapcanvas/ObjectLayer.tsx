@@ -32,6 +32,8 @@ import { buildObjectActions, buildMultiActions } from '../../hooks/interactions/
 import { calculateObjectScreenPosition } from '../../objects/screenPositionUtils';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { convertObjectToFreeform, snapObjectToGrid } from '../../objects/objectOperations';
+import { toggledDepthMode } from '../../geometry/renderers/elementBands';
+import { isLadderView } from '../../core/lodFlags';
 import { copyDeepLinkToClipboard } from '../../persistence/deepLinkHandler';
 import { LinkingModeBanner } from '../overlays/LinkingModeBanner';
 import { CardinalIndicators } from './CardinalIndicators';
@@ -507,6 +509,14 @@ const ObjectLayer = ({
     }
   };
 
+  // Ladder depth mode (kgc.13): pop at the next rung, or hold the on-screen size.
+  const handleDepthModeToggle = (): void => {
+    if (selectedItem?.type !== 'object' || !mapData) return;
+    const obj = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === selectedItem.id);
+    if (!obj) return;
+    applyObjectUpdates({ depthMode: toggledDepthMode(obj) });
+  };
+
   const handleObjectColorButtonClick = (e: TargetedMouseEvent<HTMLElement>): void => {
     if (selectedItem?.type === 'object') {
       e.preventDefault();
@@ -683,8 +693,9 @@ const ObjectLayer = ({
         onColorClick: handleObjectColorButtonClick as (e?: Event) => void,
         onResize: handleResizeButtonClick as (e?: Event) => void,
         onDelete: handleObjectDeletion,
-        onMeasureToggle: handleMeasureToggle
-      }, mapData, { isResizeMode, isMeasuring: measureMovement });
+        onMeasureToggle: handleMeasureToggle,
+        onDepthModeToggle: handleDepthModeToggle
+      }, mapData, { isResizeMode, isMeasuring: measureMovement, isLadder: isLadderView(mapData) });
 
       const menu = new Menu();
       let lastGroup: string | null = null;
@@ -833,8 +844,9 @@ const ObjectLayer = ({
             onResize: handleResizeButtonClick as (e?: Event) => void,
             onDelete: handleObjectDeletion,
             onPlayerToggle: handlePlayerToggle,
-            onMeasureToggle: handleMeasureToggle
-          }, mapData, { isResizeMode, isPlayer: selectedItem.data?.isPlayer === true, isMeasuring: measureMovement })]}
+            onMeasureToggle: handleMeasureToggle,
+            onDepthModeToggle: handleDepthModeToggle
+          }, mapData, { isResizeMode, isPlayer: selectedItem.data?.isPlayer === true, isMeasuring: measureMovement, isLadder: isLadderView(mapData) })]}
 
           mapData={mapData}
           canvasRef={canvasRef}

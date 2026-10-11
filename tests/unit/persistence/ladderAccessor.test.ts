@@ -14,6 +14,7 @@ import {
   setLevelCells,
   normaliseLevels,
   cloneLayer,
+  promoteToStrata,
 } from '../../../src/persistence/layerAccessor';
 import { migrateMapData } from '../../../src/persistence/fileOperations';
 
@@ -183,5 +184,37 @@ describe('migrateMapData never destroys ladder data', () => {
     const m = migrateMapData(roundTrip(mapWith(layer())));
     expect('lod' in m).toBe(false);
     expect('levels' in m.layers[0]).toBe(false);
+  });
+});
+
+describe('promoteToStrata carries levels (kgc.14)', () => {
+  it('a classic map promotes with no levels key anywhere and the pre-fix ground shape', () => {
+    const src = mapWith(layer());
+    const before = JSON.stringify(src);
+    const out = promoteToStrata(src);
+    expect(JSON.stringify(src)).toBe(before); // input untouched
+    for (const l of out.layers) expect('levels' in l).toBe(false);
+    const ground = out.layers.find(l => l.tileRole === 'ground') as MapLayer;
+    expect(Object.keys(ground)).toEqual([
+      'id', 'name', 'order', 'visible', 'cells', 'curves', 'edges', 'objects', 'textLabels',
+      'fogOfWar', 'tiles', 'tileRole', 'boardId',
+    ]);
+    expect(roundTrip(out)).toEqual(out);
+  });
+
+  it('merges each rung across the board layers into the ground stratum', () => {
+    const a = layer({ id: 'A', levels: { 1: [cell(4, 0)], 3: [cell(64, 0)] } });
+    const b = layer({ id: 'B', order: 1, cells: [cell(1, 1)], levels: { 1: [cell(8, 0)] } });
+    const src = mapWith(a, { layers: [a, b] });
+    const out = promoteToStrata(src);
+    const ground = out.layers.find(l => l.tileRole === 'ground') as MapLayer;
+    expect(ground.id).toBe('A');
+    expect(authoredLevels(ground)).toEqual([0, 1, 3]);
+    expect(authoredCells(ground, 1)).toEqual([cell(4, 0), cell(8, 0)]);
+    expect(authoredCells(ground, 3)).toEqual([cell(64, 0)]);
+    for (const l of out.layers) if (l.tileRole !== 'ground') expect('levels' in l).toBe(false);
+    // Survives a save/load round trip (string keys on disk).
+    const reloaded = roundTrip(out).layers.find(l => l.tileRole === 'ground') as MapLayer;
+    expect(authoredCells(reloaded, 1)).toEqual([cell(4, 0), cell(8, 0)]);
   });
 });

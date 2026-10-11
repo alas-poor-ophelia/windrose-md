@@ -26,6 +26,8 @@ import { SelectionActionsOverlay } from '../toolbars/SelectionActionsOverlay';
 import { buildTextActions } from '../../hooks/interactions/useSelectionActions';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { copyDeepLinkToClipboard } from '../../persistence/deepLinkHandler';
+import { depthModeOf } from '../../geometry/renderers/elementBands';
+import { isLadderView } from '../../core/lodFlags';
 
 
 
@@ -74,6 +76,7 @@ const TextLayer = ({
     handleTextSubmit,
     handleTextCancel,
     handleRotateClick,
+    handleDepthModeToggle,
     handleEditClick,
     handleCanvasDoubleClick,
     handleTextDeletion
@@ -146,8 +149,9 @@ const TextLayer = ({
             onEdit: handleEditClick,
             onRotate: handleRotateClick,
             onCopyLink: handleCopyLink,
-            onDelete: handleTextDeletion
-          })}
+            onDelete: handleTextDeletion,
+            onDepthModeToggle: handleDepthModeToggle
+          }, { isLadder: isLadderView(mapData), depthMode: depthModeOf(selectedItem.data ?? {}) })}
           mapData={mapData}
           canvasRef={canvasRef}
           containerRef={containerRef}

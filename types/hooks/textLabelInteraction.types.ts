@@ -107,6 +107,8 @@ export interface UseTextLabelInteractionResult {
   handleTextSubmit: HandleTextSubmit;
   handleTextCancel: HandleTextCancel;
   handleRotateClick: HandleRotateClick;
+  /** Ladder maps: flips the selected label's depth mode (pop at the next rung / hold its size). */
+  handleDepthModeToggle: HandleRotateClick;
   handleEditClick: HandleEditClick;
   handleCanvasDoubleClick: HandleCanvasDoubleClick;
 }

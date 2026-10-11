@@ -8,8 +8,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { obsidianEvalJson } from "../cli-bridge.js";
 import { opCall, jsStr } from "./ops-helper.js";
 
-/** Per-op cap; matches MAX_CELLS_PER_DEPTH_OP in src/persistence/depthAuthoring.ts. */
-const MAX_CELLS_PER_OP = 4096;
+/** Level-0 schema cap (pre-ladder behaviour). */
+const MAX_CELLS_PER_CALL = 10000;
+/** Rung (level >= 1) per-op cap, enforced by the bridge; matches MAX_CELLS_PER_DEPTH_OP in src/persistence/depthAuthoring.ts. */
+const MAX_CELLS_PER_RUNG_OP = 4096;
 
 /** Optional ladder rung. Omitted means level 0, never the camera's active level. */
 const levelParam = z.number().int().min(0).optional().describe(
@@ -74,7 +76,7 @@ export function registerDrawTools(server: McpServer): void {
         y: z.number().describe("Grid Y coordinate"),
         color: z.string().optional().describe("Hex color override for this cell"),
         opacity: z.number().min(0).max(1).optional().describe("Opacity override for this cell"),
-      })).max(MAX_CELLS_PER_OP).describe(`Array of cells to paint (at most ${MAX_CELLS_PER_OP} per call)`),
+      })).max(MAX_CELLS_PER_CALL).describe(`Array of cells to paint (at most ${MAX_CELLS_PER_CALL} per call; at most ${MAX_CELLS_PER_RUNG_OP} when level >= 1)`),
       level: levelParam,
     },
     async ({ cells, level }) => {

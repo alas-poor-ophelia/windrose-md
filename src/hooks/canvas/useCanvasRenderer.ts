@@ -37,8 +37,8 @@ import { renderGridFog } from '../../geometry/fog/gridFogRenderer';
 import { renderHexFog } from '../../geometry/fog/hexFogRenderer';
 import { getFogSettings, clearFogCanvas, renderFog } from '../../geometry/fog/fogRenderer';
 import { renderObjects } from '../../geometry/renderers/objectRenderer';
-import { OBJECT_FLOOR_PX, LABEL_FLOOR_PX, objectVisible, labelVisible, objectRenderedPx, scaledSizeForRung } from '../../geometry/renderers/elementBands';
-import { renderSelections } from '../../geometry/renderers/selectionRenderer';
+import { OBJECT_FLOOR_PX, LABEL_FLOOR_PX, groupByDepth, objectVisible, labelVisible, elementZoom, elementScale, objectRenderedPx, scaledSizeForRung } from '../../geometry/renderers/elementBands';
+import { renderSelections, renderObjectSelections, renderTextLabelSelections } from '../../geometry/renderers/selectionRenderer';
 import { segmentRenderer } from '../../geometry/renderers/segmentRenderer';
 import { getFontCss } from '../../text/fontOptions';
 import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
@@ -57,6 +57,7 @@ import { getSlotOffset, getMultiObjectScale, getObjectsInCell } from '../../obje
 import { offsetToAxial, axialToOffset } from '../../geometry/core/offsetCoordinates';
 import { getActiveLayer, getLayerBelow, getRenderLayers, getExportLayers, isCellFogged, getActiveBoardId, getBoardBelow, getBoardLayers } from '../../persistence/layerAccessor';
 import { registerSurface, touchSurface, releaseSurface, evictIfNeeded, setActiveCanvas } from './surfaceBudget';
+import { driftAllowed } from './levelSurfaces';
 import { recordFrame, recordRebuild, recordPhase } from './ladderTelemetry';
 import { materialiseLevelLayer } from '../../geometry/core/materialiseLevel';
 import { createLatticeClipCache, drawLadderLattice } from '../../geometry/renderers/latticeRenderer';
@@ -286,9 +287,13 @@ function blitStaticContent(
     return { scale: s, tx: cx, ty: cy, usable: ok };
   };
 
-  // The level's own surface if usable; otherwise, on any level above 0, the nearest
-  // coarser USABLE surface as a drift source (D17). A classic map only ever asks for
-  // level 0, so for it `sourceLevel` is always `level` and nothing below changes.
+  // The level's own surface if usable. While the level has NO surface at all (a
+  // crossing in progress: never baked, or evicted), the nearest coarser USABLE
+  // surface is the drift source (D17). Once the level owns a surface, leaving its
+  // pad or invalidating its key bakes synchronously, exactly as the classic path
+  // does at level 0: a coarser surface lacks this rung's authored cells, so
+  // drifting to it mid-pan blinks the rung's paint out (kgc.19). A classic map
+  // only ever asks for level 0, so for it `sourceLevel` is always `level`.
   let entry = set.byLevel.get(level);
   let sourceLevel = level;
   let { scale, tx, ty, usable } = entry === undefined ? { scale: 1, tx: 0, ty: 0, usable: false } : usability(entry);
@@ -297,7 +302,7 @@ function blitStaticContent(
   // crossing frame is the exception (D17): drift now; the settle re-asks.
   const honourBake = set.bakeRequested === level && !crossingFrame;
   if (honourBake) set.bakeRequested = null;
-  if (!usable && level > 0 && !honourBake) {
+  if (driftAllowed(entry !== undefined, level, honourBake)) {
     for (let coarser = level - 1; coarser >= 0; coarser--) {
       const candidate = set.byLevel.get(coarser);
       if (candidate === undefined) continue;
@@ -1270,21 +1275,14 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // active layer's objects, then its text labels.
   if (ladder !== null && !showCoordinates) {
     if (visibility.objects && activeLayer.objects.length > 0) {
-      const byHome = new Map<number, MapObject[]>();
-      for (const obj of activeLayer.objects) {
-        const home = obj.homeLevel ?? 0;
-        const group = byHome.get(home);
-        if (group !== undefined) group.push(obj);
-        else byHome.set(home, [obj]);
-      }
-      for (const [home, grouped] of byHome) {
-        if (!objectVisible(home, level)) continue;
+      for (const { home, mode, members } of groupByDepth(activeLayer.objects)) {
+        if (!objectVisible(home, level, mode)) continue;
         // The floor judges each object's own rendered width, not the cell's.
-        const objects = grouped.filter((o) => objectRenderedPx(ladder, home, zoom, o.size?.width ?? 1) >= OBJECT_FLOOR_PX);
+        const objects = members.filter((o) => objectRenderedPx(ladder, home, zoom, o.size?.width ?? 1, mode) >= OBJECT_FLOOR_PX);
         if (objects.length === 0) continue;
         renderObjects(
           { ...activeLayer, objects },
-          { ctx, offsetX, offsetY, zoom, scaledSize: scaledSizeForRung(ladder, home, zoom) },
+          { ctx, offsetX, offsetY, zoom, scaledSize: scaledSizeForRung(ladder, home, zoom), elementScale: elementScale(ladder, home, zoom, mode), slotObjects: activeLayer.objects },
           ladder.geometryForLevel(home),
           true,
           mapData.orientation ?? 'flat',
@@ -1294,11 +1292,13 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       }
     }
     if (visibility.textLabels && activeLayer.textLabels.length > 0) {
-      const labels = activeLayer.textLabels.filter(label =>
-        labelVisible(label.homeLevel ?? 0, level) && label.fontSize * zoom >= LABEL_FLOOR_PX
-      );
-      if (labels.length > 0) {
-        renderTextLabels(labels, { ctx, zoom, getFontCss }, geometry, { offsetX, offsetY, zoom });
+      for (const { home, mode, members } of groupByDepth(activeLayer.textLabels)) {
+        if (!labelVisible(home, level, mode)) continue;
+        const fontZoom = elementZoom(ladder, home, zoom, mode);
+        const labels = members.filter(label => label.fontSize * fontZoom >= LABEL_FLOOR_PX);
+        if (labels.length === 0) continue;
+        // Position at the real zoom (world px are level-invariant); font at the held zoom.
+        renderTextLabels(labels, { ctx, zoom: fontZoom, getFontCss }, geometry, { offsetX, offsetY, zoom });
       }
     }
   }
@@ -1343,25 +1343,64 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Draw selection indicators
   const isHexMapForSelection = geometry.type === 'hex';
   const hexGeomForSelection = geometry.type === 'hex' ? geometry : null;
-  renderSelections(
-    itemsArray,
-    activeLayer.textLabels,
-    activeLayer.objects,
-    { ctx, offsetX, offsetY, zoom, scaledSize },
-    geometry,
-    hexGeomForSelection,
-    isHexMapForSelection,
-    isResizeMode,
-    mapData.orientation ?? 'flat',
-    showCoordinates,
-    visibility,
-    {
-      getFontCss,
-      getObjectsInCell,
-      getSlotOffset,
-      getMultiObjectScale,
+  const selectionDeps = {
+    getFontCss,
+    getObjectsInCell,
+    getSlotOffset,
+    getMultiObjectScale,
+  };
+  if (ladder !== null) {
+    // Under the ladder the chrome follows the live element pass: one call per
+    // depth group, on the home rung's geometry, with the same hold the element
+    // was drawn with. Hidden groups (pop mode below home) get no chrome.
+    if (itemsArray.length > 0 && !showCoordinates) {
+      if (visibility.textLabels !== false) {
+        for (const { home, mode, members } of groupByDepth(activeLayer.textLabels)) {
+          if (!labelVisible(home, level, mode)) continue;
+          const fontZoom = elementZoom(ladder, home, zoom, mode);
+          const labels = members.filter(label => label.fontSize * fontZoom >= LABEL_FLOOR_PX);
+          if (labels.length === 0) continue;
+          renderTextLabelSelections(itemsArray, labels, { ctx, offsetX, offsetY, zoom, scaledSize, fontZoom }, geometry, getFontCss);
+        }
+      }
+      if (visibility.objects !== false) {
+        for (const { home, mode, members } of groupByDepth(activeLayer.objects)) {
+          if (!objectVisible(home, level, mode)) continue;
+          // Same floor as the draw pass: no chrome around an element that was not drawn.
+          const ids = new Set(members.filter((o) => objectRenderedPx(ladder, home, zoom, o.size?.width ?? 1, mode) >= OBJECT_FLOOR_PX).map((o) => o.id));
+          const items = itemsArray.filter((it) => it.type === 'object' && ids.has(it.id));
+          if (items.length === 0) continue;
+          const homeGeom = ladder.geometryForLevel(home);
+          renderObjectSelections(
+            items,
+            activeLayer.objects,
+            { ctx, offsetX, offsetY, zoom, scaledSize: scaledSizeForRung(ladder, home, zoom), elementScale: elementScale(ladder, home, zoom, mode) },
+            homeGeom,
+            homeGeom,
+            true,
+            isResizeMode,
+            mapData.orientation ?? 'flat',
+            selectionDeps
+          );
+        }
+      }
     }
-  );
+  } else {
+    renderSelections(
+      itemsArray,
+      activeLayer.textLabels,
+      activeLayer.objects,
+      { ctx, offsetX, offsetY, zoom, scaledSize },
+      geometry,
+      hexGeomForSelection,
+      isHexMapForSelection,
+      isResizeMode,
+      mapData.orientation ?? 'flat',
+      showCoordinates,
+      visibility,
+      selectionDeps
+    );
+  }
 
   // Restore context
   ctx.restore();

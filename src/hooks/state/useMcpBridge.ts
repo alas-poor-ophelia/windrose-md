@@ -234,9 +234,10 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
           return true;
         },
         paintCells: (cells: Array<{ x: number; y: number; color?: string; opacity?: number }>, level?: number): number | WindroseLevelWriteResult => {
-          // The per-op depth refusal is enforced at the MCP layer at every level.
-          if (cells.length > MAX_CELLS_PER_DEPTH_OP) return levelFail(level ?? 0, 'too-many-cells');
           if (isRung(level)) {
+            // Per-op depth budget applies to rung writes only; level 0 keeps the
+            // pre-ladder behaviour (bounded by the MCP schema's 10000 max).
+            if (cells.length > MAX_CELLS_PER_DEPTH_OP) return levelFail(level, 'too-many-cells');
             return writeRung(level, cells, (current, kept) => paintKept(current, kept, (i) => ({
               color: cells[i].color ?? selectedColor,
               opacity: cells[i].opacity ?? selectedOpacity,

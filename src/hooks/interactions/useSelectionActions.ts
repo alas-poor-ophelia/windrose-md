@@ -7,6 +7,8 @@
 
 import type { MapData } from '#types/core/map.types';
 import type { SelectedItem } from '#types/contexts/context.types';
+import { DEFAULT_DEPTH_MODE, depthModeOf } from '../../geometry/renderers/elementBands';
+import type { DepthMode } from '../../geometry/renderers/elementBands';
 
 export type ActionGroup = 'transform' | 'content' | 'links' | 'style' | 'player' | 'danger';
 
@@ -38,6 +40,8 @@ interface ObjectHandlers {
   onDelete: (e?: Event) => void;
   onPlayerToggle?: (e?: Event) => void;
   onMeasureToggle?: (e?: Event) => void;
+  /** Ladder maps only: flips the object's depth mode (pop at the next rung / hold its size). */
+  onDepthModeToggle?: (e?: Event) => void;
 }
 
 interface TextHandlers {
@@ -45,6 +49,30 @@ interface TextHandlers {
   onRotate: (e?: Event) => void;
   onCopyLink: (e?: Event) => void;
   onDelete: (e?: Event) => void;
+  /** Ladder maps only: flips the label's depth mode (pop at the next rung / hold its size). */
+  onDepthModeToggle?: (e?: Event) => void;
+}
+
+interface TextActionOptions {
+  /** True when the map is shown as a lattice ladder; the depth toggle is hidden otherwise. */
+  isLadder?: boolean;
+  /** The label's current depth mode, for the toggle's state. */
+  depthMode?: DepthMode;
+}
+
+/** The depth toggle, shared by objects and labels. Hidden off the ladder. */
+function depthModeAction(isLadder: boolean, depthMode: DepthMode, invoke: ((e?: Event) => void) | undefined): SelectionAction {
+  const isPop = depthMode === 'pop';
+  return {
+    id: 'depthMode',
+    label: isPop ? 'Hides at next zoom level' : 'Holds size when zooming in',
+    icon: isPop ? 'lucide-eye-off' : 'lucide-anchor',
+    group: 'transform',
+    visible: isLadder,
+    invoke: invoke ?? ((): void => {}),
+    active: isPop,
+    iconOnly: true
+  };
 }
 
 interface MultiHandlers {
@@ -57,6 +85,8 @@ interface ObjectActionOptions {
   isResizeMode?: boolean;
   isPlayer?: boolean;
   isMeasuring?: boolean;
+  /** True when the map is shown as a lattice ladder; the depth toggle is hidden otherwise. */
+  isLadder?: boolean;
 }
 
 function buildObjectActions(
@@ -92,6 +122,7 @@ function buildObjectActions(
       icon: 'lucide-ruler', group: 'transform', visible: true,
       invoke: handlers.onMeasureToggle ?? ((): void => {}), active: options?.isMeasuring === true, iconOnly: true
     },
+    depthModeAction(options?.isLadder === true, depthModeOf(item.data ?? {}), handlers.onDepthModeToggle),
 
     // Content group
     {
@@ -147,7 +178,7 @@ function buildObjectActions(
   ];
 }
 
-function buildTextActions(handlers: TextHandlers): SelectionAction[] {
+function buildTextActions(handlers: TextHandlers, options?: TextActionOptions): SelectionAction[] {
   return [
     {
       id: 'edit', label: 'Edit', icon: 'lucide-pencil',
@@ -157,6 +188,7 @@ function buildTextActions(handlers: TextHandlers): SelectionAction[] {
       id: 'rotate', label: 'Rotate', icon: 'lucide-rotate-cw',
       group: 'transform', visible: true, invoke: handlers.onRotate
     },
+    depthModeAction(options?.isLadder === true, options?.depthMode ?? DEFAULT_DEPTH_MODE, handlers.onDepthModeToggle),
     {
       id: 'copyLink', label: 'Copy Link', icon: 'lucide-link',
       group: 'links', visible: true, invoke: handlers.onCopyLink, iconOnly: true

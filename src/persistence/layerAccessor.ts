@@ -432,13 +432,23 @@ function promoteToStrata(mapData: MapData): MapData {
   });
 
   const otherLayers = mapData.layers.filter(l => layerBoardId(l) !== boardId);
-  return {
+  const promoted: MapData = {
     ...mapData,
     layers: [...otherLayers, ...strata],
     activeLayerId: base.id,
     activeBoardId: boardId,
     layerMode: 'strata',
   };
+
+  // Ladder rungs (kgc.14): fold every merged layer's rung cells into the ground
+  // stratum per level, exactly as level-0 `cells` merge above, through THE rung
+  // writer. Classic boards author no rungs, so no `levels` key is ever written.
+  const rungs = [...new Set(boardLayers.flatMap(l => authoredLevels(l).filter(lv => lv > 0)))]
+    .sort((a, b) => a - b);
+  return rungs.reduce(
+    (acc, level) => setLevelCells(acc, base.id, level, boardLayers.flatMap(l => authoredCells(l, level))),
+    promoted
+  );
 }
 
 /** Set the layer rendering mode. 'strata' runs the best-effort promotion; 'simple'

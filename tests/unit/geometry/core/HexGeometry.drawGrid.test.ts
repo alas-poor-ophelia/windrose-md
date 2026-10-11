@@ -99,11 +99,22 @@ describe("HexGeometry.drawGrid radial culling", () => {
     expect(thick.calls().length).toBeGreaterThanOrEqual(thinCount);
   });
 
-  it("aborts with a warning instead of drawing more than 50000 hexes", () => {
+  it("still draws the visible cells of a map with more than 50000 cells total (windrose-kgc.18)", () => {
     const g = radial(130); // 3*130*131 + 1 = 51091 cells
     const { ctx, calls } = spyOutline(g);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    g.drawGrid(ctx, 5000, 5000, 10000, 10000, 1);
+    g.drawGrid(ctx, 500, 500, 1000, 1000, 1);
+    expect(warn).not.toHaveBeenCalled();
+    expect(calls().length).toBeGreaterThan(0);
+    expect(calls().length).toBeLessThan(51091);
+    expect(calls()).toContainEqual({ q: 0, r: 0 });
+  });
+
+  it("aborts with a warning when more than 50000 hexes survive the cull", () => {
+    const g = radial(130); // 51091 cells, all on-screen at this zoom
+    const { ctx, calls } = spyOutline(g);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    g.drawGrid(ctx, 5000, 5000, 10000, 10000, 0.01);
     expect(calls().length).toBe(0);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0][0])).toContain("Too many hexes");

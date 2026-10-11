@@ -32,5 +32,18 @@ function pickDriftSource<T>(entries: ReadonlyMap<number, T>, level: number): Dri
   return null;
 }
 
+/**
+ * May this frame blit a coarser surface instead of baking the level's own?
+ * Only while the level owns NO surface (a crossing in progress: never baked, or
+ * evicted) and no settle has asked it to bake. A level that owns a surface which
+ * merely stopped fitting (pan or zoom-out past its pad) or whose key changed
+ * bakes synchronously, like the classic level-0 path: a coarser surface lacks
+ * this rung's authored cells, so drifting to it would blink that paint out
+ * (kgc.19). Level 0 never drifts.
+ */
+function driftAllowed(hasOwnSurface: boolean, level: number, honourBake: boolean): boolean {
+  return !hasOwnSurface && level > 0 && !honourBake;
+}
+
 export type { DriftSource };
-export { pickDriftSource };
+export { pickDriftSource, driftAllowed };

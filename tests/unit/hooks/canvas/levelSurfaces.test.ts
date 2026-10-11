@@ -15,7 +15,24 @@
 
 import { describe, it, expect } from "vitest";
 
-import { pickDriftSource } from "../../../../src/hooks/canvas/levelSurfaces";
+import { pickDriftSource, driftAllowed } from "../../../../src/hooks/canvas/levelSurfaces";
+
+describe("driftAllowed (kgc.19: drift only while the level owns no surface)", () => {
+  it("drifts on a crossing in progress: no own surface, rung above 0, no bake request", () => {
+    expect(driftAllowed(false, 1, false)).toBe(true);
+    expect(driftAllowed(false, 3, false)).toBe(true);
+  });
+
+  it("never drifts once the level owns a surface, even one that stopped fitting (pan past the pad)", () => {
+    expect(driftAllowed(true, 1, false)).toBe(false);
+    expect(driftAllowed(true, 2, true)).toBe(false);
+  });
+
+  it("never drifts at level 0 and never over a settle's bake request", () => {
+    expect(driftAllowed(false, 0, false)).toBe(false);
+    expect(driftAllowed(false, 1, true)).toBe(false);
+  });
+});
 
 describe("pickDriftSource", () => {
   it("returns the exact level when it is cached", () => {

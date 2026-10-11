@@ -374,10 +374,6 @@ class HexGeometry extends BaseGeometry {
     // static rebuild regardless of viewport; every sub-hex map is radial.
     if (this.renderingMode === 'radial') {
       const cells = this.getAllRadialCells(this.bounds?.maxRing ?? 0);
-      if (cells.length > 50000) {
-        console.warn(`[HexGeometry.drawGrid] Too many hexes to draw (${cells.length}), aborting`);
-        return;
-      }
       const radialPad = rotated ? Math.sqrt(width * width + height * height) / 2 : 0;
       // Half-extent of a hex's bounding box on screen, plus the line width.
       const margin = this.hexSize * zoom + lineWidth + radialPad;
@@ -385,11 +381,22 @@ class HexGeometry extends BaseGeometry {
       const maxX = width + margin;
       const minY = -margin;
       const maxY = height + margin;
-      for (const { q, r } of cells) {
-        const { worldX, worldY } = this.hexToWorld(q, r);
+      const visible: Array<{ q: number; r: number }> = [];
+      for (const cell of cells) {
+        const { worldX, worldY } = this.hexToWorld(cell.q, cell.r);
         const sx = offsetX + worldX * zoom;
         const sy = offsetY + worldY * zoom;
         if (sx < minX || sx > maxX || sy < minY || sy > maxY) continue;
+        visible.push(cell);
+      }
+      // Safety check judges the culled set, like the rectangular branch judges
+      // its visible range — never the map's total ring count, or every large
+      // radial map (maxRing >= 129) would lose its grid at any zoom.
+      if (visible.length > 50000) {
+        console.warn(`[HexGeometry.drawGrid] Too many hexes to draw (${visible.length}), aborting`);
+        return;
+      }
+      for (const { q, r } of visible) {
         this.drawHexOutline(ctx, q, r, offsetX, offsetY, zoom, lineWidth);
       }
       return;
