@@ -106,6 +106,7 @@ function depthRefusalMessage(reason: DepthWriteRefusal): string {
     case 'too-many-cells': return 'Deep edit refused: too many cells in one operation.';
     case 'level-out-of-range': return 'Deep edit refused: this zoom level cannot be edited.';
     case 'quarantined': return 'Deep edit refused: this map\'s detail levels are read-only here.';
+    case 'nested-classic': return 'Deep edit refused: this map has sub-maps, and converting it is not available yet.';
     case 'not-a-ladder': return 'Deep edit refused: this map cannot take detail edits.';
   }
 }

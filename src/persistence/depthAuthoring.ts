@@ -18,7 +18,7 @@ import type { Cell } from '#types/core/cell.types';
 import type { LayerId } from '#types/core/map.types';
 
 import { LADDER_DEFAULTS } from '../geometry/core/lattice';
-import { isDepthQuarantined, isLadderView, isLodLadderEnabled, ladderParamsFor } from '../core/lodFlags';
+import { isDepthQuarantined, isLadderView, isLodLadderEnabled, ladderParamsFor, hasSubHexChildren } from '../core/lodFlags';
 import { authoredCells, getActiveLayer, setLevelCells } from './layerAccessor';
 import { MAX_JOURNAL_PAYLOAD } from './saveJournal';
 
@@ -31,6 +31,7 @@ const BYTES_PER_CELL_ESTIMATE = 36;
 
 type DepthWriteRefusal =
   | 'not-a-ladder'
+  | 'nested-classic'
   | 'quarantined'
   | 'level-out-of-range'
   | 'too-many-cells'
@@ -61,7 +62,11 @@ function withLod(mapData: MapData): MapData {
  */
 function guardDepthWrite(mapData: MapData, layerId: LayerId, level: number, nextCells: Cell[]): DepthWriteRefusal | null {
   if (!canBeginDepthAuthoring(mapData)) {
-    return isDepthQuarantined(mapData).quarantined ? 'quarantined' : 'not-a-ladder';
+    if (isDepthQuarantined(mapData).quarantined) return 'quarantined';
+    // A classic map with sub-hex children never takes the lod stamp (design s9):
+    // the stamp would hide its children behind the ladder for good (kgc.15).
+    if (mapData.lod === undefined && hasSubHexChildren(mapData)) return 'nested-classic';
+    return 'not-a-ladder';
   }
   const params = ladderParamsFor(withLod(mapData));
   if (!Number.isInteger(level) || level < 1 || level > params.maxLevel) return 'level-out-of-range';

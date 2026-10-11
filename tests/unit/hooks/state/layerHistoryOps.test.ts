@@ -18,7 +18,7 @@ import {
   layerHistorySnapshotsEqual,
 } from '../../../../src/hooks/state/layerHistoryOps';
 import { setLevelCells, authoredCells } from '../../../../src/persistence/layerAccessor';
-import { viewStateForRung } from '../../../../src/hooks/state/layerHistoryOps';
+import { viewStateForRung, stampedLodOf, undoLodStamp, redoLodStamp } from '../../../../src/hooks/state/layerHistoryOps';
 
 const cell = (x: number, y: number): Cell => ({ x, y, color: '#4a7c59' } as Cell);
 
@@ -125,6 +125,44 @@ describe('layerHistorySnapshotsEqual', () => {
     expect(a.cells).not.toBe(b.cells);
     expect(layerHistorySnapshotsEqual(a, b)).toBe(true);
     expect(layerHistorySnapshotsEqual(a, snap(layer({ cells: [cell(1, 0)] })))).toBe(false);
+  });
+});
+
+describe('lod stamp travels with the first deep write (kgc.15)', () => {
+  const LOD = { m: 4, minCellPx: 64, maxLevel: 3 };
+
+  it('stampedLodOf records the block only when the write added it', () => {
+    const classic = mapWith(layer());
+    const stamped: MapData = { ...classic, lod: LOD };
+    expect(stampedLodOf(classic, stamped)).toEqual({ lodStamped: LOD });
+    expect(stampedLodOf(stamped, stamped)).toEqual({});
+    expect(stampedLodOf(classic, classic)).toEqual({});
+  });
+
+  it('undo leaving the stamping entry strips lod; leaving any other entry keeps it', () => {
+    const stamped: MapData = { ...mapWith(layer()), lod: LOD };
+    const stampingEntry = snap(layer(), { lodStamped: LOD });
+    const plainEntry = snap(layer());
+    const classicAgain = undoLodStamp(stamped, stampingEntry);
+    expect('lod' in classicAgain).toBe(false);
+    expect(undoLodStamp(stamped, plainEntry)).toBe(stamped);
+    expect(undoLodStamp(stamped, null)).toBe(stamped);
+    expect(undoLodStamp(classicAgain, stampingEntry)).toBe(classicAgain);
+  });
+
+  it('redo onto the stamping entry puts the block back; onto any other entry changes nothing', () => {
+    const classic = mapWith(layer());
+    const stampingEntry = snap(layer(), { lodStamped: LOD });
+    expect(redoLodStamp(classic, stampingEntry).lod).toEqual(LOD);
+    expect(redoLodStamp(classic, snap(layer()))).toBe(classic);
+    const already: MapData = { ...classic, lod: LOD };
+    expect(redoLodStamp(already, stampingEntry)).toBe(already);
+  });
+
+  it('a classic snapshot carries no lodStamped key and still dedupes by stringify', () => {
+    const s = snap(layer());
+    expect('lodStamped' in s).toBe(false);
+    expect(layerHistorySnapshotsEqual(s, snap(layer()))).toBe(true);
   });
 });
 

@@ -30,7 +30,7 @@ import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 
 import { useCallback, useMemo } from 'preact/hooks';
 import { getActiveLayer, updateActiveLayer, promoteToStrata, getActiveBoardLayers, setActiveLayer, authoredCells } from '../../persistence/layerAccessor';
-import { snapshotLevelsOf } from './layerHistoryOps';
+import { snapshotLevelsOf, stampedLodOf } from './layerHistoryOps';
 import { writeDepthCells, type DepthWriteResult } from '../../persistence/depthAuthoring';
 
 
@@ -77,7 +77,8 @@ function useDataHandlers({
     // Ladder rungs by reference, only when present (an override that names
     // `levels` wins, including one that removes them); `level` is UI-only.
     ...snapshotLevelsOf('levels' in overrides ? overrides : layer),
-    ...(overrides.level !== undefined ? { level: overrides.level } : {})
+    ...(overrides.level !== undefined ? { level: overrides.level } : {}),
+    ...(overrides.lodStamped !== undefined ? { lodStamped: overrides.lodStamped } : {})
   }), []);
 
   // =========================================================================
@@ -135,7 +136,9 @@ function useDataHandlers({
 
         if (!suppressHistory) {
           const written = getActiveLayer(result.mapData);
-          addToHistory(buildLayerHistorySnapshot(written, result.mapData.name ?? '', { ...snapshotLevelsOf(written), level }, result.mapData.regions ?? [], result.mapData.outlines ?? [], result.mapData.shapeOverlays ?? [], written.fogOfWar, result.mapData.partyPins ?? [], result.mapData.savedRoutes ?? []));
+          // The first deep write also stamps `lod`; its entry remembers that, so
+          // undo takes the stamp back out with the cells (review finding kgc.15).
+          addToHistory(buildLayerHistorySnapshot(written, result.mapData.name ?? '', { ...snapshotLevelsOf(written), level, ...stampedLodOf(currentMapData, result.mapData) }, result.mapData.regions ?? [], result.mapData.outlines ?? [], result.mapData.shapeOverlays ?? [], written.fogOfWar, result.mapData.partyPins ?? [], result.mapData.savedRoutes ?? []));
         }
 
         return result.mapData;

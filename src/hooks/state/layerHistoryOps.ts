@@ -15,7 +15,7 @@
  *   prior reference on a no-op, and every real edit makes a new array).
  */
 
-import type { MapData, MapLayer } from '#types/core/map.types';
+import type { MapData, MapLayer, LadderConfig } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
 import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 import type { StoredViewState } from '#types/core/map.types';
@@ -106,4 +106,30 @@ function viewStateForRung(mapData: MapData, level: number | undefined): StoredVi
   return { ...view, zoom };
 }
 
-export { snapshotLevelsOf, applySnapshotLevels, restoreSnapshotLevels, layerHistorySnapshotsEqual, viewStateForRung };
+/**
+ * The first deep write on a classic map stamps `lod` (depthAuthoring.withLod).
+ * Its history entry records that block, so the stamp is as reversible as the
+ * cells it came with. `{}` for every other write, so classic snapshots and
+ * later rung writes carry no `lodStamped` key.
+ */
+function stampedLodOf(before: MapData, after: MapData): { lodStamped?: LadderConfig } {
+  return before.lod === undefined && after.lod !== undefined ? { lodStamped: after.lod } : {};
+}
+
+/** Undo LEAVING the entry that stamped `lod`: the map is classic again. Same map otherwise. */
+function undoLodStamp(mapData: MapData, leaving: LayerHistorySnapshot | null | undefined): MapData {
+  if (leaving?.lodStamped === undefined || mapData.lod === undefined) return mapData;
+  const { lod: _dropped, ...rest } = mapData;
+  return rest;
+}
+
+/** Redo ONTO the entry that stamped `lod`: the block comes back. Same map otherwise. */
+function redoLodStamp(mapData: MapData, entering: LayerHistorySnapshot): MapData {
+  if (entering.lodStamped === undefined || mapData.lod !== undefined) return mapData;
+  return { ...mapData, lod: entering.lodStamped };
+}
+
+export {
+  snapshotLevelsOf, applySnapshotLevels, restoreSnapshotLevels, layerHistorySnapshotsEqual, viewStateForRung,
+  stampedLodOf, undoLodStamp, redoLodStamp
+};

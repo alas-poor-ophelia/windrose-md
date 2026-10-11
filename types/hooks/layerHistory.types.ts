@@ -10,7 +10,7 @@ import type { Cell } from '../core/cell.types';
 import type { Curve } from '../core/curve.types';
 import type { WallPath } from '../core/wallpath.types';
 import type { TerrainStroke } from '../core/terrainstroke.types';
-import type { Edge, TextLabel, MapData, LayerId, Region, ShapeOverlay, Outline, FogOfWar, PartyPin, SavedRoute } from '../core/map.types';
+import type { Edge, TextLabel, MapData, LayerId, Region, ShapeOverlay, Outline, FogOfWar, PartyPin, SavedRoute, LadderConfig } from '../core/map.types';
 import type { MapObject } from '../objects/object.types';
 import type { TileAssignment } from '../tiles/tile.types';
 import type { HistoryState } from './history.types';
@@ -62,6 +62,12 @@ export interface LayerHistorySnapshot {
   levels?: Record<number, Cell[]>;
   /** Rung the entry edited. UI/telemetry only; never selects what to restore. */
   level?: number;
+  /**
+   * Set ONLY on the entry whose deep write stamped `lod` onto a previously
+   * classic map (the first rung write). Undoing past this entry strips `lod`
+   * again; redoing onto it puts this block back. Absent everywhere else.
+   */
+  lodStamped?: LadderConfig;
 }
 
 /**

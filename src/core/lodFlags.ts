@@ -62,8 +62,19 @@ function isLadderView(mapData: MapData | null | undefined): boolean {
   if (mapData === null || mapData === undefined) return false;
   if (mapData.mapType !== 'hex') return false;
   if (((mapData.northDirection ?? 0) % 360) !== 0) return false;
-  if (mapData.lod === undefined && !isLodLadderEnabled()) return false;
+  if (mapData.lod === undefined) {
+    if (!isLodLadderEnabled()) return false;
+    // A classic map with sub-hex children keeps the classic dive and cannot
+    // enter ladder mode in v1 (design s9 / T1): the flag alone never ladders it.
+    if (hasSubHexChildren(mapData)) return false;
+  }
   return !isDepthQuarantined(mapData).quarantined;
+}
+
+/** Does this map nest classic sub-hex maps? Such a map cannot enter ladder mode in v1 (design s9). */
+function hasSubHexChildren(mapData: MapData): boolean {
+  const children = mapData.subHexMaps;
+  return children !== undefined && children !== null && Object.keys(children).length > 0;
 }
 
 /** Deepest rung >= 1 holding authored cells on any layer; 0 when none. */
@@ -155,5 +166,5 @@ function getMaxZoom(mapData: MapData | null | undefined): number {
 
 export {
   isLodLadderEnabled, getLadderOverrides, isLadderView, isDepthQuarantined, canAuthorDepth,
-  ladderParamsFor, getMaxZoom, hasDepthContent
+  ladderParamsFor, getMaxZoom, hasDepthContent, hasSubHexChildren
 };

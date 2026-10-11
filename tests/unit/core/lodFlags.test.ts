@@ -4,7 +4,7 @@ import type { MapData } from '#types/core/map.types';
 const getSettings = vi.fn(() => ({} as Record<string, unknown>));
 vi.mock('../../../src/core/settingsAccessor', () => ({ getSettings }));
 
-const { isLodLadderEnabled, isLadderView, isDepthQuarantined, canAuthorDepth, ladderParamsFor, getMaxZoom, hasDepthContent } =
+const { isLodLadderEnabled, isLadderView, isDepthQuarantined, canAuthorDepth, ladderParamsFor, getMaxZoom, hasDepthContent, hasSubHexChildren } =
   await import('../../../src/core/lodFlags');
 const { DEFAULTS } = await import('../../../src/core/dmtConstants');
 
@@ -169,6 +169,19 @@ describe('lodFlags: isLadderView, canAuthorDepth, ladderParamsFor', () => {
     getSettings.mockReturnValue({});
     expect(isLadderView(withLayers({ lod: { ...LOD, m: 1 } }))).toBe(false);
     expect(isLadderView(withLayers({ lod: LOD }))).toBe(true);
+  });
+
+  it('a classic map with sub-hex children is never laddered by the flag alone (kgc.15, design s9)', () => {
+    getSettings.mockReturnValue({ lodLadder: true });
+    const child = { mapData: hexMap() } as unknown as NonNullable<MapData['subHexMaps']>[string];
+    expect(hasSubHexChildren(withLayers({ subHexMaps: { '1,1': child } }))).toBe(true);
+    expect(hasSubHexChildren(withLayers({ subHexMaps: {} }))).toBe(false);
+    expect(hasSubHexChildren(withLayers({}))).toBe(false);
+    expect(isLadderView(withLayers({ subHexMaps: { '1,1': child } }))).toBe(false);
+    expect(isLadderView(withLayers({ subHexMaps: {} }))).toBe(true);
+    // mode is data: with lod the map is a ladder regardless of children
+    expect(isLadderView(withLayers({ lod: LOD, subHexMaps: { '1,1': child } }))).toBe(true);
+    expect(getMaxZoom(withLayers({ subHexMaps: { '1,1': child } }))).toBe(DEFAULTS.maxZoom);
   });
 
   it('a quarantined map clamps at the classic zoom ceiling', () => {

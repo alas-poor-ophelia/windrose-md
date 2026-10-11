@@ -26,7 +26,7 @@ import type {
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useHistory } from './useHistory';
 import { getActiveLayer, getLayerById, updateActiveLayer, updateLayer, addLayer, cloneLayer, removeLayer, reorderLayers, setActiveLayer } from '../../persistence/layerAccessor';
-import { snapshotLevelsOf, restoreSnapshotLevels, layerHistorySnapshotsEqual, viewStateForRung } from './layerHistoryOps';
+import { snapshotLevelsOf, restoreSnapshotLevels, layerHistorySnapshotsEqual, viewStateForRung, undoLodStamp, redoLodStamp } from './layerHistoryOps';
 
 
 /**
@@ -355,7 +355,8 @@ function useLayerHistory({
         }
       );
       // Whole `levels` record back (or stripped); `level` never selects the rung.
-      const restored = restoreSnapshotLevels(newMapData, previousState);
+      // Leaving the entry that stamped `lod` makes the map classic again.
+      const restored = undoLodStamp(restoreSnapshotLevels(newMapData, previousState), currentState);
       // Cross-rung undo: bring the camera to the rung the change lives on.
       const view = viewStateForRung(restored, leavingLevel);
       updateMapData(view !== null ? { ...restored, viewState: view } : restored);
@@ -386,7 +387,8 @@ function useLayerHistory({
         }
       );
       // Whole `levels` record back (or stripped); `level` never selects the rung.
-      const restored = restoreSnapshotLevels(newMapData, nextState);
+      // Entering the entry that stamped `lod` puts the block back.
+      const restored = redoLodStamp(restoreSnapshotLevels(newMapData, nextState), nextState);
       // Cross-rung redo: the re-applied change lives on the entry's own rung.
       const view = viewStateForRung(restored, nextState.level);
       updateMapData(view !== null ? { ...restored, viewState: view } : restored);

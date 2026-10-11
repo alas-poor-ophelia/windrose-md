@@ -65,6 +65,20 @@ describe('depthAuthoring', () => {
     }
   });
 
+  it('refuses a classic map with sub-hex children, so the lod stamp never lands on one (kgc.15, design s9)', () => {
+    const m = hexMap();
+    const nested: MapData = { ...m, subHexMaps: { '0,0': { mapData: hexMap() } as unknown as NonNullable<MapData['subHexMaps']>[string] } };
+    expect(canBeginDepthAuthoring(nested)).toBe(false);
+    const r = writeDepthCells(nested, m.layers[0].id, 1, [{ q: 4, r: 0, color: '#123456' }]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('nested-classic');
+    expect(r.mapData).toBe(nested);
+    expect(nested.lod).toBeUndefined();
+    // mode is data: a map that already carries lod stays a ladder even with children
+    const laddered: MapData = { ...nested, lod: { m: 4, minCellPx: 64, maxLevel: 3 } };
+    expect(canBeginDepthAuthoring(laddered)).toBe(true);
+  });
+
   it('refuses when quarantined and leaves the map untouched', () => {
     const m = hexMap();
     const bad: MapData = { ...m, lod: { m: 7, minCellPx: 64, maxLevel: 3 } };
