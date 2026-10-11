@@ -109,6 +109,16 @@ describe("resize with ladder rungs", () => {
     expect(filterLevelsToBounds(mapData, ladderOver(OLD_BOUNDS))).toBe(mapData);
   });
 
+  it("a quarantined map builds no ladder, throws nothing, and keeps its rungs on resize (kgc.21)", () => {
+    // m 1 is off the allowlist: createGeometryLadder would throw a RangeError on it.
+    const mapData = makeMapData({
+      mapType: "hex", hexSize: 40, hexBounds: OLD_BOUNDS, lod: { ...lod, m: 1 },
+      layers: [makeLayer({ id: "layer-1", levels: { 2: [outside2] } })],
+    });
+    expect(ladderForAuthoredRungs(mapData, new HexGeometry(40, "flat", NEW_BOUNDS))).toBeNull();
+    expect(countLevelOrphansForBounds(mapData, mapData.layers[0], NEW_BOUNDS)).toBe(0);
+  });
+
   it("a classic map builds no ladder and reports no rung orphans", () => {
     const mapData = makeMapData({
       mapType: "hex", hexSize: 40, hexBounds: OLD_BOUNDS,

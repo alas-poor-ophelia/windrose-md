@@ -17,7 +17,7 @@ import { isHexCell } from '#types/core/cell.types';
 
 import { HexGeometry } from '../geometry/core/HexGeometry';
 import { createGeometryLadder, type GeometryLadder } from '../geometry/core/createGeometryLadder';
-import { ladderParamsFor } from '../core/lodFlags';
+import { isDepthQuarantined, ladderParamsFor } from '../core/lodFlags';
 import { DEFAULTS } from '../core/dmtConstants';
 import { authoredCells, authoredLevels, setLevelCells } from './layerAccessor';
 
@@ -33,6 +33,10 @@ function hasAuthoredRungs(mapData: MapData): boolean {
  */
 function ladderForAuthoredRungs(mapData: MapData, root: HexGeometry): GeometryLadder | null {
   if (!hasAuthoredRungs(mapData)) return null;
+  // A quarantined map keeps its bytes untouched (design 06, s19 item 1): its
+  // rungs are neither counted nor filtered, and an invalid `lod` never reaches
+  // createGeometryLadder, which throws on it.
+  if (isDepthQuarantined(mapData).quarantined) return null;
   const { m, minCellPx, maxLevel } = ladderParamsFor(mapData);
   return createGeometryLadder(root, { m, minCellPx, maxLevel });
 }

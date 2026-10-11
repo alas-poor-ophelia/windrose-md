@@ -153,6 +153,30 @@ describe('lodFlags: isLadderView, canAuthorDepth, ladderParamsFor', () => {
     expect(isLadderView({ mapType: 'grid', lod: LOD } as MapData)).toBe(false);
   });
 
+  it('a quarantined map is never a ladder view, flag or no flag (kgc.21)', () => {
+    getSettings.mockReturnValue({ lodLadder: true });
+    // an m off the allowlist would throw inside createGeometryLadder
+    expect(isLadderView(withLayers({ lod: { ...LOD, m: 1 } }))).toBe(false);
+    expect(isLadderView(withLayers({ lod: { ...LOD, m: 3 } }))).toBe(false);
+    expect(isLadderView(withLayers({ lod: { ...LOD, minCellPx: 0 } }))).toBe(false);
+    // rung content without a lod block
+    expect(isLadderView(withLayers({}, { 1: [cell(1, 1)] }))).toBe(false);
+    // a maxLevel below the deepest rung
+    expect(isLadderView(withLayers({ lod: { ...LOD, maxLevel: 1 } }, { 2: [cell(1, 1)] }))).toBe(false);
+    // and the healthy neighbours stay ladder views
+    expect(isLadderView(withLayers({ lod: LOD }, { 2: [cell(1, 1)] }))).toBe(true);
+    expect(isLadderView(withLayers({}))).toBe(true);
+    getSettings.mockReturnValue({});
+    expect(isLadderView(withLayers({ lod: { ...LOD, m: 1 } }))).toBe(false);
+    expect(isLadderView(withLayers({ lod: LOD }))).toBe(true);
+  });
+
+  it('a quarantined map clamps at the classic zoom ceiling', () => {
+    getSettings.mockReturnValue({ lodLadder: true });
+    expect(getMaxZoom(withLayers({ lod: { ...LOD, m: 1 } }))).toBe(DEFAULTS.maxZoom);
+    expect(getMaxZoom(withLayers({}, { 1: [cell(1, 1)] }))).toBe(DEFAULTS.maxZoom);
+  });
+
   it('canAuthorDepth needs lod, the capability, and no quarantine', () => {
     getSettings.mockReturnValue({ lodLadder: true });
     expect(canAuthorDepth(withLayers({ lod: LOD }))).toBe(true);

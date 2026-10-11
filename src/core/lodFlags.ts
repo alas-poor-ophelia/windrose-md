@@ -51,12 +51,19 @@ function getLadderOverrides(): LadderOverrides {
  * bypasses the surface cache the ladder's per-rung bake lives in. Mode is data
  * (design 06, s19 item 2): a map carrying `lod` is a ladder map on every
  * install, flag or no flag; without `lod` the capability flag decides.
+ *
+ * Never a quarantined map (s19 item 1): it renders level 0 on the classic
+ * path, clamps at the classic zoom, and refuses deep edits. Gating here, in
+ * the one predicate every ladder consumer shares, is what keeps an invalid
+ * `lod` (an m off the allowlist, a non-positive minCellPx) away from
+ * `createGeometryLadder`, which throws on it.
  */
 function isLadderView(mapData: MapData | null | undefined): boolean {
   if (mapData === null || mapData === undefined) return false;
   if (mapData.mapType !== 'hex') return false;
   if (((mapData.northDirection ?? 0) % 360) !== 0) return false;
-  return mapData.lod !== undefined || isLodLadderEnabled();
+  if (mapData.lod === undefined && !isLodLadderEnabled()) return false;
+  return !isDepthQuarantined(mapData).quarantined;
 }
 
 /** Deepest rung >= 1 holding authored cells on any layer; 0 when none. */
@@ -107,9 +114,8 @@ function isDepthQuarantined(mapData: MapData): { quarantined: boolean; reason: s
 /** May this map take deep (rung >= 1) edits? Ladder view, `lod` present, not quarantined, capability on. */
 function canAuthorDepth(mapData: MapData | null | undefined): boolean {
   if (mapData === null || mapData === undefined) return false;
-  if (!isLadderView(mapData)) return false;
+  if (!isLadderView(mapData)) return false; // includes the quarantine gate
   if (mapData.lod === undefined) return false;
-  if (isDepthQuarantined(mapData).quarantined) return false;
   return isLodLadderEnabled();
 }
 

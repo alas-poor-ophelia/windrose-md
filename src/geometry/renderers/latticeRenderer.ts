@@ -321,7 +321,7 @@ function drawLadderLattice(
   view: LatticeView,
   epoch: number,
   cache: LatticeClipCache,
-  colours: { active: string; district: string },
+  colours: { active: string; district: string; activeWidth?: number },
   onPhase?: (name: string, ms: number) => void,
   deferClipBuild = false
 ): void {
@@ -353,7 +353,8 @@ function drawLadderLattice(
     if (onPhase !== undefined) onPhase('district', now() - t1);
   }
   const t2 = now();
-  strokeLattice(ctx, ladder, level, view, { ...ACTIVE, colour: colours.active });
+  // The active rung is the user-facing grid: it takes the theme's grid line width.
+  strokeLattice(ctx, ladder, level, view, { ...ACTIVE, width: colours.activeWidth ?? ACTIVE.width, colour: colours.active });
   if (onPhase !== undefined) onPhase('active', now() - t2);
 }
 

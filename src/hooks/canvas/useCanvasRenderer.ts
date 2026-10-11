@@ -1262,7 +1262,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       { offsetX, offsetY, zoom, width, height },
       LADDER_EPOCH,
       clipCacheFor(canvas, ladder),
-      { active: THEME.grid.lines, district: THEME.grid.lines },
+      { active: THEME.grid.lines, district: THEME.grid.lines, activeWidth: THEME.grid.lineWidth ?? 1 },
       ladderOn ? recordPhase : ignorePhase,
       crossing
     );
