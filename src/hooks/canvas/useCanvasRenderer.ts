@@ -36,7 +36,8 @@ import { renderGridFog } from '../../geometry/fog/gridFogRenderer';
 import { renderHexFog } from '../../geometry/fog/hexFogRenderer';
 import { getFogSettings, clearFogCanvas, renderFog } from '../../geometry/fog/fogRenderer';
 import { renderObjects } from '../../geometry/renderers/objectRenderer';
-import { OBJECT_FLOOR_PX, LABEL_FLOOR_PX, groupByDepth, tilesByHomeForRung, objectVisible, labelVisible, elementZoom, elementScale, objectRenderedPx, scaledSizeForRung } from '../../geometry/renderers/elementBands';
+import { ladderTileClipAt } from '../../core/lodFlags';
+import { OBJECT_FLOOR_PX, LABEL_FLOOR_PX, groupByDepth, tilesByHomeForRung,objectVisible, labelVisible, elementZoom, elementScale, objectRenderedPx, scaledSizeForRung } from '../../geometry/renderers/elementBands';
 import { renderSelections, renderObjectSelections, renderTextLabelSelections } from '../../geometry/renderers/selectionRenderer';
 import { segmentRenderer } from '../../geometry/renderers/segmentRenderer';
 import { getFontCss } from '../../text/fontOptions';
@@ -780,7 +781,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
         mapData.tilesets ?? [],
         homeShim,
         rendererViewState,
-        { opacity, getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers, terrainStrokes: strokes, clipToHex: level >= 1 }
+        { opacity, getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers, terrainStrokes: strokes, clipToHex: ladderTileClipAt(level) }
       );
     }
   };

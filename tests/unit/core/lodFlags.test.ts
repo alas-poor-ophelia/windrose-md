@@ -4,7 +4,7 @@ import type { MapData } from '#types/core/map.types';
 const getSettings = vi.fn(() => ({} as Record<string, unknown>));
 vi.mock('../../../src/core/settingsAccessor', () => ({ getSettings }));
 
-const { isLodLadderEnabled, isLadderView, isDepthQuarantined, canAuthorDepth, ladderParamsFor, getMaxZoom, hasDepthContent, hasSubHexChildren } =
+const { isLodLadderEnabled, isLadderView, isDepthQuarantined, canAuthorDepth, ladderParamsFor, getMaxZoom, hasDepthContent, hasSubHexChildren, ladderTileClipAt } =
   await import('../../../src/core/lodFlags');
 const { DEFAULTS } = await import('../../../src/core/dmtConstants');
 
@@ -114,6 +114,34 @@ const withLayers = (over: Partial<MapData>, levels?: Record<number, unknown[]>):
       objects: [], textLabels: [], fogOfWar: null, ...(levels ? { levels } : {}) }],
     ...over,
   } as Partial<MapData>);
+
+describe('lodFlags: ladderTileClipAt (kgc.23 k)', () => {
+  beforeEach(() => { getSettings.mockReset(); getSettings.mockReturnValue({ lodLadder: true }); });
+  afterEach(clearLadderGlobal);
+
+  it('never clips by default, at any rung', () => {
+    clearLadderGlobal();
+    expect(ladderTileClipAt(0)).toBe(false);
+    expect(ladderTileClipAt(1)).toBe(false);
+    expect(ladderTileClipAt(3)).toBe(false);
+  });
+
+  it('honours the developer knob: rungs clips above level 0, all clips everywhere', () => {
+    withLadderOverride({ tileClip: 'rungs' });
+    expect(ladderTileClipAt(0)).toBe(false);
+    expect(ladderTileClipAt(1)).toBe(true);
+    withLadderOverride({ tileClip: 'all' });
+    expect(ladderTileClipAt(0)).toBe(true);
+    withLadderOverride({ tileClip: 'bogus' });
+    expect(ladderTileClipAt(2)).toBe(false);
+  });
+
+  it('ignores the knob when the capability flag is off', () => {
+    getSettings.mockReturnValue({});
+    withLadderOverride({ tileClip: 'all' });
+    expect(ladderTileClipAt(1)).toBe(false);
+  });
+});
 
 describe('lodFlags: isDepthQuarantined', () => {
   it('is clear for a classic map and for a valid ladder map', () => {

@@ -44,6 +44,25 @@ function getLadderOverrides(): LadderOverrides {
 }
 
 /**
+ * Should the ladder clip root tiles to their hexagon when painting rung
+ * `level`? Decided 2026-10-12 on a lineup (bead kgc.23 item k): NO at every
+ * rung, so a tile looks the same above and below a crossing (wide wall art
+ * stays a continuous run instead of breaking into one-hex dashes at rung 1).
+ * Accepted v1 cost: a tile's art bleeding past its hex can cover a
+ * neighbour's deep paint, since tiles draw above cells (kgc.26 files the
+ * smarter clip). Developer knob for comparisons, flag-gated like the other
+ * overrides: `activeWindow.__windroseLadder.tileClip` = 'none' (default),
+ * 'rungs' (clip on rungs >= 1) or 'all' (clip level 0 too).
+ */
+function ladderTileClipAt(level: number): boolean {
+  if (!isLodLadderEnabled() || typeof activeWindow === 'undefined') return false;
+  const raw: unknown = (activeWindow as unknown as { __windroseLadder?: { tileClip?: unknown } }).__windroseLadder?.tileClip;
+  if (raw === 'all') return true;
+  if (raw === 'rungs') return level >= 1;
+  return false;
+}
+
+/**
  * Is THIS map shown as a ladder? The single definition, shared by the ladder
  * memo, the camera clamps and the seamless-dive bail, so they can never disagree.
  *
@@ -172,6 +191,6 @@ function getMaxZoom(mapData: MapData | null | undefined): number {
 }
 
 export {
-  isLodLadderEnabled, getLadderOverrides, isLadderView, isDepthQuarantined, canAuthorDepth,
+  isLodLadderEnabled, getLadderOverrides, ladderTileClipAt, isLadderView, isDepthQuarantined, canAuthorDepth,
   ladderParamsFor, getMaxZoom, hasDepthContent, hasSubHexChildren
 };
