@@ -189,7 +189,8 @@ export interface DrawingHandlers {
 
 /** Shape preview functions */
 export interface ShapePreviewOperations {
-  updateShapeHover: (gridX: number, gridY: number) => void;
+  /** Root cell plus the pointer's client coords, so a shape started on a ladder rung can resolve its hover cell on that rung. */
+  updateShapeHover: (gridX: number, gridY: number, clientX?: number, clientY?: number) => void;
   updateEdgeLineHover: (intX: number, intY: number) => void;
   isPointInShapeBounds: (x: number, y: number) => boolean;
   confirmTouchShape: () => void;

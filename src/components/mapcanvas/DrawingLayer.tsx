@@ -87,6 +87,7 @@ const DrawingLayer = ({
     mapData,
     geometry
   } = useMapState();
+  const { ladder } = useMapState();
 
   const previewSettings = useMemo((): PreviewSettings => {
     const settings = globalSettings ?? getSettings();
@@ -351,16 +352,27 @@ const DrawingLayer = ({
 
     if (shapeType == null || shapeType === '' || !startPoint) return null;
 
+    // A rectangle/circle started on a ladder rung previews on that rung: its
+    // geometry draws the outline, and a rung cell is 1/m^level of a root cell
+    // in distance, so the dimension label scales with it.
+    const shapeLevel = (startPoint as { level?: number }).level ?? 0;
+    const previewGeometry = shapeLevel > 0 && ladder !== null
+      ? ladder.geometryForLevel(shapeLevel) as unknown as typeof geometry
+      : geometry;
+    const previewDistance = shapeLevel > 0 && ladder !== null && distanceSettings != null
+      ? { ...distanceSettings, distancePerCell: distanceSettings.distancePerCell / Math.pow(ladder.params.m, shapeLevel) }
+      : distanceSettings;
+
     return (
       <ShapePreviewOverlay
         shapeType={shapeType}
         startPoint={startPoint}
         endPoint={endPoint}
-        geometry={geometry}
+        geometry={previewGeometry}
         mapData={mapData}
         canvasRef={canvasRef}
         containerRef={containerRef}
-        distanceSettings={distanceSettings}
+        distanceSettings={previewDistance}
         isConfirmable={touchConfirmPending}
       />
     );

@@ -558,7 +558,7 @@ const useEventCoordinator = ({
             if (coords) {
               const gridX = coords.x;
               const gridY = coords.y;
-              drawingHandlers.updateShapeHover(gridX, gridY);
+              drawingHandlers.updateShapeHover(gridX, gridY, clientX, clientY);
             }
           }
         }

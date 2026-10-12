@@ -270,20 +270,29 @@ function useShapeTools({
     onEdgesChange(newEdges);
   }, [mapData, geometry, selectedColor, edgeWidth, onEdgesChange]);
 
-  const updateShapeHover = useCallback((gridX: number, gridY: number): void => {
+  const updateShapeHover = useCallback((gridX: number, gridY: number, clientX?: number, clientY?: number): void => {
     if (touchConfirmPending) return;
-    // The preview draws with the root geometry and receives root-level coords;
-    // a shape started on a deeper rung shows no drag preview (not threaded yet).
-    if ((rectangleStart?.level ?? 0) > 0 || (circleStart?.level ?? 0) > 0) return;
 
     const hasStart = (currentTool === 'circle' && circleStart != null) ||
                      ((currentTool === 'rectangle' || currentTool === 'clearArea') && rectangleStart != null) ||
                      (currentTool === 'edgeLine' && edgeLineStart != null);
+    if (!hasStart) return;
 
-    if (hasStart) {
-      setShapeHoverPosition({ x: gridX, y: gridY });
+    // A shape started on a ladder rung hovers in that rung's cells (the
+    // preview draws with that rung's geometry); the root cell is only right
+    // for a root start. Without client coords the rung cell cannot be
+    // resolved, so the hover simply does not move.
+    const activeStart = currentTool === 'circle' ? circleStart : rectangleStart;
+    const level = activeStart?.level ?? 0;
+    if (level > 0) {
+      if (clientX === undefined || clientY === undefined) return;
+      const cell = screenToLevelCell?.(clientX, clientY, level) ?? null;
+      if (cell === null) return;
+      setShapeHoverPosition({ x: cell.x, y: cell.y });
+      return;
     }
-  }, [currentTool, circleStart, rectangleStart, edgeLineStart, touchConfirmPending]);
+    setShapeHoverPosition({ x: gridX, y: gridY });
+  }, [currentTool, circleStart, rectangleStart, edgeLineStart, touchConfirmPending, screenToLevelCell]);
 
   const updateEdgeLineHover = useCallback((intX: number, intY: number): void => {
     if (touchConfirmPending) return;

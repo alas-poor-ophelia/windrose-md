@@ -99,7 +99,7 @@ export interface RegisteredDrawingHandlers {
   cancelDrawing?: () => void;
   isDrawing?: boolean;
   previewEnabled?: boolean;
-  updateShapeHover?: (gridX: number, gridY: number) => void;
+  updateShapeHover?: (gridX: number, gridY: number, clientX?: number, clientY?: number) => void;
   updateEdgeLineHover?: (intX: number, intY: number) => void;
   updateSegmentHover?: (cellX: number, cellY: number, localX: number, localY: number) => void;
   circleStart?: Point | null;
