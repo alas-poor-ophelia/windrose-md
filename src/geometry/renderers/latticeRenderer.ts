@@ -13,6 +13,7 @@
  */
 
 import type { GeometryLadder } from '../core/createGeometryLadder';
+import { estimateCellsInRect, MATERIALISE_CELL_CAP } from '../core/materialiseLevel';
 
 /** Screen = offset + world * zoom, matching renderCanvas's view state. */
 export interface LatticeView {
@@ -195,6 +196,13 @@ function liveClipPath(
   // rung over a padded viewport ran to 100 ms), while string concatenation is
   // cheap and the parse is a single native pass. Existence is counted in the same
   // loop so a view deep inside the map never constructs a path at all.
+  // Safety net for one-shot renders at a rung their zoom cannot justify (kgc.20):
+  // past the materialiser's cap, draw unclipped rather than enumerate millions.
+  if (estimateCellsInRect(s, ax0, ay0, ax1, ay1) > MATERIALISE_CELL_CAP) {
+    cache.entry = { level, epoch, x0: ax0, y0: ay0, x1: ax1, y1: ay1, path: null };
+    return null;
+  }
+
   const corners = cornerOffsets(ladder, level);
   const segments: string[] = [];
   let missing = 0;

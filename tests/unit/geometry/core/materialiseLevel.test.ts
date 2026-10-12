@@ -17,7 +17,7 @@ import { describe, it, expect } from "vitest";
 import { createGeometryLadder } from "../../../../src/geometry/core/createGeometryLadder";
 import { HexGeometry } from "../../../../src/geometry/core/HexGeometry";
 import { cellKey } from "../../../../src/geometry/core/lattice";
-import { materialiseLevelLayer } from "../../../../src/geometry/core/materialiseLevel";
+import { materialiseLevelLayer, estimateCellsInRect, MATERIALISE_CELL_CAP } from "../../../../src/geometry/core/materialiseLevel";
 
 import type { GeometryLadder } from "../../../../src/geometry/core/createGeometryLadder";
 import type { WorldRect } from "../../../../src/geometry/core/materialiseLevel";
@@ -220,6 +220,41 @@ describe("materialiseLevelLayer", () => {
       });
     });
   }
+
+  describe("cell cap (kgc.20)", () => {
+    const root = new HexGeometry(30, "flat", null);
+    const ladder = createGeometryLadder(root, { m: 4, minCellPx: 64, maxLevel: 3 });
+    const layer = {
+      id: "L", name: "L", order: 0, visible: true,
+      cells: [{ q: 0, r: 0, color: "#123456" }], curves: [], edges: [], objects: [], textLabels: [], fogOfWar: null,
+      levels: { 3: [{ q: 0, r: 0, color: "#abcdef" }] }
+    } as unknown as MapLayer;
+    // A 400x300 preview at zoom 0.3: 2.3M rung-3 candidates before the cap (measured ~1 s).
+    const zoom = 0.3;
+    const rect: WorldRect = { x0: -200 / zoom, y0: -150 / zoom, x1: 200 / zoom, y1: 150 / zoom };
+
+    it("estimates the reviewer's preview far above the cap at rung 3 and below it at rung 1", () => {
+      expect(estimateCellsInRect(ladder.cellSizeAt(3), rect.x0, rect.y0, rect.x1, rect.y1)).toBeGreaterThan(MATERIALISE_CELL_CAP);
+      expect(estimateCellsInRect(ladder.cellSizeAt(1), rect.x0, rect.y0, rect.x1, rect.y1)).toBeLessThan(MATERIALISE_CELL_CAP);
+    });
+
+    it("refuses to enumerate past the cap: empty synthetic layer, nothing enumerated, reason 'capped'", () => {
+      const t0 = performance.now();
+      const { layer: out, stats } = materialiseLevelLayer(layer, ladder, 3, rect, 0);
+      expect(performance.now() - t0).toBeLessThan(100);
+      expect(stats).toEqual({ cells: 0, enumerated: 0, missReason: "capped" });
+      expect(out.cells).toEqual([]);
+      expect(out.id).toBe("L");
+    });
+
+    it("the live view's rects stay far under the cap: a 4K viewport at the rung its zoom activates", () => {
+      for (const zoom4k of [1, 8, 40, 200]) {
+        const active = ladder.activeLevel(zoom4k);
+        const r4k: WorldRect = { x0: 0, y0: 0, x1: 3840 / zoom4k, y1: 2160 / zoom4k };
+        expect(estimateCellsInRect(ladder.cellSizeAt(active), r4k.x0, r4k.y0, r4k.x1, r4k.y1)).toBeLessThan(MATERIALISE_CELL_CAP / 10);
+      }
+    });
+  });
 
   describe("synthetic layer shape", () => {
     const fixture = makeFixture("flat/rectangular", new HexGeometry(HEX_SIZE, "flat", { maxCol: 6, maxRow: 5 }));

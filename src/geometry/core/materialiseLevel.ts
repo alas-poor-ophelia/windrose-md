@@ -54,8 +54,27 @@ export interface MaterialiseStats {
    * 'hit' — the memo answered, `layer` is the same object as last time.
    * 'no-entry' — nothing memoised for this `cells` array (first call, or the array was replaced by an edit).
    * 'key-changed' — this `cells` array is memoised, but for a different level, epoch, rect or rung array.
+   * 'capped' — the rect would hold more than MATERIALISE_CELL_CAP cells at this level; nothing was
+   *   enumerated and the synthetic layer is empty (a safety net for one-shot renders, never the live view).
    */
-  missReason: 'hit' | 'no-entry' | 'key-changed';
+  missReason: 'hit' | 'no-entry' | 'key-changed' | 'capped';
+}
+
+/**
+ * Upper bound on candidate cells one materialisation may enumerate. The live
+ * view never comes near it: the active rung keeps cells at >= minCellPx on
+ * screen, so a 4K viewport holds a few thousand. Only a level OVERRIDE (preview,
+ * export) can ask for a rung whose cells are sub-pixel over a large rect; those
+ * callers clamp their rung first (elementBands.overrideRungFor), and this cap is
+ * the net under them (kgc.20: 2.3M cells, ~1 s, for one unclamped preview).
+ */
+const MATERIALISE_CELL_CAP = 250_000;
+
+/** Cheap over-estimate of the candidate cells `forEachCellInWorldRect` would visit. */
+function estimateCellsInRect(cellSize: number, x0: number, y0: number, x1: number, y1: number): number {
+  const cols = (x1 - x0) / (1.5 * cellSize) + 3;
+  const rows = (y1 - y0) / (SQRT3 * cellSize) + 3;
+  return cols * rows;
 }
 
 interface MemoEntry {
@@ -211,6 +230,13 @@ function materialiseLevelLayer(
   const missReason: MaterialiseStats['missReason'] =
     entries === undefined || entries.size === 0 ? 'no-entry' : 'key-changed';
 
+  if (estimateCellsInRect(cellSize, x0, y0, x1, y1) > MATERIALISE_CELL_CAP) {
+    const { cells: _dropped, ...rest } = layer;
+    void _dropped;
+    const empty: MapLayer = { ...rest, cells: [], curves: [], edges: [], objects: [], textLabels: [], tiles: [], wallPaths: [], terrainStrokes: [] };
+    return { layer: empty, stats: { cells: 0, enumerated: 0, missReason: 'capped' } };
+  }
+
   const fills = buildRootFillLookup(layer.cells);
   // The rung's own authored hex cells, drawn as authored in place of any inherited fill.
   const own = new Map<string, HexCell>();
@@ -283,4 +309,4 @@ function materialiseLevelLayer(
   return { layer: result, stats: { cells: synthetic.length, enumerated, missReason } };
 }
 
-export { materialiseLevelLayer };
+export { materialiseLevelLayer, estimateCellsInRect, MATERIALISE_CELL_CAP };

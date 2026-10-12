@@ -26,6 +26,7 @@ import { HexGeometry } from '../geometry/core/HexGeometry';
 import { crossingZoom } from '../geometry/core/lattice';
 import type { LadderParams } from '../geometry/core/lattice';
 import { isDepthQuarantined, isLadderView } from '../core/lodFlags';
+import { overrideRungFor } from '../geometry/renderers/elementBands';
 import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
 import { getFontCss } from '../text/fontOptions';
 import { renderCanvas } from '../hooks/canvas/useCanvasRenderer';
@@ -306,10 +307,14 @@ async function exportMapAsImage(
   const deepLevel = ladder !== null && isLadderView(mapData) && !isDepthQuarantined(mapData).quarantined
     ? deepestAuthoredLevel(exportLayers)
     : 0;
-  const renderLadder = deepLevel > 0 ? ladder : null;
   const worldWidth = exportBounds.maxX - exportBounds.minX;
   const worldHeight = exportBounds.maxY - exportBounds.minY;
-  const zoom = renderLadder !== null ? exportZoomForLevel(deepLevel, renderLadder.params, worldWidth, worldHeight) : 1;
+  const zoom = deepLevel > 0 && ladder !== null ? exportZoomForLevel(deepLevel, ladder.params, worldWidth, worldHeight) : 1;
+  // The side cap can pull the zoom below the deepest rung's crossing; then paint
+  // the rung that zoom activates, never a finer one whose cells are sub-pixel and
+  // whose enumeration over the whole map costs seconds (kgc.20).
+  const renderLevel = deepLevel > 0 && ladder !== null ? overrideRungFor(ladder, deepLevel, zoom) : 0;
+  const renderLadder = renderLevel > 0 ? ladder : null;
 
   // Calculate canvas dimensions
   const width = Math.ceil(worldWidth * zoom);
@@ -333,7 +338,7 @@ async function exportMapAsImage(
     width,
     height,
     ladder: renderLadder,
-    level: deepLevel,
+    level: renderLevel,
     zoom
   }, options);
   

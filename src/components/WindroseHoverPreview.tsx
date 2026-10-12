@@ -19,6 +19,7 @@ import { DEFAULTS } from '../core/dmtConstants';
 import { isDepthQuarantined, isLadderView, ladderParamsFor } from '../core/lodFlags';
 import { createGeometryLadder } from '../geometry/core/createGeometryLadder';
 import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
+import { overrideRungFor } from '../geometry/renderers/elementBands';
 import { authoredLevels, getActiveLayer } from '../persistence/layerAccessor';
 
 
@@ -115,17 +116,22 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
         canvas.height = preview.height;
 
         // A deep-authored map previews its deepest rung on the focused layer
-        // (design 06 s19 item 3). The ladder is built locally and the render
-        // bypasses the surface cache: a preview never takes a per-level surface,
-        // a budget slot or the active-canvas claim (s3.5). No rung, no ladder:
-        // classic previews stay byte-identical.
+        // (design 06 s19 item 3), but never a rung finer than the preview zoom
+        // activates (kgc.20): at that zoom the finer cells are sub-pixel, and
+        // enumerating them costs seconds. The ladder is built locally and the
+        // render bypasses the surface cache: a preview never takes a per-level
+        // surface, a budget slot or the active-canvas claim (s3.5). No rung, no
+        // ladder: classic previews stay byte-identical.
         const focusedLevels = authoredLevels(getActiveLayer(focused));
-        const previewLevel = focusedLevels.length > 0 ? focusedLevels[focusedLevels.length - 1] : 0;
+        const deepestAuthored = focusedLevels.length > 0 ? focusedLevels[focusedLevels.length - 1] : 0;
         let previewLadder: GeometryLadder | null = null;
-        if (previewLevel > 0 && geometry instanceof HexGeometry && isLadderView(mapData)
+        let previewLevel = 0;
+        if (deepestAuthored > 0 && geometry instanceof HexGeometry && isLadderView(mapData)
             && !isDepthQuarantined(mapData).quarantined) {
           const { m, minCellPx, maxLevel } = ladderParamsFor(mapData);
-          previewLadder = createGeometryLadder(geometry, { m, minCellPx, maxLevel });
+          const ladder = createGeometryLadder(geometry, { m, minCellPx, maxLevel });
+          previewLevel = overrideRungFor(ladder, deepestAuthored, zoom);
+          if (previewLevel > 0) previewLadder = ladder;
         }
 
         renderCanvas(canvas, null, focused, geometry, [], {

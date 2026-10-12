@@ -17,6 +17,7 @@ import {
   depthModeOf,
   groupByDepth,
   tilesByHomeForRung,
+  overrideRungFor,
   objectVisible,
   labelVisible,
   pinVisible,
@@ -167,6 +168,18 @@ describe("tilesByHomeForRung (kgc.22)", () => {
       [1, ["y"]],
       [2, ["x", "b"]]
     ]);
+  });
+});
+
+describe("overrideRungFor (kgc.20)", () => {
+  it("never exceeds the rung the zoom activates, nor the deepest authored rung", () => {
+    const z1 = crossingZoom(1, ladder.params);
+    const z2 = crossingZoom(2, ladder.params);
+    expect(overrideRungFor(ladder, 3, z1 / 2)).toBe(0);
+    expect(overrideRungFor(ladder, 3, z1)).toBe(1);
+    expect(overrideRungFor(ladder, 3, z2 * 1.5)).toBe(2);
+    expect(overrideRungFor(ladder, 1, z2 * 1.5)).toBe(1);
+    expect(overrideRungFor(ladder, 0, z2 * 1.5)).toBe(0);
   });
 });
 

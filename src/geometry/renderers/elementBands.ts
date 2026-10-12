@@ -148,6 +148,18 @@ function tilesByHomeForRung<T extends { homeLevel?: number }>(tiles: readonly T[
   return [...byHome.entries()].sort((a, b) => a[0] - b[0]);
 }
 
+/**
+ * The rung a one-shot render (hover preview, export) may draw: never finer than
+ * the rung its own zoom would activate. A deep-authored map previews its
+ * deepest rung (design s19 item 3) only when the preview zoom actually reaches
+ * it; at a zoom where those cells are sub-pixel the materialiser and the clip
+ * path would still enumerate every one of them (2.3M cells, about a second in
+ * Node, for a 400x300 preview of rung 3 at zoom 0.3, kgc.20) to show nothing.
+ */
+function overrideRungFor(ladder: GeometryLadder, deepestAuthored: number, zoom: number): number {
+  return Math.max(0, Math.min(deepestAuthored, ladder.activeLevel(zoom)));
+}
+
 export type { DepthMode, DepthGroup };
 export {
   DEFAULT_DEPTH_MODE,
@@ -157,6 +169,7 @@ export {
   toggledDepthMode,
   groupByDepth,
   tilesByHomeForRung,
+  overrideRungFor,
   objectVisible,
   labelVisible,
   pinVisible,
