@@ -39,6 +39,29 @@ describe('depthAuthoring', () => {
     expect(withLod(r.mapData)).toBe(r.mapData);
   });
 
+  it('the first deep write stamps the EFFECTIVE parameters under a developer override (kgc.16)', () => {
+    interface LadderGlobal { activeWindow?: { __windroseLadder?: unknown } }
+    const g = globalThis as unknown as LadderGlobal;
+    g.activeWindow = { __windroseLadder: { m: 2, minCellPx: 40, maxLevel: 2 } };
+    try {
+      const m = hexMap();
+      // the guard and the stamp measure with the same rod: level 2 is in range, level 3 is not
+      const refused = writeDepthCells(m, m.layers[0].id, 3, [{ q: 4, r: 0, color: '#123456' }]);
+      expect(refused.ok).toBe(false);
+      if (!refused.ok) expect(refused.reason).toBe('level-out-of-range');
+      const r = writeDepthCells(m, m.layers[0].id, 2, [{ q: 4, r: 0, color: '#123456' }]);
+      expect(r.ok).toBe(true);
+      if (r.ok) {
+        expect(r.mapData.lod).toEqual({ m: 2, minCellPx: 40, maxLevel: 2 });
+        // the stamped map is a healthy ladder: no quarantine, same params on the next frame
+        expect(canBeginDepthAuthoring(r.mapData)).toBe(true);
+        expect(authoredCells(r.mapData.layers[0], 2)).toHaveLength(1);
+      }
+    } finally {
+      delete g.activeWindow;
+    }
+  });
+
   it('refuses a level above maxLevel or below 1', () => {
     const m = hexMap();
     expect(guardDepthWrite(m, m.layers[0].id, 0, [])).toBe('level-out-of-range');

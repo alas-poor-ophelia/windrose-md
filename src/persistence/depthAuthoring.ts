@@ -17,7 +17,6 @@ import type { LadderConfig, MapData } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
 import type { LayerId } from '#types/core/map.types';
 
-import { LADDER_DEFAULTS } from '../geometry/core/lattice';
 import { isDepthQuarantined, isLadderView, isLodLadderEnabled, ladderParamsFor, hasSubHexChildren } from '../core/lodFlags';
 import { authoredCells, getActiveLayer, setLevelCells } from './layerAccessor';
 import { MAX_JOURNAL_PAYLOAD } from './saveJournal';
@@ -49,10 +48,19 @@ function canBeginDepthAuthoring(mapData: MapData | null | undefined): boolean {
   return !isDepthQuarantined(mapData).quarantined;
 }
 
-/** The map with a `lod` block, stamped from the defaults when absent. Same reference when present. */
+/**
+ * The map with a `lod` block, stamped when absent from the EFFECTIVE parameters
+ * (`ladderParamsFor`: the defaults, then the developer override in full). Those
+ * are the parameters the view ladder laid the first stroke out on, so the
+ * stored block must repeat them: stamping the bare defaults under an `m` or
+ * `maxLevel` override would re-partition the map on the next frame and read the
+ * stroke's cells back at the wrong positions, or quarantine the map at once for
+ * content past its stored maxLevel (kgc.16). Same reference when present.
+ */
 function withLod(mapData: MapData): MapData {
   if (mapData.lod !== undefined) return mapData;
-  const lod: LadderConfig = { m: LADDER_DEFAULTS.m, minCellPx: LADDER_DEFAULTS.minCellPx, maxLevel: LADDER_DEFAULTS.maxLevel };
+  const { m, minCellPx, maxLevel } = ladderParamsFor(mapData);
+  const lod: LadderConfig = { m, minCellPx, maxLevel };
   return { ...mapData, lod };
 }
 
