@@ -15,7 +15,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { pickDriftSource, driftAllowed } from "../../../../src/hooks/canvas/levelSurfaces";
+import { pickDriftSource, driftAllowed, driftCandidates } from "../../../../src/hooks/canvas/levelSurfaces";
 
 describe("driftAllowed (kgc.19: drift only while the level owns no surface)", () => {
   it("drifts on a crossing in progress: no own surface, rung above 0, no bake request", () => {
@@ -81,5 +81,33 @@ describe("pickDriftSource", () => {
     }
     expect(syncBakes).toBe(1);
     expect(scheduledBakes).toBe(5);
+  });
+});
+
+describe("driftCandidates (kgc.23 i: a zoom-out crossing may drift from the finer surface)", () => {
+  it("orders nearest coarser first, then nearest finer, never the level itself", () => {
+    expect(driftCandidates(2, [0, 1, 2, 3, 4])).toEqual([1, 0, 3, 4]);
+    expect(driftCandidates(2, new Map([[4, "L4"], [0, "L0"], [3, "L3"]]).keys())).toEqual([0, 3, 4]);
+  });
+
+  it("zoom-out crossing L -> L-1 with no coarser surface offers the finer L surface", () => {
+    expect(driftCandidates(1, [2])).toEqual([2]);
+    expect(driftCandidates(2, [3])).toEqual([3]);
+  });
+
+  it("a zoom-in crossing keeps preferring the coarser surface over any finer one", () => {
+    expect(driftCandidates(2, [3, 1])).toEqual([1, 3]);
+  });
+
+  it("offers nothing when only the level itself (or nothing) is cached, and ignores district rungs below 0", () => {
+    expect(driftCandidates(1, [])).toEqual([]);
+    expect(driftCandidates(1, [1])).toEqual([]);
+    expect(driftCandidates(1, [-1])).toEqual([]);
+  });
+
+  it("is still gated by driftAllowed: a level that owns a surface never consults candidates", () => {
+    // The renderer only walks driftCandidates when driftAllowed is true (kgc.19).
+    expect(driftAllowed(true, 1, false)).toBe(false);
+    expect(driftAllowed(false, 1, false) && driftCandidates(1, [2]).length > 0).toBe(true);
   });
 });

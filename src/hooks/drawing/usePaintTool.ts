@@ -29,7 +29,7 @@ import { eraseObjectAt } from '../../objects/objectOperations';
 import { eraseCellFromCurves, eraseWorldPolygonFromCurves } from '../../geometry/curves/curveBoolean';
 import { Notice } from 'obsidian';
 import { getActiveLayer, getActiveBoardLayers, authoredCells } from '../../persistence/layerAccessor';
-import { canBeginDepthAuthoring, guardDepthWrite } from '../../persistence/depthAuthoring';
+import { canBeginDepthAuthoring, guardDepthWrite, type DepthWriteContext, type DepthWriteRefusal } from '../../persistence/depthAuthoring';
 import { withCellPainted, withCellErased, depthRefusalMessage } from '../../drawing/depthCellOps';
 import { findTileHitInLayers } from '../../assets/tileFootprint';
 import { distanceToWallPath } from '../../drawing/wallPathOperations';
@@ -132,8 +132,12 @@ function usePaintTool({
   // The rung's authored cells at stroke start (by reference), for the one
   // undo entry per deep stroke. Null outside a deep stroke.
   const strokeInitialLevelCellsRef = useRef<Cell[] | null>(null);
-  // One refusal notice per stroke, not one per cell.
-  const refusalNoticedRef = useRef<boolean>(false);
+  // A refused deep stroke shows one notice and paints nothing more until the
+  // pointer lifts: past the cap or the budget, every further tick would refuse too.
+  const strokeRefusedRef = useRef<boolean>(false);
+  // Serialised map size at deep-stroke start: the budget check adds a per-cell
+  // estimate to it instead of stringifying the whole map on every tick (kgc.23).
+  const strokeBytesRef = useRef<number | null>(null);
 
   /**
    * Commit history for whatever this stroke touched on `layer`, then clear the
@@ -186,6 +190,7 @@ function usePaintTool({
    */
   const toggleDeepCell = (coords: Point, shouldFill: boolean, level: number): void => {
     if (!mapData || ladder === null || onLevelCellsChange === undefined) return;
+    if (strokeRefusedRef.current) return;
     const q = coords.x;
     const r = coords.y;
     if (!ladder.existsAt(level, q, r)) return;
@@ -197,23 +202,33 @@ function usePaintTool({
       : withCellErased(current, q, r);
     if (next === current) return;
 
-    const refusal = guardDepthWrite(mapData, layer.id, level, next);
+    // Within a stroke the per-op cap and the budget count from the stroke's
+    // start, so a brush cannot add MAX_CELLS_PER_DEPTH_OP cells one tick at a time.
+    const baseline = strokeInitialLevelCellsRef.current;
+    const context: DepthWriteContext = baseline !== null && strokeBytesRef.current !== null
+      ? { baseline, serialisedBytes: strokeBytesRef.current }
+      : {};
+    const refuse = (reason: DepthWriteRefusal): void => {
+      strokeRefusedRef.current = true;
+      new Notice(depthRefusalMessage(reason));
+    };
+    const refusal = guardDepthWrite(mapData, layer.id, level, next, context);
     if (refusal !== null) {
-      if (!refusalNoticedRef.current) {
-        refusalNoticedRef.current = true;
-        new Notice(depthRefusalMessage(refusal));
-      }
+      refuse(refusal);
       return;
     }
 
-    const isBatchedStroke = strokeInitialLevelCellsRef.current !== null;
+    const isBatchedStroke = baseline !== null;
     const color = selectedColor;
     const opacity = selectedOpacity;
-    onLevelCellsChange(
+    const outcome = onLevelCellsChange(
       level,
       (cells: Cell[]) => (shouldFill ? withCellPainted(cells, q, r, color, opacity) : withCellErased(cells, q, r)),
-      isBatchedStroke
+      isBatchedStroke,
+      context
     );
+    // The writer re-guards against the LIVE map; honour its verdict too.
+    if (outcome !== null && !outcome.ok) refuse(outcome.reason);
   };
 
   const toggleCell = (coords: Point, shouldFill: boolean, dragStart: DragStartContext | null = null): void => {
@@ -428,7 +443,8 @@ function usePaintTool({
       ? getActiveLevel()
       : 0;
     strokeLevelRef.current = level;
-    refusalNoticedRef.current = false;
+    strokeRefusedRef.current = false;
+    strokeBytesRef.current = level > 0 ? JSON.stringify(mapData).length : null;
     // A deep stroke never touches layer.cells, so it snapshots only its rung.
     strokeInitialStateRef.current = level > 0 ? null : [...activeLayer.cells];
     strokeInitialLevelCellsRef.current = level > 0 ? authoredCells(activeLayer, level) : null;
@@ -451,6 +467,7 @@ function usePaintTool({
     const initialLevelCells = strokeInitialLevelCellsRef.current;
     strokeLevelRef.current = 0;
     strokeInitialLevelCellsRef.current = null;
+    strokeBytesRef.current = null;
 
     if (mapData == null) return;
 
@@ -485,6 +502,7 @@ function usePaintTool({
     }
     strokeLevelRef.current = 0;
     strokeInitialLevelCellsRef.current = null;
+    strokeBytesRef.current = null;
   };
 
   return {

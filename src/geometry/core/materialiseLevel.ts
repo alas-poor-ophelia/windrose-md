@@ -91,8 +91,21 @@ const MEMO_LIMIT = 4;
  * array is the stable sub-array that only a cell edit replaces (H-1478). The
  * ladder is part of the key because existence and ownership are its functions:
  * a bounds change builds a new ladder, and the old fills must not survive it.
+ *
+ * INVARIANT (kgc.23 c): because the key ignores the layer object, a memo hit
+ * returns a synthetic layer whose non-cell fields were spread from WHATEVER
+ * layer object first missed for this `cells` array. Those fields can be stale.
+ * The synthetic layer may therefore be read ONLY for `cells` (the materialised
+ * fills) and the deliberately emptied arrays (`edges`, `curves`, `objects`,
+ * `textLabels`, `tiles`, `wallPaths`, `terrainStrokes`, `fogOfWar: null`).
+ * Today its sole consumer is `renderLayerCellsAndEdges` in useCanvasRenderer,
+ * which reads `cells` and `edges` and nothing else. A renderer that needs any
+ * other layer field (opacity, visibility, fog, rungs, ...) must read it from the
+ * real layer, never from this result. Keying on layer identity instead would
+ * defeat the memo: the layer is re-spread on cosmetic changes that leave
+ * `cells` untouched, so every such frame would re-materialise.
  */
-const memo = new WeakMap<GeometryLadder, WeakMap<Cell[], Map<string, MemoEntry>>>();
+const memo =new WeakMap<GeometryLadder, WeakMap<Cell[], Map<string, MemoEntry>>>();
 
 const SQRT3 = Math.sqrt(3);
 

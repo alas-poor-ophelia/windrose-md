@@ -31,7 +31,7 @@ import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 import { useCallback, useMemo, useRef } from 'preact/hooks';
 import { getActiveLayer, updateActiveLayer, promoteToStrata, getActiveBoardLayers, setActiveLayer, authoredCells } from '../../persistence/layerAccessor';
 import { snapshotLevelsOf, stampedLodOf } from './layerHistoryOps';
-import { writeDepthCells, withLod, type DepthWriteResult } from '../../persistence/depthAuthoring';
+import { writeDepthCells, withLod, type DepthWriteContext, type DepthWriteResult } from '../../persistence/depthAuthoring';
 
 /** Does any element in the written value sit on a ladder rung >= 1? */
 function hasDeepElement(value: unknown): boolean {
@@ -149,7 +149,7 @@ function useDataHandlers({
   // from the WRITTEN layer so it carries the whole new `levels` record, plus the
   // UI-only `level` (design section 19 item 10: undo restores the record).
   const handleLevelCellsChange = useCallback(
-    (level: number, update: (current: Cell[]) => Cell[], suppressHistory = false): DepthWriteResult | null => {
+    (level: number, update: (current: Cell[]) => Cell[], suppressHistory = false, context?: DepthWriteContext): DepthWriteResult | null => {
       if (isApplyingHistory()) return null;
 
       // Preact applies a functional update synchronously inside the setter, so
@@ -161,7 +161,7 @@ function useDataHandlers({
         if (currentMapData == null) return currentMapData;
 
         const layer = getActiveLayer(currentMapData);
-        const result = writeDepthCells(currentMapData, layer.id, level, update(authoredCells(layer, level)));
+        const result = writeDepthCells(currentMapData, layer.id, level, update(authoredCells(layer, level)), context);
         outcome = result;
         if (!result.ok) return currentMapData;
 

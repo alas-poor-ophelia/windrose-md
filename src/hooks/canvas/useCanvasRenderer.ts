@@ -56,7 +56,8 @@ import { getSlotOffset, getMultiObjectScale, getObjectsInCell } from '../../obje
 import { offsetToAxial, axialToOffset } from '../../geometry/core/offsetCoordinates';
 import { getActiveLayer, getLayerBelow, getRenderLayers, getExportLayers, isCellFogged, getActiveBoardId, getBoardBelow, getBoardLayers } from '../../persistence/layerAccessor';
 import { registerSurface, touchSurface, releaseSurface, evictIfNeeded, setActiveCanvas } from './surfaceBudget';
-import { driftAllowed } from './levelSurfaces';
+import { driftAllowed, driftCandidates } from './levelSurfaces';
+import { fogDepsForRung } from './rungFog';
 import { recordFrame, recordRebuild, recordPhase } from './ladderTelemetry';
 import { materialiseLevelLayer } from '../../geometry/core/materialiseLevel';
 import { createLatticeClipCache, drawLadderLattice } from '../../geometry/renderers/latticeRenderer';
@@ -259,7 +260,12 @@ function blitStaticContent(
   height: number,
   key: readonly unknown[],
   imageVersion: number,
-  level = 0
+  level = 0,
+  // Only ladder canvases join the global surface budget (kgc.23 a). A classic
+  // canvas never claims the active slot (`setActiveCanvas` is ladder-only), so
+  // registering it would make every classic pane a 'background' canvas and LRU-
+  // evict it whenever 4+ panes are mounted. Classic keeps its pre-ladder cache.
+  budgeted = false
 ): void {
   let set = staticLayerCaches.get(canvas);
   if (set === undefined) {
@@ -302,27 +308,29 @@ function blitStaticContent(
   const honourBake = set.bakeRequested === level && !crossingFrame;
   if (honourBake) set.bakeRequested = null;
   if (driftAllowed(entry !== undefined, level, honourBake)) {
-    for (let coarser = level - 1; coarser >= 0; coarser--) {
-      const candidate = set.byLevel.get(coarser);
+    // Nearest coarser first, then nearest finer (a zoom-out crossing, kgc.23 i).
+    for (const candidateLevel of driftCandidates(level, set.byLevel.keys())) {
+      const candidate = set.byLevel.get(candidateLevel);
       if (candidate === undefined) continue;
       const fit = usability(candidate);
       if (!fit.usable) continue;
       entry = candidate;
-      sourceLevel = coarser;
+      sourceLevel = candidateLevel;
       ({ scale, tx, ty, usable } = fit);
       break;
     }
   }
 
   if (usable && sourceLevel !== level) {
-    // Crossing frame: the new level has never been baked, so blit the coarser
-    // surface at scale (the lattice itself is stroked live elsewhere) and bake
-    // the new level once things settle. No synchronous draw happens here.
+    // Crossing frame: the new level has never been baked, so blit the drift
+    // source (coarser, or finer on a zoom-out) at scale (the lattice itself is
+    // stroked live elsewhere) and bake the new level once things settle. No
+    // synchronous draw happens here.
     scheduleStaticSettle(canvas, set);
   } else if (!usable) {
     const padX = Math.ceil(width * STATIC_PAD_RATIO);
     const padY = Math.ceil(height * STATIC_PAD_RATIO);
-    // Only this level's own offscreen may be re-used — a coarser level's
+    // Only this level's own offscreen may be re-used — another level's
     // surface is a drift source and must survive the bake.
     const ownEntry = sourceLevel === level ? entry : undefined;
     const off = ownEntry?.off ?? activeWindow.createEl('canvas');
@@ -348,8 +356,10 @@ function blitStaticContent(
     if (ownEntry === undefined) evictSurfacesForCanvas(canvas, set, level);
     set.byLevel.delete(level);
     set.byLevel.set(level, entry);
-    registerSurface(canvas, level, ow * oh * SURFACE_BYTES_PER_PX);
-    enforceSurfaceBudget(canvas, level);
+    if (budgeted) {
+      registerSurface(canvas, level, ow * oh * SURFACE_BYTES_PER_PX);
+      enforceSurfaceBudget(canvas, level);
+    }
     sourceLevel = level;
     scale = 1;
     tx = offsetX - entry.vOx;
@@ -1256,7 +1266,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     drawStaticContent(ctx, offsetX, offsetY, width, height);
   } else {
     const blitStart = ladderOn ? performance.now() : 0;
-    blitStaticContent(canvas, ctx, staticDraw, offsetX, offsetY, zoom, width, height, staticKey, getImageCacheVersion(), level);
+    blitStaticContent(canvas, ctx, staticDraw, offsetX, offsetY, zoom, width, height, staticKey, getImageCacheVersion(), level, ladderOn);
     if (ladderOn) recordPhase('blit', performance.now() - blitStart);
   }
 
@@ -1297,8 +1307,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
           ladder.geometryForLevel(home),
           true,
           mapData.orientation ?? 'flat',
-          // Fog is level-0 cell data: it cannot hide an object homed on a finer rung.
-          home === 0 ? objectDeps : { ...objectDeps, isCellFogged: (): boolean => false }
+          // Fog is level-0 cell data: a deep object is fogged by its root ancestor hex.
+          fogDepsForRung(ladder, home, objectDeps)
         );
       }
     }

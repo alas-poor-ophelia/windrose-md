@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { calculateContentBounds } from "../../../src/persistence/exportOperations";
+import { calculateContentBounds, exportLadderFor } from "../../../src/persistence/exportOperations";
 import { ladderForAuthoredRungs } from "../../../src/persistence/resizeOperations";
 import { HexGeometry } from "../../../src/geometry/core/HexGeometry";
 import { LADDER_DEFAULTS } from "../../../src/geometry/core/lattice";
@@ -96,6 +96,31 @@ describe("calculateContentBounds with ladder rungs", () => {
       const root = new HexGeometry(40, "flat", { maxCol: 10, maxRow: 10 });
       expect(calculateContentBounds(makeLayer({ objects: [deepObj] }), root, null)).toBeNull();
       expect(calculateContentBounds(makeLayer({ objects: [rootObj] }), root, null)).toEqual(root.getObjectBounds(rootObj));
+    });
+  });
+  describe("exportLadderFor (kgc.23 h: bounds follow the render's deep condition)", () => {
+    it("a ladder view gets a ladder, and its rung cells count", () => {
+      const mapData = ladderMap();
+      const root = new HexGeometry(40, "flat", { maxCol: 10, maxRow: 10 });
+      const ladder = exportLadderFor(mapData, root);
+      expect(ladder).not.toBeNull();
+      expect(calculateContentBounds(mapData.layers[0], root, ladder)).not.toBeNull();
+    });
+
+    it("a quarantined map (rung cells, no lod block) exports level 0: bounds ignore the rungs", () => {
+      const mapData: MapData = { ...ladderMap(), lod: undefined };
+      const root = new HexGeometry(40, "flat", { maxCol: 10, maxRow: 10 });
+      const ladder = exportLadderFor(mapData, root);
+      expect(ladder).toBeNull();
+      expect(calculateContentBounds(mapData.layers[0], root, ladder)).toBeNull();
+    });
+
+    it("a rotated ladder map renders level 0, so its rungs do not widen the frame", () => {
+      const mapData: MapData = { ...ladderMap(), northDirection: 90 };
+      const root = new HexGeometry(40, "flat", { maxCol: 10, maxRow: 10 });
+      const ladder = exportLadderFor(mapData, root);
+      expect(ladder).toBeNull();
+      expect(calculateContentBounds(mapData.layers[0], root, ladder)).toBeNull();
     });
   });
 });

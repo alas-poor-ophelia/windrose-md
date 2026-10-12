@@ -16,7 +16,7 @@ import type { HexColor } from '../core/common.types';
 import type { Edge } from '../core/rendering.types';
 import type { TileAssignment } from '../tiles/tile.types';
 import type { MapDataUpdater } from '../hooks/mapData.types';
-import type { DepthWriteResult } from '../../src/persistence/depthAuthoring';
+import type { DepthWriteContext, DepthWriteResult } from '../../src/persistence/depthAuthoring';
 import type { LayerHistorySnapshot } from '../hooks/layerHistory.types';
 
 // ===========================================
@@ -101,8 +101,9 @@ export type HandleRegionsChange = (regions: Region[]) => void;
 /**
  * Deep (ladder rung >= 1) cell write on the active layer. `update` maps the
  * rung's current cells to its next content; refused writes change nothing.
+ * `context` carries a multi-tick operation's start-of-op baseline (brush stroke).
  */
-export type HandleLevelCellsChange = (level: number, update: (current: Cell[]) => Cell[], suppressHistory?: boolean) => DepthWriteResult | null;
+export type HandleLevelCellsChange = (level: number, update: (current: Cell[]) => Cell[], suppressHistory?: boolean, context?: DepthWriteContext) => DepthWriteResult | null;
 
 export interface LayerDataHandlers {
   handleCellsChange: HandleCellsChange;

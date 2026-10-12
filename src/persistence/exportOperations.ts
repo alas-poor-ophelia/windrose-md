@@ -72,6 +72,18 @@ function getTextLabelBounds(label: TextLabel, ctx: CanvasRenderingContext2D): Bo
 // ===========================================
 
 /**
+ * The ladder an export measures and paints rungs with, or null for a level-0
+ * export. Same condition as the render's deep path: a ladder view that is not
+ * quarantined (a rotated map renders level 0, so its rungs must not widen the
+ * frame either).
+ */
+function exportLadderFor(mapData: MapData, geometry: ExtendedGeometry): GeometryLadder | null {
+  if (!(geometry instanceof HexGeometry)) return null;
+  if (!isLadderView(mapData) || isDepthQuarantined(mapData).quarantined) return null;
+  return ladderForAuthoredRungs(mapData, geometry);
+}
+
+/**
  * Calculate the world-coordinate bounding box of all content on a layer.
  * Rung (>= 1) cells are measured with their rung's own geometry and are only
  * included when a `ladder` is supplied; classic maps have none.
@@ -282,7 +294,7 @@ async function exportMapAsImage(
 
   // Calculate content bounds across every selected layer
   let bounds: BoundingBox | null = null;
-  const ladder = geometry instanceof HexGeometry ? ladderForAuthoredRungs(mapData, geometry) : null;
+  const ladder = exportLadderFor(mapData, geometry);
   for (const layer of exportLayers) {
     const layerBounds = calculateContentBounds(layer, geometry, ladder);
     if (!layerBounds) continue;
@@ -308,9 +320,7 @@ async function exportMapAsImage(
   
   // Deep export (design 06 s19 item 8): paint the deepest authored rung of the
   // exported layers. A quarantined or non-ladder map renders level 0 as usual.
-  const deepLevel = ladder !== null && isLadderView(mapData) && !isDepthQuarantined(mapData).quarantined
-    ? deepestAuthoredLevel(exportLayers)
-    : 0;
+  const deepLevel = ladder !== null ? deepestAuthoredLevel(exportLayers) : 0;
   const worldWidth = exportBounds.maxX - exportBounds.minX;
   const worldHeight = exportBounds.maxY - exportBounds.minY;
   const zoom = deepLevel > 0 && ladder !== null ? exportZoomForLevel(deepLevel, ladder.params, worldWidth, worldHeight) : 1;
@@ -396,4 +406,4 @@ async function saveMapImageToVault(
 // Exports
 // ===========================================
 
-export { calculateContentBounds, deepestAuthoredLevel, exportZoomForLevel, exportViewStateForBounds, renderMapToCanvas, exportMapAsImage, saveMapImageToVault };
+export { calculateContentBounds, deepestAuthoredLevel, exportLadderFor, exportZoomForLevel, exportViewStateForBounds, renderMapToCanvas, exportMapAsImage, saveMapImageToVault };

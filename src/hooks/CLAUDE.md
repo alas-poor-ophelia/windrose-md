@@ -11,6 +11,7 @@ hooks/
 ├── canvas/          # Canvas infrastructure
 │   ├── useCanvasRenderer.ts     # Coordinates all canvas rendering
 │   ├── levelSurfaces.ts         # Per-level surface selection for the lattice ladder (crossing is a drift)
+│   ├── rungFog.ts               # Fog for deep-rung elements: maps rung cells to their root ancestor
 │   ├── useCanvasInteraction.ts  # Mouse/touch event handling
 │   ├── useEventCoordinator.ts   # Centralizes event handling across layers
 │   └── usePanZoomCoordinator.ts # Pan and zoom state, transforms

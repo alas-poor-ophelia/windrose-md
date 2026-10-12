@@ -7,7 +7,7 @@ vi.mock('../../../src/core/settingsAccessor', () => ({ getSettings }));
 const { createNewMap } = await import('../../../src/persistence/fileOperations');
 const { authoredCells } = await import('../../../src/persistence/layerAccessor');
 const {
-  canBeginDepthAuthoring, withLod, guardDepthWrite, writeDepthCells, MAX_CELLS_PER_DEPTH_OP, DEPTH_BUDGET_BYTES,
+  canBeginDepthAuthoring, withLod, guardDepthWrite, writeDepthCells, MAX_CELLS_PER_DEPTH_OP, DEPTH_BUDGET_BYTES, BYTES_PER_CELL_ESTIMATE,
 } = await import('../../../src/persistence/depthAuthoring');
 
 function hexMap(): MapData {
@@ -109,5 +109,65 @@ describe('depthAuthoring', () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toBe('quarantined');
     expect(r.mapData).toBe(bad);
+  });
+  describe('stroke context (kgc.23 d/e/g)', () => {
+    const cellsFrom = (start: number, n: number) => Array.from({ length: n }, (_, i) => ({ q: start + i, r: 0, color: '#abcdef' }));
+
+    it('caps a stroke against its start, even when each tick adds one cell', () => {
+      const m = hexMap();
+      const id = m.layers[0].id;
+      const baseline = cellsFrom(0, 10);
+      const start = writeDepthCells(m, id, 1, baseline);
+      if (!start.ok) throw new Error('expected the stroke start to land');
+      // the stroke so far, one cell per tick: never more than one added at once
+      const live = writeDepthCells(start.mapData, id, 1, cellsFrom(0, 10 + MAX_CELLS_PER_DEPTH_OP), { baseline, serialisedBytes: 0 });
+      expect(live.ok).toBe(true);
+      if (!live.ok) return;
+      // one more cell this tick: harmless on its own, over the cap for the stroke
+      const nextTick = cellsFrom(0, 11 + MAX_CELLS_PER_DEPTH_OP);
+      expect(guardDepthWrite(live.mapData, id, 1, nextTick)).toBeNull();
+      expect(guardDepthWrite(live.mapData, id, 1, nextTick, { baseline, serialisedBytes: 0 })).toBe('too-many-cells');
+      expect(guardDepthWrite(live.mapData, id, 1, cellsFrom(0, 10 + MAX_CELLS_PER_DEPTH_OP), { baseline, serialisedBytes: 0 })).toBeNull();
+    });
+
+    it('uses the cached stroke-start size instead of serialising the map', () => {
+      const m = hexMap();
+      const id = m.layers[0].id;
+      const spy = vi.spyOn(JSON, 'stringify');
+      try {
+        const headroom = 5;
+        const serialisedBytes = DEPTH_BUDGET_BYTES - headroom * BYTES_PER_CELL_ESTIMATE;
+        expect(guardDepthWrite(m, id, 1, cellsFrom(0, headroom), { baseline: [], serialisedBytes })).toBeNull();
+        expect(guardDepthWrite(m, id, 1, cellsFrom(0, headroom + 1), { baseline: [], serialisedBytes })).toBe('over-budget');
+        expect(spy).not.toHaveBeenCalled();
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('an over-budget map still accepts the identity write that records the stroke undo entry', () => {
+      const m = hexMap();
+      const id = m.layers[0].id;
+      const stamped = writeDepthCells(m, id, 1, cellsFrom(0, 3));
+      expect(stamped.ok).toBe(true);
+      if (!stamped.ok) return;
+      const fat: MapData = { ...stamped.mapData, name: 'x'.repeat(DEPTH_BUDGET_BYTES + 10) };
+      const current = authoredCells(fat.layers[0], 1);
+      expect(guardDepthWrite(fat, id, 1, current)).toBeNull();
+      const r = writeDepthCells(fat, id, 1, current);
+      expect(r.ok).toBe(true);
+      // and a stroke context whose start lies far back changes nothing for it
+      expect(guardDepthWrite(fat, id, 1, current, { baseline: [], serialisedBytes: DEPTH_BUDGET_BYTES * 2 })).toBeNull();
+    });
+
+    it('refuses an unknown layer and never stamps lod', () => {
+      const m = hexMap();
+      expect(guardDepthWrite(m, 'no-such-layer', 1, cellsFrom(0, 1))).toBe('unknown-layer');
+      const r = writeDepthCells(m, 'no-such-layer', 1, cellsFrom(0, 1));
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.reason).toBe('unknown-layer');
+      expect(r.mapData).toBe(m);
+      expect(r.mapData.lod).toBeUndefined();
+    });
   });
 });

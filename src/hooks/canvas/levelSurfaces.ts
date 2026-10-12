@@ -45,5 +45,30 @@ function driftAllowed(hasOwnSurface: boolean, level: number, honourBake: boolean
   return !hasOwnSurface && level > 0 && !honourBake;
 }
 
+/**
+ * Drift sources to try, in order, for a frame at `level` that may drift
+ * (`driftAllowed`). Nearest COARSER first (D17: the zoom-in crossing, where a
+ * coarse snapshot only has to cover a shrinking region). Then, only after every
+ * coarser level, the nearest FINER cached levels (kgc.23 i): on a zoom-out
+ * crossing L -> L-1 with no coarser surface, the L surface blitted at scale < 1
+ * can still cover the viewport for a small drift, instead of baking the crossing
+ * frame inline. The caller's usability test (key match + viewport inside the
+ * scaled pad) decides whether a candidate actually serves; this only orders them.
+ * The kgc.19 rule is untouched: candidates are consulted only while the level
+ * owns no surface, so a finer surface never stands in for the level's own.
+ * Coarser candidates stop at level 0, as the pre-kgc.23 loop did.
+ */
+function driftCandidates(level: number, cachedLevels: Iterable<number>): number[] {
+  const coarser: number[] = [];
+  const finer: number[] = [];
+  for (const cached of cachedLevels) {
+    if (cached > level) finer.push(cached);
+    else if (cached < level && cached >= 0) coarser.push(cached);
+  }
+  coarser.sort((a, b) => b - a);
+  finer.sort((a, b) => a - b);
+  return [...coarser, ...finer];
+}
+
 export type { DriftSource };
-export { pickDriftSource, driftAllowed };
+export { pickDriftSource, driftAllowed, driftCandidates };

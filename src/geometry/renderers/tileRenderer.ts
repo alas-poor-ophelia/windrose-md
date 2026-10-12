@@ -829,6 +829,13 @@ function getEntryMap(tilesets: TilesetDef[]): Map<string, { entry: { vaultPath: 
 /**
  * Render tile images onto the canvas with z-sorted overflow.
  */
+/** See the `clipMode` note in renderTiles; absent or unknown reads as 'rungs'. */
+function tileClipOverride(): 'rungs' | 'all' | 'none' {
+  if (typeof activeWindow === 'undefined') return 'rungs';
+  const raw = (activeWindow as unknown as { __windroseLadder?: { tileClip?: unknown } }).__windroseLadder?.tileClip;
+  return raw === 'all' || raw === 'none' ? raw : 'rungs';
+}
+
 function renderTiles(
   ctx: CanvasRenderingContext2D,
   tiles: TileAssignment[],
@@ -952,7 +959,11 @@ function renderTiles(
   const opacity = options?.opacity ?? 1;
   const canvasW = options?.canvasWidth ?? 4000;
   const canvasH = options?.canvasHeight ?? 4000;
-  const clipToHex = options?.clipToHex === true && !isGrid;
+  // Developer knob for the clip-at-crossing lineup (bead kgc.23 item k):
+  // `activeWindow.__windroseLadder.tileClip` = 'rungs' (default: clip on
+  // rungs >= 1 only, the caller's flag), 'all' (clip level 0 too) or 'none'.
+  const clipMode = tileClipOverride();
+  const clipToHex = !isGrid && (clipMode === 'all' || (clipMode === 'rungs' && options?.clipToHex === true));
 
   const drawCellTile = (tile: TileAssignment): void => {
     const lookup = entryMap.get(tile.tilesetId + ':' + tile.tileId);

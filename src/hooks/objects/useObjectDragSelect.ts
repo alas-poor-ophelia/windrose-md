@@ -21,6 +21,7 @@ import { useMapSelection } from '../../context/MapSelectionContext';
 import { calculateEdgeAlignment, removeObjectFromHex } from '../../objects/objectOperations';
 import { getClickedObjectInCell, getObjectsInCell, assignSlot } from '../../objects/hexSlotPositioner';
 import { pickLadderObject } from '../../objects/ladderHitTest';
+import { rungFogPredicate } from '../canvas/rungFog';
 import { getActiveLayer, isCellFogged } from '../../persistence/layerAccessor';
 
 
@@ -133,10 +134,13 @@ function useObjectDragSelect(
 
     if (object != null) {
       const activeLayer = getActiveLayer(mapData);
-      // Fog is level-0 cell data: it cannot hide an object homed on a finer rung.
-      if (activeLayer.fogOfWar?.enabled === true && (object.homeLevel ?? 0) === 0) {
+      // Fog is level-0 cell data: a deep object is fogged at its root ancestor,
+      // exactly as the renderer hides it (rungFog).
+      if (activeLayer.fogOfWar?.enabled === true) {
+        const home = object.homeLevel ?? 0;
+        const fogged = ladder !== null && home > 0 ? rungFogPredicate(ladder, home, isCellFogged) : isCellFogged;
         const objOffset = geometry.toOffsetCoords(object.position.x, object.position.y);
-        if (isCellFogged(activeLayer, objOffset.col, objOffset.row)) {
+        if (fogged(activeLayer, objOffset.col, objOffset.row)) {
           object = null;
         }
       }

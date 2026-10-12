@@ -112,5 +112,6 @@ describe("depthRefusalMessage", () => {
   it("names the budget refusal in sentence case", () => {
     expect(depthRefusalMessage("over-budget")).toBe("Deep edit refused: over the map's size budget.");
     expect(depthRefusalMessage("too-many-cells")).toMatch(/^Deep edit refused: /);
+    expect(depthRefusalMessage("unknown-layer")).toMatch(/^Deep edit refused: /);
   });
 });

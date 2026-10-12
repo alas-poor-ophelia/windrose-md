@@ -18,7 +18,7 @@ import type { Cell } from '#types/core/cell.types';
 import type { LayerId } from '#types/core/map.types';
 
 import { isDepthQuarantined, isLadderView, isLodLadderEnabled, ladderParamsFor, hasSubHexChildren } from '../core/lodFlags';
-import { authoredCells, getActiveLayer, setLevelCells } from './layerAccessor';
+import { authoredCells, setLevelCells } from './layerAccessor';
 import { MAX_JOURNAL_PAYLOAD } from './saveJournal';
 
 /** Hard refusal threshold: 80% of the save journal's payload cap. */
@@ -34,7 +34,21 @@ type DepthWriteRefusal =
   | 'quarantined'
   | 'level-out-of-range'
   | 'too-many-cells'
-  | 'over-budget';
+  | 'over-budget'
+  | 'unknown-layer';
+
+/**
+ * Optional context for a write that is one tick of a longer operation (a brush
+ * stroke). Both are measured at the operation's START, so the per-op cap and the
+ * budget apply to the operation as a whole and the map is serialised once per
+ * operation instead of once per tick (kgc.23).
+ */
+interface DepthWriteContext {
+  /** The rung's cells when the operation began; the cap counts cells added since. Default: the rung's current cells. */
+  baseline?: Cell[];
+  /** `JSON.stringify(mapData).length` when `baseline` was taken. Default: measured now against the current cells. */
+  serialisedBytes?: number;
+}
 
 type DepthWriteResult =
   | { ok: true; mapData: MapData }
@@ -66,9 +80,17 @@ function withLod(mapData: MapData): MapData {
 
 /**
  * Check a proposed rung write without applying it. `nextCells` is the FULL
- * intended content of the rung after the write.
+ * intended content of the rung after the write. A write that does not grow the
+ * rung (identity, erase) is never refused on size: the stroke-end history write
+ * re-writes the current rung and must always land (kgc.23 e).
  */
-function guardDepthWrite(mapData: MapData, layerId: LayerId, level: number, nextCells: Cell[]): DepthWriteRefusal | null {
+function guardDepthWrite(
+  mapData: MapData,
+  layerId: LayerId,
+  level: number,
+  nextCells: Cell[],
+  context: DepthWriteContext = {}
+): DepthWriteRefusal | null {
   if (!canBeginDepthAuthoring(mapData)) {
     if (isDepthQuarantined(mapData).quarantined) return 'quarantined';
     // A classic map with sub-hex children never takes the lod stamp (design s9):
@@ -78,24 +100,35 @@ function guardDepthWrite(mapData: MapData, layerId: LayerId, level: number, next
   }
   const params = ladderParamsFor(withLod(mapData));
   if (!Number.isInteger(level) || level < 1 || level > params.maxLevel) return 'level-out-of-range';
-  const layer = mapData.layers.find((l) => l.id === layerId) ?? getActiveLayer(mapData);
+  // Never fall back to another layer: counting the active layer while
+  // setLevelCells no-ops on the unknown id would report success and stamp lod.
+  const layer = mapData.layers.find((l) => l.id === layerId);
+  if (layer === undefined) return 'unknown-layer';
   const current = authoredCells(layer, level);
-  const added = nextCells.length - current.length;
+  if (nextCells.length - current.length <= 0) return null;
+  const baseline = context.baseline ?? current;
+  const added = nextCells.length - baseline.length;
   if (added > MAX_CELLS_PER_DEPTH_OP) return 'too-many-cells';
-  if (added > 0) {
-    const projected = JSON.stringify(mapData).length + added * BYTES_PER_CELL_ESTIMATE;
-    if (projected > DEPTH_BUDGET_BYTES) return 'over-budget';
-  }
+  const projected = context.serialisedBytes !== undefined
+    ? context.serialisedBytes + added * BYTES_PER_CELL_ESTIMATE
+    : JSON.stringify(mapData).length + (nextCells.length - current.length) * BYTES_PER_CELL_ESTIMATE;
+  if (projected > DEPTH_BUDGET_BYTES) return 'over-budget';
   return null;
 }
 
 /** Apply a guarded rung write. On refusal the original map is returned untouched. */
-function writeDepthCells(mapData: MapData, layerId: LayerId, level: number, nextCells: Cell[]): DepthWriteResult {
-  const reason = guardDepthWrite(mapData, layerId, level, nextCells);
+function writeDepthCells(
+  mapData: MapData,
+  layerId: LayerId,
+  level: number,
+  nextCells: Cell[],
+  context: DepthWriteContext = {}
+): DepthWriteResult {
+  const reason = guardDepthWrite(mapData, layerId, level, nextCells, context);
   if (reason !== null) return { ok: false, reason, mapData };
   const stamped = withLod(mapData);
   return { ok: true, mapData: setLevelCells(stamped, layerId, level, nextCells) };
 }
 
-export type { DepthWriteRefusal, DepthWriteResult };
-export { DEPTH_BUDGET_BYTES, MAX_CELLS_PER_DEPTH_OP, canBeginDepthAuthoring, withLod, guardDepthWrite, writeDepthCells };
+export type { DepthWriteContext, DepthWriteRefusal, DepthWriteResult };
+export { BYTES_PER_CELL_ESTIMATE, DEPTH_BUDGET_BYTES, MAX_CELLS_PER_DEPTH_OP, canBeginDepthAuthoring, withLod, guardDepthWrite, writeDepthCells };
