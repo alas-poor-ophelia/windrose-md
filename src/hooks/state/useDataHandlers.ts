@@ -10,7 +10,7 @@
  */
 
 // Type-only imports
-import type { MapLayer, StoredViewState, TextLabelSettings, Region, Outline, ShapeOverlay, FogOfWar, PartyPin, SavedRoute, MeasurementRoute, MapTravelSettings } from '#types/core/map.types';
+import type { MapData, MapLayer, LadderConfig, StoredViewState, TextLabelSettings, Region,Outline, ShapeOverlay, FogOfWar, PartyPin, SavedRoute, MeasurementRoute, MapTravelSettings } from '#types/core/map.types';
 import type { CustomColor } from '#types/core/common.types';
 import type { Cell } from '#types/core/cell.types';
 import type { Curve } from '#types/core/curve.types';
@@ -28,10 +28,21 @@ import type {
 } from '#types/hooks/dataHandlers.types';
 import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 
-import { useCallback, useMemo } from 'preact/hooks';
+import { useCallback, useMemo, useRef } from 'preact/hooks';
 import { getActiveLayer, updateActiveLayer, promoteToStrata, getActiveBoardLayers, setActiveLayer, authoredCells } from '../../persistence/layerAccessor';
 import { snapshotLevelsOf, stampedLodOf } from './layerHistoryOps';
-import { writeDepthCells, type DepthWriteResult } from '../../persistence/depthAuthoring';
+import { writeDepthCells, withLod, type DepthWriteResult } from '../../persistence/depthAuthoring';
+
+/** Does any element in the written value sit on a ladder rung >= 1? */
+function hasDeepElement(value: unknown): boolean {
+  return Array.isArray(value) && value.some((item: unknown) =>
+    typeof item === 'object' && item !== null && ((item as { homeLevel?: number }).homeLevel ?? 0) > 0);
+}
+
+/** The map with `lod` stamped when `value` carries a deep element; same reference otherwise. */
+function stampLodForDeepElements(mapData: MapData, value: unknown): MapData {
+  return mapData.lod === undefined && hasDeepElement(value) ? withLod(mapData) : mapData;
+}
 
 
 /**
@@ -87,6 +98,22 @@ function useDataHandlers({
 
   type LayerField = 'cells' | 'curves' | 'objects' | 'textLabels' | 'edges' | 'tiles' | 'wallPaths' | 'terrainStrokes';
 
+  // A batched stroke writes with suppressHistory until pointerup. If one of
+  // those ticks stamped `lod` (first deep element), the stamp must still land on
+  // the entry that finally records the stroke, or undo would restore the
+  // elements but leave the map a ladder map. Parked here until that commit.
+  const pendingLodStampRef = useRef<LadderConfig | null>(null);
+  const lodStampForHistory = useCallback((before: MapData, after: MapData, suppressHistory: boolean): { lodStamped?: LadderConfig } => {
+    const stamped = stampedLodOf(before, after);
+    if (suppressHistory) {
+      if (stamped.lodStamped !== undefined) pendingLodStampRef.current = stamped.lodStamped;
+      return {};
+    }
+    const carried = pendingLodStampRef.current;
+    pendingLodStampRef.current = null;
+    return stamped.lodStamped !== undefined ? stamped : carried !== null ? { lodStamped: carried } : {};
+  }, []);
+
   const createLayerDataHandler = useCallback(<T,>(field: LayerField) => {
     return (newValue: T, suppressHistory = false): void => {
       if (isApplyingHistory()) return;
@@ -94,17 +121,21 @@ function useDataHandlers({
       updateMapData((currentMapData) => {
         if (currentMapData == null) return currentMapData;
 
-        const newMapData = updateActiveLayer(currentMapData, { [field]: newValue });
+        // An element homed on a rung >= 1 is laid out on the ladder's lattice:
+        // the first such write stamps `lod` exactly as the first deep cell
+        // write does (and the history entry records it, so undo lifts it).
+        const newMapData = stampLodForDeepElements(updateActiveLayer(currentMapData, { [field]: newValue }), newValue);
+        const lodStamp = lodStampForHistory(currentMapData, newMapData, suppressHistory);
 
         if (!suppressHistory) {
           const activeLayer = getActiveLayer(currentMapData);
-          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []));
+          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue, ...lodStamp }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []));
         }
 
         return newMapData;
       });
     };
-  }, [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot]);
+  }, [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot, lodStampForHistory]);
 
   // =========================================================================
   // Ladder rung handler (level >= 1)
@@ -189,11 +220,11 @@ function useDataHandlers({
         if (currentMapData == null) return currentMapData;
 
         const activeLayer = getActiveLayer(currentMapData);
+        let nextMapData = stampLodForDeepElements(updateActiveLayer(currentMapData, { tiles: newValue }), newValue);
+        const lodStamp = lodStampForHistory(currentMapData, nextMapData, suppressHistory);
         if (!suppressHistory) {
-          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { tiles: newValue }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []));
+          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { tiles: newValue, ...lodStamp }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []));
         }
-
-        let nextMapData = updateActiveLayer(currentMapData, { tiles: newValue });
 
         // 0→first-tile transition (anywhere on the map) promotes Simple → Strata, once.
         const mapHadTiles = currentMapData.layers.some(l => (l.tiles?.length ?? 0) > 0);
@@ -213,7 +244,7 @@ function useDataHandlers({
         return nextMapData;
       });
     },
-    [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot]
+    [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot, lodStampForHistory]
   );
 
   const handleWallPathsChange = useMemo(

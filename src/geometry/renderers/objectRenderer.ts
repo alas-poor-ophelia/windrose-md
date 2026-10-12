@@ -47,7 +47,7 @@ interface ObjectRenderDeps {
   getObjectType: (typeId: string) => ObjectTypeDefinition | null;
   getRenderChar: (objType: ObjectTypeDefinition | null | undefined) => RenderChar;
   isCellFogged: (layer: MapLayer, col: number, row: number) => boolean;
-  getObjectsInCell: (objects: MapObject[], x: number, y: number) => MapObject[];
+  getObjectsInCell: (objects: MapObject[], x: number, y: number, homeLevel?: number) => MapObject[];
   getSlotOffset: (slot: number, count: number, orientation: 'flat' | 'pointy') => { offsetX: number; offsetY: number };
   getMultiObjectScale: (count: number) => number;
   renderNoteLinkBadge: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
@@ -89,12 +89,16 @@ function isObjectUnderFog(
 
 /**
  * Calculates object screen position, handling multi-object hex slots.
+ *
+ * This is THE drawn footprint: the ladder hit-tests (objects/ladderHitTest.ts)
+ * call it with the same rung geometry, scaledSize and elementScale the draw
+ * pass uses, so what the pointer hits is exactly what was painted.
  */
 function calculateObjectPosition(
   obj: MapObject,
   allObjects: MapObject[],
   geometry: IGeometry,
-  context: ObjectRenderContext,
+  context: Omit<ObjectRenderContext, 'ctx'> & Partial<Pick<ObjectRenderContext, 'ctx'>>,
   isHexMap: boolean,
   orientation: 'flat' | 'pointy',
   deps: Pick<ObjectRenderDeps, 'getObjectsInCell' | 'getSlotOffset' | 'getMultiObjectScale'>
@@ -125,7 +129,7 @@ function calculateObjectPosition(
 
   // Multi-object support for hex maps
   if (isHexMap) {
-    const cellObjects = deps.getObjectsInCell(allObjects, obj.position.x, obj.position.y);
+    const cellObjects = deps.getObjectsInCell(allObjects, obj.position.x, obj.position.y, obj.homeLevel ?? 0);
     const objectCount = cellObjects.length;
 
     if (objectCount > 1) {

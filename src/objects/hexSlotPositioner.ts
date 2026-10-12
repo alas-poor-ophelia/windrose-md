@@ -142,32 +142,43 @@ function getMultiObjectScale(objectCount: number): number {
   return 0.55;
 }
 
+/** The ladder rung an object is homed on (absent = 0). */
+function homeLevelOf(obj: { homeLevel?: number }): number {
+  return obj.homeLevel ?? 0;
+}
+
 /**
- * Get objects in a specific cell
+ * Get objects in a specific cell.
+ *
+ * Rung cells of different ladder levels share index space: (3, -1) on rung 2 is
+ * a different place from (3, -1) on the root. Pass `homeLevel` to restrict the
+ * cell to one rung (the renderer and every ladder hit-test do); omitted, the
+ * match is by index alone, which is the classic (single-rung) behaviour.
  */
-function getObjectsInCell(objects: MapObject[], x: number, y: number): MapObject[] {
+function getObjectsInCell(objects: MapObject[], x: number, y: number, homeLevel?: number): MapObject[] {
   if (objects == null || !Array.isArray(objects)) return [];
 
   return objects.filter(obj =>
     obj.position != null &&
     obj.position.x === x &&
-    obj.position.y === y
+    obj.position.y === y &&
+    (homeLevel === undefined || homeLevelOf(obj) === homeLevel)
   );
 }
 
 /**
  * Check if a cell can accept another object
  */
-function canAddObjectToCell(objects: MapObject[], x: number, y: number): boolean {
-  const cellObjects = getObjectsInCell(objects, x, y);
+function canAddObjectToCell(objects: MapObject[], x: number, y: number, homeLevel?: number): boolean {
+  const cellObjects = getObjectsInCell(objects, x, y, homeLevel);
   return cellObjects.length < getMaxObjectsPerCell();
 }
 
 /**
  * Get occupied slots in a cell
  */
-function getOccupiedSlots(objects: MapObject[], x: number, y: number): number[] {
-  const cellObjects = getObjectsInCell(objects, x, y);
+function getOccupiedSlots(objects: MapObject[], x: number, y: number, homeLevel?: number): number[] {
+  const cellObjects = getObjectsInCell(objects, x, y, homeLevel);
   return cellObjects
     .map(obj => obj.slot)
     .filter((slot): slot is number => slot !== undefined && slot !== null);
@@ -176,8 +187,8 @@ function getOccupiedSlots(objects: MapObject[], x: number, y: number): number[] 
 /**
  * Prepare objects array after removing an object from a multi-object cell
  */
-function reorganizeAfterRemoval(objects: MapObject[], x: number, y: number): MapObject[] {
-  const cellObjects = getObjectsInCell(objects, x, y);
+function reorganizeAfterRemoval(objects: MapObject[], x: number, y: number, homeLevel?: number): MapObject[] {
+  const cellObjects = getObjectsInCell(objects, x, y, homeLevel);
 
   if (cellObjects.length <= 1) {
     if (cellObjects.length === 1 && cellObjects[0].slot !== 0) {
@@ -197,7 +208,8 @@ function reorganizeAfterRemoval(objects: MapObject[], x: number, y: number): Map
   if (remapping.size === 0) return objects;
 
   return objects.map(obj => {
-    if (obj.position?.x === x && obj.position?.y === y && obj.slot !== undefined) {
+    if (obj.position?.x === x && obj.position?.y === y && obj.slot !== undefined &&
+        (homeLevel === undefined || homeLevelOf(obj) === homeLevel)) {
       const newSlot = remapping.get(obj.slot);
       if (newSlot !== undefined) {
         return { ...obj, slot: newSlot };
@@ -216,9 +228,10 @@ function getClickedObjectInCell(
   hexY: number,
   clickOffsetX: number,
   clickOffsetY: number,
-  orientation: HexOrientation
+  orientation: HexOrientation,
+  homeLevel?: number
 ): MapObject | null {
-  const cellObjects = getObjectsInCell(objects, hexX, hexY);
+  const cellObjects = getObjectsInCell(objects, hexX, hexY, homeLevel);
 
   if (cellObjects.length === 0) return null;
   if (cellObjects.length === 1) return cellObjects[0];
@@ -248,4 +261,4 @@ function getClickedObjectInCell(
   return closest;
 }
 
-export { FLAT_TOP_ARRANGEMENTS, POINTY_TOP_ARRANGEMENTS, getSlotOffset, assignSlot, reorganizeSlots, getMaxObjectsPerCell, getMultiObjectScale, getObjectsInCell, canAddObjectToCell, getOccupiedSlots, reorganizeAfterRemoval, getClickedObjectInCell };
+export { FLAT_TOP_ARRANGEMENTS, POINTY_TOP_ARRANGEMENTS, getSlotOffset, assignSlot, reorganizeSlots, getMaxObjectsPerCell, getMultiObjectScale, getObjectsInCell, canAddObjectToCell, getOccupiedSlots, reorganizeAfterRemoval, getClickedObjectInCell, homeLevelOf };

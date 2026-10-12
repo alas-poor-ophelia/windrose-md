@@ -72,7 +72,7 @@ interface UsePaintToolOptions {
   onTerrainStrokesChange?: (strokes: TerrainStroke[], suppressHistory?: boolean) => void;
   getTextLabelAtPosition: (labels: TextLabel[], worldX: number, worldY: number, ctx: CanvasRenderingContext2D | null) => TextLabel | null;
   removeTextLabel: (labels: TextLabel[], id: string) => TextLabel[];
-  getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
+  getObjectAtPosition: (objects: MapObject[], x: number, y: number, homeLevel?: number) => MapObject | null;
   /** Lattice ladder (null/absent on classic maps). Deep strokes need all four ladder options. */
   ladder?: GeometryLadder | null;
   /** Live camera rung; latched once per stroke at pointerdown. */
@@ -278,10 +278,12 @@ function usePaintTool({
 
       const coordX = coords.x;
       const coordY = coords.y;
-      const obj = getObjectAtPosition(activeLayer.objects, coordX, coordY);
+      // This is the level-0 erase (deep strokes go through toggleDeepCell and
+      // touch cells only): an index match on another rung is a different place.
+      const obj = getObjectAtPosition(activeLayer.objects, coordX, coordY, 0);
       if (obj != null) {
         const mapType = mapData.mapType ?? 'grid';
-        const result = eraseObjectAt(activeLayer.objects, coordX, coordY, mapType);
+        const result = eraseObjectAt(activeLayer.objects, coordX, coordY, mapType, 0);
         if (result.success) {
           onObjectsChange(result.objects);
         }
@@ -295,7 +297,7 @@ function usePaintTool({
         if (onTilesChange != null) {
           const searchLayers = getActiveBoardLayers(mapData)
             .filter(l => l.visible !== false || l.id === activeLayer.id);
-          const hit = findTileHitInLayers(searchLayers, coordX, coordY);
+          const hit = findTileHitInLayers(searchLayers, coordX, coordY, 0);
           if (hit != null) {
             const layerTiles = hit.layer.tiles ?? [];
             const nextTiles = layerTiles.filter((_: TileAssignment, i: number) => i !== hit.index);

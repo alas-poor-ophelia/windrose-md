@@ -69,7 +69,7 @@ interface UseShapeToolsOptions {
   onObjectsChange: (objects: MapObject[]) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
-  removeObjectsInRectangle: (objects: MapObject[], x1: number, y1: number, x2: number, y2: number) => MapObject[];
+  removeObjectsInRectangle: (objects: MapObject[], x1: number, y1: number, x2: number, y2: number, homeLevel?: number) => MapObject[];
   /** Lattice ladder (null/absent on classic maps). Deep shapes need all four ladder options. */
   ladder?: GeometryLadder | null;
   getActiveLevel?: () => number;
@@ -206,7 +206,8 @@ function useShapeTools({
 
     const activeLayer = getActiveLayer(mapData);
 
-    const newObjects = removeObjectsInRectangle(activeLayer.objects, x1, y1, x2, y2);
+    // Level-0 clear (deep shapes write cells only): objects on other rungs stay.
+    const newObjects = removeObjectsInRectangle(activeLayer.objects, x1, y1, x2, y2, 0);
     onObjectsChange(newObjects);
 
     const minX = Math.min(x1, x2);

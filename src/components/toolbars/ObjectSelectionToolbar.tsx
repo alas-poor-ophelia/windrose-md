@@ -15,6 +15,7 @@ import type { HexColor } from '#types/core/common.types';
 import type { CustomColor } from '#types/core/common.types';
 
 import { calculateObjectScreenPosition } from '../../objects/screenPositionUtils';
+import { useMapState } from '../../context/MapContext';
 import { openNoteInNewTab } from '../../persistence/noteOperations';
 import { ColorPicker } from '../shared/ColorPicker';
 import { getActiveLayer } from '../../persistence/layerAccessor';
@@ -102,15 +103,16 @@ const ObjectSelectionToolbar = ({
   pendingCustomColorRef,
   colorButtonRef
 }: ObjectSelectionToolbarProps): VNode | null => {
+  const { ladder } = useMapState();
   // Compute bounds before hooks to satisfy rules-of-hooks (no hooks after conditional returns)
-  const hasRequiredInputs = !!selectedItem && selectedItem.type === 'object' && !!mapData && !!canvasRef?.current && !!containerRef?.current;
+  const hasRequiredInputs= !!selectedItem && selectedItem.type === 'object' && !!mapData && !!canvasRef?.current && !!containerRef?.current;
 
   const object = hasRequiredInputs
     ? getActiveLayer(mapData).objects?.find(obj => obj.id === selectedItem.id) ?? null
     : null;
 
   const screenPos = hasRequiredInputs && object != null && geometry != null
-    ? calculateObjectScreenPosition(object, canvasRef.current!, mapData, geometry, containerRef)
+    ? calculateObjectScreenPosition(object, canvasRef.current!, mapData, geometry, containerRef, ladder)
     : null;
 
   const bounds = screenPos != null

@@ -22,7 +22,7 @@ interface LinkedNoteHoverOverlaysProps {
 }
 
 const LinkedNoteHoverOverlays = ({ selectedItem }: LinkedNoteHoverOverlaysProps): VNode | null => {
-  const { canvasRef, containerRef, mapData, geometry } = useMapState();
+  const { canvasRef, containerRef, mapData, geometry, ladder } = useMapState();
 
   // Don't render anything if prerequisites aren't met
   if (!canvasRef.current || !containerRef.current || !mapData?.layers || !geometry) return null;
@@ -41,7 +41,7 @@ const LinkedNoteHoverOverlays = ({ selectedItem }: LinkedNoteHoverOverlaysProps)
       {objectsWithLinks.map(obj => {
         const canvas = canvasRef.current;
         if (!canvas) return null;
-        const position = calculateObjectScreenPosition(obj, canvas, mapData, geometry, containerRef);
+        const position = calculateObjectScreenPosition(obj, canvas, mapData, geometry, containerRef, ladder);
         if (!position) return null;
 
         const { screenX, screenY, objectWidth, objectHeight } = position;

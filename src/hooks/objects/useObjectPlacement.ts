@@ -13,7 +13,9 @@ import { Notice } from 'obsidian';
 import { useMapState } from '../../context/MapContext';
 import { useMapOperations } from '../../context/MapContext';
 import { calculateEdgeAlignment, placeObject, placeObjectFreeform, canPlaceObjectAt } from '../../objects/objectOperations';
-import { getActiveLayer } from '../../persistence/layerAccessor';
+import { getActiveLayer, authoredCells } from '../../persistence/layerAccessor';
+import { guardDepthWrite } from '../../persistence/depthAuthoring';
+import { depthRefusalMessage } from '../../drawing/depthCellOps';
 
 
 
@@ -36,7 +38,7 @@ function useObjectPlacement(
 ): {
   handleObjectPlacement: (gridX: number, gridY: number, clientX: number, clientY: number) => boolean;
 } {
-  const { mapData, geometry, screenToWorld, getActiveLevel } = useMapState();
+  const { mapData, geometry, screenToWorld, getActiveLevel, screenToLevelCell, ladder } = useMapState();
   const { onObjectsChange } = useMapOperations();
 
   const handleObjectPlacement = useCallback((
@@ -51,13 +53,27 @@ function useObjectPlacement(
 
     if (geometry == null || mapData == null) return false;
 
-    // Zoomed onto a ladder rung: objects are root-level only this phase (0 on classic maps).
-    if (getActiveLevel() > 0) {
-      new Notice('Objects can only be placed at the root level for now.');
-      return true;
-    }
-
-    if (!geometry.isWithinBounds(gridX, gridY)) {
+    // Zoomed onto a ladder rung (0 on classic maps): the object is homed there,
+    // in that rung's cell under the pointer, behind the same gate as cell paint.
+    const level = getActiveLevel();
+    let cellX = gridX;
+    let cellY = gridY;
+    if (level > 0) {
+      if (ladder === null) {
+        new Notice(depthRefusalMessage('not-a-ladder'));
+        return true;
+      }
+      const activeLayer = getActiveLayer(mapData);
+      const refusal = guardDepthWrite(mapData, activeLayer.id, level, authoredCells(activeLayer, level));
+      if (refusal !== null) {
+        new Notice(depthRefusalMessage(refusal));
+        return true;
+      }
+      const cell = screenToLevelCell(clientX, clientY, level);
+      if (!cell || !ladder.existsAt(level, cell.x, cell.y)) return true;
+      cellX = cell.x;
+      cellY = cell.y;
+    } else if (!geometry.isWithinBounds(gridX, gridY)) {
       return true;
     }
 
@@ -75,9 +91,10 @@ function useObjectPlacement(
         selectedObjectType,
         worldCoords.worldX,
         worldCoords.worldY,
-        { x: gridX, y: gridY },
+        { x: cellX, y: cellY },
         mapType,
-        mapData.objectSetId
+        mapData.objectSetId,
+        level
       );
       if (result.success) {
         onObjectsChange(result.objects);
@@ -85,7 +102,7 @@ function useObjectPlacement(
       return true;
     }
 
-    if (!canPlaceObjectAt(getActiveLayer(mapData).objects, gridX, gridY, mapType)) {
+    if (!canPlaceObjectAt(getActiveLayer(mapData).objects, cellX, cellY, mapType, level)) {
       return true;
     }
 
@@ -103,16 +120,16 @@ function useObjectPlacement(
     const result = placeObject(
       getActiveLayer(mapData).objects,
       selectedObjectType,
-      gridX,
-      gridY,
-      { mapType, alignment: alignment as ObjectAlignment, objectSetId: mapData.objectSetId }
+      cellX,
+      cellY,
+      { mapType, alignment: alignment as ObjectAlignment, objectSetId: mapData.objectSetId, homeLevel: level }
     );
 
     if (result.success) {
       onObjectsChange(result.objects);
     }
     return true;
-  }, [currentTool, selectedObjectType, mapData, geometry, getActiveLevel, edgeSnapMode, onObjectsChange, screenToWorld, altKeyPressedRef, freeformPlacementModeRef, shiftKeyPressedRef]);
+  }, [currentTool, selectedObjectType, mapData, geometry, getActiveLevel, screenToLevelCell, ladder, edgeSnapMode, onObjectsChange, screenToWorld, altKeyPressedRef, freeformPlacementModeRef, shiftKeyPressedRef]);
 
   return { handleObjectPlacement };
 }

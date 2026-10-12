@@ -84,6 +84,13 @@ function deepestAuthoredRung(mapData: MapData): number {
     const levels = authoredLevels(layer);
     const last = levels.length > 0 ? levels[levels.length - 1] : 0;
     if (last > deepest) deepest = last;
+    // Elements homed on a rung (kgc.12) are laid out on the lattice like cells.
+    for (const list of [layer.objects, layer.textLabels, layer.tiles]) {
+      for (const item of list ?? []) {
+        const home = (item as { homeLevel?: number }).homeLevel ?? 0;
+        if (home > deepest) deepest = home;
+      }
+    }
   }
   return deepest;
 }

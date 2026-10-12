@@ -184,13 +184,14 @@ export interface MapOperationsContextValue {
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
 
   // Object operations
-  getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
+  /** `homeLevel` scopes index matches to one ladder rung; omitted, any rung (classic) matches. */
+  getObjectAtPosition: (objects: MapObject[], x: number, y: number, homeLevel?: number) => MapObject | null;
   addObject: (objects: MapObject[], typeId: string, x: number, y: number, mapType?: MapType, objectSetId?: string | null) => MapObject[];
   updateObject: (objects: MapObject[] | null | undefined, objectId: string, updates: ObjectUpdate) => MapObject[];
   removeObject: (objects: MapObject[] | null | undefined, objectId: string) => MapObject[];
   removeObjectAtPosition: (objects: MapObject[] | null | undefined, x: number, y: number) => MapObject[];
   removeObjectsInRectangle: (objects: MapObject[] | null | undefined, x1: number, y1: number, x2: number, y2: number) => MapObject[];
-  isAreaFree: (objects: MapObject[] | null | undefined, x: number, y: number, width: number, height: number, excludeId?: string | null) => boolean;
+  isAreaFree: (objects: MapObject[] | null | undefined, x: number, y: number, width: number, height: number, excludeId?: string | null, homeLevel?: number) => boolean;
   canResizeObject: (objects: MapObject[], objectId: string, newWidth: number, newHeight: number, maxSize?: number) => boolean;
   onObjectsChange: (objects: MapObject[], skipHistory?: boolean) => void;
 

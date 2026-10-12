@@ -125,6 +125,16 @@ describe('lodFlags: isDepthQuarantined', () => {
     expect(isDepthQuarantined(withLayers({}, { 1: [cell(1, 1)] }))).toEqual({ quarantined: true, reason: 'levels-without-lod' });
   });
 
+  it('counts an element homed on a rung as depth content (kgc.12)', () => {
+    const deepObject = { id: 'o', type: 'entrance', position: { x: 0, y: 0 }, size: { width: 1, height: 1 }, homeLevel: 2 };
+    const map = withLayers({});
+    const withObject = { ...map, layers: [{ ...map.layers[0], objects: [deepObject] }] } as MapData;
+    expect(hasDepthContent(withObject)).toBe(true);
+    expect(isDepthQuarantined(withObject).reason).toBe('levels-without-lod');
+    expect(isDepthQuarantined({ ...withObject, lod: LOD }).quarantined).toBe(false);
+    expect(isDepthQuarantined({ ...withObject, lod: { ...LOD, maxLevel: 1 } }).reason).toBe('max-level-below-content');
+  });
+
   it('quarantines an unknown or non-integer m', () => {
     expect(isDepthQuarantined(withLayers({ lod: { ...LOD, m: 3 } })).reason).toBe('unknown-m');
     expect(isDepthQuarantined(withLayers({ lod: { ...LOD, m: 4.5 } })).reason).toBe('unknown-m');

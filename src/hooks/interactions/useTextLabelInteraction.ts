@@ -27,6 +27,8 @@ import { getNextRotation } from '../../drawing/rotationOperations';
 import { useMapState, useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { getActiveLayer } from '../../persistence/layerAccessor';
+import { Notice } from 'obsidian';
+import { canBeginDepthAuthoring } from '../../persistence/depthAuthoring';
 import { toggledDepthMode } from '../../geometry/renderers/elementBands';
 
 
@@ -46,7 +48,8 @@ const useTextLabelInteraction = (
     canvasRef,
     mapData,
     screenToWorld,
-    getClientCoords
+    getClientCoords,
+    getActiveLevel
   } = useMapState();
 
   const {
@@ -85,10 +88,21 @@ const useTextLabelInteraction = (
     const worldCoords = screenToWorld(clientX, clientY);
     if (!worldCoords) return false;
 
-    setPendingTextPosition({ x: worldCoords.worldX, y: worldCoords.worldY });
+    // Latch the rung now: zoom may drift while the modal is open.
+    const homeLevel = getActiveLevel();
+    if (homeLevel > 0 && !canBeginDepthAuthoring(mapData)) {
+      new Notice('Depth editing is unavailable on this map, so text cannot be placed at a finer level.');
+      return false;
+    }
+
+    setPendingTextPosition({
+      x: worldCoords.worldX,
+      y: worldCoords.worldY,
+      ...(homeLevel > 0 ? { homeLevel } : {})
+    });
     setShowTextModal(true);
     return true;
-  }, [currentTool, canvasRef, mapData, screenToWorld]);
+  }, [currentTool, canvasRef, mapData, screenToWorld, getActiveLevel]);
 
   /**
    * Handle text label selection
@@ -278,7 +292,8 @@ const useTextLabelInteraction = (
           fontSize: labelData.fontSize,
           fontFace: labelData.fontFace,
           color: labelData.color,
-          ...(labelData.opacity !== undefined ? { opacity: labelData.opacity } : {})
+          ...(labelData.opacity !== undefined ? { opacity: labelData.opacity } : {}),
+          ...(pendingTextPosition.homeLevel !== undefined ? { homeLevel: pendingTextPosition.homeLevel } : {})
         }
       );
       onTextLabelsChange(newLabels);

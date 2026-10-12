@@ -8,6 +8,8 @@
 // Type-only imports
 import type { Point } from '#types/core/geometry.types';
 import type { HexColor } from '#types/core/common.types';
+import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
+import { LABEL_FLOOR_PX, depthModeOf, elementScale, elementZoom, labelVisible } from '../geometry/renderers/elementBands';
 
 // ===========================================
 // Type Definitions
@@ -25,6 +27,19 @@ export interface TextLabelOptions {
   fontFace?: FontFace;
   color?: HexColor;
   opacity?: number;
+  /** Ladder rung the label is placed at; stored only when > 0 (absent = 0). */
+  homeLevel?: number;
+}
+
+/**
+ * Camera state for hit-testing labels under the lattice ladder. A null ladder
+ * (classic maps) means the unscaled, always-visible behaviour.
+ */
+export interface TextLabelHitView {
+  ladder: GeometryLadder | null;
+  /** Live camera zoom (screen px per world px). */
+  zoom: number;
+  activeLevel: number;
 }
 
 /** Text label data structure */
@@ -37,6 +52,8 @@ export interface TextLabel {
   fontFace: FontFace;
   color: HexColor;
   opacity?: number;
+  homeLevel?: number;
+  depthMode?: 'pop' | 'persist';
 }
 
 /** Partial text label for updates */
@@ -94,7 +111,8 @@ function addTextLabel(
     fontSize: options.fontSize ?? 16,
     fontFace: options.fontFace ?? 'sans',
     color: options.color ?? '#ffffff',
-    ...(options.opacity !== undefined && options.opacity !== 1 ? { opacity: options.opacity } : {})
+    ...(options.opacity !== undefined && options.opacity !== 1 ? { opacity: options.opacity } : {}),
+    ...(options.homeLevel !== undefined && options.homeLevel > 0 ? { homeLevel: options.homeLevel } : {})
   };
   
   return [...(labels ?? []), newLabel];
@@ -167,7 +185,8 @@ function getTextLabelAtPosition(
   labels: TextLabel[] | null | undefined,
   x: number,
   y: number,
-  ctx: CanvasRenderingContext2D | null = null
+  ctx: CanvasRenderingContext2D | null = null,
+  view?: TextLabelHitView
 ): TextLabel | null {
   if (!labels || !Array.isArray(labels)) return null;
   
@@ -192,9 +211,20 @@ function getTextLabelAtPosition(
   // Check labels in reverse order (top to bottom, most recent first)
   for (let i = labels.length - 1; i >= 0; i--) {
     const label = labels[i];
-    
+
+    // Ladder maps: the drawn label is hidden outside its band and sized at the held zoom.
+    let scale = 1;
+    const ladder = view?.ladder ?? null;
+    if (view !== undefined && ladder !== null) {
+      const home = label.homeLevel ?? 0;
+      const mode = depthModeOf(label);
+      if (!labelVisible(home, view.activeLevel, mode)) continue;
+      if ((label.fontSize || 16) * elementZoom(ladder, home, view.zoom, mode) < LABEL_FLOOR_PX) continue;
+      scale = elementScale(ladder, home, view.zoom, mode);
+    }
+
     // Set font to measure text accurately
-    const fontSize = label.fontSize || 16;
+    const fontSize = (label.fontSize || 16) * scale;
     const fontFace = label.fontFace || 'sans';
     const fontFamily = fontMap[fontFace] || 'sans-serif';
     
@@ -206,8 +236,10 @@ function getTextLabelAtPosition(
     const textHeight = fontSize * 1.2; // Same multiplier as renderer
     
     // Add padding (same as selection box: 4px horizontal, 2px vertical)
-    const paddingX = 4;
-    const paddingY = 2;
+    // Classic: world px, as always. Ladder: the selection box pads in SCREEN px, so divide by zoom.
+    const padScale = view !== undefined && view.ladder !== null && view.zoom > 0 ? 1 / view.zoom : 1;
+    const paddingX = 4 * padScale;
+    const paddingY = 2 * padScale;
     const boundingWidth = textWidth + paddingX * 2;
     const boundingHeight = textHeight + paddingY * 2;
     

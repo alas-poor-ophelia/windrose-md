@@ -18,9 +18,11 @@
 
 import type { MapData } from '#types/core/map.types';
 import type { ExtendedGeometry, SelectedItem } from '#types/contexts/context.types';
+import type { GeometryLadder } from '../../geometry/core/createGeometryLadder';
 
 import type { VNode } from 'preact';
 import { calculateObjectScreenPosition } from '../../objects/screenPositionUtils';
+import { useMapState } from '../../context/MapContext';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition';
 import { Icon } from '../shared/Icon';
@@ -44,7 +46,8 @@ function calculateMultiSelectBounds(
   mapData: MapData | null,
   canvasRef: { current: HTMLCanvasElement | null } | null,
   containerRef: { current: HTMLElement | null } | null,
-  geometry: ExtendedGeometry | null
+  geometry: ExtendedGeometry | null,
+  ladder: GeometryLadder | null = null
 ): { screenX: number; screenY: number; width: number; height: number } | null {
   if (!selectedItems?.length || !canvasRef?.current || !containerRef?.current || !mapData || !geometry) return null;
 
@@ -78,7 +81,7 @@ function calculateMultiSelectBounds(
       const obj = activeLayer.objects?.find(o => o.id === item.id);
       if (!obj) continue;
 
-      const pos = calculateObjectScreenPosition(obj, canvas, mapData, geometry, containerRef);
+      const pos = calculateObjectScreenPosition(obj, canvas, mapData, geometry, containerRef, ladder);
       if (!pos) continue;
 
       const left = pos.screenX - pos.objectWidth / 2;
@@ -144,9 +147,10 @@ const MultiSelectToolbar = ({
   onDuplicateAll,
   onDeleteAll
 }: MultiSelectToolbarProps): VNode | null => {
+  const { ladder } = useMapState();
   const hasRequiredRefs = !!selectedItems?.length && !!mapData && !!canvasRef?.current && !!containerRef?.current;
   const bounds = hasRequiredRefs
-    ? calculateMultiSelectBounds(selectedItems, mapData, canvasRef, containerRef, geometry)
+    ? calculateMultiSelectBounds(selectedItems, mapData, canvasRef, containerRef, geometry, ladder)
     : null;
 
   const buttonSize = 44;

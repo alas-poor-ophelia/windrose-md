@@ -105,15 +105,18 @@ export function findAssignmentAt(
  * Snapped tiles use their (rotation-aware) footprint; freeform stamps are
  * world-positioned and only ever match their drop cell.
  */
-export function tileHitsCell(t: TileAssignment, col: number, row: number): boolean {
+export function tileHitsCell(t: TileAssignment, col: number, row: number, level?: number): boolean {
+  if (level !== undefined && (t.homeLevel ?? 0) !== level) return false;
   return t.freeform === true
     ? (t.col === col && t.row === row)
     : assignmentCoversCell(t, col, row);
 }
 
 /**
- * Topmost tile hit at (col, row) across a stack of layers.
- *
+ * Topmost tile hit at (col, row) across a stack of layers. `level` restricts
+ * the hit to tiles homed on that ladder rung (rung cells share index space);
+ * omitted, any rung matches.
+*
  * `layers` must be in ASCENDING draw order (as returned by
  * `getActiveBoardLayers`); the scan runs in reverse so the TOP stratum wins,
  * and within a layer an `overlay` tile wins over a `fill` tile. Layers are
@@ -124,16 +127,17 @@ export function findTileHitInLayers(
   layers: readonly MapLayer[],
   col: number,
   row: number,
+  level?: number,
 ): TileLayerHit | null {
   for (let i = layers.length - 1; i >= 0; i--) {
     const layer = layers[i];
     const tiles = layer.tiles;
     if (tiles == null || tiles.length === 0) continue;
 
-    const overlayIdx = tiles.findIndex(t => tileHitsCell(t, col, row) && t.placement === 'overlay');
+    const overlayIdx = tiles.findIndex(t => tileHitsCell(t, col, row, level) && t.placement === 'overlay');
     if (overlayIdx >= 0) return { layer, index: overlayIdx };
 
-    const baseIdx = tiles.findIndex(t => tileHitsCell(t, col, row));
+    const baseIdx = tiles.findIndex(t => tileHitsCell(t, col, row, level));
     if (baseIdx >= 0) return { layer, index: baseIdx };
   }
   return null;

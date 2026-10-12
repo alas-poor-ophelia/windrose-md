@@ -8,6 +8,7 @@
 import type { MapData, TextLabel } from '#types/core/map.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { IGeometry } from '#types/core/geometry.types';
+import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
 
 import { calculateObjectScreenPosition } from './screenPositionUtils';
 import { getShapeBoundingHalfExtents } from './shapeOverlayOperations';
@@ -139,10 +140,11 @@ function getObjectBounds(
   canvasRef: { current: HTMLCanvasElement | null },
   containerRef: ContainerRef,
   mapData: MapData,
-  geometry: IGeometry
+  geometry: IGeometry,
+  ladder: GeometryLadder | null = null
 ): SelectionBounds | null {
   if (!canvasRef.current) return null;
-  const pos = calculateObjectScreenPosition(object, canvasRef.current, mapData, geometry, containerRef);
+  const pos = calculateObjectScreenPosition(object, canvasRef.current, mapData, geometry, containerRef, ladder);
   if (!pos) return null;
   return {
     screenX: pos.screenX,
@@ -157,7 +159,8 @@ function getSelectionBounds(
   mapData: MapData,
   canvasRef: { current: HTMLCanvasElement | null },
   containerRef: ContainerRef,
-  geometry: IGeometry
+  geometry: IGeometry,
+  ladder: GeometryLadder | null = null
 ): SelectionBounds | null {
   if (selectedItems == null || selectedItems.length === 0 || canvasRef?.current == null || containerRef?.current == null || mapData == null) return null;
 
@@ -168,7 +171,7 @@ function getSelectionBounds(
     if (item.type === 'object' || item.type === 'notePin') {
       const obj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
       if (!obj) return null;
-      return getObjectBounds(obj, canvasRef, containerRef, mapData, geometry);
+      return getObjectBounds(obj, canvasRef, containerRef, mapData, geometry, ladder);
     }
 
     if (item.type === 'text') {
@@ -246,7 +249,7 @@ function getSelectionBounds(
       const obj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
       if (!obj) continue;
 
-      const pos = calculateObjectScreenPosition(obj, canvas, mapData, geometry, containerRef);
+      const pos = calculateObjectScreenPosition(obj, canvas, mapData, geometry, containerRef, ladder);
       if (!pos) continue;
 
       const left = pos.screenX - pos.objectWidth / 2;

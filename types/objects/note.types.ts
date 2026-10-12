@@ -19,7 +19,7 @@ export type NotePinId = string;
 /** Note pin placed on the map */
 export interface NotePin {
   id: NotePinId;
-  /** Ladder rung this entity was placed at. Inert: no reader uses it yet (design 06, s19 item 3). */
+  /** Ladder rung this entity was placed at (absent = 0). Pins are placed at the root only (design 06, s19 item 3); the field exists so a pin shares MapObject's rung-scoped cell matching. */
   homeLevel?: number;
   position: Point;
   linkedNote?: string;  // Obsidian note path

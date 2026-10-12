@@ -192,6 +192,8 @@ export interface PlacementOptions {
   mapType: MapType;
   alignment?: ObjectAlignment;
   objectSetId?: string | null;
+  /** Ladder rung the object is placed on; written only when > 0 (absent = root). */
+  homeLevel?: number;
 }
 
 // ===========================================

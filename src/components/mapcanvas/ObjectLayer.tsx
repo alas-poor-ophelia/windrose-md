@@ -33,6 +33,7 @@ import { calculateObjectScreenPosition } from '../../objects/screenPositionUtils
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { convertObjectToFreeform, snapObjectToGrid } from '../../objects/objectOperations';
 import { toggledDepthMode } from '../../geometry/renderers/elementBands';
+import { pickLadderObject } from '../../objects/ladderHitTest';
 import { isLadderView } from '../../core/lodFlags';
 import { copyDeepLinkToClipboard } from '../../persistence/deepLinkHandler';
 import { LinkingModeBanner } from '../overlays/LinkingModeBanner';
@@ -98,7 +99,7 @@ const ObjectLayer = ({
   onDeleteCustomColor,
   freeformPlacementMode = false
 }: ObjectLayerProps): VNode | null => {
-  const { canvasRef, containerRef, mapData, mapId, notePath, geometry, screenToGrid, distanceOverrides, subHexPath, instanceId } = useMapState();
+  const { canvasRef, containerRef, mapData, mapId, notePath, geometry, screenToGrid, screenToWorld, distanceOverrides, subHexPath, instanceId, ladder, getActiveLevel, viewController } = useMapState();
   const { getObjectAtPosition, updateObject, onObjectsChange: contextOnObjectsChange, onTextLabelsChange } = useMapOperations();
   const {
     selectedItem, setSelectedItem,
@@ -669,11 +670,20 @@ const ObjectLayer = ({
       if (isForeignInstanceEvent(detail, instanceId)) return;
       if (detail.handled === true) return;
 
-      const coords = screenToGrid(detail.clientX, detail.clientY);
-      if (!coords) return;
-
       const activeLayer = getActiveLayer(mapData);
-      const obj = getObjectAtPosition(activeLayer.objects ?? [], coords.x, coords.y);
+      let obj: MapObject | null = null;
+      if (ladder !== null) {
+        const world = screenToWorld(detail.clientX, detail.clientY);
+        if (!world) return;
+        const zoom = viewController?.getLive().zoom ?? mapData.viewState?.zoom ?? 1;
+        obj = pickLadderObject(activeLayer.objects ?? [], world.worldX, world.worldY, {
+          ladder, level: getActiveLevel(), zoom, orientation: mapData.orientation ?? 'flat'
+        });
+      } else {
+        const coords = screenToGrid(detail.clientX, detail.clientY);
+        if (!coords) return;
+        obj = getObjectAtPosition(activeLayer.objects ?? [], coords.x, coords.y);
+      }
       if (!obj) return;
 
       detail.handled = true;
@@ -714,7 +724,7 @@ const ObjectLayer = ({
 
     activeDocument.addEventListener('windrose:selection-context-menu', handler);
     return () => activeDocument.removeEventListener('windrose:selection-context-menu', handler);
-  }, [mapData, geometry, screenToGrid, isResizeMode, instanceId]);
+  }, [mapData, geometry, screenToGrid, screenToWorld, isResizeMode, instanceId, ladder, getActiveLevel, viewController]);
 
   if (showCoordinates || !layerVisibility.objects) {
     return null;
@@ -725,7 +735,7 @@ const ObjectLayer = ({
       return null;
     }
 
-    const screenPos = calculateObjectScreenPosition(selectedObject, canvasRef.current, mapData, geometry, containerRef);
+    const screenPos = calculateObjectScreenPosition(selectedObject, canvasRef.current, mapData, geometry, containerRef, ladder);
 
     if (!screenPos) return null;
 

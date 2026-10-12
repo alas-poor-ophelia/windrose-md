@@ -38,7 +38,7 @@ function holdSelectionAroundCentre<T extends { screenX: number; screenY: number;
 
 interface SelectionRenderDeps {
   getFontCss: (fontFace: string) => string;
-  getObjectsInCell: (objects: MapObject[], x: number, y: number) => MapObject[];
+  getObjectsInCell: (objects: MapObject[], x: number, y: number, homeLevel?: number) => MapObject[];
   getSlotOffset: (slot: number, count: number, orientation: 'flat' | 'pointy') => { offsetX: number; offsetY: number };
   getMultiObjectScale: (count: number) => number;
 }
@@ -134,7 +134,7 @@ function calculateHexObjectSelectionPosition(
 
   const { worldX, worldY } = hexGeometry.hexToWorld(object.position.x, object.position.y);
 
-  const cellObjects = deps.getObjectsInCell(allObjects, object.position.x, object.position.y);
+  const cellObjects = deps.getObjectsInCell(allObjects, object.position.x, object.position.y, object.homeLevel ?? 0);
   const objectCount = cellObjects.length;
 
   let objectWidth = size.width * scaledSize;

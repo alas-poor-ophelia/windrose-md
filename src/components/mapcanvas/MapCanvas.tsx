@@ -505,6 +505,13 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
     ladder, getActiveLevel, screenToLevelCell, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex,
     handleDrawingStateChange, handlePanZoomStateChange]);
 
+  // Hit-tests honour the held label size and band visibility on ladder maps (live zoom, read at call time).
+  const getTextLabelAtPositionInView = useCallback(
+    (labels: TextLabel[], worldX: number, worldY: number, ctx: CanvasRenderingContext2D | null): TextLabel | null =>
+      getTextLabelAtPosition(labels as Parameters<typeof getTextLabelAtPosition>[0], worldX, worldY, ctx, ladder ? { ladder, zoom: viewController.getLive().zoom, activeLevel: getActiveLevel() } : undefined) as TextLabel | null,
+    [ladder, viewController, getActiveLevel]
+  );
+
   const mapOperationsValue = useMemo(() => ({
     // Object operations
     getObjectAtPosition,
@@ -517,7 +524,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
     removeObjectsInRectangle,
 
     // Text operations
-    getTextLabelAtPosition,
+    getTextLabelAtPosition: getTextLabelAtPositionInView,
     addTextLabel,
     updateTextLabel,
     removeTextLabel,
@@ -534,7 +541,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
     onWallPathsChange,
     onTerrainStrokesChange,
     onMapDataUpdate
-  } as MapOperationsContextValue), [onCellsChange, onLevelCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange, onMapDataUpdate]);
+  } as MapOperationsContextValue), [onCellsChange, onLevelCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange, onMapDataUpdate, getTextLabelAtPositionInView]);
 
   return (
     <EventHandlerProvider>

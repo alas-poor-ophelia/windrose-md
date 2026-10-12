@@ -123,7 +123,7 @@ const SelectionActionsOverlay = ({
 }: SelectionActionsOverlayProps): VNode | null => {
   // Per-mount instance id: this overlay always renders inside the MapCanvas
   // provider tree, and must only claim context-menu events from its own mount.
-  const { instanceId, viewController } = useMapState();
+  const { instanceId, viewController, ladder } = useMapState();
 
   // Hide (via CSS, in the JSX below) mid pan/zoom gesture; reanchor on
   // commit. The card's bounds are computed from committed viewState and
@@ -178,7 +178,7 @@ const SelectionActionsOverlay = ({
   const hasRequiredRefs = selectedItems.length > 0 && canvasRef.current != null && containerRef.current != null;
 
   const bounds = hasRequiredRefs
-    ? getSelectionBounds(selectedItems as Parameters<typeof getSelectionBounds>[0], mapData, canvasRef, containerRef, geometry)
+    ? getSelectionBounds(selectedItems as Parameters<typeof getSelectionBounds>[0], mapData, canvasRef, containerRef, geometry, ladder)
     : null;
 
   const visibleActions = actions.filter(a => a.visible === true);

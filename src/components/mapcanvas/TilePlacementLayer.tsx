@@ -6,6 +6,12 @@
  * (grid-snap with brush size), stamp/scatter (freeform), fill (flood fill,
  * also Shift+click), while brush/line are owned by other layers. Bresenham
  * interpolation fills gaps during fast drag strokes.
+ *
+ * Lattice ladder: a gesture latches the active rung at pointerdown. A deep
+ * gesture (rung >= 1) resolves cells on that rung's own lattice, stamps
+ * `homeLevel` on what it places, and only ever replaces/erases tiles homed on
+ * the same rung (rung cells of different levels share index space). Deep
+ * gestures pass the same depth-authoring gate as cell paint.
  */
 
 import type { ToolId } from '#types/tools/tool.types';
@@ -24,8 +30,14 @@ import { resolveTileEntry } from '../../assets/tilesetOperations';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import type { ResolvedTileRender } from '../../assets/tileRenderResolution';
 import { resolveTileRender, EDGE_BLEND_FEATHER } from '../../assets/tileRenderResolution';
-import { cellsCoveredByAssignment, assignmentsOverlap } from '../../assets/tileFootprint';
-import { getBrushCells, bresenhamLine, floodFillCells, buildWallBarrier, FLOOD_FILL_LIMIT } from '../../drawing/tilePlacementOps';
+import { cellsCoveredByAssignment } from '../../assets/tileFootprint';
+import {
+  getBrushCells, bresenhamLine, floodFillCells, buildWallBarrier, FLOOD_FILL_LIMIT,
+  homeLevelFields, tilesOnRung, tileRung, withTilePlaced, withTilesErasedAt, withFillRegionCleared
+} from '../../drawing/tilePlacementOps';
+import { guardDepthWrite } from '../../persistence/depthAuthoring';
+import { authoredCells } from '../../persistence/layerAccessor';
+import { depthRefusalMessage } from '../../drawing/depthCellOps';
 import { scatterSpacing, makeScatterDrop } from '../../drawing/scatterBrush';
 import { solidWallPolylines } from '../../geometry/renderers/wallPathRenderer';
 
@@ -86,7 +98,7 @@ const TilePlacementLayer = ({
   tileDepth,
   onTilesChange
 }: TilePlacementLayerProps): VNode | null => {
-  const { mapData, geometry, screenToGrid, screenToWorld, getActiveLevel } = useMapState();
+  const { mapData, geometry, ladder, screenToGrid, screenToWorld, screenToLevelCell, getActiveLevel } = useMapState();
   const app = useApp();
 
   const isTileTool = currentTool === 'tilePaint';
@@ -112,9 +124,18 @@ const TilePlacementLayer = ({
   const strokeTilesRef = useRef<TileAssignment[] | null>(null);
   const lastGridPosRef = useRef<{ col: number; row: number } | null>(null);
   const scatterLastDropRef = useRef<{ x: number; y: number } | null>(null);
-  // Tiles are root-level only in phase 3c (design section 19 item 10): one
-  // notice per visit to a deeper rung, re-armed by a root-level pointerdown.
+  // Ladder rung the current gesture writes to, latched at pointerdown: zoom can
+  // drift mid-stroke, and a stroke must stay on one lattice (this also keeps
+  // the unscoped "col,row" keys in paintedInStrokeRef unambiguous).
+  const strokeLevelRef = useRef(0);
+  // One refusal notice per visit to a rung the gate refuses, re-armed by an
+  // accepted pointerdown.
   const depthNoticeShownRef = useRef(false);
+
+  /** Cell under the pointer on the latched rung (level 0 is screenToGrid exactly). */
+  const cellAtLevel = useCallback((clientX: number, clientY: number, level: number) => (
+    level > 0 ? screenToLevelCell(clientX, clientY, level) : screenToGrid(clientX, clientY)
+  ), [screenToGrid, screenToLevelCell]);
 
   const placeTilesInBrush = useCallback((col: number, row: number) => {
     if (!mapData || selectedTilesetId == null || selectedTilesetId === '' || selectedTileId == null || selectedTileId === '') return;
@@ -140,6 +161,7 @@ const TilePlacementLayer = ({
     const hasFootprint = spanW != null || spanH != null;
 
     const cells = hasFootprint ? [{ col, row }] : getBrushCells(col, row, brushSize);
+    const level = strokeLevelRef.current;
 
     for (const cell of cells) {
       const anchorKey = `${cell.col},${cell.row}`;
@@ -158,17 +180,15 @@ const TilePlacementLayer = ({
         spanW,
         spanH,
         feather,
+        ...homeLevelFields(level),
       };
 
       // Mark every covered cell painted (stops a drag re-placing the same prop)
-      // and remove any same-tier tile whose footprint overlaps this one.
+      // and remove any same-rung, same-tier tile whose footprint overlaps this one.
       for (const c of cellsCoveredByAssignment(newTile)) {
         paintedInStrokeRef.current.add(`${c.col},${c.row}`);
       }
-      const remaining = currentTiles.filter(
-        (t: TileAssignment) => (t.placement ?? 'fill') !== targetPlacement || !assignmentsOverlap(t, newTile)
-      );
-      currentTiles = [...remaining, newTile];
+      currentTiles = withTilePlaced(currentTiles, newTile, targetPlacement);
       changed = true;
     }
 
@@ -196,12 +216,9 @@ const TilePlacementLayer = ({
     if (keysToErase.size === 0) return;
 
     // Footprint-aware: a snapped prop is erased if the brush touches any cell it
-    // covers; freeform stamps still erase by their drop cell.
-    const newTiles = currentTiles.filter((t: TileAssignment) =>
-      t.freeform === true
-        ? !keysToErase.has(`${t.col},${t.row}`)
-        : !cellsCoveredByAssignment(t).some(c => keysToErase.has(`${c.col},${c.row}`))
-    );
+    // covers; freeform stamps still erase by their drop cell. Only tiles homed
+    // on the stroke's rung are candidates.
+    const newTiles = withTilesErasedAt(currentTiles, keysToErase, strokeLevelRef.current);
 
     if (newTiles.length !== currentTiles.length) {
       const isBatchedStroke = strokeTilesRef.current !== null;
@@ -222,6 +239,13 @@ const TilePlacementLayer = ({
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles ?? [];
 
+    // A deep fill runs on the latched rung's own lattice: its geometry for
+    // centres/rounding and the ladder's existence gate for bounds. Walls stay
+    // world-space polylines whose doorway spans are sized in ROOT cells (walls
+    // are root-authored), so they keep the root cellSize below.
+    const level = strokeLevelRef.current;
+    const fillGeometry = level > 0 && ladder !== null ? ladder.geometryForLevel(level) : geometry;
+
     // Structure-stratum tiles on the active board bound the fill even from
     // other strata (a wall footprint stops a ground-layer flood). The active
     // layer is excluded — its own tiles already act as region boundaries.
@@ -229,7 +253,7 @@ const TilePlacementLayer = ({
     for (const layer of getActiveBoardLayers(mapData)) {
       if (layer.id === activeLayer.id || layer.tileRole !== 'structure') continue;
       for (const t of layer.tiles ?? []) {
-        if (t.freeform === true) continue;
+        if (t.freeform === true || tileRung(t) !== level) continue;
         for (const c of cellsCoveredByAssignment(t)) blockedCells.add(`${c.col},${c.row}`);
       }
     }
@@ -252,23 +276,28 @@ const TilePlacementLayer = ({
         }
       }
     }
-    const barrier = geometry != null && wallPolylines.length > 0
+    const barrier = fillGeometry != null && wallPolylines.length > 0
       ? buildWallBarrier(
           wallPolylines,
-          (c, r) => { const w = geometry.getCellCenter(c, r); return { x: w.worldX, y: w.worldY }; },
-          (wx, wy) => { const g = geometry.worldToGrid(wx, wy); return { col: Math.round(g.x), row: Math.round(g.y) }; }
+          (c, r) => { const w = fillGeometry.getCellCenter(c, r); return { x: w.worldX, y: w.worldY }; },
+          (wx, wy) => { const g = fillGeometry.worldToGrid(wx, wy); return { col: Math.round(g.x), row: Math.round(g.y) }; }
         )
       : null;
 
-    const mapWidth = mapData.dimensions?.width ?? 50;
-    const mapHeight = mapData.dimensions?.height ?? 50;
-    const { cells: fillCells, aborted } = floodFillCells(currentTiles, col, row, mapWidth, mapHeight, {
-      blockedCells,
+    // The rectangular clamp is in root cells; a deep fill is bounded by the
+    // ladder's existence gate instead (and by FLOOD_FILL_LIMIT either way).
+    const mapWidth = level > 0 ? Number.POSITIVE_INFINITY : (mapData.dimensions?.width ?? 50);
+    const mapHeight = level > 0 ? Number.POSITIVE_INFINITY : (mapData.dimensions?.height ?? 50);
+    const inBounds = level > 0 && ladder !== null
+      ? (c: number, r: number): boolean => ladder.existsAt(level, c, r)
       // Bounded geometries (hex) clamp the fill to their real bounds, which
       // the rectangular width/height margin cannot express.
-      inBounds: geometry != null && geometry.isBounded()
-        ? (c, r) => geometry.isWithinBounds(c, r)
-        : undefined,
+      : geometry != null && geometry.isBounded()
+        ? (c: number, r: number): boolean => geometry.isWithinBounds(c, r)
+        : undefined;
+    const { cells: fillCells, aborted } = floodFillCells(tilesOnRung(currentTiles, level), col, row, mapWidth, mapHeight, {
+      blockedCells,
+      inBounds,
       ...(barrier != null ? { canCross: barrier.canCross } : {}),
     });
     if (aborted) {
@@ -280,12 +309,7 @@ const TilePlacementLayer = ({
     const targetPlacement = tileLayer === 'base' ? 'fill' : 'overlay';
     const fillKeys = new Set(fillCells.map(c => `${c.col},${c.row}`));
 
-    const newTiles = currentTiles.filter((t: TileAssignment) => {
-      if ((t.placement ?? 'fill') !== targetPlacement) return true;
-      return t.freeform === true
-        ? !fillKeys.has(`${t.col},${t.row}`)
-        : !cellsCoveredByAssignment(t).some(c => fillKeys.has(`${c.col},${c.row}`));
-    });
+    const newTiles = withFillRegionCleared(currentTiles, fillKeys, targetPlacement, level);
 
     for (const cell of fillCells) {
       newTiles.push({
@@ -298,11 +322,12 @@ const TilePlacementLayer = ({
         depth: tileDepth === 'ground' ? undefined : tileDepth,
         fitMode: tileFitMode === 'auto' ? undefined : tileFitMode,
         feather,
+        ...homeLevelFields(level),
       });
     }
 
     onTilesChange(newTiles);
-  }, [app, mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, paintEdgeBlend, tileDepth, onTilesChange]);
+  }, [app, mapData, geometry, ladder, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, paintEdgeBlend, tileDepth, onTilesChange]);
 
   const placeStampAtWorld = useCallback((
     worldX: number,
@@ -335,6 +360,7 @@ const TilePlacementLayer = ({
       freeform: true,
       worldX,
       worldY,
+      ...homeLevelFields(strokeLevelRef.current),
     };
 
     // Scatter strokes batch into one history entry (same pattern as the grid brush).
@@ -348,12 +374,15 @@ const TilePlacementLayer = ({
   // in world space since the previous drop.
   const scatterAdvance = useCallback((worldX: number, worldY: number, col: number, row: number) => {
     if (!geometry) return;
+    // Spacing and jitter scale with the rung the stroke paints on.
+    const level = strokeLevelRef.current;
+    const cellSize = level > 0 && ladder !== null ? ladder.geometryForLevel(level).cellSize : geometry.cellSize;
     const last = scatterLastDropRef.current;
-    const spacing = scatterSpacing(geometry.cellSize, tileScale);
+    const spacing = scatterSpacing(cellSize, tileScale);
     if (last != null && Math.hypot(worldX - last.x, worldY - last.y) < spacing) return;
     scatterLastDropRef.current = { x: worldX, y: worldY };
     const drop = makeScatterDrop(worldX, worldY, {
-      cellSize: geometry.cellSize,
+      cellSize,
       tileScale,
       isHex: geometry.type === 'hex',
       rng: Math.random,
@@ -363,7 +392,7 @@ const TilePlacementLayer = ({
       flipH: drop.flipH,
       scale: drop.scale,
     });
-  }, [geometry, tileScale, placeStampAtWorld]);
+  }, [geometry, ladder, tileScale, placeStampAtWorld]);
 
   const handlePointerDown = useCallback((e: PointerEvent) => {
     if (!isTileTool || !geometry) return;
@@ -371,17 +400,28 @@ const TilePlacementLayer = ({
     // the 'line'/'brush' subtool no-ops below).
     if (isOpeningAsset) return;
 
-    // Zoomed onto a ladder rung: no tile placement or erase (0 on classic maps).
-    if (getActiveLevel() > 0) {
-      if (!depthNoticeShownRef.current) {
-        depthNoticeShownRef.current = true;
-        new Notice('Tiles can only be placed at the root level for now.');
+    // Latch the rung for the whole gesture (0 on classic maps). A deep gesture
+    // passes the depth-authoring gate first: flag on, ladder view, not
+    // quarantined, level in range. A nested-classic map never takes deep writes.
+    // The rung's current cells are passed as the "next" content, so the gate
+    // adds nothing and the byte budget is not consulted here.
+    const level = ladder !== null ? getActiveLevel() : 0;
+    if (level > 0) {
+      if (!mapData) return;
+      const activeLayer = getActiveLayer(mapData);
+      const refusal = guardDepthWrite(mapData, activeLayer.id, level, authoredCells(activeLayer, level));
+      if (refusal !== null) {
+        if (!depthNoticeShownRef.current) {
+          depthNoticeShownRef.current = true;
+          new Notice(depthRefusalMessage(refusal));
+        }
+        return;
       }
-      return;
     }
     depthNoticeShownRef.current = false;
+    strokeLevelRef.current = level;
 
-    const coords = screenToGrid(e.clientX, e.clientY);
+    const coords = cellAtLevel(e.clientX, e.clientY, level);
     if (!coords) return;
 
     // Shift+click stays as a flood-fill shortcut regardless of armed subtool.
@@ -437,14 +477,15 @@ const TilePlacementLayer = ({
     } else {
       eraseTilesInBrush(coords.x, coords.y);
     }
-  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, isOpeningAsset, activeSubtool, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, scatterAdvance, floodFillAtCell, mapData, getActiveLevel]);
+  }, [isTileTool, geometry, ladder, cellAtLevel, screenToWorld, hasTileSelected, isOpeningAsset, activeSubtool, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, scatterAdvance, floodFillAtCell, mapData, getActiveLevel]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     // Only the paint/erase grid stroke sets isDraggingRef; the click-only
     // subtools (stamp/fill/scatter-for-now) return from pointerdown early.
     if (!isDraggingRef.current || !isTileTool || !geometry) return;
 
-    const coords = screenToGrid(e.clientX, e.clientY);
+    // The LATCHED rung, never the live one: zoom can drift mid-stroke.
+    const coords = cellAtLevel(e.clientX, e.clientY, strokeLevelRef.current);
     if (!coords) return;
 
     // Scatter stroke: world-distance spaced jittered stamps, no cell logic.
@@ -471,7 +512,7 @@ const TilePlacementLayer = ({
     }
 
     lastGridPosRef.current = current;
-  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, activeSubtool, placeTilesInBrush, eraseTilesInBrush, scatterAdvance]);
+  }, [isTileTool, geometry, cellAtLevel, screenToWorld, hasTileSelected, activeSubtool, placeTilesInBrush, eraseTilesInBrush, scatterAdvance]);
 
   const handlePointerUp = useCallback(() => {
     if (strokeTilesRef.current !== null) {
