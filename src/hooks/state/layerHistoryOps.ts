@@ -22,7 +22,7 @@ import type { StoredViewState } from '#types/core/map.types';
 
 import { DEFAULTS } from '../../core/dmtConstants';
 import { isLadderView, ladderParamsFor, getMaxZoom } from '../../core/lodFlags';
-import { chooseLevel, crossingZoom } from '../../geometry/core/lattice';
+import { chooseLevel, crossingZoom, rungMiddleZoom, type LadderParams } from '../../geometry/core/lattice';
 
 type LevelsRecord = Record<number, Cell[]>;
 
@@ -107,6 +107,48 @@ function viewStateForRung(mapData: MapData, level: number | undefined): StoredVi
 }
 
 /**
+ * The view that shows rung `level`, unconditionally (the level chip row and
+ * MCP `setViewport(..., level)`; undo keeps `viewStateForRung`). Same centre,
+ * zoom at the geometric middle of the rung's band: `crossingZoom(L) * sqrt(m)`
+ * for L >= 1, and `crossingZoom(1) / sqrt(m)` for the root (the same middle
+ * mirrored below the first crossing). `level` is rounded and clamped to
+ * [0, maxLevel]; zoom is clamped to [DEFAULTS.minZoom, maxZoom].
+ */
+function viewStateAtRung(view: StoredViewState, level: number, params: LadderParams, maxZoom: number): StoredViewState {
+  const rung = Math.max(0, Math.min(params.maxLevel, Math.round(level)));
+  const zoom = Math.max(DEFAULTS.minZoom, Math.min(maxZoom, rungMiddleZoom(rung, params)));
+  return { ...view, zoom };
+}
+
+/**
+ * The rung authoring tools write to (design 06 s10): the camera's rung, or the
+ * locked rung when it is SHALLOWER. A lock deeper than the camera cannot be
+ * honoured (the finer rung is not materialised on screen), so it falls back to
+ * the camera's rung. `lock === null` means unlocked.
+ */
+function resolveEditLevel(lock: number | null, cameraLevel: number): number {
+  return lock === null ? cameraLevel : Math.min(lock, cameraLevel);
+}
+
+/**
+ * Zoom for an external viewport request (MCP `setViewport`). `level`, when
+ * given on a ladder view, wins and yields that rung's band-middle zoom;
+ * otherwise the requested zoom (or `fallback`) is clamped to the map's own
+ * range [DEFAULTS.minZoom, getMaxZoom(mapData)], so a classic map can never be
+ * stored past its ceiling.
+ */
+function resolveViewportZoom(mapData: MapData, zoom: number | undefined, level: number | undefined, fallback: number): number {
+  const maxZoom = getMaxZoom(mapData);
+  if (level !== undefined && Number.isFinite(level) && isLadderView(mapData)) {
+    const view = mapData.viewState ?? { zoom: fallback, center: { x: 0, y: 0 } };
+    return viewStateAtRung(view, level, ladderParamsFor(mapData), maxZoom).zoom;
+  }
+  const requested = zoom ?? fallback;
+  const finite = Number.isFinite(requested) ? requested : fallback;
+  return Math.max(DEFAULTS.minZoom, Math.min(maxZoom, finite));
+}
+
+/**
  * The first deep write on a classic map stamps `lod` (depthAuthoring.withLod).
  * Its history entry records that block, so the stamp is as reversible as the
  * cells it came with. `{}` for every other write, so classic snapshots and
@@ -131,5 +173,5 @@ function redoLodStamp(mapData: MapData, entering: LayerHistorySnapshot): MapData
 
 export {
   snapshotLevelsOf, applySnapshotLevels, restoreSnapshotLevels, layerHistorySnapshotsEqual, viewStateForRung,
-  stampedLodOf, undoLodStamp, redoLodStamp
+  viewStateAtRung, resolveEditLevel, resolveViewportZoom, stampedLodOf, undoLodStamp, redoLodStamp
 };

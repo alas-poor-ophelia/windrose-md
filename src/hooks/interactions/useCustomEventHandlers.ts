@@ -37,6 +37,7 @@ import type {
 import { isForeignInstanceEvent } from '../../core/windroseEvents';
 import { useHexContextMenu } from './useHexContextMenu';
 import { DEFAULTS } from '../../core/dmtConstants';
+import { zoomForLevel } from '../../core/lodFlags';
 import { calculateFitZoom, subHexAnchorToChildCenter } from '../../geometry/core/hexMeasurements';
 
 interface UseCustomEventHandlersOptions {
@@ -215,7 +216,7 @@ function useCustomEventHandlers({
 
   useEffect(() => {
     const handleNavigateTo = (event: CustomEvent<NavigationEventDetail>): void => {
-      const { mapId: targetMapId, x, y, zoom, layerId, subHexPath: targetSubHexPath } = event.detail;
+      const { mapId: targetMapId, x, y, zoom, layerId, subHexPath: targetSubHexPath, level } = event.detail;
 
       if (targetMapId !== mapId) return;
       // Same map mounted twice (block + embed): exactly ONE mount navigates.
@@ -244,7 +245,10 @@ function useCustomEventHandlers({
         return;
       }
 
-      applyViewRef.current(x, y, zoom, layerId);
+      // Ladder link (`|L<n>`): open at that rung's band middle instead of the
+      // raw zoom, which a minCellPx tweak would have invalidated.
+      const levelZoom = level !== undefined ? zoomForLevel(mapData, level) : null;
+      applyViewRef.current(x, y, levelZoom ?? zoom, layerId);
     };
 
     window.addEventListener('windrose-navigate-to', handleNavigateTo);

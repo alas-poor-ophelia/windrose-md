@@ -75,8 +75,8 @@ interface UsePaintToolOptions {
   getObjectAtPosition: (objects: MapObject[], x: number, y: number, homeLevel?: number) => MapObject | null;
   /** Lattice ladder (null/absent on classic maps). Deep strokes need all four ladder options. */
   ladder?: GeometryLadder | null;
-  /** Live camera rung; latched once per stroke at pointerdown. */
-  getActiveLevel?: () => number;
+  /** Edit rung (camera rung, or the shallower locked rung); latched once per stroke at pointerdown. */
+  getEditLevel?: () => number;
   screenToLevelCell?: MapStateContextValue['screenToLevelCell'];
   onLevelCellsChange?: HandleLevelCellsChange;
 }
@@ -112,7 +112,7 @@ function usePaintTool({
   onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
   onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange,
   getTextLabelAtPosition, removeTextLabel, getObjectAtPosition,
-  ladder = null, getActiveLevel, screenToLevelCell, onLevelCellsChange
+  ladder = null, getEditLevel, screenToLevelCell, onLevelCellsChange
 }: UsePaintToolOptions): UsePaintToolResult {
 
   const [paintIsDrawing, setPaintIsDrawing] = useState<boolean>(false);
@@ -439,8 +439,8 @@ function usePaintTool({
     setPaintIsDrawing(true);
     setProcessedCells(new Set());
     setProcessedEdges(new Set());
-    const level = ladder !== null && getActiveLevel !== undefined && canBeginDepthAuthoring(mapData)
-      ? getActiveLevel()
+    const level = ladder !== null && getEditLevel !== undefined && canBeginDepthAuthoring(mapData)
+      ? getEditLevel()
       : 0;
     strokeLevelRef.current = level;
     strokeRefusedRef.current = false;

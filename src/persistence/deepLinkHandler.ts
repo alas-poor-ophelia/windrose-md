@@ -14,6 +14,12 @@ export interface DeepLinkData {
    * Absent for root-level (legacy) links.
    */
   subHexPath?: string;
+  /**
+   * Optional ladder rung (integer >= 0) from a `|L<n>` token. Survives a
+   * minCellPx tweak, which a raw zoom would not. Ignored when a sub-hex path
+   * is also present (a ladder map never has sub-hex paths).
+   */
+  level?: number;
 }
 
 export interface NavigationEventDetail extends DeepLinkData {
@@ -38,6 +44,11 @@ const NAVIGATION_EVENT = 'windrose-navigate-to';
 //   Split off by the SECOND '|' before the core block is comma-parsed, so its
 //   literal commas are safe and legacy (no sub-hex) links stay byte-identical.
 //   Example: windrose:World.md|world-map,3.5,4,1.18,layer_001|0,0/2,-1
+// - |L<n> (OPTIONAL, ladder maps): trailing segment matching /^L\d+$/ is a
+//   rung level, never a sub-hex path (a path always contains a comma). It is
+//   emitted only for level >= 1; if both a path and a level appear, the path
+//   wins and the level is dropped.
+//   Example: windrose:World.md|world-map,3.5,4,1.18,layer_001|L2
 
 function decodePathComponent(raw: string): string {
   return raw.replace(/%7C/gi, '|').replace(/%2C/gi, ',');
@@ -54,7 +65,9 @@ function parseDeepLinkData(rawDataStr: string): DeepLinkData | null {
   // core block, so legacy links (no sub-hex) parse exactly as before.
   const subHexPipeIndex = afterNote.indexOf('|');
   const coordData = subHexPipeIndex === -1 ? afterNote : afterNote.slice(0, subHexPipeIndex);
-  const subHexPathRaw = subHexPipeIndex === -1 ? '' : afterNote.slice(subHexPipeIndex + 1);
+  const trailingRaw = subHexPipeIndex === -1 ? '' : afterNote.slice(subHexPipeIndex + 1);
+  const levelMatch = /^L(\d+)$/.exec(trailingRaw);
+  const subHexPathRaw = levelMatch === null ? trailingRaw : '';
 
   const parts = coordData.split(',');
 
@@ -71,6 +84,7 @@ function parseDeepLinkData(rawDataStr: string): DeepLinkData | null {
 
   const data: DeepLinkData = { notePath, mapId, x, y, zoom, layerId };
   if (subHexPathRaw !== '') data.subHexPath = subHexPathRaw;
+  else if (levelMatch !== null) data.level = parseInt(levelMatch[1], 10);
   return data;
 }
 
@@ -93,7 +107,8 @@ function generateDeepLink(
   y: number,
   zoom: number,
   layerId: string,
-  subHexPath?: string | null
+  subHexPath?: string | null,
+  level?: number
 ): string {
   // Round to 2 decimal places for clean URLs
   const roundedX = Math.round(x * 100) / 100;
@@ -103,7 +118,10 @@ function generateDeepLink(
   const encodedPath = notePath.replace(/\|/g, '%7C').replace(/,/g, '%2C');
   const base = `${PROTOCOL}${encodedPath}|${mapId},${roundedX},${roundedY},${roundedZoom},${layerId}`;
   // Append the sub-hex segment only when present — keeps root links byte-identical.
-  return (subHexPath != null && subHexPath !== '') ? `${base}|${subHexPath}` : base;
+  if (subHexPath != null && subHexPath !== '') return `${base}|${subHexPath}`;
+  // Ladder rung token: level 0 / undefined emit nothing (legacy output unchanged).
+  if (level !== undefined && Number.isInteger(level) && level >= 1) return `${base}|L${level}`;
+  return base;
 }
 
 function generateDeepLinkMarkdown(
@@ -114,10 +132,11 @@ function generateDeepLinkMarkdown(
   y: number,
   zoom: number,
   layerId: string,
-  subHexPath?: string | null
+  subHexPath?: string | null,
+  level?: number
 ): string {
   const escapedText = displayText.replace(/[[\]()]/g, '');
-  const url = generateDeepLink(notePath, mapId, x, y, zoom, layerId, subHexPath);
+  const url = generateDeepLink(notePath, mapId, x, y, zoom, layerId, subHexPath, level);
   return `[${escapedText}](${url})`;
 }
 
@@ -129,9 +148,10 @@ function copyDeepLinkToClipboard(
   y: number,
   zoom: number,
   layerId: string,
-  subHexPath?: string | null
+  subHexPath?: string | null,
+  level?: number
 ): void {
-  const markdown = generateDeepLinkMarkdown(displayText, notePath, mapId, x, y, zoom, layerId, subHexPath);
+  const markdown = generateDeepLinkMarkdown(displayText, notePath, mapId, x, y, zoom, layerId, subHexPath, level);
 
   navigator.clipboard.writeText(markdown).then(() => {
     new Notice('Deep link copied to clipboard');

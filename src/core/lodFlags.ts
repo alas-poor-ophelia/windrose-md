@@ -11,10 +11,10 @@
  * nothing here touches `DEFAULTS`, and the unflagged paths stay byte-identical.
  * Design: .claude/lod-rd/06-integration-design.md, sections 10 and 13.
  */
-import type { MapData } from '#types/core/map.types';
+import type { MapData, LadderConfig } from '#types/core/map.types';
 import { getSettings } from './settingsAccessor';
 import { DEFAULTS } from './dmtConstants';
-import { crossingZoom, LADDER_DEFAULTS, LADDER_M_ALLOWLIST, type LadderParams } from '../geometry/core/lattice';
+import { chooseLevel, crossingZoom, rungMiddleZoom, LADDER_DEFAULTS, LADDER_M_ALLOWLIST, type LadderParams } from '../geometry/core/lattice';
 import { authoredLevels } from '../persistence/layerAccessor';
 import type { LadderOverrides } from '../geometry/core/createGeometryLadder';
 
@@ -190,7 +190,49 @@ function getMaxZoom(mapData: MapData | null | undefined): number {
   return crossingZoom(params.maxLevel + 1, params);
 }
 
+/**
+ * The rung a map opens at: the active level at its opening zoom for the given
+ * ladder settings (`config` null = LADDER_DEFAULTS). Pure; the settings
+ * readout ("Opens at L<n>") recomputes it from pending edits.
+ */
+function ladderOpensAt(hexSize: number, config: Omit<LadderConfig, 'distanceOverrides'> | null, openZoom: number): number {
+  const c = config ?? LADDER_DEFAULTS;
+  return chooseLevel(openZoom, { hexSize, m: c.m, minCellPx: c.minCellPx, maxLevel: c.maxLevel });
+}
+
+/**
+ * Merge a settings-panel ladder edit over the stored `lod`. Returns null when
+ * there is nothing to write: no edit, or the edit equals what is stored.
+ * Keeps every stored key the panel does not edit (`distanceOverrides`).
+ */
+function mergeLadderConfig(stored: LadderConfig | null | undefined, edited: LadderConfig | null | undefined): LadderConfig | null {
+  if (edited === null || edited === undefined) return null;
+  // Unchanged against what the map already holds (or, with nothing stored,
+  // against the defaults it would inherit anyway) writes nothing: a classic
+  // hex map only gains a `lod` block from a real edit.
+  const baseline = stored ?? LADDER_DEFAULTS;
+  if (baseline.m === edited.m && baseline.minCellPx === edited.minCellPx && baseline.maxLevel === edited.maxLevel) {
+    return null;
+  }
+  return { ...(stored ?? {}), m: edited.m, minCellPx: edited.minCellPx, maxLevel: edited.maxLevel };
+}
+
+/**
+ * Zoom that puts the camera in the middle of rung `level`'s band
+ * (`crossingZoom(level) * sqrt(m)`), clamped to the map's max zoom. Null when
+ * the map is not a ladder view or `level` is not an integer in [0, maxLevel],
+ * so callers fall back to their own zoom.
+ */
+function zoomForLevel(mapData: MapData | null | undefined, level: number): number | null {
+  if (mapData === null || mapData === undefined) return null;
+  if (!isLadderView(mapData)) return null;
+  const params = ladderParamsFor(mapData);
+  if (!Number.isInteger(level) || level < 0 || level > params.maxLevel) return null;
+  return Math.max(DEFAULTS.minZoom, Math.min(rungMiddleZoom(level, params), getMaxZoom(mapData)));
+}
+
 export {
-  isLodLadderEnabled, getLadderOverrides, ladderTileClipAt, isLadderView, isDepthQuarantined, canAuthorDepth,
-  ladderParamsFor, getMaxZoom, hasDepthContent, hasSubHexChildren
+  zoomForLevel, isLodLadderEnabled, getLadderOverrides, ladderTileClipAt, isLadderView, isDepthQuarantined, canAuthorDepth,
+  ladderParamsFor, getMaxZoom, hasDepthContent, hasSubHexChildren, deepestAuthoredRung,
+  ladderOpensAt, mergeLadderConfig
 };

@@ -126,6 +126,10 @@ export interface UseToolStateResult {
   freeformPlacementMode: boolean;
   setFreeformPlacementMode: (mode: boolean | ((prev: boolean) => boolean)) => void;
 
+  /** Ladder edit-level lock (rung authoring is pinned to), null = follow the camera. Session-only. */
+  editLevelLock: number | null;
+  setEditLevelLock: (level: number | null) => void;
+
   // Opacity persistence
   handleOpacityChange: (opacity: number) => void;
 }

@@ -62,7 +62,7 @@ const TextLayer = ({
   onDeleteCustomColor
 }: TextLayerProps): VNode | null => {
   const app = useApp();
-  const { mapData, mapId, notePath, canvasRef, containerRef, geometry, subHexPath } = useMapState();
+  const { mapData, mapId, notePath, canvasRef, containerRef, geometry, subHexPath, ladder, getActiveLevel } = useMapState();
   const { selectedItem, showCoordinates, layerVisibility, isDraggingSelection } = useMapSelection();
 
   const {
@@ -127,8 +127,8 @@ const TextLayer = ({
     const x = label.position.x / gridSize;
     const y = label.position.y / gridSize;
 
-    copyDeepLinkToClipboard(displayText, notePath, mapId, x, y, zoom, layerId, subHexPath);
-  }, [selectedItem, mapData, mapId, notePath, subHexPath]);
+    copyDeepLinkToClipboard(displayText, notePath, mapId, x, y, zoom, layerId, subHexPath, ladder !== null && getActiveLevel() >= 1 ? getActiveLevel() : undefined);
+  }, [selectedItem, mapData, mapId, notePath, subHexPath, ladder, getActiveLevel]);
 
   useLayerHandlers('text', {
     handleTextPlacement, handleTextSelection,

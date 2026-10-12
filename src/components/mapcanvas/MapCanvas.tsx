@@ -39,6 +39,8 @@ import { createGeometryLadder } from '../../geometry/core/createGeometryLadder';
 import type { GeometryLadder } from '../../geometry/core/createGeometryLadder';
 import { isLadderView, ladderParamsFor } from '../../core/lodFlags';
 import { LinkedNoteHoverOverlays } from '../overlays/LinkedNoteHoverOverlays';
+import { LadderLevelOverlay } from './LadderLevelOverlay';
+import { resolveEditLevel } from '../../hooks/state/layerHistoryOps';
 import { MapStateProvider, MapOperationsProvider } from '../../context/MapContext';
 import { MapSelectionProvider, useMapSelection } from '../../context/MapSelectionContext';
 import { ObjectLinkingProvider } from '../../context/ObjectLinkingContext';
@@ -121,6 +123,9 @@ interface MapCanvasContentProps {
   onViewStateChange: (viewState: StoredViewState) => void;
   onTextLabelSettingsChange: (settings: TextLabelSettings) => void;
   currentTool: ToolId;
+  /** Ladder edit-level lock (null = edit follows the camera rung). Owned by useToolState. */
+  editLevelLock: number | null;
+  onEditLevelLockChange: (level: number | null) => void;
   selectedObjectType: ObjectTypeId | undefined;
   selectedColor: string;
   isColorPickerOpen: boolean;
@@ -191,7 +196,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, adjacentEmptySlots, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex, children }: MapCanvasContentProps): VNode => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, adjacentEmptySlots, onViewStateChange, onTextLabelSettingsChange, currentTool, editLevelLock, onEditLevelLockChange, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex, children }: MapCanvasContentProps): VNode => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -303,6 +308,20 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
     (): number => (ladder ? ladder.activeLevel(viewController.getLive().zoom) : 0),
     [ladder, viewController]
   );
+
+  // The rung authoring tools write to: the camera rung, or the locked rung when
+  // shallower (a deeper lock is not on screen, so it yields to the camera).
+  // Read live at pointerdown like getActiveLevel. 0 on classic maps.
+  const getEditLevel = useCallback(
+    (): number => resolveEditLevel(editLevelLock, getActiveLevel()),
+    [editLevelLock, getActiveLevel]
+  );
+
+  // The lock is session-only and per map: drop it when the map changes or the
+  // map stops being a ladder view (flag off, rotation, non-hex).
+  useEffect(() => {
+    onEditLevelLockChange(null);
+  }, [mapId, ladderOn, onEditLevelLockChange]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -488,6 +507,9 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
     viewController,
     ladder,
     getActiveLevel,
+    editLevelLock,
+    setEditLevelLock: onEditLevelLockChange,
+    getEditLevel,
     screenToLevelCell,
     GridGeometry,
     HexGeometry,
@@ -502,7 +524,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
     onPanZoomStateChange: handlePanZoomStateChange
   } as MapStateContextValue), [mapData, mapId, notePath, geometry, currentTool, selectedColor,
     selectedObjectType, screenToGrid, screenToWorld, getClientCoords, viewController,
-    ladder, getActiveLevel, screenToLevelCell, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex,
+    ladder, getActiveLevel, editLevelLock, onEditLevelLockChange, getEditLevel, screenToLevelCell, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex,
     handleDrawingStateChange, handlePanZoomStateChange]);
 
   // Hit-tests honour the held label size and band visibility on ladder maps (live zoom, read at call time).
@@ -588,6 +610,9 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
             <LinkedNoteHoverOverlays
               selectedItem={selectedItem}
             />
+
+            {/* Ladder level chips + edit-level padlock (null on classic maps) */}
+            {!interactionLocked && <LadderLevelOverlay />}
 
             {/* Render child layers */}
             {children}

@@ -101,9 +101,10 @@ export function registerQueryTools(server: McpServer): void {
         // Also include live dataFilePath from plugin object
         `const dp = (function(){ try { return app.plugins.plugins['windrose-md']?.dataFilePath || null; } catch(e) { return null; } })();` +
         `const wf = document.hasFocus();` +
-        // Ladder level: getActiveLevel is a function (dropped by JSON), so call it; cellCountByLevel rides the spread.
+        // Ladder levels: getActiveLevel/getEditLevel are functions (dropped by JSON), so call them; cellCountByLevel rides the spread.
         `const al = typeof inst.getActiveLevel === 'function' ? inst.getActiveLevel() : undefined;` +
-        `return JSON.stringify({ ...inst, dataFilePath: dp, windowFocused: wf, activeLevel: al });`
+        `const el = typeof inst.getEditLevel === 'function' ? inst.getEditLevel() : undefined;` +
+        `return JSON.stringify({ ...inst, dataFilePath: dp, windowFocused: wf, activeLevel: al, editLevel: el });`
       );
       try {
         const result = await obsidianEvalJson<Record<string, unknown>>(code);

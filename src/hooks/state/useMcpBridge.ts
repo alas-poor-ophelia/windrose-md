@@ -33,6 +33,7 @@ import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import { computeGapSpans, seatedLeafSize } from '../../geometry/renderers/wallPathRenderer';
 import { buildGapFlatten, clampGapToSegment, pointAtLength } from '../../drawing/wallGapOperations';
 import { withTilePlaced, homeLevelFields } from '../../drawing/tilePlacementOps';
+import { resolveEditLevel, resolveViewportZoom } from './layerHistoryOps';
 import { placeObject as opsPlaceObject } from '../../objects/objectOperations';
 import { getResolvedObjectTypes } from '../../objects/objectTypeResolver';
 
@@ -52,6 +53,8 @@ interface UseMcpBridgeParams {
   currentTool: string;
   selectedColor: string;
   selectedOpacity: number;
+  /** Ladder edit-level lock (null = follow the camera); feeds instance.getEditLevel. */
+  editLevelLock: number | null;
   canUndo: boolean;
   canRedo: boolean;
   saveStatus: string;
@@ -85,7 +88,7 @@ interface UseMcpBridgeParams {
 function useMcpBridge(params: UseMcpBridgeParams): void {
   const {
     mapData, mapId, mapName, notePath, mcpKey, fullPane, geometry,
-    currentTool, selectedColor, selectedOpacity,
+    currentTool, selectedColor, selectedOpacity, editLevelLock,
     canUndo, canRedo, saveStatus, isExpanded,
     setCurrentTool, setSelectedColor, handleOpacityChange,
     handleCellsChange, handleLevelCellsChange, wrappedHandleUndo, handleRedo, handleLayerSelect, forceSave,
@@ -199,6 +202,8 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
     const couldUndo = canUndo;
     const couldRedo = canRedo;
 
+    const getActiveLevel = (): number => (ladder != null ? ladder.activeLevel(mapData.viewState?.zoom ?? 1) : 0);
+
     window.__windrose.mcpInstances[key] = {
       mapId,
       mapName: mapData.name ?? mapName,
@@ -224,7 +229,8 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
       cellCount,
       layerCellCounts,
       cellCountByLevel,
-      getActiveLevel: (): number => (ladder != null ? ladder.activeLevel(mapData.viewState?.zoom ?? 1) : 0),
+      getActiveLevel,
+      getEditLevel: (): number => resolveEditLevel(ladder != null ? editLevelLock : null, getActiveLevel()),
       objectCount,
       wallPathCount,
       textLabelCount,
@@ -294,8 +300,10 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
         redo: (): boolean => { handleRedo(); return couldRedo; },
         selectLayer: (layerId: string) => handleLayerSelect(layerId),
         forceSave: () => { void forceSave(); },
-        setViewport: (x: number, y: number, zoom?: number): { ok: boolean; viewState: { x: number; y: number; zoom: number } } => {
-          const nextZoom = zoom ?? mapData.viewState?.zoom ?? 1;
+        setViewport: (x: number, y: number, zoom?: number, level?: number): { ok: boolean; viewState: { x: number; y: number; zoom: number } } => {
+          // Clamped to the map's own range (a classic map can never be stored
+          // past its ceiling); `level` on a ladder map picks that rung's zoom.
+          const nextZoom = resolveViewportZoom(mapData, zoom, level, mapData.viewState?.zoom ?? 1);
           handleViewStateChange({ center: { x, y }, zoom: nextZoom });
           return { ok: true, viewState: { x, y, zoom: nextZoom } };
         },
@@ -490,7 +498,7 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
     };
   }, [
     mapData, mapId, mapName, notePath, mcpKey, fullPane, geometry,
-    currentTool, selectedColor, selectedOpacity,
+    currentTool, selectedColor, selectedOpacity, editLevelLock,
     canUndo, canRedo, saveStatus, isExpanded,
     setCurrentTool, setSelectedColor, handleOpacityChange,
     handleCellsChange, handleLevelCellsChange, wrappedHandleUndo, handleRedo, handleLayerSelect, forceSave,

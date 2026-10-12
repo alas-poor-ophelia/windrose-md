@@ -286,6 +286,8 @@ If a given hex has a **sub-map** then a diamond icon will be shown in the center
 
 **Embedding a sub-map directly**: a `windrose-map` code block can open a specific sub-map with the `subhex` key — the value is the hex coordinate path from the root map, with `/` between nesting levels (e.g. `subhex: 0,0` or `subhex: 0,0/2,-1`). Get a ready-made block via right-click → "Copy sub-map embed" on any hex with a sub-map, or the header's copy-block button while drilled into one. If the path doesn't exist, the embed opens at the deepest level that does.
 
+**Ladder maps**: a `windrose-map` block can open at a depth rung with `level: 2` (an integer from 0; out-of-range or non-ladder maps ignore it). Deep links copied from a ladder map at rung 1 or deeper end in a `|L<n>` token (for example `|L2`), so the link reopens at that rung even after the minimum cell size setting changes; level 0 links stay unchanged.
+
 ### Tiles (HEX ONLY)
 Hex maps support **tile images** — import a folder of tile images from your vault, and paint them onto individual hexes.
 

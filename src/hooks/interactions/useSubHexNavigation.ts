@@ -14,6 +14,7 @@ import type { SubHexExitDetail } from '../../core/windroseEvents';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { DEFAULTS, SCHEMA_VERSION } from '../../core/dmtConstants';
 import { isFeatureEnabled } from '../../core/featureFlags';
+import { zoomForLevel } from '../../core/lodFlags';
 import { getSettings } from '../../core/settingsAccessor';
 import { generateLayerId } from '../../persistence/layerAccessor';
 import { clearSubHexBackdrop, pruneSubHexBackdrops, relabelSubHexBackdrop } from '../../core/subHexBackdropStore';
@@ -58,6 +59,13 @@ interface UseSubHexNavigationOptions {
    * applied once, so the user can freely navigate away afterwards.
    */
   initialSubHexPath?: string | null;
+  /**
+   * Optional ladder rung to open at (the `level:` key of a windrose-map block).
+   * Applied once, after the map loads, as that rung's band-middle zoom. Ignored
+   * when the map is not a ladder view, the level is out of range, or
+   * `initialSubHexPath` is also set (a ladder map has no sub-hex maps).
+   */
+  initialLevel?: number | null;
   /**
    * Live map canvas accessor (stable identity). The backdrop store is keyed
    * per-canvas, so exits clear and sibling navigation re-labels THIS view's
@@ -241,6 +249,7 @@ function useSubHexNavigation({
   mapData: rootMapData,
   updateMapData: rootUpdateMapData,
   initialSubHexPath,
+  initialLevel,
   getCanvas
 }: UseSubHexNavigationOptions): UseSubHexNavigationResult {
 
@@ -804,6 +813,23 @@ function useSubHexNavigation({
     const segments = initialSubHexPath.split('/').map(s => s.trim()).filter(s => s !== '');
     if (segments.length > 0) setPendingDrill({ segments, index: 0 });
   }, [initialSubHexPath, rootMapData]);
+
+  // Open at a ladder rung from an embed block's `level:` key, once per load.
+  // Cosmetic write: a pan/zoom must never raise the save-conflict panel.
+  const initialLevelAppliedRef = useRef(false);
+  useEffect(() => {
+    if (initialLevelAppliedRef.current) return;
+    if (initialLevel == null) return;
+    if (rootMapData == null) return; // wait for the root map to load
+    if (initialSubHexPath != null && initialSubHexPath !== '') { initialLevelAppliedRef.current = true; return; }
+    const zoom = zoomForLevel(rootMapData, initialLevel);
+    if (zoom === null) { initialLevelAppliedRef.current = true; return; }
+    initialLevelAppliedRef.current = true;
+    rootUpdateMapData((current: MapData) => {
+      if (!current.viewState) return current;
+      return { ...current, viewState: { ...current.viewState, zoom } };
+    }, { cosmetic: true });
+  }, [initialLevel, initialSubHexPath, rootMapData, rootUpdateMapData]);
 
   // Drill into an absolute sub-hex path from root (deep-link navigation).
   // Resets to root first so the absolute path drills from a known base;

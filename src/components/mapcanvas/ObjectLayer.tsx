@@ -356,8 +356,8 @@ const ObjectLayer = ({
       y = label.position.y / gridSize;
     }
 
-    copyDeepLinkToClipboard(displayText, notePath, mapId, x, y, zoom, layerId, subHexPath);
-  }, [selectedItem, mapData, mapId, notePath, subHexPath]);
+    copyDeepLinkToClipboard(displayText, notePath, mapId, x, y, zoom, layerId, subHexPath, ladder !== null && getActiveLevel() >= 1 ? getActiveLevel() : undefined);
+  }, [selectedItem, mapData, mapId, notePath, subHexPath, ladder, getActiveLevel]);
 
   const {
     isResizing,

@@ -13,7 +13,7 @@ import type {
   UIPreferences, MapSettings,
 } from '#types/index';
 import { isHexCell } from '#types/core/cell.types';
-import type { HexBounds } from '#types/core/map.types';
+import type { HexBounds, LadderConfig } from '#types/core/map.types';
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { getLayerById } from '../../persistence/layerAccessor';
@@ -50,7 +50,8 @@ interface UsePanelStateResult {
     hexBounds?: HexBounds | null,
     backgroundImage?: BackgroundImage | null,
     hexSize?: number | null,
-    deleteOrphanedContent?: boolean
+    deleteOrphanedContent?: boolean,
+    lod?: LadderConfig | null
   ) => void;
   handleSettingsClose: () => void;
 }
@@ -95,7 +96,8 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
     hexBounds: HexBounds | null = null,
     backgroundImage: BackgroundImage | null = null,
     hexSize: number | null = null,
-    deleteOrphanedContent: boolean = false
+    deleteOrphanedContent: boolean = false,
+    lod: LadderConfig | null = null
   ): void => {
     if (!mapData) return;
 
@@ -194,6 +196,13 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
 
     if (hexSize !== null && mapData.mapType === 'hex') {
       newMapData.hexSize = hexSize;
+    }
+
+    // Ladder settings arrive already merged over the stored lod (the settings
+    // context sends null unless its ladder section produced a change), so a
+    // null here leaves the stored lod exactly as it was.
+    if (lod !== null && mapData.mapType === 'hex') {
+      newMapData.lod = lod;
     }
 
     updateMapData(newMapData);

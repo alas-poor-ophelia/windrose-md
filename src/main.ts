@@ -135,6 +135,8 @@ export default class WindrosePlugin extends Plugin {
       const mapName = config.name ?? 'Unnamed Map';
       const mapType = (config.type ?? 'grid') as MapType;
       const initialSubHexPath = config.subhex ?? '';
+      const levelRaw = config.level ?? '';
+      const initialLevel = /^\d+$/.test(levelRaw) ? parseInt(levelRaw, 10) : undefined;
 
       if (mapId === '') {
         el.createDiv({
@@ -146,7 +148,7 @@ export default class WindrosePlugin extends Plugin {
 
       render(
         h(AppContext.Provider, { value: this.app },
-          h(DungeonMapTracker, { mapId, mapName, mapType, notePath: ctx.sourcePath, initialSubHexPath })
+          h(DungeonMapTracker, { mapId, mapName, mapType, notePath: ctx.sourcePath, initialSubHexPath, initialLevel })
         ),
         el
       );

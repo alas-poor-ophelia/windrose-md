@@ -98,7 +98,7 @@ const TilePlacementLayer = ({
   tileDepth,
   onTilesChange
 }: TilePlacementLayerProps): VNode | null => {
-  const { mapData, geometry, ladder, screenToGrid, screenToWorld, screenToLevelCell, getActiveLevel } = useMapState();
+  const { mapData, geometry, ladder, screenToGrid, screenToWorld, screenToLevelCell, getEditLevel } = useMapState();
   const app = useApp();
 
   const isTileTool = currentTool === 'tilePaint';
@@ -405,7 +405,7 @@ const TilePlacementLayer = ({
     // quarantined, level in range. A nested-classic map never takes deep writes.
     // The rung's current cells are passed as the "next" content, so the gate
     // adds nothing and the byte budget is not consulted here.
-    const level = ladder !== null ? getActiveLevel() : 0;
+    const level = ladder !== null ? getEditLevel() : 0;
     if (level > 0) {
       if (!mapData) return;
       const activeLayer = getActiveLayer(mapData);
@@ -477,7 +477,7 @@ const TilePlacementLayer = ({
     } else {
       eraseTilesInBrush(coords.x, coords.y);
     }
-  }, [isTileTool, geometry, ladder, cellAtLevel, screenToWorld, hasTileSelected, isOpeningAsset, activeSubtool, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, scatterAdvance, floodFillAtCell, mapData, getActiveLevel]);
+  }, [isTileTool, geometry, ladder, cellAtLevel, screenToWorld, hasTileSelected, isOpeningAsset, activeSubtool, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, scatterAdvance, floodFillAtCell, mapData, getEditLevel]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     // Only the paint/erase grid stroke sets isDraggingRef; the click-only

@@ -275,6 +275,50 @@ describe('deepLinkHandler', () => {
       });
     });
 
+    it('parses a |L2 token into level with no subHexPath', () => {
+      const result = parseDeepLink('windrose:World.md|world-map,3.5,4,1.18,layer_001|L2');
+      expect(result).toEqual({
+        notePath: 'World.md', mapId: 'world-map', x: 3.5, y: 4, zoom: 1.18, layerId: 'layer_001', level: 2
+      });
+      expect(result).not.toHaveProperty('subHexPath');
+    });
+
+    it('accepts |L0 as level 0', () => {
+      expect(parseDeepLink('windrose:World.md|world-map,3,4,1,layer_001|L0')?.level).toBe(0);
+    });
+
+    it('keeps a comma path as subHexPath, not a level', () => {
+      const result = parseDeepLink('windrose:World.md|world-map,3,4,1,layer_001|0,0/2,-1');
+      expect(result?.subHexPath).toBe('0,0/2,-1');
+      expect(result).not.toHaveProperty('level');
+    });
+
+    it('treats a non-matching trailing segment as subHexPath', () => {
+      const result = parseDeepLink('windrose:World.md|world-map,3,4,1,layer_001|L2x');
+      expect(result?.subHexPath).toBe('L2x');
+      expect(result).not.toHaveProperty('level');
+    });
+
+    it('legacy 5-part links carry no level', () => {
+      expect(parseDeepLink('windrose:World.md|world-map,3,4,1.18,layer_001')).not.toHaveProperty('level');
+    });
+
+    it('generates |L2 when level is 2', () => {
+      expect(generateDeepLink('World.md', 'world-map', 3.5, 4, 1.18, 'layer_001', null, 2))
+        .toBe('windrose:World.md|world-map,3.5,4,1.18,layer_001|L2');
+    });
+
+    it('generates the legacy link for level 0 or undefined', () => {
+      const legacy = 'windrose:World.md|world-map,3.5,4,1.18,layer_001';
+      expect(generateDeepLink('World.md', 'world-map', 3.5, 4, 1.18, 'layer_001', null, 0)).toBe(legacy);
+      expect(generateDeepLink('World.md', 'world-map', 3.5, 4, 1.18, 'layer_001', undefined, undefined)).toBe(legacy);
+    });
+
+    it('sub-hex path wins over level when generating', () => {
+      expect(generateDeepLink('World.md', 'world-map', 3.5, 4, 1.18, 'layer_001', '0,0', 2))
+        .toBe('windrose:World.md|world-map,3.5,4,1.18,layer_001|0,0');
+    });
+
     it('omits subHexPath entirely for legacy (no sub-hex) links', () => {
       const result = parseDeepLink('windrose:World.md|world-map,3,4,1.18,layer_001');
       expect(result).not.toHaveProperty('subHexPath');

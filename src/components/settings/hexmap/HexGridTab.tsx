@@ -3,7 +3,8 @@
  *
  * Hex Grid settings tab for MapSettingsModal.
  * Composes BackgroundImageSection, SizingModeSection, BoundsSection,
- * and CoordinateDisplaySection into a unified tab.
+ * LadderSection (ladder capability only) and CoordinateDisplaySection into a
+ * unified tab.
  */
 
 import type { VNode } from 'preact';
@@ -14,6 +15,8 @@ import { SizingModeSection } from './SizingModeSection';
 import { BoundsSection } from './BoundsSection';
 import { CoordinateDisplaySection } from './CoordinateDisplaySection';
 import { SubHexBackdropSection } from './SubHexBackdropSection';
+import { LadderSection } from './LadderSection';
+import { isLadderView, isLodLadderEnabled } from '../../../core/lodFlags';
 
 
 
@@ -28,7 +31,7 @@ import { SubHexBackdropSection } from './SubHexBackdropSection';
  * Hex Grid tab content - composes all hex-specific settings sections
  */
 function HexGridTab(): VNode | null {
-  const { mapType } = useModalShell();
+  const { mapType, mapData } = useModalShell();
 
   // Guard: only render for hex maps
   if (mapType !== 'hex') {
@@ -46,11 +49,14 @@ function HexGridTab(): VNode | null {
       {/* Map Bounds Section - columns × rows */}
       <BoundsSection />
 
+      {/* Lattice ladder parameters (capability flag only) */}
+      {isLodLadderEnabled() && <LadderSection />}
+
       {/* Coordinate Display Section - mode selector and text colors */}
       <CoordinateDisplaySection />
 
       {/* Sub-hex parent map backdrop override (sub-hex maps only) */}
-      <SubHexBackdropSection />
+      {!isLadderView(mapData) && <SubHexBackdropSection />}
     </div>
   );
 }

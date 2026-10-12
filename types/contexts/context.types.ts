@@ -124,6 +124,20 @@ export interface MapStateContextValue {
    * at pointerdown; nothing should read it per render.
    */
   getActiveLevel: () => number;
+  /**
+   * Edit-level lock (design 06 s10): the rung authoring tools are pinned to,
+   * or null when unlocked (edit follows the camera). Session-only, never
+   * persisted; cleared on map change and when the map stops being a ladder view.
+   */
+  editLevelLock: number | null;
+  /** Set (a rung) or clear (null) the edit-level lock. */
+  setEditLevelLock: (level: number | null) => void;
+  /**
+   * The rung authoring tools write to, read LIVE at call time (a function, like
+   * getActiveLevel): the camera rung, or the locked rung when it is shallower
+   * (`resolveEditLevel`). 0 on classic maps. Read at pointerdown, never per render.
+   */
+  getEditLevel: () => number;
   /** Cell under the pointer on ladder rung `level`; level 0 equals screenToGrid. */
   screenToLevelCell: (clientX: number, clientY: number, level: number) => Point | null;
   /**

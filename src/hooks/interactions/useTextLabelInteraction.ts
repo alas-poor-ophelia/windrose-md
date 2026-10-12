@@ -51,7 +51,7 @@ const useTextLabelInteraction = (
     mapData,
     screenToWorld,
     getClientCoords,
-    getActiveLevel
+    getEditLevel
   } = useMapState();
 
   const {
@@ -92,7 +92,7 @@ const useTextLabelInteraction = (
 
     // Latch the rung now: zoom may drift while the modal is open. Same gate
     // and notice as object and tile placement; a refused click is consumed.
-    const homeLevel = getActiveLevel();
+    const homeLevel = getEditLevel();
     if (homeLevel > 0) {
       const layer = getActiveLayer(mapData);
       const refusal = guardDepthWrite(mapData, layer.id, homeLevel, authoredCells(layer, homeLevel));
@@ -109,7 +109,7 @@ const useTextLabelInteraction = (
     });
     setShowTextModal(true);
     return true;
-  }, [currentTool, canvasRef, mapData, screenToWorld, getActiveLevel]);
+  }, [currentTool, canvasRef, mapData, screenToWorld, getEditLevel]);
 
   /**
    * Handle text label selection

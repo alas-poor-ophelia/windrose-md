@@ -28,12 +28,14 @@ export function registerInteractTools(server: McpServer): void {
     {
       x: z.number().describe("World X coordinate for the viewport center"),
       y: z.number().describe("World Y coordinate for the viewport center"),
-      zoom: z.number().min(0.1).max(2048).optional().describe("Zoom level 0.1–2048; the app clamps to the map's own ceiling (8 on classic maps, higher on ladder maps). Default: current zoom unchanged"),
+      zoom: z.number().min(0.1).max(2048).optional().describe("Zoom level 0.1–2048; the app clamps to the map's own range (ceiling 4 on classic maps, higher on ladder maps). Default: current zoom unchanged"),
+      level: z.number().int().min(0).optional().describe("Ladder maps only: zoom to the middle of this rung's band (overrides zoom; clamped to the map's maxLevel). Ignored on classic maps"),
     },
-    async ({ x, y, zoom }) => {
-      const zoomArg = zoom !== undefined ? `,${zoom}` : "";
+    async ({ x, y, zoom, level }) => {
+      const zoomArg = zoom !== undefined ? `${zoom}` : "undefined";
+      const extraArgs = level !== undefined ? `,${zoomArg},${level}` : (zoom !== undefined ? `,${zoomArg}` : "");
       const body =
-        `var r=ops.setViewport(${x},${y}${zoomArg});` +
+        `var r=ops.setViewport(${x},${y}${extraArgs});` +
         `return JSON.stringify(r);`;
       const result = await obsidianEvalJson<{ ok: boolean; viewState?: { x: number; y: number; zoom: number }; error?: string }>(opCall(body));
       if (result.error) {

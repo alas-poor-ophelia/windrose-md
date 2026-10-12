@@ -10,6 +10,7 @@
  * - selectedColor: Active color for painting
  * - selectedOpacity: Opacity for painting (0-1)
  * - isColorPickerOpen: Whether color picker UI is visible
+ * - editLevelLock: Ladder rung authoring is pinned to (null = follow the camera)
  */
 
 // Type-only imports
@@ -47,6 +48,10 @@ function useToolState(options: UseToolStateOptions = {}): UseToolStateResult {
 
   // Freeform placement mode (tool modifier)
   const [freeformPlacementMode, setFreeformPlacementMode] = useState(false);
+
+  // Ladder edit-level lock (design 06 s10). Session-only: never persisted.
+  // MapCanvas clears it on map change and when the map leaves ladder view.
+  const [editLevelLock, setEditLevelLock] = useState<number | null>(null);
 
   // Initialize opacity from mapData when loaded
   useEffect(() => {
@@ -100,6 +105,8 @@ function useToolState(options: UseToolStateOptions = {}): UseToolStateResult {
     setIsColorPickerOpen,
     freeformPlacementMode,
     setFreeformPlacementMode,
+    editLevelLock,
+    setEditLevelLock,
     handleOpacityChange
   };
 }

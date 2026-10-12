@@ -66,8 +66,8 @@ interface WindroseMcpOps {
   redo: () => boolean;
   selectLayer: (layerId: string) => void;
   forceSave: () => void;
-  /** Drive the live viewport (pan/zoom). Omitting zoom keeps the current zoom. */
-  setViewport: (x: number, y: number, zoom?: number) => { ok: boolean; viewState: { x: number; y: number; zoom: number } };
+  /** Drive the live viewport (pan/zoom). Omitting zoom keeps the current zoom; zoom is clamped to the map's range. `level` (ladder maps) overrides zoom with that rung's band-middle zoom. */
+  setViewport: (x: number, y: number, zoom?: number, level?: number) => { ok: boolean; viewState: { x: number; y: number; zoom: number } };
   /** Installed tilesets and their tiles (vaultPath is the human-meaningful name). */
   listTiles: () => Array<{ tilesetId: string; tilesetName: string; tileCount: number; tiles: Array<{ id: string; vaultPath: string }> }>;
   /** Select a tile and arm the tile-paint tool. */
@@ -123,6 +123,8 @@ interface WindroseMcpInstance {
   cellCountByLevel: Record<string, number>;
   /** Ladder rung the current zoom shows; 0 on classic (non-ladder) maps */
   getActiveLevel: () => number;
+  /** Rung authoring tools write to: the active level, or the locked edit level when shallower; 0 on classic maps */
+  getEditLevel: () => number;
   /** Total objects across all layers */
   objectCount: number;
   /** Total wall paths across all layers */

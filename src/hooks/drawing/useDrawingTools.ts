@@ -62,7 +62,7 @@ const useDrawingTools = (
     screenToWorld,
     getClientCoords,
     ladder,
-    getActiveLevel,
+    getEditLevel,
     screenToLevelCell,
   } = useMapState();
 
@@ -90,7 +90,7 @@ const useDrawingTools = (
     onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
     onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange,
     getTextLabelAtPosition, removeTextLabel, getObjectAtPosition,
-    ladder, getActiveLevel, screenToLevelCell, onLevelCellsChange
+    ladder, getEditLevel, screenToLevelCell, onLevelCellsChange
   });
 
   const edgeDrag = useEdgeDragTool({
@@ -108,7 +108,7 @@ const useDrawingTools = (
     mapData, geometry, screenToWorld, getClientCoords,
     onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
     removeObjectsInRectangle,
-    ladder, getActiveLevel, screenToLevelCell, onLevelCellsChange
+    ladder, getEditLevel, screenToLevelCell, onLevelCellsChange
   });
 
   const segmentPicker = useSegmentPicker({

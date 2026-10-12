@@ -76,7 +76,7 @@ import { useApp } from './context/AppContext';
 import { Icon } from './components/shared/Icon';
 import { CornerBrackets } from './components/shared/CornerBrackets';
 import { tooltipRef } from './components/shared/obsidianTooltip';
-import { listMaps, deleteMapData } from './persistence/fileOperations';
+import { listMaps, deleteMapData, setPendingNewMapOptions } from './persistence/fileOperations';
 import type { MapListEntry } from './persistence/fileOperations';
 import { ConfirmModal } from './settings/modals/ConfirmModal';
 import { loadTileMetadata, setTileMetadataForRender, getTileMetadataForRender } from './persistence/tileMetadata';
@@ -95,12 +95,14 @@ interface DungeonMapTrackerProps {
   notePath?: string;
   /** Sub-hex path ('/'-joined hexKeys, e.g. "0,0/2,-1") to auto-drill into on load. */
   initialSubHexPath?: string;
+  /** `level:` code-block key: open the map at this ladder rung once loaded (ladder maps only). */
+  initialLevel?: number;
   /** Optional explicit MCP registration key. When provided and non-empty, overrides
    *  notePath as the key in window.__windrose.mcpInstances. Used by full-pane ItemViews
    *  which have notePath === '' and would otherwise be invisible to MCP tools. */
   mcpKey?: string;
   fullPane?: boolean;
-  onMapChange?: (mapId: string, mapName: string, mapType: MapType) => void;
+  onMapChange?: (mapId: string, mapName: string, mapType: MapType, ladderM?: number) => void;
   onNameChange?: (name: string) => void;
   savedPanelState?: Partial<Record<PanelId, PanelState>>;
   onPanelStateChange?: (state: Partial<Record<PanelId, PanelState>>) => void;
@@ -129,7 +131,7 @@ let mapInstanceCounter = 0;
 // MAIN COMPONENT
 // ============================================================================
 
-const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', initialSubHexPath, mcpKey, fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange, onMapDeleted }: DungeonMapTrackerProps): VNode => {
+const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', initialSubHexPath, initialLevel, mcpKey, fullPane = false,onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange, onMapDeleted }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
   useThemeMode();
   const { mapData: rootMapData, isLoading, loadFailure, reload: reloadMapData, saveStatus, updateMapData: rootUpdateMapData, forceSave, markDeleted, staleConflict, acknowledgeStaleConflict, settingsVersion, getCachedImage } = useMapData(mapId, mapName, mapType);
@@ -161,7 +163,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     adjacentEmptySlots,
     activeDistanceOverrides,
     subHexPath
-  } = useSubHexNavigation({ mapData: rootMapData, updateMapData: rootUpdateMapData, initialSubHexPath, getCanvas: getCanvasEl });
+  } = useSubHexNavigation({ mapData: rootMapData, updateMapData: rootUpdateMapData, initialSubHexPath, initialLevel, getCanvas: getCanvasEl });
 
   // Distance overrides for the active map: sub-hex levels get live-derived
   // scale from the parent chain; the root map uses its own stored settings.
@@ -205,6 +207,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     selectedOpacity,
     isColorPickerOpen, setIsColorPickerOpen,
     freeformPlacementMode, setFreeformPlacementMode,
+    editLevelLock, setEditLevelLock,
     handleOpacityChange
   } = useToolState({ mapData, updateMapData });
 
@@ -445,8 +448,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   }, [onMapChange]);
 
   const handleNewMap = useCallback(() => {
-    new NewMapModal(app, (newId, newName, newType) => {
-      onMapChange?.(newId, newName, newType);
+    new NewMapModal(app, (newId, newName, newType, ladderM) => {
+      // The map is built lazily on its first load, by whichever host opens it
+      // (full-pane view or an embed block), so the preset is parked here, at
+      // the dialog, rather than in any one host's map-change handler.
+      if (ladderM !== undefined && newType === 'hex') setPendingNewMapOptions(newId, { ladderM });
+      onMapChange?.(newId, newName, newType, ladderM);
     }).open();
   }, [app, onMapChange]);
 
@@ -1125,7 +1132,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // > notePath (block mode); the hook bails on an empty effective key.
   useMcpBridge({
     mapData, mapId, mapName, notePath, mcpKey, fullPane, geometry,
-    currentTool, selectedColor, selectedOpacity,
+    currentTool, selectedColor, selectedOpacity, editLevelLock,
     canUndo, canRedo, saveStatus, isExpanded,
     setCurrentTool, setSelectedColor, handleOpacityChange,
     handleCellsChange, handleLevelCellsChange, wrappedHandleUndo, handleRedo, handleLayerSelect, forceSave,
@@ -1454,6 +1461,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onViewStateChange={handleViewStateChange}
               onTextLabelSettingsChange={handleTextLabelSettingsChange}
               currentTool={currentTool}
+              editLevelLock={editLevelLock}
+              onEditLevelLockChange={setEditLevelLock}
               isAlignmentMode={isAlignmentMode}
               interactionLocked={pictureFrameActive}
               selectedObjectType={selectedObjectType ?? undefined}

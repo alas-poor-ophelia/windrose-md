@@ -157,6 +157,16 @@ export function crossingZoom(level: number, p: LadderParams): number {
   return (p.minCellPx * Math.pow(p.m, level)) / (2 * p.hexSize);
 }
 
+/**
+ * The zoom at the geometric middle of rung `level`'s band: crossingZoom(level)
+ * times sqrt(m) (equivalently crossingZoom(level + 1) over sqrt(m)). Where a
+ * link, a level chip or an MCP call "goes to a rung", this is the zoom it lands
+ * on, so every path lands on the same one.
+ */
+export function rungMiddleZoom(level: number, p: LadderParams): number {
+  return crossingZoom(level, p) * Math.sqrt(p.m);
+}
+
 /** Active level at `zoom`: the finest L <= maxLevel whose on-screen cell width is at least minCellPx. Pure function of zoom, no hysteresis. */
 export function chooseLevel(zoom: number, p: LadderParams): number {
   let level = 0;

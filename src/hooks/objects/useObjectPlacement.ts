@@ -38,7 +38,7 @@ function useObjectPlacement(
 ): {
   handleObjectPlacement: (gridX: number, gridY: number, clientX: number, clientY: number) => boolean;
 } {
-  const { mapData, geometry, screenToWorld, getActiveLevel, screenToLevelCell, ladder } = useMapState();
+  const { mapData, geometry, screenToWorld, getEditLevel, screenToLevelCell, ladder } = useMapState();
   const { onObjectsChange } = useMapOperations();
 
   const handleObjectPlacement = useCallback((
@@ -55,7 +55,7 @@ function useObjectPlacement(
 
     // Zoomed onto a ladder rung (0 on classic maps): the object is homed there,
     // in that rung's cell under the pointer, behind the same gate as cell paint.
-    const level = getActiveLevel();
+    const level = getEditLevel();
     let cellX = gridX;
     let cellY = gridY;
     if (level > 0) {
@@ -129,7 +129,7 @@ function useObjectPlacement(
       onObjectsChange(result.objects);
     }
     return true;
-  }, [currentTool, selectedObjectType, mapData, geometry, getActiveLevel, screenToLevelCell, ladder, edgeSnapMode, onObjectsChange, screenToWorld, altKeyPressedRef, freeformPlacementModeRef, shiftKeyPressedRef]);
+  }, [currentTool, selectedObjectType, mapData, geometry, getEditLevel, screenToLevelCell, ladder, edgeSnapMode, onObjectsChange, screenToWorld, altKeyPressedRef, freeformPlacementModeRef, shiftKeyPressedRef]);
 
   return { handleObjectPlacement };
 }

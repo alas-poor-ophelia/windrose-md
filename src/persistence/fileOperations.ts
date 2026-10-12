@@ -17,6 +17,28 @@ import { getSettings } from '../core/settingsAccessor';
 import { migrateToLayerSchema, needsMigration, generateLayerId, ensureBoards, DEFAULT_BOARD_ID, normaliseLevels } from './layerAccessor';
 import { calculateFitZoom } from '../geometry/core/hexMeasurements';
 import { resolveTileEntry } from '../assets/tilesetOperations';
+import { isLodLadderEnabled } from '../core/lodFlags';
+import { LADDER_DEFAULTS, LADDER_M_ALLOWLIST } from '../geometry/core/lattice';
+
+/** Creation-time presets for a brand-new map (lattice ladder phase 6). */
+interface NewMapOptions {
+  /** Ladder subdivision for a new hex map; honoured only while the ladder capability is on. */
+  ladderM?: number;
+}
+
+/**
+ * Presets chosen in the new-map dialog, keyed by the minted map id. A new map
+ * is built lazily on its first load (the entry is absent from the data file),
+ * which happens after a re-render the dialog's host cannot pass options
+ * through, so the preset waits here until that load consumes it. Cleared once
+ * the entry exists in the data file.
+ */
+const pendingNewMapOptions = new Map<string, NewMapOptions>();
+
+/** Record creation presets for a map id that has not been created yet. */
+function setPendingNewMapOptions(mapId: string, options: NewMapOptions): void {
+  pendingNewMapOptions.set(mapId, options);
+}
 
 // Serializes EVERY data-file operation (reads as well as writes) so concurrent
 // access can't race or interleave. Reads have to share the mutex: a read that
@@ -503,8 +525,9 @@ function applyLockedViewState(mapData: MapData): MapData {
  * Serialized through the data-file mutex so it can never observe a write in
  * progress.
  */
-async function loadMapDataWithGeneration(app: App, mapId: string, mapName: string = '', mapType: MapType = 'grid'): Promise<{ data: MapData; generation: number }> {
+async function loadMapDataWithGeneration(app: App, mapId: string, mapName: string = '', mapType: MapType = 'grid', options?: NewMapOptions): Promise<{ data: MapData; generation: number }> {
   const dataPath = getDataFilePath();
+  const newMapOptions = options ?? pendingNewMapOptions.get(mapId);
   return enqueueDataFileOp(async () => {
     // Captured INSIDE the mutex: the returned snapshot is exactly the state
     // at this generation — no save can land between the read and the stamp.
@@ -512,7 +535,7 @@ async function loadMapDataWithGeneration(app: App, mapId: string, mapName: strin
     const file = app.vault.getAbstractFileByPath(dataPath);
 
     if (!(file instanceof TFile)) {
-      return { data: createNewMap(mapName, mapType), generation };
+      return { data: createNewMap(mapName, mapType, newMapOptions), generation };
     }
 
     let data: DataFile;
@@ -529,9 +552,10 @@ async function loadMapDataWithGeneration(app: App, mapId: string, mapName: strin
     }
 
     if (data.maps[mapId] == null) {
-      return { data: createNewMap(mapName, mapType), generation };
+      return { data: createNewMap(mapName, mapType, newMapOptions), generation };
     }
 
+    pendingNewMapOptions.delete(mapId);
     try {
       data.maps[mapId] = migrateMapData(data.maps[mapId]);
       if (data.maps[mapId].name == null && mapName) {
@@ -842,7 +866,7 @@ async function deleteMapData(app: App, mapId: string): Promise<boolean> {
   });
 }
 
-function createNewMap(mapName: string = '', mapType: MapType = 'grid'): MapData {
+function createNewMap(mapName: string = '', mapType: MapType = 'grid', options?: NewMapOptions): MapData {
   // Generate layer ID for initial layer
   const initialLayerId = generateLayerId();
 
@@ -909,6 +933,13 @@ function createNewMap(mapName: string = '', mapType: MapType = 'grid'): MapData 
     baseMap.orientation = globalSettings.hexOrientation || DEFAULTS.hexOrientation;
     baseMap.hexBounds = { ...DEFAULTS.hexBounds };
     baseMap.dimensions = { ...DEFAULTS.dimensions };
+
+    // Ladder preset from the new-map dialog: the map is born a ladder map.
+    // Never without the capability flag, never with an m off the allowlist.
+    const ladderM = options?.ladderM;
+    if (ladderM !== undefined && LADDER_M_ALLOWLIST.includes(ladderM) && isLodLadderEnabled()) {
+      baseMap.lod = { m: ladderM, minCellPx: LADDER_DEFAULTS.minCellPx, maxLevel: LADDER_DEFAULTS.maxLevel };
+    }
 
     // Calculate proper viewport center for hex map using offset coordinates
     const hexSize = baseMap.hexSize;
@@ -992,10 +1023,10 @@ async function listMaps(app: App): Promise<MapListEntry[]> {
 export type { SaveMapResult };
 export {
   loadMapData, loadMapDataWithGeneration, getEntryGeneration,
-  saveMapData, deleteMapData, createNewMap, listMaps, migrateMapData,
+  saveMapData, deleteMapData, createNewMap, setPendingNewMapOptions, listMaps, migrateMapData,
   canonicalizeTileIds, applyLockedViewState, enqueueDataFileOp, getSaveQueue,
   notifyCorruptedDataFile, readRawMapEntry, isMapTombstoned, MapDataUnreadableError,
   shouldRotateBak, otherBakSlot, bakPathForSlot, backupTimestamp,
   findBestBackup, restoreFromBackup, BAK_THROTTLE_MS
 };
-export type { MapListEntry, BakSlot, DataFileBackup, RestoreResult };
+export type { MapListEntry, BakSlot, DataFileBackup, RestoreResult, NewMapOptions };

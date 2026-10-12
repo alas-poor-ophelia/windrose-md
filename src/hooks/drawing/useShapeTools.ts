@@ -72,7 +72,7 @@ interface UseShapeToolsOptions {
   removeObjectsInRectangle: (objects: MapObject[], x1: number, y1: number, x2: number, y2: number, homeLevel?: number) => MapObject[];
   /** Lattice ladder (null/absent on classic maps). Deep shapes need all four ladder options. */
   ladder?: GeometryLadder | null;
-  getActiveLevel?: () => number;
+  getEditLevel?: () => number;
   screenToLevelCell?: MapStateContextValue['screenToLevelCell'];
   onLevelCellsChange?: HandleLevelCellsChange;
 }
@@ -113,7 +113,7 @@ function useShapeTools({
   mapData, geometry, screenToWorld, getClientCoords,
   onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
   removeObjectsInRectangle,
-  ladder = null, getActiveLevel, screenToLevelCell, onLevelCellsChange
+  ladder = null, getEditLevel, screenToLevelCell, onLevelCellsChange
 }: UseShapeToolsOptions): UseShapeToolsResult {
 
   const [rectangleStart, setRectangleStart] = useState<RectangleStart | null>(null);
@@ -126,7 +126,7 @@ function useShapeTools({
   // Rung for a NEW shape, read once at its first pointerdown. 0 whenever the
   // map cannot take deep edits (flag off, classic map, quarantine).
   const latchShapeLevel = (): number =>
-    (ladder !== null && getActiveLevel !== undefined && canBeginDepthAuthoring(mapData) ? getActiveLevel() : 0);
+    (ladder !== null && getEditLevel !== undefined && canBeginDepthAuthoring(mapData) ? getEditLevel() : 0);
 
   // Write rung `level` through the guarded deep handler (one undo entry). A
   // refusal shows one notice and changes nothing.

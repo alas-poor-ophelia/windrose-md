@@ -30,6 +30,7 @@ MapCanvas.tsx (orchestrator)
 ├── ShapePreviewOverlay.tsx   # Shape tool preview
 ├── SegmentHoverOverlay.tsx   # Segment hover feedback
 ├── SegmentPickerOverlay.tsx  # Segment picker UI
+├── LadderLevelOverlay.tsx    # Ladder level chips (L0..Lmax, click zooms to a rung), edit-level padlock, level readout
 ├── CardinalIndicators.tsx    # N/S/E/W indicators
 ├── MapCanvasActionButtons.tsx # Floating action buttons
 └── RerollDungeonButton.tsx   # Dungeon generation reroll

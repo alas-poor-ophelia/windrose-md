@@ -7,7 +7,7 @@
  */
 
 // Type-only imports
-import type { MapType, HexBounds, MeasurementMethod } from '#types/core/map.types';
+import type { MapType, HexBounds, MeasurementMethod, LadderConfig } from '#types/core/map.types';
 import type {
   HexOrientation,
   DiagonalRule,
@@ -26,6 +26,7 @@ import type { MapObject } from '#types/objects/object.types';
 import { axialToOffset, isWithinOffsetBounds } from '../../geometry/core/offsetCoordinates';
 import { calculateGridFromColumns, calculateGridFromMeasurement, measurementToHexSize, validateMeasurementSize, MEASUREMENT_CORNER } from '../../geometry/core/hexMeasurements';
 import { getDisplayNameFromPath } from '../../assets/imageOperations';
+import { LADDER_DEFAULTS } from '../../geometry/core/lattice';
 
 
 // ===========================================
@@ -140,6 +141,9 @@ export interface SettingsModalState {
   // Sub-hex parent map backdrop override (undefined = inherit global)
   showParentBackdrop?: boolean;
 
+  // Lattice ladder settings (hex). null = no stored lod and no edit (inherit defaults)
+  lod: LadderConfig | null;
+
   // Background image
   backgroundImagePath: string | null;
   backgroundImageDisplayName: string;
@@ -232,6 +236,8 @@ export interface BuildInitialStateProps {
   currentBackgroundImage?: CurrentBackgroundImage;
   currentDistanceSettings?: CurrentDistanceSettings;
   currentObjectSetId?: string | null;
+  /** Stored `mapData.lod` (top-level MapData field, not part of settings). */
+  currentLod?: LadderConfig | null;
 }
 
 // ===========================================
@@ -276,7 +282,8 @@ const Actions = {
   CLEAR_FOG_IMAGE: 'CLEAR_FOG_IMAGE',
   SET_OBJECT_SET_ID: 'SET_OBJECT_SET_ID',
   SET_BOUNDS_SHAPE: 'SET_BOUNDS_SHAPE',
-  SET_PARENT_BACKDROP: 'SET_PARENT_BACKDROP'
+  SET_PARENT_BACKDROP: 'SET_PARENT_BACKDROP',
+  SET_LADDER_CONFIG: 'SET_LADDER_CONFIG'
 } as const;
 
 /** Action type union */
@@ -464,6 +471,12 @@ interface SetParentBackdropAction {
   payload: boolean | undefined;
 }
 
+interface SetLadderConfigAction {
+  type: typeof Actions.SET_LADDER_CONFIG;
+  /** Fields to change; merged over the current lod, or over LADDER_DEFAULTS when there is none. */
+  payload: Partial<Pick<LadderConfig, 'm' | 'minCellPx' | 'maxLevel'>>;
+}
+
 /** Discriminated union of all actions */
 type SettingsAction =
   | InitializeAction
@@ -502,7 +515,8 @@ type SettingsAction =
   | ClearFogImageAction
   | SetObjectSetIdAction
   | SetBoundsShapeAction
-  | SetParentBackdropAction;
+  | SetParentBackdropAction
+  | SetLadderConfigAction;
 
 // ===========================================
 // Constants
@@ -680,6 +694,8 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
     coordinateDisplayMode: (currentSettings?.coordinateDisplayMode ?? 'rectangular') as CoordinateDisplayMode,
 
     showParentBackdrop: currentSettings?.showParentBackdrop,
+
+    lod: props.currentLod ?? null,
 
     backgroundImagePath: currentBackgroundImage?.path ?? null,
     backgroundImageDisplayName: currentBackgroundImage?.path != null && currentBackgroundImage.path !== ''
@@ -871,6 +887,9 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
 
     case Actions.SET_PARENT_BACKDROP:
       return { ...state, showParentBackdrop: action.payload };
+
+    case Actions.SET_LADDER_CONFIG:
+      return { ...state, lod: { ...(state.lod ?? LADDER_DEFAULTS), ...action.payload } };
 
     case Actions.SET_IMAGE_SEARCH_RESULTS:
       return { ...state, imageSearchResults: action.payload };

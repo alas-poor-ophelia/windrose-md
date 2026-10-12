@@ -30,7 +30,7 @@ const useNotePinInteraction = (
   selectedObjectType: ObjectTypeId | null
 ): UseNotePinInteractionResult => {
   // Get all required state and operations from Context
-  const { mapData, getActiveLevel } = useMapState();
+  const { mapData, getEditLevel } = useMapState();
 
   const {
     onObjectsChange,
@@ -66,7 +66,7 @@ const useNotePinInteraction = (
     // Pins live on the root rung only (design 06, s19 item 3): the cell the
     // coordinator hands us is a level-0 cell, so refuse while zoomed deeper
     // rather than stamp a root pin from a rung-2 click.
-    if (getActiveLevel() > 0) {
+    if (getEditLevel() > 0) {
       new Notice('Note pins are placed at the root level only.');
       return true;
     }
