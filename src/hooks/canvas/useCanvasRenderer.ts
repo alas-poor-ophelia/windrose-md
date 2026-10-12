@@ -12,7 +12,6 @@ import type { Cell } from '#types/core/cell.types';
 import { isGridCell } from '#types/core/cell.types';
 import type { BuildCellLookupFn, CalculateBordersFn } from '#types/core/rendering.types';
 import type { MapObject } from '#types/objects/object.types';
-import type { TileAssignment } from '#types/tiles/tile.types';
 import type {
   RenderCanvas,
   UseCanvasRenderer,
@@ -37,7 +36,7 @@ import { renderGridFog } from '../../geometry/fog/gridFogRenderer';
 import { renderHexFog } from '../../geometry/fog/hexFogRenderer';
 import { getFogSettings, clearFogCanvas, renderFog } from '../../geometry/fog/fogRenderer';
 import { renderObjects } from '../../geometry/renderers/objectRenderer';
-import { OBJECT_FLOOR_PX, LABEL_FLOOR_PX, groupByDepth, objectVisible, labelVisible, elementZoom, elementScale, objectRenderedPx, scaledSizeForRung } from '../../geometry/renderers/elementBands';
+import { OBJECT_FLOOR_PX, LABEL_FLOOR_PX, groupByDepth, tilesByHomeForRung, objectVisible, labelVisible, elementZoom, elementScale, objectRenderedPx, scaledSizeForRung } from '../../geometry/renderers/elementBands';
 import { renderSelections, renderObjectSelections, renderTextLabelSelections } from '../../geometry/renderers/selectionRenderer';
 import { segmentRenderer } from '../../geometry/renderers/segmentRenderer';
 import { getFontCss } from '../../text/fontOptions';
@@ -746,6 +745,36 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     ? { hexToWorld: geometry.hexToWorld.bind(geometry), worldToScreen: geometry.worldToScreen.bind(geometry), hexSize: geometry.hexSize, orientation: mapData.orientation ?? 'flat' }
     : { hexToWorld: geometry.getCellCenter.bind(geometry), worldToScreen: geometry.worldToScreen.bind(geometry), hexSize: geometry.cellSize, orientation: 'grid' };
 
+  // Tiles under the ladder (kgc.6 / kgc.22), for the active layer and both ghost
+  // passes alike: each tile draws ONCE on its HOME rung's geometry (world-anchored
+  // at the parent's rect) and a tile homed finer than the active rung is skipped.
+  // At rungs >= 1 the draw is clipped to the parent hexagon - that single draw,
+  // baked into the per-level surface, is the parent art every fine cell under it
+  // inherits; the level-0 draw stays unclipped like the classic path. `tilesets`
+  // stay the root list. Groups run sequentially (renderTiles' scratch canvases
+  // are not reentrant); the root-anchored terrain strokes ride with home 0.
+  const renderLadderTiles = (
+    layer: MapLayer,
+    opacity: number,
+    hiddenLayers: Set<string> | undefined
+  ): void => {
+    if (ladder === null) return;
+    for (const [home, homeTiles] of tilesByHomeForRung(layer.tiles ?? [], level)) {
+      const strokes = home === 0 ? layer.terrainStrokes : undefined;
+      if (homeTiles.length === 0 && (strokes == null || strokes.length === 0)) continue;
+      const homeGeom = ladder.geometryForLevel(home);
+      const homeShim = { hexToWorld: homeGeom.hexToWorld.bind(homeGeom), worldToScreen: homeGeom.worldToScreen.bind(homeGeom), hexSize: homeGeom.hexSize, orientation: mapData.orientation ?? 'flat' };
+      renderTiles(
+        ctx,
+        homeTiles,
+        mapData.tilesets ?? [],
+        homeShim,
+        rendererViewState,
+        { opacity, getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers, terrainStrokes: strokes, clipToHex: level >= 1 }
+      );
+    }
+  };
+
   // iOS defensive: Reset canvas state
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
@@ -784,14 +813,18 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       const hasTiles = belowLayer.tiles != null && belowLayer.tiles.length > 0;
       const hasStrokes = belowLayer.terrainStrokes != null && belowLayer.terrainStrokes.length > 0;
       if ((hasTiles || hasStrokes) && mapData.tilesets != null && mapData.tilesets.length > 0) {
-        renderTiles(
-          ctx,
-          belowLayer.tiles ?? [],
-          mapData.tilesets,
-          tileGeomShim,
-          rendererViewState,
-          { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, terrainStrokes: belowLayer.terrainStrokes }
-        );
+        if (ladder !== null) {
+          renderLadderTiles(belowLayer, ghostOpacity, undefined);
+        } else {
+          renderTiles(
+            ctx,
+            belowLayer.tiles ?? [],
+            mapData.tilesets,
+            tileGeomShim,
+            rendererViewState,
+            { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, terrainStrokes: belowLayer.terrainStrokes }
+          );
+        }
       }
       if (belowLayer.curves.length > 0) {
         const ghostGridConfig = geometry.type === 'grid'
@@ -825,14 +858,18 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       const ghostHasTiles = layerBelow.tiles != null && layerBelow.tiles.length > 0;
       const ghostHasStrokes = layerBelow.terrainStrokes != null && layerBelow.terrainStrokes.length > 0;
       if ((ghostHasTiles || ghostHasStrokes) && mapData.tilesets != null && mapData.tilesets.length > 0) {
-        renderTiles(
-          ctx,
-          layerBelow.tiles ?? [],
-          mapData.tilesets,
-          tileGeomShim,
-          rendererViewState,
-          { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, terrainStrokes: layerBelow.terrainStrokes }
-        );
+        if (ladder !== null) {
+          renderLadderTiles(layerBelow, ghostOpacity, undefined);
+        } else {
+          renderTiles(
+            ctx,
+            layerBelow.tiles ?? [],
+            mapData.tilesets,
+            tileGeomShim,
+            rendererViewState,
+            { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, terrainStrokes: layerBelow.terrainStrokes }
+          );
+        }
       }
       // Ghost layer curves
       if (layerBelow.curves.length > 0) {
@@ -1057,35 +1094,9 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     const hasTiles = drawLayer.tiles != null && drawLayer.tiles.length > 0;
     const hasStrokes = drawLayer.terrainStrokes != null && drawLayer.terrainStrokes.length > 0;
     if ((hasTiles || hasStrokes) && mapData.tilesets != null && mapData.tilesets.length > 0) {
-      if (ladder !== null && level >= 1) {
-        // Tiles at depth (kgc.6): each tile draws ONCE at its HOME rung (world-
-        // anchored at the parent's rect), clipped to the parent hexagon - that
-        // single draw, baked into the per-level surface, is the parent art every
-        // fine cell under it inherits. `tilesets` stay the root list. Groups run
-        // sequentially (renderTiles' scratch canvases are not reentrant); the
-        // root-anchored terrain strokes ride with the home-0 group only.
-        const byHome = new Map<number, TileAssignment[]>([[0, []]]);
-        for (const t of drawLayer.tiles ?? []) {
-          const home = t.homeLevel ?? 0;
-          const group = byHome.get(home);
-          if (group != null) group.push(t);
-          else byHome.set(home, [t]);
-        }
-        for (const [home, homeTiles] of byHome) {
-          // Snapped tiles band is home..home plus inheritance (design s8): a tile
-          // homed on a FINER rung than the active one does not draw.
-          if (home > level) continue;
-          const homeGeom = ladder.geometryForLevel(home);
-          const homeShim = { hexToWorld: homeGeom.hexToWorld.bind(homeGeom), worldToScreen: homeGeom.worldToScreen.bind(homeGeom), hexSize: homeGeom.hexSize, orientation: mapData.orientation ?? 'flat' };
-          renderTiles(
-            ctx,
-            homeTiles,
-            mapData.tilesets,
-            homeShim,
-            rendererViewState,
-            { opacity: layerOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers: hiddenTileLayers, terrainStrokes: home === 0 ? drawLayer.terrainStrokes : undefined, clipToHex: true }
-          );
-        }
+      if (ladder !== null) {
+        // Tiles at depth, every rung including 0 (kgc.6 / kgc.22): see renderLadderTiles.
+        renderLadderTiles(drawLayer, layerOpacity, hiddenTileLayers);
       } else {
         renderTiles(
           ctx,

@@ -16,6 +16,7 @@ import {
   LABEL_FLOOR_PX,
   depthModeOf,
   groupByDepth,
+  tilesByHomeForRung,
   objectVisible,
   labelVisible,
   pinVisible,
@@ -146,6 +147,26 @@ describe("groupByDepth", () => {
 
   it("returns no groups for no elements", () => {
     expect(groupByDepth([])).toEqual([]);
+  });
+});
+
+describe("tilesByHomeForRung (kgc.22)", () => {
+  const t = (id: string, homeLevel?: number): { id: string; homeLevel?: number } => (homeLevel === undefined ? { id } : { id, homeLevel });
+
+  it("at level 0 only root tiles draw, and the home-0 group always exists", () => {
+    const groups = tilesByHomeForRung([t("a"), t("b", 2), t("c", 0), t("d", 1)], 0);
+    expect(groups.map(([home, tiles]) => [home, tiles.map((x) => x.id)])).toEqual([[0, ["a", "c"]]]);
+    expect(tilesByHomeForRung([], 0)).toEqual([[0, []]]);
+    expect(tilesByHomeForRung([t("deep", 3)], 0)).toEqual([[0, []]]);
+  });
+
+  it("at a deeper rung every home up to the active rung draws, coarsest first, finer ones skipped", () => {
+    const groups = tilesByHomeForRung([t("x", 2), t("a"), t("y", 1), t("z", 3), t("b", 2)], 2);
+    expect(groups.map(([home, tiles]) => [home, tiles.map((x) => x.id)])).toEqual([
+      [0, ["a"]],
+      [1, ["y"]],
+      [2, ["x", "b"]]
+    ]);
   });
 });
 

@@ -127,6 +127,27 @@ function scaledSizeForRung(ladder: GeometryLadder, homeLevel: number, zoom: numb
   return ladder.geometryForLevel(homeLevel).getScaledCellSize(zoom);
 }
 
+/**
+ * Snapped tiles under the ladder: each draws ONCE on its HOME rung's geometry,
+ * and a tile homed on a FINER rung than the active one does not draw at all
+ * (design s8, band home..home plus inheritance). Returns the drawable groups by
+ * home rung, coarsest first; the home-0 group is always present, even empty,
+ * because the root-anchored terrain strokes ride with it. Insertion order is
+ * kept within a group. Used by the active layer and both ghost passes alike
+ * (kgc.22): the level-0 band is not a special case.
+ */
+function tilesByHomeForRung<T extends { homeLevel?: number }>(tiles: readonly T[], activeLevel: number): Array<[number, T[]]> {
+  const byHome = new Map<number, T[]>([[0, []]]);
+  for (const tile of tiles) {
+    const home = tile.homeLevel ?? 0;
+    if (home > activeLevel) continue;
+    const group = byHome.get(home);
+    if (group !== undefined) group.push(tile);
+    else byHome.set(home, [tile]);
+  }
+  return [...byHome.entries()].sort((a, b) => a[0] - b[0]);
+}
+
 export type { DepthMode, DepthGroup };
 export {
   DEFAULT_DEPTH_MODE,
@@ -135,6 +156,7 @@ export {
   depthModeOf,
   toggledDepthMode,
   groupByDepth,
+  tilesByHomeForRung,
   objectVisible,
   labelVisible,
   pinVisible,
