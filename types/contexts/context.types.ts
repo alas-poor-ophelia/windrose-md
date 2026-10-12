@@ -276,6 +276,8 @@ export interface GroupDragOffset {
   worldOffsetX: number;
   worldOffsetY: number;
   freeform?: boolean;
+  /** Ladder rung the object lives on (absent = 0); the grid offset is measured on this rung. */
+  homeLevel?: number;
 }
 
 /** Layer visibility settings */

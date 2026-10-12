@@ -80,8 +80,8 @@ function addObject(objects: MapObject[], typeId: string, x: number, y: number, m
     return objects;
   }
   
-  // Check if object already exists at position
-  const existing = getObjectAtPosition(objects, x, y);
+  // Check if object already exists at position (addObject is root-only: note pins)
+  const existing = getObjectAtPosition(objects, x, y, 0);
   if (existing) {
     console.warn(`Object already exists at position (${x}, ${y})`);
     return objects;
@@ -325,8 +325,8 @@ function canResizeObject(
   const object = objects.find(obj => obj.id === objectId);
   if (!object) return false;
   
-  // Check if new size would overlap with other objects
-  return isAreaFree(objects, object.position.x, object.position.y, newWidth, newHeight, objectId);
+  // Check if new size would overlap with other objects on the same rung
+  return isAreaFree(objects, object.position.x, object.position.y, newWidth, newHeight, objectId, object.homeLevel ?? 0);
 }
 
 // ===========================================

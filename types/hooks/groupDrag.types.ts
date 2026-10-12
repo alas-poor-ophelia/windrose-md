@@ -26,6 +26,8 @@ export interface DragOffset {
   worldOffsetX: number;
   worldOffsetY: number;
   freeform?: boolean;
+  /** Ladder rung the object lives on (absent = 0); the grid offset is measured on this rung. */
+  homeLevel?: number;
 }
 
 /** Map of item IDs to their drag offsets */
@@ -79,7 +81,10 @@ export interface UseGroupDragResult {
     gridX: number,
     gridY: number,
     worldX: number,
-    worldY: number
+    worldY: number,
+    /** Pointer client coords; needed to resolve deep (homeLevel > 0) objects on their own rung. */
+    clientX?: number,
+    clientY?: number
   ) => SelectedItem | null;
 
   /** Start group drag operation */

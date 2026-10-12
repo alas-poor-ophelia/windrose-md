@@ -82,13 +82,13 @@ interface WindroseMcpOps {
   /** Non-mutating derived-form probe (waits out async tile-metadata load in E2E). */
   deriveForm: (tilesetId: string, tileId: string) => TileForm | null;
   /** Place a tile at a grid/hex cell, removing overlapping same-tier tiles. */
-  placeTile: (a: { col: number; row: number; tilesetId: string; tileId: string; rotation?: number; depth?: string; scale?: number }) => { ok: boolean; tileCount: number; error?: string };
+  placeTile: (a: { col: number; row: number; tilesetId: string; tileId: string; rotation?: number; depth?: string; scale?: number }, level?: number) => { ok: boolean; tileCount: number; error?: string };
   /** Resolved object types for the active map's type + object set. */
   listObjectTypes: () => Array<{ id: string; label: string; category: string }>;
   /** Objects on the active layer. */
-  listObjects: () => Array<{ id: string; type: string; x: number; y: number; label?: string }>;
+  listObjects: (level?: number) => Array<{ id: string; type: string; x: number; y: number; label?: string; level: number }>;
   /** Place an object via the imperative placement API. */
-  placeObject: (typeId: string, x: number, y: number) => { ok: boolean; objectId?: string; error?: string };
+  placeObject: (typeId: string, x: number, y: number, level?: number) => { ok: boolean; objectId?: string; error?: string };
   /** Open a drawer pane or edge-rail flyout; null closes the rail. */
   openDrawer: (pane: 'tiles' | 'objects' | 'layers' | 'colors' | 'regions' | 'view' | null) => { ok: boolean; note?: string };
   /** Computed gap skip-intervals + seated-art transforms for the active board's walls (G-F9). */

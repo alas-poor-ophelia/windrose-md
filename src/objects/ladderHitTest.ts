@@ -49,7 +49,29 @@ interface FootprintRect {
   objectHeight: number;
 }
 
-const slotDeps = { getObjectsInCell, getSlotOffset, getMultiObjectScale };
+type SlotDeps = { getObjectsInCell: typeof getObjectsInCell; getSlotOffset: typeof getSlotOffset; getMultiObjectScale: typeof getMultiObjectScale };
+
+const slotDeps: SlotDeps = { getObjectsInCell, getSlotOffset, getMultiObjectScale };
+
+/**
+ * Slot deps whose cell lookup is a prebuilt index of `objects` by rung and
+ * cell: a pick walks every object, and each footprint asks for its cell-mates,
+ * so the plain O(n) filter would make hover O(n^2) per pointermove.
+ */
+function indexedSlotDeps(objects: MapObject[]): SlotDeps {
+  const byCell = new Map<string, MapObject[]>();
+  for (const o of objects) {
+    if (o.position == null) continue;
+    const key = (o.homeLevel ?? 0) + ':' + o.position.x + ',' + o.position.y;
+    const bucket = byCell.get(key);
+    if (bucket === undefined) byCell.set(key, [o]); else bucket.push(o);
+  }
+  return {
+    ...slotDeps,
+    getObjectsInCell: (_objects, x, y, homeLevel) =>
+      homeLevel === undefined ? getObjectsInCell(objects, x, y) : (byCell.get(homeLevel + ':' + x + ',' + y) ?? [])
+  };
+}
 
 /**
  * The rect an object is drawn in under `view`, or null when the live element
@@ -57,7 +79,7 @@ const slotDeps = { getObjectsInCell, getSlotOffset, getMultiObjectScale };
  * `allObjects` is the whole active layer: the hex slot layout needs the
  * object's cell-mates.
  */
-function ladderObjectFootprint(obj: MapObject, allObjects: MapObject[], view: LadderHitView): FootprintRect | null {
+function ladderObjectFootprint(obj: MapObject, allObjects: MapObject[], view: LadderHitView, deps: SlotDeps = slotDeps): FootprintRect | null {
   const home = obj.homeLevel ?? 0;
   const mode = depthModeOf(obj);
   if (!objectVisible(home, view.level, mode)) return null;
@@ -75,7 +97,7 @@ function ladderObjectFootprint(obj: MapObject, allObjects: MapObject[], view: La
     },
     true,
     view.orientation,
-    slotDeps
+    deps
   );
 }
 
@@ -92,10 +114,12 @@ function rectContains(rect: FootprintRect, px: number, py: number): boolean {
 function pickLadderObject(objects: MapObject[], worldX: number, worldY: number, view: LadderHitView): MapObject | null {
   const px = worldX * view.zoom;
   const py = worldY * view.zoom;
+  const deps = indexedSlotDeps(objects);
   let hit: MapObject | null = null;
-  for (const { members } of groupByDepth(objects)) {
+  for (const { home, mode, members } of groupByDepth(objects)) {
+    if (!objectVisible(home, view.level, mode)) continue;
     for (const obj of members) {
-      const rect = ladderObjectFootprint(obj, objects, view);
+      const rect = ladderObjectFootprint(obj, objects, view, deps);
       if (rect !== null && rectContains(rect, px, py)) hit = obj;
     }
   }

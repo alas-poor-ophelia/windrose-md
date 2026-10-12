@@ -102,8 +102,12 @@ function calculateContentBounds(
   // 2. Objects
   if (layer.objects.length > 0) {
     for (const obj of layer.objects) {
+      const home = obj.homeLevel ?? 0;
+      if (home > 0 && ladder === null) continue;
       hasContent = true;
-      const bounds = geometry.getObjectBounds(obj);
+      const bounds = home > 0 && ladder !== null
+        ? ladder.geometryForLevel(home).getObjectBounds(obj)
+        : geometry.getObjectBounds(obj);
       minX = Math.min(minX, bounds.minX);
       minY = Math.min(minY, bounds.minY);
       maxX = Math.max(maxX, bounds.maxX);

@@ -23,7 +23,7 @@ import { crossingZoom } from '../../../src/geometry/core/lattice';
 import { scaledSizeForRung } from '../../../src/geometry/renderers/elementBands';
 import { ladderObjectFootprint, pickLadderObject } from '../../../src/objects/ladderHitTest';
 import { getObjectsInCell, canAddObjectToCell } from '../../../src/objects/hexSlotPositioner';
-import { placeObject, placeObjectFreeform, canPlaceObjectAt, eraseObjectAt, getObjectAtPosition, removeObjectFromHex, isAreaFree, removeObjectsInRectangle, removeObjectAtPosition } from '../../../src/objects/objectOperations';
+import { placeObject, placeObjectFreeform, canPlaceObjectAt, eraseObjectAt, getObjectAtPosition, removeObjectFromHex, isAreaFree, removeObjectsInRectangle, removeObjectAtPosition, addObject, canResizeObject } from '../../../src/objects/objectOperations';
 import { findTileHitInLayers, tileHitsCell } from '../../../src/assets/tileFootprint';
 import type { TileAssignment } from '#types/tiles/tile.types';
 import type { MapLayer } from '#types/core/map.types';
@@ -224,6 +224,20 @@ describe('level-0 erase paths never reach another rung (review fixes)', () => {
     expect(removeObjectAtPosition([rootA, deep], 1, 1, 0).map(o => o.id)).toEqual(['d']);
     expect(removeObjectAtPosition([rootA, deep], 1, 1, 2).map(o => o.id)).toEqual(['r']);
     expect(removeObjectAtPosition([rootA, deep], 1, 1)).toEqual([]);
+  });
+
+  it('a root-only add (note pins) is not blocked by a deep object sharing the index', () => {
+    const next = addObject([deep], 'note_pin', 1, 1, 'hex');
+    expect(next.length).toBe(2);
+    expect('homeLevel' in next[1]).toBe(false);
+  });
+
+  it('canResizeObject checks overlap on the object\'s own rung', () => {
+    const wide = obj({ id: 'w', homeLevel: 2, position: { x: 0, y: 0 } });
+    const rootNeighbour = obj({ id: 'n', position: { x: 1, y: 0 } });
+    const deepNeighbour = obj({ id: 'dn', homeLevel: 2, position: { x: 1, y: 0 } });
+    expect(canResizeObject([wide, rootNeighbour], 'w', 2, 1)).toBe(true);
+    expect(canResizeObject([wide, deepNeighbour], 'w', 2, 1)).toBe(false);
   });
 
   it('tile hits by cell honour the rung', () => {

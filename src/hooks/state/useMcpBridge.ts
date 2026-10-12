@@ -27,12 +27,12 @@ import { createGeometryLadder, type GeometryLadder } from '../../geometry/core/c
 import { withCellsPainted, withCellsErased } from '../../drawing/depthCellOps';
 import { getDataFilePath } from '../../core/settingsAccessor';
 import { setCell as accessorSetCell, removeCell as accessorRemoveCell, cellToPoint } from '../../geometry/core/cellAccessor';
-import { assignmentsOverlap } from '../../assets/tileFootprint';
 import { resolveTileEntry } from '../../assets/tilesetOperations';
 import { deriveTileForm } from '../../assets/tileForm';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import { computeGapSpans, seatedLeafSize } from '../../geometry/renderers/wallPathRenderer';
 import { buildGapFlatten, clampGapToSegment, pointAtLength } from '../../drawing/wallGapOperations';
+import { withTilePlaced, homeLevelFields } from '../../drawing/tilePlacementOps';
 import { placeObject as opsPlaceObject } from '../../objects/objectOperations';
 import { getResolvedObjectTypes } from '../../objects/objectTypeResolver';
 
@@ -129,6 +129,18 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
     const isRung = (level: number | undefined): level is number => level !== undefined && level !== 0;
     const levelFail = (level: number, error: string, skipped = 0): WindroseLevelWriteResult =>
       ({ ok: false, level, count: 0, skipped, error });
+
+    /** null when (col,row) is placeable on `level`; otherwise an error string. Level 0 is ungated. */
+    const checkRungCell = (level: number, col: number, row: number): string | null => {
+      if (!Number.isInteger(level) || level < 0) return 'invalid-level';
+      if (level === 0) return null;
+      if (ladder == null) return 'not-a-ladder';
+      if (level > ladder.params.maxLevel) return 'level-out-of-range';
+      if (!Number.isInteger(col) || !Number.isInteger(row) || !ladder.existsAt(level, col, row)) {
+        return `cell (${col}, ${row}) does not exist at level ${level}`;
+      }
+      return null;
+    };
 
     /**
      * Rung write: drop coords that do not exist at `level`, then commit through
@@ -334,8 +346,10 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
           const meta = tile.vaultPath != null ? getTileMetadataForRender()[tile.vaultPath] : undefined;
           return deriveTileForm(meta, ts);
         },
-        placeTile: (a: { col: number; row: number; tilesetId: string; tileId: string; rotation?: number; depth?: string; scale?: number }): { ok: boolean; tileCount: number; error?: string } => {
+        placeTile: (a: { col: number; row: number; tilesetId: string; tileId: string; rotation?: number; depth?: string; scale?: number }, level: number = 0): { ok: boolean; tileCount: number; error?: string } => {
           if (activeLayer == null) return { ok: false, tileCount: 0, error: 'No active layer' };
+          const rungError = checkRungCell(level, a.col, a.row);
+          if (rungError != null) return { ok: false, tileCount: activeLayer.tiles?.length ?? 0, error: rungError };
           const ts = availableTilesets.find(t => t.id === a.tilesetId);
           const tile = resolveTileEntry(ts, a.tileId);
           if (ts == null || tile == null) {
@@ -351,34 +365,38 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
             scale: a.scale != null && a.scale !== 1 ? a.scale : undefined,
             spanW: 1,
             spanH: 1,
+            ...homeLevelFields(level),
           };
-          const targetPlacement = newTile.placement ?? 'fill';
-          const current = activeLayer.tiles ?? [];
-          const remaining = current.filter(
-            (t: TileAssignment) => (t.placement ?? 'fill') !== targetPlacement || !assignmentsOverlap(t, newTile)
-          );
-          const nextTiles = [...remaining, newTile];
+          // Same-rung, same-tier replace only: a root placement never removes a deep tile at the same index.
+          const nextTiles = withTilePlaced(activeLayer.tiles ?? [], newTile, newTile.placement ?? 'fill');
           handleTilesChange(nextTiles);
           return { ok: true, tileCount: nextTiles.length };
         },
         listObjectTypes: (): Array<{ id: string; label: string; category: string }> =>
           getResolvedObjectTypes(mapData.mapType ?? 'grid', mapData.objectSetId)
             .map(t => ({ id: t.id, label: t.label, category: t.category })),
-        listObjects: (): Array<{ id: string; type: string; x: number; y: number; label?: string }> => {
+        listObjects: (level?: number): Array<{ id: string; type: string; x: number; y: number; label?: string; level: number }> => {
           if (activeLayer == null) return [];
-          return activeLayer.objects.map(o => ({
-            id: o.id,
-            type: o.type,
-            x: o.position.x,
-            y: o.position.y,
-            label: o.label,
-          }));
+          return activeLayer.objects
+            .filter(o => level === undefined || (o.homeLevel ?? 0) === level)
+            .map(o => ({
+              id: o.id,
+              type: o.type,
+              x: o.position.x,
+              y: o.position.y,
+              label: o.label,
+              level: o.homeLevel ?? 0,
+            }));
         },
-        placeObject: (typeId: string, x: number, y: number): { ok: boolean; objectId?: string; error?: string } => {
+        placeObject: (typeId: string, x: number, y: number, level: number = 0): { ok: boolean; objectId?: string; error?: string } => {
           if (activeLayer == null) return { ok: false, error: 'No active layer' };
+          // On a rung (level >= 1) x/y are rung cell indices; same existence gate as the cell ops.
+          const rungError = checkRungCell(level, x, y);
+          if (rungError != null) return { ok: false, error: rungError };
           const result = opsPlaceObject(activeLayer.objects, typeId, x, y, {
             mapType: mapData.mapType ?? 'grid',
             objectSetId: mapData.objectSetId,
+            homeLevel: level,
           });
           if (!result.success) return { ok: false, error: result.error };
           handleObjectsChange(result.objects);

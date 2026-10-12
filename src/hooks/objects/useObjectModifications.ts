@@ -148,6 +148,9 @@ const useObjectModifications = (): {
 
     const { mapType } = mapData;
     const { x: sourceX, y: sourceY } = sourceObject.position;
+    // The copy keeps the source's rung (spread below), so it must look for
+    // room among that rung's cells, not the root's.
+    const home = sourceObject.homeLevel ?? 0;
 
     // Hex-axial 6 directions vs Cartesian 4 directions
     const directions = mapType === 'hex'
@@ -159,7 +162,7 @@ const useObjectModifications = (): {
 
     // Check immediate neighbors first
     for (const [dx, dy] of directions) {
-      if (canPlaceObjectAt(getActiveLayer(mapData).objects, sourceX + dx, sourceY + dy, mapType)) {
+      if (canPlaceObjectAt(getActiveLayer(mapData).objects, sourceX + dx, sourceY + dy, mapType, home)) {
         targetX = sourceX + dx;
         targetY = sourceY + dy;
         found = true;
@@ -176,7 +179,7 @@ const useObjectModifications = (): {
               const checkX = sourceX + dx;
               const checkY = sourceY + dy;
 
-              if (canPlaceObjectAt(getActiveLayer(mapData).objects, checkX, checkY, mapType)) {
+              if (canPlaceObjectAt(getActiveLayer(mapData).objects, checkX, checkY, mapType, home)) {
                 targetX = checkX;
                 targetY = checkY;
                 found = true;
@@ -200,7 +203,7 @@ const useObjectModifications = (): {
 
     if (mapType === 'hex') {
       const occupiedSlots = getActiveLayer(mapData).objects
-        .filter((obj: MapObject) => obj.position.x === targetX && obj.position.y === targetY)
+        .filter((obj: MapObject) => obj.position.x === targetX && obj.position.y === targetY && (obj.homeLevel ?? 0) === home)
         .map((obj: MapObject) => obj.slot)
         .filter((s: number | undefined): s is number => s !== undefined);
       newObject.slot = assignSlot(occupiedSlots);

@@ -13,10 +13,12 @@ import type { MapData } from '#types/core/map.types';
 import type { MapObject, ObjectSize } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { SelectedItem } from '#types/contexts/context.types';
-import type { PositionUpdate } from '#types/hooks/groupDrag.types';
 import type { HexOrientation } from '#types/settings/settings.types';
 
+import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
+
 import { getActiveLayer } from '../persistence/layerAccessor';
+import { ladderObjectFootprint } from './ladderHitTest';
 import { getFontCss } from '../text/fontOptions';
 
 
@@ -38,7 +40,14 @@ export interface WorldPoint {
   worldY: number;
 }
 
-/** Geometry with bounds check */
+/** The camera under the lattice ladder: marquee bounds follow the drawn footprint. */
+interface MarqueeLadderView {
+  ladder: GeometryLadder;
+  level: number;
+  zoom: number;
+  orientation: 'flat' | 'pointy';
+}
+
 // ===========================================
 // Rectangle Operations
 // ===========================================
@@ -68,8 +77,22 @@ function rectsOverlap(
 function getObjectWorldBounds(
   obj: MapObject,
   geometry: ExtendedGeometry,
-  mapData: MapData
-): WorldBounds {
+  mapData: MapData,
+  view?: MarqueeLadderView,
+  allObjects?: MapObject[]
+): WorldBounds | null {
+  if (view !== undefined && geometry.type === 'hex') {
+    // Ladder view: the drawn footprint (zoomed world px) is the selectable area
+    const rect = ladderObjectFootprint(obj, allObjects ?? [obj], view);
+    if (rect === null) return null;
+    return {
+      minX: rect.screenX / view.zoom,
+      minY: rect.screenY / view.zoom,
+      maxX: (rect.screenX + rect.objectWidth) / view.zoom,
+      maxY: (rect.screenY + rect.objectHeight) / view.zoom
+    };
+  }
+
   const pos = obj.position;
   const size: ObjectSize = obj.size ?? { width: 1, height: 1 };
 
@@ -189,7 +212,8 @@ function getItemsInWorldRect(
   corner1: WorldPoint,
   corner2: WorldPoint,
   geometry: ExtendedGeometry,
-  ctx: CanvasRenderingContext2D | null
+  ctx: CanvasRenderingContext2D | null,
+  view?: MarqueeLadderView
 ): SelectedItem[] {
   const activeLayer = getActiveLayer(mapData);
   const items: SelectedItem[] = [];
@@ -203,8 +227,8 @@ function getItemsInWorldRect(
   // Check objects
   const objects = activeLayer.objects ?? [];
   for (const obj of objects) {
-    const objBounds = getObjectWorldBounds(obj, geometry, mapData);
-    if (rectsOverlap(minX, minY, maxX, maxY, objBounds)) {
+    const objBounds = getObjectWorldBounds(obj, geometry, mapData, view, objects);
+    if (objBounds !== null && rectsOverlap(minX, minY, maxX, maxY, objBounds)) {
       items.push({ type: 'object', id: obj.id, data: obj });
     }
   }
@@ -221,91 +245,9 @@ function getItemsInWorldRect(
   return items;
 }
 
-/**
- * Calculate the combined bounding box for multiple selected items.
- * Used for positioning the multi-select toolbar.
- */
-function getSelectionBounds(
-  selectedItems: SelectedItem[] | null | undefined,
-  geometry: ExtendedGeometry,
-  mapData: MapData,
-  ctx: CanvasRenderingContext2D | null
-): WorldBounds | null {
-  if (!selectedItems || selectedItems.length === 0) {
-    return null;
-  }
-  
-  let minX = Infinity, minY = Infinity;
-  let maxX = -Infinity, maxY = -Infinity;
-  
-  for (const item of selectedItems) {
-    let bounds: WorldBounds | undefined;
-    
-    if (item.type === 'object' && item.data) {
-      bounds = getObjectWorldBounds(item.data, geometry, mapData);
-    } else if (item.type === 'text' && item.data) {
-      bounds = getTextLabelWorldBounds(item.data, ctx);
-    }
-    
-    if (bounds) {
-      minX = Math.min(minX, bounds.minX);
-      minY = Math.min(minY, bounds.minY);
-      maxX = Math.max(maxX, bounds.maxX);
-      maxY = Math.max(maxY, bounds.maxY);
-    }
-  }
-  
-  if (minX === Infinity) {
-    return null;
-  }
-  
-  return { minX, minY, maxX, maxY };
-}
-
-// ===========================================
-// Bounds Validation
-// ===========================================
-
-/**
- * Check if a position is within map bounds
- */
-function isWithinBounds(
-  gridX: number,
-  gridY: number,
-  geometry: ExtendedGeometry | null,
-  _mapData: MapData
-): boolean {
-  if (geometry == null) return true;
-  
-  // Use geometry's bounds check if available
-  if (geometry.isWithinBounds != null) {
-    return geometry.isWithinBounds(gridX, gridY);
-  }
-  
-  // For grid maps without explicit bounds, assume unbounded
-  return true;
-}
-
-/**
- * Validate that all positions in a group move are within bounds
- */
-function validateGroupMove(
-  updates: PositionUpdate[],
-  geometry: ExtendedGeometry | null,
-  mapData: MapData
-): boolean {
-  for (const update of updates) {
-    if (update.position != null) {
-      if (!isWithinBounds(update.position.x, update.position.y, geometry, mapData)) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
 // ===========================================
 // Exports
 // ===========================================
 
-export { rectsOverlap, getObjectWorldBounds, getTextLabelWorldBounds, getItemsInWorldRect, getSelectionBounds, isWithinBounds, validateGroupMove };
+export type { MarqueeLadderView };
+export { rectsOverlap, getObjectWorldBounds, getTextLabelWorldBounds, getItemsInWorldRect };

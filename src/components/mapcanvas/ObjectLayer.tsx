@@ -398,11 +398,24 @@ const ObjectLayer = ({
     isTouchActive?: boolean
   ): boolean => {
     if (isLinkingMode && linkingFrom && mapData) {
-      // In linking mode - try to find target object
+      // In linking mode - try to find target object. Under the ladder the
+      // target is whatever is DRAWN under the pointer (home rung, held size,
+      // depth-mode visibility); the level-0 cell is only right on classic maps.
       const activeLayer = getActiveLayer(mapData);
-      const targetObject = activeLayer.objects?.find((obj: MapObject) => {
-        return obj.position.x === gridX && obj.position.y === gridY;
-      });
+      let targetObject: MapObject | undefined;
+      if (ladder !== null) {
+        const world = screenToWorld(clientX, clientY);
+        const zoom = viewController?.getLive().zoom ?? mapData.viewState?.zoom ?? 1;
+        targetObject = world
+          ? pickLadderObject(activeLayer.objects ?? [], world.worldX, world.worldY, {
+            ladder, level: getActiveLevel(), zoom, orientation: mapData.orientation ?? 'flat'
+          }) ?? undefined
+          : undefined;
+      } else {
+        targetObject = activeLayer.objects?.find((obj: MapObject) => {
+          return obj.position.x === gridX && obj.position.y === gridY;
+        });
+      }
 
       if (targetObject) {
         // Prevent self-linking
@@ -461,7 +474,7 @@ const ObjectLayer = ({
 
     // Not in linking mode or no target found - use normal selection
     return handleObjectSelection(clientX, clientY, gridX, gridY, isTouchActive);
-  }, [isLinkingMode, linkingFrom, mapData, handleObjectSelection, applyLinkUpdate, cancelLinking, setSelectedItem]);
+  }, [isLinkingMode, linkingFrom, mapData, handleObjectSelection, applyLinkUpdate, cancelLinking, setSelectedItem, ladder, screenToWorld, getActiveLevel, viewController]);
 
   useLayerHandlers('object', {
     handleObjectPlacement,

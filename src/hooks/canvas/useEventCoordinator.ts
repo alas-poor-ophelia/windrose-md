@@ -211,7 +211,7 @@ const useEventCoordinator = ({
         if (hasMultiSelection) {
           const worldCoords = screenToWorld(clientX, clientY);
           if (worldCoords) {
-            const clickedItem = getClickedSelectedItem(gridX, gridY, worldCoords.worldX, worldCoords.worldY);
+            const clickedItem = getClickedSelectedItem(gridX, gridY, worldCoords.worldX, worldCoords.worldY, clientX, clientY);
             if (clickedItem) {
               startGroupDrag(clientX, clientY, gridX, gridY);
               return;
@@ -257,7 +257,7 @@ const useEventCoordinator = ({
         if (hasMultiSelection) {
           const worldCoords = screenToWorld(clientX, clientY);
           if (worldCoords) {
-            const clickedItem = getClickedSelectedItem(gridX, gridY, worldCoords.worldX, worldCoords.worldY);
+            const clickedItem = getClickedSelectedItem(gridX, gridY, worldCoords.worldX, worldCoords.worldY, clientX, clientY);
             if (clickedItem) {
               startGroupDrag(clientX, clientY, gridX, gridY);
               return;

@@ -28,7 +28,9 @@ import { useMapState, useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { Notice } from 'obsidian';
-import { canBeginDepthAuthoring } from '../../persistence/depthAuthoring';
+import { guardDepthWrite } from '../../persistence/depthAuthoring';
+import { depthRefusalMessage } from '../../drawing/depthCellOps';
+import { authoredCells } from '../../persistence/layerAccessor';
 import { toggledDepthMode } from '../../geometry/renderers/elementBands';
 
 
@@ -88,11 +90,16 @@ const useTextLabelInteraction = (
     const worldCoords = screenToWorld(clientX, clientY);
     if (!worldCoords) return false;
 
-    // Latch the rung now: zoom may drift while the modal is open.
+    // Latch the rung now: zoom may drift while the modal is open. Same gate
+    // and notice as object and tile placement; a refused click is consumed.
     const homeLevel = getActiveLevel();
-    if (homeLevel > 0 && !canBeginDepthAuthoring(mapData)) {
-      new Notice('Depth editing is unavailable on this map, so text cannot be placed at a finer level.');
-      return false;
+    if (homeLevel > 0) {
+      const layer = getActiveLayer(mapData);
+      const refusal = guardDepthWrite(mapData, layer.id, homeLevel, authoredCells(layer, homeLevel));
+      if (refusal !== null) {
+        new Notice(depthRefusalMessage(refusal));
+        return true;
+      }
     }
 
     setPendingTextPosition({
