@@ -87,4 +87,4 @@ function MosaicCard({ category, tiles, count, getThumbUrl, onClick }: {
 }
 
 export { TileCell, TileListRow, MosaicCard };
-export type { TileCellProps };
+

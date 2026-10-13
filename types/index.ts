@@ -334,7 +334,6 @@ export type {
   CoordinateHelpers,
   ZoomHandlers,
   PanHandlers,
-  CanvasInteractionSetters,
   LastTouchTimeRef,
   OnViewStateChangeCallback,
   UseCanvasInteractionResult,

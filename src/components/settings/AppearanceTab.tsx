@@ -539,4 +539,4 @@ function InstalledFogPacks({ currentImage, onSelect, disabled }: {
   );
 }
 
-export { AppearanceTab, ColorPickerItem, FogOfWarSection };
+export { AppearanceTab, ColorPickerItem };

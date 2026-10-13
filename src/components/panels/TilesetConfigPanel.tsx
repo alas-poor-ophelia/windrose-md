@@ -11,7 +11,7 @@ import { updateTileMetadata, bulkSetDefaultSpan } from '../../persistence/tileMe
 import { DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
 import { predictSpanFromMeta } from './tileBrowserCommon';
 
-export interface TilesetConfigPanelProps {
+interface TilesetConfigPanelProps {
   tilesets: TilesetDef[];
   selectedTilesetId: string | null;
   tilesetOverrides?: Record<string, TilesetOverrides>;

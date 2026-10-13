@@ -25,6 +25,7 @@ import { Modal, Menu } from 'obsidian';
 import { useApp } from '../../context/AppContext';
 import type { HexContextMenuDetail } from '../../core/windroseEvents';
 import { isForeignInstanceEvent } from '../../core/windroseEvents';
+import { mintId } from '../../core/ids';
 import { tooltipRef } from '../shared/obsidianTooltip';
 
 
@@ -271,7 +272,7 @@ const OutlineLayer = ({
         item.onClick(() => {
           const dup: Outline = {
             ...outlineRef,
-            id: `outline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            id: mintId('outline', { randomLength: 6 }),
             order: (mapData.outlines ?? []).length
           };
           onOutlinesChange([...(mapData.outlines ?? []), dup]);

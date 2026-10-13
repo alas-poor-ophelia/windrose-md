@@ -201,7 +201,7 @@ interface MapSettingsHandlers {
 // ===========================================
 
 /** Modal shell context - UI chrome + tab-specific data for the settings modal */
-export interface ModalShellContextValue {
+interface ModalShellContextValue {
   isOpen: boolean;
   activeTab: SettingsTabId;
   tabs: SettingsTab[];
@@ -253,7 +253,7 @@ export interface AppearanceContextValue {
 }
 
 /** Background image context - image, sizing, density, measurement */
-export interface BackgroundImageContextValue {
+interface BackgroundImageContextValue {
   backgroundImagePath: string | null;
   backgroundImageDisplayName: string;
   imageDimensions: ImageDimensions | null;
@@ -538,15 +538,21 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       }
     };
 
+    // The provider renders inside an Obsidian Modal (NativeModalPortal) and
+    // holds no element of its own; the modal opens in the focused window, and
+    // the picker is opened by a click inside it, so activeDocument here IS the
+    // modal's document. Captured once so add and remove hit the same document
+    // even if focus moves to another window before cleanup.
+    const doc = activeDocument;
     const timeoutId = window.setTimeout(() => {
-      activeDocument.addEventListener('mousedown', handleClickOutside);
-      activeDocument.addEventListener('touchstart', handleClickOutside, { passive: true });
+      doc.addEventListener('mousedown', handleClickOutside);
+      doc.addEventListener('touchstart', handleClickOutside, { passive: true });
     }, 0);
 
     return () => {
       window.clearTimeout(timeoutId);
-      activeDocument.removeEventListener('mousedown', handleClickOutside);
-      activeDocument.removeEventListener('touchstart', handleClickOutside);
+      doc.removeEventListener('mousedown', handleClickOutside);
+      doc.removeEventListener('touchstart', handleClickOutside);
     };
   }, [state.activeColorPicker]);
 

@@ -85,4 +85,4 @@ function DockPanel({
 }
 
 export { DockPanel };
-export type { DockPanelProps };
+

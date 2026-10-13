@@ -174,6 +174,6 @@ Orchestrators (`useDrawingTools`, `useObjectInteractions`) compose focused sub-h
 
 - **Stale closures**: most "caching" bugs are this; use the latest-ref pattern for listeners.
 - **Unstable references**: returning a new object each render re-renders consumers.
-- **Effect cleanup**: always remove listeners; use `activeWindow`/`activeDocument` for popout-window safety.
+- **Effect cleanup**: always remove listeners. For popout-window safety, resolve `doc`/`win` once per effect run from an element you already hold (`ref.current.ownerDocument`, `.defaultView`; DMT passes `containerRef` to the interaction hooks), falling back to `activeDocument`/`window`, and remove from the same captured target. Exception: the plugin-wide `windrose-settings-changed` / `windrose-navigate-to` / object-link bus stays on the main `window`.
 - **Hooks after early return**: all hooks run before any conditional return.
 - **Don't confuse** `useViewController` (canvas/, live pan/zoom) with `useViewControls` (state/, zoom buttons and compass).

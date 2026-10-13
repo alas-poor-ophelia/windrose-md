@@ -120,4 +120,4 @@ const BlockTileDrawer = ({ drawer, tileBrowser, objectsPane, tileViewMode, onTil
   );
 };
 
-export { BlockTileDrawer, CompactDrawerHead };
+export { BlockTileDrawer };

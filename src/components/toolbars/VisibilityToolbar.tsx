@@ -32,7 +32,7 @@ interface LayerDef {
 }
 
 /** Props for VisibilityToolbar component */
-export interface VisibilityToolbarProps {
+interface VisibilityToolbarProps {
   isOpen: boolean;
   layerVisibility: LayerVisibility;
   onToggleLayer: (layerId: keyof LayerVisibility) => void;

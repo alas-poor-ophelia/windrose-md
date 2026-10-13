@@ -41,4 +41,4 @@ const DockRibbon = ({ items, onExpand }: DockRibbonProps): VNode => (
 );
 
 export { DockRibbon };
-export type { DockRibbonItem };
+

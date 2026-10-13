@@ -9,7 +9,7 @@
 import { describe, it, expect } from "vitest";
 
 // Import directly from the source file - transformer should handle it
-import { isSimpleCell, hasSegments } from "#types/core/cell.types";
+import { isSimpleCell, hasSegments } from "../../../../src/geometry/core/cellAccessor";
 import {
   getSegmentAtPosition,
   normalizeCell,

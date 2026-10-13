@@ -41,7 +41,7 @@ import { ResizeConfirmDialog } from './ResizeConfirmDialog';
 
 
 /** Props for MapSettingsModal (provider props minus children/onClose, plus onCancel) */
-export type MapSettingsModalProps = Omit<MapSettingsProviderProps, 'children' | 'onClose'> & {
+type MapSettingsModalProps = Omit<MapSettingsProviderProps, 'children' | 'onClose'> & {
   onCancel: () => void;
 };
 

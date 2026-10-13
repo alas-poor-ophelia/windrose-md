@@ -192,7 +192,8 @@ const DrawingLayer = ({
       });
     }
   }, [isDrawing, rectangleStart, circleStart, edgeLineStart, shapeHoverPosition,
-    touchConfirmPending, onDrawingStateChange, handleStopDrawing, cancelShapePreview]);
+    touchConfirmPending, onDrawingStateChange, handleStopDrawing, cancelShapePreview,
+    handleDrawingPointerDown, handleDrawingPointerMove, cancelDrawing]);
 
   const renderStartMarker = (): VNode | null => {
     if (!canvasRef.current || !containerRef?.current || !geometry) return null;

@@ -22,7 +22,7 @@ import { tooltipRef } from './obsidianTooltip';
 
 
 /** Color definition from palette */
-export interface ColorDef {
+interface ColorDef {
   id: string;
   color: HexColor;
   label: string;
@@ -33,10 +33,10 @@ export interface ColorDef {
 }
 
 /** Position for color picker */
-export type PickerPosition = 'below' | 'above' | null;
+type PickerPosition = 'below' | 'above' | null;
 
 /** Alignment for color picker */
-export type PickerAlign = 'left' | 'right';
+type PickerAlign = 'left' | 'right';
 
 /** Bounding rect of the swatch the edit panel is anchored to (viewport coordinates) */
 interface EditAnchorRect {

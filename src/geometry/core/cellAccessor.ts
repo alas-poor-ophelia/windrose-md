@@ -32,7 +32,6 @@ import type {
 } from '#types/core/cell.types';
 import type { IGeometry } from '#types/core/geometry.types';
 
-import { isGridCell, hasSegments, isSimpleCell } from '#types/core/cell.types';
 import { SEGMENT_NAMES } from '../../core/dmtConstants';
 
 // Re-export types for consumers
@@ -57,6 +56,42 @@ export type {
 
 // Import segment constants
 
+
+// ============================================================================
+// CELL KIND GUARDS (runtime; types/ holds types only)
+// ============================================================================
+
+/** Check if cell is a grid cell (has x, y) */
+function isGridCell(cell: Cell): cell is GridCell {
+  return 'x' in cell && 'y' in cell;
+}
+
+/** Check if cell is a hex cell (has q, r) */
+function isHexCell(cell: Cell): cell is HexCell {
+  return 'q' in cell && 'r' in cell;
+}
+
+/** Check if cell has partial fill (segments with entries) */
+function hasSegments(cell: Cell): cell is SegmentGridCell {
+  return isGridCell(cell) &&
+    cell.segments !== undefined &&
+    Object.keys(cell.segments).length > 0;
+}
+
+/** Check if cell is simple (fully painted, no segments) */
+function isSimpleCell(cell: Cell): boolean {
+  return !hasSegments(cell);
+}
+
+/** Segments of a cell, or undefined when it is not a partially filled grid cell. */
+function getSegments(cell: Cell): SegmentMap | undefined {
+  return hasSegments(cell) ? cell.segments : undefined;
+}
+
+/** The single "a,b" key format for every coordinate-keyed lookup (x,y or q,r). */
+function pointKey(a: number, b: number): string {
+  return `${a},${b}`;
+}
 
 // ============================================================================
 // GEOMETRY TYPE DETECTION
@@ -92,10 +127,8 @@ function cellToPoint(cell: Cell): Point {
  * Uses Point coordinates for consistency.
  */
 function cellKey(coords: Point, geometry: IGeometry): CellKey {
-  if (isGridGeometry(geometry)) {
-    return `${coords.x},${coords.y}`;
-  }
-  return `${coords.x},${coords.y}`;  // Same format, geometry interprets meaning
+  void geometry; // Same format for every geometry; the geometry interprets meaning
+  return pointKey(coords.x, coords.y);
 }
 
 /**
@@ -459,6 +492,7 @@ function getLocalCellPosition(
 
 export { // Geometry type detection
   isGridGeometry, // Type guards
+  isGridCell, isHexCell, hasSegments, isSimpleCell, getSegments, pointKey,
   // Coordinate utilities
   cellKey, cellKeyFromCell, cellToPoint, // Query functions
   getCellAt, getCellIndex, cellExists, buildCellMap, // Modification functions (immutable)

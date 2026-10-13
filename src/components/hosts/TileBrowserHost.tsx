@@ -44,4 +44,4 @@ const TileBrowserHost = ({ bag, variant, ribbon, tilesetConfigOpen, onTilesetCon
 };
 
 export { TileBrowserHost };
-export type { TileBrowserVariant, TileBrowserHostProps };
+

@@ -32,7 +32,7 @@ import { Z_INDEX } from '../../core/dmtConstants';
 type ShapeType = 'rectangle' | 'circle' | 'clearArea' | 'edgeLine';
 
 /** Props for ShapePreviewOverlay component */
-export interface ShapePreviewOverlayProps {
+interface ShapePreviewOverlayProps {
   /** Shape type to preview */
   // Callers pass values beyond ShapeType (e.g. 'areaSelect', 'shapeSquare', or a
   // raw string from DrawingLayer); `string & {}` keeps literal hints without

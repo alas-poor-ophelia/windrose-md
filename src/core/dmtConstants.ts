@@ -134,18 +134,6 @@ interface CrossCellAdjacency {
   neighborSegment: SegmentName;
 }
 
-/** Cell edge names */
-type CellEdge = 'top' | 'right' | 'bottom' | 'left';
-
-/** Edge half (for segment positioning) */
-type EdgeHalf = 'first' | 'second';
-
-/** External edge definition for a segment */
-export interface ExternalEdge {
-  edge: CellEdge;
-  half: EdgeHalf;
-}
-
 // =============================================================================
 // Diagonal Fill Tool Types
 // =============================================================================

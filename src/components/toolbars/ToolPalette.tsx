@@ -99,7 +99,7 @@ interface ToolButtonWithSubMenuProps {
 }
 
 /** Props for ToolPalette */
-export interface ToolPaletteProps {
+interface ToolPaletteProps {
   currentTool: ToolId;
   onToolChange: (tool: ToolId) => void;
   onUndo: () => void;

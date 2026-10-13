@@ -43,10 +43,11 @@ const ObjectSidebar = memo(({ selectedObjectType, onObjectTypeSelect, onToolChan
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
   // Read available object sets from plugin settings
+  const plugins = app.plugins.plugins;
   const objectSets = useMemo(() => {
-    const plugin = app.plugins.plugins['windrose-md'] as { settings?: { objectSets?: ObjectSet[] } } | undefined;
+    const plugin = plugins['windrose-md'] as { settings?: { objectSets?: ObjectSet[] } } | undefined;
     return plugin?.settings?.objectSets ?? [];
-  }, []);
+  }, [plugins]);
 
   // Validate that objectSetId references an existing set; fall back to Default if stale
   const validatedSetId = useMemo(() => {

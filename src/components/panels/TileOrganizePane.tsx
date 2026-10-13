@@ -29,7 +29,7 @@ import { MAX_TILE_SPAN } from '../../assets/tileRenderResolution';
 import { observeWidth, predictSpanFromMeta, TileThumbnail } from './tileBrowserCommon';
 import { tooltipRef } from '../shared/obsidianTooltip';
 
-export interface TileOrganizePaneProps {
+interface TileOrganizePaneProps {
   tilesets: TilesetDef[];
   /** The browsable pool (wall end-caps already excluded). */
   allTiles: TileEntry[];

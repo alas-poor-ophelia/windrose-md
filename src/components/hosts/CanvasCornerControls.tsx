@@ -79,4 +79,4 @@ const CanvasCornerControls = ({ mapData, onCompassClick, block, showStandaloneCo
 };
 
 export { CanvasCornerControls };
-export type { BlockControlsState };
+

@@ -34,7 +34,7 @@ interface SegmentHoverInfo {
 }
 
 /** Props for SegmentHoverOverlay component */
-export interface SegmentHoverOverlayProps {
+interface SegmentHoverOverlayProps {
   /** Hover information or null */
   hoverInfo: SegmentHoverInfo | null;
   /** Currently selected paint color */

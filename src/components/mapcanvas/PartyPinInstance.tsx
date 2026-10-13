@@ -46,7 +46,7 @@ const PARTY_NOTE_SAVE_DELAY_MS = 2000;
 /** Related notes shown per result before the "+N more" overflow */
 const PARTY_RELATED_CAP = 5;
 
-export interface PartyPinInstanceProps {
+interface PartyPinInstanceProps {
   pin: PartyPin;
   /** Show this beacon's controls card (it is the selected beacon) */
   showControls: boolean;

@@ -13,7 +13,7 @@
 
 import type { MapData, MapLayer, StoredViewState } from '#types/core/map.types';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
-import { isGridCell } from '#types/core/cell.types';
+import { isGridCell } from './cellAccessor';
 
 import { DEFAULTS } from '../../core/dmtConstants';
 

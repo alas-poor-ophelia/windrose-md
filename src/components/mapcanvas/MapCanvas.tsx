@@ -233,10 +233,25 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
 
   // Create geometry instance based on map type
   // Return null during loading to prevent errors
+  // Keyed on the five fields createGeometry reads; the rest of mapData comes
+  // from a latest-ref so unrelated edits don't rebuild the geometry.
+  const geometryMapDataRef = useRef(mapData);
+  geometryMapDataRef.current = mapData;
+  const hasGeometryMapData = mapData != null;
+  const geoMapType = mapData?.mapType;
+  const geoGridSize = mapData?.gridSize;
+  const geoHexSize = mapData?.hexSize;
+  const geoOrientation = mapData?.orientation;
+  const geoHexBounds = mapData?.hexBounds;
   const geometry = useMemo((): ExtendedGeometry | null => {
-    if (!mapData) return null;
-    return createGeometry(mapData);
-  }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
+    const latest = geometryMapDataRef.current;
+    if (!hasGeometryMapData || latest == null) return null;
+    return createGeometry({
+      ...latest,
+      mapType: geoMapType ?? latest.mapType, gridSize: geoGridSize, hexSize: geoHexSize,
+      orientation: geoOrientation, hexBounds: geoHexBounds
+    });
+  }, [hasGeometryMapData, geoMapType, geoGridSize, geoHexSize, geoOrientation, geoHexBounds]);
 
   // Shared live pan/zoom controller. Holds viewState off the React path during a
   // gesture and commits to mapData once at gesture end (sink = onViewStateChange).

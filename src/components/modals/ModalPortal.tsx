@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { VNode, ComponentChildren } from 'preact';
-export interface ModalPortalProps {
+interface ModalPortalProps {
   /** Content to render in the portal */
   children: ComponentChildren;
 }

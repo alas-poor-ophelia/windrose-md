@@ -3,6 +3,7 @@ import { Modal, Setting } from 'obsidian';
 import type { MapType } from '#types/index';
 import { listMaps, ensureDataFileForNewMap } from '../../persistence/fileOperations';
 import { isFeatureEnabled } from '../../core/featureFlags';
+import { mintId } from '../../core/ids';
 import type { MapListEntry } from '../../persistence/fileOperations';
 
 export class InsertMapModal extends Modal {
@@ -122,7 +123,7 @@ export class InsertMapModal extends Modal {
   }
 
   private generateMapId(): string {
-    return 'map-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+    return mintId('map');
   }
 
   private submitNew(): void {

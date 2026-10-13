@@ -6,12 +6,12 @@
 
 import type { IGeometry } from '#types/core/geometry.types';
 import type { Cell, SegmentName } from '#types/core/cell.types';
-import { isGridCell } from '#types/core/cell.types';
+
 import type { MapData } from '#types/core/map.types';
 import type { SegmentPickerCell } from '#types/hooks/drawingTools.types';
 
 import { useState } from 'preact/hooks';
-import { setSegments } from '../../geometry/core/cellAccessor';
+import { isGridCell, setSegments } from '../../geometry/core/cellAccessor';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 
 

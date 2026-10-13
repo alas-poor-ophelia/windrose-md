@@ -139,4 +139,4 @@ function CoordinateDisplaySection(): VNode {
   );
 }
 
-export { CoordinateDisplaySection, CoordinateModeContent, CoordinateColorsContent };
+export { CoordinateDisplaySection };

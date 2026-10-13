@@ -158,17 +158,10 @@ export default [
   // inline sites — see git history for the per-site reasoning.
   {
     files: [
+      // DMT: theme memo keyed on settingsVersion/isLightTheme (invalidation
+      // keys for getSettings() and the body theme class, read inside resolveTheme).
       "src/DungeonMapTracker.tsx",
-      "src/components/mapcanvas/DrawingLayer.tsx",
-      "src/components/mapcanvas/MapCanvas.tsx",
-      "src/components/mapcanvas/MeasurementLayer.tsx",
-      "src/components/mapcanvas/NotePinLayer.tsx",
-      "src/components/mapcanvas/PartyPinLayer.tsx",
-      "src/components/mapcanvas/TextLayer.tsx",
-      "src/components/modals/NativeModalPortal.tsx",
-      "src/components/panels/FloatingPanel.tsx",
-      "src/components/panels/ObjectSidebar.tsx",
-      "src/components/settings/SettingItem.tsx",
+      // isOpen-keyed getSettings() snapshot (421), open-effect init (518).
       "src/context/MapSettingsContext.tsx"
     ],
     rules: {

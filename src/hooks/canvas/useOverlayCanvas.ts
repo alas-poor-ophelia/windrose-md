@@ -81,8 +81,8 @@ function useOverlayCanvas(canvasRef: CanvasRefLike, options: OverlayCanvasOption
 		const parent = main?.parentElement;
 		if (main == null || parent == null) return null;
 
-		// Created via activeWindow, then adopted by parent's document on append.
-		const overlay = activeWindow.createEl('canvas');
+		// Created in the main canvas's own window (popout-safe), not activeWindow.
+		const overlay = main.win.createEl('canvas');
 		overlay.width = main.width;
 		overlay.height = main.height;
 		overlay.classList.add('windrose-overlay-layer');

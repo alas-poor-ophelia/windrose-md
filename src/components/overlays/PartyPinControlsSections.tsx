@@ -407,4 +407,4 @@ const PartyPinControlsNearby = ({ results, travelLabelFor, travelHint, onShowOnM
 );
 
 export { PartyPinControlsFilters, PartyPinControlsNote, PartyPinControlsNearby, commitOnEnter };
-export type { UpdatePin };
+

@@ -33,12 +33,6 @@ export interface ExternalBorder {
   neighborSegment: SegmentName;
 }
 
-/** Combined border calculation result */
-export interface SegmentBorders {
-  internal: InternalBorder[];
-  external: ExternalBorder[];
-}
-
 // ============================================================================
 // INTERNAL BORDER CALCULATION
 // ============================================================================

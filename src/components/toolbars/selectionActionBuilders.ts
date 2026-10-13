@@ -10,7 +10,7 @@ import type { SelectedItem } from '#types/contexts/context.types';
 
 import { isFeatureEnabled } from '../../core/featureFlags';
 
-export type ActionGroup = 'transform' | 'content' | 'links' | 'style' | 'player' | 'danger';
+type ActionGroup = 'transform' | 'content' | 'links' | 'style' | 'player' | 'danger';
 
 export interface SelectionAction {
   id: string;

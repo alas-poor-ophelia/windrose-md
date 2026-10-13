@@ -188,8 +188,11 @@ function NativeModalPortal({
 
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  // The modal is opened once on mount from the first-render props.
+  const mountPropsRef = useRef({ app, modalClass, title, draggable, resizable });
 
   useEffect(() => {
+    const { app, modalClass, title, draggable, resizable } = mountPropsRef.current;
     const modal = new (class extends Modal {
       override onOpen(): void {
         if (title != null && title !== '') {

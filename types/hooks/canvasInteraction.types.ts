@@ -119,17 +119,6 @@ export interface PanHandlers {
 }
 
 // ===========================================
-// State Setters
-// ===========================================
-
-/**
- * No direct setters remain: every writer sets ref and state together inside
- * the hook (the pinch baseline is seeded through startPinch).
- * @deprecated Empty; kept only for the types/index.ts re-export. Delete both together.
- */
-export type CanvasInteractionSetters = Record<string, never>;
-
-// ===========================================
 // Ref Types
 // ===========================================
 

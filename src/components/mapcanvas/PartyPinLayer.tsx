@@ -107,9 +107,9 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
   }, [app]);
 
   // Travel packs come from plugin settings; re-read when settings change
-  const [settingsVersion, setSettingsVersion] = useState(0);
+  const [pluginSettings, setPluginSettings] = useState(() => getSettings());
   useEffect(() => {
-    const handler = (): void => setSettingsVersion(v => v + 1);
+    const handler = (): void => setPluginSettings(getSettings());
     window.addEventListener('windrose-settings-changed', handler);
     return () => window.removeEventListener('windrose-settings-changed', handler);
   }, []);
@@ -118,13 +118,13 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
   // range query memoized across unrelated map edits
   const mapType = mapData?.mapType;
   const distanceSettings = useMemo(
-    () => getEffectiveDistanceSettings(mapType ?? 'grid', getSettings(), distanceOverrides ?? null),
-    [mapType, distanceOverrides, settingsVersion]
+    () => getEffectiveDistanceSettings(mapType ?? 'grid', pluginSettings, distanceOverrides ?? null),
+    [mapType, distanceOverrides, pluginSettings]
   );
 
   const enabledPacks = useMemo(
-    () => getEnabledTravelPacks(getSettings().travelPacks),
-    [settingsVersion]
+    () => getEnabledTravelPacks(pluginSettings.travelPacks),
+    [pluginSettings]
   );
   const selectedTravelModes = useMemo(
     () => resolveSelectedModes(enabledPacks, mapData?.travelSettings?.modeIds ?? []),

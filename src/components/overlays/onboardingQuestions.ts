@@ -127,4 +127,4 @@ function mapAnswersToFeatures(answers: OnboardingAnswers): Record<WindroseFeatur
 }
 
 export { ONBOARDING_QUESTIONS, allFeaturesEnabled, mapAnswersToFeatures };
-export type { OnboardingAnswers, OnboardingOption, OnboardingQuestion };
+export type { OnboardingAnswers };

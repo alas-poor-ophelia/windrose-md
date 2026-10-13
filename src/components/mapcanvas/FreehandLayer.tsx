@@ -18,6 +18,7 @@ import { useOverlayCanvas } from '../../hooks/canvas/useOverlayCanvas';
 import { fitPointsToBezier } from '../../geometry/curves/curveFitting';
 import { applyNorthRotation, calculateViewportOffset } from '../../geometry/core/viewportMath';
 import { getActiveLayer } from '../../persistence/layerAccessor';
+import { mintId } from '../../core/ids';
 
 
 
@@ -31,7 +32,7 @@ export interface FreehandLayerProps {
 
 /** Generate a unique curve ID */
 function generateCurveId(): string {
-  return 'curve-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+  return mintId('curve');
 }
 
 const FreehandLayer = ({

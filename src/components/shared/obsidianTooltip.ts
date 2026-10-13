@@ -56,4 +56,4 @@ function tooltipRef(text: string, options?: TooltipOptions): TooltipRefCallback 
 }
 
 export { tooltipRef };
-export type { TooltipRefCallback };
+

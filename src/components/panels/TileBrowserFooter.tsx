@@ -469,5 +469,5 @@ function LoadedBrushFooter({
   );
 }
 
-export { LoadedBrushFooter, WallToolBar, TileScaleSlider };
-export type { LoadedBrushFooterProps };
+export { LoadedBrushFooter };
+

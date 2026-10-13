@@ -103,4 +103,4 @@ const TerrainPickerPopup = ({
 };
 
 export { TerrainPickerPopup };
-export type { TerrainPickerOption };
+

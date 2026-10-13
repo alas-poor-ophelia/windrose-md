@@ -19,7 +19,7 @@ export interface FilterFacet {
   size: number;
 }
 
-export interface TileFilterScreenProps {
+interface TileFilterScreenProps {
   /** 'types' = top level, else a facet id ('tags' | 'packs'). */
   view: string;
   /** Navigate within the screen (facet id or 'types'); null closes it. */

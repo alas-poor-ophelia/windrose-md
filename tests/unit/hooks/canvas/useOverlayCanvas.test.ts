@@ -12,9 +12,17 @@ import { act } from 'preact/test-utils';
 import { useOverlayCanvas } from '../../../../src/hooks/canvas/useOverlayCanvas';
 import type { OverlayCanvas, OverlayCanvasOptions } from '../../../../src/hooks/canvas/useOverlayCanvas';
 
+// Obsidian augments Node with `win` and Window with `createEl`; happy-dom has
+// neither. The hook resolves the overlay's window from the main canvas.
 beforeAll(() => {
-  const g = globalThis as unknown as { activeWindow?: { createEl: (tag: string) => HTMLElement } };
-  g.activeWindow ??= { createEl: (tag: string) => document.createElement(tag) };
+  if (!('win' in Node.prototype)) {
+    Object.defineProperty(Node.prototype, 'win', {
+      configurable: true,
+      get(this: Node) { return this.ownerDocument?.defaultView ?? window; },
+    });
+  }
+  const w = window as unknown as { createEl?: (tag: string) => HTMLElement };
+  w.createEl ??= (tag: string) => window.document.createElement(tag);
 });
 
 let root: HTMLElement | null = null;

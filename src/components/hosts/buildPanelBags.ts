@@ -182,4 +182,4 @@ function buildPanelBags(src: PanelBagSources): PanelBags {
 }
 
 export { buildPanelBags };
-export type { PanelBagSources };
+

@@ -29,7 +29,7 @@ const QUICK_SYMBOLS = [
 type IconMode = 'none' | 'symbol' | 'rpgawesome';
 
 /** Props for LayerEditModal */
-export interface LayerEditModalProps {
+interface LayerEditModalProps {
   /** The layer being edited */
   layer: MapLayer;
   /** Default name to show when name matches layer order */

@@ -200,11 +200,6 @@ function renderThumbnail(path: string, img: ImageBitmap): void {
   }
 }
 
-export function clearThumbnail(path: string): void {
-  cache.delete(path);
-  pending.delete(path);
-}
-
 function clearAll(): void {
   queueGeneration++;
   cache.clear();

@@ -318,10 +318,25 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   } = useAlignmentMode({ mapData, updateMapData, setShowSettingsModal });
 
   // Create geometry instance for coordinate conversions
+  // Keyed on the five fields createGeometry reads; the rest of mapData comes
+  // from a latest-ref so unrelated edits don't rebuild the geometry.
+  const geometryMapDataRef = useRef(mapData);
+  geometryMapDataRef.current = mapData;
+  const hasGeometryMapData = mapData != null;
+  const geoMapType = mapData?.mapType;
+  const geoGridSize = mapData?.gridSize;
+  const geoHexSize = mapData?.hexSize;
+  const geoOrientation = mapData?.orientation;
+  const geoHexBounds = mapData?.hexBounds;
   const geometry = useMemo((): ExtendedGeometry | null => {
-    if (!mapData) return null;
-    return createGeometry(mapData);
-  }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
+    const latest = geometryMapDataRef.current;
+    if (!hasGeometryMapData || latest == null) return null;
+    return createGeometry({
+      ...latest,
+      mapType: geoMapType ?? latest.mapType, gridSize: geoGridSize, hexSize: geoHexSize,
+      orientation: geoOrientation, hexBounds: geoHexBounds
+    });
+  }, [hasGeometryMapData, geoMapType, geoGridSize, geoHexSize, geoOrientation, geoHexBounds]);
 
   // Copy a deep link to the current sub-hex view (block mode only).
   const handleCopySubHexLink = useSubHexLink({ notePath, mapId, subHexPath, mapData, geometry });
@@ -459,7 +474,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         entry.id === mapId ? { ...entry, name: newName } : entry
       ));
     }
-  }, [handleNameChange, onNameChange, fullPane, mapId]);
+  }, [handleNameChange, onNameChange, fullPane, mapId, setMapListEntries]);
 
   const handleFloatingPickerClose = useCallback(() => {
     if (floatingPickerPendingRef.current != null && floatingPickerPendingRef.current !== '') {
@@ -499,11 +514,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     mapData, mapId, instanceId, isFocused, geometry, updateMapData,
     handleLayerSelect, enterSubHex, exitSubHex, drillToSubHexPath, isInSubHex,
     handleRegionsChange,
-    subHexPath
+    subHexPath, containerRef
   });
 
   // Player fog clearing on drop (reads latest state via functional updater, supports undo)
-  usePlayerFogClear({ geometry, updateMapData, addToHistory, isApplyingHistory, instanceId });
+  usePlayerFogClear({ geometry, updateMapData, addToHistory, isApplyingHistory, instanceId, containerRef });
 
   // Adjacent sub-map previews: global toggle + click-to-navigate on siblings and "+" slots.
   const { showAdjacentSubMaps, setShowAdjacentSubMaps } = useAdjacentSubMaps({
@@ -530,7 +545,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleUndo: wrappedHandleUndo, handleRedo, handleLayerSelect,
     pictureFrameLocked: pictureFrameActive,
     onTogglePictureFrame: !fullPane ? handleTogglePictureFrame : undefined,
-    onRecenterView: handleRecenterView
+    onRecenterView: handleRecenterView,
+    containerRef
   });
 
   // MCP bridge: each map instance registers its own state + operations.

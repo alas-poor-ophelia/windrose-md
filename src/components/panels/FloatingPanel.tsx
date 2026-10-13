@@ -92,6 +92,10 @@ function FloatingPanel({
   }
   wasFloatingRef.current = isFloating;
 
+  // Latest-ref: the drag setup is keyed on layout props, not on the callback.
+  const onPositionChangeRef = useRef(onPositionChange);
+  onPositionChangeRef.current = onPositionChange;
+
   useEffect(() => {
     if (!isFloating || !panelRef.current) return undefined;
 
@@ -129,7 +133,7 @@ function FloatingPanel({
           el.style.top = `${positionRef.current.y}px`;
         },
         end: () => {
-          onPositionChange?.(positionRef.current);
+          onPositionChangeRef.current?.(positionRef.current);
         },
       },
     });
@@ -210,4 +214,4 @@ function FloatingPanel({
 }
 
 export { FloatingPanel, clampPanelPosition };
-export type { FloatingPanelProps };
+

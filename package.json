@@ -29,7 +29,6 @@
     "deploy": "bun run build:dev && node -e \"const fs=require('fs');const d='C:/Users/whipl/OneDrive/Documents/MiniSheet Dev/.obsidian/plugins/windrose-md';['main.js','styles.css','manifest.json'].forEach(f=>fs.copyFileSync(f,d+'/'+f));console.log('Deployed to '+d)\"",
     "lint:scanner": "eslint --config eslint.scanner-replica.mjs \"src/**/*.ts\" \"src/**/*.tsx\"",
     "lint:knip": "knip",
-    "postinstall": "patch-package",
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "//devDependencies": "ajv, brace-expansion, minimatch, and picomatch are NOT imported by src/ — they are direct-dependency security pins forcing the resolver onto patched versions for the Obsidian store dependency scan. They stay as direct devDependencies (not runtime dependencies, and not overrides: ajv 6 / minimatch 3-9 / picomatch 2 are still needed by eslint and other tooling, so a name-global override would break them). Do not prune them as unused.",
@@ -38,7 +37,7 @@
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
     "ajv": "^8.20.0",
-    "brace-expansion": "^5.0.9",
+    "brace-expansion": "^5.0.12",
     "esbuild": "^0.28.1",
     "eslint": "^9.17.0",
     "eslint-plugin-obsidianmd": "0.4.1",
@@ -47,14 +46,13 @@
     "interactjs": "^1.10.27",
     "knip": "^6.41.0",
     "minimatch": "^10.2.6",
-    "obsidian": "^1.13.1",
+    "obsidian": "^1.14.4",
     "obsidian-testing-framework": "0.1.6",
     "obsidian-typings": "5.22.0",
-    "patch-package": "^8.0.1",
     "picomatch": "^4.0.5",
     "polygon-clipping": "^0.15.7",
     "preact": "^10.28.2",
-    "sass": "^1.100.0",
+    "sass": "^1.105.1",
     "typescript": "^5.7.0",
     "vitest": "^4.1.11"
   },
@@ -85,7 +83,7 @@
     "yaml": "^2.8.3",
     "js-yaml": "^4.3.1",
     "flatted": "^3.4.2",
-    "fast-uri": "^3.1.6"
+    "fast-uri": "^3.1.8"
   },
   "resolutions": {
     "mermaid": "^11.16.0",
@@ -100,6 +98,10 @@
     "yaml": "^2.8.3",
     "js-yaml": "^4.3.1",
     "flatted": "^3.4.2",
-    "fast-uri": "^3.1.6"
+    "fast-uri": "^3.1.8"
+  },
+  "//patchedDependencies": "obsidian-testing-framework is patched by bun's native patchedDependencies (applied at install, hash recorded in bun.lock). patch-package was removed because its find-yarn-workspace-root > micromatch > braces chain carries GHSA-vfj7-8cjw-p6xm, which has no patched braces release. Edit the patch with `bun patch obsidian-testing-framework` / `bun patch --commit`, or hand-edit it (paths are relative to the package root).",
+  "patchedDependencies": {
+    "obsidian-testing-framework@0.1.6": "patches/obsidian-testing-framework+0.1.6.patch"
   }
 }

@@ -23,7 +23,7 @@ export interface LinkingSource {
 }
 
 /** ObjectLinkingContext value shape */
-export interface ObjectLinkingContextValue {
+interface ObjectLinkingContextValue {
   isLinkingMode: boolean;
   linkingFrom: LinkingSource | null;
   startLinking: (source: LinkingSource) => void;

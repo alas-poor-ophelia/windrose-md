@@ -20,7 +20,7 @@ import { Icon } from './Icon';
 import { tooltipRef } from './obsidianTooltip';
 
 /** Props for IconPickerPopup */
-export interface IconPickerPopupProps {
+interface IconPickerPopupProps {
   /** Whether the picker is open */
   isOpen: boolean;
   /** Currently selected icon (`ra-*` class or literal symbol), or null */

@@ -14,7 +14,7 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
 import type { ObjectTypeId } from '#types/objects/object.types';
 
-import { useEffect } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
 import { useNotePinInteraction } from '../../hooks/interactions/useNotePinInteraction';
 import { useMapState } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
@@ -61,7 +61,13 @@ const NotePinLayer = ({
 
   useLayerHandlers('notePin', { handleNotePinPlacement });
 
+  // Latest-ref: the modal opens when the show flag / pin id change, reading
+  // the current map and handlers at that moment.
+  const noteModalInputsRef = useRef({ app, mapData, handleNoteLinkSave, handleNoteLinkCancel });
+  noteModalInputsRef.current = { app, mapData, handleNoteLinkSave, handleNoteLinkCancel };
+
   useEffect(() => {
+    const { app, mapData, handleNoteLinkSave, handleNoteLinkCancel } = noteModalInputsRef.current;
     if (!showNoteLinkModal || pendingNotePinId == null || pendingNotePinId === '' || !mapData) return;
 
     // Objects live on the active layer; the root mapData.objects is legacy.

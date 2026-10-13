@@ -393,4 +393,4 @@ function DrawerDock({
 }
 
 export { DrawerDock };
-export type { DrawerDockProps, FlyoutTile };
+export type { FlyoutTile };

@@ -33,9 +33,12 @@ function SettingItem({ name, description, vertical, children }: SettingItemProps
   const containerRef = useRef<HTMLDivElement>(null);
   const controlRef = useRef<HTMLDivElement>(null);
   const settingRef = useRef<Setting | null>(null);
+  // The native Setting is built once on mount from the first-render props.
+  const mountPropsRef = useRef({ name, description, vertical });
 
   useEffect((): (() => void) | undefined => {
     if (!containerRef.current) return undefined;
+    const { name, description, vertical } = mountPropsRef.current;
 
     try {
       const setting = new Setting(containerRef.current);

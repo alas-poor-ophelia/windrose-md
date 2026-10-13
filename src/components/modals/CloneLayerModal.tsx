@@ -12,9 +12,9 @@ import { Modal } from 'obsidian';
 import type { App } from 'obsidian';
 
 
-export type CloneMode = 'all' | 'mapOnly';
+type CloneMode = 'all' | 'mapOnly';
 
-export interface CloneLayerModalProps {
+interface CloneLayerModalProps {
   layerName: string;
   onClone: (mode: CloneMode) => void;
   onCancel: () => void;

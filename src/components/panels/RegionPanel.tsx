@@ -16,7 +16,7 @@ import { tooltipRef } from '../shared/obsidianTooltip';
 const REGION_NAME_MAX_LENGTH = 20;
 const REGION_NAME_TRUNCATE_AT = 17;
 
-export interface RegionPanelProps {
+interface RegionPanelProps {
   regions: Region[];
   onRegionsChange: (regions: Region[]) => void;
   isOpen?: boolean;

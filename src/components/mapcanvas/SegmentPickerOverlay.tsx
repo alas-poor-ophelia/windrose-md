@@ -28,7 +28,7 @@ interface ExistingCellData {
 }
 
 /** Props for SegmentPickerOverlay component */
-export interface SegmentPickerOverlayProps {
+interface SegmentPickerOverlayProps {
   /** Whether the picker is visible */
   isOpen: boolean;
   /** Coordinates of the cell being edited */

@@ -200,7 +200,7 @@ interface TileAssetBrowserProps {
   ribbon?: VNode;
 }
 
-export type TileViewMode = 'grid' | 'list';
+type TileViewMode = 'grid' | 'list';
 
 // `string & {}` keeps the literal autocomplete hints while still allowing any
 // dynamic tileset id (set via setRailSel(cat)) without collapsing to bare string.

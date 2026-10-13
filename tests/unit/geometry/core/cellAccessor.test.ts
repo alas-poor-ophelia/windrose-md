@@ -8,8 +8,8 @@
 
 import { describe, it, expect } from "vitest";
 import type { Point } from "#types/core/geometry.types";
-import type { Cell, GridCell, HexCell, SegmentGridCell, SegmentName, CellKey } from "#types/core/cell.types";
-import { isGridCell, isHexCell, hasSegments, isSimpleCell } from "#types/core/cell.types";
+import type { Cell, GridCell, HexCell, SegmentGridCell, SegmentName, CellKey } from "../../../../src/geometry/core/cellAccessor";
+import { isGridCell, isHexCell, hasSegments, isSimpleCell } from "../../../../src/geometry/core/cellAccessor";
 
 // =============================================================================
 // TYPES (mirrors cellAccessor.ts types)

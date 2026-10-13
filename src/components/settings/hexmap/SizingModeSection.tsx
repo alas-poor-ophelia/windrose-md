@@ -386,4 +386,4 @@ function SizingModeSection(): VNode | null {
   );
 }
 
-export { SizingModeSection, DensityModeContent, MeasurementModeContent };
+export { SizingModeSection };

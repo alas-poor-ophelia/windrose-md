@@ -2,6 +2,7 @@ import type { App } from 'obsidian';
 import { Modal, Setting } from 'obsidian';
 import type { MapType } from '#types/index';
 import { isFeatureEnabled } from '../../core/featureFlags';
+import { mintId } from '../../core/ids';
 import { ensureDataFileForNewMap } from '../../persistence/fileOperations';
 
 class NewMapModal extends Modal {
@@ -90,7 +91,7 @@ class NewMapModal extends Modal {
 
   private submit(): void {
     if (!this.mapType) return;
-    const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+    const mapId = mintId('map');
     const mapName = this.mapName;
     const mapType = this.mapType;
     this.close();
