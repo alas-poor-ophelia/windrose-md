@@ -10,7 +10,7 @@ import {
 import type { CellCoord, DungeonRoom } from "../../../src/generation/dungeonGenerator.js";
 
 // Helper to create a simple rectangular room
-function createRoom(id: string, x: number, y: number, width: number, height: number): DungeonRoom {
+function createRoom(id: number, x: number, y: number, width: number, height: number): DungeonRoom {
   return { id, x, y, width, height, shape: "rectangle" };
 }
 
@@ -84,7 +84,7 @@ describe("dungeonDoors", () => {
         { x: 5, y: 5 },
       ]);
       // Room covers the center position
-      const rooms = [createRoom("room1", 4, 4, 3, 3)];
+      const rooms = [createRoom(1, 4, 4, 3, 3)];
       const pos = { x: 5, y: 5 };
 
       expect(isAtCorridorIntersection(pos, corridorSet, rooms)).toBe(false);
@@ -92,7 +92,7 @@ describe("dungeonDoors", () => {
   });
 
   describe("isCellAdjacentToRoomForOpening", () => {
-    const room = createRoom("room1", 5, 5, 3, 3); // Room from (5,5) to (7,7)
+    const room = createRoom(1, 5, 5, 3, 3); // Room from (5,5) to (7,7)
 
     it("returns true when cell is orthogonally adjacent to room (north)", () => {
       // Cell at (6, 4) is north of room
@@ -130,7 +130,7 @@ describe("dungeonDoors", () => {
   });
 
   describe("isCellInRoom", () => {
-    const room = createRoom("room1", 5, 5, 3, 3);
+    const room = createRoom(1, 5, 5, 3, 3);
 
     it("returns true for cell inside room", () => {
       expect(isCellInRoom(6, 6, room)).toBe(true);
@@ -148,7 +148,7 @@ describe("dungeonDoors", () => {
   });
 
   describe("calculateRoomOpeningWidth", () => {
-    const room = createRoom("room1", 5, 5, 4, 4); // Room from (5,5) to (8,8)
+    const room = createRoom(1, 5, 5, 4, 4); // Room from (5,5) to (8,8)
 
     it("returns width 1 for single-cell opening", () => {
       // Single corridor cell adjacent to room
@@ -278,7 +278,7 @@ describe("dungeonDoors", () => {
 
   describe("generateAllRoomBoundaryEdges", () => {
     it("generates edges for corridor cells adjacent to rooms", () => {
-      const rooms = [createRoom("room1", 5, 5, 3, 3)];
+      const rooms = [createRoom(1, 5, 5, 3, 3)];
       // Corridor cell north of room
       const corridorCellSet = createCorridorSet([{ x: 6, y: 4 }]);
       const doorPositions: CellCoord[] = [];
@@ -294,7 +294,7 @@ describe("dungeonDoors", () => {
     });
 
     it("skips cells with doors", () => {
-      const rooms = [createRoom("room1", 5, 5, 3, 3)];
+      const rooms = [createRoom(1, 5, 5, 3, 3)];
       const corridorCellSet = createCorridorSet([
         { x: 6, y: 4 },
         { x: 7, y: 4 },
@@ -316,8 +316,8 @@ describe("dungeonDoors", () => {
     it("deduplicates edges", () => {
       // Two rooms sharing a corridor cell - should not duplicate edges
       const rooms = [
-        createRoom("room1", 5, 5, 2, 2),
-        createRoom("room2", 5, 8, 2, 2),
+        createRoom(1, 5, 5, 2, 2),
+        createRoom(2, 5, 8, 2, 2),
       ];
       // Corridor between them
       const corridorCellSet = createCorridorSet([{ x: 5, y: 7 }]);
@@ -332,7 +332,7 @@ describe("dungeonDoors", () => {
     });
 
     it("uses a custom wall color when provided", () => {
-      const rooms = [createRoom("room1", 5, 5, 3, 3)];
+      const rooms = [createRoom(1, 5, 5, 3, 3)];
       const corridorCellSet = createCorridorSet([{ x: 6, y: 4 }]);
       const doorPositions: CellCoord[] = [];
 
@@ -343,7 +343,7 @@ describe("dungeonDoors", () => {
     });
 
     it("returns empty array when no corridor cells adjacent to rooms", () => {
-      const rooms = [createRoom("room1", 5, 5, 3, 3)];
+      const rooms = [createRoom(1, 5, 5, 3, 3)];
       // Corridor far from room
       const corridorCellSet = createCorridorSet([{ x: 0, y: 0 }]);
       const doorPositions: CellCoord[] = [];

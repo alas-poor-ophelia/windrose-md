@@ -7,7 +7,7 @@ import { Notice } from 'obsidian';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { saveMapData } from '../../persistence/fileOperations';
 import { registerSaveInstance, unregisterSaveInstance } from '../../persistence/saveCoordinator';
-import { clearJournal, journalPending, moveJournalToConflict } from '../../persistence/saveJournal';
+import { clearJournal, dropRestoredSlot, journalPending, moveJournalToConflict } from '../../persistence/saveJournal';
 
 type MapDataSetter = (value: MapData | null | ((prev: MapData | null) => MapData | null)) => void;
 
@@ -58,6 +58,13 @@ interface UseDebouncedSaveResult {
   acknowledgeStaleConflict: () => void;
   /** This mount's save-writer id (also its journal slot owner). */
   writerId: string;
+  /**
+   * Apply a tree restored from the crash journal into this writer's slot.
+   * Like updateMapData(data), and it also lets the landed save of that tree
+   * (or any later one) drop the restored slot even if journaling it was
+   * skipped (parallax wave-7 finding 4).
+   */
+  applyRestored: (data: MapData) => void;
 }
 
 /**
@@ -116,6 +123,12 @@ function useDebouncedSave(
   // changes. Decides the UX of a stale refusal: real edits block behind the
   // conflict panel; a refused pan/zoom write is dropped silently.
   const hasRealEditRef = useRef(false);
+  // A journal-restored tree handed to applyRestored, until its edit lands in
+  // updateMapData; then the edit version it got. A landed save of that
+  // version or later contains the restored edits, so it may drop the
+  // restored slot (whose sentinel version no landed save ever clears).
+  const restoredTreeRef = useRef<MapData | null>(null);
+  const restoreVersionRef = useRef<number | null>(null);
   // Resurrection guard: once the map is deleted, no save may ever fire again for
   // this instance. A trailing autosave (debounce timer, unmount flush, or
   // forceSave) would otherwise rewrite the deleted entry. Every save path
@@ -254,6 +267,12 @@ function useDebouncedSave(
       // Only this writer's slot, and only if no newer edit was journaled
       // since (an unmount flush may have journaled a newer tree).
       clearOwnJournal(version);
+      // The restored tree (or a descendant) is on disk now: a restored copy
+      // still sitting in the slot (its journalNow was skipped) is obsolete.
+      if (restoreVersionRef.current != null && version >= restoreVersionRef.current) {
+        dropRestoredSlot(a, m, writerId);
+        restoreVersionRef.current = null;
+      }
     } else if (result.status === 'stale') {
       if (unmountedRef.current && hasRealEditRef.current) {
         // DATA-13: nobody is left to show the conflict panel. Set the
@@ -426,6 +445,10 @@ function useDebouncedSave(
       // before the debounce effect re-runs can never mistake itself for the
       // latest and drop this edit.
       saveVersionRef.current++;
+      if (newData === restoredTreeRef.current) {
+        restoredTreeRef.current = null;
+        restoreVersionRef.current = saveVersionRef.current;
+      }
       setPendingData(newData);
       setSaveStatus('Unsaved changes');
       return newData;
@@ -486,7 +509,12 @@ function useDebouncedSave(
     return () => unregisterSaveInstance(id);
   }, []);
 
-  return { saveStatus, updateMapData, forceSave, markDeleted, mapDeleted, staleConflict, acknowledgeStaleConflict, writerId: instanceIdRef.current };
+  const applyRestored = useCallback((data: MapData): void => {
+    restoredTreeRef.current = data;
+    updateMapData(data);
+  }, [updateMapData]);
+
+  return { saveStatus, updateMapData, forceSave, markDeleted, mapDeleted, staleConflict, acknowledgeStaleConflict, writerId: instanceIdRef.current, applyRestored };
 }
 
 export { useDebouncedSave, retryDelayMs, MAX_SAVE_RETRIES };

@@ -7,6 +7,7 @@ import type { PluginSettings } from '#types/settings/settings.types';
 import { CONTENT_PACKS_FOLDER } from './contentPackConstants';
 import { ObjectSetHelpers } from '../settings/helpers/objectSetHelpers';
 import { ensureFolder } from '../persistence/vaultFolders';
+import { assertNever } from '../utils/assertNever';
 import { upsertTravelPack, validateTravelPackImport } from '../travel/travelPackOperations';
 
 /** Hard cap on the total uncompressed size of one pack archive (guards memory on mobile). */
@@ -32,8 +33,10 @@ function getExtractPath(pack: RegistryPack, settings: PluginSettings): string {
       return CONTENT_PACKS_FOLDER + '/fog/' + pack.id;
     case 'font-pack':
       return CONTENT_PACKS_FOLDER + '/fonts/' + pack.id;
+    case 'travel-pack':
+      return CONTENT_PACKS_FOLDER + '/travel-pack/' + pack.id;
     default:
-      return CONTENT_PACKS_FOLDER + '/' + String(pack.type) + '/' + pack.id;
+      return assertNever(pack.type, 'pack type');
   }
 }
 

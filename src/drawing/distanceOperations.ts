@@ -8,6 +8,7 @@
 
 // Type-only imports
 import type { MapType } from '#types/core/map.types';
+import type { MapDistanceOverrides } from '#types/hooks/distanceMeasurement.types';
 import type { 
   DiagonalRule, 
   DistanceDisplayFormat,
@@ -20,13 +21,6 @@ import { DEFAULTS } from '../core/dmtConstants';
 // Type Definitions
 // ===========================================
 
-/** Per-map distance settings override */
-export interface MapDistanceOverrides {
-  distancePerCell?: number;
-  distanceUnit?: string;
-  gridDiagonalRule?: DiagonalRule;
-  displayFormat?: DistanceDisplayFormat;
-}
 
 /** Resolved distance settings */
 export interface ResolvedDistanceSettings {
@@ -74,6 +68,8 @@ function formatDistance(
       return `${roundedDistance} ${unitDisplay}`.trim();
     case 'both':
     default:
+      // Deliberately not assertNever: a stale or hand-edited persisted
+      // displayFormat must fall back to 'both' rather than throw in the UI.
       if (unitDisplay) {
         return `${roundedCells} ${cellLabel} (${roundedDistance} ${unitDisplay})`;
       }

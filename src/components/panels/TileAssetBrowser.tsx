@@ -34,7 +34,7 @@ import {
 } from '../../persistence/tileMetadata';
 import { predictDepthTier } from '../../assets/depthPredictor';
 import { deriveTileForm, formDef } from '../../assets/tileForm';
-import type { TileSubtoolId } from '../../assets/tileForm';
+import type { TileSubtoolId } from '#types/tiles/tile.types';
 import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
 import { runDetectionScan, claimDetectionScanPaths, releaseDetectionScanPaths } from '../../assets/tileImageScan';
 import { useTileMetadata } from '../../hooks/state/useTileMetadata';
@@ -48,6 +48,7 @@ import { TileFilterScreen } from './TileFilterScreen';
 import type { FilterFacet } from './TileFilterScreen';
 import { TilesetConfigPanel } from './TilesetConfigPanel';
 import { tooltipRef } from '../shared/obsidianTooltip';
+import { assertNever } from '../../utils/assertNever';
 
 // ===========================================
 // Horizontal scroller (wheel→sideways + drag)
@@ -700,8 +701,10 @@ const TileAssetBrowser = memo(({
           return 24;
         case 'empty':
           return 40;
-        default:
+        case 'tileRow':
           return listMode ? LIST_ROW_H : fullCellWidth;
+        default:
+          return assertNever(row);
       }
     },
     gap: gridGap,

@@ -48,7 +48,7 @@ function fixture(orientation: HexOrientation): MapData {
 
 function saveWithDelete(mapData: MapData, bounds: HexBounds): MapData {
   let saved: MapData | null = null;
-  const { handleSettingsSave } = usePanelState({ mapData, updateMapData: (d) => { saved = d; } });
+  const { handleSettingsSave } = usePanelState({ mapData, updateMapData: (d) => { saved = typeof d === "function" ? d(mapData) : d; } });
   handleSettingsSave(
     { useGlobalSettings: true, overrides: {} },
     {} as UIPreferences,

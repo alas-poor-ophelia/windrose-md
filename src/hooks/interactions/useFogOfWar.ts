@@ -29,9 +29,21 @@ import type {
   UseFogOfWarResult,
 } from '#types/hooks/fog.types';
 
+import type { MapData } from '#types/core/map.types';
+import type { MapDataUpdater } from '#types/hooks/mapData.types';
+
 import { useCallback, useMemo, useState } from 'preact/hooks';
 import { getActiveLayer, updateActiveLayer, initializeFogOfWar, fogAll, fogPaintedCells, revealAll, toggleFogVisibility, getFogState } from '../../persistence/layerAccessor';
 
+
+/**
+ * Same as UseFogOfWarOptions but with the functional-capable writer, so every
+ * handler can derive its edit from the latest map instead of a render copy
+ * (DATA-09). Fold into fog.types.ts when types/ is next touched.
+ */
+type FogOfWarOptions = Omit<UseFogOfWarOptions, 'updateMapData'> & {
+  updateMapData: MapDataUpdater;
+};
 
 /**
  * Hook for managing Fog of War UI state and high-level operations
@@ -43,7 +55,7 @@ function useFogOfWar({
   mapData,
   geometry,
   updateMapData
-}: UseFogOfWarOptions): UseFogOfWarResult {
+}: FogOfWarOptions): UseFogOfWarResult {
   const [showFogTools, setShowFogTools] = useState<boolean>(false);
   const [fogActiveTool, setFogActiveTool] = useState<FogToolId | null>(null);
 
@@ -83,11 +95,12 @@ function useFogOfWar({
   const handleFogVisibilityToggle = useCallback((): void => {
     if (!mapData) return;
 
-    const activeLayer = getActiveLayer(mapData);
-    if (!activeLayer.fogOfWar) return;
-
-    const updatedLayer = toggleFogVisibility(activeLayer);
-    updateMapData(updateActiveLayer(mapData, { fogOfWar: updatedLayer.fogOfWar }));
+    updateMapData((prev: MapData) => {
+      const activeLayer = getActiveLayer(prev);
+      if (!activeLayer.fogOfWar) return prev;
+      const updatedLayer = toggleFogVisibility(activeLayer);
+      return updateActiveLayer(prev, { fogOfWar: updatedLayer.fogOfWar });
+    });
   }, [mapData, updateMapData]);
 
   // Fill all cells with fog
@@ -96,56 +109,58 @@ function useFogOfWar({
   const handleFogFillAll = useCallback((): void => {
     if (!mapData || !geometry) return;
 
-    let workingMapData = mapData;
-    let activeLayer = getActiveLayer(workingMapData);
+    updateMapData((prev: MapData) => {
+      let workingMapData = prev;
+      let activeLayer = getActiveLayer(workingMapData);
 
-    // Initialize FoW if needed
-    if (!activeLayer.fogOfWar) {
-      workingMapData = initializeFogOfWar(workingMapData, workingMapData.activeLayerId);
-      activeLayer = getActiveLayer(workingMapData);
-    }
-
-    // Use geometry to determine fog strategy
-    let updatedLayer: MapLayer;
-    if (geometry.isBounded()) {
-      // Bounded maps: fog all cells within bounds
-      const bounds = geometry.getBounds();
-      if (!bounds) return;
-      updatedLayer = fogAll(activeLayer, bounds);
-    } else {
-      // Unbounded maps: fog only painted cells
-      if (activeLayer.cells == null || activeLayer.cells.length === 0) {
-        console.warn('[FoW] No painted cells to fog');
-        return;
+      // Initialize FoW if needed
+      if (!activeLayer.fogOfWar) {
+        workingMapData = initializeFogOfWar(workingMapData, workingMapData.activeLayerId);
+        activeLayer = getActiveLayer(workingMapData);
       }
-      updatedLayer = fogPaintedCells(activeLayer, geometry);
-    }
 
-    // Ensure fog is enabled
-    if (updatedLayer.fogOfWar != null) {
-      updateMapData(updateActiveLayer(workingMapData, {
+      // Use geometry to determine fog strategy
+      let updatedLayer: MapLayer;
+      if (geometry.isBounded()) {
+        // Bounded maps: fog all cells within bounds
+        const bounds = geometry.getBounds();
+        if (!bounds) return prev;
+        updatedLayer = fogAll(activeLayer, bounds);
+      } else {
+        // Unbounded maps: fog only painted cells
+        if (activeLayer.cells == null || activeLayer.cells.length === 0) {
+          console.warn('[FoW] No painted cells to fog');
+          return prev;
+        }
+        updatedLayer = fogPaintedCells(activeLayer, geometry);
+      }
+
+      // Ensure fog is enabled
+      if (updatedLayer.fogOfWar == null) return prev;
+      return updateActiveLayer(workingMapData, {
         fogOfWar: {
           ...updatedLayer.fogOfWar,
           enabled: true
         }
-      }));
-    }
+      });
+    });
   }, [mapData, geometry, updateMapData]);
 
   const handleFogClearAll = useCallback((): void => {
     if (!mapData) return;
 
-    const activeLayer = getActiveLayer(mapData);
-    if (!activeLayer.fogOfWar) return;
-
-    const updatedLayer = revealAll(activeLayer);
-    updateMapData(updateActiveLayer(mapData, { fogOfWar: updatedLayer.fogOfWar }));
+    updateMapData((prev: MapData) => {
+      const activeLayer = getActiveLayer(prev);
+      if (!activeLayer.fogOfWar) return prev;
+      const updatedLayer = revealAll(activeLayer);
+      return updateActiveLayer(prev, { fogOfWar: updatedLayer.fogOfWar });
+    });
   }, [mapData, updateMapData]);
 
   // Handle fog changes from FogOfWarLayer (for paint/erase/rectangle operations)
   const handleFogChange = useCallback((updatedFogOfWar: FogOfWar): void => {
     if (!mapData) return;
-    updateMapData(updateActiveLayer(mapData, { fogOfWar: updatedFogOfWar }));
+    updateMapData((prev: MapData) => updateActiveLayer(prev, { fogOfWar: updatedFogOfWar }));
   }, [mapData, updateMapData]);
 
   // =========================================================================

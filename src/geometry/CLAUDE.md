@@ -20,6 +20,10 @@ geometry/
 │   ├── viewportMath.ts    # Pure view math: client->canvas px, north (un)rotation, canvas<->world, pan deltas, anchored zoom
 │   └── subHexBackdrop.ts  # Pure placement math for the parent-map snapshot behind a sub-hex map
 ├── renderers/             # Canvas draw functions
+│   ├── mapRenderer.ts     # renderCanvas: whole-map render (backdrop, rotation, static cache blit, fog, selections); pure, no React
+│   ├── staticPasses.ts    # Static content as named passes over one RenderFrame (#types/rendering/renderFrame.types), in draw order
+│   ├── staticLayerCache.ts # Offscreen static snapshot cache (12M px budget, rotated maps blit under rotation, settle re-render)
+│   ├── layerCellsRenderer.ts # One layer's cells/borders/edges (viewport-culled) + grid/hex renderer dispatch
 │   ├── gridRenderer.ts, hexRenderer.ts, backgroundRenderer.ts
 │   ├── objectRenderer.ts, textLabelRenderer.ts, selectionRenderer.ts
 │   ├── badgeRenderer.ts, segmentRenderer.ts, regionRenderer.ts

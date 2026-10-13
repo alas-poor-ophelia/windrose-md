@@ -10,7 +10,7 @@
 
 import type { TileEntry, TileForm } from '#types/tiles/tile.types';
 import type { WallToolSurface } from '#types/core/wallpath.types';
-import type { TileSubtoolId } from '../../assets/tileForm';
+import type { TileSubtoolId } from '#types/tiles/tile.types';
 import type { VNode } from 'preact';
 
 import { useCallback, useState } from 'preact/hooks';

@@ -5,6 +5,7 @@ import { TFile } from 'obsidian';
 import {
   journalPending,
   clearJournal,
+  dropRestoredSlot,
   readJournal,
   pruneJournal,
   compareJournalToDisk,
@@ -448,5 +449,22 @@ describe('wave-6 parallax finding 3: a restore into the pane own slot survives o
     expect(readJournal(h.app, 'w6-r')?.version).toBe(4);
     clearJournal(h.app, 'w6-r', { writerId: 'pane-b', keepRestored: true });
     expect(readJournal(h.app, 'w6-r')).toBeNull();
+  });
+});
+
+describe('parallax wave-7 finding 4: dropRestoredSlot', () => {
+  it('drops the own slot only while it still holds a restored copy', async () => {
+    const h = makeApp(JSON.stringify({ maps: { 'w7-r': createNewMap('Disk', 'grid') } }));
+    journalPending(h.app, 'w7-r', createNewMap('Crashed', 'grid'), { writerId: 'dead', version: 9 });
+    await resolveJournalOnLoad(h.app, 'w7-r', '', async () => 'restore', 'pane-c');
+    expect(readJournal(h.app, 'w7-r')?.version).toBe(Number.MAX_SAFE_INTEGER);
+
+    dropRestoredSlot(h.app, 'w7-r', 'pane-c');
+    expect(readJournal(h.app, 'w7-r')).toBeNull();
+
+    // A slot the pane journaled itself (restoredAt null) is not touched.
+    journalPending(h.app, 'w7-r', createNewMap('Own', 'grid'), { writerId: 'pane-c', version: 2 });
+    dropRestoredSlot(h.app, 'w7-r', 'pane-c');
+    expect(readJournal(h.app, 'w7-r')?.version).toBe(2);
   });
 });

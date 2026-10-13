@@ -16,7 +16,7 @@ import type {
   LayerVisibility
 } from '#types/index';
 import type { ResolvedTheme } from '#types/settings/settings.types';
-import type { ExtendedGeometry, MapStateContextValue, MapOperationsContextValue } from '#types/contexts/context.types';
+import type { ExtendedGeometry, MapStateContextValue } from '#types/contexts/context.types';
 import type { AdjacentEmptySlotRenderData, AdjacentSubHexRenderData } from '#types/hooks/canvasRenderer.types';
 import type { MapDistanceOverrides } from '#types/hooks/distanceMeasurement.types';
 import type { TileAssignment } from '#types/tiles/tile.types';
@@ -504,7 +504,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     onWallPathsChange,
     onTerrainStrokesChange,
     onMapDataUpdate
-  } as MapOperationsContextValue), [onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange, onMapDataUpdate]);
+  }), [onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange, onMapDataUpdate]);
 
   return (
     <EventHandlerProvider>

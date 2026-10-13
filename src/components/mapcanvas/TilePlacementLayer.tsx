@@ -11,7 +11,7 @@
 import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
 import type { TileAssignment, TileRotation, TileLayerRole, TilesetDef, TileMetadataStore } from '#types/tiles/tile.types';
-import type { TileSubtoolId } from '../../assets/tileForm';
+import type { TileSubtoolId } from '#types/tiles/tile.types';
 
 import { Notice } from 'obsidian';
 import { useCallback, useRef } from 'preact/hooks';

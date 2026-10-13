@@ -15,7 +15,7 @@
  * remains the only persisted render mode; `TileForm` is a read-time projection.
  */
 
-import type { TileForm, TileMetadataEntry, TilesetDef } from '#types/tiles/tile.types';
+import type { TileForm, TileMetadataEntry, TilesetDef, TileSubtoolId } from '#types/tiles/tile.types';
 import { DEFAULT_PIXELS_PER_CELL } from './spanPredictor';
 
 /** DD source dirs drawn ALONG edges/curves (swept strips). */
@@ -54,9 +54,6 @@ function deriveTileForm(
 
   return 'cell';
 }
-
-/** A placement subtool the ribbon can offer. */
-export type TileSubtoolId = 'paint' | 'stamp' | 'scatter' | 'fill' | 'brush' | 'line' | 'autotile' | 'opening';
 
 /**
  * How a form grades a subtool:

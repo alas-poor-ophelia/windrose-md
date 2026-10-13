@@ -232,3 +232,99 @@ describe('useLayerHistory per sub-hex level', () => {
     expect(m.store.get('<root>')).toBe(root);
   });
 });
+
+describe('parallax wave-7 hardening', () => {
+  it('finding 2: a dead entry (field replaced outside history) is dropped, not spent; the next entry applies in the same keypress', () => {
+    const m = mount({ '<root>': createNewMap('Map', 'grid') });
+    paint(m, [cell(1)]);
+    const pins = [pin('beacon-1')];
+    m.update((prev: MapData) => {
+      const next = { ...prev, partyPins: pins };
+      m.hook().addToHistory(snapshot(next));
+      return next;
+    });
+    // A non-history writer replaces the Beacon array.
+    const replaced = [pin('beacon-2')];
+    m.update((prev: MapData) => ({ ...prev, partyPins: replaced }));
+
+    let applied = false;
+    act0(() => { applied = m.hook().handleUndo(); });
+    // The Beacon entry could not apply: dropped; the paint entry applied instead.
+    expect(applied).toBe(true);
+    expect(getActiveLayer(m.map()).cells).toEqual([]);
+    expect(m.map().partyPins).toBe(replaced);
+    expect(m.hook().canUndo).toBe(false);
+    expect(m.hook().canRedo).toBe(true);
+
+    // The paint redo pair is intact.
+    act0(() => { applied = m.hook().handleRedo(); });
+    expect(applied).toBe(true);
+    expect(getActiveLayer(m.map()).cells).toHaveLength(1);
+    expect(m.hook().canRedo).toBe(false);
+  });
+
+  it('finding 2: when nothing can apply, the stack empties and undo reports no change', () => {
+    const m = mount({ '<root>': createNewMap('Map', 'grid') });
+    paint(m, [cell(1)]);
+    const replaced = [cell(5)];
+    m.update((prev: MapData) => updateActiveLayer(prev, { cells: replaced }));
+    const before = m.map();
+
+    let applied = true;
+    act0(() => { applied = m.hook().handleUndo(); });
+    expect(applied).toBe(false);
+    expect(m.map()).toBe(before);
+    expect(m.hook().canUndo).toBe(false);
+    expect(m.hook().canRedo).toBe(false);
+  });
+
+  it('finding 2: the same holds for redo', () => {
+    const m = mount({ '<root>': createNewMap('Map', 'grid') });
+    paint(m, [cell(1)]);
+    act0(() => m.hook().handleUndo());
+    expect(m.hook().canRedo).toBe(true);
+    m.update((prev: MapData) => updateActiveLayer(prev, { cells: [cell(7)] }));
+    let applied = true;
+    act0(() => { applied = m.hook().handleRedo(); });
+    expect(applied).toBe(false);
+    expect(getActiveLayer(m.map()).cells).toHaveLength(1);
+    expect(m.hook().canRedo).toBe(false);
+  });
+
+  it('finding 7: root history survives a dive into a sub-hex and back', () => {
+    const m = mount({ '<root>': createNewMap('Root', 'hex'), 'A': createNewMap('Child', 'hex') });
+    paint(m, [cell(9)]);
+    m.setLevel('A');
+    expect(m.hook().canUndo).toBe(false);
+    paint(m, [cell(1)]);
+    m.setLevel(null);
+    expect(m.hook().canUndo).toBe(true);
+    act0(() => m.hook().handleUndo());
+    expect(getActiveLayer(m.store.get('<root>') as MapData).cells).toEqual([]);
+    // The sub-hex level's history was dropped on exit.
+    m.setLevel('A');
+    expect(m.hook().canUndo).toBe(false);
+  });
+
+  it('finding 8: fog coalescing does not merge across a layer round trip', () => {
+    const base = updateActiveLayer(createNewMap('Map', 'hex'), { fogOfWar: fog([1, 2, 3]) });
+    const layer1 = base.activeLayerId;
+    const withTwo = addLayer(base);
+    const layer2 = withTwo.activeLayerId;
+    const m = mount({ '<root>': { ...withTwo, activeLayerId: layer1 } });
+    const reveal = (remaining: number[]): void => m.update((prev: MapData) => {
+      const next = updateActiveLayer(prev, { fogOfWar: fog(remaining) });
+      m.hook().recordMapChange(prev, next, { coalesceKey: 'fog' });
+      return next;
+    });
+
+    reveal([2, 3]);
+    act0(() => m.hook().handleLayerSelect(layer2));
+    act0(() => m.hook().handleLayerSelect(layer1));
+    reveal([3]);
+
+    act0(() => m.hook().handleUndo());
+    expect(getActiveLayer(m.map()).fogOfWar?.foggedCells).toHaveLength(2);
+    expect(m.hook().canUndo).toBe(true);
+  });
+});

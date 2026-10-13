@@ -18,8 +18,14 @@
 // Type-only imports
 import type { MapData, MapLayer, PartyPin } from '#types/core/map.types';
 import type { IGeometry, Point } from '#types/core/geometry.types';
-import type { MapObject, ObjectId } from '#types/objects/object.types';
+import type { MapObject } from '#types/objects/object.types';
 import type { DiagonalRule, DistanceDisplayFormat } from '#types/settings/settings.types';
+import type {
+  PartyRangeNoteResult,
+  PartyRangeUnlinkedResult,
+  PartyRangeBeaconResult,
+  PartyRangeResults,
+} from '#types/objects/partyRange.types';
 
 import { formatDistance } from '../drawing/distanceOperations';
 
@@ -33,45 +39,6 @@ export interface NoteMetadata {
 
 /** Metadata accessor injected by the caller; null when the note is unknown */
 export type NoteMetadataAccessor = (notePath: string) => NoteMetadata | null;
-
-/** A linked note within range of the party pin */
-export interface PartyRangeNoteResult {
-  notePath: string;
-  displayName: string;
-  distanceInCells: number;
-  distanceLabel: string;
-  /** Nearest marker linking this note (for show-on-map affordances) */
-  sourceObjectId: ObjectId;
-  /** Cell position of that marker */
-  position: Point;
-}
-
-/** A labeled but unlinked marker within range */
-export interface PartyRangeUnlinkedResult {
-  label: string;
-  distanceInCells: number;
-  distanceLabel: string;
-  objectId: ObjectId;
-  position: Point;
-}
-
-/** Another beacon within range of this one */
-export interface PartyRangeBeaconResult {
-  pinId: string;
-  label: string;
-  color: string;
-  distanceInCells: number;
-  distanceLabel: string;
-  position: Point;
-  /** That beacon's generated note, when it has one */
-  notePath?: string;
-}
-
-export interface PartyRangeResults {
-  linked: PartyRangeNoteResult[];
-  unlinked: PartyRangeUnlinkedResult[];
-  beacons: PartyRangeBeaconResult[];
-}
 
 interface PartyRangeQuerySettings {
   rangeInCells: number;

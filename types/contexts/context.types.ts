@@ -261,9 +261,10 @@ export interface LayerVisibility {
   grid: boolean;
   objects: boolean;
   textLabels: boolean;
-  hexCoordinates: boolean;
-  regions: boolean;
-  outlines: boolean;
+  hexCoordinates?: boolean;
+  regions?: boolean;
+  outlines?: boolean;
+  savedRoutes?: boolean;
 }
 
 /** Mouse position */

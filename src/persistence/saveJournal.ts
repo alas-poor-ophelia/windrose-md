@@ -411,6 +411,18 @@ function clearJournal(
   }
 }
 
+/**
+ * Drop `writerId`'s live slot only while it still holds a restored copy
+ * (restoredAt set). Called once a save of the restored tree (or a later one)
+ * has landed, so the MAX_SAFE_INTEGER sentinel version cannot outlive it when
+ * the pane's own journalNow was skipped (parallax wave-7 finding 4). A slot
+ * the pane has journaled since (restoredAt null) is left to clearJournal.
+ */
+function dropRestoredSlot(app: App, mapId: string, writerId: string): void {
+  const own = slotId(mapId, writerId);
+  if (readMeta(app, own)?.restoredAt != null) removeLiveSlot(app, own);
+}
+
 /** Whether `mapId` holds at least one "keep for later" entry. */
 function isJournalKept(app: App, mapId: string): boolean {
   return readKeptEntries(app, mapId).length > 0;
@@ -848,6 +860,7 @@ async function resolveJournalOnLoad(
 export {
   journalPending,
   clearJournal,
+  dropRestoredSlot,
   isJournalKept,
   readKeptEntries,
   moveJournalToConflict,

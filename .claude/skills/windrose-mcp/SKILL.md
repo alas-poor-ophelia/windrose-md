@@ -30,7 +30,7 @@ The MCP has dedicated tools for every historically-thrashed task. Reaching for `
 | Place an image tile | `windrose_place_tile` | Imperative API — do NOT synthesize canvas clicks |
 | List/place map objects | `windrose_list_objects` (`types:true` for catalog), `windrose_place_object` | Synthetic pointer events NEVER reach Preact handlers — 0/7 historical success rate; always use the tool |
 | Open Tiles/Objects/Layers UI | `windrose_open_drawer` | Side effect: switches active tool. Edge-rail panes are block-mode only |
-| Tool/color/layer/undo/save | `windrose_set_tool`, `windrose_set_color`, `windrose_select_layer`, `windrose_undo/redo`, `windrose_force_save` | undo/redo return honest results now |
+| Tool/color/layer/undo/save | `windrose_set_tool`, `windrose_set_color`, `windrose_select_layer`, `windrose_undo/redo`, `windrose_force_save` | undo/redo: `ok` = the map changed (an entry that no longer applies is dropped, the next one tried); "Nothing to undo" means nothing changed. Needs DMT's undo wrapper to pass the result through (else it falls back to the pre-step canUndo) |
 | Reload after `npm run deploy` | `windrose_reload` | Flushes saves first (never raw disable/enable — a raw teardown once truncated the data file), rerenders blocks, polls ready. Pass `notePath` to reopen in one call |
 | Read any vault file | `windrose_vault_read` | `search` param for context-around-match |
 | Console errors | `windrose_get_errors` | |

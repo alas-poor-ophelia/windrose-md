@@ -99,4 +99,18 @@ describe('useMcpBridge', () => {
     rootB.remove();
     expect(Object.keys(window.__windrose?.mcpInstances ?? {})).toHaveLength(0);
   });
+  it('undo/redo report whether the map changed when the handler says so (parallax wave-7 #9)', () => {
+    const params = { ...makeParams(makeMap('A', 1), 'n.md'), canUndo: true, canRedo: true,
+      wrappedHandleUndo: () => false, handleRedo: () => true };
+    act(() => { render(h(Probe, { params }), root); });
+    const ops = window.__windrose?.mcpInstances?.['n.md']?.ops;
+    expect(ops?.undo()).toBe(false);
+    expect(ops?.redo()).toBe(true);
+  });
+
+  it('falls back to the availability flag when the handler returns nothing', () => {
+    const params = { ...makeParams(makeMap('A', 1), 'n.md'), canUndo: true };
+    act(() => { render(h(Probe, { params }), root); });
+    expect(window.__windrose?.mcpInstances?.['n.md']?.ops.undo()).toBe(true);
+  });
 });

@@ -1,5 +1,5 @@
 /**
- * dungeonGenerator.js
+ * dungeonGenerator.ts
  * 
  * Pure procedural dungeon generation module for Windrose MapDesigner.
  * Implements a four-phase pipeline:
@@ -11,10 +11,167 @@
  */
 
 // =============================================================================
+// TYPES
+// =============================================================================
+
+export interface CellCoord {
+  x: number;
+  y: number;
+}
+
+export interface RoomRect extends CellCoord {
+  width: number;
+  height: number;
+}
+
+export interface DungeonRoom extends RoomRect {
+  id: number;
+  shape: string;
+  /** Composite rooms: which letter shape was generated */
+  compositeType?: string;
+  /** Circle rooms only */
+  radius?: number;
+  /** Composite (L/T) rooms only */
+  parts?: RoomRect[];
+}
+
+export interface DungeonCell extends CellCoord {
+  color: string;
+  segments?: Record<string, boolean>;
+  opacity?: number;
+}
+
+export interface WallEdge {
+  x: number;
+  y: number;
+  side: string;
+  color: string;
+}
+
+export interface DungeonObject {
+  id: string;
+  type: string;
+  position: CellCoord;
+  alignment?: string | null;
+  scale?: number;
+  rotation?: number;
+}
+
+/** Corridor cell: plain position, or a diagonal segment cell carrying color and segments. */
+export interface CorridorCell extends CellCoord {
+  color?: string;
+  segments?: Record<string, boolean>;
+}
+
+export interface DiagonalPath {
+  cells: CorridorCell[];
+  orderedPath: CellCoord[];
+  width: number;
+  hasDiagonals: boolean;
+}
+
+export interface CorridorConnection {
+  cells: CorridorCell[];
+  orderedPath: CellCoord[];
+  width: number;
+  hasDiagonals?: boolean;
+  roomA: DungeonRoom;
+  roomB: DungeonRoom;
+}
+
+export interface CorridorResult {
+  cells: CorridorCell[];
+  byConnection: CorridorConnection[];
+}
+
+export interface DungeonResult {
+  cells: DungeonCell[];
+  objects: DungeonObject[];
+  edges: WallEdge[];
+  metadata: {
+    rooms: DungeonRoom[];
+    connections: Array<[number, number]>;
+    gridWidth: number;
+    gridHeight: number;
+    roomCount: number;
+    doorCount: number;
+    secretDoorCount: number;
+    hasWideCorridors: boolean;
+    hasDiagonalCorridors: boolean;
+    entryRoomId?: number;
+    exitRoomId?: number;
+    waterRoomIds: number[];
+    corridorResult: CorridorResult;
+    doorPositions: CellCoord[];
+    style: string;
+  };
+}
+
+export interface RoomSizeRange {
+  minWidth: number;
+  maxWidth: number;
+  minHeight: number;
+  maxHeight: number;
+}
+
+export interface DungeonPreset {
+  gridWidth: number;
+  gridHeight: number;
+  roomCount: { min: number; max: number };
+  roomSize: RoomSizeRange;
+  padding: number;
+  corridorWidth: number;
+  corridorStyle: string;
+  circleChance: number;
+  complexRoomChance: number;
+  loopChance: number;
+  doorChance: number;
+  secretDoorChance: number;
+  wideCorridorChance: number;
+  diagonalCorridorChance: number;
+}
+
+interface CarvedPath {
+  cells: CorridorCell[];
+  orderedPath: CellCoord[];
+  width: number;
+}
+
+type OffsetPathResult = CarvedPath;
+
+/** Composite room before generateRooms assigns its id. */
+type UnnumberedRoom = Omit<DungeonRoom, 'id'>;
+
+interface StraightRun {
+  startIdx: number;
+  endIdx: number;
+  direction: string;
+}
+
+interface DoorCandidate extends CellCoord {
+  type: string;
+  alignment: string;
+  roomId: number;
+  scale: number;
+  isSecret: boolean;
+}
+
+/** Preset merged with a style overlay and caller overrides. */
+type DungeonConfig = DungeonPreset & {
+  roomSizeBias?: number;
+  waterChance?: number;
+  style?: string;
+  floorColor?: string;
+  wallColor?: string;
+  waterColor?: string;
+  waterOpacity?: number;
+};
+
+// =============================================================================
 // PRESETS
 // =============================================================================
 
-const DUNGEON_PRESETS = {
+const DUNGEON_PRESETS: Record<string, DungeonPreset> = {
   small: {
     // "Tight Lair" - cramped goblin den, linear flow, get in and get out
     gridWidth: 20,
@@ -74,7 +231,7 @@ const DUNGEON_PRESETS = {
 // They define the "flavor" of the dungeon independent of its size.
 // =============================================================================
 
-const DUNGEON_STYLES = {
+const DUNGEON_STYLES: Record<string, { name: string; description: string; overrides: Partial<DungeonConfig> }> = {
   classic: {
     // Default balanced dungeon - no overrides needed
     name: 'Classic',
@@ -141,7 +298,7 @@ const DEFAULT_WALL_COLOR = '#333333';
 // UTILITY FUNCTIONS
 // =============================================================================
 
-function randomInt(min, max) {
+function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
@@ -151,7 +308,7 @@ function randomInt(min, max) {
  * @param {number} max - Maximum value  
  * @param {number} bias - Bias from -1 (favor min/compact) to 1 (favor max/spacious), 0 = uniform
  */
-function biasedRandomInt(min, max, bias = 0) {
+function biasedRandomInt(min: number, max: number, bias = 0): number {
   if (bias === 0) return randomInt(min, max);
   
   // Use power curve to skew distribution
@@ -164,7 +321,7 @@ function biasedRandomInt(min, max, bias = 0) {
   return Math.floor(min + skewed * (max - min + 1));
 }
 
-function rectanglesOverlap(a, b, padding = 0) {
+function rectanglesOverlap(a: RoomRect, b: RoomRect, padding = 0): boolean {
   return !(
     a.x + a.width + padding <= b.x ||
     b.x + b.width + padding <= a.x ||
@@ -173,11 +330,11 @@ function rectanglesOverlap(a, b, padding = 0) {
   );
 }
 
-function getRoomCenter(room) {
+function getRoomCenter(room: DungeonRoom): CellCoord {
   if (room.shape === 'circle') {
     return {
-      x: Math.floor(room.x + room.radius),
-      y: Math.floor(room.y + room.radius)
+      x: Math.floor(room.x + (room.radius ?? 0)),
+      y: Math.floor(room.y + (room.radius ?? 0))
     };
   }
   return {
@@ -186,27 +343,27 @@ function getRoomCenter(room) {
   };
 }
 
-function cellKey(x, y) {
+function cellKey(x: number, y: number): string {
   return `${x},${y}`;
 }
 
-function isCellInRoom(x, y, room) {
+function isCellInRoom(x: number, y: number, room: DungeonRoom): boolean {
   if (x < room.x || x >= room.x + room.width ||
       y < room.y || y >= room.y + room.height) {
     return false;
   }
   
   if (room.shape === 'circle') {
-    const centerX = room.x + room.radius;
-    const centerY = room.y + room.radius;
+    const centerX = room.x + (room.radius ?? 0);
+    const centerY = room.y + (room.radius ?? 0);
     const dx = x + 0.5 - centerX;
     const dy = y + 0.5 - centerY;
-    return dx * dx + dy * dy <= room.radius * room.radius;
+    return dx * dx + dy * dy <= (room.radius ?? 0) * (room.radius ?? 0);
   }
   
   if (room.shape === 'composite') {
     // Check if cell is in any of the room's parts
-    return room.parts.some(part => 
+    return (room.parts ?? []).some(part => 
       x >= part.x && x < part.x + part.width &&
       y >= part.y && y < part.y + part.height
     );
@@ -219,13 +376,13 @@ function isCellInRoom(x, y, room) {
  * Check if cell is in room's RECTANGULAR bounds only.
  * Used for door detection to avoid circular room corner issues.
  */
-function isCellInRoomRect(x, y, room) {
+function isCellInRoomRect(x: number, y: number, room: RoomRect): boolean {
   return x >= room.x && x < room.x + room.width &&
          y >= room.y && y < room.y + room.height;
 }
 
-function generateObjectId() {
-  return 'obj-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+function generateObjectId(): string {
+  return 'obj-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 }
 
 // =============================================================================
@@ -241,7 +398,7 @@ function generateObjectId() {
  * @param {number} bias - Room size bias (-1 to 1)
  * @returns {Object} Room with shape='composite' and parts array
  */
-function generateLShapedRoom(x, y, roomSize, bias = 0) {
+function generateLShapedRoom(x: number, y: number, roomSize: RoomSizeRange, bias = 0): UnnumberedRoom {
   // Generate two rectangles that will form the L
   // First rectangle is the "stem", second is the "foot"
   const stemWidth = biasedRandomInt(roomSize.minWidth, roomSize.maxWidth, bias);
@@ -316,7 +473,7 @@ function generateLShapedRoom(x, y, roomSize, bias = 0) {
  * @param {number} bias - Room size bias (-1 to 1)
  * @returns {Object} Room with shape='composite' and parts array
  */
-function generateTShapedRoom(x, y, roomSize, bias = 0) {
+function generateTShapedRoom(x: number, y: number, roomSize: RoomSizeRange, bias = 0): UnnumberedRoom {
   // T-shape needs a minimum size to look good
   const stemWidth = biasedRandomInt(Math.max(2, roomSize.minWidth - 1), Math.max(3, roomSize.maxWidth - 2), bias);
   const stemHeight = biasedRandomInt(Math.max(roomSize.minHeight, 4), roomSize.maxHeight + 2, bias);
@@ -392,7 +549,7 @@ function generateTShapedRoom(x, y, roomSize, bias = 0) {
  * @param {number} bias - Room size bias
  * @returns {Object} Composite room
  */
-function generateCompositeRoom(x, y, roomSize, bias = 0) {
+function generateCompositeRoom(x: number, y: number, roomSize: RoomSizeRange, bias = 0): UnnumberedRoom {
   if (Math.random() < 0.7) {
     return generateLShapedRoom(x, y, roomSize, bias);
   } else {
@@ -404,7 +561,7 @@ function generateCompositeRoom(x, y, roomSize, bias = 0) {
 // PHASE 1: ROOM GENERATION
 // =============================================================================
 
-function generateRooms(config) {
+function generateRooms(config: DungeonConfig): DungeonRoom[] {
   const {
     gridWidth,
     gridHeight,
@@ -417,7 +574,7 @@ function generateRooms(config) {
   } = config;
   
   const targetCount = randomInt(roomCount.min, roomCount.max);
-  const rooms = [];
+  const rooms: DungeonRoom[] = [];
   const maxAttempts = targetCount * 50;
   let attempts = 0;
   
@@ -468,7 +625,7 @@ function generateRooms(config) {
       const x = randomInt(margin, maxX);
       const y = randomInt(margin, maxY);
       
-      newRoom = generateCompositeRoom(x, y, roomSize, roomSizeBias);
+      newRoom = generateCompositeRoom(x, y, roomSize, roomSizeBias) as DungeonRoom;
       newRoom.id = rooms.length;
       
       // Verify the room fits within grid bounds
@@ -514,7 +671,7 @@ function generateRooms(config) {
 // PHASE 2: CONNECTION GRAPH (MST)
 // =============================================================================
 
-function getRoomDistance(roomA, roomB) {
+function getRoomDistance(roomA: DungeonRoom, roomB: DungeonRoom): number {
   const centerA = getRoomCenter(roomA);
   const centerB = getRoomCenter(roomB);
   const dx = centerB.x - centerA.x;
@@ -522,10 +679,10 @@ function getRoomDistance(roomA, roomB) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-function buildConnectionGraph(rooms, loopChance = 0) {
+function buildConnectionGraph(rooms: DungeonRoom[], loopChance = 0): Array<[DungeonRoom, DungeonRoom]> {
   if (rooms.length < 2) return [];
   
-  const connections = [];
+  const connections: Array<[DungeonRoom, DungeonRoom]> = [];
   const connectedIndices = new Set([0]);
   const unconnectedIndices = new Set(rooms.map((_, i) => i).filter(i => i !== 0));
   
@@ -591,7 +748,7 @@ function buildConnectionGraph(rooms, loopChance = 0) {
  * Check if a cell is adjacent to a room (but not inside it).
  * Used to detect if a corridor runs along a room's wall.
  */
-function isCellAdjacentToRoom(x, y, room) {
+function isCellAdjacentToRoom(x: number, y: number, room: DungeonRoom): boolean {
   if (isCellInRoomRect(x, y, room)) return false;
   
   return isCellInRoomRect(x - 1, y, room) ||
@@ -604,7 +761,7 @@ function isCellAdjacentToRoom(x, y, room) {
  * Try to find an offset path that avoids adjacency issues.
  * Creates a 3-segment "Z-shape" path by offsetting the elbow point.
  */
-function tryOffsetPath(centerA, centerB, width, startOffset, endOffset, allRooms, roomA, roomB) {
+function tryOffsetPath(centerA: CellCoord, centerB: CellCoord, width: number, startOffset: number, endOffset: number, allRooms: DungeonRoom[], roomA: DungeonRoom, roomB: DungeonRoom): OffsetPathResult | null {
   const dx = centerB.x - centerA.x;
   const dy = centerB.y - centerA.y;
   const xDir = dx > 0 ? 1 : dx < 0 ? -1 : 0;
@@ -637,7 +794,7 @@ function tryOffsetPath(centerA, centerB, width, startOffset, endOffset, allRooms
 /**
  * Check if an offset path would be clear of adjacency issues.
  */
-function isOffsetPathClear(centerA, centerB, elbowX, elbowY, width, startOffset, endOffset, allRooms, roomA, roomB, xDir, yDir) {
+function isOffsetPathClear(centerA: CellCoord, centerB: CellCoord, elbowX: number, elbowY: number, width: number, startOffset: number, endOffset: number, allRooms: DungeonRoom[], roomA: DungeonRoom, roomB: DungeonRoom, _xDir: number, _yDir: number): boolean {
   const corridorCells = [];
   
   // Segment 1: centerA to elbow
@@ -683,7 +840,7 @@ function isOffsetPathClear(centerA, centerB, elbowX, elbowY, width, startOffset,
   
   // Check adjacency to other rooms
   for (const room of allRooms) {
-    if (room.id === roomA.id || room.id === roomB.id) continue;
+    if (room.id === roomA?.id || room.id === roomB?.id) continue;
     
     let adjacentCount = 0;
     for (const cell of corridorCells) {
@@ -703,7 +860,7 @@ function isOffsetPathClear(centerA, centerB, elbowX, elbowY, width, startOffset,
 /**
  * Carve a path with a specified elbow point.
  */
-function carveOffsetPath(centerA, centerB, elbowX, elbowY, width, startOffset, endOffset, xDir, yDir, horizontalFirst) {
+function carveOffsetPath(centerA: CellCoord, centerB: CellCoord, elbowX: number, elbowY: number, width: number, startOffset: number, endOffset: number, xDir: number, yDir: number, horizontalFirst: boolean): OffsetPathResult {
   const cells = [];
   const orderedPath = [];
   
@@ -778,7 +935,7 @@ function carveOffsetPath(centerA, centerB, elbowX, elbowY, width, startOffset, e
   return { cells, orderedPath, width };
 }
 
-function carveCorridorBetween(roomA, roomB, width = 1, allRooms = []) {
+function carveCorridorBetween(roomA: DungeonRoom, roomB: DungeonRoom, width = 1, allRooms: DungeonRoom[] = []): CarvedPath {
   const centerA = getRoomCenter(roomA);
   const centerB = getRoomCenter(roomB);
   
@@ -879,7 +1036,7 @@ function carveCorridorBetween(roomA, roomB, width = 1, allRooms = []) {
  * Check if corridor cells run alongside a room (adjacent but outside) for more than 1 cell.
  * This catches cases like a corridor running along a room's wall before entering it.
  */
-function runsAlongsideRoom(corridorCells, room) {
+function runsAlongsideRoom(corridorCells: CellCoord[], room: DungeonRoom): boolean {
   let adjacentOutsideCount = 0;
   
   for (const cell of corridorCells) {
@@ -898,7 +1055,7 @@ function runsAlongsideRoom(corridorCells, room) {
   return false;
 }
 
-function wouldRunAdjacentToRoom(centerA, centerB, horizontalFirst, allRooms, roomA, roomB, width = 1) {
+function wouldRunAdjacentToRoom(centerA: CellCoord, centerB: CellCoord, horizontalFirst: boolean, allRooms: DungeonRoom[], roomA: DungeonRoom, roomB: DungeonRoom, width = 1): boolean {
   const dx = centerB.x - centerA.x;
   const dy = centerB.y - centerA.y;
   const xDir = dx > 0 ? 1 : dx < 0 ? -1 : 0;
@@ -979,7 +1136,7 @@ function wouldRunAdjacentToRoom(centerA, centerB, horizontalFirst, allRooms, roo
   return false;
 }
 
-function carveCorridors(connections, corridorWidth = 1, allRooms = [], corridorStyle = 'straight') {
+function carveCorridors(connections: Array<[DungeonRoom, DungeonRoom]>, corridorWidth = 1, allRooms: DungeonRoom[] = [], corridorStyle = 'straight'): CorridorResult {
   const allCorridorCells = [];
   const corridorsByConnection = [];
   
@@ -1018,7 +1175,7 @@ function carveCorridors(connections, corridorWidth = 1, allRooms = [], corridorS
  * @param {Set} existingCells - Set of "x,y" keys for existing corridor cells
  * @returns {boolean} True if wobble would cause issues
  */
-function wouldWobbleCauseIssues(x, y, allRooms, roomA, roomB, existingCells) {
+function wouldWobbleCauseIssues(x: number, y: number, allRooms: DungeonRoom[], roomA: DungeonRoom, roomB: DungeonRoom, _existingCells: Set<string>): boolean {
   // Check adjacency to rooms other than source/dest
   for (const room of allRooms) {
     if (room.id === roomA.id || room.id === roomB.id) continue;
@@ -1034,36 +1191,12 @@ function wouldWobbleCauseIssues(x, y, allRooms, roomA, roomB, existingCells) {
 }
 
 /**
- * Determine the direction of a path segment (horizontal, vertical, or turning).
- * @param {Object} prev - Previous point {x, y}
- * @param {Object} curr - Current point {x, y}
- * @param {Object} next - Next point {x, y}
- * @returns {string} 'horizontal', 'vertical', or 'turn'
- */
-function getSegmentDirection(prev, curr, next) {
-  if (!prev || !next) return 'end';
-  
-  const fromPrev = { dx: curr.x - prev.x, dy: curr.y - prev.y };
-  const toNext = { dx: next.x - curr.x, dy: next.y - curr.y };
-  
-  // Check if direction changes (it's a turn)
-  if ((fromPrev.dx !== 0 && toNext.dy !== 0) || (fromPrev.dy !== 0 && toNext.dx !== 0)) {
-    return 'turn';
-  }
-  
-  if (fromPrev.dx !== 0 || toNext.dx !== 0) return 'horizontal';
-  if (fromPrev.dy !== 0 || toNext.dy !== 0) return 'vertical';
-  
-  return 'unknown';
-}
-
-/**
  * Find straight runs in the ordered path (sequences of 4+ cells in same direction).
  * @param {Array} orderedPath - Array of {x, y} points
  * @returns {Array} Array of {startIdx, endIdx, direction} for each straight run
  */
-function findStraightRuns(orderedPath) {
-  const runs = [];
+function findStraightRuns(orderedPath: CellCoord[]): StraightRun[] {
+  const runs: StraightRun[] = [];
   if (orderedPath.length < 4) return runs;
   
   let runStart = 0;
@@ -1074,12 +1207,11 @@ function findStraightRuns(orderedPath) {
     const curr = orderedPath[i];
     
     const dx = curr.x - prev.x;
-    const dy = curr.y - prev.y;
     const direction = dx !== 0 ? 'horizontal' : 'vertical';
     
     if (direction !== runDirection) {
       // End previous run if it was long enough
-      if (runDirection && i - runStart >= 4) {
+      if (runDirection !== null && i - runStart >= 4) {
         runs.push({ startIdx: runStart, endIdx: i - 1, direction: runDirection });
       }
       runStart = i - 1;
@@ -1088,7 +1220,7 @@ function findStraightRuns(orderedPath) {
   }
   
   // Check final run
-  if (runDirection && orderedPath.length - runStart >= 4) {
+  if (runDirection !== null && orderedPath.length - runStart >= 4) {
     runs.push({ startIdx: runStart, endIdx: orderedPath.length - 1, direction: runDirection });
   }
   
@@ -1103,7 +1235,7 @@ function findStraightRuns(orderedPath) {
  * @param {Object} roomB - Destination room
  * @returns {Object} Modified corridor result with wobbled path
  */
-function addCorridorWobble(corridorResult, allRooms, roomA, roomB) {
+function addCorridorWobble(corridorResult: CarvedPath, allRooms: DungeonRoom[], roomA: DungeonRoom, roomB: DungeonRoom): CarvedPath {
   const { orderedPath, width } = corridorResult;
   
   // Don't wobble very short corridors
@@ -1185,9 +1317,9 @@ function addCorridorWobble(corridorResult, allRooms, roomA, roomB) {
  * Check if adding a fill cell at (x,y) would cause issues with room adjacency.
  * @returns {boolean} True if fill would cause problems
  */
-function wouldFillCauseIssues(x, y, allRooms, roomA, roomB) {
+function wouldFillCauseIssues(x: number, y: number, allRooms: DungeonRoom[], roomA: DungeonRoom | null, roomB: DungeonRoom | null): boolean {
   for (const room of allRooms) {
-    if (room.id === roomA.id || room.id === roomB.id) continue;
+    if (room.id === roomA?.id || room.id === roomB?.id) continue;
     
     // Don't fill into another room
     if (isCellInRoomRect(x, y, room)) return true;
@@ -1208,9 +1340,9 @@ function wouldFillCauseIssues(x, y, allRooms, roomA, roomB) {
  * @param {Object} roomB - Destination room
  * @returns {Array} Array of {x, y} cells
  */
-function rebuildCellsFromPath(path, width, allRooms = [], roomA = null, roomB = null) {
-  const cellSet = new Set();
-  const cells = [];
+function rebuildCellsFromPath(path: CellCoord[], width: number, allRooms: DungeonRoom[] = [], roomA: DungeonRoom | null = null, roomB: DungeonRoom | null = null): CellCoord[] {
+  const cellSet = new Set<string>();
+  const cells: CellCoord[] = [];
   
   const startOffset = -Math.floor((width - 1) / 2);
   const endOffset = Math.floor(width / 2);
@@ -1218,7 +1350,7 @@ function rebuildCellsFromPath(path, width, allRooms = [], roomA = null, roomB = 
   /**
    * Add a cell and its width expansion to the cell set
    */
-  const addCellWithWidth = (x, y, expandDir) => {
+  const addCellWithWidth = (x: number, y: number, expandDir: string): void => {
     if (expandDir === 'vertical' || expandDir === 'both') {
       for (let w = startOffset; w <= endOffset; w++) {
         const key = `${x},${y + w}`;
@@ -1245,7 +1377,7 @@ function rebuildCellsFromPath(path, width, allRooms = [], roomA = null, roomB = 
     const next = path[i + 1];
     
     // Check for diagonal step from prev to curr - need to fill the gap
-    if (prev) {
+    if (prev !== undefined) {
       const dx = curr.x - prev.x;
       const dy = curr.y - prev.y;
       
@@ -1277,7 +1409,7 @@ function rebuildCellsFromPath(path, width, allRooms = [], roomA = null, roomB = 
     // Determine segment direction for width expansion
     let direction = 'both'; // Default: expand in both directions for corners
     
-    if (prev && next) {
+    if (prev !== undefined && next !== undefined) {
       const fromPrev = { dx: curr.x - prev.x, dy: curr.y - prev.y };
       const toNext = { dx: next.x - curr.x, dy: next.y - curr.y };
       
@@ -1289,9 +1421,9 @@ function rebuildCellsFromPath(path, width, allRooms = [], roomA = null, roomB = 
       else if (fromPrev.dy !== 0 && toNext.dy !== 0 && fromPrev.dx === 0 && toNext.dx === 0) {
         direction = 'horizontal';
       }
-    } else if (prev) {
+    } else if (prev !== undefined) {
       direction = (prev.x !== curr.x) ? 'vertical' : 'horizontal';
-    } else if (next) {
+    } else if (next !== undefined) {
       direction = (next.x !== curr.x) ? 'vertical' : 'horizontal';
     }
     
@@ -1310,7 +1442,7 @@ function rebuildCellsFromPath(path, width, allRooms = [], roomA = null, roomB = 
  * Segment mapping for diagonal directions.
  * Each diagonal direction fills 4 segments (matching CORNER_SEGMENT_FILL pattern).
  */
-const DIAGONAL_SEGMENTS = {
+const DIAGONAL_SEGMENTS: Record<string, Record<string, boolean>> = {
   // NE direction (moving right and up) - matches TR corner
   ne: { nw: true, n: true, ne: true, e: true },
   // SE direction (moving right and down) - matches BR corner
@@ -1327,7 +1459,7 @@ const DIAGONAL_SEGMENTS = {
  * @param {number} dy - Y difference (positive = moving down)
  * @returns {string|null} Diagonal direction ('ne', 'se', 'sw', 'nw') or null if not diagonal
  */
-function getDiagonalDirection(dx, dy) {
+function getDiagonalDirection(dx: number, dy: number): string | null {
   if (dx === 0 || dy === 0) return null;
   if (dx > 0 && dy < 0) return 'ne';  // Right and up
   if (dx > 0 && dy > 0) return 'se';  // Right and down
@@ -1341,7 +1473,7 @@ function getDiagonalDirection(dx, dy) {
  * Diagonals work best when rooms are offset both horizontally and vertically.
  * @returns {boolean} True if diagonal corridor is appropriate
  */
-function canUseDiagonalCorridor(roomA, roomB, allRooms) {
+function canUseDiagonalCorridor(roomA: DungeonRoom, roomB: DungeonRoom, allRooms: DungeonRoom[]): boolean {
   const centerA = getRoomCenter(roomA);
   const centerB = getRoomCenter(roomB);
 
@@ -1353,7 +1485,7 @@ function canUseDiagonalCorridor(roomA, roomB, allRooms) {
 
   // Check if diagonal path would cross another room
   const diagonalDir = getDiagonalDirection(centerB.x - centerA.x, centerB.y - centerA.y);
-  if (!diagonalDir) return false;
+  if (diagonalDir === null) return false;
 
   // Sample points along diagonal path
   const steps = Math.min(dx, dy);
@@ -1381,7 +1513,7 @@ function canUseDiagonalCorridor(roomA, roomB, allRooms) {
  * @param {string} color - Cell color
  * @returns {Object} Cell with segments property
  */
-function createDiagonalSegmentCell(x, y, diagonalDir, color) {
+function createDiagonalSegmentCell(x: number, y: number, diagonalDir: string, color: string): DungeonCell {
   return {
     x,
     y,
@@ -1400,7 +1532,7 @@ function createDiagonalSegmentCell(x, y, diagonalDir, color) {
  * @param {string} color - Floor color
  * @returns {Object} { cells: Array, orderedPath: Array, width: number, hasDiagonals: boolean }
  */
-function carveDiagonalCorridor(roomA, roomB, width, allRooms, color) {
+function carveDiagonalCorridor(roomA: DungeonRoom, roomB: DungeonRoom, width: number, allRooms: DungeonRoom[], color: string): DiagonalPath {
   const centerA = getRoomCenter(roomA);
   const centerB = getRoomCenter(roomB);
 
@@ -1409,12 +1541,15 @@ function carveDiagonalCorridor(roomA, roomB, width, allRooms, color) {
   const xDir = dx > 0 ? 1 : -1;
   const yDir = dy > 0 ? 1 : -1;
   const diagonalDir = getDiagonalDirection(dx, dy);
+  if (diagonalDir === null) {
+    throw new Error('carveDiagonalCorridor requires a non-axis-aligned offset');
+  }
 
-  const cells = [];
-  const orderedPath = [];
-  const cellSet = new Set();
+  const cells: CorridorCell[] = [];
+  const orderedPath: CellCoord[] = [];
+  const cellSet = new Set<string>();
 
-  const addCell = (cell) => {
+  const addCell = (cell: CorridorCell): void => {
     const key = cellKey(cell.x, cell.y);
     if (!cellSet.has(key)) {
       cellSet.add(key);
@@ -1445,7 +1580,7 @@ function carveDiagonalCorridor(roomA, roomB, width, allRooms, color) {
 
   // Crook segment patterns based on diagonal direction
   // Each direction needs specific segment wedges to create smooth 45° walls
-  const CROOK_SEGMENTS = {
+  const CROOK_SEGMENTS: Record<string, { horizontal: string; vertical: string }> = {
     se: { horizontal: 'sw', vertical: 'ne' },
     nw: { horizontal: 'ne', vertical: 'sw' },
     ne: { horizontal: 'nw', vertical: 'se' },
@@ -1534,12 +1669,12 @@ function carveDiagonalCorridor(roomA, roomB, width, allRooms, color) {
  * @param {string} color - Floor color
  * @returns {Object} { cells: Array, byConnection: Array }
  */
-function carveCorridorsWithDiagonals(connections, corridorWidth, allRooms, corridorStyle, diagonalChance, color) {
-  const allCorridorCells = [];
-  const corridorsByConnection = [];
+function carveCorridorsWithDiagonals(connections: Array<[DungeonRoom, DungeonRoom]>, corridorWidth: number, allRooms: DungeonRoom[], corridorStyle: string, diagonalChance: number, color: string): CorridorResult {
+  const allCorridorCells: CorridorCell[] = [];
+  const corridorsByConnection: CorridorConnection[] = [];
 
   for (const [roomA, roomB] of connections) {
-    let result;
+    let result: CarvedPath | DiagonalPath | null = null;
     let usedDiagonal = false;
 
     // Try diagonal if style allows and rooms are suitable
@@ -1553,7 +1688,7 @@ function carveCorridorsWithDiagonals(connections, corridorWidth, allRooms, corri
     }
 
     // Fall back to standard corridor
-    if (!usedDiagonal) {
+    if (result === null) {
       result = carveCorridorBetween(roomA, roomB, corridorWidth, allRooms);
 
       // Apply wobble for organic style
@@ -1584,8 +1719,8 @@ function carveCorridorsWithDiagonals(connections, corridorWidth, allRooms, corri
  * Find door candidates by walking corridors and detecting room boundary crossings.
  * Uses actual room shape (isCellInRoom) for accurate detection with composite/circular rooms.
  */
-function findDoorCandidatesForConnection(roomA, roomB, orderedPath, corridorWidth) {
-  const candidates = [];
+function findDoorCandidatesForConnection(roomA: DungeonRoom, roomB: DungeonRoom, orderedPath: CellCoord[], corridorWidth: number): DoorCandidate[] {
+  const candidates: DoorCandidate[] = [];
 
   if (orderedPath.length < 2) return candidates;
 
@@ -1626,7 +1761,7 @@ function findDoorCandidatesForConnection(roomA, roomB, orderedPath, corridorWidt
   return candidates;
 }
 
-function getAlignmentFromDelta(dx, dy) {
+function getAlignmentFromDelta(dx: number, dy: number): string {
   // Always use cardinal directions (no diagonal door rotation)
   // For diagonal movement, pick the dominant axis or default to vertical
   if (dy < 0) return 'north';
@@ -1636,7 +1771,7 @@ function getAlignmentFromDelta(dx, dy) {
   return 'center';
 }
 
-function addDoorsForWidth(candidates, baseCell, type, alignment, roomId, width, pathDx, pathDy) {
+function addDoorsForWidth(candidates: DoorCandidate[], baseCell: CellCoord, type: string, alignment: string, roomId: number, width: number, pathDx: number, pathDy: number): void {
   const startOffset = -Math.floor((width - 1) / 2);
   const endOffset = Math.floor(width / 2);
 
@@ -1657,20 +1792,6 @@ function addDoorsForWidth(candidates, baseCell, type, alignment, roomId, width, 
 }
 
 /**
- * Check if a cell is on the perimeter of a room (not an interior cell).
- * A perimeter cell is one where at least one orthogonal neighbor is outside the room.
- */
-function isCellOnRoomPerimeter(x, y, room) {
-  if (!isCellInRoom(x, y, room)) return false;
-
-  // Check if any orthogonal neighbor is outside the room
-  return !isCellInRoom(x - 1, y, room) ||
-         !isCellInRoom(x + 1, y, room) ||
-         !isCellInRoom(x, y - 1, room) ||
-         !isCellInRoom(x, y + 1, room);
-}
-
-/**
  * Validate a door position to filter out floating doors.
  * A valid door must be adjacent to its associated room (touching from outside).
  * @param {Object} pos - Door position with x, y, roomId
@@ -1679,7 +1800,7 @@ function isCellOnRoomPerimeter(x, y, room) {
  * @param {Set<string>} [segmentCellSet] - Set of diagonal segment cell keys to exclude
  * @returns {boolean} True if door position is valid
  */
-function isValidDoorPosition(pos, rooms, corridorCellSet = null, segmentCellSet = null) {
+function isValidDoorPosition(pos: DoorCandidate, rooms: DungeonRoom[], corridorCellSet: Set<string> | null = null, segmentCellSet: Set<string> | null = null): boolean {
   const room = rooms.find(r => r.id === pos.roomId);
   if (!room) return false;
 
@@ -1720,7 +1841,7 @@ function isValidDoorPosition(pos, rooms, corridorCellSet = null, segmentCellSet 
  * @param {Array<Object>} rooms - All rooms to check if position is inside one
  * @returns {boolean} True if position is at a 4-way corridor intersection
  */
-function isAtCorridorIntersection(pos, corridorCellSet, rooms) {
+function isAtCorridorIntersection(pos: CellCoord, corridorCellSet: Set<string>, rooms: DungeonRoom[]): boolean {
   // If position is inside a room, it's not at a corridor intersection
   if (rooms.some(r => isCellInRoom(pos.x, pos.y, r))) return false;
 
@@ -1741,9 +1862,9 @@ function isAtCorridorIntersection(pos, corridorCellSet, rooms) {
  * @param {Set<string>} [segmentCellSet] - Set of diagonal segment cell keys to exclude
  * @returns {Array<Object>} Valid door candidate positions
  */
-function findDoorCandidates(corridorsByConnection, rooms, corridorCellSet = null, segmentCellSet = null) {
-  const allCandidates = [];
-  const globalProcessed = new Set();
+function findDoorCandidates(corridorsByConnection: CorridorConnection[], rooms: DungeonRoom[], corridorCellSet: Set<string> | null = null, segmentCellSet: Set<string> | null = null): DoorCandidate[] {
+  const allCandidates: DoorCandidate[] = [];
+  const globalProcessed = new Set<string>();
 
   for (const { roomA, roomB, orderedPath, width } of corridorsByConnection) {
     const candidates = findDoorCandidatesForConnection(roomA, roomB, orderedPath, width);
@@ -1768,7 +1889,7 @@ function findDoorCandidates(corridorsByConnection, rooms, corridorCellSet = null
  * @param {Object} room - Room to check adjacency against
  * @returns {boolean} True if cell has at least one orthogonal neighbor inside the room
  */
-function isCellAdjacentToRoomForOpening(x, y, room) {
+function isCellAdjacentToRoomForOpening(x: number, y: number, room: DungeonRoom): boolean {
   return isCellInRoom(x - 1, y, room) || isCellInRoom(x + 1, y, room) ||
          isCellInRoom(x, y - 1, room) || isCellInRoom(x, y + 1, room);
 }
@@ -1783,7 +1904,7 @@ function isCellAdjacentToRoomForOpening(x, y, room) {
  * @param {Set<string>} [corridorCellSet] - Optional corridor-only cell set for accuracy
  * @returns {{width: number, cells: Array<{x: number, y: number}>}} Opening width and cells
  */
-function calculateRoomOpeningWidth(doorPos, room, carvedCellSet, alignment, corridorCellSet) {
+function calculateRoomOpeningWidth(doorPos: CellCoord, room: DungeonRoom, carvedCellSet: Set<string>, alignment: string, corridorCellSet: Set<string> | null): { width: number; cells: CellCoord[] } {
   // Determine scan direction (perpendicular to alignment)
   const scanDir = (alignment === 'north' || alignment === 'south')
     ? { dx: 1, dy: 0 }  // scan horizontally
@@ -1792,7 +1913,7 @@ function calculateRoomOpeningWidth(doorPos, room, carvedCellSet, alignment, corr
   const openingCells = [{ x: doorPos.x, y: doorPos.y }];
 
   // Use corridorCellSet if available for more accurate detection
-  const cellSet = corridorCellSet || carvedCellSet;
+  const cellSet = corridorCellSet ?? carvedCellSet;
 
   for (let i = 1; i < 10; i++) {
     const testX = doorPos.x + scanDir.dx * i;
@@ -1825,7 +1946,7 @@ function calculateRoomOpeningWidth(doorPos, room, carvedCellSet, alignment, corr
  * @param {string} [wallColor] - Edge color for the generated walls
  * @returns {Array<{x: number, y: number, side: string, color: string}>} Wall edge definitions
  */
-function generateWallEdgesForCells(cells, alignment, wallColor = DEFAULT_WALL_COLOR) {
+function generateWallEdgesForCells(cells: CellCoord[], alignment: string, wallColor = DEFAULT_WALL_COLOR): WallEdge[] {
   const edges = [];
 
   for (const cell of cells) {
@@ -1856,7 +1977,7 @@ function generateWallEdgesForCells(cells, alignment, wallColor = DEFAULT_WALL_CO
  * @param {string} [wallColor] - Edge color for the generated walls
  * @returns {Array<{x: number, y: number, side: string, color: string}>} Deduplicated wall edges
  */
-function generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions, wallColor = DEFAULT_WALL_COLOR) {
+function generateAllRoomBoundaryEdges(rooms: DungeonRoom[], corridorCellSet: Set<string>, doorPositions: CellCoord[], wallColor = DEFAULT_WALL_COLOR): WallEdge[] {
   const edges = [];
 
   const doorSet = new Set(doorPositions.map(d => `${d.x},${d.y}`));
@@ -1908,7 +2029,7 @@ function generateAllRoomBoundaryEdges(rooms, corridorCellSet, doorPositions, wal
  * @param {Array<{x: number, y: number}>} doorPositions - Existing door positions
  * @returns {Array<Object>} Rooms with no adjacent doors
  */
-function getIsolatedRooms(rooms, doorPositions) {
+function getIsolatedRooms(rooms: DungeonRoom[], doorPositions: CellCoord[]): DungeonRoom[] {
   return rooms.filter(room => {
     for (const door of doorPositions) {
       if (isCellAdjacentToRoomForOpening(door.x, door.y, room)) {
@@ -1928,7 +2049,7 @@ function getIsolatedRooms(rooms, doorPositions) {
  * @param {number} secretDoorQuota - Remaining quota of secret doors to create for isolated rooms
  * @returns {{updatedEdges: Array<Object>, secretDoorObjects: Array<Object>}} Updated edges with secret doors
  */
-function addSecretDoorsToIsolatedRooms(rooms, doorPositions, wallEdges, corridorCellSet, secretDoorQuota = Infinity) {
+function addSecretDoorsToIsolatedRooms(rooms: DungeonRoom[], doorPositions: CellCoord[], wallEdges: WallEdge[], corridorCellSet: Set<string>, secretDoorQuota = Infinity): { updatedEdges: WallEdge[]; secretDoorObjects: DungeonObject[] } {
   const isolatedRooms = getIsolatedRooms(rooms, doorPositions);
 
   if (isolatedRooms.length === 0) {
@@ -1937,8 +2058,8 @@ function addSecretDoorsToIsolatedRooms(rooms, doorPositions, wallEdges, corridor
 
   const existingDoorPositions = new Set(doorPositions.map(d => `${d.x},${d.y}`));
 
-  const secretDoorObjects = [];
-  const edgesToRemove = new Set();
+  const secretDoorObjects: DungeonObject[] = [];
+  const edgesToRemove = new Set<number>();
   let secretDoorsCreated = 0;
 
   for (const room of isolatedRooms) {
@@ -2016,22 +2137,22 @@ function addSecretDoorsToIsolatedRooms(rooms, doorPositions, wallEdges, corridor
 /**
  * Group door candidates into contiguous entrance groups and apply door/secret chances.
  */
-function groupDoorCandidates(candidates) {
+function groupDoorCandidates(candidates: DoorCandidate[]): DoorCandidate[][] {
   if (candidates.length === 0) return [];
   
   // Group by roomId and alignment
-  const groups = new Map();
+  const groups = new Map<string, DoorCandidate[]>();
   
   for (const door of candidates) {
     const groupKey = `${door.roomId}-${door.alignment}`;
     if (!groups.has(groupKey)) {
       groups.set(groupKey, []);
     }
-    groups.get(groupKey).push(door);
+    groups.get(groupKey)?.push(door);
   }
   
   // Split non-contiguous doors into separate groups
-  const finalGroups = [];
+  const finalGroups: DoorCandidate[][] = [];
   
   for (const [, doorList] of groups) {
     // Sort by position
@@ -2075,7 +2196,7 @@ function groupDoorCandidates(candidates) {
  * @param {string} [wallColor] - Edge color for wide-opening wall edges
  * @returns {{doorPositions: Array<Object>, wallEdges: Array<Object>}} Door positions and wall edges
  */
-function findDoorPositions(corridorsByConnection, rooms, doorChance = 0.7, secretDoorChance = 0.05, carvedCellSet = null, corridorCellSet = null, segmentCellSet = null, wallColor = DEFAULT_WALL_COLOR) {
+function findDoorPositions(corridorsByConnection: CorridorConnection[], rooms: DungeonRoom[], doorChance = 0.7, secretDoorChance = 0.05, carvedCellSet: Set<string> | null = null, corridorCellSet: Set<string> | null = null, segmentCellSet: Set<string> | null = null, wallColor = DEFAULT_WALL_COLOR): { doorPositions: DoorCandidate[]; wallEdges: WallEdge[] } {
   const candidates = findDoorCandidates(corridorsByConnection, rooms, corridorCellSet, segmentCellSet);
   const groups = groupDoorCandidates(candidates);
 
@@ -2144,7 +2265,7 @@ function findDoorPositions(corridorsByConnection, rooms, doorChance = 0.7, secre
   return { doorPositions, wallEdges };
 }
 
-function generateDoorObjects(doorPositions) {
+function generateDoorObjects(doorPositions: DoorCandidate[]): DungeonObject[] {
   return doorPositions.map(pos => {
     // Calculate rotation based on alignment
     let rotation = 0;
@@ -2169,7 +2290,7 @@ function generateDoorObjects(doorPositions) {
 // PHASE 3.6: STAIR GENERATION
 // =============================================================================
 
-function getRoomCells(room) {
+function getRoomCells(room: DungeonRoom): CellCoord[] {
   const cells = [];
   for (let x = room.x; x < room.x + room.width; x++) {
     for (let y = room.y; y < room.y + room.height; y++) {
@@ -2181,7 +2302,7 @@ function getRoomCells(room) {
   return cells;
 }
 
-function findEntryExitRooms(rooms) {
+function findEntryExitRooms(rooms: DungeonRoom[]): { entry: DungeonRoom | null; exit: DungeonRoom | null } {
   if (rooms.length === 0) return { entry: null, exit: null };
   if (rooms.length === 1) return { entry: rooms[0], exit: rooms[0] };
   
@@ -2211,7 +2332,7 @@ function findEntryExitRooms(rooms) {
   return { entry, exit };
 }
 
-function generateStairObjects(entryRoom, exitRoom) {
+function generateStairObjects(entryRoom: DungeonRoom | null, exitRoom: DungeonRoom | null): DungeonObject[] {
   const objects = [];
   
   if (entryRoom) {
@@ -2260,7 +2381,7 @@ function generateStairObjects(entryRoom, exitRoom) {
  * @param {number|null} exitRoomId - Exit room ID to exclude
  * @returns {Array} Array of room IDs selected for water
  */
-function selectWaterRooms(rooms, waterChance, entryRoomId, exitRoomId) {
+function selectWaterRooms(rooms: DungeonRoom[], waterChance: number, entryRoomId: number | null | undefined, exitRoomId: number | null | undefined): number[] {
   const waterRoomIds = [];
 
   for (const room of rooms) {
@@ -2285,7 +2406,7 @@ function selectWaterRooms(rooms, waterChance, entryRoomId, exitRoomId) {
  * @param {number} waterOpacity - Opacity for water cells (0-1)
  * @returns {Array} Array of water cell objects {x, y, color, opacity}
  */
-function generateWaterCells(rooms, waterRoomIds, waterColor, waterOpacity) {
+function generateWaterCells(rooms: DungeonRoom[], waterRoomIds: number[], waterColor: string, waterOpacity: number): DungeonCell[] {
   const waterCells = [];
   const waterRoomSet = new Set(waterRoomIds);
 
@@ -2309,8 +2430,8 @@ function generateWaterCells(rooms, waterRoomIds, waterColor, waterOpacity) {
 // PHASE 4: CELL GENERATION
 // =============================================================================
 
-function generateCells(rooms, corridorCells, color = DEFAULT_FLOOR_COLOR) {
-  const cellMap = new Map();
+function generateCells(rooms: DungeonRoom[], corridorCells: CorridorCell[], color = DEFAULT_FLOOR_COLOR): DungeonCell[] {
+  const cellMap = new Map<string, DungeonCell>();
 
   // Add room cells (always full cells)
   for (const room of rooms) {
@@ -2331,9 +2452,9 @@ function generateCells(rooms, corridorCells, color = DEFAULT_FLOOR_COLOR) {
     if (!existing) {
       // No existing cell - add corridor cell as-is (may be segment or full)
       if (cell.segments) {
-        cellMap.set(key, { x: cell.x, y: cell.y, color: cell.color || color, segments: cell.segments });
+        cellMap.set(key, { x: cell.x, y: cell.y, color: cell.color != null && cell.color !== '' ? cell.color : color, segments: cell.segments });
       } else {
-        cellMap.set(key, { x: cell.x, y: cell.y, color: cell.color || color });
+        cellMap.set(key, { x: cell.x, y: cell.y, color: cell.color != null && cell.color !== '' ? cell.color : color });
       }
     } else if (cell.segments && !existing.segments) {
       // Existing is full cell, corridor has segments - keep full cell (room wins)
@@ -2352,12 +2473,12 @@ function generateCells(rooms, corridorCells, color = DEFAULT_FLOOR_COLOR) {
 // MAIN GENERATION FUNCTION
 // =============================================================================
 
-function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, configOverrides = {}) {
-  const baseConfig = DUNGEON_PRESETS[presetName] || DUNGEON_PRESETS.medium;
+function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, configOverrides: Partial<DungeonConfig> & Record<string, unknown> = {}): DungeonResult {
+  const baseConfig = DUNGEON_PRESETS[presetName] ?? DUNGEON_PRESETS.medium;
   
   // Apply style overrides if a style is specified
   let styleOverrides = {};
-  if (configOverrides.style && DUNGEON_STYLES[configOverrides.style]) {
+  if (configOverrides.style != null && configOverrides.style !== '' && DUNGEON_STYLES[configOverrides.style] != null) {
     styleOverrides = DUNGEON_STYLES[configOverrides.style].overrides;
   }
   
@@ -2462,7 +2583,7 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
   const floorCells = generateCells(rooms, corridorCells, floorColor);
 
   // Merge water cells - water overlays floor cells
-  const cellMap = new Map();
+  const cellMap = new Map<string, DungeonCell>();
   for (const cell of floorCells) {
     cellMap.set(cellKey(cell.x, cell.y), cell);
   }
@@ -2487,14 +2608,14 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
       doorCount: doorObjects.length,
       secretDoorCount,
       hasWideCorridors: useWideCorridors,
-      hasDiagonalCorridors: corridorsByConnection.some(c => c.hasDiagonals),
+      hasDiagonalCorridors: corridorsByConnection.some(c => c.hasDiagonals === true),
       entryRoomId: entry?.id,
       exitRoomId: exit?.id,
       waterRoomIds,
       // Data for objectPlacer (dungeon stocking)
       corridorResult,
       doorPositions,
-      style: config.style || 'classic'
+      style: config.style != null && config.style !== '' ? config.style : 'classic'
     }
   };
 }

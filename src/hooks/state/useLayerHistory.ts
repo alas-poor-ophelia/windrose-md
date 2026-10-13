@@ -13,13 +13,19 @@
  *   behind, so undo never clobbers an edit made since (e.g. a Beacon placed on
  *   another layer, or a fog reveal).
  *
- * Stacks are kept per layer (undo acts on the active layer's edits) and are
- * cleared whenever the open sub-hex level changes (levelKey or
- * navigationVersion): each level has its own data and history never crosses
- * levels.
+ * Stacks are kept per layer (undo acts on the active layer's edits) and per
+ * level: history never crosses levels. The root level's stacks are set aside
+ * while a sub-hex is open and come back on return; a sub-hex level's stacks
+ * are cleared when it is left (levelKey or navigationVersion change).
+ *
+ * An undo/redo step whose entry no longer applies to the live map (every
+ * field changed since by a write outside history) is dropped and the next
+ * entry is tried, inside the same functional update, so a keypress never
+ * spends an entry on a silent no-op (parallax wave-7 finding 2). handleUndo
+ * and handleRedo report whether the map changed.
  *
  * Fog operations enter history through recordMapChange (prev -> next diff);
- * fog brush strokes coalesce into one entry.
+ * fog brush strokes coalesce into one entry, never across a layer switch.
  */
 
 // Type-only imports
@@ -44,6 +50,7 @@ import { useCallback, useRef, useState } from 'preact/hooks';
 import {
   createHistoryStack,
   diffHistoryFields,
+  dropHistoryStep,
   guardedPatch,
   mergeFieldDiffs,
   peekTopHistoryEntry,
@@ -171,10 +178,34 @@ function useLayerHistory({
   // render as the level's map data, so a fallback to an ancestor level (trim)
   // clears history before any undo can run; navigationVersion is kept as a
   // second trigger for re-entering the same path.
+  // The root level's stacks survive a dive and come back on exit (parallax
+  // wave-7 finding 7); entries guard against the live values on apply, so a
+  // root field changed meanwhile is never clobbered.
   const levelRef = useRef<{ nav: number; key: string | null }>({ nav: navigationVersion, key: levelKey });
-  if (isLoading || levelRef.current.nav !== navigationVersion || levelRef.current.key !== levelKey) {
+  const rootStacksRef = useRef<LayerHistoryStacks | null>(null);
+  // Layer of the last recorded entry; coalescing requires it to be unchanged
+  // (no merge across an A -> B -> A round trip, parallax wave-7 finding 8).
+  const lastRecordLayerRef = useRef<LayerId | null>(null);
+  if (isLoading) {
     levelRef.current = { nav: navigationVersion, key: levelKey };
     stacksRef.current = {};
+    rootStacksRef.current = null;
+    lastRecordLayerRef.current = null;
+  } else if (levelRef.current.nav !== navigationVersion || levelRef.current.key !== levelKey) {
+    const leaving = levelRef.current.key;
+    if (leaving !== levelKey) {
+      if (leaving === null) rootStacksRef.current = stacksRef.current;
+      stacksRef.current = levelKey === null ? (rootStacksRef.current ?? {}) : {};
+      if (levelKey === null) rootStacksRef.current = null;
+    } else if (levelKey !== null) {
+      // The same sub-hex path re-entered: it may be a recreated level.
+      stacksRef.current = {};
+    }
+    levelRef.current = { nav: navigationVersion, key: levelKey };
+    lastRecordLayerRef.current = null;
+  }
+  if (mapData != null && lastRecordLayerRef.current !== mapData.activeLayerId) {
+    lastRecordLayerRef.current = null;
   }
 
   // Sync known values from the rendered map. Pushes diff against these, so
@@ -209,7 +240,8 @@ function useLayerHistory({
         time: now
       };
 
-      const top = coalesceKey != null ? peekTopHistoryEntry(stack) : null;
+      const top = coalesceKey != null && lastRecordLayerRef.current === layerId ? peekTopHistoryEntry(stack) : null;
+      lastRecordLayerRef.current = layerId;
       if (top != null && top.coalesceKey === coalesceKey && now - top.time <= COALESCE_WINDOW_MS) {
         stacksRef.current[layerId] = replaceTopHistoryEntry(stack, {
           ...entry,
@@ -274,29 +306,55 @@ function useLayerHistory({
   // Undo/Redo Handlers
   // =========================================================================
 
+  /**
+   * One undo/redo keypress. The stack moves only once an entry actually
+   * changes the live map; an entry that no longer applies (every field
+   * changed since by a write outside history) is dropped and the next one is
+   * tried. All of it runs against the live map inside the functional update,
+   * computed from the stack as it was at the call, so the result is the same
+   * however often the updater runs. Returns whether the map changed (known at
+   * return because updaters run at dispatch; false if it was deferred).
+   */
   const applyStep = useCallback(
-    (direction: 'undo' | 'redo'): void => {
+    (direction: 'undo' | 'redo'): boolean => {
       const layerId = knownRef.current.activeLayerId;
-      if (layerId == null) return;
-      const stack = stacksRef.current[layerId] as LayerHistoryStacks[LayerId] | undefined;
-      if (stack == null) return;
-      const step = direction === 'undo' ? stepHistoryUndo(stack) : stepHistoryRedo(stack);
-      if (step == null) return;
-      stacksRef.current[layerId] = step.stack;
-      bump();
+      if (layerId == null) return false;
+      const startStack = stacksRef.current[layerId] as LayerHistoryStacks[LayerId] | undefined;
+      if (startStack == null) return false;
+      if (direction === 'undo' ? startStack.index === 0 : startStack.index >= startStack.entries.length) return false;
 
+      let applied = false;
       isApplyingHistoryRef.current = true;
-      updateMapData((prev: MapData) => applyLayerHistoryEntry(prev, step.entry, direction));
+      updateMapData((prev: MapData) => {
+        let stack = startStack;
+        let next = prev;
+        for (;;) {
+          const step = direction === 'undo' ? stepHistoryUndo(stack) : stepHistoryRedo(stack);
+          if (step == null) break;
+          const candidate = applyLayerHistoryEntry(prev, step.entry, direction);
+          if (candidate !== prev) {
+            stack = step.stack;
+            next = candidate;
+            break;
+          }
+          stack = dropHistoryStep(stack, direction);
+        }
+        stacksRef.current[layerId] = stack;
+        applied = next !== prev;
+        return next;
+      });
+      if (stacksRef.current[layerId] !== startStack) bump();
       // Re-enable recording once the update has been dispatched.
       window.setTimeout(() => {
         isApplyingHistoryRef.current = false;
       }, 0);
+      return applied;
     },
     [updateMapData, bump]
   );
 
-  const handleUndo = useCallback((): void => applyStep('undo'), [applyStep]);
-  const handleRedo = useCallback((): void => applyStep('redo'), [applyStep]);
+  const handleUndo = useCallback((): boolean => applyStep('undo'), [applyStep]);
+  const handleRedo = useCallback((): boolean => applyStep('redo'), [applyStep]);
 
   /**
    * Check if we're currently applying history (undo/redo in progress)

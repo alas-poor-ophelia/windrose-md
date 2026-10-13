@@ -8,7 +8,7 @@ import {
   stockDungeon,
   STYLE_OBJECT_POOLS,
   ROOM_TEMPLATES,
-} from "../../../src/generation/objectPlacer.js";
+} from "../../../src/generation/objectPlacer";
 
 describe("objectPlacer", () => {
   describe("rollWeightedCategory", () => {

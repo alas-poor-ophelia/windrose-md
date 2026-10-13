@@ -10,7 +10,7 @@ import type { App } from 'obsidian';
 import { TFile } from 'obsidian';
 
 import type { PartyPin } from '#types/core/map.types';
-import type { PartyRangeResults } from '../../../src/objects/partyRangeQuery';
+import type { PartyRangeResults } from '#types/objects/partyRange.types';
 
 import {
   sanitizePartyNoteFileName,

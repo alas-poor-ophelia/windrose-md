@@ -11,7 +11,7 @@ import {
   OPENING_DD_SOURCES,
   THRESHOLD_ENTRY,
 } from '../../../src/assets/tileForm';
-import type { TileSubtoolId } from '../../../src/assets/tileForm';
+import type { TileSubtoolId } from '#types/tiles/tile.types';
 import type { TileForm, TileMetadataEntry, TilesetDef } from '../../../types/tiles/tile.types';
 
 function makeTileset(opts?: Partial<TilesetDef>): TilesetDef {

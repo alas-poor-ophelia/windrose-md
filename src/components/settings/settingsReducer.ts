@@ -7,7 +7,7 @@
  */
 
 // Type-only imports
-import type { MapType, HexBounds, MeasurementMethod } from '#types/core/map.types';
+import type { MapType, HexBounds, MeasurementMethod, SizingMode } from '#types/core/map.types';
 import type {
   HexOrientation,
   DiagonalRule,
@@ -37,8 +37,7 @@ import { getDisplayNameFromPath } from '../../assets/imageOperations';
 /** Grid density preset key */
 export type GridDensityKey = 'sparse' | 'medium' | 'dense' | 'custom';
 
-/** Sizing mode for background image */
-export type SizingMode = 'density' | 'measurement';
+export type { SizingMode };
 
 /** Coordinate display mode */
 export type CoordinateDisplayMode = 'rectangular' | 'radial' | 'axial' | 'none';

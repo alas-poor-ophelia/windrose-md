@@ -18,6 +18,7 @@ import { recordInputEventProbe } from './utils/inputEventProbe';
 import { recordZoomTrace } from './utils/zoomTraceProbe';
 import { scanTilesetFolder } from './assets/tilesetOperations';
 import { buildMapEntry, createMapEntry, getSaveQueue, listMapsResult } from './persistence/fileOperations';
+import { noteStoreFileModified, noteStoreFilePathGone } from './persistence/storeCache';
 import { disposeImageCache } from './assets/imageOperations';
 import { clearAll as clearThumbnailCache } from './assets/thumbnailCache';
 import { flushAll, installLifecycleJournaling, journalAll } from './persistence/saveCoordinator';
@@ -287,6 +288,15 @@ export default class WindrosePlugin extends Plugin {
         await flushAll();
         await getSaveQueue();
       })());
+    }));
+
+    // Store cache (MEM-12): any change to the data file not made by this
+    // session's own write drops the cached store, so the next save re-reads.
+    this.registerEvent(this.app.vault.on('modify', (file) => noteStoreFileModified(file)));
+    this.registerEvent(this.app.vault.on('delete', (file) => noteStoreFilePathGone(file.path)));
+    this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
+      noteStoreFilePathGone(oldPath);
+      noteStoreFilePathGone(file.path);
     }));
 
     // Beacon notes follow renames: mounted beacons repoint their stored path.

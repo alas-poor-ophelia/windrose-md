@@ -19,7 +19,8 @@ import type { ResolvedDistanceSettings } from '../../drawing/distanceOperations'
 import { rangeUnitsToCells } from '../../drawing/rangeOperations';
 import { getPartyPinIconPlacement, removePartyPin, upsertPartyPin } from '../../objects/partyPinOperations';
 import { queryPartyBeacons, queryPartyRange } from '../../objects/partyRangeQuery';
-import type { NoteMetadataAccessor, PartyRangeResults } from '../../objects/partyRangeQuery';
+import type { NoteMetadataAccessor } from '../../objects/partyRangeQuery';
+import type { PartyRangeResults } from '#types/objects/partyRange.types';
 import type { RelatedNotes, RelatedNotesSource } from '../../objects/partyRelatedNotes';
 import { extractCacheTags, getRelatedByBacklinks, getRelatedByTags } from '../../objects/partyRelatedNotes';
 import type { PartyNoteContext, PartyNoteTravelLabels } from '../../persistence/partyNoteOperations';

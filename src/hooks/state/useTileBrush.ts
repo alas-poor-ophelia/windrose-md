@@ -21,7 +21,7 @@
 
 
 import type { TileForm, TileLayerRole } from '#types/tiles/tile.types';
-import type { TileSubtoolId } from '../../assets/tileForm';
+import type { TileSubtoolId } from '#types/tiles/tile.types';
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { formDef } from '../../assets/tileForm';
 const MAX_RECENT_TILES = 20;

@@ -146,10 +146,10 @@ export interface LayerActions {
  * Grouped history management actions.
  */
 export interface HistoryActions {
-  /** Perform undo operation */
-  handleUndo: () => void;
-  /** Perform redo operation */
-  handleRedo: () => void;
+  /** Perform undo; returns whether the map changed (a dead entry is dropped, not spent) */
+  handleUndo: () => boolean;
+  /** Perform redo; returns whether the map changed */
+  handleRedo: () => boolean;
   /** Add state to history (for data change handlers) */
   addToHistory: (state: LayerHistorySnapshot) => void;
   /** Record a prev -> next map transition (diffs the active layer + map-wide fields) */
@@ -186,9 +186,9 @@ export interface UseLayerHistoryResult {
   // Grouped history actions
   historyActions: HistoryActions;
 
-  // Direct history action access
-  handleUndo: () => void;
-  handleRedo: () => void;
+  // Direct history action access (return: whether the map changed)
+  handleUndo: () => boolean;
+  handleRedo: () => boolean;
 
   // For data change handlers
   addToHistory: (state: LayerHistorySnapshot) => void;

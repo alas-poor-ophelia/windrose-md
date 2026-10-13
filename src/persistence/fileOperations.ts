@@ -18,6 +18,10 @@ import { generateLayerId, DEFAULT_BOARD_ID } from './layerAccessor';
 import { migrateMapData, MapSchemaError, claimedSchemaVersion, isNewerSchema } from './schemaMigration';
 import { calculateFitZoom } from '../geometry/core/hexMeasurements';
 import { resolveTileEntry } from '../assets/tilesetOperations';
+import {
+  invalidateStoreCache, getValidStoreCache, commitStoreCache, snapshotFromParsed, serializeStore, cachedEntry,
+} from './storeCache';
+import type { StoreSnapshot } from './storeCache';
 
 // Serializes EVERY data-file operation (reads as well as writes) so concurrent
 // access can't race or interleave. Reads have to share the mutex: a read that
@@ -81,10 +85,15 @@ class MapDeletedError extends Error {
  */
 class MapDataFileMissingError extends Error {
   readonly dataPath: string;
-  constructor(dataPath: string) {
-    super(`Map data file not found: ${dataPath}`);
+  /** A same-named store or backup found at another vault path, if any. */
+  readonly foundAt: string | null;
+  constructor(dataPath: string, foundAt: string | null = null) {
+    super(foundAt != null
+      ? `Map data file not found: ${dataPath} (a store file exists at ${foundAt})`
+      : `Map data file not found: ${dataPath}`);
     this.name = 'MapDataFileMissingError';
     this.dataPath = dataPath;
+    this.foundAt = foundAt;
   }
 }
 
@@ -127,9 +136,41 @@ function hasPriorStoreEvidence(app: App, dataPath: string): boolean {
   const siblings = [bakPathForSlot(dataPath, 1), bakPathForSlot(dataPath, 2), dailyBakPath(dataPath)];
   if (siblings.some(p => app.vault.getAbstractFileByPath(p) != null)) return true;
   const corruptPrefix = `${dataPath}.corrupt-`;
-  let files: TFile[] = [];
-  try { files = app.vault.getFiles(); } catch { /* minimal vault (tests): no listing */ }
-  return files.some(f => f.path.startsWith(corruptPrefix));
+  if (vaultFiles(app).some(f => f.path.startsWith(corruptPrefix))) return true;
+  return storeFoundElsewhere(app, dataPath) != null;
+}
+
+function vaultFiles(app: App): TFile[] {
+  try { return app.vault.getFiles(); } catch { return []; /* minimal vault (tests): no listing */ }
+}
+
+function baseName(path: string): string {
+  return path.includes('/') ? path.substring(path.lastIndexOf('/') + 1) : path;
+}
+
+function dirName(path: string): string {
+  return path.includes('/') ? path.substring(0, path.lastIndexOf('/')) : '';
+}
+
+/**
+ * A file at ANOTHER vault folder named like the store or one of its backups
+ * (parallax wave-7 finding 1): a vault whose store lives in a subfolder must
+ * get the missing-store panel naming that path, never a blank map whose first
+ * edit creates a rival store at the configured path. Prefers the store name
+ * itself over a backup name. Call inside the data-file mutex.
+ */
+function storeFoundElsewhere(app: App, dataPath: string): string | null {
+  const storeName = baseName(dataPath);
+  const storeDir = dirName(dataPath);
+  const bakNames = new Set([bakPathForSlot(dataPath, 1), bakPathForSlot(dataPath, 2), dailyBakPath(dataPath)].map(baseName));
+  let bakHit: string | null = null;
+  for (const f of vaultFiles(app)) {
+    if (dirName(f.path) === storeDir) continue;
+    const name = baseName(f.path);
+    if (name === storeName) return f.path;
+    if (bakHit == null && bakNames.has(name)) bakHit = f.path;
+  }
+  return bakHit;
 }
 
 /** Data file structure */
@@ -374,6 +415,9 @@ interface RestoreResult {
 async function restoreFromBackup(app: App, backup: DataFileBackup): Promise<RestoreResult> {
   const dataPath = getDataFilePath();
   return enqueueDataFileOp(async (): Promise<RestoreResult> => {
+    // The store is about to be replaced wholesale: never splice a save over
+    // a cached copy of the pre-restore file.
+    invalidateStoreCache();
     const adapter = app.vault.adapter;
     let corruptPath: string | null = null;
 
@@ -449,8 +493,9 @@ async function loadMapDataWithGeneration(app: App, mapId: string, mapName: strin
     const file = app.vault.getAbstractFileByPath(dataPath);
 
     if (!(file instanceof TFile)) {
+      invalidateStoreCache();
       // A store that existed before and is gone now: recovery panel, no write.
-      if (hasPriorStoreEvidence(app, dataPath)) throw new MapDataFileMissingError(dataPath);
+      if (hasPriorStoreEvidence(app, dataPath)) throw new MapDataFileMissingError(dataPath, storeFoundElsewhere(app, dataPath));
       // Fresh install (no store, no backups, never seen): a blank map. Nothing
       // is written here; the new-map flows create the store up front and the
       // first save creates it otherwise.
@@ -458,7 +503,15 @@ async function loadMapDataWithGeneration(app: App, mapId: string, mapName: strin
     }
 
     let data: DataFile;
-    try {
+    // Warm path: the file is still exactly what this session last wrote, so
+    // parse only this map's entry text (MEM-12).
+    const cached = await getValidStoreCache(app, dataPath);
+    if (cached != null) {
+      data = { maps: {} };
+      const entry = cached.entries.get(mapId);
+      if (entry != null) data.maps[mapId] = JSON.parse(entry.json) as MapData;
+      markStoreObserved(dataPath);
+    } else try {
       const content = await app.vault.read(file);
       data = JSON.parse(content) as DataFile;
       if (data == null || typeof data !== 'object' || data.maps == null || typeof data.maps !== 'object') {
@@ -466,6 +519,7 @@ async function loadMapDataWithGeneration(app: App, mapId: string, mapName: strin
       }
       markStoreObserved(dataPath);
     } catch (error) {
+      invalidateStoreCache();
       console.error('[loadMapData] Data file exists but could not be read. Refusing to substitute a blank map:', error);
       notifyCorruptedDataFile(dataPath);
       throw new MapDataUnreadableError(dataPath);
@@ -517,6 +571,7 @@ async function createEmptyDataFile(app: App): Promise<boolean> {
   const dataPath = getDataFilePath();
   return enqueueDataFileOp(async () => {
     if (app.vault.getAbstractFileByPath(dataPath) != null) return false;
+    invalidateStoreCache();
     try {
       const dirPath = dataPath.includes('/') ? dataPath.substring(0, dataPath.lastIndexOf('/')) : '';
       if (dirPath !== '' && app.vault.getAbstractFileByPath(dirPath) == null) {
@@ -548,7 +603,16 @@ async function ensureDataFileForNewMap(app: App): Promise<boolean> {
     return hasPriorStoreEvidence(app, dataPath) ? 'refuse' as const : 'create' as const;
   });
   if (proceed === 'exists') return true;
-  if (proceed === 'refuse') return false;
+  if (proceed === 'refuse') {
+    // Parallax wave-7 finding 5: say why no store was created.
+    new Notice(
+      `Windrose: no map data file was created at ${dataPath} because one existed before ` +
+      `(a backup, a corrupt copy or a same-named file elsewhere in the vault). ` +
+      `Open the map to restore it or to create a new data file from the panel.`,
+      10_000
+    );
+    return false;
+  }
   return createEmptyDataFile(app);
 }
 
@@ -568,8 +632,12 @@ async function loadMapData(app: App, mapId: string, mapName: string = '', mapTyp
 async function readRawMapEntry(app: App, mapId: string): Promise<string | null> {
   return enqueueDataFileOp(async () => {
     try {
-      const file = app.vault.getAbstractFileByPath(getDataFilePath());
+      const dataPath = getDataFilePath();
+      const file = app.vault.getAbstractFileByPath(dataPath);
       if (!(file instanceof TFile)) return null;
+      // The cached entry text IS the on-disk text (it is what was written).
+      const cached = await getValidStoreCache(app, dataPath);
+      if (cached != null) return cached.entries.get(mapId)?.json ?? null;
       const data = JSON.parse(await app.vault.read(file)) as DataFile;
       const entry = data?.maps?.[mapId];
       return entry != null ? JSON.stringify(entry) : null;
@@ -753,7 +821,7 @@ type SaveMapResult =
  * exactly one store-writer contract.
  */
 async function writeMapEntryLocked(app: App, mapId: string, mapData: MapData, writerId: string | null, basedOnSavedEntry = false): Promise<SaveMapResult> {
-  let allData: DataFile = { maps: {} };
+  let snapshot: StoreSnapshot = { rest: {}, entries: new Map() };
 
   // Load existing data
   const dataPath = getDataFilePath();
@@ -769,10 +837,24 @@ async function writeMapEntryLocked(app: App, mapId: string, mapData: MapData, wr
     console.error(`[saveMapData] Data file ${dataPath} is missing; refusing to create a one-map store for "${mapId}".`);
     return { status: 'failed' } as const;
   }
-  if (file) {
+  const now = Date.now();
+  const rotateDue = file != null && shouldRotateBak(lastBakAt, now);
+  // Warm path (MEM-12): the file on disk is still exactly what this session
+  // last wrote (a fresh stat matches), so the other entries' text is reused
+  // and nothing is read or parsed. A due backup rotation needs the on-disk
+  // text, so it always takes the cold path (which also bounds a cache's life
+  // to BAK_THROTTLE_MS).
+  const cached = file != null && !rotateDue ? await getValidStoreCache(app, dataPath) : null;
+  if (cached != null) {
+    // Copy: the cache itself is not touched until this write has landed.
+    snapshot = { rest: cached.rest, entries: new Map(cached.entries) };
+  } else if (file) {
+    invalidateStoreCache();
     const content = await app.vault.read(file);
+    let parsed: StoreSnapshot | null;
     try {
-      allData = JSON.parse(content) as DataFile;
+      parsed = snapshotFromParsed(JSON.parse(content));
+      if (parsed == null) throw new Error('data file is not a map store object');
     } catch (parseError) {
       console.error(
         '[saveMapData] Existing data file is unparseable. Refusing to overwrite to avoid data loss. ' +
@@ -782,25 +864,19 @@ async function writeMapEntryLocked(app: App, mapId: string, mapData: MapData, wr
       notifyCorruptedDataFile(dataPath);
       return { status: 'failed' } as const;
     }
+    snapshot = parsed;
 
     // Backup rotation. `content` has just been proven to parse, so it is
     // known-good — the backup captures THAT, never the merged output we are
     // about to write (a backup of unverified new state protects nothing).
     // Runs before vault.modify, inside the mutex.
-    const now = Date.now();
-    if (shouldRotateBak(lastBakAt, now)) {
+    if (rotateDue) {
       // Stamped BEFORE the write: a slot that keeps failing must not retry
       // on every autosave (see BAK_THROTTLE_MS).
       lastBakAt = now;
-      const mapCount = allData.maps != null && typeof allData.maps === 'object' ? Object.keys(allData.maps).length : 0;
-      await rotateBackups(app, dataPath, content, mapCount, now);
+      await rotateBackups(app, dataPath, content, snapshot.entries.size, now);
     }
   }
-
-  // Update specific map with legacy tile ids upgraded. The canonical tree is
-  // a copy-on-write result: the caller's (live) object is never edited.
-  allData.maps ??= {};
-  allData.maps[mapId] = canonicalizeTileIds(mapData);
 
   // Serialize BEFORE touching disk. A circular ref or BigInt makes
   // JSON.stringify throw, which aborts the save here without corrupting the
@@ -809,14 +885,20 @@ async function writeMapEntryLocked(app: App, mapId: string, mapData: MapData, wr
   // output (no pretty-print): on a multi-MB multi-map file the indentation
   // pass plus the redundant re-parse tripled per-save main-thread time,
   // freezing the UI ~300-450ms on every autosave.
+  // Update this map with legacy tile ids upgraded (a copy-on-write result:
+  // the caller's live object is never edited). Only this entry is
+  // stringified; the others are spliced in as their stored text.
   let jsonString: string;
   try {
-    jsonString = JSON.stringify(allData);
+    snapshot.entries.set(mapId, cachedEntry(mapId, canonicalizeTileIds(mapData)));
+    jsonString = serializeStore(snapshot);
   } catch (serializeError) {
     console.error('[saveMapData] Serialization failed, save aborted:', serializeError);
     return { status: 'failed' } as const;
   }
 
+  // Dropped before the write: a failed or interrupted write leaves no cache.
+  invalidateStoreCache();
   if (file) {
     await app.vault.modify(file, jsonString);
   } else {
@@ -827,6 +909,7 @@ async function writeMapEntryLocked(app: App, mapId: string, mapData: MapData, wr
     await app.vault.create(dataPath, jsonString);
   }
   markStoreObserved(dataPath);
+  await commitStoreCache(app, dataPath, snapshot, jsonString);
 
   const generation = getEntryGeneration(mapId) + 1;
   entryGenerations.set(mapId, { generation, writerId });
@@ -880,6 +963,8 @@ async function deleteMapData(app: App, mapId: string): Promise<boolean> {
   // pre-tombstone saves that beat us into the mutex write first and are deleted after.
   deletedMapIds.add(mapId);
   return enqueueDataFileOp(async () => {
+    // Rare op: always a full re-read; the next save rebuilds the cache.
+    invalidateStoreCache();
     try {
       const dataPath = getDataFilePath();
       const abstractFile = app.vault.getAbstractFileByPath(dataPath);
@@ -1087,6 +1172,10 @@ async function listMapsResult(app: App): Promise<MapListResult> {
   return enqueueDataFileOp(async (): Promise<MapListResult> => {
     const file = app.vault.getAbstractFileByPath(dataPath);
     if (!(file instanceof TFile)) return { status: 'ok', maps: [] };
+    const cached = await getValidStoreCache(app, dataPath);
+    if (cached != null) {
+      return { status: 'ok', maps: [...cached.entries].map(([id, e]) => ({ id, name: e.name, type: e.type })) };
+    }
     try {
       const content = await app.vault.read(file);
       const data = JSON.parse(content) as DataFile;
@@ -1120,7 +1209,7 @@ export {
   loadMapData, loadMapDataWithGeneration, getEntryGeneration,
   saveMapData, deleteMapData, createNewMap, buildMapEntry, createMapEntry, listMaps, listMapsResult, migrateMapData,
   canonicalizeTileIds, applyLockedViewState, enqueueDataFileOp, getSaveQueue,
-  notifyCorruptedDataFile, readRawMapEntry, isMapTombstoned, MapDataUnreadableError, MapDeletedError, MapDataFileMissingError, MapSchemaError, createEmptyDataFile, ensureDataFileForNewMap,
+  notifyCorruptedDataFile, readRawMapEntry, storeFoundElsewhere, isMapTombstoned, MapDataUnreadableError, MapDeletedError, MapDataFileMissingError, MapSchemaError, createEmptyDataFile, ensureDataFileForNewMap,
   shouldRotateBak, otherBakSlot, bakPathForSlot, dailyBakPath, isSuspiciousShrink, backupTimestamp,
   findBestBackup, restoreFromBackup, BAK_THROTTLE_MS
 };

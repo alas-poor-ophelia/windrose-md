@@ -8,6 +8,7 @@
 
 import type { FoggedCell } from '#types/core/map.types';
 import { THEME } from '../../core/dmtConstants';
+import { applyNorthRotation } from '../core/viewportMath';
 
 interface FogOfWar {
   enabled: boolean;
@@ -35,17 +36,16 @@ interface FogRenderContext {
 }
 
 import type { IGeometry } from '#types/core/geometry.types';
+import type { HexGeometryLike as SharedHexGeometryLike } from '../hex/hexRegionMath';
 
 export interface GridGeometryLike {
   cellSize: number;
 }
 
-export interface HexGeometryLike {
-  hexSize: number;
-  getHexVertices: (q: number, r: number) => Array<{ worldX: number; worldY: number }>;
-  hexToWorld: (q: number, r: number) => { worldX: number; worldY: number };
-  getNeighbors: (q: number, r: number) => Array<{ x: number; y: number }>;
-}
+export type HexGeometryLike = Pick<
+  SharedHexGeometryLike,
+  'hexSize' | 'getHexVertices' | 'hexToWorld' | 'getNeighbors'
+>;
 
 interface MapBounds {
   hexBounds?: { maxCol: number; maxRow: number };
@@ -237,9 +237,7 @@ function setupFogCanvas(
   fogCtx.clearRect(0, 0, width, height);
 
   fogCtx.save();
-  fogCtx.translate(width / 2, height / 2);
-  fogCtx.rotate((northDirection * Math.PI) / 180);
-  fogCtx.translate(-width / 2, -height / 2);
+  applyNorthRotation(fogCtx, width, height, northDirection);
 
   fogCtx.fillStyle = fowColor;
 

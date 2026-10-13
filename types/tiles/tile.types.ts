@@ -6,6 +6,13 @@
  */
 
 // ===========================================
+// Placement Subtools
+// ===========================================
+
+/** A placement subtool the ribbon can offer. */
+export type TileSubtoolId = 'paint' | 'stamp' | 'scatter' | 'fill' | 'brush' | 'line' | 'autotile' | 'opening';
+
+// ===========================================
 // Tileset Source Types
 // ===========================================
 

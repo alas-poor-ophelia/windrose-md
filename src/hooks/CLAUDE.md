@@ -13,6 +13,7 @@ Encapsulate stateful logic, side effects, and event handling. Hooks sit between 
 | `objects/` | Object manipulation: select, drag, place, resize, modify, hover |
 | `state/` | App and document state: map data, history, tool state, saving, panels, feature flags |
 | `walls/` | The wall/path/opening tool: state + handlers, overlay paints, drawer-footer control surface |
+| `app/` | Composition hooks for the root map component (DungeonMapTracker): drawer state, map-list actions, board handlers, adjacent sub-maps, tileset art handlers, chrome state. Only DMT calls these |
 | `interactions/` | Every other tool/feature interaction (fog, regions, outlines, measure, Beacon, sub-hex, keyboard) |
 
 Only real hooks use the `use*` prefix. The former non-hook files `useSelectionActions.ts` and `useToolbarPosition.ts` now live in `components/toolbars/` as `selectionActionBuilders.ts` and `toolbarPosition.ts`.
@@ -22,8 +23,9 @@ Only real hooks use the `use*` prefix. The former non-hook files `useSelectionAc
 ```
 hooks/
 ├── canvas/
-│   ├── useCanvasRenderer.ts        # Draws all layers onto the main canvas (rAF-coalesced)
+│   ├── useCanvasRenderer.ts        # rAF-coalesced renderCanvas scheduling + static-cache lifecycle (renderer itself: geometry/renderers/mapRenderer.ts)
 │   ├── useCanvasInteraction.ts     # Pan/touch/space-key state for the canvas
+│   ├── useSeamlessSubHex.ts        # Seamless sub-hex dive/surface zoom transition (cooldown, approach prewarm); used by useCanvasInteraction
 │   ├── useEventCoordinator.ts      # Attaches canvas listeners; routes pointer events to registered layer handlers by current tool
 │   ├── toolDispatch.ts             # TOOL_ROUTES: Record<ToolId, ToolRoute> - per-tool down/move/up/leave/doubleClick routing table
 │   ├── useLayerHandlers.ts         # Layer-side registration with the coordinator (typed by HandlerTypeMap, latest-ref Proxy)
@@ -59,7 +61,7 @@ hooks/
 │   ├── useMapData.ts               # Load/hold map data
 │   ├── useDataHandlers.ts          # onCellsChange/onObjectsChange/... handlers that write layer data
 │   ├── useDebouncedSave.ts         # Debounced save with flush registry and stale-conflict handling
-│   ├── useHistory.ts               # Generic undo/redo stack
+│   ├── useHistory.ts               # NOT a hook any more: pure undo/redo building blocks (field diffs, stack cap) used by useLayerHistory; rename is a later bead
 │   ├── useLayerHistory.ts          # Per-layer history and layer switching
 │   ├── useToolState.ts             # Current tool, color, opacity
 │   ├── usePanelState.ts            # Panel/modal visibility
@@ -80,6 +82,18 @@ hooks/
 │   ├── useWallTools.ts             # Wall tool state, pointer/keyboard handlers, wall mutation (draw/edit/opening modes; ephemeral edit-drag, one commit on pointerup)
 │   ├── useWallOverlay.ts           # Wall overlay canvas: draw preview, edit handles (drag hot path), opening ghost, live pan/zoom redraw
 │   └── useWallToolSurface.ts       # Publishes the drawer-footer control surface (stable actions, primitive deps)
+├── app/                            # DungeonMapTracker composition hooks (one caller)
+│   ├── useTileDrawerState.ts       # Tiles/Objects pane + tool coupling, rail sel, grid/list modes, wall surface, bare threshold
+│   ├── useTileToolCoupling.ts      # Strip/opening armed <-> wall tool transitions
+│   ├── useDrawerRibbon.tsx         # Memoized full-pane drawer ribbon VNode
+│   ├── useTileFlyouts.ts           # Recent/starred flyout data + pick
+│   ├── useTilesetArtHandlers.ts    # Tileset overrides, global art nudge/scale (debounced), unmount flush
+│   ├── useMapListActions.ts        # Map list, select/new/generate/delete
+│   ├── useBoardHandlers.ts         # Board (floor) + strata handlers
+│   ├── useAdjacentSubMaps.ts       # Adjacent sub-map toggle + click-to-navigate hit-test
+│   ├── useDockLayout.ts            # Full-pane dock column/section collapse
+│   ├── useLayerLinkActions.ts      # useSubHexLink (copy deep link), useCloneLayerRequest
+│   └── useMapChromeState.ts        # useOnboardingState, useSubHexRowReveal, useCanvasFrameSize
 └── interactions/
     ├── useKeyboardShortcuts.ts     # Undo/redo, layer nav, global shortcuts
     ├── useCustomEventHandlers.ts   # windrose:* DOM custom events

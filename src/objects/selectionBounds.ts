@@ -11,7 +11,7 @@ import type { IGeometry } from '#types/core/geometry.types';
 
 import { calculateObjectScreenPosition } from './screenPositionUtils';
 import { getShapeBoundingHalfExtents } from './shapeOverlayOperations';
-import { calculateViewportOffset } from '../geometry/core/BaseGeometry';
+import { calculateViewportOffset, rotateAboutCanvasCenter } from '../geometry/core/viewportMath';
 import { getActiveLayer } from '../persistence/layerAccessor';
 
 interface SelectionBounds {
@@ -62,19 +62,12 @@ function applyNorthRotation(
   canvas: HTMLCanvasElement,
   northDirection: number | undefined
 ): { x: number; y: number } {
-  const angle = northDirection ?? 0;
-  if (angle === 0) return { x: screenX, y: screenY };
-
-  const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2;
-  const relX = screenX - centerX;
-  const relY = screenY - centerY;
-  const angleRad = (angle * Math.PI) / 180;
-
-  return {
-    x: centerX + relX * Math.cos(angleRad) - relY * Math.sin(angleRad),
-    y: centerY + relX * Math.sin(angleRad) + relY * Math.cos(angleRad)
-  };
+  return rotateAboutCanvasCenter(
+    screenX,
+    screenY,
+    { width: canvas.width, height: canvas.height },
+    northDirection ?? 0
+  );
 }
 
 function calculateTextLabelBounds(

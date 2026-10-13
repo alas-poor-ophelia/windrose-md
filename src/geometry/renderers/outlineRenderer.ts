@@ -6,22 +6,20 @@
 
 import type { Point } from '#types/core/geometry.types';
 import type { Outline } from '#types/core/map.types';
+import { assertNever } from '../../utils/assertNever';
+import {
+  computeBoundaryEdges,
+  forEachHexInBounds,
+  hexKey,
+  pointInPolygon,
+  type HexGeometryLike,
+  type HexRegionBounds
+} from '../hex/hexRegionMath';
 
 /** Canvas dash patterns (on, off) in px for each outline line style. */
 const OUTLINE_DASHED_PATTERN = [12, 6];
 const OUTLINE_DOTTED_PATTERN = [0.5, 8];
 
-
-export interface HexGeometryLike {
-  hexSize: number;
-  orientation: string;
-  hexToWorld(q: number, r: number): { worldX: number; worldY: number };
-  getHexVertices(q: number, r: number): { worldX: number; worldY: number }[];
-  worldToScreen(worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number): { screenX: number; screenY: number };
-  getNeighbors(x: number, y: number): Point[];
-  isWithinBounds(q: number, r: number): boolean;
-  worldToHex(worldX: number, worldY: number): { q: number; r: number };
-}
 
 interface ViewState {
   x: number;
@@ -29,28 +27,13 @@ interface ViewState {
   zoom: number;
 }
 
-function getDashPattern(lineStyle: string): number[] {
+function getDashPattern(lineStyle: Outline['lineStyle']): number[] {
   switch (lineStyle) {
+    case 'solid': return [];
     case 'dashed': return OUTLINE_DASHED_PATTERN;
     case 'dotted': return OUTLINE_DOTTED_PATTERN;
-    default: return [];
+    default: return assertNever(lineStyle);
   }
-}
-
-function hexKey(q: number, r: number): string {
-  return `${q},${r}`;
-}
-
-function pointInPolygon(px: number, py: number, polygon: Array<{ x: number; y: number }>): boolean {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].x, yi = polygon[i].y;
-    const xj = polygon[j].x, yj = polygon[j].y;
-    if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) {
-      inside = !inside;
-    }
-  }
-  return inside;
 }
 
 function hexOverlapsPolygon(
@@ -75,77 +58,15 @@ function hexOverlapsPolygon(
 function findEnclosedHexes(
   vertices: Point[],
   geometry: HexGeometryLike,
-  mapBounds: { maxRing?: number; maxCol?: number; maxRow?: number },
+  mapBounds: HexRegionBounds,
   orientation: string
 ): Point[] {
   const selected: Point[] = [];
-
-  if (mapBounds.maxRing !== undefined) {
-    for (let ring = 0; ring <= mapBounds.maxRing; ring++) {
-      if (ring === 0) {
-        if (hexOverlapsPolygon(0, 0, vertices, geometry)) {
-          selected.push({ x: 0, y: 0 });
-        }
-      } else {
-        let q = ring, r = 0;
-        const dirs = [
-          { dq: -1, dr: 1 }, { dq: -1, dr: 0 }, { dq: 0, dr: -1 },
-          { dq: 1, dr: -1 }, { dq: 1, dr: 0 }, { dq: 0, dr: 1 }
-        ];
-        for (const dir of dirs) {
-          for (let step = 0; step < ring; step++) {
-            if (geometry.isWithinBounds(q, r)) {
-              if (hexOverlapsPolygon(q, r, vertices, geometry)) {
-                selected.push({ x: q, y: r });
-              }
-            }
-            q += dir.dq;
-            r += dir.dr;
-          }
-        }
-      }
-    }
-  } else if (mapBounds.maxCol !== undefined && mapBounds.maxRow !== undefined) {
-    for (let col = 0; col <= mapBounds.maxCol; col++) {
-      for (let row = 0; row <= mapBounds.maxRow; row++) {
-        let q: number, r: number;
-        if (orientation === 'flat') {
-          q = col;
-          r = row - (col - (col & 1)) / 2;
-        } else {
-          q = col - (row - (row & 1)) / 2;
-          r = row;
-        }
-        if (geometry.isWithinBounds(q, r)) {
-          if (hexOverlapsPolygon(q, r, vertices, geometry)) {
-            selected.push({ x: q, y: r });
-          }
-        }
-      }
-    }
-  }
-
+  // Ring 0 is not bounds-checked (forEachHexInBounds preserves that).
+  forEachHexInBounds(geometry, mapBounds, orientation, (q, r) => {
+    if (hexOverlapsPolygon(q, r, vertices, geometry)) selected.push({ x: q, y: r });
+  });
   return selected;
-}
-
-function computeBoundaryEdges(
-  hexes: Point[],
-  geometry: HexGeometryLike
-): Array<{ q: number; r: number; edgeIndex: number }> {
-  const memberSet = new Set<string>();
-  for (const h of hexes) memberSet.add(hexKey(h.x, h.y));
-
-  const edges: Array<{ q: number; r: number; edgeIndex: number }> = [];
-  for (const h of hexes) {
-    const neighbors = geometry.getNeighbors(h.x, h.y);
-    for (let i = 0; i < 6; i++) {
-      const neighbor = neighbors[i];
-      if (!memberSet.has(hexKey(neighbor.x, neighbor.y))) {
-        edges.push({ q: h.x, r: h.y, edgeIndex: i });
-      }
-    }
-  }
-  return edges;
 }
 
 // â”€â”€ Straight-mode rendering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -292,3 +213,4 @@ function renderOutlines(
 }
 
 export { renderOutlines, findEnclosedHexes, computeBoundaryEdges, pointInPolygon };
+export type { HexGeometryLike };

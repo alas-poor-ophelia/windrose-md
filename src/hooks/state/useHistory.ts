@@ -161,6 +161,25 @@ export function stepHistoryRedo<E>(stack: HistoryStack<E>): { stack: HistoryStac
 }
 
 /**
+ * Remove the entry the next step in `direction` would apply, without moving
+ * past it: undo drops the entry below the cursor, redo the one above it. Used
+ * when an entry can no longer apply to the live map (every field changed
+ * since), so it is not spent as a silent no-op step. No-op at the end.
+ */
+export function dropHistoryStep<E>(stack: HistoryStack<E>, direction: 'undo' | 'redo'): HistoryStack<E> {
+  if (direction === 'undo') {
+    if (stack.index === 0) return stack;
+    const entries = stack.entries.slice();
+    entries.splice(stack.index - 1, 1);
+    return { entries, index: stack.index - 1 };
+  }
+  if (stack.index >= stack.entries.length) return stack;
+  const entries = stack.entries.slice();
+  entries.splice(stack.index, 1);
+  return { entries, index: stack.index };
+}
+
+/**
  * Merge two consecutive diffs into one: the older diff's `before` values win
  * (they predate both edits), the newer diff's `after` values win.
  */

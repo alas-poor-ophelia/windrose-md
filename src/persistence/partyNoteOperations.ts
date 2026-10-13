@@ -21,7 +21,7 @@
 
 import type { App } from 'obsidian';
 import type { PartyPin } from '#types/core/map.types';
-import type { PartyRangeResults } from '../objects/partyRangeQuery';
+import type { PartyRangeResults } from '#types/objects/partyRange.types';
 import type { RelatedNotes } from '../objects/partyRelatedNotes';
 
 import { normalizePath, TFile as ObsidianTFile } from 'obsidian';

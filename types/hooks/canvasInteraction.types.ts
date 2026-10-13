@@ -12,6 +12,22 @@ import type { StoredViewState } from '../core/map.types';
 // Re-export WorldCoords for backwards compatibility
 export type { WorldCoords };
 
+/**
+ * Seamless zoom-out surfacing payload: the child view at the moment the
+ * surface fired, so the exit can restore a visually-continuous parent view
+ * (sub-map footprint → parent hex footprint) instead of the stale dive-time
+ * view. Escape-key / breadcrumb exits dispatch no detail and keep the
+ * classic restore.
+ */
+export interface SubHexExitDetail {
+  /** Child zoom the surfacing tick was heading to. */
+  childZoom: number;
+  /** Child world point under the zoom anchor (cursor / pinch center). */
+  childAnchor: { x: number; y: number };
+  /** Anchor's screen offset from the canvas center, in canvas pixels. */
+  anchorOffset: { dx: number; dy: number };
+}
+
 // ===========================================
 // Pan State Types
 // ===========================================

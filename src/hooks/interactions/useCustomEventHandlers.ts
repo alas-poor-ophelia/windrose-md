@@ -29,11 +29,11 @@ import { consumePendingNavigate } from '../../persistence/deepLinkHandler';
 import type { NavigationEventDetail } from '../../persistence/deepLinkHandler';
 import type {
   SubHexCoordDetail,
-  SubHexExitDetail,
   RegionIdDetail,
   CreateObjectLinkDetail,
   RemoveObjectLinkDetail
 } from '../../core/windroseEvents';
+import type { SubHexExitDetail } from '#types/hooks/canvasInteraction.types';
 import { isForeignInstanceEvent } from '../../core/windroseEvents';
 import { useHexContextMenu } from './useHexContextMenu';
 import { DEFAULTS } from '../../core/dmtConstants';

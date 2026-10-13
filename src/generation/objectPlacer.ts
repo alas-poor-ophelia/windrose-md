@@ -9,54 +9,103 @@
 import { getRoomCells, isCellInRoom } from './dungeonGenerator';
 
 // =============================================================================
-// TYPE DEFINITIONS (JSDoc)
+// TYPE DEFINITIONS
 // =============================================================================
 
-/**
- * @typedef {Object} CellPosition
- * @property {number} x - Grid X coordinate
- * @property {number} y - Grid Y coordinate
- */
+export interface CellPosition {
+  x: number;
+  y: number;
+}
 
-/**
- * @typedef {Object} PlacementZones
- * @property {CellPosition[]} center - Center area cells
- * @property {CellPosition[]} corners - Corner cells
- * @property {CellPosition[]} walls - Wall-adjacent cells
- * @property {CellPosition[]} doorAdjacent - Cells near doors (excluded from placement)
- * @property {CellPosition[]} scattered - All valid cells for random placement
- */
+export interface PlacementZones {
+  center: CellPosition[];
+  corners: CellPosition[];
+  walls: CellPosition[];
+  doorAdjacent: CellPosition[];
+  scattered: CellPosition[];
+}
 
-/**
- * @typedef {Object} PlacementContext
- * @property {string} [category] - Room category ('monster', 'trap', 'feature', 'empty')
- * @property {boolean} [isTreasure] - Whether this is a treasure object
- * @property {string} [templateName] - Template name if using a room template
- * @property {boolean} [isCorridor] - Whether placed in a corridor
- */
+export type CategoryWeights = {
+  monster: number;
+  empty: number;
+  feature: number;
+  trap: number;
+};
 
-/**
- * @typedef {Object} PlacedObject
- * @property {string} id - Unique object ID
- * @property {string} type - Object type ID
- * @property {CellPosition} position - Grid position
- * @property {{width: number, height: number}} size - Object size in cells
- * @property {string} alignment - Cell alignment
- * @property {number} scale - Render scale
- * @property {number} rotation - Rotation in degrees
- * @property {string} label - Display label
- * @property {string} [customTooltip] - Tooltip text (if applicable)
- */
+/** Room bounds used for zone classification (no id needed). */
+export interface RoomGeometry {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  shape: string;
+}
 
-/**
- * @typedef {Object} RoomDefinition
- * @property {number} id - Room ID
- * @property {number} x - Top-left X
- * @property {number} y - Top-left Y
- * @property {number} width - Room width
- * @property {number} height - Room height
- * @property {string} [shape] - Room shape ('rectangle', 'circle', 'composite')
- */
+/** Room as handed to the stocker; structurally compatible with the generator's DungeonRoom. */
+export interface RoomLike extends RoomGeometry {
+  id: number;
+  radius?: number;
+  parts?: Array<{ x: number; y: number; width: number; height: number }>;
+}
+
+export interface PlacementContext {
+  /** Room category ('monster', 'trap', 'feature', 'empty') */
+  category?: string;
+  isTreasure?: boolean;
+  templateName?: string;
+  isCorridor?: boolean;
+}
+
+export type PlacedObject = {
+  id: string;
+  type: string;
+  position: CellPosition;
+  size: { width: number; height: number };
+  alignment: string;
+  scale: number;
+  rotation: number;
+  label: string;
+  customTooltip?: string;
+};
+
+export type RoomAssignment = {
+  category: string;
+  hasSecondaryTreasure: boolean;
+  template?: string;
+  isWater?: boolean;
+};
+
+export interface CorridorResult {
+  cells: CellPosition[];
+  byConnection: unknown[];
+}
+
+export interface TemplateObjectSpec {
+  type: string;
+  count: { min: number; max: number };
+  placement: string;
+}
+
+export interface RoomTemplate {
+  name: string;
+  objects: TemplateObjectSpec[];
+  minRoomSize: number;
+}
+
+export interface StockingOptions {
+  entryRoomId?: number | string;
+  exitRoomId?: number | string;
+  waterRoomIds?: (number | string)[];
+}
+
+type PlacementZoneName = keyof PlacementZones;
+
+interface StylePool {
+  monsters: string[];
+  treasures: string[];
+  features: string[];
+  traps: string[];
+}
 
 // =============================================================================
 // CONSTANTS
@@ -100,7 +149,7 @@ const STOCKING_CONFIG = {
 // STYLE-SPECIFIC OBJECT POOLS
 // =============================================================================
 
-const STYLE_OBJECT_POOLS = {
+const STYLE_OBJECT_POOLS: Record<string, StylePool> = {
   classic: {
     monsters: ['monster', 'guard'],
     treasures: ['chest', 'sack'],
@@ -154,7 +203,7 @@ const WATER_PLACEMENT_RULES = {
 // ROOM TEMPLATES
 // =============================================================================
 
-const ROOM_TEMPLATES = {
+const ROOM_TEMPLATES: Record<string, RoomTemplate> = {
   library: {
     name: 'Library',
     objects: [
@@ -210,7 +259,7 @@ const ROOM_TEMPLATES = {
 // PLACEMENT PREFERENCES
 // =============================================================================
 
-const PLACEMENT_PREFERENCES = {
+const PLACEMENT_PREFERENCES: Record<string, PlacementZoneName[]> = {
   // Monsters can be anywhere
   monster: ['scattered', 'center'],
   guard: ['scattered', 'center'],
@@ -250,22 +299,32 @@ const PLACEMENT_PREFERENCES = {
 // UTILITY FUNCTIONS
 // =============================================================================
 
-function randomInt(min, max) {
+function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function generateObjectId() {
-  return 'obj-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+function generateObjectId(): string {
+  return 'obj-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 }
 
-function cellKey(x, y) {
+/** Narrow an untyped config value: the number itself, or the fallback when absent. */
+function numberOr(value: unknown, fallback: number): number {
+  return typeof value === 'number' ? value : fallback;
+}
+
+/** Pick from a pool that is never empty in practice; the fallback only guards the type. */
+function pickFromPool(pool: readonly string[]): string {
+  return selectFromPool(pool) ?? 'monster';
+}
+
+function cellKey(x: number, y: number): string {
   return `${x},${y}`;
 }
 
 /**
  * Select a random item from an array.
  */
-function selectFromPool(pool) {
+function selectFromPool<T>(pool: readonly T[] | null | undefined): T | null {
   if (!pool || pool.length === 0) return null;
   return pool[Math.floor(Math.random() * pool.length)];
 }
@@ -275,11 +334,11 @@ function selectFromPool(pool) {
  * @param {Object} weights - Object with category names as keys and weights as values
  * @returns {string} Selected category name
  */
-function rollWeightedCategory(weights) {
-  const entries = Object.entries(weights);
+function rollWeightedCategory(weights: CategoryWeights): keyof CategoryWeights {
+  const entries = Object.entries(weights) as Array<[keyof CategoryWeights, number]>;
   const total = entries.reduce((sum, [, w]) => sum + w, 0);
 
-  if (total === 0) return ROOM_CATEGORIES.EMPTY;
+  if (total === 0) return 'empty';
 
   let roll = Math.random() * total;
 
@@ -294,8 +353,8 @@ function rollWeightedCategory(weights) {
 /**
  * Normalize weights to sum to 1.0.
  */
-function normalizeWeights(weights) {
-  const sum = Object.values(weights).reduce((a, b) => a + b, 0);
+function normalizeWeights(weights: CategoryWeights): CategoryWeights {
+  const sum = Object.values<number>(weights).reduce((a, b) => a + b, 0);
   if (sum === 0) {
     return {
       monster: 0.25,
@@ -305,9 +364,9 @@ function normalizeWeights(weights) {
     };
   }
 
-  const normalized = {};
-  for (const [key, val] of Object.entries(weights)) {
-    normalized[key] = val / sum;
+  const normalized: CategoryWeights = { monster: 0, empty: 0, feature: 0, trap: 0 };
+  for (const key of Object.keys(weights) as Array<keyof CategoryWeights>) {
+    normalized[key] = weights[key] / sum;
   }
   return normalized;
 }
@@ -319,7 +378,7 @@ function normalizeWeights(weights) {
 /**
  * Object type labels for display.
  */
-const OBJECT_LABELS = {
+const OBJECT_LABELS: Record<string, string> = {
   // Monsters
   monster: 'Monster',
   guard: 'Guard',
@@ -360,7 +419,7 @@ const OBJECT_LABELS = {
  * @param {string} objectType - The object type ID
  * @returns {string} Human-readable label
  */
-function getObjectLabel(objectType) {
+function getObjectLabel(objectType: string): string {
   return OBJECT_LABELS[objectType] || objectType.charAt(0).toUpperCase() + objectType.slice(1);
 }
 
@@ -374,16 +433,16 @@ function getObjectLabel(objectType) {
  * @param {boolean} context.isCorridor - Whether placed in corridor
  * @returns {string} Tooltip text
  */
-function getObjectTooltip(objectType, context = {}) {
+function getObjectTooltip(objectType: string, context: PlacementContext = {}): string | null {
   const { category, isTreasure, templateName, isCorridor } = context;
 
   // Corridor traps
-  if (isCorridor) {
+  if (isCorridor === true) {
     return 'Corridor trap';
   }
 
   // Treasure objects get special tooltips based on room category
-  if (isTreasure) {
+  if (isTreasure === true) {
     if (category === 'monster') {
       return 'Guarded treasure';
     }
@@ -409,7 +468,7 @@ function getObjectTooltip(objectType, context = {}) {
   }
 
   // Feature category with template
-  if (templateName) {
+  if (templateName != null && templateName !== '') {
     return `${templateName} furnishing`;
   }
 
@@ -429,8 +488,8 @@ function getObjectTooltip(objectType, context = {}) {
 /**
  * Calculate object budget based on room size and density multiplier.
  */
-function getObjectBudget(roomSize, densityMultiplier = 1.0) {
-  let base;
+function getObjectBudget(roomSize: number, densityMultiplier = 1.0): number {
+  let base: number;
 
   if (roomSize <= STOCKING_CONFIG.sizeThresholds.small) {
     // Small rooms: 1-2 objects
@@ -457,8 +516,8 @@ function getObjectBudget(roomSize, densityMultiplier = 1.0) {
  * @param {Array} doorPositions - Door positions to avoid
  * @returns {Object} Zones: center, corners, walls, scattered, doorAdjacent
  */
-function identifyPlacementZones(roomCells, room, doorPositions = []) {
-  const zones = {
+function identifyPlacementZones(roomCells: CellPosition[], room: RoomGeometry, doorPositions: CellPosition[] = []): PlacementZones {
+  const zones: PlacementZones = {
     center: [],
     corners: [],
     walls: [],
@@ -468,7 +527,7 @@ function identifyPlacementZones(roomCells, room, doorPositions = []) {
 
   // Build door position set for quick lookup
   const doorCells = new Set(doorPositions.map(d => cellKey(d.x, d.y)));
-  const doorAdjacentCells = new Set();
+  const doorAdjacentCells = new Set<string>();
 
   // Mark cells adjacent to doors
   for (const door of doorPositions) {
@@ -519,7 +578,7 @@ function identifyPlacementZones(roomCells, room, doorPositions = []) {
 /**
  * Check if a cell is in a corner of the room.
  */
-function isCornerCell(cell, minX, maxX, minY, maxY) {
+function isCornerCell(cell: CellPosition, minX: number, maxX: number, minY: number, maxY: number): boolean {
   const nearLeft = cell.x <= minX + 1;
   const nearRight = cell.x >= maxX - 1;
   const nearTop = cell.y <= minY + 1;
@@ -531,7 +590,7 @@ function isCornerCell(cell, minX, maxX, minY, maxY) {
 /**
  * Check if a cell is along a wall (edge) but not a corner.
  */
-function isWallCell(cell, minX, maxX, minY, maxY) {
+function isWallCell(cell: CellPosition, minX: number, maxX: number, minY: number, maxY: number): boolean {
   return cell.x === minX || cell.x === maxX ||
          cell.y === minY || cell.y === maxY;
 }
@@ -549,15 +608,21 @@ function isWallCell(cell, minX, maxX, minY, maxY) {
  * @param {PlacementContext} context - Placement context for tooltip generation
  * @returns {PlacedObject|null} Object definition or null if no valid position
  */
-function placeObject(zones, objectType, occupiedCells, preferredZone = null, context = {}) {
+function placeObject(
+  zones: PlacementZones,
+  objectType: string,
+  occupiedCells: Set<string>,
+  preferredZone: PlacementZoneName | null = null,
+  context: PlacementContext = {}
+): PlacedObject | null {
   // Determine zone preference order
-  const preferences = preferredZone
+  const preferences: PlacementZoneName[] = preferredZone
     ? [preferredZone, 'scattered']
-    : (PLACEMENT_PREFERENCES[objectType] || ['scattered']);
+    : (PLACEMENT_PREFERENCES[objectType] ?? ['scattered']);
 
   for (const zoneName of preferences) {
     const zone = zones[zoneName];
-    if (!zone || zone.length === 0) continue;
+    if (zone == null || zone.length === 0) continue;
 
     // Find available cells in this zone
     const available = zone.filter(cell => !occupiedCells.has(cellKey(cell.x, cell.y)));
@@ -571,7 +636,7 @@ function placeObject(zones, objectType, occupiedCells, preferredZone = null, con
     const label = getObjectLabel(objectType);
     const customTooltip = getObjectTooltip(objectType, context);
 
-    const obj = {
+    const obj: PlacedObject = {
       id: generateObjectId(),
       type: objectType,
       position: { x: cell.x, y: cell.y },
@@ -583,7 +648,7 @@ function placeObject(zones, objectType, occupiedCells, preferredZone = null, con
     };
 
     // Only add customTooltip if we have one
-    if (customTooltip) {
+    if (customTooltip != null && customTooltip !== '') {
       obj.customTooltip = customTooltip;
     }
 
@@ -603,12 +668,19 @@ function placeObject(zones, objectType, occupiedCells, preferredZone = null, con
  * @param {PlacementContext} context - Placement context for tooltip generation
  * @returns {PlacedObject[]} Placed objects
  */
-function placeObjects(zones, pool, count, occupiedCells, preferredZone = null, context = {}) {
-  const placed = [];
+function placeObjects(
+  zones: PlacementZones,
+  pool: string[],
+  count: number,
+  occupiedCells: Set<string>,
+  preferredZone: PlacementZoneName | null = null,
+  context: PlacementContext = {}
+): PlacedObject[] {
+  const placed: PlacedObject[] = [];
 
   for (let i = 0; i < count; i++) {
     const objectType = selectFromPool(pool);
-    if (!objectType) continue;
+    if (objectType == null || objectType === '') continue;
 
     const obj = placeObject(zones, objectType, occupiedCells, preferredZone, context);
     if (obj) {
@@ -626,7 +698,7 @@ function placeObjects(zones, pool, count, occupiedCells, preferredZone = null, c
 /**
  * Select a valid template for the given room size.
  */
-function selectValidTemplate(roomSize) {
+function selectValidTemplate(roomSize: number): RoomTemplate | null {
   const validTemplates = Object.entries(ROOM_TEMPLATES)
     .filter(([, template]) => roomSize >= template.minRoomSize);
 
@@ -657,15 +729,15 @@ function selectValidTemplate(roomSize) {
  * @param {Set<string>} occupiedCells - Set of occupied cell keys
  * @returns {PlacedObject[]} Placed objects
  */
-function applyRoomTemplate(template, zones, occupiedCells) {
-  const placed = [];
-  const context = { category: 'feature', templateName: template.name };
+function applyRoomTemplate(template: RoomTemplate, zones: PlacementZones, occupiedCells: Set<string>): PlacedObject[] {
+  const placed: PlacedObject[] = [];
+  const context: PlacementContext = { category: 'feature', templateName: template.name };
 
   for (const spec of template.objects) {
     const count = randomInt(spec.count.min, spec.count.max);
 
     for (let i = 0; i < count; i++) {
-      const obj = placeObject(zones, spec.type, occupiedCells, spec.placement, context);
+      const obj = placeObject(zones, spec.type, occupiedCells, spec.placement as PlacementZoneName, context);
       if (obj) {
         placed.push(obj);
       }
@@ -682,7 +754,7 @@ function applyRoomTemplate(template, zones, occupiedCells) {
 /**
  * Find cells that are only in corridors (not in any room).
  */
-function findCorridorOnlyCells(corridorCells, rooms) {
+function findCorridorOnlyCells(corridorCells: CellPosition[], rooms: RoomLike[]): CellPosition[] {
   return corridorCells.filter(cell => {
     for (const room of rooms) {
       if (isCellInRoom(cell.x, cell.y, room)) {
@@ -696,7 +768,7 @@ function findCorridorOnlyCells(corridorCells, rooms) {
 /**
  * Select a position for a corridor trap.
  */
-function selectCorridorTrapPosition(corridorCells, occupiedCells) {
+function selectCorridorTrapPosition(corridorCells: CellPosition[], occupiedCells: Set<string>): CellPosition | null {
   const available = corridorCells.filter(cell =>
     !occupiedCells.has(cellKey(cell.x, cell.y))
   );
@@ -717,9 +789,9 @@ function selectCorridorTrapPosition(corridorCells, occupiedCells) {
  * @param {Object} room - Room object with bounds
  * @returns {Object} { shore: CellPosition[], deepWater: CellPosition[] }
  */
-function identifyWaterZones(roomCells, room) {
-  const shore = [];
-  const deepWater = [];
+function identifyWaterZones(roomCells: CellPosition[], room: RoomGeometry): { shore: CellPosition[]; deepWater: CellPosition[] } {
+  const shore: CellPosition[] = [];
+  const deepWater: CellPosition[] = [];
 
   const minX = room.x;
   const maxX = room.x + room.width - 1;
@@ -760,15 +832,21 @@ function identifyWaterZones(roomCells, room) {
  * @param {Set<string>} occupiedCells - Set of occupied cell keys
  * @returns {Object} { objects: PlacedObject[], assignment: { category, isWater: true } }
  */
-function stockWaterRoom(room, roomCells, roomDoors, style, occupiedCells) {
-  const objects = [];
+function stockWaterRoom(
+  room: RoomLike,
+  roomCells: CellPosition[],
+  roomDoors: CellPosition[],
+  style: string,
+  occupiedCells: Set<string>
+): { objects: PlacedObject[]; assignment: RoomAssignment } {
+  const objects: PlacedObject[] = [];
   const waterZones = identifyWaterZones(roomCells, room);
 
   // Calculate reduced budget for water rooms
   const budget = Math.max(1, Math.floor(roomCells.length / WATER_PLACEMENT_RULES.budgetDivisor));
 
   // Build door-adjacent exclusion set
-  const doorAdjacentCells = new Set();
+  const doorAdjacentCells = new Set<string>();
   for (const door of roomDoors) {
     doorAdjacentCells.add(cellKey(door.x, door.y));
     for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
@@ -788,7 +866,7 @@ function stockWaterRoom(room, roomCells, roomDoors, style, occupiedCells) {
     );
     if (centerCells.length > 0) {
       const cell = centerCells[Math.floor(Math.random() * centerCells.length)];
-      const featureType = selectFromPool(WATER_PLACEMENT_RULES.centerFeatures);
+      const featureType = pickFromPool(WATER_PLACEMENT_RULES.centerFeatures);
       occupiedCells.add(cellKey(cell.x, cell.y));
       objects.push({
         id: generateObjectId(),
@@ -837,7 +915,7 @@ function stockWaterRoom(room, roomCells, roomDoors, style, occupiedCells) {
     if (available.length === 0) break;
 
     const cell = available[Math.floor(Math.random() * available.length)];
-    const objectType = selectFromPool(shorePool);
+    const objectType = pickFromPool(shorePool);
     occupiedCells.add(cellKey(cell.x, cell.y));
 
     objects.push({
@@ -874,28 +952,35 @@ function stockWaterRoom(room, roomCells, roomDoors, style, occupiedCells) {
  * @param {Object} options - Additional options (entryRoomId, exitRoomId, waterRoomIds)
  * @returns {Object} { objects: MapObject[], roomAssignments: {} }
  */
-function stockDungeon(rooms, corridorResult, doorPositions, style = 'classic', config = {}, options = {}) {
-  const stockedObjects = [];
-  const roomAssignments = {};
-  const occupiedCells = new Set();
+function stockDungeon(
+  rooms: RoomLike[],
+  corridorResult: CorridorResult,
+  doorPositions: CellPosition[],
+  style = 'classic',
+  config: Record<string, unknown> = {},
+  options: StockingOptions = {}
+): { objects: PlacedObject[]; roomAssignments: Record<string | number, RoomAssignment> } {
+  const stockedObjects: PlacedObject[] = [];
+  const roomAssignments: Record<string | number, RoomAssignment> = {};
+  const occupiedCells = new Set<string>();
 
   // Get style-specific object pool
-  const objectPool = STYLE_OBJECT_POOLS[style] || STYLE_OBJECT_POOLS.classic;
+  const objectPool = STYLE_OBJECT_POOLS[style] ?? STYLE_OBJECT_POOLS.classic;
 
   // Build water room lookup set
-  const waterRoomSet = new Set(options.waterRoomIds || []);
+  const waterRoomSet = new Set<number | string | undefined>(options.waterRoomIds ?? []);
 
   // Merge config with defaults
   const categoryWeights = normalizeWeights({
-    monster: config.monsterWeight ?? STOCKING_CONFIG.categoryWeights.monster,
-    empty: config.emptyWeight ?? STOCKING_CONFIG.categoryWeights.empty,
-    feature: config.featureWeight ?? STOCKING_CONFIG.categoryWeights.feature,
-    trap: config.trapWeight ?? STOCKING_CONFIG.categoryWeights.trap
+    monster: numberOr(config.monsterWeight, STOCKING_CONFIG.categoryWeights.monster),
+    empty: numberOr(config.emptyWeight, STOCKING_CONFIG.categoryWeights.empty),
+    feature: numberOr(config.featureWeight, STOCKING_CONFIG.categoryWeights.feature),
+    trap: numberOr(config.trapWeight, STOCKING_CONFIG.categoryWeights.trap)
   });
 
-  const densityMultiplier = config.objectDensity ?? 1.0;
+  const densityMultiplier = numberOr(config.objectDensity, 1.0);
   const useTemplates = config.useTemplates !== false;
-  const corridorTrapChance = config.corridorTrapChance ?? 0.1;
+  const corridorTrapChance = numberOr(config.corridorTrapChance, 0.1);
 
   // Mark existing object positions as occupied (doors, stairs)
   for (const door of doorPositions) {
@@ -942,7 +1027,7 @@ function stockDungeon(rooms, corridorResult, doorPositions, style = 'classic', c
       case ROOM_CATEGORIES.MONSTER: {
         // Place monsters (60% of budget)
         const monsterCount = Math.max(1, Math.ceil(objectBudget * 0.6));
-        const monsterContext = { category: 'monster' };
+        const monsterContext: PlacementContext = { category: 'monster' };
         const monsters = placeObjects(zones, objectPool.monsters, monsterCount, occupiedCells, null, monsterContext);
         stockedObjects.push(...monsters);
 
@@ -950,7 +1035,7 @@ function stockDungeon(rooms, corridorResult, doorPositions, style = 'classic', c
         if (Math.random() < STOCKING_CONFIG.treasureChance.monster) {
           roomAssignments[room.id].hasSecondaryTreasure = true;
           const treasureCount = Math.max(1, Math.floor(objectBudget * 0.3));
-          const treasureContext = { category: 'monster', isTreasure: true };
+          const treasureContext: PlacementContext = { category: 'monster', isTreasure: true };
           const treasure = placeObjects(zones, objectPool.treasures, treasureCount, occupiedCells, 'corners', treasureContext);
           stockedObjects.push(...treasure);
         }
@@ -960,14 +1045,14 @@ function stockDungeon(rooms, corridorResult, doorPositions, style = 'classic', c
       case ROOM_CATEGORIES.TRAP: {
         // Place trap(s)
         const trapCount = randomInt(1, 2);
-        const trapContext = { category: 'trap' };
+        const trapContext: PlacementContext = { category: 'trap' };
         const traps = placeObjects(zones, objectPool.traps, trapCount, occupiedCells, null, trapContext);
         stockedObjects.push(...traps);
 
         // Secondary treasure roll (B/X: 2-in-6 for trap rooms - it's bait!)
         if (Math.random() < STOCKING_CONFIG.treasureChance.trap) {
           roomAssignments[room.id].hasSecondaryTreasure = true;
-          const treasureContext = { category: 'trap', isTreasure: true };
+          const treasureContext: PlacementContext = { category: 'trap', isTreasure: true };
           const treasure = placeObjects(zones, objectPool.treasures, 1, occupiedCells, 'center', treasureContext);
           stockedObjects.push(...treasure);
         }
@@ -988,7 +1073,7 @@ function stockDungeon(rooms, corridorResult, doorPositions, style = 'classic', c
 
         // Otherwise place random features
         const featureCount = objectBudget;
-        const featureContext = { category: 'feature' };
+        const featureContext: PlacementContext = { category: 'feature' };
         const features = placeObjects(zones, objectPool.features, featureCount, occupiedCells, null, featureContext);
         stockedObjects.push(...features);
         break;
@@ -999,7 +1084,7 @@ function stockDungeon(rooms, corridorResult, doorPositions, style = 'classic', c
         // Usually empty, but small chance of hidden treasure (B/X: 1-in-6)
         if (Math.random() < STOCKING_CONFIG.treasureChance.empty) {
           roomAssignments[room.id].hasSecondaryTreasure = true;
-          const treasureContext = { category: 'empty', isTreasure: true };
+          const treasureContext: PlacementContext = { category: 'empty', isTreasure: true };
           const treasure = placeObjects(zones, objectPool.treasures, 1, occupiedCells, 'corners', treasureContext);
           stockedObjects.push(...treasure);
         }
@@ -1009,7 +1094,7 @@ function stockDungeon(rooms, corridorResult, doorPositions, style = 'classic', c
   }
 
   // Place corridor traps
-  if (corridorTrapChance > 0 && corridorResult && corridorResult.cells) {
+  if (corridorTrapChance > 0 && corridorResult != null && corridorResult.cells != null) {
     const corridorOnlyCells = findCorridorOnlyCells(corridorResult.cells, rooms);
 
     // Calculate corridor trap count based on corridor length and chance
@@ -1019,7 +1104,7 @@ function stockDungeon(rooms, corridorResult, doorPositions, style = 'classic', c
       const cell = selectCorridorTrapPosition(corridorOnlyCells, occupiedCells);
       if (cell) {
         occupiedCells.add(cellKey(cell.x, cell.y));
-        const trapType = selectFromPool(objectPool.traps);
+        const trapType = pickFromPool(objectPool.traps);
         stockedObjects.push({
           id: generateObjectId(),
           type: trapType,

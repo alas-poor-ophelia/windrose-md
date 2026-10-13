@@ -10,8 +10,9 @@
 import type { MapData, MapLayer, SubHexMapData, StoredViewState } from '#types/core/map.types';
 import type { MapDataUpdater } from '#types/hooks/mapData.types';
 import type { SubHexPath } from '../../persistence/subHexPath';
-import type { MapDistanceOverrides, ResolvedDistanceSettings, SubHexDistanceLevel } from '../../drawing/distanceOperations';
-import type { SubHexExitDetail } from '../../core/windroseEvents';
+import type { MapDistanceOverrides } from '#types/hooks/distanceMeasurement.types';
+import type { ResolvedDistanceSettings, SubHexDistanceLevel } from '../../drawing/distanceOperations';
+import type { SubHexExitDetail } from '#types/hooks/canvasInteraction.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { DEFAULTS } from '../../core/dmtConstants';

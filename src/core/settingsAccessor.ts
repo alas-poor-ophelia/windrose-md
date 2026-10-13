@@ -231,6 +231,14 @@ function mergeSettingsOverrides(
 }
 
 /**
+ * Whether a sub-map shows the parent-map backdrop: the per-map setting wins,
+ * then the global showSubHexBackdrop toggle, defaulting to on.
+ */
+function resolveShowParentBackdrop(mapSettings: { showParentBackdrop?: boolean } | null | undefined): boolean {
+  return mapSettings?.showParentBackdrop ?? getSettings().showSubHexBackdrop ?? true;
+}
+
+/**
  * Get effective settings for a map, merging map-specific overrides with global settings
  */
 function getEffectiveSettings(
@@ -368,5 +376,5 @@ function getTilesetFolders(): string[] {
   }
 }
 
-export { setPlugin, clearPlugin, getApp, getDataFilePath, getSettings, getSetting, getTheme, resolveTheme, getEffectiveSettings, mergeSettingsOverrides, getObjectSettings, getObjectSettingsForSet, getColorPaletteSettings, getTilesetFolders, FALLBACK_SETTINGS, BUILT_IN_COLORS };
+export { setPlugin, clearPlugin, getApp, getDataFilePath, getSettings, getSetting, getTheme, resolveTheme, getEffectiveSettings, resolveShowParentBackdrop, mergeSettingsOverrides, getObjectSettings, getObjectSettingsForSet, getColorPaletteSettings, getTilesetFolders, FALLBACK_SETTINGS, BUILT_IN_COLORS };
 export type { WindrosePluginRef };

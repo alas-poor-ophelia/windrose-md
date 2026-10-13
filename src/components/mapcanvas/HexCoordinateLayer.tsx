@@ -268,7 +268,7 @@ const HexCoordinateLayer = (): VNode | null => {
   
   // C key (showCoordinates) overrides layerVisibility - if C is pressed, always show
   // Otherwise, respect the toolbar visibility setting
-  const effectiveVisible = showCoordinates || layerVisibility.hexCoordinates;
+  const effectiveVisible = showCoordinates || layerVisibility.hexCoordinates === true;
   
   // Don't render if not effectively visible or not a hex map
   if (!effectiveVisible || !geometry || !mapData || mapData.mapType !== 'hex' || geometry.type !== 'hex') {

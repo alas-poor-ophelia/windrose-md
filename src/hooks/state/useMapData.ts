@@ -2,7 +2,6 @@ import type { MapData, MapType } from '#types/core/map.types';
 import type {
   UseMapDataResult,
   MapDataLoadFailure,
-  MapDataUpdater,
   MapId,
   MapName,
 } from '#types/hooks/mapData.types';
@@ -34,7 +33,7 @@ function useMapData(
 
   // Assigned below, after useDebouncedSave — the load effect needs the updater
   // to apply a restored journal entry through the normal save path.
-  const updateMapDataRef = useRef<MapDataUpdater | null>(null);
+  const applyRestoredRef = useRef<((data: MapData) => void) | null>(null);
   // This pane's save-writer id, used to owner-stamp a restored journal copy.
   const writerIdRef = useRef('');
 
@@ -87,7 +86,7 @@ function useMapData(
       // Crash journal: offer to restore edits a previous session couldn't write.
       const restored = await resolveJournalOnLoad(app, mapId, data.name ?? mapName, undefined, writerIdRef.current === '' ? undefined : writerIdRef.current);
       if (cancelled || restored == null) return;
-      updateMapDataRef.current?.(restored);
+      applyRestoredRef.current?.(restored);
     }
     void load();
     return () => { cancelled = true; };
@@ -121,9 +120,9 @@ function useMapData(
   // with the active map and this hook's settingsVersion (windrose-1mc).
   useTilesetBuilder(app, mapData, setMapData, isLoading, settingsVersion);
 
-  const { saveStatus, updateMapData, forceSave, markDeleted, mapDeleted: saveDeleted, staleConflict, acknowledgeStaleConflict, writerId } =
+  const { saveStatus, updateMapData, forceSave, markDeleted, mapDeleted: saveDeleted, staleConflict, acknowledgeStaleConflict, writerId, applyRestored } =
     useDebouncedSave(app, mapId, setMapData, baseGenRef);
-  updateMapDataRef.current = updateMapData;
+  applyRestoredRef.current = applyRestored;
   writerIdRef.current = writerId;
 
   return {

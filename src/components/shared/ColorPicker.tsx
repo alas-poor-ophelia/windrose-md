@@ -7,6 +7,7 @@
 import type { CSSProperties, TargetedEvent, TargetedMouseEvent, TargetedTouchEvent, VNode } from 'preact';
 import { Fragment } from 'preact';
 import type { CustomColor, HexColor } from '#types/core/common.types';
+import type { ColorOpacityOverrides } from '#types/core/map.types';
 
 import type { MutableRef } from 'preact/hooks';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
@@ -36,9 +37,6 @@ export type PickerPosition = 'below' | 'above' | null;
 
 /** Alignment for color picker */
 export type PickerAlign = 'left' | 'right';
-
-/** Per-color opacity overrides */
-export type ColorOpacityOverrides = Record<string, number>;
 
 /** Bounding rect of the swatch the edit panel is anchored to (viewport coordinates) */
 interface EditAnchorRect {

@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { computeStaticPad, rotatedViewportHalfExtents } from "../../../../src/hooks/canvas/useCanvasRenderer";
+import { computeStaticPad, rotatedViewportHalfExtents } from "../../../../src/geometry/renderers/staticLayerCache";
 
 const area = (w: number, h: number, p: { padX: number; padY: number }): number => (w + 2 * p.padX) * (h + 2 * p.padY);
 

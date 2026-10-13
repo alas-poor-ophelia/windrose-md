@@ -225,12 +225,20 @@ function scheduleSave(app: App): void {
   }, SAVE_DEBOUNCE_MS);
 }
 
-/** Write a pending debounced save now (before a raw file read, or on unload). */
+/**
+ * Write a pending debounced save now (before a raw file read, or on unload),
+ * and in every case wait for any save already in flight, so a caller that
+ * resets module state afterwards never does so mid-write (parallax wave-7
+ * finding 10).
+ */
 async function flushTileMetadataSave(): Promise<void> {
-  if (saveTimer == null || saveApp == null) return;
-  window.clearTimeout(saveTimer);
-  saveTimer = null;
-  await queueStoreSave(saveApp);
+  if (saveTimer != null && saveApp != null) {
+    window.clearTimeout(saveTimer);
+    saveTimer = null;
+    await queueStoreSave(saveApp);
+    return;
+  }
+  await _saveChain;
 }
 
 /** Drop all module state (tests; plugin unload after flushTileMetadataSave). */

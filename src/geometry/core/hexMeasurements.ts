@@ -21,15 +21,13 @@
  */
 
 import type { HexOrientation, GridCalculation } from '#types/settings/settings.types';
+import type { MeasurementMethod } from '#types/core/map.types';
 
 import { DEFAULTS } from '../../core/dmtConstants';
 
 // ===========================================
 // Type Definitions
 // ===========================================
-
-/** Measurement method */
-export type MeasurementMethod = 'edge' | 'corner';
 
 /** Validation result */
 export interface ValidationResult {

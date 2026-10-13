@@ -137,6 +137,7 @@ src/
 │   ├── drawing/           # Drawing tools
 │   ├── objects/           # Object interactions
 │   ├── state/             # State management & data
+│   ├── app/               # Root-component composition hooks (DungeonMapTracker only)
 │   └── interactions/      # Feature-specific tool interactions
 ├── components/
 │   ├── controls/          # Map chrome & navigation
@@ -145,6 +146,7 @@ src/
 │   ├── panels/            # Sidebar/docked panels
 │   ├── toolbars/          # Action toolbars
 │   ├── shared/            # Reusable primitives (Icon, InternalLink)
+│   ├── hosts/             # DMT layout hosts: one prop bag per panel (panelBags/buildPanelBags), TileBrowserHost (block|fullpane|floating), edge rail, drawers, dock column, floating panels, canvas layers
 │   ├── mapcanvas/         # Canvas layer components
 │   └── settings/          # Settings UI components
 ├── context/               # Preact Contexts
@@ -156,7 +158,7 @@ src/
 │   ├── helpers/           # Settings utilities
 │   ├── modals/            # Settings modals
 │   └── tabs/settingsTabContext.ts   # Structural tab type for definition builders
-└── generation/            # Random map generation
+└── generation/            # Random map generation (dungeonGenerator.ts, objectPlacer.ts, dungeonStyleColors.ts; all TypeScript, golden-hash test in tests/unit/generation)
 ```
 
 Non-source files live outside `src/`: `CHANGELOG.md` (read by the release workflow) at the repo root, and the sample map-block template and object set under `examples/`.
@@ -167,11 +169,11 @@ Non-source files live outside `src/`: `CHANGELOG.md` (read by the release workfl
 |---------|-------|
 | Beacon (party pin) | `objects/partyPinOperations.ts`, `objects/partyRangeQuery.ts`, `objects/partyRelatedNotes.ts`, `persistence/partyNoteOperations.ts`, `components/mapcanvas/PartyPinLayer.tsx` + `PartyPinInstance.tsx`, `components/overlays/PartyPin*.tsx`, `hooks/interactions/usePartyPin*.ts` |
 | Travel and routes | `travel/` (packs, time, segment terrain sampler), `drawing/routeOperations.ts`, `components/mapcanvas/RouteLayer.tsx` + `MeasurementLayer.tsx`, `hooks/interactions/useTerrainSampling.ts`, `components/modals/SaveRouteModal.ts`, `settings/modals/TravelPackEditModal.ts` |
-| Openings (wall gaps) | `drawing/wallGapOperations.ts`, `components/mapcanvas/WallLayer.tsx` (walls/paths: `drawing/wallPath*.ts`, `geometry/renderers/wallPathRenderer.ts`) |
+| Openings (wall gaps) | `drawing/wallGapOperations.ts`, `drawing/wallEditGeometry.ts`, `components/mapcanvas/WallLayer.tsx`, `hooks/walls/` (`useWallTools.ts` state + handlers, `useWallOverlay.ts` overlay canvas, `useWallToolSurface.ts` drawer-footer controls) (walls/paths: `drawing/wallPath*.ts`, `geometry/renderers/wallPathRenderer.ts`) |
 | Full-pane view | `views/WindroseMapView.ts` |
 | Sub-hex maps | `hooks/interactions/useSubHexNavigation.ts`, `persistence/subHexPath.ts` (hexKey-path read/write helpers), `core/subHexBackdropStore.ts`, `core/paintedViewStore.ts`, `geometry/core/subHexBackdrop.ts`, `geometry/renderers/subHexBackdropRenderer.ts`, `components/controls/SubHexBreadcrumb.tsx` |
 | Export | `persistence/exportOperations.ts`, `components/modals/ExportImageModal.ts` |
-| Dock panels | `components/panels/Dock*.tsx`, `DrawerDock.tsx`, `EdgeRail.tsx`, `hooks/state/useFloatingPanels.ts` |
+| Dock panels | `components/panels/Dock*.tsx`, `DrawerDock.tsx`, `EdgeRail.tsx`, `hooks/state/useFloatingPanels.ts`; rendered via `components/hosts/` (add a panel prop in `panelBags.ts` + `buildPanelBags.ts`, never per layout) |
 | Tile import wizard | `assets/import*.ts` (+ predictors, `tile*.ts`), `settings/modals/AddTilesModal.ts`, `components/panels/TileAssetBrowser.tsx` (+ `TileCell.tsx`, `TileBrowserFooter.tsx`, `hooks/tiles/useTileFilterPipeline.ts`), `TileOrganizePane.tsx` |
 | Terrain strokes | `drawing/terrainStrokeOperations.ts`, `geometry/strokes/`, `components/mapcanvas/TerrainBrushLayer.tsx` |
 | Pan/zoom performance | `hooks/canvas/useViewController.ts`, `useLiveOverlay*.ts` |

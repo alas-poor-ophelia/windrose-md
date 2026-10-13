@@ -61,8 +61,10 @@ interface UseMcpBridgeParams {
   setSelectedColor: (color: string) => void;
   handleOpacityChange: (opacity: number) => void;
   handleCellsChange: (cells: Cell[]) => void;
-  wrappedHandleUndo: () => void;
-  handleRedo: () => void;
+  /** Undo; a boolean return means "the map changed" (useLayerHistory's handleUndo). */
+  wrappedHandleUndo: () => unknown;
+  /** Redo; a boolean return means "the map changed". */
+  handleRedo: () => unknown;
   handleLayerSelect: (layerId: string) => void;
   forceSave: () => unknown;
   handleViewStateChange: (viewState: { center: { x: number; y: number }; zoom: number }) => void;
@@ -199,8 +201,11 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
         const yHi = Math.max(bbox.y0, bbox.y1);
         return mapped.filter(c => c.x >= xLo && c.x <= xHi && c.y >= yLo && c.y <= yHi);
       },
-      undo: (): boolean => { S().wrappedHandleUndo(); return S().canUndo; },
-      redo: (): boolean => { S().handleRedo(); return S().canRedo; },
+      // true only when the step changed the map (parallax wave-7 finding 9).
+      // A caller that does not pass the result through falls back to the
+      // pre-step availability flag (the old, weaker contract).
+      undo: (): boolean => { const r = S().wrappedHandleUndo(); return typeof r === 'boolean' ? r : S().canUndo; },
+      redo: (): boolean => { const r = S().handleRedo(); return typeof r === 'boolean' ? r : S().canRedo; },
       selectLayer: (layerId: string) => S().handleLayerSelect(layerId),
       forceSave: () => { void S().forceSave(); },
       setViewport: (x: number, y: number, zoom?: number): { ok: boolean; viewState: { x: number; y: number; zoom: number } } => {

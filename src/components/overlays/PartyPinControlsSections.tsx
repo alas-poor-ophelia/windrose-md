@@ -15,7 +15,7 @@ import type { VNode } from 'preact';
 import type { Point } from '#types/core/geometry.types';
 import type { MapData, PartyPin, PartyRelatedMode } from '#types/core/map.types';
 
-import type { PartyRangeResults } from '../../objects/partyRangeQuery';
+import type { PartyRangeResults } from '#types/objects/partyRange.types';
 
 import {
   parseTagFilters,

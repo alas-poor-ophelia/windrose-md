@@ -142,6 +142,13 @@ export type {
 } from './objects/note.types';
 
 export type {
+  PartyRangeNoteResult,
+  PartyRangeUnlinkedResult,
+  PartyRangeBeaconResult,
+  PartyRangeResults,
+} from './objects/partyRange.types';
+
+export type {
   IconCategory,
   IconData,
   IconMap,
@@ -161,6 +168,7 @@ export type {
   TilesetOverrides,
   TileLayerRole,
   TileRenderContext,
+  TileSubtoolId,
 } from './tiles/tile.types';
 export { DEFAULT_TILE_LAYERS } from './tiles/tile.types';
 
@@ -424,6 +432,7 @@ export type {
   UseCanvasRendererOptions,
   UseCanvasRenderer,
 } from './hooks/canvasRenderer.types';
+export type { RenderFrame } from './rendering/renderFrame.types';
 
 export type {
   UsePanZoomCoordinatorOptions,

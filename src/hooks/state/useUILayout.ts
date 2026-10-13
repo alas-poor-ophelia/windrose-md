@@ -180,11 +180,10 @@ function useUILayout({
     }
 
     if (mapData != null && mapData.uiPreferences?.rememberExpandedState === true) {
-      const newMapData = {
-        ...mapData,
+      updateMapData((prev: MapData) => ({
+        ...prev,
         expandedState: newExpandedState
-      };
-      updateMapData(newMapData);
+      }));
     }
   };
 

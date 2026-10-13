@@ -6,16 +6,13 @@
  */
 
 // Type-only imports
-import type { Point } from '#types/core/geometry.types';
 import type { HexColor } from '#types/core/common.types';
+import type { TextLabel, TextLabelId } from '#types/objects/note.types';
 import { updateById, removeById } from '../objects/entityList';
 
 // ===========================================
 // Type Definitions
 // ===========================================
-
-/** Unique text label identifier */
-export type TextLabelId = string;
 
 /** Font face options */
 export type FontFace = 'sans' | 'serif' | 'mono' | 'script' | 'fantasy';
@@ -25,18 +22,6 @@ export interface TextLabelOptions {
   fontSize?: number;
   fontFace?: FontFace;
   color?: HexColor;
-  opacity?: number;
-}
-
-/** Text label data structure */
-export interface TextLabel {
-  id: TextLabelId;
-  content: string;
-  position: Point;
-  rotation: number;
-  fontSize: number;
-  fontFace: FontFace;
-  color: HexColor;
   opacity?: number;
 }
 
@@ -177,7 +162,7 @@ function getTextLabelAtPosition(
   }
   
   // Font family mapping
-  const fontMap: Record<FontFace, string> = {
+  const fontMap: Partial<Record<string, string>> = {
     'sans': 'system-ui, -apple-system, sans-serif',
     'serif': 'Georgia, Times, serif',
     'mono': '"Courier New", monospace',
@@ -192,7 +177,7 @@ function getTextLabelAtPosition(
     // Set font to measure text accurately
     const fontSize = label.fontSize || 16;
     const fontFace = label.fontFace || 'sans';
-    const fontFamily = fontMap[fontFace] || 'sans-serif';
+    const fontFamily = fontMap[fontFace] ?? 'sans-serif';
     
     context.font = `${fontSize}px ${fontFamily}`;
     
@@ -212,7 +197,7 @@ function getTextLabelAtPosition(
       x, y,
       label.position.x, label.position.y,
       boundingWidth, boundingHeight,
-      label.rotation || 0
+      label.rotation ?? 0
     )) {
       return label;
     }

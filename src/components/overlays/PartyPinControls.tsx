@@ -17,7 +17,7 @@ import type { IGeometry, Point } from '#types/core/geometry.types';
 import type { MapData, PartyPin, PartyRangeStyle } from '#types/core/map.types';
 import type { ViewController } from '#types/hooks/viewController.types';
 
-import type { PartyRangeResults } from '../../objects/partyRangeQuery';
+import type { PartyRangeResults } from '#types/objects/partyRange.types';
 
 import {
   isValidRange,

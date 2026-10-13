@@ -17,7 +17,7 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
 import type { TerrainStroke } from '#types/core/terrainstroke.types';
 import type { TileLayerRole } from '#types/tiles/tile.types';
-import type { TileSubtoolId } from '../../assets/tileForm';
+import type { TileSubtoolId } from '#types/tiles/tile.types';
 
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';

@@ -18,7 +18,7 @@ import type { MutableRef } from 'preact/hooks';
 
 import { useCallback, useEffect } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
-import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
+import { calculateViewportOffset } from '../../geometry/core/viewportMath';
 import { renderWallPaths, flattenWallPath } from '../../geometry/renderers/wallPathRenderer';
 import { getCachedImage } from '../../assets/imageOperations';
 import { gapHandleAnchors, findGapOnWallAtPoint, planGapInsert } from '../../drawing/wallGapOperations';

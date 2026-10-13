@@ -8,6 +8,7 @@
  * - Settings change listener (forces re-render on windrose-settings-changed)
  */
 
+import type { MapDataUpdater } from '#types/hooks/mapData.types';
 import type {
   MapData, MapLayer, MapObject, Cell, BackgroundImage,
   UIPreferences, MapSettings,
@@ -31,7 +32,7 @@ import { offsetToAxial, isAxialInHexBounds, isOffsetInHexBounds } from '../../ge
 
 interface UsePanelStateOptions {
   mapData: MapData | null;
-  updateMapData: (data: MapData) => void;
+  updateMapData: MapDataUpdater;
 }
 
 interface UsePanelStateResult {
@@ -96,82 +97,84 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
   ): void => {
     if (!mapData) return;
 
-    const newMapData: MapData = {
-      ...mapData,
-      settings: settingsData,
-      uiPreferences: preferencesData,
-      objectSetId: settingsData.objectSetId ?? null
-    };
+    updateMapData((prev: MapData) => {
+      const newMapData: MapData = {
+        ...prev,
+        settings: settingsData,
+        uiPreferences: preferencesData,
+        objectSetId: settingsData.objectSetId ?? null
+      };
 
-    if (hexBounds !== null && mapData.mapType === 'hex') {
-      newMapData.hexBounds = hexBounds;
+      if (hexBounds !== null && prev.mapType === 'hex') {
+        newMapData.hexBounds = hexBounds;
 
-      if (deleteOrphanedContent) {
-        const orientation = mapData.orientation ?? 'flat';
-        // Same predicate the settings modal uses to count orphans
-        const isInBounds = (q: number, r: number): boolean =>
-          isAxialInHexBounds(q, r, hexBounds, orientation);
-        const isFogCellInBounds = (col: number, row: number): boolean =>
-          isOffsetInHexBounds(col, row, hexBounds, orientation);
+        if (deleteOrphanedContent) {
+          const orientation = prev.orientation ?? 'flat';
+          // Same predicate the settings modal uses to count orphans
+          const isInBounds = (q: number, r: number): boolean =>
+            isAxialInHexBounds(q, r, hexBounds, orientation);
+          const isFogCellInBounds = (col: number, row: number): boolean =>
+            isOffsetInHexBounds(col, row, hexBounds, orientation);
 
-        if (newMapData.layers.length > 0) {
-          newMapData.layers = newMapData.layers.map((layer: MapLayer) => {
-            const filteredCells = layer.cells?.filter((cell: Cell) =>
-              isHexCell(cell) && isInBounds(cell.q, cell.r)
-            );
-            const filteredObjects = layer.objects?.filter((obj: MapObject) =>
-              isInBounds(obj.position.x, obj.position.y)
-            );
-            const filteredFog = layer.fogOfWar?.foggedCells?.filter(
-              (fc: { col: number; row: number }) => isFogCellInBounds(fc.col, fc.row)
-            );
-            const fogChanged = filteredFog !== layer.fogOfWar?.foggedCells;
-            if (filteredCells === layer.cells && filteredObjects === layer.objects && !fogChanged) return layer;
-            return {
-              ...layer,
-              cells: filteredCells ?? [],
-              objects: filteredObjects ?? [],
-              ...(layer.fogOfWar && fogChanged ? {
-                fogOfWar: { ...layer.fogOfWar, foggedCells: filteredFog ?? [] }
-              } : {})
-            };
-          });
-        }
-      }
-    }
-
-    if (hexBounds !== null && mapData.mapType === 'hex') {
-      const wasRadial = mapData.hexBounds?.maxRing !== undefined;
-      const isNowRadial = hexBounds.maxRing !== undefined;
-      if (wasRadial !== isNowRadial) {
-        if (isNowRadial) {
-          newMapData.viewState = { ...mapData.viewState, center: { x: 0, y: 0 }, zoom: mapData.viewState?.zoom ?? 1 };
-        } else {
-          const orientation = mapData.orientation ?? 'flat';
-          const hSize = hexSize ?? mapData.hexSize ?? 40;
-          const centerCol = Math.floor(hexBounds.maxCol / 2);
-          const centerRow = Math.floor(hexBounds.maxRow / 2);
-          const { q, r } = offsetToAxial(centerCol, centerRow, orientation);
-          let worldX: number, worldY: number;
-          if (orientation === 'flat') {
-            worldX = hSize * (3 / 2) * q;
-            worldY = hSize * (Math.sqrt(3) / 2 * q + Math.sqrt(3) * r);
-          } else {
-            worldX = hSize * (Math.sqrt(3) * q + Math.sqrt(3) / 2 * r);
-            worldY = hSize * (3 / 2) * r;
+          if (newMapData.layers.length > 0) {
+            newMapData.layers = newMapData.layers.map((layer: MapLayer) => {
+              const filteredCells = layer.cells?.filter((cell: Cell) =>
+                isHexCell(cell) && isInBounds(cell.q, cell.r)
+              );
+              const filteredObjects = layer.objects?.filter((obj: MapObject) =>
+                isInBounds(obj.position.x, obj.position.y)
+              );
+              const filteredFog = layer.fogOfWar?.foggedCells?.filter(
+                (fc: { col: number; row: number }) => isFogCellInBounds(fc.col, fc.row)
+              );
+              const fogChanged = filteredFog !== layer.fogOfWar?.foggedCells;
+              if (filteredCells === layer.cells && filteredObjects === layer.objects && !fogChanged) return layer;
+              return {
+                ...layer,
+                cells: filteredCells ?? [],
+                objects: filteredObjects ?? [],
+                ...(layer.fogOfWar && fogChanged ? {
+                  fogOfWar: { ...layer.fogOfWar, foggedCells: filteredFog ?? [] }
+                } : {})
+              };
+            });
           }
-          newMapData.viewState = { ...mapData.viewState, center: { x: worldX, y: worldY }, zoom: mapData.viewState?.zoom ?? 1 };
         }
       }
-    }
 
-    newMapData.backgroundImage = backgroundImage ?? undefined;
+      if (hexBounds !== null && prev.mapType === 'hex') {
+        const wasRadial = prev.hexBounds?.maxRing !== undefined;
+        const isNowRadial = hexBounds.maxRing !== undefined;
+        if (wasRadial !== isNowRadial) {
+          if (isNowRadial) {
+            newMapData.viewState = { ...prev.viewState, center: { x: 0, y: 0 }, zoom: prev.viewState?.zoom ?? 1 };
+          } else {
+            const orientation = prev.orientation ?? 'flat';
+            const hSize = hexSize ?? prev.hexSize ?? 40;
+            const centerCol = Math.floor(hexBounds.maxCol / 2);
+            const centerRow = Math.floor(hexBounds.maxRow / 2);
+            const { q, r } = offsetToAxial(centerCol, centerRow, orientation);
+            let worldX: number, worldY: number;
+            if (orientation === 'flat') {
+              worldX = hSize * (3 / 2) * q;
+              worldY = hSize * (Math.sqrt(3) / 2 * q + Math.sqrt(3) * r);
+            } else {
+              worldX = hSize * (Math.sqrt(3) * q + Math.sqrt(3) / 2 * r);
+              worldY = hSize * (3 / 2) * r;
+            }
+            newMapData.viewState = { ...prev.viewState, center: { x: worldX, y: worldY }, zoom: prev.viewState?.zoom ?? 1 };
+          }
+        }
+      }
 
-    if (hexSize !== null && mapData.mapType === 'hex') {
-      newMapData.hexSize = hexSize;
-    }
+      newMapData.backgroundImage = backgroundImage ?? undefined;
 
-    updateMapData(newMapData);
+      if (hexSize !== null && prev.mapType === 'hex') {
+        newMapData.hexSize = hexSize;
+      }
+
+      return newMapData;
+    });
     setSettingsVersion((prev: number) => prev + 1);
   };
 
