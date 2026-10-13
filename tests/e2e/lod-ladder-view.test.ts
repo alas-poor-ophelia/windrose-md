@@ -463,9 +463,18 @@ describe("Lattice ladder phase 6 UI", () => {
     await openSettingsModal(page);
     await page.locator('.windrose-settings-tab:has-text("Hex Grid")').click();
     const modal = page.locator(".windrose-settings-modal");
-    for (const label of ["Enable detail ladder", "Subdivision", "Minimum cell size", "Deepest level"]) {
-      expect(await modal.getByText(label, { exact: false }).count(), `missing "${label}"`).toBeGreaterThan(0);
+    // A classic hex map shows only the opt-in toggle; the parameter rows appear
+    // once it is switched on. Cancel afterwards so no lod block is ever saved.
+    expect(await modal.getByText("Enable detail ladder", { exact: false }).count(), 'missing "Enable detail ladder"').toBeGreaterThan(0);
+    for (const label of ["Subdivision", "Minimum cell size", "Deepest level"]) {
+      expect(await modal.getByText(label, { exact: false }).count(), `"${label}" shown before opt-in`).toBe(0);
     }
+    await modal.locator('.setting-item:has-text("Enable detail ladder") .checkbox-container').first().click();
+    await page.waitForTimeout(300);
+    for (const label of ["Subdivision", "Minimum cell size", "Deepest level"]) {
+      expect(await modal.getByText(label, { exact: false }).count(), `missing "${label}" after opt-in`).toBeGreaterThan(0);
+    }
+    expect(await modal.getByText("Opens at L", { exact: false }).count(), 'missing "Opens at L" readout').toBeGreaterThan(0);
     await closeSettingsModal(page);
     expect(errors).toHaveLength(0);
   });
