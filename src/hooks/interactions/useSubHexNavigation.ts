@@ -287,13 +287,21 @@ function useSubHexNavigation({
   // path that HAS resolved before is trimmed: a just-entered sub-map whose
   // creation write has not committed yet must not be popped.
   const lastResolvedPathRef = useRef('');
+  // A frame pushed while its creation write was still deferred: if a root
+  // commit lands and the path still does not resolve, the write was dropped
+  // and the frame is dead (never resolved, so the rule above never trims it).
+  const pendingCreateRef = useRef<{ pathKey: string; root: MapData | null } | null>(null);
   useEffect(() => {
     if (rootMapData == null) return;
     if (resolvedDepth === navStack.length) {
       lastResolvedPathRef.current = fullPathKey;
+      if (pendingCreateRef.current?.pathKey === fullPathKey) pendingCreateRef.current = null;
       return;
     }
-    if (lastResolvedPathRef.current !== fullPathKey) return;
+    const pending = pendingCreateRef.current;
+    const droppedCreation = pending != null && pending.pathKey === fullPathKey && pending.root !== rootMapData;
+    if (droppedCreation) pendingCreateRef.current = null;
+    if (lastResolvedPathRef.current !== fullPathKey && !droppedCreation) return;
     const kept = navStack.slice(0, resolvedDepth);
     pruneSubHexBackdrops(getCanvas?.() ?? null, formatSubHexPath(kept.map(f => f.hexKey)));
     setNavStack(kept);
@@ -358,21 +366,33 @@ function useSubHexNavigation({
     const view = viewOverride != null
       ? { zoom: viewOverride.zoom, center: { ...viewOverride.center } }
       : null;
+    // Did the creation write add the entry? Preact runs state updaters at
+    // dispatch time, so this is known right after the call (null = deferred).
+    // A level that vanished first makes addSubHexEntryAtPath return the root
+    // unchanged: pushing a frame then would leave a dead entry in navStack
+    // that jumps the view if another writer later creates that key.
+    const creation: { added: boolean | null } = { added: null };
     if (created != null || view != null) {
       const toAdd = created;
       rootUpdateMapData((prev) => {
-        let next = toAdd != null ? addSubHexEntryAtPath(prev, path, hexKey, toAdd) : prev;
+        let next = prev;
+        if (toAdd != null) {
+          next = addSubHexEntryAtPath(prev, path, hexKey, toAdd);
+          creation.added = next !== prev;
+        }
         if (view != null) next = setAtSubHexPath(next, childPath, m => ({ ...m, viewState: view }));
         return next;
       }, { cosmetic: created == null });
     }
+    if (creation.added === false) return;
+    if (created != null && creation.added == null) pendingCreateRef.current = { pathKey: childPath.join('/'), root: rootMapData };
 
     setNavStack([...frames, { hexKey, parentStoredViewState: currentMapData.viewState ?? DEFAULT_PARENT_VIEW }]);
     traceZoom('enterSubHex', viewOverride != null
       ? { hexKey, overrideZoom: viewOverride.zoom }
       : { hexKey, storedZoom: subHex.mapData.viewState?.zoom ?? null });
     setNavigationVersion(prev => prev + 1);
-  }, [activeMapData, path, frames, rootUpdateMapData]);
+  }, [activeMapData, path, frames, rootUpdateMapData, rootMapData]);
 
   // Exit current sub-hex (go up one level). Edits already live in the root,
   // so the only write is the parent's view restore, which is cosmetic.
@@ -542,6 +562,26 @@ function useSubHexNavigation({
     // wrong too: the live canvas shows the DEPARTING sibling's interior,
     // not the parent imagery.
     const siblingPath = [...parentPath, siblingKey];
+
+    // Write first: a creation dropped because the parent level vanished must
+    // not relabel the backdrop or replace the frame (see enterSubHex).
+    const creation: { added: boolean | null } = { added: null };
+    if (created != null || arrivalView != null) {
+      const toAdd = created;
+      const view = arrivalView;
+      rootUpdateMapData((prev) => {
+        let next = prev;
+        if (toAdd != null) {
+          next = addSubHexEntryAtPath(prev, parentPath, siblingKey, toAdd);
+          creation.added = next !== prev;
+        }
+        if (view != null) next = setAtSubHexPath(next, siblingPath, m => ({ ...m, viewState: view }));
+        return next;
+      }, { cosmetic: created == null });
+    }
+    if (creation.added === false) return;
+    if (created != null && creation.added == null) pendingCreateRef.current = { pathKey: siblingPath.join('/'), root: rootMapData };
+
     const canvas = getCanvas?.() ?? null;
     if (canvas != null) {
       relabelSubHexBackdrop({
@@ -554,20 +594,10 @@ function useSubHexNavigation({
       });
     }
 
-    if (created != null || arrivalView != null) {
-      const toAdd = created;
-      const view = arrivalView;
-      rootUpdateMapData((prev) => {
-        let next = toAdd != null ? addSubHexEntryAtPath(prev, parentPath, siblingKey, toAdd) : prev;
-        if (view != null) next = setAtSubHexPath(next, siblingPath, m => ({ ...m, viewState: view }));
-        return next;
-      }, { cosmetic: created == null });
-    }
-
     // Replace the top frame with the sibling's frame
     setNavStack([...frames.slice(0, -1), { hexKey: siblingKey, parentStoredViewState: topFrame.parentStoredViewState }]);
     setNavigationVersion(prev => prev + 1);
-  }, [frames, parentMapData, parentPath, activeMapData, pathKey, rootUpdateMapData, getCanvas]);
+  }, [frames, parentMapData, parentPath, activeMapData, pathKey, rootUpdateMapData, getCanvas, rootMapData]);
 
   // Current hex key (for adjacent sub-hex lookup)
   const currentHexKey = isInSubHex ? path[path.length - 1] : null;

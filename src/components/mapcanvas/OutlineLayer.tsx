@@ -17,7 +17,8 @@ import { useMapState } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useLiveOverlayRedraw } from '../../hooks/canvas/useLiveOverlayRedraw';
 import { useOverlayCanvas } from '../../hooks/canvas/useOverlayCanvas';
-import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
+import { applyNorthRotation, calculateViewportOffset } from '../../geometry/core/viewportMath';
+import { assertNever } from '../../utils/assertNever';
 import { useOutlineTools } from '../../hooks/interactions/useOutlineTools';
 import type { MenuItem } from 'obsidian';
 import { Modal, Menu } from 'obsidian';
@@ -198,9 +199,11 @@ const OutlineLayer = ({
     modal.open();
   }, [app, onOutlinesChange]);
 
-  useLayerHandlers('outline', isOutlineTool
-    ? { handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick }
-    : {});
+  useLayerHandlers(
+    'outline',
+    { handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick },
+    { enabled: isOutlineTool }
+  );
 
   // ESC to cancel drawing, Delete/Backspace to delete selected
   useEffect(() => {
@@ -354,9 +357,7 @@ const OutlineLayer = ({
     const northDirection = mapData.northDirection ?? 0;
     if (northDirection !== 0) {
       ctx.save();
-      ctx.translate(overlay.width / 2, overlay.height / 2);
-      ctx.rotate((northDirection * Math.PI) / 180);
-      ctx.translate(-overlay.width / 2, -overlay.height / 2);
+      applyNorthRotation(ctx, overlay.width, overlay.height, northDirection);
     }
 
     // Draw in-progress outline
@@ -372,7 +373,8 @@ const OutlineLayer = ({
       switch (outlineSettings.lineStyle) {
         case 'dotted': ctx.setLineDash([0.5, 8]); break;
         case 'dashed': ctx.setLineDash([12, 6]); break;
-        default: ctx.setLineDash([]); break;
+        case 'solid': ctx.setLineDash([]); break;
+        default: assertNever(outlineSettings.lineStyle, 'outline line style');
       }
       ctx.beginPath();
       ctx.moveTo(screenVerts[0].screenX, screenVerts[0].screenY);

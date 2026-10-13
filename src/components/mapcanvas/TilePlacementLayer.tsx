@@ -16,6 +16,7 @@ import type { TileSubtoolId } from '../../assets/tileForm';
 import { Notice } from 'obsidian';
 import { useCallback, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
+import { assertNever } from '../../utils/assertNever';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useApp } from '../../context/AppContext';
 import { getActiveLayer, getActiveBoardLayers } from '../../persistence/layerAccessor';
@@ -410,8 +411,13 @@ const TilePlacementLayer = ({
         case 'line':
           // 'line' arms the wall tool, so tilePaint never sees these events.
           return;
+        case 'paint':
+        case 'autotile': // autotile until built
+        case 'opening': // unreachable: openings return above
+        case null: // no subtool armed = paint
+          break; // grid brush stroke below
         default:
-          break; // 'paint' (and autotile until built) → grid brush stroke below
+          assertNever(activeSubtool, 'tile subtool');
       }
     }
 
@@ -477,9 +483,11 @@ const TilePlacementLayer = ({
     scatterLastDropRef.current = null;
   }, [onTilesChange]);
 
-  useLayerHandlers('tilePlacement', isTileTool
-    ? { handlePointerDown, handlePointerMove, handlePointerUp }
-    : {});
+  useLayerHandlers(
+    'tilePlacement',
+    { handlePointerDown, handlePointerMove, handlePointerUp },
+    { enabled: isTileTool }
+  );
 
   return null;
 };

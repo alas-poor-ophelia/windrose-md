@@ -195,6 +195,12 @@ export interface IGeometry {
    * Get the cell/hex size scaled by zoom level
    */
   getScaledCellSize(zoom: number): number;
+
+  /**
+   * Canvas px per view-centre unit: cellSize * zoom on grid (centre in cell
+   * units), zoom on hex (centre in world px). See geometry/core/viewportMath.
+   */
+  getViewCenterScale(zoom: number): number;
   
   /**
    * Create a cell object from coordinates and color

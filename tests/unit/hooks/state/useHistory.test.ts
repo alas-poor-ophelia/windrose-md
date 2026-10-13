@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { isSameHistoryState } from '../../../../src/hooks/state/useHistory';
+import {
+  isSameHistoryState, diffHistoryFields, guardedPatch, pushHistoryEntry, createHistoryStack, stepHistoryUndo, mergeFieldDiffs,
+} from '../../../../src/hooks/state/useHistory';
 
 describe('isSameHistoryState (MEM-01 reference change check)', () => {
   const cells = [{ x: 1, y: 2 }];
@@ -41,5 +43,33 @@ describe('isSameHistoryState (MEM-01 reference change check)', () => {
 
   it('compares changed scalar fields by value', () => {
     expect(isSameHistoryState(base, { ...base, name: 'Other' })).toBe(false);
+  });
+});
+
+
+describe('diff history helpers (DATA-06)', () => {
+  const a = [1];
+  const b = [2];
+  it('diffs only changed keys, and skips undefined when asked', () => {
+    expect(diffHistoryFields<{ x: number[]; y: number[] }>(['x', 'y'], { x: a, y: a }, { x: b, y: a }, false))
+      .toEqual({ before: { x: a }, after: { x: b } });
+    expect(diffHistoryFields<{ x?: number[] }>(['x'], { x: a }, { x: undefined }, true)).toBeNull();
+    expect(diffHistoryFields<{ x?: number[] }>(['x'], { x: undefined }, { x: [] }, false)).toBeNull();
+  });
+  it('guardedPatch leaves fields changed since the entry alone', () => {
+    expect(guardedPatch<{ x: number[]; y: number[] }>({ x: b, y: [9] }, { x: b, y: b }, { x: a, y: a })).toEqual({ x: a });
+    expect(guardedPatch<{ x: number[] }>({ x: [9] }, { x: b }, { x: a })).toBeNull();
+  });
+  it('caps the stack and drops the redo tail on push', () => {
+    let s = createHistoryStack<number>();
+    for (let i = 0; i < 5; i++) s = pushHistoryEntry(s, i, 3);
+    expect(s.entries).toEqual([2, 3, 4]);
+    const undone = stepHistoryUndo(s);
+    s = pushHistoryEntry(undone?.stack ?? s, 9, 3);
+    expect(s.entries).toEqual([2, 3, 9]);
+  });
+  it('merges diffs keeping the oldest before and newest after', () => {
+    expect(mergeFieldDiffs<{ x: number }>({ before: { x: 1 }, after: { x: 2 } }, { before: { x: 2 }, after: { x: 3 } }))
+      .toEqual({ before: { x: 1 }, after: { x: 3 } });
   });
 });

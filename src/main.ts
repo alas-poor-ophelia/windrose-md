@@ -29,7 +29,10 @@ import {
   isTileMetadataCorrupt,
   commitTileMetadataDelta,
   bulkSetDdSourceType,
+  flushTileMetadataSave,
+  resetTileMetadataStore,
 } from './persistence/tileMetadata';
+import { flushTilesetArtSaves } from './persistence/tilesetArtSettings';
 import type { TileEntry } from '#types/tiles/tile.types';
 
 /** View center used when a generated dungeon has no cells to derive bounds from. */
@@ -126,7 +129,6 @@ export default class WindrosePlugin extends Plugin {
     await this.loadSettings();
     this.initMcpNamespace();
     await this.resolveDebugConfig();
-    await this.resolveDataFilePath();
     await this.resolveOnboardingState();
     this.checkForConflicts();
 
@@ -389,6 +391,11 @@ export default class WindrosePlugin extends Plugin {
       render(null, el);
     }
     this.mountedElements.clear();
+    // Pending tile saves must not die with the plugin: tileset art writes
+    // flush synchronously, the metadata flush is async, and only after it
+    // settles is the module-level store dropped.
+    flushTilesetArtSaves();
+    void flushTileMetadataSave().finally(resetTileMetadataStore);
     disposeImageCache();
     clearThumbnailCache();
     clearPlugin();
@@ -531,18 +538,6 @@ export default class WindrosePlugin extends Plugin {
 
   async hasOldPluginData(): Promise<boolean> {
     return this.app.vault.adapter.exists(this.oldPluginDataPath);
-  }
-
-  private async resolveDataFilePath(): Promise<void> {
-    if (this.dataFilePath !== 'windrose-md-data.json') return;
-    if (await this.app.vault.adapter.exists(this.dataFilePath)) return;
-
-    const allFiles = this.app.vault.getFiles();
-    const dataFile = allFiles.find(f => f.name === 'windrose-md-data.json');
-    if (dataFile != null) {
-      this.dataFilePath = dataFile.path;
-      console.debug('[Windrose] Auto-discovered data file at:', dataFile.path);
-    }
   }
 
   private checkForConflicts(): void {

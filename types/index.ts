@@ -4,6 +4,7 @@
  * 
  * Re-exports all types for convenient importing:
  *   import type { Point, Cell, MapObject } from '#types';
+ *   (prefer direct '#types/core/...' imports; '#types' resolves to this barrel)
  */
 
 // ===========================================
@@ -232,8 +233,8 @@ export type {
 // Hook Types
 // ===========================================
 export type {
-  HistoryState,
-  UseHistoryResult,
+  FieldDiff,
+  HistoryStack,
 } from './hooks/history.types';
 
 export type {
@@ -246,7 +247,8 @@ export type {
 
 export type {
   LayerHistorySnapshot,
-  LayerHistoryCache,
+  LayerHistoryEntry,
+  LayerHistoryStacks,
   UseLayerHistoryOptions,
   LayerActions,
   HistoryActions,

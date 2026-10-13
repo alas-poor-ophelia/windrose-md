@@ -1,7 +1,7 @@
 import type { App } from 'obsidian';
 import { Modal, Setting } from 'obsidian';
 import type { MapType } from '#types/index';
-import { listMaps } from '../../persistence/fileOperations';
+import { listMaps, ensureDataFileForNewMap } from '../../persistence/fileOperations';
 import { isFeatureEnabled } from '../../core/featureFlags';
 import type { MapListEntry } from '../../persistence/fileOperations';
 
@@ -127,8 +127,14 @@ export class InsertMapModal extends Modal {
 
   private submitNew(): void {
     if (!this.mapType) return;
-    this.onInsert(this.generateMapId(), this.mapName, this.mapType);
+    const mapId = this.generateMapId();
+    const mapName = this.mapName;
+    const mapType = this.mapType;
     this.close();
+    // First use: create the store before the block mounts (see NewMapModal).
+    void ensureDataFileForNewMap(this.app).finally(() => {
+      this.onInsert(mapId, mapName, mapType);
+    });
   }
 
   override onClose(): void {

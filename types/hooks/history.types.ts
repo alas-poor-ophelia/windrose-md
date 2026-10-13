@@ -2,57 +2,34 @@
  * History Hook Type Definitions
  * Path: types/hooks/history.types.ts
  *
- * Generic undo/redo history management types.
+ * Generic undo/redo stack types. Entries are diffs (before/after values of
+ * only the fields an edit touched), so undoing one entry never rewrites
+ * fields that other edits own (DATA-06).
  */
 
 // ===========================================
-// Internal State
+// Field diffs
 // ===========================================
 
 /**
- * Internal history state structure.
- * Combines history stack with current index for atomic updates.
+ * The fields one edit changed: their values before and after the edit.
+ * Both records hold exactly the same keys.
  */
-export interface HistoryState<T> {
-  /** Stack of historical states */
-  history: T[];
-  /** Index of current state in history array */
-  currentIndex: number;
+export interface FieldDiff<T> {
+  before: Partial<T>;
+  after: Partial<T>;
 }
 
 // ===========================================
-// Hook Return Type
+// Stack
 // ===========================================
 
 /**
- * Return type for useHistory hook.
- * Generic over the state type T being tracked.
+ * An undo/redo stack of entries. `index` is the number of applied entries:
+ * undo steps `entries[index - 1]` back, redo steps `entries[index]` forward.
+ * Treated as immutable; every operation returns a new stack.
  */
-export interface UseHistoryResult<T> {
-  /** Current state from history */
-  currentState: T;
-
-  /** Add a new state to history (clears redo stack) */
-  addToHistory: (newState: T) => void;
-
-  /** Undo to previous state, returns the state or null if at beginning */
-  undo: () => T | null;
-
-  /** Redo to next state, returns the state or null if at end */
-  redo: () => T | null;
-
-  /** Whether undo is available */
-  canUndo: boolean;
-
-  /** Whether redo is available */
-  canRedo: boolean;
-
-  /** Reset history to a single state */
-  resetHistory: (newState: T) => void;
-
-  /** Get full history state (for saving) */
-  getHistoryState: () => HistoryState<T>;
-
-  /** Restore full history state (for loading) */
-  restoreHistoryState: (savedState: HistoryState<T>) => void;
+export interface HistoryStack<E> {
+  entries: E[];
+  index: number;
 }

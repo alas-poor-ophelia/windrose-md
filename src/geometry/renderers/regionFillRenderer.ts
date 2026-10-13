@@ -13,6 +13,12 @@ import { strokeBoundsWorld } from '../strokes/terrainStrokeGeometry';
 import { getFeatherCanvas, getMaskCanvas, regionBlurStrategy, shadowBlurImage, pyramidBlurImage } from './canvasBlur';
 import type { TileGeometry, TileViewState } from './computeTileDrawPlan';
 
+/** Pattern scale below which the next mip level is used. */
+const PATTERN_MIP_SCALE_CUTOFF = 0.5;
+/** Feather widths at or below this (px) are treated as no feather. */
+const MIN_FEATHER_PX = 0.5;
+
+
 /** Default cells-per-texture-span for region (terrain) fills. Used only as the
  *  pattern-transform fallback; per-tile resolution supplies the live value. */
 const DEFAULT_WORLD_REPEAT = 4;
@@ -41,7 +47,7 @@ function patternSourceForScale(
   scale: number
 ): { source: HTMLImageElement | HTMLCanvasElement; scaleX: number; scaleY: number } {
   let level = 0;
-  for (let s = scale; s < 0.5 && level < PATTERN_MIP_MAX_LEVEL; s *= 2) level++;
+  for (let s = scale; s < PATTERN_MIP_SCALE_CUTOFF && level < PATTERN_MIP_MAX_LEVEL; s *= 2) level++;
   if (level === 0 || typeof document === 'undefined') {
     return { source: img, scaleX: scale, scaleY: scale };
   }
@@ -227,7 +233,7 @@ function renderRegionFills(
     const featherPx = regionFeatherPx(cellPx, grp.edgeFeather);
 
     // Hard-edged fill (feather disabled): clip to the cell union and fill directly.
-    if (!(featherPx > 0.5)) {
+    if (!(featherPx > MIN_FEATHER_PX)) {
       hardFillRegion(ctx, img, grp, path, geometry, viewState, screenPerWorld, scale, translateX, translateY, alpha, minX, minY, maxX, maxY);
       continue;
     }

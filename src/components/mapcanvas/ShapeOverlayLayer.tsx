@@ -75,9 +75,11 @@ const ShapeOverlayLayer = ({
   });
 
   // Always expose handleShapeSelection so the select tool can hit shapes
-  useLayerHandlers('shapeOverlay', isShapeTool
-    ? { handlePointerDown, handlePointerMove, handleShapeSelection, handleShapeDragging, stopShapeDragging }
-    : { handleShapeSelection, handleShapeDragging, stopShapeDragging });
+  useLayerHandlers('shapeOverlay', {
+    handleShapeSelection, handleShapeDragging, stopShapeDragging,
+    handlePointerDown: isShapeTool ? handlePointerDown : undefined,
+    handlePointerMove: isShapeTool ? handlePointerMove : undefined
+  });
 
   // ESC to cancel placement
   useEffect(() => {

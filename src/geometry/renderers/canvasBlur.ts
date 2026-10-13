@@ -7,6 +7,11 @@
  * canvases (with the idle shrink, MEM-17). Split out of tileRenderer.ts.
  */
 
+/** Clamp for the blur-pyramid depth (halvings) chosen from the blur radius. */
+const MIN_PYRAMID_LEVELS = 1;
+const MAX_PYRAMID_LEVELS = 5;
+
+
 /**
  * Viewport-sized scratch canvases (feather, mask, pyramid pair) are reused
  * across frames to avoid per-frame allocation, but released to 0x0 once
@@ -134,7 +139,7 @@ function shadowBlurWorks(): boolean {
 
 /** Pure: number of half-scale steps whose bilinear spread approximates blurPx. */
 function pyramidLevels(blurPx: number): number {
-  return Math.max(1, Math.min(5, Math.round(Math.log2(Math.max(2, blurPx)))));
+  return Math.max(MIN_PYRAMID_LEVELS, Math.min(MAX_PYRAMID_LEVELS, Math.round(Math.log2(Math.max(2, blurPx)))));
 }
 
 /** Ping-pong scratch pair for the pyramid blur; viewport-bounded singletons. */

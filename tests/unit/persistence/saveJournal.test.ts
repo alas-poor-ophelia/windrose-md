@@ -423,3 +423,30 @@ describe('wave-5 journal fixes', () => {
     expect(readJournal(h.app, 'w5-q')).not.toBeNull();
   });
 });
+
+describe('wave-6 parallax finding 3: a restore into the pane own slot survives older saves', () => {
+  it('an in-flight save landing after the restore, or a stale refusal, leaves the restored slot until the next journal', async () => {
+    const h = makeApp(JSON.stringify({ maps: { 'w6-r': createNewMap('Disk', 'grid') } }));
+    journalPending(h.app, 'w6-r', createNewMap('Crashed', 'grid'), { writerId: 'dead', version: 9 });
+
+    const restored = await resolveJournalOnLoad(h.app, 'w6-r', '', async () => 'restore', 'pane-b');
+    expect(restored?.name).toBe('Crashed');
+    const slot = readJournal(h.app, 'w6-r');
+    expect(slot?.writerId).toBe('pane-b');
+    expect(slot?.version).toBe(Number.MAX_SAFE_INTEGER);
+
+    // A save dispatched before the restore (version 3) lands: the slot stays.
+    clearJournal(h.app, 'w6-r', { writerId: 'pane-b', upToVersion: 3 });
+    expect(JSON.parse(readJournal(h.app, 'w6-r')?.payload as string).name).toBe('Crashed');
+
+    // The same in-flight save comes back stale: the stale branch keeps it too.
+    clearJournal(h.app, 'w6-r', { writerId: 'pane-b', keepRestored: true });
+    expect(JSON.parse(readJournal(h.app, 'w6-r')?.payload as string).name).toBe('Crashed');
+
+    // The pane's next journalNow overwrites it with the real version; that save landing clears it.
+    journalPending(h.app, 'w6-r', createNewMap('Crashed', 'grid'), { writerId: 'pane-b', version: 4 });
+    expect(readJournal(h.app, 'w6-r')?.version).toBe(4);
+    clearJournal(h.app, 'w6-r', { writerId: 'pane-b', keepRestored: true });
+    expect(readJournal(h.app, 'w6-r')).toBeNull();
+  });
+});

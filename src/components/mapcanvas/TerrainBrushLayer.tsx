@@ -23,7 +23,7 @@ import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useApp } from '../../context/AppContext';
-import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
+import { calculateViewportOffset } from '../../geometry/core/viewportMath';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { resolveTileEntry } from '../../assets/tilesetOperations';
 import { useTileMetadata } from '../../hooks/state/useTileMetadata';
@@ -257,9 +257,11 @@ const TerrainBrushLayer = ({
 
   // Register under 'terrainBrush' — the coordinator dispatches tilePaint
   // events to both tile layers; the subtool gate decides which one acts.
-  useLayerHandlers('terrainBrush', isBrushActive
-    ? { handlePointerDown, handlePointerMove, handlePointerUp }
-    : {});
+  useLayerHandlers(
+    'terrainBrush',
+    { handlePointerDown, handlePointerMove, handlePointerUp },
+    { enabled: isBrushActive }
+  );
 
   return null;
 };

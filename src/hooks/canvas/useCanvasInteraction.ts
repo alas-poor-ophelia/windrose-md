@@ -30,6 +30,13 @@ import { getApp } from '../../core/settingsAccessor';
 import { captureSubHexBackdrop } from '../../core/subHexBackdropStore';
 import { prewarmMapAssets } from '../state/useImagePreloading';
 import { traceZoom } from '../../utils/zoomTraceProbe';
+import {
+  anchoredZoomCenter,
+  clientToCanvasPx,
+  clientToWorld,
+  rotateVector,
+  screenDeltaToCenterUnits
+} from '../../geometry/core/viewportMath';
 import { calculateFitZoom, subHexAnchorToChildCenter, subHexContinuityZoom } from '../../geometry/core/hexMeasurements';
 
 /**
@@ -361,103 +368,21 @@ function useCanvasInteraction(
   };
 
   const screenToGrid = (clientX: number, clientY: number): Point | null => {
-    if (!mapData) return null;
     if (!geometry) return null;
-    if (!canvasRef.current) return null;
-
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-
-    let x = clientX - rect.left;
-    let y = clientY - rect.top;
-
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    x *= scaleX;
-    y *= scaleY;
-
-    const { zoom, center } = viewController.getLive();
-    const northDirection = mapData.northDirection ?? 0;
-
-    if (northDirection !== 0) {
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-
-      x -= centerX;
-      y -= centerY;
-
-      const angleRad = (-northDirection * Math.PI) / 180;
-      const rotatedX = x * Math.cos(angleRad) - y * Math.sin(angleRad);
-      const rotatedY = x * Math.sin(angleRad) + y * Math.cos(angleRad);
-
-      x = rotatedX + centerX;
-      y = rotatedY + centerY;
-    }
-
-    let offsetX: number, offsetY: number;
-    if (geometry.type === 'grid') {
-      const scaledCellSize = geometry.getScaledCellSize(zoom);
-      offsetX = canvas.width / 2 - center.x * scaledCellSize;
-      offsetY = canvas.height / 2 - center.y * scaledCellSize;
-    } else {
-      offsetX = canvas.width / 2 - center.x * zoom;
-      offsetY = canvas.height / 2 - center.y * zoom;
-    }
-
-    const worldX = (x - offsetX) / zoom;
-    const worldY = (y - offsetY) / zoom;
-
-    return geometry.worldToGrid(worldX, worldY);
+    const world = screenToWorld(clientX, clientY);
+    return world ? geometry.worldToGrid(world.worldX, world.worldY) : null;
   };
 
+  // One transform for every pointer -> map conversion: CSS scaling, inverse
+  // north rotation, then the view offset (unit rule owned by viewportMath).
   const screenToWorld = (clientX: number, clientY: number): WorldCoords | null => {
     if (!mapData) return null;
     if (!geometry) return null;
     if (!canvasRef.current) return null;
-
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-
-    let x = clientX - rect.left;
-    let y = clientY - rect.top;
-
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    x *= scaleX;
-    y *= scaleY;
-
-    const { zoom, center } = viewController.getLive();
-    const northDirection = mapData.northDirection ?? 0;
-
-    let offsetX: number, offsetY: number;
-    if (geometry.type === 'grid') {
-      const scaledCellSize = geometry.getScaledCellSize(zoom);
-      offsetX = canvas.width / 2 - center.x * scaledCellSize;
-      offsetY = canvas.height / 2 - center.y * scaledCellSize;
-    } else {
-      offsetX = canvas.width / 2 - center.x * zoom;
-      offsetY = canvas.height / 2 - center.y * zoom;
-    }
-
-    if (northDirection !== 0) {
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-
-      x -= centerX;
-      y -= centerY;
-
-      const angleRad = (-northDirection * Math.PI) / 180;
-      const rotatedX = x * Math.cos(angleRad) - y * Math.sin(angleRad);
-      const rotatedY = x * Math.sin(angleRad) + y * Math.cos(angleRad);
-
-      x = rotatedX + centerX;
-      y = rotatedY + centerY;
-    }
-
-    const worldX = (x - offsetX) / zoom;
-    const worldY = (y - offsetY) / zoom;
-
-    return { worldX, worldY };
+    return clientToWorld(
+      geometry, canvasRef.current, clientX, clientY,
+      viewController.getLive(), mapData.northDirection ?? 0
+    );
   };
 
   /**
@@ -537,15 +462,15 @@ function useCanvasInteraction(
       // …placed at the anchor's SCREEN position, not the canvas center:
       // center = anchor − screenOffset/zoom (screen offset rotated into the
       // child's world axes when the child map is rotated).
-      const rect = canvas.getBoundingClientRect();
-      const dx = (anchorClientX - rect.left) * (canvas.width / rect.width) - canvas.width / 2;
-      const dy = (anchorClientY - rect.top) * (canvas.height / rect.height) - canvas.height / 2;
-      const childAngleRad = (-(child.northDirection ?? 0) * Math.PI) / 180;
-      const rotDx = dx * Math.cos(childAngleRad) - dy * Math.sin(childAngleRad);
-      const rotDy = dx * Math.sin(childAngleRad) + dy * Math.cos(childAngleRad);
+      const anchorPx = clientToCanvasPx(canvas, anchorClientX, anchorClientY);
+      const rot = rotateVector(
+        anchorPx.x - canvas.width / 2,
+        anchorPx.y - canvas.height / 2,
+        -(child.northDirection ?? 0)
+      );
       const childCenter = {
-        x: childAnchor.x - rotDx / childZoom,
-        y: childAnchor.y - rotDy / childZoom
+        x: childAnchor.x - rot.x / childZoom,
+        y: childAnchor.y - rot.y / childZoom
       };
 
       // Freeze the parent as it looks RIGHT NOW (still at `currentZoom` — the
@@ -604,14 +529,14 @@ function useCanvasInteraction(
     // Hand the exit the child view at this instant so it can restore a
     // visually-continuous parent view (same spot, matched footprint).
     const anchorWorld = screenToWorld(anchorClientX, anchorClientY);
-    const rect = canvas.getBoundingClientRect();
+    const anchorPx = clientToCanvasPx(canvas, anchorClientX, anchorClientY);
     const exitDetail = anchorWorld != null
       ? {
           childZoom: newZoom,
           childAnchor: { x: anchorWorld.worldX, y: anchorWorld.worldY },
           anchorOffset: {
-            dx: (anchorClientX - rect.left) * (canvas.width / rect.width) - canvas.width / 2,
-            dy: (anchorClientY - rect.top) * (canvas.height / rect.height) - canvas.height / 2
+            dx: anchorPx.x - canvas.width / 2,
+            dy: anchorPx.y - canvas.height / 2
           }
         }
       : null;
@@ -631,23 +556,12 @@ function useCanvasInteraction(
     if (!mapData || !geometry) return;
 
     const { zoom, center } = viewController.getLive();
-    const northDirection = mapData.northDirection ?? 0;
-
-    const angleRad = (-northDirection * Math.PI) / 180;
-    const rotatedDeltaX = e.deltaX * Math.cos(angleRad) - e.deltaY * Math.sin(angleRad);
-    const rotatedDeltaY = e.deltaX * Math.sin(angleRad) + e.deltaY * Math.cos(angleRad);
-
-    const scale = geometry.type === 'grid' && geometry.getScaledCellSize != null
-      ? geometry.getScaledCellSize(zoom)
-      : zoom;
+    const d = screenDeltaToCenterUnits(geometry, e.deltaX, e.deltaY, zoom, mapData.northDirection ?? 0);
 
     gestureIdRef.current ??= viewController.beginGesture();
     viewController.setLive({
       zoom,
-      center: {
-        x: center.x + rotatedDeltaX / scale,
-        y: center.y + rotatedDeltaY / scale
-      }
+      center: { x: center.x + d.x, y: center.y + d.y }
     });
     armWheelSettle();
   };
@@ -661,40 +575,16 @@ function useCanvasInteraction(
     const canvas = canvasRef.current;
     if (!canvas || !geometry) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = clientX - rect.left;
-    const mouseY = clientY - rect.top;
-    const { zoom: oldZoom, center: oldCenter } = viewController.getLive();
-
-    // Use the same offset formula as screenToWorld/screenToGrid:
-    // Grid maps: offset = canvas/2 - center * cellSize * zoom
-    // Hex maps:  offset = canvas/2 - center * zoom
-    let oldScale: number, newScale: number;
-    if (geometry.type === 'grid') {
-      oldScale = geometry.getScaledCellSize(oldZoom);
-      newScale = geometry.getScaledCellSize(newZoom);
-    } else {
-      oldScale = oldZoom;
-      newScale = newZoom;
-    }
-
-    const offsetX = canvas.width / 2 - oldCenter.x * oldScale;
-    const offsetY = canvas.height / 2 - oldCenter.y * oldScale;
-
-    const worldX = (mouseX - offsetX) / oldScale;
-    const worldY = (mouseY - offsetY) / oldScale;
-
-    const newOffsetX = mouseX - worldX * newScale;
-    const newOffsetY = mouseY - worldY * newScale;
-
-    const newCenterX = (canvas.width / 2 - newOffsetX) / newScale;
-    const newCenterY = (canvas.height / 2 - newOffsetY) / newScale;
+    // Anchor in canvas buffer px (CSS scaling) and solved in the map frame
+    // (north rotation), the same chain screenToWorld uses.
+    const anchor = clientToCanvasPx(canvas, clientX, clientY);
+    const center = anchoredZoomCenter(
+      geometry, anchor, { width: canvas.width, height: canvas.height },
+      viewController.getLive(), newZoom, mapData?.northDirection ?? 0
+    );
 
     gestureIdRef.current ??= viewController.beginGesture();
-    viewController.setLive({
-      zoom: newZoom,
-      center: { x: newCenterX, y: newCenterY }
-    });
+    viewController.setLive({ zoom: newZoom, center });
   };
 
   const handleWheel = (e: WheelEvent): void => {
@@ -863,19 +753,10 @@ function useCanvasInteraction(
     const { zoom, center } = viewController.getLive();
     const northDirection = mapData.northDirection ?? 0;
 
-    const angleRad = (-northDirection * Math.PI) / 180;
-    const rotatedDeltaX = deltaX * Math.cos(angleRad) - deltaY * Math.sin(angleRad);
-    const rotatedDeltaY = deltaX * Math.sin(angleRad) + deltaY * Math.cos(angleRad);
-
-    let gridDeltaX: number, gridDeltaY: number;
-    if (geometry.type === 'grid') {
-      const scaledGridSize = geometry.getScaledCellSize(zoom);
-      gridDeltaX = -rotatedDeltaX / scaledGridSize;
-      gridDeltaY = -rotatedDeltaY / scaledGridSize;
-    } else {
-      gridDeltaX = -rotatedDeltaX / zoom;
-      gridDeltaY = -rotatedDeltaY / zoom;
-    }
+    // Client-px delta (not buffer px), as before; content follows the finger.
+    const d = screenDeltaToCenterUnits(geometry, deltaX, deltaY, zoom, northDirection);
+    const gridDeltaX = -d.x;
+    const gridDeltaY = -d.y;
 
     viewController.setLive({
       zoom,
@@ -924,6 +805,13 @@ function useCanvasInteraction(
     setInitialPinchDistance(distance);
   };
 
+  // Two-finger gesture start: open the touch pan and seed the pinch baseline
+  // in one call, so callers never touch the baseline setter directly.
+  const startPinch = (center: TouchCenter, distance: number): void => {
+    startTouchPan(center);
+    seedInitialPinchDistance(distance);
+  };
+
   const updateTouchPan = (touches: TouchList): void => {
     if (!isTouchPanningRef.current || !touchPanStartRef.current || !mapData) {
       return;
@@ -953,19 +841,10 @@ function useCanvasInteraction(
     const { zoom, center: viewCenter } = viewController.getLive();
     const northDirection = mapData.northDirection ?? 0;
 
-    const angleRad = (-northDirection * Math.PI) / 180;
-    const rotatedDeltaX = deltaX * Math.cos(angleRad) - deltaY * Math.sin(angleRad);
-    const rotatedDeltaY = deltaX * Math.sin(angleRad) + deltaY * Math.cos(angleRad);
-
-    let gridDeltaX: number, gridDeltaY: number;
-    if (geometry.type === 'grid') {
-      const scaledGridSize = geometry.getScaledCellSize(zoom);
-      gridDeltaX = -rotatedDeltaX / scaledGridSize;
-      gridDeltaY = -rotatedDeltaY / scaledGridSize;
-    } else {
-      gridDeltaX = -rotatedDeltaX / zoom;
-      gridDeltaY = -rotatedDeltaY / zoom;
-    }
+    // Client-px delta (not buffer px), as before; content follows the finger.
+    const d = screenDeltaToCenterUnits(geometry, deltaX, deltaY, zoom, northDirection);
+    const gridDeltaX = -d.x;
+    const gridDeltaY = -d.y;
     let newZoom = zoom;
     if (initialPinchDistanceRef.current != null) {
       const scale = distance / initialPinchDistanceRef.current;
@@ -1102,12 +981,8 @@ function useCanvasInteraction(
     updateTouchPan,
     stopTouchPan,
 
-    setIsPanning,
-    setIsTouchPanning,
-    setPanStart,
-    setTouchPanStart,
-    setInitialPinchDistance: seedInitialPinchDistance,
-    setSpaceKeyPressed
+    startPinch,
+    setInitialPinchDistance: seedInitialPinchDistance
   };
 }
 

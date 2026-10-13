@@ -1,20 +1,17 @@
 /**
  * useHistory.ts
  *
- * Generic undo/redo history management hook.
- * Maintains a stack of historical states with configurable max size.
+ * Generic, pure undo/redo building blocks (no Preact state):
+ * - reference-based field comparison (MEM-01: no JSON.stringify snapshots)
+ * - field diffs: before/after values of only the fields an edit changed
+ * - an immutable entry stack with a size cap (DEFAULTS.maxHistory)
  *
- * Features:
- * - Add states to history (clears redo stack)
- * - Undo/redo navigation
- * - History size limiting (from DEFAULTS.maxHistory)
- * - Full state save/restore for layer switching
+ * useLayerHistory composes these into per-layer diff history (DATA-06).
  */
 
 // Type-only imports
-import type { HistoryState, UseHistoryResult } from '#types/hooks/history.types';
+import type { FieldDiff, HistoryStack } from '#types/hooks/history.types';
 
-import { useCallback, useState } from 'preact/hooks';
 import { DEFAULTS } from '../../core/dmtConstants';
 
 
@@ -56,119 +53,120 @@ export function isSameHistoryState<T>(a: T, b: T): boolean {
   return true;
 }
 
-/**
- * Hook for managing undo/redo history of any state type.
- *
- * @template T - The type of state being tracked
- * @param initialState - Initial state to start history with
- * @returns History management interface
- */
-function useHistory<T>(initialState: T): UseHistoryResult<T> {
-  // Combine history and index into single state for better synchronization
-  const [historyState, setHistoryState] = useState<HistoryState<T>>({
-    history: [initialState],
-    currentIndex: 0
-  });
-
-  // Add a new state to history
-  const addToHistory = useCallback((newState: T): void => {
-    setHistoryState((prev: HistoryState<T>) => {
-      // Skip if identical to current state
-      const currentState = prev.history[prev.currentIndex];
-      if (isSameHistoryState(newState, currentState)) {
-        return prev;
-      }
-
-      // Remove any "future" states (redo states) when adding new state
-      const newHistory = prev.history.slice(0, prev.currentIndex + 1);
-
-      // Add new state
-      newHistory.push(newState);
-
-      // Limit history size
-      let newIndex = newHistory.length - 1;
-      if (newHistory.length > DEFAULTS.maxHistory) {
-        newHistory.shift();
-        newIndex = prev.currentIndex; // Index stays the same since we removed from beginning
-      }
-
-      return {
-        history: newHistory,
-        currentIndex: newIndex
-      };
-    });
-  }, []);
-
-  // Undo to previous state
-  const undo = useCallback((): T | null => {
-    let result: T | null = null;
-    setHistoryState((prev: HistoryState<T>) => {
-      if (prev.currentIndex > 0) {
-        result = prev.history[prev.currentIndex - 1];
-        return {
-          ...prev,
-          currentIndex: prev.currentIndex - 1
-        };
-      }
-      return prev;
-    });
-    return result;
-  }, []);
-
-  // Redo to next state
-  const redo = useCallback((): T | null => {
-    let result: T | null = null;
-    setHistoryState((prev: HistoryState<T>) => {
-      if (prev.currentIndex < prev.history.length - 1) {
-        result = prev.history[prev.currentIndex + 1];
-        return {
-          ...prev,
-          currentIndex: prev.currentIndex + 1
-        };
-      }
-      return prev;
-    });
-    return result;
-  }, []);
-
-  // Reset history (useful when loading new map)
-  const resetHistory = useCallback((newState: T): void => {
-    setHistoryState({
-      history: [newState],
-      currentIndex: 0
-    });
-  }, []);
-
-  // Get full history state (for saving before layer switch)
-  const getHistoryState = useCallback((): HistoryState<T> => {
-    return historyState;
-  }, [historyState]);
-
-  // Set full history state (for restoring after layer switch)
-  const restoreHistoryState = useCallback((savedState: HistoryState<T>): void => {
-    if (savedState.history.length > 0 && typeof savedState.currentIndex === 'number') {
-      setHistoryState(savedState);
-    }
-  }, []);
-
-  // Check if undo/redo are available
-  const canUndo = historyState.currentIndex > 0;
-  const canRedo = historyState.currentIndex < historyState.history.length - 1;
-
-  // Get current state
-  const currentState = historyState.history[historyState.currentIndex];
-
-  return {
-    currentState,
-    addToHistory,
-    undo,
-    redo,
-    canUndo,
-    canRedo,
-    resetHistory,
-    getHistoryState,
-    restoreHistoryState
-  };
+/** Absent, null and empty-array field values all mean "nothing here". */
+function isEmptyValue(v: unknown): boolean {
+  return v == null || (Array.isArray(v) && v.length === 0);
 }
 
-export { useHistory };
+/**
+ * Field equality for diffing: reference/shallow-array equality, plus
+ * absent ≈ null ≈ [] (snapshot builders default missing arrays to `[]`).
+ */
+export function isSameHistoryValue(a: unknown, b: unknown): boolean {
+  return isSameField(a, b) || (isEmptyValue(a) && isEmptyValue(b));
+}
+
+/**
+ * Diff `next` against `base` over `keys`. Returns null when nothing changed.
+ *
+ * With `skipUndefined`, a key whose `next` value is undefined counts as "not
+ * provided" and is skipped (partial snapshots from callers that only know a
+ * subset of the fields).
+ */
+export function diffHistoryFields<T extends object>(
+  keys: readonly (keyof T)[],
+  base: Partial<T>,
+  next: Partial<T>,
+  skipUndefined: boolean
+): FieldDiff<T> | null {
+  const before: Partial<T> = {};
+  const after: Partial<T> = {};
+  let changed = false;
+  for (const key of keys) {
+    const nextValue = next[key];
+    if (skipUndefined && nextValue === undefined) continue;
+    if (isSameHistoryValue(base[key], nextValue)) continue;
+    before[key] = base[key];
+    after[key] = nextValue;
+    changed = true;
+  }
+  return changed ? { before, after } : null;
+}
+
+/**
+ * Pick the fields of `target` that may be written over `current`: only those
+ * whose live value still equals `expected` (the value the entry left behind).
+ * A field another edit has changed since is left alone, so undo/redo never
+ * clobbers work it does not own. Returns null when no field qualifies.
+ */
+export function guardedPatch<T extends object>(
+  current: Partial<T>,
+  expected: Partial<T>,
+  target: Partial<T>
+): Partial<T> | null {
+  const patch: Partial<T> = {};
+  let any = false;
+  for (const key of Object.keys(target) as (keyof T)[]) {
+    if (!isSameHistoryValue(current[key], expected[key])) continue;
+    patch[key] = target[key];
+    any = true;
+  }
+  return any ? patch : null;
+}
+
+/** An empty stack. */
+export function createHistoryStack<E>(): HistoryStack<E> {
+  return { entries: [], index: 0 };
+}
+
+/**
+ * Push an entry: drops the redo tail, appends, and caps the stack at
+ * `maxSize` entries (oldest dropped first).
+ */
+export function pushHistoryEntry<E>(
+  stack: HistoryStack<E>,
+  entry: E,
+  maxSize: number = DEFAULTS.maxHistory
+): HistoryStack<E> {
+  const entries = stack.entries.slice(0, stack.index);
+  entries.push(entry);
+  while (entries.length > maxSize) entries.shift();
+  return { entries, index: entries.length };
+}
+
+/** Replace the most recent applied entry (for coalescing). No-op when empty. */
+export function replaceTopHistoryEntry<E>(stack: HistoryStack<E>, entry: E): HistoryStack<E> {
+  if (stack.index === 0) return stack;
+  const entries = stack.entries.slice(0, stack.index);
+  entries[entries.length - 1] = entry;
+  return { entries, index: entries.length };
+}
+
+/** The most recent applied entry, if it is also the stack top (no redo tail). */
+export function peekTopHistoryEntry<E>(stack: HistoryStack<E>): E | null {
+  if (stack.index === 0 || stack.index !== stack.entries.length) return null;
+  return stack.entries[stack.index - 1];
+}
+
+/** Step back one entry. Returns the entry to revert, or null at the bottom. */
+export function stepHistoryUndo<E>(stack: HistoryStack<E>): { stack: HistoryStack<E>; entry: E } | null {
+  if (stack.index === 0) return null;
+  return { stack: { entries: stack.entries, index: stack.index - 1 }, entry: stack.entries[stack.index - 1] };
+}
+
+/** Step forward one entry. Returns the entry to re-apply, or null at the top. */
+export function stepHistoryRedo<E>(stack: HistoryStack<E>): { stack: HistoryStack<E>; entry: E } | null {
+  if (stack.index >= stack.entries.length) return null;
+  return { stack: { entries: stack.entries, index: stack.index + 1 }, entry: stack.entries[stack.index] };
+}
+
+/**
+ * Merge two consecutive diffs into one: the older diff's `before` values win
+ * (they predate both edits), the newer diff's `after` values win.
+ */
+export function mergeFieldDiffs<T>(older: FieldDiff<T>, newer: FieldDiff<T>): FieldDiff<T> {
+  return {
+    before: { ...newer.before, ...older.before },
+    after: { ...older.after, ...newer.after }
+  };
+}

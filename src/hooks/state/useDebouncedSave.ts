@@ -146,8 +146,8 @@ function useDebouncedSave(
   };
 
   /** Drop this writer's live journal slot (conditioned on `upToVersion` when given). */
-  const clearOwnJournal = (upToVersion?: number): void => {
-    clearJournal(flushRef.current.app, flushRef.current.mapId, { writerId: instanceIdRef.current, upToVersion });
+  const clearOwnJournal = (upToVersion?: number, keepRestored = false): void => {
+    clearJournal(flushRef.current.app, flushRef.current.mapId, { writerId: instanceIdRef.current, upToVersion, keepRestored });
     lastJournalRef.current = null;
   };
 
@@ -265,13 +265,15 @@ function useDebouncedSave(
           notifyStaleUnmountConflict(moveJournalToConflict(a, m, writerId) === 'moved');
           lastJournalRef.current = null;
         } else {
-          clearOwnJournal();
+          clearOwnJournal(undefined, true);
           notifyStaleUnmountConflict(false);
         }
       } else {
         // NEVER leave a refused stale tree in the journal — restoring it on
-        // next load would be a user-consented whole-entry clobber.
-        clearOwnJournal();
+        // next load would be a user-consented whole-entry clobber. A copy
+        // restored into this slot after the refused save was dispatched is
+        // not that tree: it stays (parallax wave-6 finding 3).
+        clearOwnJournal(undefined, true);
       }
     } else {
       // DATA-03: the edits now exist only in memory. Make sure the journal
@@ -410,12 +412,16 @@ function useDebouncedSave(
   }, []);
 
   const updateMapData: MapDataUpdater = useCallback((updaterOrData, options) => {
-    if (options?.cosmetic !== true) hasRealEditRef.current = true;
     setMapData((prev) => {
       if (!prev) return prev;
       const newData = typeof updaterOrData === 'function'
         ? updaterOrData(prev)
         : updaterOrData;
+      // A no-op (e.g. a write aimed at a sub-hex level that vanished returns
+      // the same root) is not an edit: no real-edit flag, no version bump, no
+      // save, so it can never raise a stale-conflict panel (parallax wave-6 #6).
+      if (newData === prev) return prev;
+      if (options?.cosmetic !== true) hasRealEditRef.current = true;
       // Version bumps synchronously with the edit, so a save that completes
       // before the debounce effect re-runs can never mistake itself for the
       // latest and drop this edit.

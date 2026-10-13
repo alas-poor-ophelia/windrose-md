@@ -9,6 +9,13 @@ import type { ShapeOverlay } from '#types/core/map.types';
 
 import { getShapeHalfExtents } from '../../objects/shapeOverlayOperations';
 
+/** Player light radius: disc fill alpha, dashed ring alpha, ring width and dash (on, off). */
+const LIGHT_FILL_ALPHA = 0.15;
+const LIGHT_RING_ALPHA = 0.4;
+const LIGHT_RING_WIDTH_PX = 1.5;
+const LIGHT_RING_DASH = [4, 4];
+
+
 interface ViewState {
   x: number;
   y: number;
@@ -103,16 +110,16 @@ function renderPlayerLights(
     const screenRadius = radiusInWorld * viewState.zoom;
 
     ctx.save();
-    ctx.globalAlpha = 0.15;
+    ctx.globalAlpha = LIGHT_FILL_ALPHA;
     ctx.fillStyle = obj.lightColor ?? 'rgba(255, 255, 100, 1)';
     ctx.beginPath();
     ctx.arc(sx, sy, screenRadius, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.globalAlpha = 0.4;
+    ctx.globalAlpha = LIGHT_RING_ALPHA;
     ctx.strokeStyle = obj.lightColor ?? 'rgba(255, 255, 100, 1)';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = LIGHT_RING_WIDTH_PX;
+    ctx.setLineDash(LIGHT_RING_DASH);
     ctx.stroke();
     ctx.restore();
   }

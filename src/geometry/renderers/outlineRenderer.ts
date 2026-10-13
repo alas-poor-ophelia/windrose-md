@@ -7,6 +7,11 @@
 import type { Point } from '#types/core/geometry.types';
 import type { Outline } from '#types/core/map.types';
 
+/** Canvas dash patterns (on, off) in px for each outline line style. */
+const OUTLINE_DASHED_PATTERN = [12, 6];
+const OUTLINE_DOTTED_PATTERN = [0.5, 8];
+
+
 export interface HexGeometryLike {
   hexSize: number;
   orientation: string;
@@ -26,8 +31,8 @@ interface ViewState {
 
 function getDashPattern(lineStyle: string): number[] {
   switch (lineStyle) {
-    case 'dashed': return [12, 6];
-    case 'dotted': return [0.5, 8];
+    case 'dashed': return OUTLINE_DASHED_PATTERN;
+    case 'dotted': return OUTLINE_DOTTED_PATTERN;
     default: return [];
   }
 }

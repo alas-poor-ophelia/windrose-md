@@ -12,6 +12,7 @@ Encapsulate stateful logic, side effects, and event handling. Hooks sit between 
 | `drawing/` | Paint-class tools: cells, edges, segments, shapes, diagonal fill |
 | `objects/` | Object manipulation: select, drag, place, resize, modify, hover |
 | `state/` | App and document state: map data, history, tool state, saving, panels, feature flags |
+| `walls/` | The wall/path/opening tool: state + handlers, overlay paints, drawer-footer control surface |
 | `interactions/` | Every other tool/feature interaction (fog, regions, outlines, measure, Beacon, sub-hex, keyboard) |
 
 Only real hooks use the `use*` prefix. The former non-hook files `useSelectionActions.ts` and `useToolbarPosition.ts` now live in `components/toolbars/` as `selectionActionBuilders.ts` and `toolbarPosition.ts`.
@@ -24,7 +25,8 @@ hooks/
 │   ├── useCanvasRenderer.ts        # Draws all layers onto the main canvas (rAF-coalesced)
 │   ├── useCanvasInteraction.ts     # Pan/touch/space-key state for the canvas
 │   ├── useEventCoordinator.ts      # Attaches canvas listeners; routes pointer events to registered layer handlers by current tool
-│   ├── useLayerHandlers.ts         # Layer-side registration with the coordinator (latest-ref Proxy)
+│   ├── toolDispatch.ts             # TOOL_ROUTES: Record<ToolId, ToolRoute> - per-tool down/move/up/leave/doubleClick routing table
+│   ├── useLayerHandlers.ts         # Layer-side registration with the coordinator (typed by HandlerTypeMap, latest-ref Proxy)
 │   ├── usePanZoomCoordinator.ts    # Wheel/drag/pinch pan-zoom input, writes through ViewController
 │   ├── useViewController.ts        # Live pan/zoom state held OFF the Preact path during a gesture
 │   ├── useLiveOverlayTransform.ts  # Keeps SVG overlay groups locked to the canvas during live gestures
@@ -47,6 +49,10 @@ hooks/
 │   ├── useObjectHover.ts           # Hover tracking
 │   ├── useObjectModifications.ts   # Scale/rotate/color/note/delete/duplicate
 │   ├── useObjectModals.ts          # Note and note-link modal state
+│   ├── useMultiSelectionActions.ts # Rotate/duplicate/delete all for a multi-selection (pure edits exported)
+│   ├── useObjectLinking.ts         # Object-to-object links: start, complete-on-click, follow, remove
+│   ├── useObjectContextMenu.ts     # Native right-click menu for an UNSELECTED object (claimant rule)
+│   ├── useDragMeasurement.ts       # Measure-movement toggle and drag distance readout
 │   ├── useEdgeSnapModifiers.ts     # Edge-snap / freeform modifier keys
 │   └── useGroupDrag.ts             # Multi-select group drag
 ├── state/
@@ -68,6 +74,12 @@ hooks/
 │   ├── useThumbnailPipeline.ts     # Tile thumbnail requests/cache
 │   ├── useVirtualizer.ts           # Preact wrapper over @tanstack/virtual-core
 │   └── useMcpBridge.ts             # Registers the instance on window.__windrose.mcpInstances (MCP server + E2E)
+├── tiles/
+│   └── useTileFilterPipeline.ts    # TileAssetBrowser's memo chain: search/tag/pack/category filtering and grouping (read-only over the metadata snapshot)
+├── walls/
+│   ├── useWallTools.ts             # Wall tool state, pointer/keyboard handlers, wall mutation (draw/edit/opening modes; ephemeral edit-drag, one commit on pointerup)
+│   ├── useWallOverlay.ts           # Wall overlay canvas: draw preview, edit handles (drag hot path), opening ghost, live pan/zoom redraw
+│   └── useWallToolSurface.ts       # Publishes the drawer-footer control surface (stable actions, primitive deps)
 └── interactions/
     ├── useKeyboardShortcuts.ts     # Undo/redo, layer nav, global shortcuts
     ├── useCustomEventHandlers.ts   # windrose:* DOM custom events
@@ -84,7 +96,7 @@ hooks/
     ├── useTerrainSampling.ts       # Auto route-segment terrain (sampler context)
     ├── usePartyPinInteraction.ts   # Beacon (party pin) place/drag
     ├── usePartyPinCardPosition.ts  # Beacon controls card anchor/placement
-    ├── useSubHexNavigation.ts      # Sub-hex drill-down stack
+    ├── useSubHexNavigation.ts      # Sub-hex drill-down on a hexKey path; one functional writer (persistence/subHexPath.ts)
     ├── useHexContextMenu.ts        # Hex right-click menu
     └── useAlignmentMode.ts         # Background image alignment mode
 ```
@@ -97,7 +109,11 @@ Pointer events are routed centrally; layers never attach their own canvas listen
 
 1. A layer builds its handler object and calls `useLayerHandlers(name, handlers, { enabled })` (names are the keys of `HandlerTypeMap` in `types/hooks/eventCoordinator.types.ts`: `'object'`, `'drawing'`, `'wall'`, `'region'`, `'partyPin'`, ...).
 2. `useLayerHandlers` stores the handlers in a ref refreshed every render and registers a stable Proxy with `EventHandlerContext`, so the coordinator always sees the latest closures and the layer never re-registers mid-gesture. Pass `enabled: false` (or a tool gate) to unregister.
-3. `useEventCoordinator` (called once from `MapCanvas`) attaches the canvas listeners and, per `currentTool`, modifier keys, touch state and selection state, looks handlers up with `getHandlers(name)` and dispatches. To change which tool reaches which layer, edit its tool routing, not the layer.
+3. `useEventCoordinator` (called once from `MapCanvas`) attaches the canvas listeners and, per `currentTool`, modifier keys, touch state and selection state, looks handlers up with `getHandlers(name)` and dispatches. Routing lives in `TOOL_ROUTES` (`canvas/toolDispatch.ts`): every `ToolId` must declare its down/move/up/leave/doubleClick behaviour (noop or notConsumed included), so a new tool without a route is a compile error. To change which tool reaches which layer, edit its route, not the layer. Registration is typed: `useLayerHandlers<T>(name, handlers)` checks `handlers` against `HandlerTypeMap[T]`.
+
+### Sub-hex Navigation
+
+The open sub-hex level is a path of hexKeys, not a copy of map data. `persistence/subHexPath.ts` holds the pure helpers (`getMapAtSubHexPath`, `setAtSubHexPath`, `addSubHexEntryAtPath`, `toRootUpdater`). `useSubHexNavigation` exposes `activeUpdateMapData`, which lifts every edit into a functional root update, so there is no propagate-up step and a root write made while a level is open survives. Do not reintroduce a local copy of a level's map data.
 
 ### Live Pan/Zoom (anything positioned in screen space)
 
@@ -105,7 +121,7 @@ Pan/zoom must not reconcile the Preact tree per input tick. `useViewController` 
 
 - Read the view through `viewController.getLive()` (as the renderer and `screenToGrid`/`screenToWorld` do), not `mapData.viewState`, inside anything that must track a gesture.
 - SVG overlay drawn in world coordinates: `useLiveOverlayTransform` rewrites the group transform per tick (used by RouteLayer, MeasurementOverlay, PartyPinOverlay).
-- Overlay `<canvas>`: `useLiveOverlayRedraw(viewController, redraw)` (used by FreehandLayer, OutlineLayer, RegionLayer, WallLayer). The canvas itself comes from `useOverlayCanvas(canvasRef, { active?, onResize? })` (those four plus TerrainBrushLayer): draw via `sized()`, which re-syncs to the main canvas size; it does not handle pan/zoom.
+- Overlay `<canvas>`: `useLiveOverlayRedraw(viewController, redraw)` (used by FreehandLayer, OutlineLayer, RegionLayer, and WallLayer via `walls/useWallOverlay`). The canvas itself comes from `useOverlayCanvas(canvasRef, { active?, onResize? })` (those four plus TerrainBrushLayer): draw via `sized()`, which re-syncs to the main canvas size; it does not handle pan/zoom.
 - An overlay that only reads committed state freezes mid-pan and snaps at gesture end.
 
 ### Stable References

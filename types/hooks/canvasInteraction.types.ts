@@ -6,7 +6,6 @@
  * and coordinate transformation for the canvas.
  */
 
-import type { Dispatch, StateUpdater } from 'preact/hooks';
 import type { Point, WorldCoords } from '../core/geometry.types';
 import type { StoredViewState } from '../core/map.types';
 
@@ -97,6 +96,8 @@ export interface PanHandlers {
    */
   markPanAnchorStale: () => void;
   startTouchPan: (center: TouchCenter) => void;
+  /** Two-finger start: startTouchPan + pinch baseline seed in one call. */
+  startPinch: (center: TouchCenter, distance: number) => void;
   updateTouchPan: (touches: TouchList) => void;
   stopTouchPan: () => void;
 }
@@ -105,15 +106,14 @@ export interface PanHandlers {
 // State Setters
 // ===========================================
 
-/** Direct state setters for external control */
+/**
+ * Remaining direct setter. The raw state setters (isPanning, panStart, ...)
+ * are not exposed: every writer must set ref and state together inside the
+ * hook. Prefer startPinch; this stays until the event coordinator switches.
+ */
 export interface CanvasInteractionSetters {
-  setIsPanning: Dispatch<StateUpdater<boolean>>;
-  setIsTouchPanning: Dispatch<StateUpdater<boolean>>;
-  setPanStart: Dispatch<StateUpdater<PanStart | null>>;
-  setTouchPanStart: Dispatch<StateUpdater<TouchCenter | null>>;
   /** Seeds the pinch baseline into ref and state together — plain values only. */
   setInitialPinchDistance: (distance: number | null) => void;
-  setSpaceKeyPressed: Dispatch<StateUpdater<boolean>>;
 }
 
 // ===========================================

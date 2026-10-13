@@ -123,8 +123,8 @@ src/
 ├── travel/                # Travel packs (units, terrains, modes, allowances) and segment terrain sampler
 ├── assets/                # Icons, tileset operations, and the tile import/prediction pipeline (import*, *Predictor, tile*)
 ├── content-packs/         # Content pack browser/download/install/registry, DD pack import
-├── persistence/           # Data I/O & vault interaction (fileOperations, saveCoordinator, schemaMigration, exportOperations, layerAccessor)
-├── utils/                 # Dev/diagnostic probes (perfTelemetry, zoomTraceProbe, inputEventProbe, canvasCapabilityReport)
+├── persistence/           # Data I/O & vault interaction (fileOperations, saveCoordinator, schemaMigration, exportOperations, layerAccessor, fogOperations, subHexPath)
+├── utils/                 # Dev/diagnostic probes (perfTelemetry, zoomTraceProbe, inputEventProbe, canvasCapabilityReport) plus small shared guards: keyboardTargets.ts (typing-surface check for map key handlers), assertNever.ts (exhaustive-switch guard: `default: return assertNever(x)`)
 ├── views/                 # WindroseMapView.ts (full-pane Obsidian view)
 ├── geometry/
 │   ├── core/              # Geometry abstractions (Base/Grid/Hex), createGeometry, contentFitView, subHexBackdrop
@@ -169,7 +169,7 @@ Non-source files live outside `src/`: `CHANGELOG.md` (read by the release workfl
 | Travel and routes | `travel/` (packs, time, segment terrain sampler), `drawing/routeOperations.ts`, `components/mapcanvas/RouteLayer.tsx` + `MeasurementLayer.tsx`, `hooks/interactions/useTerrainSampling.ts`, `components/modals/SaveRouteModal.ts`, `settings/modals/TravelPackEditModal.ts` |
 | Openings (wall gaps) | `drawing/wallGapOperations.ts`, `components/mapcanvas/WallLayer.tsx` (walls/paths: `drawing/wallPath*.ts`, `geometry/renderers/wallPathRenderer.ts`) |
 | Full-pane view | `views/WindroseMapView.ts` |
-| Sub-hex maps | `hooks/interactions/useSubHexNavigation.ts`, `core/subHexBackdropStore.ts`, `core/paintedViewStore.ts`, `geometry/core/subHexBackdrop.ts`, `geometry/renderers/subHexBackdropRenderer.ts`, `components/controls/SubHexBreadcrumb.tsx` |
+| Sub-hex maps | `hooks/interactions/useSubHexNavigation.ts`, `persistence/subHexPath.ts` (hexKey-path read/write helpers), `core/subHexBackdropStore.ts`, `core/paintedViewStore.ts`, `geometry/core/subHexBackdrop.ts`, `geometry/renderers/subHexBackdropRenderer.ts`, `components/controls/SubHexBreadcrumb.tsx` |
 | Export | `persistence/exportOperations.ts`, `components/modals/ExportImageModal.ts` |
 | Dock panels | `components/panels/Dock*.tsx`, `DrawerDock.tsx`, `EdgeRail.tsx`, `hooks/state/useFloatingPanels.ts` |
 | Tile import wizard | `assets/import*.ts` (+ predictors, `tile*.ts`), `settings/modals/AddTilesModal.ts`, `components/panels/TileAssetBrowser.tsx` (+ `TileCell.tsx`, `TileBrowserFooter.tsx`, `hooks/tiles/useTileFilterPipeline.ts`), `TileOrganizePane.tsx` |

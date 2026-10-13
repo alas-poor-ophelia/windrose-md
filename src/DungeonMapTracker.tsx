@@ -1,5 +1,5 @@
 // DungeonMapTracker.tsx - Root component of one mounted Windrose map (grid, hex, or world; code-block embed or full-pane view).
-// Owns: map data load/save (useMapData, useDataHandlers), per-layer undo/redo (useLayerHistory), sub-hex drill-down
+// Owns: map data load/save (useMapData, useDataHandlers), per-layer diff undo/redo incl. fog (useLayerHistory), sub-hex drill-down
 // (useSubHexNavigation), tool/color state, panel and dock layout (usePanelState, useUILayout, useFloatingPanels),
 // fog, alignment mode, keyboard shortcuts, the MCP bridge, and composes MapCanvas with its layers, toolbars, docks and modals.
 
@@ -12,6 +12,8 @@ import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { ResolvedTheme, OnboardingState } from '#types/settings/settings.types';
 import type { WallToolSurface } from '#types/core/wallpath.types';
 import type { TilesetOverrides } from '#types/tiles/tile.types';
+import type { MapDataUpdater } from '#types/hooks/mapData.types';
+import type { RecordMapChangeOptions } from '#types/hooks/layerHistory.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useMapData } from './hooks/state/useMapData';
@@ -731,6 +733,19 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     copyDeepLinkToClipboard(mapData.name ?? 'Sub-hex view', notePath, mapId, x, y, zoom, layerId, subHexPath);
   }, [notePath, mapId, subHexPath, mapData, geometry]);
 
+  // Fog operations enter undo history (DATA-06): wrap the writer so every fog
+  // update records its exact prev -> next diff. useLayerHistory is called
+  // further down, so its recorder is read through a ref. Brush strokes
+  // (one update per cell) coalesce into a single entry.
+  const recordMapChangeRef = useRef<((prev: MapData, next: MapData, options?: RecordMapChangeOptions) => void) | null>(null);
+  const fogUpdateMapData = useCallback<MapDataUpdater>((updaterOrData, options) => {
+    updateMapData((prev: MapData) => {
+      const next = typeof updaterOrData === 'function' ? updaterOrData(prev) : updaterOrData;
+      recordMapChangeRef.current?.(prev, next, { coalesceKey: 'fog' });
+      return next;
+    }, options);
+  }, [updateMapData]);
+
   // Fog of War state and handlers (extracted to useFogOfWar hook)
   const {
     showFogTools,
@@ -742,7 +757,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleFogFillAll,
     handleFogClearAll,
     handleFogChange
-  } = useFogOfWar({ mapData, geometry, updateMapData });
+  } = useFogOfWar({ mapData, geometry, updateMapData: fogUpdateMapData });
 
   // Effective settings (global + map overrides), fetched fresh each render.
   const effectiveSettings = mapData ? getEffectiveSettings(mapData.settings) : null;
@@ -811,8 +826,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleRedo,
     // For data change handlers
     addToHistory,
-    isApplyingHistory
-  } = useLayerHistory({ mapData, updateMapData, isLoading, navigationVersion });
+    isApplyingHistory,
+    recordMapChange,
+  } = useLayerHistory({ mapData, updateMapData, isLoading, navigationVersion, levelKey: subHexPath });
+  recordMapChangeRef.current = recordMapChange;
 
   // Board (floor) + strata-mode handlers (Phase 7). Structural board ops update map
   // data directly; layer-content undo is unaffected (history is per-layerId).

@@ -104,6 +104,34 @@ function notifyCorruptedDataFile(dataPath: string): void {
   );
 }
 
+/**
+ * Store paths this plugin session has read or written successfully. Once a
+ * store has been seen, its later absence is a disappearance (moved, deleted,
+ * sync mid-flight), never a first use: the loader shows the missing-store
+ * panel and saves refuse to create a one-map store in its place.
+ */
+const observedStorePaths = new Set<string>();
+
+function markStoreObserved(dataPath: string): void {
+  observedStorePaths.add(dataPath);
+}
+
+/**
+ * Whether anything says a store existed at `dataPath` before: this session
+ * saw it, or a backup / daily backup / quarantined corrupt copy sits beside
+ * it. No evidence means a fresh install (first map), where creating an empty
+ * store is safe. Call inside the data-file mutex.
+ */
+function hasPriorStoreEvidence(app: App, dataPath: string): boolean {
+  if (observedStorePaths.has(dataPath)) return true;
+  const siblings = [bakPathForSlot(dataPath, 1), bakPathForSlot(dataPath, 2), dailyBakPath(dataPath)];
+  if (siblings.some(p => app.vault.getAbstractFileByPath(p) != null)) return true;
+  const corruptPrefix = `${dataPath}.corrupt-`;
+  let files: TFile[] = [];
+  try { files = app.vault.getFiles(); } catch { /* minimal vault (tests): no listing */ }
+  return files.some(f => f.path.startsWith(corruptPrefix));
+}
+
 /** Data file structure */
 interface DataFile {
   maps: Record<string, MapData>;
@@ -421,7 +449,12 @@ async function loadMapDataWithGeneration(app: App, mapId: string, mapName: strin
     const file = app.vault.getAbstractFileByPath(dataPath);
 
     if (!(file instanceof TFile)) {
-      throw new MapDataFileMissingError(dataPath);
+      // A store that existed before and is gone now: recovery panel, no write.
+      if (hasPriorStoreEvidence(app, dataPath)) throw new MapDataFileMissingError(dataPath);
+      // Fresh install (no store, no backups, never seen): a blank map. Nothing
+      // is written here; the new-map flows create the store up front and the
+      // first save creates it otherwise.
+      return { data: createNewMap(mapName, mapType), generation };
     }
 
     let data: DataFile;
@@ -431,6 +464,7 @@ async function loadMapDataWithGeneration(app: App, mapId: string, mapName: strin
       if (data == null || typeof data !== 'object' || data.maps == null || typeof data.maps !== 'object') {
         throw new Error('data file has no "maps" object');
       }
+      markStoreObserved(dataPath);
     } catch (error) {
       console.error('[loadMapData] Data file exists but could not be read. Refusing to substitute a blank map:', error);
       notifyCorruptedDataFile(dataPath);
@@ -489,12 +523,33 @@ async function createEmptyDataFile(app: App): Promise<boolean> {
         try { await app.vault.createFolder(dirPath); } catch { /* already exists */ }
       }
       await app.vault.create(dataPath, JSON.stringify({ maps: {} }));
+      markStoreObserved(dataPath);
       return true;
     } catch (error) {
       console.error('[createEmptyDataFile] failed:', error);
       return false;
     }
   });
+}
+
+/**
+ * First-use store creation for the new-map flows: creates an empty store at
+ * the configured path ONLY when none exists and nothing says one existed
+ * before (no backup, no corrupt copy, not seen this session). A missing store
+ * with evidence is left for the recovery panel, never papered over. Returns
+ * true when a store now exists or creation was not needed for a fresh store;
+ * false when it was refused or failed (the caller still inserts the block; the
+ * map then shows the appropriate panel).
+ */
+async function ensureDataFileForNewMap(app: App): Promise<boolean> {
+  const dataPath = getDataFilePath();
+  const proceed = await enqueueDataFileOp(async () => {
+    if (app.vault.getAbstractFileByPath(dataPath) != null) return 'exists' as const;
+    return hasPriorStoreEvidence(app, dataPath) ? 'refuse' as const : 'create' as const;
+  });
+  if (proceed === 'exists') return true;
+  if (proceed === 'refuse') return false;
+  return createEmptyDataFile(app);
 }
 
 /** Convenience wrapper for read-only consumers that don't track generations. */
@@ -537,9 +592,10 @@ function isMapTombstoned(mapId: string): boolean {
  *      Required because each save does read-modify-write on the whole file;
  *      without serialization, simultaneous saves of different maps would clobber
  *      each other (lost-update problem).
- *   2. Pre-write validation — JSON.parse the serialized output before any disk
- *      write, and refuse to save if existing on-disk file is unparseable
- *      (prevents silently overwriting corrupted data with partial state).
+ *   2. Unreadable-file refusal — a save never overwrites an on-disk file that
+ *      fails to parse (prevents silently replacing corrupted data with partial
+ *      state), and the state is serialized before disk is touched so a
+ *      serialization error aborts the write (see writeMapEntryLocked).
  */
 /**
  * Upgrade stored tile ids to their canonical form against the map's tileset
@@ -696,13 +752,23 @@ type SaveMapResult =
  * write generation. Shared by saveMapData and createMapEntry so there is
  * exactly one store-writer contract.
  */
-async function writeMapEntryLocked(app: App, mapId: string, mapData: MapData, writerId: string | null): Promise<SaveMapResult> {
+async function writeMapEntryLocked(app: App, mapId: string, mapData: MapData, writerId: string | null, basedOnSavedEntry = false): Promise<SaveMapResult> {
   let allData: DataFile = { maps: {} };
 
   // Load existing data
   const dataPath = getDataFilePath();
   const abstractFile = app.vault.getAbstractFileByPath(dataPath);
   const file = abstractFile instanceof TFile ? abstractFile : null;
+
+  // Disappearance: the store this session loaded or wrote (or one evidenced by
+  // a backup or corrupt copy) is gone: moved, deleted, sync between states.
+  // Creating a file here would hold only this map and could sync over the
+  // real store. Refuse; the journal keeps the edits. Only a true first use
+  // (no evidence) may create the store.
+  if (file == null && (basedOnSavedEntry || hasPriorStoreEvidence(app, dataPath))) {
+    console.error(`[saveMapData] Data file ${dataPath} is missing; refusing to create a one-map store for "${mapId}".`);
+    return { status: 'failed' } as const;
+  }
   if (file) {
     const content = await app.vault.read(file);
     try {
@@ -760,6 +826,7 @@ async function writeMapEntryLocked(app: App, mapId: string, mapData: MapData, wr
     }
     await app.vault.create(dataPath, jsonString);
   }
+  markStoreObserved(dataPath);
 
   const generation = getEntryGeneration(mapId) + 1;
   entryGenerations.set(mapId, { generation, writerId });
@@ -792,7 +859,7 @@ async function saveMapData(app: App, mapId: string, mapData: MapData, baseGenera
         console.warn(`[saveMapData] Refusing stale save of "${mapId}": base generation ${String(baseGeneration)} < current ${String(current.generation)} last written by ${current.writerId ?? 'untracked'} (map open in another pane?)`);
         return { status: 'stale' } as const;
       }
-      return await writeMapEntryLocked(app, mapId, mapData, writerId ?? null);
+      return await writeMapEntryLocked(app, mapId, mapData, writerId ?? null, (baseGeneration ?? 0) > 0);
     } catch (error) {
       console.error('Error saving map data:', error);
       return { status: 'failed' } as const;
@@ -1053,7 +1120,7 @@ export {
   loadMapData, loadMapDataWithGeneration, getEntryGeneration,
   saveMapData, deleteMapData, createNewMap, buildMapEntry, createMapEntry, listMaps, listMapsResult, migrateMapData,
   canonicalizeTileIds, applyLockedViewState, enqueueDataFileOp, getSaveQueue,
-  notifyCorruptedDataFile, readRawMapEntry, isMapTombstoned, MapDataUnreadableError, MapDeletedError, MapDataFileMissingError, MapSchemaError, createEmptyDataFile,
+  notifyCorruptedDataFile, readRawMapEntry, isMapTombstoned, MapDataUnreadableError, MapDeletedError, MapDataFileMissingError, MapSchemaError, createEmptyDataFile, ensureDataFileForNewMap,
   shouldRotateBak, otherBakSlot, bakPathForSlot, dailyBakPath, isSuspiciousShrink, backupTimestamp,
   findBestBackup, restoreFromBackup, BAK_THROTTLE_MS
 };

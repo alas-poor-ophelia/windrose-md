@@ -12,7 +12,7 @@ import type {
 } from '#types/hooks/objectInteractions.types';
 
 import { useCallback, useRef, useState } from 'preact/hooks';
-import { applyInverseRotation } from '../../objects/screenPositionUtils';
+import { calculateViewportOffset, clientToCanvasPx, unrotateCanvasPx } from '../../geometry/core/viewportMath';
 import { useMapState } from '../../context/MapContext';
 import { useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
@@ -63,44 +63,29 @@ function useObjectResize(): {
     if (!canvasRef.current) return null;
 
     const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-
-    let x = clientX - rect.left;
-    let y = clientY - rect.top;
-
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    x *= scaleX;
-    y *= scaleY;
-
     if (mapData == null || geometry == null) return null;
     const { viewState } = mapData;
     if (viewState == null) return null;
     const { zoom, center } = viewState;
     const northDirection = mapData.northDirection ?? 0;
 
-    let offsetX: number, offsetY: number, objectWidth: number, objectHeight: number;
+    const canvasSize = { width: canvas.width, height: canvas.height };
+    const { offsetX, offsetY } = calculateViewportOffset(geometry, center, canvasSize, zoom);
+    let objectWidth: number, objectHeight: number;
     if (geometry.type === 'hex') {
-      offsetX = canvas.width / 2 - center.x * zoom;
-      offsetY = canvas.height / 2 - center.y * zoom;
-
       const hexSize = geometry.hexSize;
       const size = object.size ?? { width: 1, height: 1 };
       objectWidth = size.width * hexSize * zoom;
       objectHeight = size.height * hexSize * zoom;
     } else {
       const scaledGridSize = geometry.getScaledCellSize != null ? geometry.getScaledCellSize(zoom) : zoom;
-      offsetX = canvas.width / 2 - center.x * scaledGridSize;
-      offsetY = canvas.height / 2 - center.y * scaledGridSize;
-
       const size = object.size ?? { width: 1, height: 1 };
       objectWidth = size.width * scaledGridSize;
       objectHeight = size.height * scaledGridSize;
     }
 
-    const rotated = applyInverseRotation(x, y, canvas.width, canvas.height, northDirection);
-    x = rotated.x;
-    y = rotated.y;
+    const canvasPx = clientToCanvasPx(canvas, clientX, clientY);
+    const { x, y } = unrotateCanvasPx(canvasPx.x, canvasPx.y, canvasSize, northDirection);
 
     let screenX: number, screenY: number;
     if (geometry.type === 'hex') {

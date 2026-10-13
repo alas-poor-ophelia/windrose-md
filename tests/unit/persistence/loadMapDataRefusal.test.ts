@@ -15,9 +15,15 @@ const DATA_PATH = 'windrose-md-data.json';
 
 const creates: string[] = [];
 
-function makeApp(initialContent: string | null): App {
+function makeApp(initialContent: string | null, siblingPaths: string[] = []): App {
   const files = new Map<string, TFile>();
   const contents = new Map<string, string>();
+  for (const path of siblingPaths) {
+    const sibling = new TFile();
+    sibling.path = path;
+    files.set(path, sibling);
+    contents.set(path, '{"maps":{}}');
+  }
 
   if (initialContent != null) {
     const file = new TFile();
@@ -66,9 +72,9 @@ describe('loadMapData refuses unreadable data files', () => {
     await expect(loadMapData(app, 'a')).rejects.toBeInstanceOf(MapDataUnreadableError);
   });
 
-  it('throws MapDataFileMissingError when the data file is absent, and writes nothing', async () => {
+  it('throws MapDataFileMissingError when the data file is absent with a backup beside it, and writes nothing', async () => {
     creates.length = 0;
-    const app = makeApp(null);
+    const app = makeApp(null, ['windrose-md-data.bak1.json']);
     const modify = vi.spyOn(app.vault, 'modify');
 
     const error = await loadMapData(app, 'a', 'Brand new', 'grid').catch((e: unknown) => e);

@@ -4,7 +4,7 @@
  * persists through saveMapData's guarded path.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { App } from 'obsidian';
 import { TFile } from 'obsidian';
 
@@ -131,9 +131,18 @@ describe('createMapEntry persists through the guarded save path', () => {
     expect(files.get(DATA_PATH)).toBe('{"maps": {"trunc');
   });
 
-  it('creates the store when absent', async () => {
+  it('creates the store when absent on first use (fresh module session, no prior store)', async () => {
+    vi.resetModules();
+    const fresh = await import('../../../src/persistence/fileOperations');
     const { app, files } = makeApp(null);
-    await createMapEntry(app, 'gen-new', built());
+    await fresh.createMapEntry(app, 'gen-new', built());
     expect(Object.keys((JSON.parse(files.get(DATA_PATH) as string) as { maps: object }).maps)).toEqual(['gen-new']);
+  });
+
+  it('refuses to create a one-map store once this session has seen the store', async () => {
+    // The earlier tests in this file wrote the store at DATA_PATH this session.
+    const { app, files } = makeApp(null);
+    await expect(createMapEntry(app, 'gen-orphan', built())).rejects.toThrow();
+    expect(files.has(DATA_PATH)).toBe(false);
   });
 });

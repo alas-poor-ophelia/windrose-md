@@ -23,6 +23,11 @@ import type { RegionGroup } from './regionFillRenderer';
 import { SQRT3, isFolderTileset, sortTilesForRendering, calculateTileDrawRect, tileOrientationAdaptation, makeEntryLookup } from './computeTileDrawPlan';
 import type { TileGeometry, TileViewState, TileRenderOptions } from './computeTileDrawPlan';
 
+/** Fallbacks when a tileset does not set its own stamp threshold / minimum stamp scale. */
+const DEFAULT_STAMP_THRESHOLD = 0.5;
+const DEFAULT_MIN_STAMP_SCALE = 0.35;
+
+
 // ===========================================
 // Main Render Function
 // ===========================================
@@ -217,7 +222,7 @@ function renderTiles(
     if (natW > 0 && natH > 0 && tile.fitMode == null) {
       const wRatio = natW / tileset.tileWidth;
       const hRatio = natH / hexHeight;
-      const stampThreshold = tileset.stampThreshold ?? 0.5;
+      const stampThreshold = tileset.stampThreshold ?? DEFAULT_STAMP_THRESHOLD;
       if (wRatio < stampThreshold || hRatio < stampThreshold) {
         // Scale relative to the footprint using pre-computed screen dimensions
         const fillScaleX = cellW / tileset.tileWidth;
@@ -226,7 +231,7 @@ function renderTiles(
         const baseScale = Math.min(fillScaleX, fillScaleY);
         // Ensure stamps are at least minStampScale of the footprint's smaller dimension
         const minHexDim = Math.min(cellW, cellH);
-        const minStampDim = minHexDim * (tileset.minStampScale ?? 0.35);
+        const minStampDim = minHexDim * (tileset.minStampScale ?? DEFAULT_MIN_STAMP_SCALE);
         const naturalMinDim = Math.min(natW, natH) * baseScale;
         const effectiveScale = (naturalMinDim < minStampDim
           ? baseScale * (minStampDim / naturalMinDim)

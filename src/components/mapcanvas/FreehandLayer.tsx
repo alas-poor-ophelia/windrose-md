@@ -16,7 +16,7 @@ import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useLiveOverlayRedraw } from '../../hooks/canvas/useLiveOverlayRedraw';
 import { useOverlayCanvas } from '../../hooks/canvas/useOverlayCanvas';
 import { fitPointsToBezier } from '../../geometry/curves/curveFitting';
-import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
+import { applyNorthRotation, calculateViewportOffset } from '../../geometry/core/viewportMath';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 
 
@@ -85,11 +85,7 @@ const FreehandLayer = ({
 
     // Apply north rotation if present
     const northDirection = mapData.northDirection ?? 0;
-    if (northDirection !== 0) {
-      ctx.translate(width / 2, height / 2);
-      ctx.rotate((northDirection * Math.PI) / 180);
-      ctx.translate(-width / 2, -height / 2);
-    }
+    applyNorthRotation(ctx, width, height, northDirection);
 
     // Transform to world coordinates
     ctx.translate(offsetX, offsetY);

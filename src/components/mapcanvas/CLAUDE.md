@@ -10,13 +10,13 @@ The main map component and its layer/overlay components. `MapCanvas` provides th
 MapCanvas.tsx               # Providers (MapSelection, ObjectLinking, EventHandler, MapState, MapOperations),
 │                           #   main canvas + fog canvas, Coordinators (usePanZoomCoordinator + useEventCoordinator)
 ├── DrawingLayer.tsx          # Cell painting, erasing
-├── ObjectLayer.tsx           # Placed objects (doors, traps, etc.)
+├── ObjectLayer.tsx           # Placed objects (doors, traps, etc.); multi-select, linking, right-click menu, drag measure in hooks/objects
 ├── ObjectHoverTooltip.tsx    # Hovered-object label; sole useHoverState() subscriber (rendered by ObjectLayer)
 ├── TextLayer.tsx             # Text labels
 ├── FogOfWarLayer.tsx         # Fog tools
 ├── FreehandLayer.tsx         # Freehand curves (overlay canvas)
 ├── TerrainBrushLayer.tsx     # Terrain stroke brush (overlay canvas, hard-edge preview)
-├── WallLayer.tsx             # Wall/path strips, curves, openings (wall gaps), edit mode (overlay canvas)
+├── WallLayer.tsx             # Wall/path tool: composes hooks/walls (useWallTools, useWallOverlay, useWallToolSurface); geometry in drawing/wallEditGeometry.ts
 ├── OutlineLayer.tsx          # Polygon outlines, hex (overlay canvas)
 ├── RegionLayer.tsx           # Named regions, hex (overlay canvas)
 ├── TilePlacementLayer.tsx    # Tile placement tool
@@ -77,4 +77,4 @@ Layers consume `MapContext` (state + operations), `MapSelectionContext`, `Object
 - **Don't store derived state**; compute from context values.
 - **Don't assume pixel coordinates**; use `geometry.cellToPixel`/`pixelToCell` and `viewController.getLive()`.
 - **Touch**: all interactions must work on iPad.
-- **Size**: `WallLayer`, `ObjectLayer`, `RegionLayer`, `OutlineLayer` are large; extract sub-hooks rather than growing them.
+- **Size**: `ObjectLayer`, `RegionLayer`, `OutlineLayer` are large; extract sub-hooks rather than growing them.

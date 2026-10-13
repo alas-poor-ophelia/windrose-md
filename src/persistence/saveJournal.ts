@@ -382,14 +382,17 @@ function journalPending(
 function clearJournal(
   app: App,
   mapId: string,
-  options?: { writerId?: string; upToVersion?: number; includeKept?: boolean }
+  options?: { writerId?: string; upToVersion?: number; includeKept?: boolean; keepRestored?: boolean }
 ): void {
   const writerId = options?.writerId;
   if (writerId != null && options?.includeKept !== true) {
     const own = slotId(mapId, writerId);
     const ownMeta = readMeta(app, own);
     const ownVersion = ownMeta?.version ?? null;
-    if (options?.upToVersion == null || ownVersion == null || ownVersion <= options.upToVersion) {
+    // keepRestored: a copy restored into this slot (restoredAt set) is not
+    // this writer's refused tree; only its own next journal replaces it.
+    const restoredHere = options?.keepRestored === true && ownMeta?.restoredAt != null;
+    if (!restoredHere && (options?.upToVersion == null || ownVersion == null || ownVersion <= options.upToVersion)) {
       removeLiveSlot(app, own);
     }
     // A restored writerless copy is cleared only by a writer that journaled
@@ -826,10 +829,15 @@ async function resolveJournalOnLoad(
     // move fails the entry stays where it was and is offered once more
     // (comparing clean once the save has landed).
     // The writerless copy is stamped with the restore time (see clearJournal).
+    // Into a pane's own slot: version MAX_SAFE_INTEGER (never Infinity: JSON
+    // turns it into null, which any landed save clears) so a save that was
+    // already in flight before the restore cannot clear it; the pane's next
+    // journalNow overwrites it with the real version. restoredAt marks it so
+    // a stale refusal leaves it too (parallax wave-6 finding 3).
     const targetWriter = restoringWriterId ?? null;
     const inPlace = c.source === 'live' && c.slot === slotId(mapId, targetWriter);
-    const stampedAt = targetWriter == null ? Date.now() : null;
-    if (writeLiveSlot(app, mapId, targetWriter, null, c.entry.payload, c.entry.savedAt, stampedAt) && !inPlace) {
+    const restoredVersion = targetWriter == null ? null : Number.MAX_SAFE_INTEGER;
+    if (writeLiveSlot(app, mapId, targetWriter, restoredVersion, c.entry.payload, c.entry.savedAt, Date.now()) && !inPlace) {
       dropCandidate(app, mapId, c);
     }
     return restored;

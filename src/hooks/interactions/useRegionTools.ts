@@ -15,7 +15,7 @@ import type { ExtendedGeometry } from '#types/contexts/context.types';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { updateById, removeById } from '../../objects/entityList';
 import { getRegionLabelWorldPosition, computeCentroid } from '../../geometry/renderers/regionRenderer';
-import { offsetToAxial } from '../../geometry/core/offsetCoordinates';
+import { hexKey, pointInPolygon, forEachHexInBounds } from '../../geometry/hex/hexRegionMath';
 
 interface RegionToolsOptions {
   currentTool: ToolId;
@@ -57,28 +57,10 @@ interface UseRegionToolsResult {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function hexKey(q: number, r: number): string {
-  return `${q},${r}`;
-}
-
 function generateRegionId(): string {
   return `region-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/**
- * Point-in-polygon test (ray casting) for world-space coordinates.
- */
-function pointInPolygon(px: number, py: number, polygon: Array<{ x: number; y: number }>): boolean {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].x, yi = polygon[i].y;
-    const xj = polygon[j].x, yj = polygon[j].y;
-    if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) {
-      inside = !inside;
-    }
-  }
-  return inside;
-}
 
 // ── Hook ─────────────────────────────────────────────────────────────
 
@@ -262,49 +244,12 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
 
     // Find all hexes whose centers fall inside the polygon
     const selected: Point[] = [];
-
-    if (bounds.maxRing !== undefined) {
-      // Radial bounds
-      for (let ring = 0; ring <= bounds.maxRing; ring++) {
-        if (ring === 0) {
-          const center = hexGeom.hexToWorld(0, 0);
-          if (pointInPolygon(center.worldX, center.worldY, boundaryVertices)) {
-            selected.push({ x: 0, y: 0 });
-          }
-        } else {
-          let q = ring, r = 0;
-          const dirs = [
-            { dq: -1, dr: 1 }, { dq: -1, dr: 0 }, { dq: 0, dr: -1 },
-            { dq: 1, dr: -1 }, { dq: 1, dr: 0 }, { dq: 0, dr: 1 }
-          ];
-          for (const dir of dirs) {
-            for (let step = 0; step < ring; step++) {
-              if (hexGeom.isWithinBounds(q, r)) {
-                const center = hexGeom.hexToWorld(q, r);
-                if (pointInPolygon(center.worldX, center.worldY, boundaryVertices)) {
-                  selected.push({ x: q, y: r });
-                }
-              }
-              q += dir.dq;
-              r += dir.dr;
-            }
-          }
-        }
+    forEachHexInBounds(hexGeom, bounds, mapData.orientation ?? 'flat', (q, r) => {
+      const center = hexGeom.hexToWorld(q, r);
+      if (pointInPolygon(center.worldX, center.worldY, boundaryVertices)) {
+        selected.push({ x: q, y: r });
       }
-    } else {
-      // Rectangular bounds - iterate offset coords and convert
-      for (let col = 0; col <= bounds.maxCol; col++) {
-        for (let row = 0; row <= bounds.maxRow; row++) {
-          const { q, r } = offsetToAxial(col, row, mapData.orientation ?? 'flat');
-          if (hexGeom.isWithinBounds(q, r)) {
-            const center = hexGeom.hexToWorld(q, r);
-            if (pointInPolygon(center.worldX, center.worldY, boundaryVertices)) {
-              selected.push({ x: q, y: r });
-            }
-          }
-        }
-      }
-    }
+    });
 
     setPendingHexes(selected);
     setBoundaryVertices([]);

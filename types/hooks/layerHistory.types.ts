@@ -2,8 +2,9 @@
  * Layer History Hook Type Definitions
  * Path: types/hooks/layerHistory.types.ts
  *
- * Types for useLayerHistory hook - manages per-layer undo/redo history
- * with layer switching support and history caching.
+ * Types for useLayerHistory hook - per-layer undo/redo stacks of field
+ * diffs (DATA-06): each entry records only the fields one edit changed, so
+ * undo never rewrites map-wide fields or fog that other edits own.
  */
 
 import type { Cell } from '../core/cell.types';
@@ -13,15 +14,17 @@ import type { TerrainStroke } from '../core/terrainstroke.types';
 import type { Edge, TextLabel, MapData, LayerId, Region, ShapeOverlay, Outline, FogOfWar, PartyPin, SavedRoute } from '../core/map.types';
 import type { MapObject } from '../objects/object.types';
 import type { TileAssignment } from '../tiles/tile.types';
-import type { HistoryState } from './history.types';
+import type { FieldDiff, HistoryStack } from './history.types';
+import type { MapDataUpdater } from './mapData.types';
 
 // ===========================================
 // Layer History State
 // ===========================================
 
 /**
- * Snapshot of layer-specific data tracked in history.
- * Represents the undoable state for a single layer.
+ * Post-edit snapshot handed to addToHistory by data handlers. Fields left
+ * undefined are "not provided" and never enter the diff; provided fields are
+ * diffed against the last known values, and only changed ones are recorded.
  */
 export interface LayerHistorySnapshot {
   /** Cell data for the layer */
@@ -56,11 +59,38 @@ export interface LayerHistorySnapshot {
   fogOfWar?: FogOfWar | null;
 }
 
+/** Snapshot keys that live on the layer (restored onto the entry's layer). */
+export type LayerHistoryLayerKey =
+  'cells' | 'curves' | 'objects' | 'textLabels' | 'edges' | 'tiles' | 'wallPaths' | 'terrainStrokes' | 'fogOfWar';
+
+/** Snapshot keys that live on the map root (map-wide). */
+export type LayerHistoryMapKey = 'name' | 'regions' | 'outlines' | 'shapeOverlays' | 'partyPins' | 'savedRoutes';
+
+export type LayerHistoryLayerValues = Pick<LayerHistorySnapshot, LayerHistoryLayerKey>;
+export type LayerHistoryMapValues = Pick<LayerHistorySnapshot, LayerHistoryMapKey>;
+
 /**
- * Per-layer history cache.
- * Maps layer IDs to their saved history states.
+ * One undoable edit: the layer it was made on, plus before/after values of
+ * only the layer fields and map-wide fields it changed.
  */
-export type LayerHistoryCache = Record<LayerId, HistoryState<LayerHistorySnapshot>>;
+export interface LayerHistoryEntry {
+  layerId: LayerId;
+  layer: FieldDiff<LayerHistoryLayerValues>;
+  map: FieldDiff<LayerHistoryMapValues>;
+  /** Consecutive entries with the same key pushed close together merge (fog brush strokes). */
+  coalesceKey?: string;
+  /** Push time (ms), for coalescing. */
+  time: number;
+}
+
+/** Undo stacks keyed by layer id (one map level; cleared on sub-hex navigation). */
+export type LayerHistoryStacks = Record<LayerId, HistoryStack<LayerHistoryEntry>>;
+
+/** Options for recordMapChange. */
+export interface RecordMapChangeOptions {
+  /** Merge with the previous entry when it has the same key and was pushed recently. */
+  coalesceKey?: string;
+}
 
 // ===========================================
 // Hook Parameters
@@ -72,12 +102,14 @@ export type LayerHistoryCache = Record<LayerId, HistoryState<LayerHistorySnapsho
 export interface UseLayerHistoryOptions {
   /** Current map data */
   mapData: MapData | null;
-  /** Function to update map data */
-  updateMapData: (data: MapData) => void;
+  /** Function to update map data (functional updates are used for undo/redo) */
+  updateMapData: MapDataUpdater;
   /** Whether map data is still loading */
   isLoading: boolean;
-  /** Incremented on sub-hex navigation to reset history */
+  /** Incremented on sub-hex navigation; history is cleared per level */
   navigationVersion?: number;
+  /** Identity of the open sub-hex level (path string, null at root); a change clears history */
+  levelKey?: string | null;
 }
 
 // ===========================================
@@ -120,6 +152,8 @@ export interface HistoryActions {
   handleRedo: () => void;
   /** Add state to history (for data change handlers) */
   addToHistory: (state: LayerHistorySnapshot) => void;
+  /** Record a prev -> next map transition (diffs the active layer + map-wide fields) */
+  recordMapChange: (prev: MapData, next: MapData, options?: RecordMapChangeOptions) => void;
   /** Check if undo/redo is in progress */
   isApplyingHistory: () => boolean;
 }
@@ -158,5 +192,6 @@ export interface UseLayerHistoryResult {
 
   // For data change handlers
   addToHistory: (state: LayerHistorySnapshot) => void;
+  recordMapChange: (prev: MapData, next: MapData, options?: RecordMapChangeOptions) => void;
   isApplyingHistory: () => boolean;
 }

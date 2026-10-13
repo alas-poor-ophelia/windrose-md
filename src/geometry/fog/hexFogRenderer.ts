@@ -16,6 +16,8 @@ import type { HexGeometryLike } from './fogRenderer';
 import type { IGeometry } from '#types/core/geometry.types';
 import { getFoggedCellSet } from './foggedCellIndex';
 
+import { FOG_PASS_OPACITY_BASE, FOG_PASS_OPACITY_RAMP, FOG_FILTER_BLUR_START, FOG_FILTER_MIN_BLUR_PX } from '../renderers/renderConstants';
+
 /** Screen-space rectangle (pre-rotation) a fog cell centre must fall inside to be drawn. */
 interface ScreenCullRect {
   minX: number;
@@ -220,11 +222,11 @@ function renderHexBlurPasses(
   for (let i = 0; i < numPasses; i++) {
     const t = i / (numPasses - 1);
     const scale = 1.0 + (maxExpansion * (1.0 - t));
-    const opacity = 0.50 + (0.30 * t);
+    const opacity = FOG_PASS_OPACITY_BASE + (FOG_PASS_OPACITY_RAMP * t);
 
     if (useFilterFallback) {
-      const passBlur = filterBlurAmount * (1.5 - t);
-      targetCtx.filter = passBlur > 0.5 ? `blur(${passBlur}px)` : 'none';
+      const passBlur = filterBlurAmount * (FOG_FILTER_BLUR_START - t);
+      targetCtx.filter = passBlur > FOG_FILTER_MIN_BLUR_PX ? `blur(${passBlur}px)` : 'none';
     }
 
     targetCtx.beginPath();

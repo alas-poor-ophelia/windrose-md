@@ -48,6 +48,8 @@ interface Harness {
   root: () => MapData;
   /** A write straight to the root store (MCP, tileset rescan, journal restore). */
   rootWrite: MapDataUpdater;
+  /** The same root write without its own act(), to batch with a nav call. */
+  rootWriteInBatch: MapDataUpdater;
   writes: MapDataUpdateOptions[];
   unmount: () => void;
 }
@@ -78,6 +80,7 @@ function mount(initial: MapData, initialSubHexPath?: string): Harness {
     nav: () => nav as Nav,
     root: () => root,
     rootWrite: (u, o) => { act(() => { (rootWrite as MapDataUpdater)(u, o); }); },
+    rootWriteInBatch: (u, o) => { (rootWrite as MapDataUpdater)(u, o); },
     writes,
     unmount: () => { act(() => { render(null, container); }); }
   };
@@ -162,6 +165,40 @@ describe('useSubHexNavigation: path-based navigation', () => {
     hx.rootWrite(hexMap('Root (restored)', { '0,0': entry(hexMap('A only')) }));
     expect(hx.nav().subHexPath).toBe('0,0');
     expect(hx.nav().activeMapData?.name).toBe('A only');
+    hx.unmount();
+  });
+
+  it('parallax wave-6 #4: a creation against a level that vanished first pushes no dead frame', () => {
+    const hx = mount(tree());
+    step(() => hx.nav().enterSubHex(0, 0));
+    // Same batch: another writer removes level A, then a dive from A's stale view creates "1,0".
+    step(() => {
+      hx.rootWriteInBatch(hexMap('Root (A removed)'));
+      hx.nav().enterSubHex(1, 0);
+    });
+    expect(getMapAtSubHexPath(hx.root(), ['0,0'])).toBeNull();
+    expect(hx.nav().isInSubHex).toBe(false);
+
+    // A later writer recreates exactly that path: the view must not jump into it.
+    hx.rootWrite(hexMap('Root (rebuilt)', { '0,0': entry(hexMap('A2', { '1,0': entry(hexMap('C')) })) }));
+    expect(hx.nav().isInSubHex).toBe(false);
+    expect(hx.nav().subHexPath).toBeNull();
+    hx.unmount();
+  });
+
+  it('parallax wave-6 #4: a sibling creation against a vanished parent level pushes no dead frame', () => {
+    const hx = mount(tree());
+    step(() => hx.nav().enterSubHex(0, 0));
+    step(() => hx.nav().enterSubHex(2, -1));
+    step(() => {
+      // The parent level A vanishes in the same batch as the sibling creation.
+      hx.rootWriteInBatch(hexMap('Root (A removed)'));
+      hx.nav().navigateToSibling(1, -1, { createIfMissing: true });
+    });
+    // No "0,0/1,-1" frame was pushed; the vanished path trims to the root.
+    expect(hx.nav().subHexPath).toBeNull();
+    hx.rootWrite(hexMap('Root', { '0,0': entry(hexMap('A again', { '1,-1': entry(hexMap('D')) })) }));
+    expect(hx.nav().subHexPath).toBeNull();
     hx.unmount();
   });
 });

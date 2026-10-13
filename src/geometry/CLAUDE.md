@@ -17,6 +17,7 @@ geometry/
 │   ├── hexMeasurements.ts # Hex-specific calculations
 │   ├── offsetCoordinates.ts # Coordinate system conversions
 │   ├── contentFitView.ts  # Pure "fit to content" view (center + zoom) for the recenter control
+│   ├── viewportMath.ts    # Pure view math: client->canvas px, north (un)rotation, canvas<->world, pan deltas, anchored zoom
 │   └── subHexBackdrop.ts  # Pure placement math for the parent-map snapshot behind a sub-hex map
 ├── renderers/             # Canvas draw functions
 │   ├── gridRenderer.ts, hexRenderer.ts, backgroundRenderer.ts
@@ -138,6 +139,19 @@ interface DistanceOptions {
 ```
 
 Note: Hex ignores these options (hex has no diagonal ambiguity).
+
+## Viewport Math (screen <-> world)
+
+`core/viewportMath.ts` is the ONLY place that converts between client/canvas pixels and world coordinates. It owns the view-centre unit rule: `StoredViewState.center` is in **cell units on grid** and **world px on hex**; `viewCenterScale(geometry, zoom)` (also `IGeometry.getViewCenterScale(zoom)`) is cellSize*zoom on grid and zoom on hex. Callers pass a geometry and never branch on map type.
+
+- `clientToCanvasPx(canvas, clientX, clientY)`: honours CSS scaling (the canvas buffer can be larger than its CSS box).
+- `clientToWorld` / `canvasPxToWorld` / `worldToCanvasPx`: full chain incl. inverse north rotation about the buffer centre.
+- `calculateViewportOffset` (re-exported from `BaseGeometry` for old importers).
+- `screenDeltaToCenterUnits`: pan/wheel deltas -> centre delta (negate for drag-to-pan).
+- `anchoredZoomCenter`: zoom-to-cursor keeping the anchor's map point fixed (rotation and CSS scaling included).
+- `applyNorthRotation(ctx, w, h, deg)`: rotate a 2D context about the surface centre; caller owns save/restore.
+
+Do not hand-write `canvas.width / 2 - center.x * ...` or `northDirection * Math.PI / 180` outside this module.
 
 ## Grid vs Hex
 

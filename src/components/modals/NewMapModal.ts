@@ -2,6 +2,7 @@ import type { App } from 'obsidian';
 import { Modal, Setting } from 'obsidian';
 import type { MapType } from '#types/index';
 import { isFeatureEnabled } from '../../core/featureFlags';
+import { ensureDataFileForNewMap } from '../../persistence/fileOperations';
 
 class NewMapModal extends Modal {
   private mapName = '';
@@ -90,8 +91,15 @@ class NewMapModal extends Modal {
   private submit(): void {
     if (!this.mapType) return;
     const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
-    this.onCreate(mapId, this.mapName, this.mapType);
+    const mapName = this.mapName;
+    const mapType = this.mapType;
     this.close();
+    // First use: create the store before the block mounts, so a fresh vault's
+    // first map renders instead of the missing-store panel. Refuses when a
+    // prior store is evidenced (the panel then explains it).
+    void ensureDataFileForNewMap(this.app).finally(() => {
+      this.onCreate(mapId, mapName, mapType);
+    });
   }
 
   override onClose(): void {

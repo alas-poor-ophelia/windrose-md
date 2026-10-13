@@ -11,6 +11,7 @@
  */
 
 // Type-only imports
+import { INTERIOR_RATIO } from './renderConstants';
 import type { Point, GridStyle } from '#types/core/geometry.types';
 import type {
   RenderViewState,
@@ -208,7 +209,7 @@ const gridRenderer = {
   ): void {
     if (cells == null || cells.length === 0) return;
     
-    const { lineColor = '#666666', lineWidth = 1, interiorRatio = 0.5 } = style;
+    const { lineColor = '#666666', lineWidth = 1, interiorRatio = INTERIOR_RATIO } = style;
     const scaledSize = geometry.getScaledCellSize(viewState.zoom);
     const actualLineWidth = Math.max(1, lineWidth * interiorRatio);
     const halfWidth = actualLineWidth / 2;

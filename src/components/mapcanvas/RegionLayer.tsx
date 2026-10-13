@@ -16,7 +16,7 @@ import { useMapState } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useLiveOverlayRedraw } from '../../hooks/canvas/useLiveOverlayRedraw';
 import { useOverlayCanvas } from '../../hooks/canvas/useOverlayCanvas';
-import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
+import { applyNorthRotation, calculateViewportOffset } from '../../geometry/core/viewportMath';
 import { useRegionTools } from '../../hooks/interactions/useRegionTools';
 import type { MenuItem } from 'obsidian';
 import { Menu } from 'obsidian';
@@ -84,7 +84,9 @@ const RegionLayer = ({
   // Context menu handler is always present; tool handlers resolve to undefined when inactive
   useLayerHandlers('region', {
     handleContextMenu,
-    ...(isRegionTool ? { handlePointerDown, handlePointerMove, handleDoubleClick } : {})
+    handlePointerDown: isRegionTool ? handlePointerDown : undefined,
+    handlePointerMove: isRegionTool ? handlePointerMove : undefined,
+    handleDoubleClick: isRegionTool ? handleDoubleClick : undefined
   });
 
   // Listen for edit-region events from sidebar panel
@@ -270,9 +272,7 @@ const RegionLayer = ({
 
     if (northDirection !== 0) {
       ctx.save();
-      ctx.translate(overlay.width / 2, overlay.height / 2);
-      ctx.rotate((northDirection * Math.PI) / 180);
-      ctx.translate(-overlay.width / 2, -overlay.height / 2);
+      applyNorthRotation(ctx, overlay.width, overlay.height, northDirection);
     }
 
     const { offsetX, offsetY } = calculateViewportOffset(

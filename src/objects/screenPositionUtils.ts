@@ -5,6 +5,7 @@
 import type { MapData } from '#types/core/map.types';
 import type { MapObject, ObjectAlignment } from '#types/objects/object.types';
 import type { IGeometry } from '#types/core/geometry.types';
+import { calculateViewportOffset, rotateAboutCanvasCenter } from '../geometry/core/viewportMath';
 
 /** Screen position result */
 interface ScreenPosition {
@@ -52,17 +53,15 @@ function calculateObjectScreenPosition(
   const size = object.size ?? { width: 1, height: 1 };
   const alignment = object.alignment ?? 'center';
 
-  const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2;
+  const canvasSize = { width: canvas.width, height: canvas.height };
+  const { offsetX, offsetY } = calculateViewportOffset(geometry, center, canvasSize, zoom);
 
-  let offsetX: number, offsetY: number, screenX: number, screenY: number;
+  let screenX: number, screenY: number;
   let objectWidth: number, objectHeight: number;
 
   if (object.freeform === true && object.worldPosition != null) {
     const cellUnit = mapType === 'hex' ? (geometry as HexGeometryLike).hexSize : gridSize ?? 32;
     const cellUnitValue = cellUnit ?? 32;
-    offsetX = centerX - center.x * (mapType === 'hex' ? zoom : cellUnitValue * zoom);
-    offsetY = centerY - center.y * (mapType === 'hex' ? zoom : cellUnitValue * zoom);
     // worldPosition is the object center; screenX/screenY should also be center
     screenX = offsetX + object.worldPosition.x * zoom;
     screenY = offsetY + object.worldPosition.y * zoom;
@@ -76,9 +75,6 @@ function calculateObjectScreenPosition(
     objectWidth = size.width * hexSize * zoom;
     objectHeight = size.height * hexSize * zoom;
 
-    offsetX = centerX - center.x * zoom;
-    offsetY = centerY - center.y * zoom;
-
     screenX = offsetX + worldX * zoom;
     screenY = offsetY + worldY * zoom;
 
@@ -86,9 +82,6 @@ function calculateObjectScreenPosition(
     screenY += getAlignmentScreenOffset(alignment, hexSize, zoom).y;
   } else {
     const scaledGridSize = (gridSize ?? 32) * zoom;
-    offsetX = centerX - center.x * scaledGridSize;
-    offsetY = centerY - center.y * scaledGridSize;
-
     screenX = offsetX + (object.position.x + size.width / 2) * scaledGridSize;
     screenY = offsetY + (object.position.y + size.height / 2) * scaledGridSize;
 
@@ -99,17 +92,7 @@ function calculateObjectScreenPosition(
     objectHeight = size.height * scaledGridSize;
   }
 
-  if (northDirection != null && northDirection !== 0) {
-    const relX = screenX - centerX;
-    const relY = screenY - centerY;
-
-    const angleRad = (northDirection * Math.PI) / 180;
-    const rotatedX = relX * Math.cos(angleRad) - relY * Math.sin(angleRad);
-    const rotatedY = relX * Math.sin(angleRad) + relY * Math.cos(angleRad);
-
-    screenX = centerX + rotatedX;
-    screenY = centerY + rotatedY;
-  }
+  ({ x: screenX, y: screenY } = rotateAboutCanvasCenter(screenX, screenY, canvasSize, northDirection ?? 0));
 
   const rect = canvas.getBoundingClientRect();
   const container = containerRef?.current ?? canvas.parentElement;
@@ -151,35 +134,4 @@ function getAlignmentScreenOffset(
   }
 }
 
-/**
- * Apply inverse rotation transformation to coordinates
- * Used when converting screen/canvas coordinates back to world/grid coordinates
- */
-function applyInverseRotation(
-  x: number,
-  y: number,
-  canvasWidth: number,
-  canvasHeight: number,
-  northDirection: number
-): ScreenOffset {
-  if (northDirection === 0) {
-    return { x, y };
-  }
-
-  const centerX = canvasWidth / 2;
-  const centerY = canvasHeight / 2;
-
-  const translatedX = x - centerX;
-  const translatedY = y - centerY;
-
-  const angleRad = (-northDirection * Math.PI) / 180;
-  const rotatedX = translatedX * Math.cos(angleRad) - translatedY * Math.sin(angleRad);
-  const rotatedY = translatedX * Math.sin(angleRad) + translatedY * Math.cos(angleRad);
-
-  return {
-    x: rotatedX + centerX,
-    y: rotatedY + centerY
-  };
-}
-
-export { calculateObjectScreenPosition, applyInverseRotation, getAlignmentScreenOffset };
+export { calculateObjectScreenPosition, getAlignmentScreenOffset };

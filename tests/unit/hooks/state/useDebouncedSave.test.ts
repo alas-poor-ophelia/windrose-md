@@ -411,3 +411,20 @@ describe('useDebouncedSave: journal before every save (DATA-05) and per-writer s
     m.unmount();
   });
 });
+
+describe('useDebouncedSave: a no-op updater is not an edit (parallax wave-6 finding 6)', () => {
+  it('schedules no save, marks nothing unsaved and journals nothing', async () => {
+    const { app } = makeApp();
+    saveMock.mockResolvedValue({ status: 'saved', generation: 1 });
+    const m = mount(app, 'ds-noop');
+
+    act(() => { m.hook().updateMapData((prev) => prev); });
+    await advance(5000);
+
+    expect(saveMock).not.toHaveBeenCalled();
+    expect(m.hook().saveStatus).not.toBe('Unsaved changes');
+    expect(readJournal(app, 'ds-noop')).toBeNull();
+    m.unmount();
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+});
