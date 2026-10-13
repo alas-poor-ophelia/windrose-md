@@ -2,8 +2,9 @@
  * EventHandlerContext.tsx
  *
  * Provides a registration system for event handlers from different layers.
- * Layers register their handlers (object, text, drawing, notePin, panZoom)
- * and the EventCoordinationLayer uses these to route pointer events.
+ * Layers register their handlers (one typed set per HandlerTypeMap key,
+ * usually via useLayerHandlers) and useEventCoordinator routes pointer
+ * events to them through its per-tool dispatch table.
  *
  * This enables clean separation: each layer owns its handlers,
  * EventCoordinationLayer owns the routing logic.
@@ -18,14 +19,14 @@
 import type { ComponentChildren, FunctionComponent } from 'preact';
 import { createContext } from 'preact';
 import { useCallback, useContext, useMemo, useRef } from 'preact/hooks';
-import type { HandlerLayerName, HandlerTypeMap, LayerHandlers } from '#types/hooks/eventCoordinator.types';
+import type { HandlerLayerName, HandlerTypeMap, HandlersRegistry } from '#types/hooks/eventCoordinator.types';
 
-/** All registered handlers by layer type */
-export type HandlersRegistry = Partial<Record<HandlerLayerName, LayerHandlers>>;
+export type { HandlersRegistry };
 
 /** EventHandlerContext value shape */
 export interface EventHandlerContextValue {
-  registerHandlers: (layerType: HandlerLayerName, handlers: LayerHandlers) => void;
+  /** Typed per layer: an unknown key or a wrong handler shape is a type error. */
+  registerHandlers: <T extends HandlerLayerName>(layerType: T, handlers: HandlerTypeMap[T]) => void;
   unregisterHandlers: (layerType: HandlerLayerName) => void;
   getHandlers: <T extends HandlerLayerName>(layerType: T) => HandlerTypeMap[T] | null;
   getAllHandlers: () => HandlersRegistry;
@@ -79,7 +80,7 @@ const EventHandlerProvider: FunctionComponent<EventHandlerProviderProps> = ({ ch
   // Store handlers by layer type
   const handlersRef = useRef<HandlersRegistry>({});
 
-  const registerHandlers = useCallback((layerType: HandlerLayerName, handlers: LayerHandlers): void => {
+  const registerHandlers = useCallback(<T extends HandlerLayerName>(layerType: T, handlers: HandlerTypeMap[T]): void => {
     handlersRef.current[layerType] = handlers;
   }, []);
 
@@ -88,7 +89,7 @@ const EventHandlerProvider: FunctionComponent<EventHandlerProviderProps> = ({ ch
   }, []);
 
   const getHandlers = useCallback(<T extends HandlerLayerName>(layerType: T): HandlerTypeMap[T] | null => {
-    return (handlersRef.current[layerType] ?? null) as HandlerTypeMap[T] | null;
+    return handlersRef.current[layerType] ?? null;
   }, []);
 
   /**

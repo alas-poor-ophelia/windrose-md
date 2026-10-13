@@ -161,7 +161,7 @@ const MeasurementLayer = ({
     handleMeasureClick(cellX, cellY, isTouch);
   }, [handleMeasureClick, handleSaveRoute, waypoints.length]);
 
-  useLayerHandlers('measure', { handleMeasureClick: handleMeasureClickOrFinish, handleMeasureMove, clearMeasurement });
+  useLayerHandlers('measure', { handleMeasureClick: handleMeasureClickOrFinish, handleMeasureMove });
 
   const [terrainPicker, setTerrainPicker] = useState<TerrainPickerState | null>(null);
 

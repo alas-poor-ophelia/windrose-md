@@ -166,8 +166,7 @@ const DrawingLayer = ({
     handleDrawingPointerDown, handleDrawingPointerMove,
     stopDrawing: handleStopDrawing, cancelDrawing,
     isDrawing, rectangleStart, circleStart, edgeLineStart,
-    updateShapeHover, updateEdgeLineHover, shapeHoverPosition,
-    touchConfirmPending, cancelShapePreview,
+    updateShapeHover, updateEdgeLineHover, cancelShapePreview,
     previewEnabled: previewSettings.kbmEnabled,
     updateSegmentHover, clearSegmentHover
   });

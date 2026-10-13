@@ -638,7 +638,7 @@ class JournalRestoreModal extends Modal {
     this.source = source;
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     const conflict = this.source === 'conflict';
@@ -675,7 +675,7 @@ class JournalRestoreModal extends Modal {
     this.close();
   }
 
-  onClose(): void {
+  override onClose(): void {
     this.contentEl.empty();
     // Dismissing the modal is the conservative option: nothing is lost.
     if (!this.resolved && this.resolvePromise != null) this.resolvePromise('keep');
@@ -769,7 +769,13 @@ async function resolveJournalOnLoad(
   mapId: string,
   mapLabel = '',
   /** Test seam: replaces the modal prompt. */
-  prompt?: (savedAt: number, mapLabel: string, source: JournalSource) => Promise<JournalChoice>
+  prompt?: (savedAt: number, mapLabel: string, source: JournalSource) => Promise<JournalChoice>,
+  /**
+   * The restoring pane's writer id. When given, the restored copy lives in
+   * that pane's own slot (owner-stamped; its landed save clears it). Absent:
+   * the shared writerless slot stamped with the restore time.
+   */
+  restoringWriterId?: string
 ): Promise<MapData | null> {
   const candidates: JournalCandidate[] = [];
   // One live candidate per writer slot (several panes may have crashed), newest first.
@@ -820,8 +826,10 @@ async function resolveJournalOnLoad(
     // move fails the entry stays where it was and is offered once more
     // (comparing clean once the save has landed).
     // The writerless copy is stamped with the restore time (see clearJournal).
-    const inPlace = c.source === 'live' && c.slot === mapId;
-    if (writeLiveSlot(app, mapId, null, null, c.entry.payload, c.entry.savedAt, Date.now()) && !inPlace) {
+    const targetWriter = restoringWriterId ?? null;
+    const inPlace = c.source === 'live' && c.slot === slotId(mapId, targetWriter);
+    const stampedAt = targetWriter == null ? Date.now() : null;
+    if (writeLiveSlot(app, mapId, targetWriter, null, c.entry.payload, c.entry.savedAt, stampedAt) && !inPlace) {
       dropCandidate(app, mapId, c);
     }
     return restored;

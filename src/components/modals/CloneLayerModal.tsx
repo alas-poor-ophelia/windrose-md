@@ -33,7 +33,7 @@ function openNativeCloneLayerModal(options: {
     const modal = new (class extends Modal {
       private submitted = false;
 
-      onOpen(): void {
+      override onOpen(): void {
         const { contentEl, titleEl } = this;
         titleEl.setText(`Clone Layer: ${layerName}`);
 
@@ -64,7 +64,7 @@ function openNativeCloneLayerModal(options: {
         });
       }
 
-      onClose(): void {
+      override onClose(): void {
         if (!this.submitted && onCancel) {
           onCancel();
         }

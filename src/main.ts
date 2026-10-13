@@ -115,13 +115,13 @@ function buildGeneratedDungeonMap(
 }
 
 export default class WindrosePlugin extends Plugin {
-  settings: PluginSettings = {} as PluginSettings;
+  override settings: PluginSettings = {} as PluginSettings;
   dataFilePath: string = 'windrose-md-data.json';
   private mountedElements: Set<HTMLElement> = new Set();
   /** Raw loadData() result, kept for fresh-vs-upgrade onboarding detection. */
   private rawLoadedSettings: Partial<PluginSettings> | null = null;
 
-  async onload(): Promise<void> {
+  override async onload(): Promise<void> {
     await this.migrateFromOldPlugin();
     await this.loadSettings();
     this.initMcpNamespace();
@@ -380,7 +380,7 @@ export default class WindrosePlugin extends Plugin {
     }
   }
 
-  onunload(): void {
+  override onunload(): void {
     // Unmounting runs each tree's cleanup, which fires an unawaited save. If
     // the unload is part of an app shutdown that save may never land, so every
     // mounted map's pending data is journalled synchronously first.

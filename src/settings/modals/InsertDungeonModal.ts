@@ -273,7 +273,7 @@ class InsertDungeonModal extends Modal {
     this.updateVisualizer();
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-insert-dungeon-modal');
@@ -578,7 +578,7 @@ class InsertDungeonModal extends Modal {
     })(); });
   }
 
-  onClose(): void {
+  override onClose(): void {
     if (this.visualizer) {
       this.visualizer.destroy();
       this.visualizer = null;

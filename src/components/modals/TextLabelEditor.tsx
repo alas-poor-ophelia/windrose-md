@@ -69,7 +69,7 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
       pendingCustomColorRef = { current: null as string | null };
       clickOutsideHandler: ((e: MouseEvent) => void) | null = null;
 
-      onOpen(): void {
+      override onOpen(): void {
         const { contentEl, titleEl } = this;
         titleEl.setText(isEditing ? 'Edit Text Label' : 'Add Text Label');
         contentEl.addClass('windrose-text-editor-native');
@@ -285,7 +285,7 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
         }
       }
 
-      onClose(): void {
+      override onClose(): void {
         if (this.clickOutsideHandler) {
           activeDocument.removeEventListener('mousedown', this.clickOutsideHandler);
           this.clickOutsideHandler = null;

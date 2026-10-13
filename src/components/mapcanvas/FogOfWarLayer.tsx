@@ -50,7 +50,6 @@ const FogOfWarLayer = ({
 
   const fogTools = useFogTools(activeTool, onFogChange, onInitializeFog);
   const {
-    isDrawing,
     rectangleStart,
     handlePointerDown,
     handlePointerMove,
@@ -61,7 +60,7 @@ const FogOfWarLayer = ({
 
   useLayerHandlers('fogOfWar', {
     handlePointerDown, handlePointerMove, handlePointerUp, handleKeyDown,
-    isDrawing, rectangleStart, rectangleHover
+    rectangleStart
   }, { enabled: activeTool != null });
 
   const renderPreviewOverlay = (): VNode | null => {

@@ -60,7 +60,6 @@ const RegionLayer = ({
     editingRegion,
     handlePointerDown,
     handlePointerMove,
-    handlePointerUp,
     handleDoubleClick,
     handleContextMenu,
     confirmRegion,
@@ -85,7 +84,7 @@ const RegionLayer = ({
   // Context menu handler is always present; tool handlers resolve to undefined when inactive
   useLayerHandlers('region', {
     handleContextMenu,
-    ...(isRegionTool ? { handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick } : {})
+    ...(isRegionTool ? { handlePointerDown, handlePointerMove, handleDoubleClick } : {})
   });
 
   // Listen for edit-region events from sidebar panel

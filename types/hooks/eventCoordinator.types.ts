@@ -62,20 +62,22 @@ export interface AreaSelectPending {
 // Base Handler Types
 // ===========================================
 
-/** Generic handler function type */
-export type HandlerFunction = (...args: unknown[]) => unknown;
+// Handler members use METHOD syntax on purpose: their parameters are checked
+// bivariantly, so a layer may declare the narrower event it actually
+// receives (PointerEvent, MouseEvent | TouchEvent) while the coordinator
+// passes the raw canvas event or a SyntheticPointerEvent. Unknown keys and
+// unrelated signatures are still rejected at registration. `this: void`
+// marks them safe to destructure (they are plain closures).
 
-/** Handler set for a layer (generic/fallback) */
-export interface LayerHandlers {
-  handlePointerDown?: HandlerFunction;
-  handlePointerMove?: HandlerFunction;
-  handlePointerUp?: HandlerFunction;
-  handleWheel?: HandlerFunction;
-  handleClick?: HandlerFunction;
-  handleDoubleClick?: HandlerFunction;
-  handleKeyDown?: HandlerFunction;
-  handleKeyUp?: HandlerFunction;
-  [key: string]: unknown;
+/**
+ * Pointer handler set for the polyline/brush layers the coordinator forwards
+ * raw events to (wall, outline, region, tile placement, terrain brush,
+ * shape overlay, fog). Each phase is called only for the tool that owns it.
+ */
+export interface PointerPhaseHandlers {
+  handlePointerDown?(this: void, e: Event | SyntheticPointerEvent): void;
+  handlePointerMove?(this: void, e: Event): void;
+  handlePointerUp?(this: void, e: Event): void;
 }
 
 // ===========================================
@@ -84,149 +86,157 @@ export interface LayerHandlers {
 
 /** Drawing layer handlers (registered with event coordinator) */
 export interface RegisteredDrawingHandlers {
-  handleDrawingPointerDown?: (e: Event | SyntheticPointerEvent, gridX: number, gridY: number, isTouchEvent: boolean) => boolean;
-  handleDrawingPointerMove?: (e: Event) => boolean;
-  stopDrawing?: (e?: Event) => void;
-  cancelDrawing?: () => void;
+  handleDrawingPointerDown?(this: void, e: Event | SyntheticPointerEvent, gridX: number, gridY: number, isTouchEvent: boolean): boolean;
+  handleDrawingPointerMove?(this: void, e: Event): boolean;
+  stopDrawing?(this: void, e?: Event): void;
+  cancelDrawing?(this: void): void;
   isDrawing?: boolean;
   previewEnabled?: boolean;
-  updateShapeHover?: (gridX: number, gridY: number) => void;
-  updateEdgeLineHover?: (intX: number, intY: number) => void;
-  updateSegmentHover?: (cellX: number, cellY: number, localX: number, localY: number) => void;
-  clearSegmentHover?: () => void;
+  updateShapeHover?(this: void, gridX: number, gridY: number): void;
+  updateEdgeLineHover?(this: void, intX: number, intY: number): void;
+  updateSegmentHover?(this: void, cellX: number, cellY: number, localX: number, localY: number): void;
+  /** Called on pointer leave so the segment highlight does not stick at the edge. */
+  clearSegmentHover?(this: void): void;
   circleStart?: Point | null;
   rectangleStart?: Point | null;
   edgeLineStart?: Point | null;
-  cancelShapePreview?: () => void;
+  cancelShapePreview?(this: void): void;
 }
 
 /** Object layer handlers */
 export interface ObjectHandlers {
-  handleObjectSelection?: (clientX: number, clientY: number, gridX: number, gridY: number, isTouchActive?: boolean) => boolean;
-  handleObjectPlacement?: (gridX: number, gridY: number, clientX: number, clientY: number) => void;
-  handleObjectDragging?: (e: Event) => void;
-  stopObjectDragging?: () => void;
-  handleObjectResizing?: (e: Event) => void;
-  stopObjectResizing?: () => void;
-  handleHoverUpdate?: (e: Event) => void;
-  handleObjectWheel?: (e: WheelEvent) => boolean;
-  handleObjectKeyDown?: (e: KeyboardEvent) => boolean;
+  handleObjectSelection?(this: void, clientX: number, clientY: number, gridX: number, gridY: number, isTouchActive?: boolean): boolean;
+  handleObjectPlacement?(this: void, gridX: number, gridY: number, clientX: number, clientY: number): void;
+  handleObjectDragging?(this: void, e: Event): void;
+  stopObjectDragging?(this: void): void;
+  handleObjectResizing?(this: void, e: Event): void;
+  stopObjectResizing?(this: void): void;
+  handleHoverUpdate?(this: void, e: Event): void;
+  handleObjectWheel?(this: void, e: WheelEvent): boolean;
+  handleObjectKeyDown?(this: void, e: KeyboardEvent): boolean;
   isResizing?: boolean;
   edgeSnapMode?: boolean;
-  setEdgeSnapMode?: (value: boolean) => void;
+  setEdgeSnapMode?(this: void, value: boolean): void;
 }
 
 /** Text layer handlers */
 export interface TextHandlers {
-  handleTextSelection?: (clientX: number, clientY: number) => boolean;
-  handleTextPlacement?: (clientX: number, clientY: number) => void;
-  handleTextDragging?: (e: Event) => void;
-  stopTextDragging?: () => void;
-  handleCanvasDoubleClick?: (e: MouseEvent) => void;
-  handleTextKeyDown?: (e: KeyboardEvent) => boolean;
+  handleTextSelection?(this: void, clientX: number, clientY: number): boolean;
+  handleTextPlacement?(this: void, clientX: number, clientY: number): void;
+  handleTextDragging?(this: void, e: Event): void;
+  stopTextDragging?(this: void): void;
+  handleCanvasDoubleClick?(this: void, e: MouseEvent): void;
+  handleTextKeyDown?(this: void, e: KeyboardEvent): boolean;
 }
 
 /** Note pin handlers */
 export interface NotePinHandlers {
-  handleNotePinPlacement?: (gridX: number, gridY: number) => boolean;
+  handleNotePinPlacement?(this: void, gridX: number, gridY: number): boolean;
 }
 
 /** Party pin handlers */
 export interface PartyPinHandlers {
-  handlePartyPinPointerDown?: (gridX: number, gridY: number, clientX?: number, clientY?: number) => void;
+  handlePartyPinPointerDown?(this: void, gridX: number, gridY: number, clientX?: number, clientY?: number): void;
   /** Select-tool grab: true when the press hit the pin's cell (handled) */
-  handlePartyPinSelectPointerDown?: (gridX: number, gridY: number, clientX?: number, clientY?: number) => boolean;
-  handlePartyPinMove?: (gridX: number, gridY: number) => void;
-  stopPartyPinDrag?: () => void;
-  isPartyPinDragging?: () => boolean;
+  handlePartyPinSelectPointerDown?(this: void, gridX: number, gridY: number, clientX?: number, clientY?: number): boolean;
+  handlePartyPinMove?(this: void, gridX: number, gridY: number): void;
+  stopPartyPinDrag?(this: void): void;
+  isPartyPinDragging?(this: void): boolean;
 }
 
 /** Pan/zoom handlers */
 export interface PanZoomHandlers {
-  getClientCoords: (e: Event) => { clientX: number; clientY: number };
-  screenToGrid: (clientX: number, clientY: number) => Point | null;
-  screenToWorld?: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
+  getClientCoords(this: void, e: Event): { clientX: number; clientY: number };
+  screenToGrid(this: void, clientX: number, clientY: number): Point | null;
   lastTouchTimeRef: { current: number };
-  getTouchCenter: (touches: TouchList) => { x: number; y: number } | null;
-  getTouchDistance: (touches: TouchList) => number | null;
-  startPan: (clientX: number, clientY: number) => void;
-  updatePan: (clientX: number, clientY: number) => void;
-  stopPan: () => void;
+  getTouchCenter(this: void, touches: TouchList): { x: number; y: number } | null;
+  getTouchDistance(this: void, touches: TouchList): number | null;
+  startPan(this: void, clientX: number, clientY: number): void;
+  updatePan(this: void, clientX: number, clientY: number): void;
+  stopPan(this: void): void;
   /** Ref-only: a multi-touch was seen while a single-pointer pan may be armed. */
-  markPanAnchorStale: () => void;
-  startTouchPan: (center: { x: number; y: number }) => void;
-  updateTouchPan: (touches: TouchList) => void;
-  stopTouchPan: () => void;
-  setInitialPinchDistance: (distance: number) => void;
+  markPanAnchorStale(this: void): void;
+  startTouchPan(this: void, center: { x: number; y: number }): void;
+  updateTouchPan(this: void, touches: TouchList): void;
+  stopTouchPan(this: void): void;
+  setInitialPinchDistance(this: void, distance: number): void;
   spaceKeyPressed: boolean;
   isPanning: boolean;
-  isTouchPanning: boolean;
   isTouchPanningRef: { current: boolean };
-  touchPanStartRef: { current: { x: number; y: number } | null };
-  initialPinchDistanceRef: { current: number | null };
   panStart: PanStartPosition | null;
-  touchPanStart: { x: number; y: number } | null;
-  handleWheel: (e: WheelEvent) => void;
+  handleWheel(this: void, e: WheelEvent): void;
   /** WebKit-proprietary trackpad pinch (iPadOS / macOS Safari GestureEvents). */
-  handleGestureStart: (e: Event) => void;
-  handleGestureChange: (e: Event) => void;
-  handleGestureEnd: (e: Event) => void;
+  handleGestureStart(this: void, e: Event): void;
+  handleGestureChange(this: void, e: Event): void;
+  handleGestureEnd(this: void, e: Event): void;
 }
 
 /** Measure tool handlers */
 export interface MeasureHandlers {
-  handleMeasureClick?: (gridX: number, gridY: number, isTouch: boolean) => void;
-  handleMeasureMove?: (gridX: number, gridY: number) => void;
+  handleMeasureClick?(this: void, gridX: number, gridY: number, isTouch: boolean): void;
+  handleMeasureMove?(this: void, gridX: number, gridY: number): void;
 }
 
-/** Fog of war handlers */
-export interface FogHandlers {
-  handlePointerDown?: (e: Event | SyntheticPointerEvent) => void;
-  handlePointerMove?: (e: Event) => void;
-  handlePointerUp?: (e: Event) => void;
+/** Fog of war handlers (registered only while a fog tool is active; fog runs before every tool) */
+export interface FogHandlers extends PointerPhaseHandlers {
   /** Escape cancels an in-progress fog rectangle. */
-  handleKeyDown?: (e: KeyboardEvent) => void;
+  handleKeyDown?(this: void, e: KeyboardEvent): void;
   rectangleStart?: { col: number; row: number } | null;
 }
 
 /** Area select handlers */
 export interface AreaSelectHandlers {
   areaSelectStart?: Point | null;
-  handleAreaSelectClick?: (e: Event | SyntheticPointerEvent) => void;
-  updateAreaSelectHover?: (gridX: number, gridY: number) => void;
+  handleAreaSelectClick?(this: void, e: Event | SyntheticPointerEvent): void;
+  updateAreaSelectHover?(this: void, gridX: number, gridY: number): void;
 }
 
 /** Diagonal fill handlers */
 export interface DiagonalFillHandlers {
-  handleDiagonalFillClick?: (e: PointerEvent | MouseEvent | TouchEvent, isTouch?: boolean) => boolean;
-  handleDiagonalFillMove?: (e: PointerEvent | MouseEvent) => void;
-  cancelFill?: () => void;
-  fillStart?: { x: number; y: number; corner: string } | null;
+  handleDiagonalFillClick?(this: void, e: PointerEvent | MouseEvent | TouchEvent, isTouch?: boolean): boolean;
+  handleDiagonalFillMove?(this: void, e: PointerEvent | MouseEvent): void;
+  cancelFill?(this: void): void;
 }
 
-/** Shape overlay handlers */
+/** Shape overlay handlers (pointer-up of a shape drag goes through isDraggingSelection) */
 export interface ShapeOverlayHandlers {
-  handleShapeSelection?: (clientX: number, clientY: number) => boolean;
-  handleShapeDragging?: (e: MouseEvent | TouchEvent) => void;
-  stopShapeDragging?: () => void;
-  handlePointerDown?: (e: Event | SyntheticPointerEvent) => void;
-  handlePointerMove?: (e: Event) => void;
+  handleShapeSelection?(this: void, clientX: number, clientY: number): boolean;
+  handleShapeDragging?(this: void, e: MouseEvent | TouchEvent): void;
+  stopShapeDragging?(this: void): void;
+  handlePointerDown?(this: void, e: Event | SyntheticPointerEvent): void;
+  handlePointerMove?(this: void, e: Event): void;
 }
 
 /** Freehand drawing handlers */
 export interface FreehandHandlers {
-  handlePointerDown?: (e: Event | SyntheticPointerEvent, gridX?: number, gridY?: number, isTouch?: boolean) => void;
-  handlePointerMove?: (e: Event) => void;
-  stopDrawing?: () => void;
+  handlePointerDown?(this: void, e: Event | SyntheticPointerEvent, gridX?: number, gridY?: number, isTouch?: boolean): void;
+  handlePointerMove?(this: void, e: Event): void;
+  stopDrawing?(this: void): void;
 }
 
-/** Region tool handlers */
+/**
+ * Region tool handlers. No pointer-up: a region label drag ends through
+ * useRegionTools' own document pointerup listener.
+ */
 export interface RegionHandlers {
-  handlePointerDown?: (e: Event | SyntheticPointerEvent) => void;
-  handlePointerMove?: (e: Event) => void;
-  handleDoubleClick?: (e: MouseEvent) => void;
-  handleContextMenu?: (e: MouseEvent) => void;
+  handlePointerDown?(this: void, e: Event | SyntheticPointerEvent): void;
+  handlePointerMove?(this: void, e: Event): void;
+  handleDoubleClick?(this: void, e: MouseEvent): void;
+  handleContextMenu?(this: void, e: MouseEvent): void;
 }
+
+/** Outline tool handlers (double-click closes the polygon) */
+export interface OutlineHandlers extends PointerPhaseHandlers {
+  handleDoubleClick?(this: void, e: MouseEvent): void;
+}
+
+/** Wall/path tool handlers (double-click finishes the wall) */
+export interface WallHandlers extends PointerPhaseHandlers {
+  handleDoubleClick?(this: void, e: MouseEvent): void;
+}
+
+/** Tile placement and terrain brush handlers (both listen on tilePaint and self-gate on the subtool) */
+export type TileToolHandlers = PointerPhaseHandlers;
 
 // ===========================================
 // Handler Registry
@@ -245,16 +255,19 @@ export interface HandlerTypeMap {
   areaSelect: AreaSelectHandlers;
   diagonalFill: DiagonalFillHandlers;
   freehand: FreehandHandlers;
-  tilePlacement: LayerHandlers;
-  terrainBrush: LayerHandlers;
-  outline: LayerHandlers;
+  tilePlacement: TileToolHandlers;
+  terrainBrush: TileToolHandlers;
+  outline: OutlineHandlers;
   region: RegionHandlers;
   shapeOverlay: ShapeOverlayHandlers;
-  wall: LayerHandlers;
+  wall: WallHandlers;
 }
 
 /** All registered layer names (derived from HandlerTypeMap) */
 export type HandlerLayerName = keyof HandlerTypeMap;
+
+/** Every layer's handler set, by name (absent = not registered) */
+export type HandlersRegistry = { [K in HandlerLayerName]?: HandlerTypeMap[K] };
 
 /** Type-safe handler getter function */
 export type GetHandlers = <T extends HandlerLayerName>(layer: T) => HandlerTypeMap[T] | null;

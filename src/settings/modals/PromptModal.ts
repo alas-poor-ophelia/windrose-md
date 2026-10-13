@@ -24,7 +24,7 @@ class PromptModal extends Modal {
     this.resolved = false;
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
 
@@ -65,7 +65,7 @@ class PromptModal extends Modal {
     };
   }
 
-  onClose(): void {
+  override onClose(): void {
     this.contentEl.empty();
     if (!this.resolved && this.resolvePromise != null) {
       this.resolvePromise(null);

@@ -28,11 +28,11 @@ class WindroseMapView extends ItemView {
     return this.mapName || 'Windrose Map';
   }
 
-  getIcon(): string {
+  override getIcon(): string {
     return 'compass';
   }
 
-  async onOpen(): Promise<void> {
+  override async onOpen(): Promise<void> {
     this.contentEl.addClass('windrose-full-pane');
 
     this.addAction('copy', 'Copy as map block', () => {
@@ -58,7 +58,7 @@ class WindroseMapView extends ItemView {
     }
   }
 
-  async onClose(): Promise<void> {
+  override async onClose(): Promise<void> {
     // Flush BEFORE unmounting: the unmount cleanup's save is unawaited, so if
     // the leaf is closing as part of a shutdown it may never land. Obsidian
     // awaits onClose, which gives the write a real chance to complete.
@@ -67,11 +67,11 @@ class WindroseMapView extends ItemView {
     render(null, this.contentEl);
   }
 
-  onResize(): void {
+  override onResize(): void {
     window.dispatchEvent(new Event('resize'));
   }
 
-  getState(): Record<string, unknown> {
+  override getState(): Record<string, unknown> {
     return {
       mapId: this.mapId,
       mapName: this.mapName,
@@ -81,7 +81,7 @@ class WindroseMapView extends ItemView {
     };
   }
 
-  async setState(state: Record<string, unknown>): Promise<void> {
+  override async setState(state: Record<string, unknown>): Promise<void> {
     if (typeof state?.mapId === 'string' && state.mapId !== '') this.mapId = state.mapId;
     if (typeof state?.mapName === 'string' && state.mapName !== '') this.mapName = state.mapName;
     if (typeof state?.mapType === 'string' && state.mapType !== '') this.mapType = state.mapType as MapType;

@@ -130,7 +130,7 @@ const TextLayer = ({
   useLayerHandlers('text', {
     handleTextPlacement, handleTextSelection,
     handleTextDragging, stopTextDragging,
-    handleCanvasDoubleClick, handleEditClick, handleTextKeyDown
+    handleCanvasDoubleClick, handleTextKeyDown
   });
 
   if (showCoordinates || !layerVisibility.textLabels) {

@@ -56,6 +56,8 @@ interface UseDebouncedSaveResult {
   staleConflict: boolean;
   /** Dismiss the stale-conflict state (pair with a reload). */
   acknowledgeStaleConflict: () => void;
+  /** This mount's save-writer id (also its journal slot owner). */
+  writerId: string;
 }
 
 /**
@@ -478,7 +480,7 @@ function useDebouncedSave(
     return () => unregisterSaveInstance(id);
   }, []);
 
-  return { saveStatus, updateMapData, forceSave, markDeleted, mapDeleted, staleConflict, acknowledgeStaleConflict };
+  return { saveStatus, updateMapData, forceSave, markDeleted, mapDeleted, staleConflict, acknowledgeStaleConflict, writerId: instanceIdRef.current };
 }
 
 export { useDebouncedSave, retryDelayMs, MAX_SAVE_RETRIES };

@@ -33,7 +33,7 @@ class ContentPackBrowserModal extends Modal {
     this.onInstalled = onInstalled;
   }
 
-  async onOpen(): Promise<void> {
+  override async onOpen(): Promise<void> {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-content-pack-modal');
@@ -61,7 +61,7 @@ class ContentPackBrowserModal extends Modal {
     await this.renderPackList();
   }
 
-  onClose(): void {
+  override onClose(): void {
     if (this.didInstall && this.onInstalled) {
       this.onInstalled();
     }

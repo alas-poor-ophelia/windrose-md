@@ -50,7 +50,7 @@ class SaveRouteModal extends Modal {
     this.resolved = false;
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.createEl('h3', { text: this.title });
@@ -105,7 +105,7 @@ class SaveRouteModal extends Modal {
     };
   }
 
-  onClose(): void {
+  override onClose(): void {
     this.contentEl.empty();
     if (!this.resolved && this.resolvePromise != null) {
       this.resolvePromise(null);

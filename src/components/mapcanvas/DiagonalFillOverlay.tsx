@@ -140,7 +140,7 @@ const DiagonalFillOverlay = ({ currentTool }: DiagonalFillOverlayProps): VNode |
     cancelFill
   } = useDiagonalFill(currentTool);
 
-  useLayerHandlers('diagonalFill', { handleDiagonalFillClick, handleDiagonalFillMove, cancelFill, fillStart });
+  useLayerHandlers('diagonalFill', { handleDiagonalFillClick, handleDiagonalFillMove, cancelFill });
 
   if (currentTool !== 'diagonalFill' || !fillStart || !geometry || !mapData || !mapData.viewState || !canvasRef?.current) {
     return null;

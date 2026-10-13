@@ -172,7 +172,7 @@ Non-source files live outside `src/`: `CHANGELOG.md` (read by the release workfl
 | Sub-hex maps | `hooks/interactions/useSubHexNavigation.ts`, `core/subHexBackdropStore.ts`, `core/paintedViewStore.ts`, `geometry/core/subHexBackdrop.ts`, `geometry/renderers/subHexBackdropRenderer.ts`, `components/controls/SubHexBreadcrumb.tsx` |
 | Export | `persistence/exportOperations.ts`, `components/modals/ExportImageModal.ts` |
 | Dock panels | `components/panels/Dock*.tsx`, `DrawerDock.tsx`, `EdgeRail.tsx`, `hooks/state/useFloatingPanels.ts` |
-| Tile import wizard | `assets/import*.ts` (+ predictors, `tile*.ts`), `settings/modals/AddTilesModal.ts`, `components/panels/TileAssetBrowser.tsx`, `TileOrganizePane.tsx` |
+| Tile import wizard | `assets/import*.ts` (+ predictors, `tile*.ts`), `settings/modals/AddTilesModal.ts`, `components/panels/TileAssetBrowser.tsx` (+ `TileCell.tsx`, `TileBrowserFooter.tsx`, `hooks/tiles/useTileFilterPipeline.ts`), `TileOrganizePane.tsx` |
 | Terrain strokes | `drawing/terrainStrokeOperations.ts`, `geometry/strokes/`, `components/mapcanvas/TerrainBrushLayer.tsx` |
 | Pan/zoom performance | `hooks/canvas/useViewController.ts`, `useLiveOverlay*.ts` |
 | Content packs | `content-packs/` |

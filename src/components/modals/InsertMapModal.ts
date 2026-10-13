@@ -15,7 +15,7 @@ export class InsertMapModal extends Modal {
     this.onInsert = onInsert;
   }
 
-  async onOpen(): Promise<void> {
+  override async onOpen(): Promise<void> {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-insert-map-modal');
@@ -131,7 +131,7 @@ export class InsertMapModal extends Modal {
     this.close();
   }
 
-  onClose(): void {
+  override onClose(): void {
     this.contentEl.empty();
   }
 }

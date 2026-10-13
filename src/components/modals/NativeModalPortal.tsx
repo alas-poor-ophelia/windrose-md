@@ -191,7 +191,7 @@ function NativeModalPortal({
 
   useEffect(() => {
     const modal = new (class extends Modal {
-      onOpen(): void {
+      override onOpen(): void {
         if (title != null && title !== '') {
           this.titleEl.setText(title);
         }
@@ -210,7 +210,7 @@ function NativeModalPortal({
           });
         }
       }
-      onClose(): void {
+      override onClose(): void {
         closedExternallyRef.current = true;
         if (!closedByCodeRef.current) {
           onCloseRef.current();

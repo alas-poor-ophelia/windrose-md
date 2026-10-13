@@ -57,7 +57,7 @@ export interface MapDataLoadFailure {
    * backup restore may help. 'schema': the map needs a newer or fixed plugin
    * version (MapSchemaError); the file is fine and NO restore is offered.
    */
-  kind?: 'unreadable' | 'schema';
+  kind?: 'unreadable' | 'schema' | 'missing';
 }
 
 // ===========================================

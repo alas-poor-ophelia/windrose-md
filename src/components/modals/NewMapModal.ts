@@ -13,7 +13,7 @@ class NewMapModal extends Modal {
     this.onCreate = onCreate;
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-insert-map-modal');
@@ -94,7 +94,7 @@ class NewMapModal extends Modal {
     this.close();
   }
 
-  onClose(): void {
+  override onClose(): void {
     this.contentEl.empty();
   }
 }

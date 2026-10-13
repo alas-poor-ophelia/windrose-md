@@ -265,15 +265,6 @@ function useDataHandlers({
     }, { cosmetic: true });
   }, [updateMapData]);
 
-  // Handle sidebar collapse state change - NOT tracked in history (cosmetic,
-  // same rationale as handleViewStateChange)
-  const handleSidebarCollapseChange = useCallback((collapsed: boolean): void => {
-    updateMapData((currentMapData) => {
-      if (currentMapData == null) return currentMapData;
-      return { ...currentMapData, sidebarCollapsed: collapsed };
-    }, { cosmetic: true });
-  }, [updateMapData]);
-
   // Handle object set change - NOT tracked in history
   // Cosmetic (DATA-18): a preference, so a stale refusal stays silent
   // instead of arming the conflict panel. Still saved normally.
@@ -411,7 +402,6 @@ function useDataHandlers({
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
     handleViewStateChange,
-    handleSidebarCollapseChange,
     handleObjectSetChange,
     handleTextLabelSettingsChange,
     handleRegionsChange,
@@ -442,7 +432,6 @@ function useDataHandlers({
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
     handleViewStateChange,
-    handleSidebarCollapseChange,
     handleObjectSetChange,
     handleTextLabelSettingsChange,
     handleRegionsChange,

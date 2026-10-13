@@ -91,7 +91,7 @@ class ObjectEditModal extends Modal {
     this.imageSearchResults = [];
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-object-edit-modal');
@@ -667,7 +667,7 @@ class ObjectEditModal extends Modal {
     this.close();
   }
 
-  onClose(): void {
+  override onClose(): void {
     this.contentEl.empty();
   }
 }

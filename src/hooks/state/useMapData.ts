@@ -9,7 +9,7 @@ import type {
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
-import { loadMapDataWithGeneration, MapDataUnreadableError, MapDeletedError, MapSchemaError } from '../../persistence/fileOperations';
+import { loadMapDataWithGeneration, MapDataUnreadableError, MapDeletedError, MapDataFileMissingError, MapSchemaError } from '../../persistence/fileOperations';
 import { getDataFilePath } from '../../core/settingsAccessor';
 import { resolveJournalOnLoad } from '../../persistence/saveJournal';
 import { getCachedImage } from '../../assets/imageOperations';
@@ -35,6 +35,8 @@ function useMapData(
   // Assigned below, after useDebouncedSave — the load effect needs the updater
   // to apply a restored journal entry through the normal save path.
   const updateMapDataRef = useRef<MapDataUpdater | null>(null);
+  // This pane's save-writer id, used to owner-stamp a restored journal copy.
+  const writerIdRef = useRef('');
 
   // Write generation this instance's tree is based on (see saveMapData's
   // stale-base guard). Set at load, advanced by useDebouncedSave on save.
@@ -58,6 +60,13 @@ function useMapData(
           setIsLoading(false);
           return;
         }
+        if (error instanceof MapDataFileMissingError) {
+          // Store file absent: never a blank editable map whose first edit
+          // would create a one-map store (DATA-08).
+          setLoadFailure({ dataPath: error.dataPath, message: error.message, kind: 'missing' });
+          setIsLoading(false);
+          return;
+        }
         // Unreadable data file: do NOT fall back to a blank map. Surface the
         // failure so the UI can block editing before anything overwrites it.
         console.error('[Windrose] Map load failed:', error);
@@ -76,7 +85,7 @@ function useMapData(
       setIsLoading(false);
 
       // Crash journal: offer to restore edits a previous session couldn't write.
-      const restored = await resolveJournalOnLoad(app, mapId, data.name ?? mapName);
+      const restored = await resolveJournalOnLoad(app, mapId, data.name ?? mapName, undefined, writerIdRef.current === '' ? undefined : writerIdRef.current);
       if (cancelled || restored == null) return;
       updateMapDataRef.current?.(restored);
     }
@@ -112,9 +121,10 @@ function useMapData(
   // with the active map and this hook's settingsVersion (windrose-1mc).
   useTilesetBuilder(app, mapData, setMapData, isLoading, settingsVersion);
 
-  const { saveStatus, updateMapData, forceSave, markDeleted, mapDeleted: saveDeleted, staleConflict, acknowledgeStaleConflict } =
+  const { saveStatus, updateMapData, forceSave, markDeleted, mapDeleted: saveDeleted, staleConflict, acknowledgeStaleConflict, writerId } =
     useDebouncedSave(app, mapId, setMapData, baseGenRef);
   updateMapDataRef.current = updateMapData;
+  writerIdRef.current = writerId;
 
   return {
     mapData,

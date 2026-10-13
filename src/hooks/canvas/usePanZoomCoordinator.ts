@@ -16,9 +16,10 @@
 // Type-only imports
 import type { UsePanZoomCoordinatorOptions } from '#types/hooks/panZoomCoordinator.types';
 
-import { useEffect, useRef } from 'preact/hooks';
+import type { PanZoomHandlers } from '#types/hooks/eventCoordinator.types';
+
 import { useCanvasInteraction } from './useCanvasInteraction';
-import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useLayerHandlers } from './useLayerHandlers';
 import { useMapState } from '../../context/MapContext';
 
 
@@ -43,17 +44,14 @@ const usePanZoomCoordinator = ({
   // navigation hook (no document events — see core/windroseEvents.ts).
   const { isInSubHex, subHexPath, requestEnterSubHex, requestExitSubHex } = useMapState();
 
-  // Use canvas interaction hook for pan/zoom logic
+  // Use canvas interaction hook for pan/zoom logic. Only what the event
+  // coordinator reads is registered (PanZoomHandlers); raw pan-state
+  // setters stay private to useCanvasInteraction.
   const {
     isPanning,
-    isTouchPanning,
     isTouchPanningRef,
-    touchPanStartRef,
-    initialPinchDistanceRef,
     panStart,
-    touchPanStart,
     spaceKeyPressed,
-    initialPinchDistance,
     lastTouchTimeRef,
     getClientCoords,
     getTouchCenter,
@@ -70,41 +68,21 @@ const usePanZoomCoordinator = ({
     startTouchPan,
     updateTouchPan,
     stopTouchPan,
-    setIsPanning,
-    setIsTouchPanning,
-    setPanStart,
-    setTouchPanStart,
     setInitialPinchDistance
   } = useCanvasInteraction(canvasRef, mapData, geometry, isFocused, viewController, isInSubHex === true, subHexPath ?? null, requestEnterSubHex, requestExitSubHex);
 
-  // Register pan/zoom handlers with EventHandlerContext for event coordination
-  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
-
-  // Ref holds the latest handler object; updated every render so consumers
-  // always get current closures without effect re-registration churn.
-  const handlersRef = useRef<Record<string, unknown> | null>(null);
-  handlersRef.current = {
+  // Latest handler object, swapped in every render; the registry holds a
+  // stable proxy over it (same latest-ref pattern as useLayerHandlers).
+  const handlers: PanZoomHandlers = {
     startPan, updatePan, stopPan, markPanAnchorStale,
-    startTouchPan, updateTouchPan, stopTouchPan,
+    startTouchPan, updateTouchPan, stopTouchPan, setInitialPinchDistance,
     handleWheel,
     handleGestureStart, handleGestureChange, handleGestureEnd,
     getClientCoords, getTouchCenter, getTouchDistance, screenToGrid,
-    isPanning, isTouchPanning, panStart, touchPanStart, spaceKeyPressed,
-    isTouchPanningRef, touchPanStartRef, initialPinchDistanceRef,
-    lastTouchTimeRef, initialPinchDistance,
-    setIsPanning, setIsTouchPanning, setPanStart, setTouchPanStart, setInitialPinchDistance
+    isPanning, panStart, spaceKeyPressed,
+    isTouchPanningRef, lastTouchTimeRef
   };
-
-  // Register once on mount with stable proxy that delegates to handlersRef
-  useEffect(() => {
-    const proxy = new Proxy({}, {
-      get(_target, prop: string) {
-        return handlersRef.current?.[prop];
-      }
-    });
-    registerHandlers('panZoom', proxy);
-    return () => unregisterHandlers('panZoom');
-  }, [registerHandlers, unregisterHandlers]);
+  useLayerHandlers('panZoom', handlers);
 
   // Coordinator hooks don't return anything - they just set up behavior
 };

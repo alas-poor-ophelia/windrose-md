@@ -49,7 +49,7 @@ function openNativeNoteLinkModal(app: App, options: OpenNativeNoteLinkModalOptio
       inputEl!: HTMLInputElement;
       submitted = false;
 
-      onOpen(): void {
+      override onOpen(): void {
         const { contentEl, titleEl } = this;
         titleEl.setText(`Link Note to ${objectTypeLabel}`);
 
@@ -96,7 +96,7 @@ function openNativeNoteLinkModal(app: App, options: OpenNativeNoteLinkModalOptio
             }
           }
 
-          selectSuggestion(entry: NoteLinkSuggestion): void {
+          override selectSuggestion(entry: NoteLinkSuggestion): void {
             inputEl.value = entry.displayName;
             inputEl.dispatchEvent(new Event('input'));
             selectedPath = entry.path;
@@ -167,7 +167,7 @@ function openNativeNoteLinkModal(app: App, options: OpenNativeNoteLinkModalOptio
         this.close();
       }
 
-      onClose(): void {
+      override onClose(): void {
         if (!this.submitted) {
           onClose();
         }

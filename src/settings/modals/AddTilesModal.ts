@@ -99,7 +99,7 @@ class AddTilesModal extends Modal {
    * cancel: confirm → the extraction loop stops cleanly and the modal
    * closes itself (already-extracted files stay; re-import resumes safely).
    */
-  close(): void {
+  override close(): void {
     if (this.importing) {
       if (!this.cancelPromptOpen && !this.cancelRequested) {
         this.cancelPromptOpen = true;
@@ -118,12 +118,12 @@ class AddTilesModal extends Modal {
     super.close();
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     this.modalEl.addClass('windrose-add-tiles-modal');
     this.render();
   }
 
-  onClose(): void {
+  override onClose(): void {
     if (this.scanTimer != null) window.clearTimeout(this.scanTimer);
     this.contentEl.empty();
     if (this.finished && this.onImported != null) this.onImported();

@@ -27,7 +27,7 @@ class ColorEditModal extends Modal {
     this.isBuiltIn = existingColor?.isBuiltIn ?? false;
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-color-edit-modal');
@@ -180,7 +180,7 @@ class ColorEditModal extends Modal {
     cancelBtn.addEventListener('click', () => this.close());
   }
 
-  onClose(): void {
+  override onClose(): void {
     this.contentEl.empty();
   }
 }

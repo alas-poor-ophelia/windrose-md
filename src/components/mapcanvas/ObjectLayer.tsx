@@ -364,7 +364,6 @@ const ObjectLayer = ({
 
   const {
     isResizing,
-    resizeCorner,
     objectColorBtnRef,
     pendingObjectCustomColorRef,
     edgeSnapMode,
@@ -472,8 +471,7 @@ const ObjectLayer = ({
     handleObjectDragging, handleObjectResizing,
     stopObjectDragging, stopObjectResizing,
     handleHoverUpdate, handleObjectWheel, handleObjectKeyDown,
-    isResizing, resizeCorner,
-    edgeSnapMode, setEdgeSnapMode
+    isResizing, edgeSnapMode, setEdgeSnapMode
   });
 
   const handleResizeButtonClick = (e: TargetedMouseEvent<HTMLElement>): void => {

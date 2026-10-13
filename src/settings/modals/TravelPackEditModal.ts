@@ -170,7 +170,7 @@ class TravelPackEditModal extends Modal {
     });
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     this.modalEl.addClass('windrose-travel-pack-modal');
     this.settingsListener = () => { this.handleSettingsChanged(); };
     window.addEventListener('windrose-settings-changed', this.settingsListener);
@@ -660,7 +660,7 @@ class TravelPackEditModal extends Modal {
     }
   }
 
-  onClose(): void {
+  override onClose(): void {
     // Flush any debounced text-edit save so closing the modal never drops
     // the last keystrokes.
     if (this.notifyTimer != null) this.flushNotify();

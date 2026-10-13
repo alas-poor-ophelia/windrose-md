@@ -22,7 +22,7 @@ geometry/
 │   ├── gridRenderer.ts, hexRenderer.ts, backgroundRenderer.ts
 │   ├── objectRenderer.ts, textLabelRenderer.ts, selectionRenderer.ts
 │   ├── badgeRenderer.ts, segmentRenderer.ts, regionRenderer.ts
-│   ├── tileRenderer.ts, curveRenderer.ts, wallPathRenderer.ts
+│   ├── tileRenderer.ts (entry; composes canvasBlur.ts, regionFillRenderer.ts, computeTileDrawPlan.ts), curveRenderer.ts, wallPathRenderer.ts
 │   ├── outlineRenderer.ts       # Polygon outlines (hex)
 │   ├── shapeOverlayRenderer.ts  # Rectangle/circle shape overlays
 │   └── subHexBackdropRenderer.ts # Blits the parent snapshot, right after the background fill

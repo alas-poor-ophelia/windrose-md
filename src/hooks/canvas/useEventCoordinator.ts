@@ -22,11 +22,8 @@ import { useRegisteredHandlers } from '../../context/EventHandlerContext';
 import { useGroupDrag } from '../objects/useGroupDrag';
 import { captureSubHexBackdrop } from '../../core/subHexBackdropStore';
 import { shouldHandleMapKey } from '../../utils/keyboardTargets';
+import { TOOL_ROUTES } from './toolDispatch';
 
-const DRAWING_TOOL_SET: Set<string> = new Set([
-  'draw', 'erase', 'rectangle', 'circle', 'clearArea',
-  'edgeDraw', 'edgeErase', 'edgeLine', 'segmentDraw'
-]);
 
 const useEventCoordinator = ({
   isColorPickerOpen,
@@ -73,14 +70,10 @@ const useEventCoordinator = ({
 
   const handlePointerDown = useCallback((e: MouseEvent | TouchEvent): void => {
     const layerVisibility = layerVisibilityRef.current;
-    const drawingHandlers = getHandlers('drawing');
     const objectHandlers = getHandlers('object');
     const textHandlers = getHandlers('text');
-    const notePinHandlers = getHandlers('notePin');
     const panZoomHandlers = getHandlers('panZoom');
-    const measureHandlers = getHandlers('measure');
     const fogHandlers = getHandlers('fogOfWar');
-    const diagonalFillHandlers = getHandlers('diagonalFill');
 
     if (!panZoomHandlers) return;
 
@@ -292,123 +285,14 @@ const useEventCoordinator = ({
         areaSelectPendingRef.current = { clientX, clientY, syntheticEvent };
         startPan(clientX, clientY);
 
-      } else if (currentTool != null && DRAWING_TOOL_SET.has(currentTool)) {
+      } else if (currentTool != null) {
+        const route = TOOL_ROUTES[currentTool];
+        if (route.down == null) return;
         if (hasMultiSelection) clearSelection();
-
-        if (drawingHandlers?.handleDrawingPointerDown) {
-          const eventToUse = isTouchEvent ? syntheticEvent : e;
-          drawingHandlers.handleDrawingPointerDown(eventToUse, gridX, gridY, isTouchEvent);
-        }
-
-      } else if (currentTool === 'addNote') {
-        if (hasMultiSelection) clearSelection();
-        if (!layerVisibility.objects) return;
-
-        if (notePinHandlers?.handleNotePinPlacement) {
-          notePinHandlers.handleNotePinPlacement(gridX, gridY);
-        }
-
-      } else if (currentTool === 'addObject') {
-        if (hasMultiSelection) clearSelection();
-
-        if (!layerVisibility.objects) return;
-
-        if (notePinHandlers?.handleNotePinPlacement) {
-          const notePinHandled = notePinHandlers.handleNotePinPlacement(gridX, gridY);
-          if (notePinHandled) return;
-        }
-
-        if (objectHandlers?.handleObjectPlacement) {
-          objectHandlers.handleObjectPlacement(gridX, gridY, clientX, clientY);
-        }
-
-      } else if (currentTool === 'addText') {
-        if (hasMultiSelection) clearSelection();
-
-        if (!layerVisibility.textLabels) return;
-
-        if (textHandlers?.handleTextPlacement) {
-          textHandlers.handleTextPlacement(clientX, clientY);
-        }
-
-      } else if (currentTool === 'measure') {
-        if (hasMultiSelection) clearSelection();
-
-        if (measureHandlers?.handleMeasureClick) {
-          measureHandlers.handleMeasureClick(gridX, gridY, isTouchEvent);
-        }
-
-      } else if (currentTool === 'partyPin') {
-        if (hasMultiSelection) clearSelection();
-
-        const partyPinHandlers = getHandlers('partyPin');
-        if (partyPinHandlers?.handlePartyPinPointerDown) {
-          partyPinHandlers.handlePartyPinPointerDown(gridX, gridY, clientX, clientY);
-        }
-
-      } else if (currentTool === 'diagonalFill') {
-        if (hasMultiSelection) clearSelection();
-
-        if (diagonalFillHandlers?.handleDiagonalFillClick) {
-          diagonalFillHandlers.handleDiagonalFillClick(e, isTouchEvent);
-        }
-
-      } else if (currentTool === 'freehand') {
-        if (hasMultiSelection) clearSelection();
-
-        const freehandHandlers = getHandlers('freehand');
-        if (freehandHandlers?.handlePointerDown) {
-          const eventToUse = isTouchEvent ? syntheticEvent : e;
-          freehandHandlers.handlePointerDown(eventToUse, gridX, gridY, isTouchEvent);
-        }
-
-      } else if (currentTool === 'regionPaint' || currentTool === 'regionBoundary') {
-        if (hasMultiSelection) clearSelection();
-
-        const regionHandlers = getHandlers('region');
-        if (regionHandlers?.handlePointerDown) {
-          const eventToUse = isTouchEvent ? syntheticEvent : e;
-          regionHandlers.handlePointerDown(eventToUse);
-        }
-      } else if (currentTool === 'outline') {
-        if (hasMultiSelection) clearSelection();
-
-        const outlineHandlers = getHandlers('outline');
-        if (outlineHandlers?.handlePointerDown) {
-          const eventToUse = isTouchEvent ? syntheticEvent : e;
-          outlineHandlers.handlePointerDown(eventToUse);
-        }
-      } else if (currentTool === 'tilePaint') {
-        if (hasMultiSelection) clearSelection();
-
-        // Both tile layers listen on tilePaint; they self-gate on the armed
-        // subtool (TerrainBrushLayer acts only for 'brush', TilePlacementLayer
-        // yields it), so exactly one handles the event.
-        const eventToUse = isTouchEvent ? syntheticEvent : e;
-        const brushHandlers = getHandlers('terrainBrush');
-        if (brushHandlers?.handlePointerDown) {
-          brushHandlers.handlePointerDown(eventToUse);
-        }
-        const tileHandlers = getHandlers('tilePlacement');
-        if (tileHandlers?.handlePointerDown) {
-          tileHandlers.handlePointerDown(eventToUse);
-        }
-      } else if (currentTool === 'wall') {
-        if (hasMultiSelection) clearSelection();
-
-        const wallHandlers = getHandlers('wall');
-        if (wallHandlers?.handlePointerDown) {
-          const eventToUse = isTouchEvent ? syntheticEvent : e;
-          wallHandlers.handlePointerDown(eventToUse);
-        }
-      } else if (currentTool === 'shape') {
-        if (hasMultiSelection) clearSelection();
-
-        const shapeHandlers = getHandlers('shapeOverlay');
-        if (shapeHandlers?.handlePointerDown) {
-          const eventToUse = isTouchEvent ? syntheticEvent : e;
-          shapeHandlers.handlePointerDown(eventToUse);
-        }
+        route.down({
+          getHandlers, e, eventToUse: isTouchEvent ? syntheticEvent : e,
+          gridX, gridY, clientX, clientY, isTouchEvent, layerVisibility
+        });
       }
     };
 
@@ -425,13 +309,10 @@ const useEventCoordinator = ({
 
   const handlePointerMove = useCallback((e: MouseEvent | TouchEvent): void => {
     const layerVisibility = layerVisibilityRef.current;
-    const drawingHandlers = getHandlers('drawing');
     const objectHandlers = getHandlers('object');
     const textHandlers = getHandlers('text');
     const panZoomHandlers = getHandlers('panZoom');
-    const measureHandlers = getHandlers('measure');
     const fogHandlers = getHandlers('fogOfWar');
-    const diagonalFillHandlers = getHandlers('diagonalFill');
 
     if (!panZoomHandlers) return;
 
@@ -513,166 +394,23 @@ const useEventCoordinator = ({
       fogHandlers.handlePointerMove(e);
     }
 
-    if (currentTool === 'areaSelect') {
-      const isTouch = touchEvent.touches !== undefined || (e as PointerEvent).pointerType === 'touch';
-      if (!isTouch) {
-        const areaSelectHandlers = getHandlers('areaSelect');
-        if (areaSelectHandlers?.areaSelectStart != null && areaSelectHandlers.updateAreaSelectHover != null && toGrid != null) {
-          const coords = toGrid(clientX, clientY);
-          if (coords) {
-            areaSelectHandlers.updateAreaSelectHover(coords.x, coords.y);
-          }
-        }
-      }
-      if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
-        objectHandlers.handleHoverUpdate(e);
-      }
-      return;
+    if (currentTool != null) {
+      const consumed = TOOL_ROUTES[currentTool].move({
+        getHandlers, e, tool: currentTool, clientX, clientY,
+        isTouch: touchEvent.touches !== undefined || (e as PointerEvent).pointerType === 'touch',
+        toGrid, screenToWorld, cellSize: geometry?.cellSize ?? null
+      });
+      if (consumed) return;
     }
 
-    if (currentTool != null && DRAWING_TOOL_SET.has(currentTool)) {
-
-      if (drawingHandlers?.handleDrawingPointerMove) {
-        drawingHandlers.handleDrawingPointerMove(e);
-      }
-
-      const isTouch = touchEvent.touches !== undefined || (e as PointerEvent).pointerType === 'touch';
-      if (!isTouch && drawingHandlers?.previewEnabled === true && drawingHandlers?.updateShapeHover != null) {
-
-        // screenToWorld comes from MapState (the same projection the edgeLine
-        // click path uses); the panZoom registry never carried it.
-        if (currentTool === 'edgeLine' && drawingHandlers.edgeLineStart != null) {
-          const worldCoords = screenToWorld(clientX, clientY);
-          if (worldCoords != null && geometry != null) {
-            const cellSize = geometry.cellSize;
-            const nearestX = Math.round(worldCoords.worldX / cellSize);
-            const nearestY = Math.round(worldCoords.worldY / cellSize);
-            if (drawingHandlers.updateEdgeLineHover) {
-              drawingHandlers.updateEdgeLineHover(nearestX, nearestY);
-            }
-          }
-        }
-        else if ((currentTool === 'rectangle' || currentTool === 'clearArea' || currentTool === 'circle') && toGrid != null) {
-          const hasStart = (currentTool === 'circle' && drawingHandlers.circleStart != null) ||
-                           ((currentTool === 'rectangle' || currentTool === 'clearArea') && drawingHandlers.rectangleStart != null);
-          if (hasStart) {
-            const coords = toGrid(clientX, clientY);
-            if (coords) {
-              const gridX = coords.x;
-              const gridY = coords.y;
-              drawingHandlers.updateShapeHover(gridX, gridY);
-            }
-          }
-        }
-      }
-
-      if (!isTouch && currentTool === 'segmentDraw' && drawingHandlers?.updateSegmentHover) {
-        if (screenToWorld != null && geometry != null) {
-          const worldCoords = screenToWorld(clientX, clientY);
-          if (worldCoords) {
-            const cellSize = geometry.cellSize;
-            const cellX = Math.floor(worldCoords.worldX / cellSize);
-            const cellY = Math.floor(worldCoords.worldY / cellSize);
-            const localX = (worldCoords.worldX / cellSize) - cellX;
-            const localY = (worldCoords.worldY / cellSize) - cellY;
-            drawingHandlers.updateSegmentHover(cellX, cellY, localX, localY);
-          }
-        }
-      }
-
-      if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
-        objectHandlers.handleHoverUpdate(e);
-      }
-      return;
-    }
-
-    if (currentTool === 'measure' && measureHandlers?.handleMeasureMove) {
-      if (toGrid != null) {
-        const coords = toGrid(clientX, clientY);
-        if (coords) {
-          const gridX = coords.x;
-          const gridY = coords.y;
-          measureHandlers.handleMeasureMove(gridX, gridY);
-        }
-      }
-      return;
-    }
-
-    if (currentTool === 'partyPin' || (currentTool === 'select' && getHandlers('partyPin')?.isPartyPinDragging?.() === true)) {
-      const partyPinHandlers = getHandlers('partyPin');
-      if (partyPinHandlers?.handlePartyPinMove && toGrid != null) {
-        const coords = toGrid(clientX, clientY);
-        if (coords) {
-          partyPinHandlers.handlePartyPinMove(coords.x, coords.y);
-        }
-      }
-      return;
-    }
-
-    if (currentTool === 'diagonalFill' && diagonalFillHandlers?.handleDiagonalFillMove) {
-      diagonalFillHandlers.handleDiagonalFillMove(e as MouseEvent);
-      return;
-    }
-
-    if (currentTool === 'freehand') {
-      const freehandHandlers = getHandlers('freehand');
-      if (freehandHandlers?.handlePointerMove) {
-        freehandHandlers.handlePointerMove(e);
-      }
-      return;
-    }
-
-    if (currentTool === 'regionPaint' || currentTool === 'regionBoundary') {
-      const regionHandlers = getHandlers('region');
-      if (regionHandlers?.handlePointerMove) {
-        regionHandlers.handlePointerMove(e);
-      }
-      return;
-    }
-
-    if (currentTool === 'outline') {
-      const outlineHandlers = getHandlers('outline');
-      if (outlineHandlers?.handlePointerMove) {
-        outlineHandlers.handlePointerMove(e);
-      }
-      return;
-    }
-
-    if (currentTool === 'wall') {
-      const wallHandlers = getHandlers('wall');
-      if (wallHandlers?.handlePointerMove) {
-        wallHandlers.handlePointerMove(e);
-      }
-      return;
-    }
-
-    if (currentTool === 'tilePaint') {
-      const brushHandlers = getHandlers('terrainBrush');
-      if (brushHandlers?.handlePointerMove) {
-        brushHandlers.handlePointerMove(e);
-      }
-      const tileHandlers = getHandlers('tilePlacement');
-      if (tileHandlers?.handlePointerMove) {
-        tileHandlers.handlePointerMove(e);
-      }
-      return;
-    }
-
-    if (currentTool === 'shape') {
-      const shapeHandlers = getHandlers('shapeOverlay');
-      if (shapeHandlers?.handlePointerMove) {
-        shapeHandlers.handlePointerMove(e);
-      }
-      return;
-    }
-
+    // Tools that do not consume the move (selection, placement, drawing)
+    // still drive the object hover highlight.
     if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
       objectHandlers.handleHoverUpdate(e);
     }
   }, [currentTool, isDraggingSelection, dragStart, selectedItem, handleGroupDrag, getHandlers, isAlignmentMode, geometry, screenToWorld]);
 
   const handlePointerUp = useCallback((e: MouseEvent | TouchEvent): void => {
-    const drawingHandlers = getHandlers('drawing');
     const objectHandlers = getHandlers('object');
     const textHandlers = getHandlers('text');
     const panZoomHandlers = getHandlers('panZoom');
@@ -764,42 +502,8 @@ const useEventCoordinator = ({
       return;
     }
 
-    if (currentTool != null && DRAWING_TOOL_SET.has(currentTool)) {
-      if (drawingHandlers?.stopDrawing) {
-        drawingHandlers.stopDrawing(e);
-      }
-    }
-
-    if (currentTool === 'freehand') {
-      const freehandHandlers = getHandlers('freehand');
-      if (freehandHandlers?.stopDrawing) {
-        freehandHandlers.stopDrawing();
-      }
-    }
-
-    if (currentTool === 'tilePaint') {
-      const brushHandlers = getHandlers('terrainBrush');
-      if (brushHandlers?.handlePointerUp) {
-        brushHandlers.handlePointerUp(e);
-      }
-      const tileHandlers = getHandlers('tilePlacement');
-      if (tileHandlers?.handlePointerUp) {
-        tileHandlers.handlePointerUp(e);
-      }
-    }
-
-    if (currentTool === 'outline') {
-      const outlineHandlers = getHandlers('outline');
-      if (outlineHandlers?.handlePointerUp) {
-        outlineHandlers.handlePointerUp(e);
-      }
-    }
-
-    if (currentTool === 'wall') {
-      const wallHandlers = getHandlers('wall');
-      if (wallHandlers?.handlePointerUp) {
-        wallHandlers.handlePointerUp(e);
-      }
+    if (currentTool != null) {
+      TOOL_ROUTES[currentTool].up({ getHandlers, e });
     }
 
     if (fogHandlers?.handlePointerUp) {
@@ -808,28 +512,13 @@ const useEventCoordinator = ({
   }, [currentTool, recentMultiTouch, isDraggingSelection, dragStart, selectedItem, setSelectedItem, stopGroupDrag, getHandlers, isAlignmentMode, scheduleMultiTouchReset]);
 
   const handlePointerLeave = useCallback((_e: MouseEvent): void => {
-    const drawingHandlers = getHandlers('drawing');
-    const diagonalFillHandlers = getHandlers('diagonalFill');
-
     if (pendingToolTimeoutRef.current != null) {
       window.clearTimeout(pendingToolTimeoutRef.current);
       pendingToolTimeoutRef.current = null;
     }
 
-    if (currentTool != null && DRAWING_TOOL_SET.has(currentTool)) {
-      if (drawingHandlers?.cancelDrawing) {
-        drawingHandlers.cancelDrawing();
-      }
-    }
-
-    // The segment highlight only updates on moves over the canvas; drop it
-    // when the pointer leaves so it does not stick at the edge.
-    if (currentTool === 'segmentDraw') {
-      drawingHandlers?.clearSegmentHover?.();
-    }
-
-    if (currentTool === 'diagonalFill' && diagonalFillHandlers?.cancelFill) {
-      diagonalFillHandlers.cancelFill();
+    if (currentTool != null) {
+      TOOL_ROUTES[currentTool].leave({ getHandlers });
     }
   }, [currentTool, getHandlers]);
 
@@ -926,32 +615,8 @@ const useEventCoordinator = ({
     // View-locked: no polygon closers, no text-label editing
     if (interactionLocked) return;
 
-    // Region boundary mode: double-click closes the polygon
-    if (currentTool === 'regionBoundary') {
-      const regionHandlers = getHandlers('region');
-      if (regionHandlers?.handleDoubleClick) {
-        regionHandlers.handleDoubleClick(e);
-        return;
-      }
-    }
-
-    // Outline mode: double-click closes the polygon
-    if (currentTool === 'outline') {
-      const outlineHandlers = getHandlers('outline');
-      if (outlineHandlers?.handleDoubleClick) {
-        outlineHandlers.handleDoubleClick(e);
-        return;
-      }
-    }
-
-    // Wall mode: double-click finishes the wall
-    if (currentTool === 'wall') {
-      const wallHandlers = getHandlers('wall');
-      if (wallHandlers?.handleDoubleClick) {
-        wallHandlers.handleDoubleClick(e);
-        return;
-      }
-    }
+    // Polygon/wall tools: double-click closes the polygon or finishes the wall
+    if (currentTool != null && TOOL_ROUTES[currentTool].doubleClick({ getHandlers, e })) return;
 
     const textHandlers = getHandlers('text');
     if (!textHandlers?.handleCanvasDoubleClick) return;

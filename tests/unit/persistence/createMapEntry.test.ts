@@ -72,7 +72,6 @@ describe('buildMapEntry matches the old generated-dungeon literal', () => {
       mapType: 'grid',
       northDirection: 0,
       customColors: [],
-      sidebarCollapsed: false,
       expandedState: false,
       generationSettings: generation,
       settings: { useGlobalSettings: false, overrides: { distancePerCellGrid: 5, distanceUnitGrid: 'ft' } },

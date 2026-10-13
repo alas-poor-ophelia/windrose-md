@@ -373,7 +373,6 @@ export interface MapData {
   // UI state persistence (optional - defaults exist)
   uiPreferences?: UIPreferences;
   showAdjacentSubMaps?: boolean;
-  sidebarCollapsed?: boolean;
   expandedState?: boolean;
 
   // Custom colors for this map

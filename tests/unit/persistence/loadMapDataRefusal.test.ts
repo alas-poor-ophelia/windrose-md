@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { App } from 'obsidian';
 import { TFile } from 'obsidian';
 
@@ -6,10 +6,14 @@ import {
   loadMapData,
   createNewMap,
   MapDataUnreadableError,
+  MapDataFileMissingError,
+  createEmptyDataFile,
 } from '../../../src/persistence/fileOperations';
 import type { MapData } from '../../../types/core/map.types';
 
 const DATA_PATH = 'windrose-md-data.json';
+
+const creates: string[] = [];
 
 function makeApp(initialContent: string | null): App {
   const files = new Map<string, TFile>();
@@ -26,7 +30,8 @@ function makeApp(initialContent: string | null): App {
     getAbstractFileByPath: (path: string) => files.get(path) ?? null,
     read: async (file: TFile) => contents.get(file.path) ?? '',
     modify: async (file: TFile, data: string) => { contents.set(file.path, data); },
-    create: async () => { /* unused */ },
+    create: async (path: string, data: string) => { creates.push(path); contents.set(path, data); },
+    createFolder: async () => { /* unused */ },
   };
   return { vault } as unknown as App;
 }
@@ -61,13 +66,29 @@ describe('loadMapData refuses unreadable data files', () => {
     await expect(loadMapData(app, 'a')).rejects.toBeInstanceOf(MapDataUnreadableError);
   });
 
-  it('still returns a fresh map when the data file is absent', async () => {
+  it('throws MapDataFileMissingError when the data file is absent, and writes nothing', async () => {
+    creates.length = 0;
     const app = makeApp(null);
+    const modify = vi.spyOn(app.vault, 'modify');
 
-    const data = await loadMapData(app, 'a', 'Brand new', 'grid');
+    const error = await loadMapData(app, 'a', 'Brand new', 'grid').catch((e: unknown) => e);
 
-    expect(data.name).toBe('Brand new');
-    expect(data.layers).toHaveLength(1);
+    expect(error).toBeInstanceOf(MapDataFileMissingError);
+    expect((error as MapDataFileMissingError).dataPath).toBe(DATA_PATH);
+    expect(creates).toEqual([]);
+    expect(modify).not.toHaveBeenCalled();
+  });
+
+  it('createEmptyDataFile creates an empty store only on request, and never over an existing file', async () => {
+    creates.length = 0;
+    const app = makeApp(null);
+    expect(await createEmptyDataFile(app)).toBe(true);
+    expect(creates).toEqual([DATA_PATH]);
+
+    creates.length = 0;
+    const existing = makeApp(fileWith({}));
+    expect(await createEmptyDataFile(existing)).toBe(false);
+    expect(creates).toEqual([]);
   });
 
   it('still returns a fresh map when the file parses but the map id is absent', async () => {

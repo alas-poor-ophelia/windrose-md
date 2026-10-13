@@ -80,9 +80,6 @@ export type HandleUpdateColorOpacity = (colorId: string, newOpacity: number) => 
 /** Handle view state change */
 export type HandleViewStateChange = (newViewState: StoredViewState) => void;
 
-/** Handle sidebar collapse change */
-export type HandleSidebarCollapseChange = (collapsed: boolean) => void;
-
 /** Handle object set change */
 export type HandleObjectSetChange = (setId: string | null) => void;
 
@@ -115,7 +112,6 @@ export interface MapDataHandlers {
   handleDeleteCustomColor: HandleDeleteCustomColor;
   handleUpdateColorOpacity: HandleUpdateColorOpacity;
   handleViewStateChange: HandleViewStateChange;
-  handleSidebarCollapseChange: HandleSidebarCollapseChange;
   handleObjectSetChange: HandleObjectSetChange;
   handleTextLabelSettingsChange: HandleTextLabelSettingsChange;
   handleRegionsChange: HandleRegionsChange;
@@ -151,7 +147,6 @@ export interface UseDataHandlersResult {
   handleDeleteCustomColor: HandleDeleteCustomColor;
   handleUpdateColorOpacity: HandleUpdateColorOpacity;
   handleViewStateChange: HandleViewStateChange;
-  handleSidebarCollapseChange: HandleSidebarCollapseChange;
   handleObjectSetChange: HandleObjectSetChange;
   handleTextLabelSettingsChange: HandleTextLabelSettingsChange;
   handleRegionsChange: HandleRegionsChange;

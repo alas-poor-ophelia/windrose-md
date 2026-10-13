@@ -16,7 +16,7 @@ import { Notice } from 'obsidian';
 import { useCallback, useEffect, useState } from 'preact/hooks';
 
 import { useApp } from '../../context/AppContext';
-import { findBestBackup, restoreFromBackup } from '../../persistence/fileOperations';
+import { createEmptyDataFile, findBestBackup, restoreFromBackup } from '../../persistence/fileOperations';
 import type { DataFileBackup } from '../../persistence/fileOperations';
 import { ConfirmModal } from '../../settings/modals/ConfirmModal';
 
@@ -26,9 +26,11 @@ interface DataFileRecoveryPanelProps {
   /**
    * 'schema': the map needs a newer or fixed plugin version. The file itself
    * is fine, so no backup restore is offered (it would discard recent edits
-   * and not help). Default 'unreadable'.
+   * and not help). 'missing': the configured file does not exist (DATA-08);
+   * offers a user-confirmed empty store or a re-check, never auto-creates.
+   * Default 'unreadable'.
    */
-  kind?: 'unreadable' | 'schema';
+  kind?: 'unreadable' | 'schema' | 'missing';
   /** Reload the map data after a successful restore. Omitted → the user is told to reopen. */
   onRestored?: () => void;
 }
@@ -42,7 +44,7 @@ const DataFileRecoveryPanel = ({ dataPath, kind = 'unreadable', onRestored }: Da
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (kind === 'schema') return undefined;
+    if (kind !== 'unreadable') return undefined;
     let cancelled = false;
     void findBestBackup(app).then((found) => {
       if (cancelled) return;
@@ -83,6 +85,48 @@ const DataFileRecoveryPanel = ({ dataPath, kind = 'unreadable', onRestored }: Da
       setBusy(false);
     }
   }, [app, backup, busy, dataPath, onRestored]);
+
+  const handleCreate = useCallback(async (): Promise<void> => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const confirmed = await new ConfirmModal(app, {
+        message: [
+          `Create a new empty data file at ${dataPath}?`,
+          'If this vault is synced, make sure your existing data file is not simply still downloading, or the empty file could overwrite it.',
+        ].join('\n'),
+        confirmText: 'Create',
+        cancelText: 'Cancel',
+      }).openAndGetValue();
+      if (!confirmed) return;
+      if (!(await createEmptyDataFile(app))) {
+        new Notice('Data file was not created. A file may already exist at that path.', 10_000);
+      }
+      if (onRestored != null) onRestored();
+      else new Notice('Reopen the map to load it.', 10_000);
+    } finally {
+      setBusy(false);
+    }
+  }, [app, busy, dataPath, onRestored]);
+
+  if (kind === 'missing') {
+    return (
+      <div className="windrose-loading">
+        <p>Data file not found. To avoid overwriting your maps, editing is disabled.</p>
+        <p><code>{dataPath}</code></p>
+        <p>If the file was moved or is still syncing, put it back and check again. Otherwise create a new empty data file here.</p>
+        <p>
+          <button className="mod-cta" disabled={busy} onClick={() => { onRestored?.(); }}>
+            Check again
+          </button>
+          {' '}
+          <button disabled={busy} onClick={() => { void handleCreate(); }}>
+            Create a new data file here
+          </button>
+        </p>
+      </div>
+    );
+  }
 
   if (kind === 'schema') {
     return (

@@ -1,4 +1,4 @@
-// Path: dmtConstants.ts
+// Path: src/core/dmtConstants.ts
 // Shared constants: theme, defaults, schema version, data file path, z-index, and segment geometry tables
 
 // Type-only imports

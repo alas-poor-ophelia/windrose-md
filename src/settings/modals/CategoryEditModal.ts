@@ -28,7 +28,7 @@ class CategoryEditModal extends Modal {
     this.order = existingCategory?.order ?? 100;
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-category-edit-modal');
@@ -114,7 +114,7 @@ class CategoryEditModal extends Modal {
     this.close();
   }
 
-  onClose(): void {
+  override onClose(): void {
     this.contentEl.empty();
   }
 }

@@ -73,6 +73,21 @@ class MapDeletedError extends Error {
   }
 }
 
+/**
+ * Thrown by loadMapData when the configured store file does not exist (DATA-08).
+ * A blank map would let the first edit write a one-map store that file sync can
+ * then propagate over the real store elsewhere, so the UI shows a recovery panel
+ * instead and nothing is created until the user asks.
+ */
+class MapDataFileMissingError extends Error {
+  readonly dataPath: string;
+  constructor(dataPath: string) {
+    super(`Map data file not found: ${dataPath}`);
+    this.name = 'MapDataFileMissingError';
+    this.dataPath = dataPath;
+  }
+}
+
 // Throttle the corrupted-file notice so we don't spam the user with a toast
 // every time autosave fires while the file is broken.
 let lastCorruptionNoticeAt = 0;
@@ -384,8 +399,8 @@ function applyLockedViewState(mapData: MapData): MapData {
 /**
  * Load one map from the data file.
  *
- * Returns a fresh map ONLY when the data file is absent, or when it parses
- * cleanly but holds no entry for `mapId`. Any other failure (unreadable file,
+ * Returns a fresh map ONLY when the data file parses cleanly but holds no
+ * entry for `mapId`. An absent data file throws MapDataFileMissingError. Any other failure (unreadable file,
  * bad JSON, structurally-wrong document, migration blowup) throws
  * MapDataUnreadableError so the caller can block editing — silently returning a
  * blank map here is what turned a truncated read into permanent data loss.
@@ -406,7 +421,7 @@ async function loadMapDataWithGeneration(app: App, mapId: string, mapName: strin
     const file = app.vault.getAbstractFileByPath(dataPath);
 
     if (!(file instanceof TFile)) {
-      return { data: createNewMap(mapName, mapType), generation };
+      throw new MapDataFileMissingError(dataPath);
     }
 
     let data: DataFile;
@@ -454,6 +469,30 @@ async function loadMapDataWithGeneration(app: App, mapId: string, mapName: strin
       console.error('[loadMapData] Stored map entry could not be migrated. Refusing to substitute a blank map:', error);
       notifyCorruptedDataFile(dataPath);
       throw new MapDataUnreadableError(dataPath);
+    }
+  });
+}
+
+/**
+ * User-initiated creation of an empty store at the configured path (the
+ * recovery panel's "Create a new data file here"). Never called implicitly.
+ * Returns false when a file already exists (nothing is overwritten) or the
+ * write failed.
+ */
+async function createEmptyDataFile(app: App): Promise<boolean> {
+  const dataPath = getDataFilePath();
+  return enqueueDataFileOp(async () => {
+    if (app.vault.getAbstractFileByPath(dataPath) != null) return false;
+    try {
+      const dirPath = dataPath.includes('/') ? dataPath.substring(0, dataPath.lastIndexOf('/')) : '';
+      if (dirPath !== '' && app.vault.getAbstractFileByPath(dirPath) == null) {
+        try { await app.vault.createFolder(dirPath); } catch { /* already exists */ }
+      }
+      await app.vault.create(dataPath, JSON.stringify({ maps: {} }));
+      return true;
+    } catch (error) {
+      console.error('[createEmptyDataFile] failed:', error);
+      return false;
     }
   });
 }
@@ -839,7 +878,6 @@ function createNewMap(mapName: string = '', mapType: MapType = 'grid'): MapData 
     mapType: mapType,
     northDirection: 0,
     customColors: [],
-    sidebarCollapsed: false,
     expandedState: false,
     settings: {
       useGlobalSettings: true,
@@ -1015,7 +1053,7 @@ export {
   loadMapData, loadMapDataWithGeneration, getEntryGeneration,
   saveMapData, deleteMapData, createNewMap, buildMapEntry, createMapEntry, listMaps, listMapsResult, migrateMapData,
   canonicalizeTileIds, applyLockedViewState, enqueueDataFileOp, getSaveQueue,
-  notifyCorruptedDataFile, readRawMapEntry, isMapTombstoned, MapDataUnreadableError, MapDeletedError, MapSchemaError,
+  notifyCorruptedDataFile, readRawMapEntry, isMapTombstoned, MapDataUnreadableError, MapDeletedError, MapDataFileMissingError, MapSchemaError, createEmptyDataFile,
   shouldRotateBak, otherBakSlot, bakPathForSlot, dailyBakPath, isSuspiciousShrink, backupTimestamp,
   findBestBackup, restoreFromBackup, BAK_THROTTLE_MS
 };

@@ -55,7 +55,7 @@ class ExportImageModal extends Modal {
     this.exportButton.disabled = this.included.size === 0;
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.createEl('h3', { text: 'Export as image' });
@@ -128,7 +128,7 @@ class ExportImageModal extends Modal {
     };
   }
 
-  onClose(): void {
+  override onClose(): void {
     this.contentEl.empty();
     this.exportButton = null;
     if (!this.resolved && this.resolvePromise != null) {
