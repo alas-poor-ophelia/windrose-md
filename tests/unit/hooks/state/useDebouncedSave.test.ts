@@ -378,6 +378,24 @@ describe('useDebouncedSave: journal before every save (DATA-05) and per-writer s
     m.unmount();
   });
 
+  it('a later edit after the cap gets a fresh retry budget while saves still fail (wave-5 finding 7)', async () => {
+    const { app } = makeApp();
+    saveMock.mockResolvedValue({ status: 'failed' });
+    const m = mount(app, 'ds-cap2');
+
+    edit(m, 'stuck');
+    await advance(2000);
+    await advance(120_000);
+    expect(saveMock).toHaveBeenCalledTimes(1 + MAX_SAVE_RETRIES);
+
+    edit(m, 'still failing');
+    await advance(2000);
+    await advance(120_000);
+    expect(saveMock).toHaveBeenCalledTimes(2 * (1 + MAX_SAVE_RETRIES));
+    expect(noticeMessages.filter(n => /retries have stopped/.test(n)).length).toBeGreaterThanOrEqual(1);
+    m.unmount();
+  });
+
   it('a rejected save is treated as failed and retried', async () => {
     const { app } = makeApp();
     saveMock

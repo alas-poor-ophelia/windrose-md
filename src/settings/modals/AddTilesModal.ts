@@ -34,9 +34,8 @@ import {
 import type { FolderTierRow, TagSuggestion } from '../../assets/importPlanner';
 import { runImportDetectionPass } from '../../assets/importDetectionPass';
 import {
-  loadTileMetadata,
-  saveTileMetadata,
-  setTileMetadataForRender,
+  ensureTileMetadataLoaded,
+  commitTileMetadataDelta,
   bulkSetDepthAffinity,
   bulkSetImportTags,
 } from '../../persistence/tileMetadata';
@@ -739,7 +738,9 @@ class AddTilesModal extends Modal {
         await this.plugin.saveSettings();
       }
 
-      let metadata = await loadTileMetadata(this.app);
+      // Snapshot of the shared store; only this import's delta is merged back.
+      const base = await ensureTileMetadataLoaded(this.app);
+      let metadata = base;
       // Import-moment guard (2026-06-09 RCA): prior metadata means this set
       // was known before and may have placements — withhold render-mode.
       const hasPrior = this.tiles.some(t => metadata[t.vaultPath] != null);
@@ -782,8 +783,9 @@ class AddTilesModal extends Modal {
           status.setText(`Scanning tiles ${done}/${total}…`);
         },
       });
-      await saveTileMetadata(this.app, next);
-      setTileMetadataForRender(next);
+      if (!await commitTileMetadataDelta(this.app, base, next)) {
+        new Notice('Windrose: tile metadata save was refused — tiers and tags were not saved. See console.');
+      }
       window.dispatchEvent(new Event('windrose-settings-changed'));
 
       progressBar.value = 100;

@@ -22,7 +22,6 @@ export type ToolId =
   | 'draw'
   | 'freehand'
   | 'erase'
-  | 'eyedropper'
   // Shape tools
   | 'rectangle'
   | 'circle'
@@ -30,6 +29,7 @@ export type ToolId =
   | 'diagonalFill'
   // Edge/segment tools
   | 'edgeDraw'
+  /** MCP-only: reachable via the bridge's setTool; the UI erases edges with 'erase'. */
   | 'edgeErase'
   | 'edgeLine'
   | 'segmentDraw'
@@ -50,9 +50,7 @@ export type ToolId =
   // Wall/path tool (textures swept along editable polylines)
   | 'wall'
   // Utility tools
-  | 'measure'
-  | 'fog'
-  | 'fogErase';
+  | 'measure';
 
 // ===========================================
 // Tool State

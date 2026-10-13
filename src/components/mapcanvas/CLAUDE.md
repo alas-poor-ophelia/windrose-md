@@ -55,7 +55,7 @@ Layers do NOT read `MapSettingsContext`: that provider exists only inside the pe
 ### Canvas Rendering
 
 - Committed content is drawn by `useCanvasRenderer` onto the main canvas; do not draw map content to it from layers.
-- Layers that need live feedback own a private overlay `<canvas>` created in the layer: Freehand, TerrainBrush, Wall, Outline, Region. `MapCanvas` also owns the fog blur canvas.
+- Layers that need live feedback own a private overlay `<canvas>` through `useOverlayCanvas` (hooks/canvas): Freehand, TerrainBrush, Wall, Outline, Region. Do not hand-roll the create/size/remove lifecycle. `MapCanvas` also owns the fog blur canvas.
 - Pan/zoom goes through `useViewController` (live state off the Preact path; commit at gesture end), driven by `usePanZoomCoordinator`. Anything positioned in screen space must follow live ticks: `useLiveOverlayRedraw` for overlay canvases, `useLiveOverlayTransform` for SVG groups (RouteLayer, MeasurementOverlay, PartyPinOverlay). See "Live Pan/Zoom" in `hooks/CLAUDE.md`.
 
 ## Context Dependencies
@@ -73,7 +73,7 @@ Layers consume `MapContext` (state + operations), `MapSelectionContext`, `Object
 
 ## Gotchas
 
-- **DOM**: prefer refs from context; layers that own an overlay canvas (and `WallLayer`) do touch DOM directly: create via `activeWindow.createEl` and clean up on unmount.
+- **DOM**: prefer refs from context; overlay canvases are created and removed by `useOverlayCanvas` (`activeWindow.createEl`, removed on unmount).
 - **Don't store derived state**; compute from context values.
 - **Don't assume pixel coordinates**; use `geometry.cellToPixel`/`pixelToCell` and `viewController.getLive()`.
 - **Touch**: all interactions must work on iPad.

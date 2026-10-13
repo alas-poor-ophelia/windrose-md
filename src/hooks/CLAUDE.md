@@ -28,7 +28,8 @@ hooks/
 │   ├── usePanZoomCoordinator.ts    # Wheel/drag/pinch pan-zoom input, writes through ViewController
 │   ├── useViewController.ts        # Live pan/zoom state held OFF the Preact path during a gesture
 │   ├── useLiveOverlayTransform.ts  # Keeps SVG overlay groups locked to the canvas during live gestures
-│   └── useLiveOverlayRedraw.ts     # Same, for overlay <canvas> redraws (rAF-coalesced)
+│   ├── useLiveOverlayRedraw.ts     # Same, for overlay <canvas> redraws (rAF-coalesced)
+│   └── useOverlayCanvas.ts         # A layer's private overlay <canvas>: guarded create, size follows main canvas, remove/unmount
 ├── drawing/
 │   ├── useDrawingTools.ts          # Orchestrator composing the drawing hooks below
 │   ├── usePaintTool.ts             # Paint/erase drag: cells, edges, objects, labels, curves, tiles, walls, terrain strokes
@@ -104,7 +105,7 @@ Pan/zoom must not reconcile the Preact tree per input tick. `useViewController` 
 
 - Read the view through `viewController.getLive()` (as the renderer and `screenToGrid`/`screenToWorld` do), not `mapData.viewState`, inside anything that must track a gesture.
 - SVG overlay drawn in world coordinates: `useLiveOverlayTransform` rewrites the group transform per tick (used by RouteLayer, MeasurementOverlay, PartyPinOverlay).
-- Overlay `<canvas>`: `useLiveOverlayRedraw(viewController, redraw)` (used by FreehandLayer, OutlineLayer, RegionLayer, WallLayer).
+- Overlay `<canvas>`: `useLiveOverlayRedraw(viewController, redraw)` (used by FreehandLayer, OutlineLayer, RegionLayer, WallLayer). The canvas itself comes from `useOverlayCanvas(canvasRef, { active?, onResize? })` (those four plus TerrainBrushLayer): draw via `sized()`, which re-syncs to the main canvas size; it does not handle pan/zoom.
 - An overlay that only reads committed state freezes mid-pan and snaps at gesture end.
 
 ### Stable References

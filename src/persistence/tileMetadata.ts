@@ -28,12 +28,20 @@ const SAVE_DEBOUNCE_MS = 2000;
 // mounts (a star in one embed erased by a tag in another).
 //
 // Writers outside the component tree (pack import, classification rescan,
-// folder detection) still load -> mutate -> saveTileMetadata, then hand the
-// result to setTileMetadataForRender, which replaces this store and notifies
-// subscribers.
+// folder detection) run their slow scan against a snapshot, then commit ONLY
+// the fields they changed through commitTileMetadataDelta, which merges them
+// into the live store after the await (never a pre-await snapshot wholesale:
+// that erased edits made during the scan).
+//
+// Corrupt file (the 2026-07-30 wipe class): a store file that exists but does
+// not parse leaves the store UNLOADED and sets _corrupt. While set, every
+// mutation and save is a no-op, and the next ensureTileMetadataLoaded re-reads
+// the file, so an in-session repair is picked up instead of being overwritten
+// by whatever was mutated over the empty placeholder.
 
 let _store: TileMetadataStore = {};
 let _loaded = false;
+let _corrupt = false;
 let _loadPromise: Promise<TileMetadataStore> | null = null;
 /** Bumped on every store change so render caches can key on it (STRUCT-A-31). */
 let _version = 0;
@@ -77,14 +85,28 @@ function subscribeTileMetadata(listener: () => void): () => void {
  */
 function ensureTileMetadataLoaded(app: App): Promise<TileMetadataStore> {
   if (_loaded) return Promise.resolve(_store);
-  _loadPromise ??= loadTileMetadata(app).then(store => {
+  _loadPromise ??= readTileMetadataFile(app).then(({ store, corrupt }) => {
     _loadPromise = null;
+    if (corrupt) {
+      // Stay unloaded: the next ensure retries the read (in-session repair).
+      _corrupt = true;
+      return _store;
+    }
+    _corrupt = false;
     // A writer may have replaced the store while the read was in flight;
     // its copy is newer than what we just read.
     if (!_loaded) setTileMetadataForRender(store);
     return _store;
+  }, (e: unknown) => {
+    _loadPromise = null;
+    throw e;
   });
   return _loadPromise;
+}
+
+/** True while the on-disk store is unparseable; mutations and saves are refused. */
+function isTileMetadataCorrupt(): boolean {
+  return _corrupt;
 }
 
 /**
@@ -101,15 +123,105 @@ function updateTileMetadata(app: App, mutator: (store: TileMetadataStore) => Til
     scheduleSave(app);
   };
   if (_loaded) apply();
-  else void ensureTileMetadataLoaded(app).then(apply);
+  else {
+    void ensureTileMetadataLoaded(app).then(() => {
+      // Corrupt file: the store is a placeholder, not the library. Drop it.
+      if (!_loaded || _corrupt) return;
+      apply();
+    });
+  }
+}
+
+/** Field-level JSON comparison; entry values are primitives or string arrays. */
+function sameValue(a: unknown, b: unknown): boolean {
+  return a === b || JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * Merge into `store` only the fields `next` changed relative to `base` (set,
+ * changed, or removed), row by row and field by field. Rows and fields the
+ * writer did not touch keep whatever the live store holds now, so an edit
+ * committed while the writer was awaiting a slow scan survives.
+ */
+function mergeTileMetadataDelta(
+  store: TileMetadataStore,
+  base: TileMetadataStore,
+  next: TileMetadataStore
+): TileMetadataStore {
+  let result: TileMetadataStore | null = null;
+  const paths = new Set([...Object.keys(base), ...Object.keys(next)]);
+  for (const path of paths) {
+    const before = base[path];
+    const after = next[path];
+    if (before === after) continue;
+    const beforeEntry: Record<string, unknown> = { ...(before ?? {}) };
+    const afterEntry: Record<string, unknown> = { ...(after ?? {}) };
+    const changed: Record<string, unknown> = {};
+    const removed: string[] = [];
+    for (const key of new Set([...Object.keys(beforeEntry), ...Object.keys(afterEntry)])) {
+      if (sameValue(beforeEntry[key], afterEntry[key])) continue;
+      if (afterEntry[key] !== undefined) changed[key] = afterEntry[key];
+      else removed.push(key);
+    }
+    if (Object.keys(changed).length === 0 && removed.length === 0) continue;
+    result ??= { ...store };
+    const merged: Record<string, unknown> = { ...(result[path] ?? {}), ...changed };
+    for (const key of removed) delete merged[key];
+    result[path] = merged;
+  }
+  return result ?? store;
+}
+
+/**
+ * Commit an external writer's changes to the SHARED store and save it now.
+ * `mutator` runs against the live store after the load, never against a
+ * snapshot taken before an await. Refused (false) while the file is corrupt
+ * or when the save itself is refused.
+ */
+async function applyExternalTileMetadata(
+  app: App,
+  mutator: (store: TileMetadataStore) => TileMetadataStore
+): Promise<boolean> {
+  await ensureTileMetadataLoaded(app);
+  if (!_loaded || _corrupt) {
+    notifyCorruptedMetadataFile();
+    return false;
+  }
+  const next = mutator(_store);
+  if (next !== _store) commitStore(next);
+  if (saveTimer != null) window.clearTimeout(saveTimer);
+  saveTimer = null;
+  return queueStoreSave(app);
+}
+
+/**
+ * Convenience over applyExternalTileMetadata: `base` is the snapshot the
+ * writer started from, `next` the writer's result; only the delta lands.
+ */
+function commitTileMetadataDelta(
+  app: App,
+  base: TileMetadataStore,
+  next: TileMetadataStore
+): Promise<boolean> {
+  return applyExternalTileMetadata(app, store => mergeTileMetadataDelta(store, base, next));
+}
+
+// Serializes store saves so an older snapshot can never land after a newer
+// one; each queued save writes the store as it is when its turn comes.
+let _saveChain: Promise<boolean> = Promise.resolve(true);
+function queueStoreSave(app: App): Promise<boolean> {
+  const run = (): Promise<boolean> => (_corrupt ? Promise.resolve(false) : saveTileMetadata(app, _store));
+  _saveChain = _saveChain.then(run, run);
+  return _saveChain;
 }
 
 function scheduleSave(app: App): void {
+  if (_corrupt) return;
   saveApp = app;
   if (saveTimer != null) window.clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
     saveTimer = null;
-    void saveTileMetadata(app, _store);
+    void queueStoreSave(app);
   }, SAVE_DEBOUNCE_MS);
 }
 
@@ -118,7 +230,7 @@ async function flushTileMetadataSave(): Promise<void> {
   if (saveTimer == null || saveApp == null) return;
   window.clearTimeout(saveTimer);
   saveTimer = null;
-  await saveTileMetadata(saveApp, _store);
+  await queueStoreSave(saveApp);
 }
 
 /** Drop all module state (tests; plugin unload after flushTileMetadataSave). */
@@ -128,7 +240,9 @@ function resetTileMetadataStore(): void {
   saveApp = null;
   _store = {};
   _loaded = false;
+  _corrupt = false;
   _loadPromise = null;
+  _saveChain = Promise.resolve(true);
   _listeners.clear();
 }
 
@@ -144,7 +258,7 @@ function notifyCorruptedMetadataFile(): void {
   new Notice(
     `Windrose: tile metadata file is corrupted and metadata saves are paused to protect your data.\n\n` +
     `File: ${METADATA_FILE}\n\n` +
-    `Inspect or restore the file manually, then reload Obsidian to resume saving.`,
+    `Inspect or restore the file manually; saving resumes once it parses again.`,
     15_000
   );
 }
@@ -155,12 +269,17 @@ function notifyCorruptedMetadataFile(): void {
  * that already holds every in-memory edit.
  */
 async function loadTileMetadata(app: App): Promise<TileMetadataStore> {
+  return (await readTileMetadataFile(app)).store;
+}
+
+/** Raw read that reports corruption instead of masking it as an empty store. */
+async function readTileMetadataFile(app: App): Promise<{ store: TileMetadataStore; corrupt: boolean }> {
   await flushTileMetadataSave();
   const file = app.vault.getAbstractFileByPath(METADATA_FILE);
-  if (!(file instanceof TFile)) return {};
+  if (!(file instanceof TFile)) return { store: {}, corrupt: false };
   try {
     const content = await app.vault.read(file);
-    return JSON.parse(content) as TileMetadataStore;
+    return { store: JSON.parse(content) as TileMetadataStore, corrupt: false };
   } catch (e) {
     // An existing-but-unreadable store must be loud: silently treating it as
     // empty makes every tile render unclassified (all "Terrain") AND primes the
@@ -168,7 +287,7 @@ async function loadTileMetadata(app: App): Promise<TileMetadataStore> {
     // Saves are refused separately in saveTileMetadata until the file is fixed.
     console.error('[Windrose] Tile metadata file exists but is unreadable:', e);
     notifyCorruptedMetadataFile();
-    return {};
+    return { store: {}, corrupt: true };
   }
 }
 
@@ -549,6 +668,10 @@ export {
   subscribeTileMetadata,
   ensureTileMetadataLoaded,
   updateTileMetadata,
+  applyExternalTileMetadata,
+  commitTileMetadataDelta,
+  mergeTileMetadataDelta,
+  isTileMetadataCorrupt,
   flushTileMetadataSave,
   resetTileMetadataStore,
   pruneEmptyEntries,

@@ -15,6 +15,7 @@ import { useApp } from '../../context/AppContext';
 import { useMapState } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useLiveOverlayRedraw } from '../../hooks/canvas/useLiveOverlayRedraw';
+import { useOverlayCanvas } from '../../hooks/canvas/useOverlayCanvas';
 import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
 import { useRegionTools } from '../../hooks/interactions/useRegionTools';
 import type { MenuItem } from 'obsidian';
@@ -232,32 +233,11 @@ const RegionLayer = ({
   }, [editingRegionId, cancelPreviewFrame]);
 
   // ── Overlay canvas (same as FreehandLayer pattern) ─────────────────
-  const overlayRef = useRef<HTMLCanvasElement | null>(null);
-
-  useEffect(() => {
-    const mainCanvas = canvasRef.current;
-    if (!mainCanvas || !mainCanvas.parentElement || !isRegionTool) {
-      if (overlayRef.current && overlayRef.current.parentElement) {
-        overlayRef.current.parentElement.removeChild(overlayRef.current);
-        overlayRef.current = null;
-      }
-      return undefined;
-    }
-
-    if (!overlayRef.current) {
-      const overlay = activeWindow.createEl('canvas');
-      overlay.classList.add('windrose-overlay-layer');
-      mainCanvas.parentElement.appendChild(overlay);
-      overlayRef.current = overlay;
-    }
-
-    return () => {
-      if (overlayRef.current && overlayRef.current.parentElement) {
-        overlayRef.current.parentElement.removeChild(overlayRef.current);
-        overlayRef.current = null;
-      }
-    };
-  }, [canvasRef, isRegionTool]);
+  // Present while the tool is active; resizing clears it, so repaint.
+  const { sized: sizedOverlay } = useOverlayCanvas(canvasRef, {
+    active: isRegionTool,
+    onResize: () => { repaintOverlayRef.current(); },
+  });
 
   // Render pending/editing hexes on the overlay. The view basis is a
   // PARAMETER: during a pan/zoom gesture the ViewController's live state
@@ -265,14 +245,11 @@ const RegionLayer = ({
   // commit), so the live subscription below re-runs this with getLive()
   // and the overlay tracks the gesture instead of freezing until release.
   const drawRegionOverlay = useCallback((viewState: StoredViewState) => {
-    const overlay = overlayRef.current;
-    const mainCanvas = canvasRef.current;
-    if (!overlay || !mainCanvas || !geometry || geometry.type !== 'hex' || !mapData) return;
-
-    // Only resize when the size changed: assigning width/height resets the
+    if (!geometry || geometry.type !== 'hex' || !mapData) return;
+    // Only resizes when the size changed: assigning width/height resets the
     // context and can reallocate the backing store on every live frame (MEM-18).
-    if (overlay.width !== mainCanvas.width) overlay.width = mainCanvas.width;
-    if (overlay.height !== mainCanvas.height) overlay.height = mainCanvas.height;
+    const overlay = sizedOverlay();
+    if (!overlay) return;
 
     const ctx = overlay.getContext('2d');
     if (!ctx) return;
@@ -348,7 +325,7 @@ const RegionLayer = ({
     }
 
     if (northDirection !== 0) ctx.restore();
-  }, [pendingHexes, boundaryVertices, canvasRef, geometry, mapData, selectedColor, editingRegion]);
+  }, [pendingHexes, boundaryVertices, sizedOverlay, geometry, mapData, selectedColor, editingRegion]);
 
   const repaintOverlay = useCallback(() => {
     const vs = viewController?.getLive() ?? mapData?.viewState;

@@ -17,14 +17,13 @@ import type { DungeondraftPackMeta } from './pckMetadata';
 import { parseDungeondraftTags, parseWallSidecars } from './pckMetadata';
 import { CONTENT_PACKS_FOLDER } from './contentPackConstants';
 import {
-	loadTileMetadata,
+	ensureTileMetadataLoaded,
+	commitTileMetadataDelta,
 	bulkSetImportTags,
 	bulkSetDdSourceType,
 	bulkSetDepthAffinity,
 	bulkSetWallStripInfo,
 	bulkMarkWallEndCaps,
-	saveTileMetadata,
-	setTileMetadataForRender,
 } from '../persistence/tileMetadata';
 import { runImportDetectionPass } from '../assets/importDetectionPass';
 import { ensureFolder } from '../persistence/vaultFolders';
@@ -412,7 +411,10 @@ async function runDdImport(
 	try {
 	if (importTagEntries.length > 0 || ddSourceEntries.length > 0) {
 		onProgress?.(textures.length, textures.length, 'metadata');
-		let metadata = await loadTileMetadata(app);
+		// Snapshot of the shared store: the passes below run against it and
+		// only the fields they change are merged back after the scan's await.
+		const base = await ensureTileMetadataLoaded(app);
+		let metadata = base;
 		if (importTagEntries.length > 0) {
 			metadata = bulkSetImportTags(metadata, importTagEntries);
 		}
@@ -481,11 +483,10 @@ async function runDdImport(
 			}
 		}
 
-		const saved = await saveTileMetadata(app, metadata);
+		// Merges into the shared store (which notifies the renderer, so open
+		// maps resolve the new per-tile render modes without a reload) and saves.
+		const saved = await commitTileMetadataDelta(app, base, metadata);
 		if (!saved) throw new Error('tile metadata save was refused or failed');
-		// Push the freshly-written store into the renderer's accessor so any
-		// open map resolves the new per-tile render modes without a full reload.
-		setTileMetadataForRender(metadata);
 	}
 	} catch (e) {
 		console.error('[Windrose] Pack classification phase failed:', e);

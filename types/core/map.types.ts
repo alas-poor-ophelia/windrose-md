@@ -134,8 +134,8 @@ export type { Edge };
 // Text Labels & Note Pins (canonical types in objects/note.types.ts)
 // ===========================================
 
-import type { TextLabel, NotePin } from '../objects/note.types';
-export type { TextLabel, NotePin };
+import type { TextLabel } from '../objects/note.types';
+export type { TextLabel };
 
 // ===========================================
 // Outlines (hex map polygon outlines)
@@ -384,9 +384,6 @@ export interface MapData {
 
   // Last selected object opacity
   lastSelectedOpacity?: number;
-
-  // Note pins (global, not per-layer)
-  notePins?: NotePin[];
 
   // Shape overlays (global, both grid and hex maps)
   shapeOverlays?: ShapeOverlay[];

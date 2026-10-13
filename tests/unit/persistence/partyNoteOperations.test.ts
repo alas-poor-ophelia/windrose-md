@@ -331,6 +331,15 @@ function makeVault(initial: Record<string, string> = {}, opts: { raceOnCreate?: 
 }
 
 describe('mergePartyNoteContent', () => {
+  it('a note with only one marker keeps the user prose (wave-5 finding 8)', () => {
+    const pin = makePin();
+    const fresh = buildPartyNoteContent({ ...pin, range: 60 }, makeResults(), context);
+    const startOnly = '---\nwindrose-party-pin: x\n---\n<!-- windrose-beacon:start -->\nMy prose.\n';
+    const endOnly = 'My prose.\n<!-- windrose-beacon:end -->\nMore prose.\n';
+    expect(mergePartyNoteContent(startOnly, fresh)).toBe(startOnly);
+    expect(mergePartyNoteContent(endOnly, fresh)).toBe(endOnly);
+  });
+
   it('replaces only the marker region, keeping user text and frontmatter', () => {
     const pin = makePin();
     const old = buildPartyNoteContent(pin, makeResults(), context);

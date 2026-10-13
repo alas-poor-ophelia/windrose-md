@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { App } from 'obsidian';
 import { TFile } from 'obsidian';
 
@@ -16,6 +16,7 @@ import {
   RAW_PAYLOAD_LIMIT,
   MAX_JOURNAL_PAYLOAD,
 } from '../../../src/persistence/saveJournal';
+import { registerSaveInstance, unregisterSaveInstance } from '../../../src/persistence/saveCoordinator';
 import { createNewMap, deleteMapData } from '../../../src/persistence/fileOperations';
 import type { MapData } from '../../../types/core/map.types';
 
@@ -153,7 +154,9 @@ describe('saveJournal size guard', () => {
     const h = makeApp();
     const map = createNewMap('Plain', 'grid');
     journalPending(h.app, 'j-plain', map);
-    expect(h.store.get(JOURNAL_KEY_PREFIX + 'j-plain')).toBe(JSON.stringify(map));
+    // v3: one header line, then the payload unwrapped (no second escaping level).
+    const stored = h.store.get(JOURNAL_KEY_PREFIX + 'j-plain') as string;
+    expect(stored.slice(stored.indexOf('\n') + 1)).toBe(JSON.stringify(map));
     const meta = JSON.parse(h.store.get(JOURNAL_META_PREFIX + 'j-plain') as string) as Record<string, unknown>;
     expect(meta.enc).toBe('json');
     expect(meta).not.toHaveProperty('payload');
@@ -209,12 +212,14 @@ describe('saveJournal size guard', () => {
 describe('pruneJournal', () => {
   it('drops entries older than a week', () => {
     const h = makeApp();
-    journalPending(h.app, 'j-old', createNewMap('Old', 'grid'));
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(Date.now() - 8 * 24 * 60 * 60 * 1000);
+      journalPending(h.app, 'j-old', createNewMap('Old', 'grid'));
+    } finally {
+      vi.useRealTimers();
+    }
     journalPending(h.app, 'j-fresh', createNewMap('Fresh', 'grid'));
-
-    const stale = JSON.parse(h.store.get(JOURNAL_KEY_PREFIX + 'j-old') as string) as Record<string, unknown>;
-    stale.savedAt = Date.now() - 8 * 24 * 60 * 60 * 1000;
-    h.store.set(JOURNAL_KEY_PREFIX + 'j-old', JSON.stringify(stale));
 
     pruneJournal(h.app);
 
@@ -348,3 +353,73 @@ function noise(length: number): string {
   }
   return out;
 }
+
+describe('wave-5 journal fixes', () => {
+  it('finding 4: pane A has a pending slot, pane B mounts: no restore prompt, A slot intact', async () => {
+    const onDisk = createNewMap('Disk', 'grid');
+    const h = makeApp(JSON.stringify({ maps: { 'w5-live': onDisk } }));
+    registerSaveInstance('pane-a', { getPending: () => null, flush: async () => {} });
+    try {
+      journalPending(h.app, 'w5-live', createNewMap('A pending', 'grid'), { writerId: 'pane-a', version: 2 });
+      pruneJournal(h.app, { liveMapIds: ['w5-live'] });
+
+      const prompt = vi.fn(async () => 'discard' as const);
+      await expect(resolveJournalOnLoad(h.app, 'w5-live', '', prompt)).resolves.toBeNull();
+      expect(prompt).not.toHaveBeenCalled();
+      expect(JSON.parse(readJournal(h.app, 'w5-live')?.payload as string).name).toBe('A pending');
+    } finally {
+      unregisterSaveInstance('pane-a');
+    }
+    // Once pane A is gone, its slot is an orphan and is offered again.
+    const prompt2 = vi.fn(async () => 'discard' as const);
+    await resolveJournalOnLoad(h.app, 'w5-live', '', prompt2);
+    expect(prompt2).toHaveBeenCalledTimes(1);
+  });
+
+  it('finding 5: a sibling landing an older tree does not clear the restored writerless slot', async () => {
+    const h = makeApp(JSON.stringify({ maps: { 'w5-r': createNewMap('Disk', 'grid') } }));
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const t0 = Date.now();
+      // Pane A journals its older tree, then (later) a dead writer's slot is restored by pane B.
+      journalPending(h.app, 'w5-r', createNewMap('A tree', 'grid'), { writerId: 'pane-a', version: 1 });
+      journalPending(h.app, 'w5-r', createNewMap('Crashed', 'grid'), { writerId: 'dead', version: 7 });
+      registerSaveInstance('pane-a', { getPending: () => null, flush: async () => {} });
+      vi.setSystemTime(t0 + 1000);
+      const restored = await resolveJournalOnLoad(h.app, 'w5-r', '', async () => 'restore');
+      unregisterSaveInstance('pane-a');
+      expect(restored?.name).toBe('Crashed');
+
+      // Pane A's older save lands: the restored copy must survive.
+      clearJournal(h.app, 'w5-r', { writerId: 'pane-a', upToVersion: 1 });
+      expect(JSON.parse(readJournal(h.app, 'w5-r')?.payload as string).name).toBe('Crashed');
+
+      // Pane B journals the restored tree after the restore and lands it: now it clears.
+      vi.setSystemTime(t0 + 2000);
+      journalPending(h.app, 'w5-r', createNewMap('Crashed', 'grid'), { writerId: 'pane-b', version: 1 });
+      clearJournal(h.app, 'w5-r', { writerId: 'pane-b', upToVersion: 1 });
+      expect(readJournal(h.app, 'w5-r')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('finding 6: a quota failure on the meta write leaves the new pair readable (single framed write)', () => {
+    const h = makeApp();
+    journalPending(h.app, 'w5-q', createNewMap('Older', 'grid'), { writerId: 'w', version: 1 });
+    const writable = h.app as unknown as { saveLocalStorage: (k: string, v: unknown) => void };
+    const real = writable.saveLocalStorage;
+    writable.saveLocalStorage = (k: string, v: unknown) => {
+      if (k.startsWith(JOURNAL_META_PREFIX) && v != null) throw new Error('QuotaExceededError');
+      real(k, v);
+    };
+    expect(journalPending(h.app, 'w5-q', createNewMap('Newer', 'grid'), { writerId: 'w', version: 2 })).toBe(true);
+    writable.saveLocalStorage = real;
+    const entry = readJournal(h.app, 'w5-q');
+    expect(JSON.parse(entry?.payload as string).name).toBe('Newer');
+    expect(entry?.version).toBe(2);
+    // The version guard still reads the header metadata.
+    clearJournal(h.app, 'w5-q', { writerId: 'w', upToVersion: 1 });
+    expect(readJournal(h.app, 'w5-q')).not.toBeNull();
+  });
+});

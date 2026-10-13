@@ -30,7 +30,7 @@ import { useViewController } from '../../hooks/canvas/useViewController';
 import type { ViewController } from '#types/hooks/viewController.types';
 import { GridGeometry } from '../../geometry/core/GridGeometry';
 import { DEFAULTS } from '../../core/dmtConstants';
-import { getObjectAtPosition, addObject, removeObject, removeObjectAtPosition, removeObjectsInRectangle, updateObject, isAreaFree, canResizeObject } from '../../objects/objectOperations';
+import { getObjectAtPosition, addObject, removeObject, removeObjectsInRectangle, updateObject, isAreaFree } from '../../objects/objectOperations';
 import { addTextLabel, getTextLabelAtPosition, removeTextLabel, updateTextLabel } from '../../text/textLabelOperations';
 import { HexGeometry } from '../../geometry/core/HexGeometry';
 import { createGeometry } from '../../geometry/core/createGeometry';
@@ -119,9 +119,6 @@ interface MapCanvasContentProps {
   selectedObjectType: ObjectTypeId | undefined;
   selectedColor: string;
   isColorPickerOpen: boolean;
-  customColors: string[];
-  onAddCustomColor: (color: string) => void;
-  onDeleteCustomColor: (color: string) => void;
   isFocused: boolean;
   isAnimating: boolean;
   theme: ResolvedTheme;
@@ -186,7 +183,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, adjacentEmptySlots, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex, children }: MapCanvasContentProps): VNode => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, adjacentEmptySlots, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex, children }: MapCanvasContentProps): VNode => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -488,8 +485,6 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     updateObject,
     removeObject,
     isAreaFree,
-    canResizeObject,
-    removeObjectAtPosition,
     removeObjectsInRectangle,
 
     // Text operations

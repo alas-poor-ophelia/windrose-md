@@ -349,14 +349,6 @@ button.windrose-fow-tool-btn:disabled svg,
   transition: left 0.3s ease;
 }
 
-.windrose-left-panels.sidebar-open {
-  left: 188px;
-}
-
-.windrose-left-panels.sidebar-closed {
-  left: 8px;
-}
-
 /* ============================================
    BLOCK-MODE LEFT DRAWER (Layers / Colors / View)
    42px icon rail + a 198px panel that FOLDS open beside it (mirror of the
@@ -515,12 +507,6 @@ button.windrose-edge-rail-btn {
   opacity: 1;
   transform: translateX(0);
   pointer-events: auto;
-}
-
-/* Remove old absolute positioning — now handled by container */
-.windrose-region-panel.sidebar-open,
-.windrose-region-panel.sidebar-closed {
-  left: auto;
 }
 
 .windrose-region-panel-header {

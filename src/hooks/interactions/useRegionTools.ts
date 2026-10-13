@@ -13,6 +13,7 @@ import type { MapData, Region } from '#types/core/map.types';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { updateById, removeById } from '../../objects/entityList';
 import { getRegionLabelWorldPosition, computeCentroid } from '../../geometry/renderers/regionRenderer';
 import { offsetToAxial } from '../../geometry/core/offsetCoordinates';
 
@@ -366,9 +367,7 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     }
 
     // Update region with new label position (running delta)
-    const regions = (mapData.regions ?? []).map(r =>
-      r.id === draggingLabelRegionId ? { ...r, labelPosition: newPos } : r
-    );
+    const regions = updateById<Region>(mapData.regions, draggingLabelRegionId, { labelPosition: newPos });
     onRegionsChange(regions);
   }, [draggingLabelRegionId, getWorldCoords, mapData, geometry, onRegionsChange]);
 
@@ -450,16 +449,14 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
 
   const deleteRegion = useCallback((regionId: string) => {
     if (!mapData) return;
-    const regions = (mapData.regions ?? []).filter(r => r.id !== regionId);
+    const regions = removeById<Region>(mapData.regions, regionId);
     onRegionsChange(regions);
     if (editingRegionId === regionId) setEditingRegionId(null);
   }, [mapData, onRegionsChange, editingRegionId]);
 
   const updateRegion = useCallback((regionId: string, updates: Partial<Region>) => {
     if (!mapData) return;
-    const regions = (mapData.regions ?? []).map(r =>
-      r.id === regionId ? { ...r, ...updates } : r
-    );
+    const regions = updateById<Region>(mapData.regions, regionId, updates);
     onRegionsChange(regions);
   }, [mapData, onRegionsChange]);
 

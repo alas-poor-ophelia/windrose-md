@@ -124,25 +124,6 @@ const MapSelectionProvider: FunctionComponent<MapSelectionProviderProps> = ({ ch
   }, []);
 
   /**
-   * Add item to current selection
-   */
-  const addToSelection = useCallback((item: SelectedItem | null): void => {
-    if (!item) return;
-    setSelectedItems(prev => {
-      // Don't add duplicates
-      if (prev.some(i => i.id === item.id)) return prev;
-      return [...prev, item];
-    });
-  }, []);
-
-  /**
-   * Remove item from current selection
-   */
-  const removeFromSelection = useCallback((id: string): void => {
-    setSelectedItems(prev => prev.filter(item => item.id !== id));
-  }, []);
-
-  /**
    * Clear all selection
    */
   const clearSelection = useCallback((): void => {
@@ -257,15 +238,12 @@ const MapSelectionProvider: FunctionComponent<MapSelectionProviderProps> = ({ ch
   const value: MapSelectionContextValue = useMemo(() => ({
     // Multi-select state
     selectedItems,
-    setSelectedItems,
     hasMultiSelection,
     selectionCount,
 
     // Selection helpers
     selectItem,
     selectMultiple,
-    addToSelection,
-    removeFromSelection,
     clearSelection,
     isSelected,
     updateSelectedItemsData,
@@ -311,7 +289,7 @@ const MapSelectionProvider: FunctionComponent<MapSelectionProviderProps> = ({ ch
     layerVisibility: effectiveLayerVisibility
   }), [
     selectedItems, hasMultiSelection, selectionCount,
-    selectItem, selectMultiple, addToSelection, removeFromSelection, clearSelection, isSelected, updateSelectedItemsData,
+    selectItem, selectMultiple, clearSelection, isSelected, updateSelectedItemsData,
     areaSelectStart, selectedItem, setSelectedItem,
     isDraggingSelection, dragStart, isResizeMode, isGroupDragging,
     showNoteLinkModal, pendingNotePinId, editingNoteObjectId,

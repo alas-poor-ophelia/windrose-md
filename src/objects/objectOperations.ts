@@ -15,7 +15,9 @@ import type {
   AlignmentOffset,
 } from '#types/objects/object.types';
 
+import { getNextRotation } from '../drawing/rotationOperations';
 import { getObjectType } from './objectTypeResolver';
+import { updateById, removeById } from './entityList';
 import { assignSlot, getObjectsInCell, canAddObjectToCell, getOccupiedSlots, reorganizeAfterRemoval } from './hexSlotPositioner';
 
 
@@ -94,8 +96,7 @@ function addObject(objects: MapObject[], typeId: string, x: number, y: number, m
  * Remove object by ID
  */
 function removeObject(objects: MapObject[] | null | undefined, objectId: ObjectId): MapObject[] {
-  if (!objects || !Array.isArray(objects)) return [];
-  return objects.filter(obj => obj.id !== objectId);
+  return removeById<MapObject>(objects, objectId);
 }
 
 /**
@@ -244,14 +245,19 @@ function updateObject(
   objectId: ObjectId,
   updates: ObjectUpdate
 ): MapObject[] {
-  if (!objects || !Array.isArray(objects)) return [];
-  
-  return objects.map(obj => {
-    if (obj.id === objectId) {
-      return { ...obj, ...updates };
-    }
-    return obj;
-  });
+  return updateById<MapObject>(objects, objectId, updates);
+}
+
+/**
+ * Advance one object's rotation to the next 45-degree step (non-standard values snap to 0).
+ * Shared by the keyboard shortcut and the toolbar action.
+ */
+function rotateObjectInList(
+  objects: MapObject[] | null | undefined,
+  objectId: ObjectId
+): MapObject[] {
+  const current = objects?.find(obj => obj.id === objectId);
+  return updateObject(objects, objectId, { rotation: getNextRotation(current?.rotation ?? 0) });
 }
 
 // ===========================================
@@ -612,7 +618,7 @@ function snapObjectToGrid(
 // ===========================================
 
 export { // Core operations
-  getObjectType, generateObjectId, getObjectAtPosition, updateObject, isAreaFree, canResizeObject, // Grid-specific operations (legacy, prefer unified API)
+  getObjectType, generateObjectId, getObjectAtPosition, updateObject, rotateObjectInList, isAreaFree, canResizeObject, // Grid-specific operations (legacy, prefer unified API)
   addObject, removeObject, removeObjectAtPosition, removeObjectsInRectangle, calculateEdgeAlignment, getAlignmentOffset, // Hex-specific operations (internal, prefer unified API)
   addObjectToHex, removeObjectFromHex, removeOneObjectFromHex, // Unified API (preferred for new code)
   placeObject, eraseObjectAt, canPlaceObjectAt, findDuplicateTarget, // Freeform placement API

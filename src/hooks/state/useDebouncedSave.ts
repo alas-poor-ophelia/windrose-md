@@ -102,6 +102,8 @@ function useDebouncedSave(
   // (or a failure right after the pre-save journal) does not re-serialize an
   // unchanged payload (MEM-22). Reset whenever the slot is cleared.
   const lastJournalRef = useRef<{ data: MapData; version: number; ok: boolean } | null>(null);
+  /** The tree of the last save that landed (identity), so it is never re-journaled. */
+  const lastLandedRef = useRef<MapData | null>(null);
   // Bumped synchronously by every edit (and by delete/acknowledge to
   // invalidate in-flight bookkeeping). A save result only settles state when
   // its version is still the latest.
@@ -131,6 +133,9 @@ function useDebouncedSave(
 
   /** Journal `data` into this writer's live slot, skipping an unchanged re-write. */
   const journalNow = (data: MapData, version: number): boolean => {
+    // The exact tree already landed on disk: nothing to protect, and the
+    // stringify/deflate cost is skipped (wave-5 finding 11).
+    if (data === lastLandedRef.current) return true;
     const last = lastJournalRef.current;
     if (last != null && last.ok && last.data === data && last.version === version) return true;
     const ok = journalPending(flushRef.current.app, flushRef.current.mapId, data, { writerId: instanceIdRef.current, version });
@@ -243,6 +248,7 @@ function useDebouncedSave(
 
     if (result.status === 'saved') {
       baseGenRef.current = result.generation;
+      lastLandedRef.current = data;
       // Only this writer's slot, and only if no newer edit was journaled
       // since (an unmount flush may have journaled a newer tree).
       clearOwnJournal(version);
@@ -337,11 +343,14 @@ function useDebouncedSave(
 
     if (saveTimerRef.current != null) window.clearTimeout(saveTimerRef.current);
     // A new edit supersedes any pending failure retry; the debounced save
-    // below carries it.
+    // below carries it, with a fresh retry budget (wave-5 finding 7: after
+    // the cap, a later edit's failed save otherwise got no retry at all).
     if (retryTimerRef.current != null) {
       window.clearTimeout(retryTimerRef.current);
       retryTimerRef.current = null;
     }
+    retryAttemptRef.current = 0;
+    retriesStoppedRef.current = false;
 
     const currentVersion = saveVersionRef.current;
     saveTimerRef.current = window.setTimeout(() => {

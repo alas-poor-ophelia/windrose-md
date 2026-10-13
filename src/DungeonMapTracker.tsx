@@ -12,7 +12,6 @@ import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { ResolvedTheme, OnboardingState } from '#types/settings/settings.types';
 import type { WallToolSurface } from '#types/core/wallpath.types';
 import type { TilesetOverrides } from '#types/tiles/tile.types';
-import type { CustomColor } from '#types/core/common.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useMapData } from './hooks/state/useMapData';
@@ -34,7 +33,7 @@ import { FogOfWarToolbar } from './components/toolbars/FogOfWarToolbar';
 import { WindroseCompass } from './components/shared/WindroseCompass';
 
 import { MapSettingsModal } from './components/settings/MapSettingsModal';
-import { getTheme, getEffectiveSettings, getSettings, getTilesetFolders } from './core/settingsAccessor';
+import { resolveTheme, getEffectiveSettings, getSettings, getTilesetFolders } from './core/settingsAccessor';
 import { isFeatureEnabled } from './core/featureFlags';
 import { getColorByHex, isDefaultColor, DEFAULT_COLOR } from './drawing/colorOperations';
 import { ImageAlignmentMode } from './components/overlays/ImageAlignmentMode';
@@ -82,7 +81,8 @@ import { tooltipRef } from './components/shared/obsidianTooltip';
 import { listMaps, deleteMapData } from './persistence/fileOperations';
 import type { MapListEntry } from './persistence/fileOperations';
 import { ConfirmModal } from './settings/modals/ConfirmModal';
-import { ensureTileMetadataLoaded, getTileMetadataForRender } from './persistence/tileMetadata';
+import { ensureTileMetadataLoaded, getTileMetadataForRender, flushTileMetadataSave } from './persistence/tileMetadata';
+import { scheduleTilesetArtSave, flushTilesetArtSaves, getSettingsWriter } from './persistence/tilesetArtSettings';
 import { NewMapModal } from './components/modals/NewMapModal';
 import { InsertDungeonModal } from './settings/modals/InsertDungeonModal';
 import type { DungeonInsertOptions } from './settings/modals/InsertDungeonModal';
@@ -134,7 +134,7 @@ let mapInstanceCounter = 0;
 
 const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', initialSubHexPath, mcpKey, fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange, onMapDeleted }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
-  useThemeMode();
+  const isLightTheme = useThemeMode();
   const { mapData: rootMapData, isLoading, loadFailure, mapDeleted: dataMapDeleted, reload: reloadMapData, saveStatus, updateMapData: rootUpdateMapData, forceSave, markDeleted, staleConflict, acknowledgeStaleConflict, settingsVersion, getCachedImage } = useMapData(mapId, mapName, mapType);
   const [mapDeleted, setMapDeleted] = useState(false);
 
@@ -189,13 +189,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
   // Populate the renderer's tile-metadata accessor on mount so terrain tiles
   // resolve to seamless region fills out-of-the-box, even if the tile browser
-  // panel is never opened. Also refresh on import (windrose-settings-changed)
-  // so a pack imported while a map is open picks up the new classifications.
+  // panel is never opened. The store is shared and loads once per session;
+  // importers write through it, so no settings-changed re-read is needed.
   useEffect(() => {
-    const refresh = (): void => { void ensureTileMetadataLoaded(app); };
-    refresh();
-    window.addEventListener('windrose-settings-changed', refresh);
-    return () => window.removeEventListener('windrose-settings-changed', refresh);
+    void ensureTileMetadataLoaded(app);
   }, [app]);
 
   // notePath is passed from the code block processor (ctx.sourcePath)
@@ -288,27 +285,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     setBareThresholdArmed(prev => !prev);
     setCurrentTool('wall');
   }, [setCurrentTool]);
-  // Vertical left ribbon: Tiles/Objects tabs + (on Tiles with a tile selected) placement subtools.
-  const renderDrawerRibbon = (): VNode => (
-    <div className="windrose-fd-subrib">
-      {featureFlags.tiles && <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'tiles' ? 'on' : ''}`} ref={tooltipRef('Tiles')} onClick={() => selectPane('tiles')}><Icon icon="lucide-layout-dashboard" size={16} /></button>}
-      <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'objects' ? 'on' : ''}`} ref={tooltipRef('Objects')} onClick={() => selectPane('objects')}><Icon icon="lucide-sofa" size={16} /></button>
-      {tilePane === 'tiles' && (
-        <>
-          <div className="windrose-fd-subrib-div" />
-          <button className={`windrose-fd-ribtab interactive-child ${tileRailSel === 'recent' ? 'on' : ''}`} ref={tooltipRef('Recent')} onClick={() => setTileRailSel(tileRailSel === 'recent' ? 'all' : 'recent')}><Icon icon="lucide-clock" size={16} /></button>
-          <button className={`windrose-fd-ribtab interactive-child ${tileRailSel === 'starred' ? 'on' : ''}`} ref={tooltipRef('Starred')} onClick={() => setTileRailSel(tileRailSel === 'starred' ? 'all' : 'starred')}><Icon icon="lucide-star" size={16} /></button>
-        </>
-      )}
-      {tilePane === 'tiles' && selectedTileForm != null && (
-        <>
-          <div className="windrose-fd-subrib-div" />
-          <div className="windrose-fd-subrib-cap">Mode</div>
-          <TileSubtoolRibbon form={selectedTileForm} activeSubtool={tileSubtool} onSubtoolChange={setTileSubtool} onThreshold={handleThreshold} thresholdActive={bareThresholdArmed} />
-        </>
-      )}
-    </div>
-  );
   // `hideHeader` in block mode (the compact head above both panes serves); the
   // full-pane pane renders its own DrawerPaneHead to match the tile pane, and
   // takes the vertical ribbon so it seats below the header like the tile ribbon.
@@ -317,8 +293,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
       selectedObjectType={selectedObjectType}
       onObjectTypeSelect={setSelectedObjectType}
       onToolChange={setCurrentTool}
-      isCollapsed={false}
-      onCollapseChange={() => {}}
       mapType={mapData?.mapType ?? 'grid'}
       objectSetId={mapData?.objectSetId}
       onObjectSetChange={handleObjectSetChange}
@@ -518,15 +492,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     getSettings().showAdjacentSubMaps ?? false
   );
   const setShowAdjacentSubMaps = useCallback((v: boolean) => {
-    try {
-      const plugin = app.plugins.plugins['windrose-md'] as unknown as
-        { settings: { showAdjacentSubMaps?: boolean }; saveSettings(): Promise<void> } | undefined;
-      if (plugin != null) {
-        plugin.settings.showAdjacentSubMaps = v;
-        void plugin.saveSettings();
-        window.dispatchEvent(new Event('windrose-settings-changed'));
-      }
-    } catch { /* settings plugin unavailable */ }
+    // saveSettings() dispatches windrose-settings-changed itself.
+    const writer = getSettingsWriter(app);
+    if (writer != null) {
+      writer.settings.showAdjacentSubMaps = v;
+      void writer.saveSettings();
+    }
     setShowAdjacentSubMapsState(v);
   }, [app]);
   useEffect(() => {
@@ -556,6 +527,31 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     recentTiles,
     handleTileSelect, handleTileDeselect,
   } = useTileBrush();
+
+  // Vertical left ribbon: Tiles/Objects tabs + (on Tiles with a tile selected) placement subtools.
+  // Memoized (STRUCT-A-06): a fresh VNode every render defeated TileAssetBrowser's
+  // memo(). The tooltipRef closures are captured once per dep change; their
+  // text is static, so that is safe.
+  const drawerRibbon = useMemo((): VNode => (
+    <div className="windrose-fd-subrib">
+      {featureFlags.tiles && <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'tiles' ? 'on' : ''}`} ref={tooltipRef('Tiles')} onClick={() => selectPane('tiles')}><Icon icon="lucide-layout-dashboard" size={16} /></button>}
+      <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'objects' ? 'on' : ''}`} ref={tooltipRef('Objects')} onClick={() => selectPane('objects')}><Icon icon="lucide-sofa" size={16} /></button>
+      {tilePane === 'tiles' && (
+        <>
+          <div className="windrose-fd-subrib-div" />
+          <button className={`windrose-fd-ribtab interactive-child ${tileRailSel === 'recent' ? 'on' : ''}`} ref={tooltipRef('Recent')} onClick={() => setTileRailSel(tileRailSel === 'recent' ? 'all' : 'recent')}><Icon icon="lucide-clock" size={16} /></button>
+          <button className={`windrose-fd-ribtab interactive-child ${tileRailSel === 'starred' ? 'on' : ''}`} ref={tooltipRef('Starred')} onClick={() => setTileRailSel(tileRailSel === 'starred' ? 'all' : 'starred')}><Icon icon="lucide-star" size={16} /></button>
+        </>
+      )}
+      {tilePane === 'tiles' && selectedTileForm != null && (
+        <>
+          <div className="windrose-fd-subrib-div" />
+          <div className="windrose-fd-subrib-cap">Mode</div>
+          <TileSubtoolRibbon form={selectedTileForm} activeSubtool={tileSubtool} onSubtoolChange={setTileSubtool} onThreshold={handleThreshold} thresholdActive={bareThresholdArmed} />
+        </>
+      )}
+    </div>
+  ), [featureFlags.tiles, tilePane, tileRailSel, selectedTileForm, tileSubtool, setTileSubtool, handleThreshold, bareThresholdArmed, selectPane, setTileRailSel]);
 
   // Coupling: the 'line' subtool and the wall tool travel together. Arming
   // line (a wall/path strip got selected) switches to the wall tool; leaving
@@ -676,53 +672,32 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // apply to the live merged tileset immediately, persist debounced — the
   // eventual saveSettings() fires windrose-settings-changed and a full tileset
   // rebuild, which a dragged slider must not storm per tick.
-  const artOffsetSaveTimer = useRef<number | null>(null);
   const handleTilesetArtOffsetChange = useCallback((tilesetId: string, value: number | undefined) => {
     updateMapData((prev: MapData) => ({
       ...prev,
       tilesets: (prev.tilesets ?? []).map(ts => ts.id === tilesetId ? { ...ts, artOffsetY: value } : ts),
     }));
-    if (artOffsetSaveTimer.current != null) window.clearTimeout(artOffsetSaveTimer.current);
-    artOffsetSaveTimer.current = window.setTimeout(() => {
-      artOffsetSaveTimer.current = null;
-      try {
-        const plugin = app.plugins.plugins['windrose-md'] as unknown as
-          { settings: { tilesetArtOffsets?: Record<string, number> }; saveSettings(): Promise<void> } | undefined;
-        if (plugin != null) {
-          const offsets = { ...(plugin.settings.tilesetArtOffsets ?? {}) };
-          if (value == null || value === 0) delete offsets[tilesetId];
-          else offsets[tilesetId] = value;
-          plugin.settings.tilesetArtOffsets = offsets;
-          void plugin.saveSettings();
-        }
-      } catch { /* settings plugin unavailable */ }
-    }, 600);
+    // One debounce timer per tileset (STRUCT-A-03): nudging A then B inside
+    // the window must persist both.
+    scheduleTilesetArtSave(app, 'tilesetArtOffsets', tilesetId, value);
   }, [updateMapData, app]);
 
   // Art scale mirrors the art nudge exactly: GLOBAL per tileset, applied to
   // the live merged tileset immediately, persisted debounced.
-  const artScaleSaveTimer = useRef<number | null>(null);
   const handleTilesetArtScaleChange = useCallback((tilesetId: string, value: number | undefined) => {
     updateMapData((prev: MapData) => ({
       ...prev,
       tilesets: (prev.tilesets ?? []).map(ts => ts.id === tilesetId ? { ...ts, artScale: value } : ts),
     }));
-    if (artScaleSaveTimer.current != null) window.clearTimeout(artScaleSaveTimer.current);
-    artScaleSaveTimer.current = window.setTimeout(() => {
-      artScaleSaveTimer.current = null;
-      try {
-        const plugin = app.plugins.plugins['windrose-md'] as unknown as
-          { settings: { tilesetArtScales?: Record<string, number> }; saveSettings(): Promise<void> } | undefined;
-        if (plugin != null) {
-          const scales = { ...(plugin.settings.tilesetArtScales ?? {}) };
-          if (value == null || value === 1) delete scales[tilesetId];
-          else scales[tilesetId] = value;
-          plugin.settings.tilesetArtScales = scales;
-          void plugin.saveSettings();
-        }
-      } catch { /* settings plugin unavailable */ }
-    }, 600);
+    scheduleTilesetArtSave(app, 'tilesetArtScales', tilesetId, value);
   }, [updateMapData, app]);
+
+  // Pending debounced writes (art nudge/scale, tile metadata) must not be lost
+  // when this view closes inside the debounce window.
+  useEffect(() => () => {
+    flushTilesetArtSaves();
+    void flushTileMetadataSave();
+  }, []);
 
   // Image alignment mode (extracted to useAlignmentMode hook)
   const {
@@ -769,24 +744,17 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleFogChange
   } = useFogOfWar({ mapData, geometry, updateMapData });
 
-  // Get current theme with effective settings (global + map overrides)
-  // This will be called on every render, fetching fresh settings each time
+  // Effective settings (global + map overrides), fetched fresh each render.
   const effectiveSettings = mapData ? getEffectiveSettings(mapData.settings) : null;
-  const theme: ResolvedTheme = effectiveSettings ? {
-    grid: {
-      lines: effectiveSettings.gridLineColor,
-      lineWidth: effectiveSettings.gridLineWidth,
-      background: effectiveSettings.backgroundColor
-    },
-    cells: {
-      fill: getTheme().cells.fill,
-      border: effectiveSettings.borderColor,
-      borderWidth: getTheme().cells.borderWidth
-    },
-    compass: getTheme().compass,
-    decorativeBorder: getTheme().decorativeBorder,
-    coordinateKey: effectiveSettings.coordinateKeyColor
-  } as ResolvedTheme : getTheme();
+  // Theme is memoized so MapCanvas / the renderer see a stable object between
+  // renders. Deps: the map's overrides, global settings (settingsVersion bumps
+  // on windrose-settings-changed) and light/dark mode (grid line and background
+  // defaults swap on the body theme class).
+  const mapSettings = mapData?.settings;
+  const theme: ResolvedTheme = useMemo(
+    () => resolveTheme(mapSettings),
+    [mapSettings, settingsVersion, isLightTheme]
+  );
 
   // Determine canvas height based on device type and settings
   // Detect touch devices using media query match
@@ -1415,7 +1383,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     <RegionPanel
                       regions={mapData.regions ?? []}
                       onRegionsChange={handleRegionsChange}
-                      sidebarCollapsed={false}
                       isOpen
                       instanceId={instanceId}
                     />
@@ -1467,9 +1434,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               selectedObjectType={selectedObjectType ?? undefined}
               selectedColor={selectedColor}
               isColorPickerOpen={isColorPickerOpen}
-              customColors={(mapData.customColors ?? []).map((c: CustomColor) => c.color)}
-              onAddCustomColor={handleAddCustomColor}
-              onDeleteCustomColor={handleDeleteCustomColor}
               isFocused={isFocused}
               isAnimating={isAnimating}
               theme={theme}
@@ -1961,7 +1925,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                   tilesEnabled={featureFlags.tiles}
                 >
                   {tilePane === 'objects' ? (
-                  renderObjectsPane(false, renderDrawerRibbon())
+                  renderObjectsPane(false, drawerRibbon)
                   ) : (
                   <TileAssetBrowser
                     tilesets={availableTilesets}
@@ -2009,7 +1973,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                     onRailSelChange={setTileRailSel}
                     viewMode={tileViewMode}
                     onViewModeChange={setTileViewMode}
-                    ribbon={renderDrawerRibbon()}
+                    ribbon={drawerRibbon}
                   />
                   )}
                 </DrawerDock>

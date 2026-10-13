@@ -19,7 +19,6 @@ const REGION_NAME_TRUNCATE_AT = 17;
 export interface RegionPanelProps {
   regions: Region[];
   onRegionsChange: (regions: Region[]) => void;
-  sidebarCollapsed: boolean;
   isOpen?: boolean;
   /** Per-mount instance id — stamped into center-on-region events. */
   instanceId?: string;
@@ -28,7 +27,6 @@ export interface RegionPanelProps {
 const RegionPanel = ({
   regions,
   onRegionsChange,
-  sidebarCollapsed,
   isOpen = false,
   instanceId
 }: RegionPanelProps): VNode | null => {
@@ -61,7 +59,7 @@ const RegionPanel = ({
 
   return (
     <div
-      className={`windrose-region-panel ${sidebarCollapsed ? 'sidebar-closed' : 'sidebar-open'} ${isOpen ? 'windrose-region-panel-open' : ''}`}
+      className={`windrose-region-panel ${isOpen ? 'windrose-region-panel-open' : ''}`}
     >
       <div className="windrose-region-panel-header">
         <Icon icon="lucide-map" size={12} />

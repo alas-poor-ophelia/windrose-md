@@ -18,6 +18,7 @@ import {
   clearFogCanvas,
   renderFog,
 } from "../../../../src/geometry/fog/fogRenderer";
+import { THEME } from "../../../../src/core/dmtConstants";
 
 // Mock canvas context
 function createMockContext(): CanvasRenderingContext2D {
@@ -76,7 +77,7 @@ describe("fogRenderer", () => {
       expect(settings.fowOpacity).toBe(0.9);
       expect(settings.fowImagePath).toBeUndefined();
       expect(settings.fowBlurEnabled).toBe(false);
-      expect(settings.fowBlurFactor).toBe(0.08);
+      expect(settings.fowBlurFactor).toBe(THEME.fogOfWar.blurFactor);
     });
 
     it("extracts fog settings from provided values", () => {

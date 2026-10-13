@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useLiveOverlayRedraw } from '../../hooks/canvas/useLiveOverlayRedraw';
+import { useOverlayCanvas } from '../../hooks/canvas/useOverlayCanvas';
 import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
 import { useOutlineTools } from '../../hooks/interactions/useOutlineTools';
 import type { MenuItem } from 'obsidian';
@@ -321,46 +322,28 @@ const OutlineLayer = ({
   const settingsFillOpacityDrag = useLiveInputCommit(commitSettingsFillOpacity);
 
   // ── Overlay canvas for in-progress drawing ────────────────────────
-  const overlayRef = useRef<HTMLCanvasElement | null>(null);
-
-  useEffect(() => {
-    const mainCanvas = canvasRef.current;
-    if (!mainCanvas || !mainCanvas.parentElement || !isOutlineTool) {
-      if (overlayRef.current && overlayRef.current.parentElement) {
-        overlayRef.current.parentElement.removeChild(overlayRef.current);
-        overlayRef.current = null;
-      }
-      return undefined;
-    }
-
-    if (!overlayRef.current) {
-      const overlay = activeWindow.createEl('canvas');
-      overlay.classList.add('windrose-overlay-layer');
-      mainCanvas.parentElement.appendChild(overlay);
-      overlayRef.current = overlay;
-    }
-
-    return () => {
-      if (overlayRef.current && overlayRef.current.parentElement) {
-        overlayRef.current.parentElement.removeChild(overlayRef.current);
-        overlayRef.current = null;
-      }
-    };
-  }, [canvasRef, isOutlineTool]);
+  // Present while the tool is active; resizing clears it, so repaint.
+  const { sized: sizedOverlay } = useOverlayCanvas(canvasRef, {
+    active: isOutlineTool,
+    onResize: () => { repaintOverlayRef.current(); },
+  });
 
   // Render drawing vertices and selected outline vertices on overlay.
   // View basis is a parameter so the live-pan subscription below can
   // redraw mid-gesture (same fix as RegionLayer/FreehandLayer).
   const drawOutlineOverlay = useCallback((viewState: StoredViewState) => {
-    const overlay = overlayRef.current;
-    const mainCanvas = canvasRef.current;
-    if (!overlay || !mainCanvas || !geometry || geometry.type !== 'hex' || !mapData) return;
-
-    overlay.width = mainCanvas.width;
-    overlay.height = mainCanvas.height;
+    if (!geometry || geometry.type !== 'hex' || !mapData) return;
+    // Resizes only when the main canvas size changed (MEM-18).
+    const overlay = sizedOverlay();
+    if (!overlay) return;
 
     const ctx = overlay.getContext('2d');
     if (!ctx) return;
+    // The size assignment no longer runs every draw, so reset context state
+    // it used to reset implicitly.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.setLineDash([]);
     ctx.clearRect(0, 0, overlay.width, overlay.height);
 
     const { offsetX, offsetY } = calculateViewportOffset(
@@ -429,7 +412,7 @@ const OutlineLayer = ({
     }
 
     if (northDirection !== 0) ctx.restore();
-  }, [drawingVertices, selectedOutlineId, canvasRef, geometry, mapData, selectedColor, outlineSettings, outlineColorDrag]);
+  }, [drawingVertices, selectedOutlineId, sizedOverlay, geometry, mapData, selectedColor, outlineSettings, outlineColorDrag]);
 
   const repaintOverlay = useCallback(() => {
     const vs = viewController?.getLive() ?? mapData?.viewState;

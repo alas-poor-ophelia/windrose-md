@@ -117,7 +117,15 @@ interface CurveCellMergeIndex {
 //   - pan: translation-only drawImage (pixel-exact)
 //   - zoom: scale-blit from the cached snapshot (momentarily soft), with a
 //     debounced crisp re-render once the gesture settles
-//   - content change / pan past the padding / rotation: full re-render
+//   - content change / pan past the padding: full re-render
+// Rotated maps (non-zero northDirection) use the same cache (MEM-09): the
+// snapshot is baked UNROTATED and the blit happens under the live canvas's
+// rotation transform, so rotation is applied at composite time and never
+// enters the key. The usable-region check and padding cover the rotated
+// viewport's axis-aligned bounding box in pre-rotation space.
+// The offscreen is capped by a device-pixel budget (MEM-17): the old fixed
+// 0.5 pad made it 4x the viewport per mount, which on a full-pane iPad
+// (2732x2048) exceeded WebKit's per-canvas area limit and silently blanked.
 // World→screen mapping is affine (screen = offset + world·zoom) for both grid
 // and hex, so the blit transform is exact: scale = zoom/cachedZoom,
 // translate = offset − cachedOffset·scale.
@@ -135,12 +143,28 @@ interface StaticLayerCacheEntry {
   settleTimer: number | null;
 }
 
-type DrawStaticFn = (tctx: CanvasRenderingContext2D, ox: number, oy: number, w: number, h: number) => void;
+/**
+ * `cullNorth` is the rotation the TARGET context is drawn under: 0 for the
+ * (always unrotated) offscreen snapshot, the map's northDirection when drawing
+ * straight onto the rotated live canvas. Viewport culling widens only for the
+ * latter.
+ */
+type DrawStaticFn = (tctx: CanvasRenderingContext2D, ox: number, oy: number, w: number, h: number, cullNorth: number) => void;
 
 const staticLayerCaches = new WeakMap<HTMLCanvasElement, StaticLayerCacheEntry>();
 const staticSettleCallbacks = new WeakMap<HTMLCanvasElement, () => void>();
 /** Extra rendered area on each side, as a fraction of the viewport. */
 const STATIC_PAD_RATIO = 0.5;
+/**
+ * Device-pixel budget for one static offscreen (~48 MB of backing store). The
+ * pad shrinks toward the minimum the rotated viewport needs to fit it.
+ */
+const STATIC_MAX_PIXELS = 12_000_000;
+/**
+ * Hard ceiling (WebKit's 4096x4096 canvas area limit). If even the minimum
+ * rotated-viewport snapshot would exceed it, draw directly instead.
+ */
+const STATIC_HARD_MAX_PIXELS = 16_777_216;
 /** Crisp re-render fires this long after the last zoom change. */
 const ZOOM_SETTLE_MS = 150;
 
@@ -161,6 +185,52 @@ function releaseStaticLayerCache(canvas: HTMLCanvasElement): void {
     entry.settleTimer = null;
   }
   staticSettleCallbacks.delete(canvas);
+  // Free the offscreen's backing store now rather than whenever GC gets to
+  // it; WebKit counts canvas memory per page (MEM-17).
+  if (entry != null) {
+    entry.off.width = 0;
+    entry.off.height = 0;
+    staticLayerCaches.delete(canvas);
+  }
+}
+
+/**
+ * Half-extents of the viewport's axis-aligned bounding box in pre-rotation
+ * space (the canvas is rotated about its centre). Unrotated: (w/2, h/2).
+ */
+function rotatedViewportHalfExtents(width: number, height: number, northDirection: number): { ex: number; ey: number } {
+  if (northDirection % 360 === 0) return { ex: width / 2, ey: height / 2 };
+  const rad = (northDirection * Math.PI) / 180;
+  const c = Math.abs(Math.cos(rad));
+  const sn = Math.abs(Math.sin(rad));
+  // +1 px slack absorbs float error at the bbox edge.
+  return { ex: (c * width + sn * height) / 2 + 1, ey: (sn * width + c * height) / 2 + 1 };
+}
+
+/**
+ * Offscreen padding per side. Starts at the STATIC_PAD_RATIO pad (or the
+ * rotation minimum, whichever is larger) and shrinks the extra toward that
+ * minimum until the offscreen fits STATIC_MAX_PIXELS. Returns null when even
+ * the minimum exceeds the hard canvas-area ceiling.
+ */
+function computeStaticPad(
+  width: number,
+  height: number,
+  northDirection: number
+): { padX: number; padY: number } | null {
+  const { ex, ey } = rotatedViewportHalfExtents(width, height, northDirection);
+  const minX = Math.max(0, Math.ceil(ex - width / 2));
+  const minY = Math.max(0, Math.ceil(ey - height / 2));
+  const wantX = Math.max(minX, Math.ceil(width * STATIC_PAD_RATIO));
+  const wantY = Math.max(minY, Math.ceil(height * STATIC_PAD_RATIO));
+  const area = (px: number, py: number): number => (width + 2 * px) * (height + 2 * py);
+  for (let t = 1; t > 0; t -= 0.125) {
+    const px = Math.ceil(minX + (wantX - minX) * t);
+    const py = Math.ceil(minY + (wantY - minY) * t);
+    if (area(px, py) <= STATIC_MAX_PIXELS) return { padX: px, padY: py };
+  }
+  if (area(minX, minY) <= STATIC_HARD_MAX_PIXELS) return { padX: minX, padY: minY };
+  return null;
 }
 
 function staticKeysEqual(a: readonly unknown[], b: readonly unknown[]): boolean {
@@ -181,9 +251,17 @@ function blitStaticContent(
   width: number,
   height: number,
   key: readonly unknown[],
-  imageVersion: number
+  imageVersion: number,
+  northDirection = 0
 ): void {
   let entry = staticLayerCaches.get(canvas);
+  const rotated = northDirection % 360 !== 0;
+  // Region the live canvas actually shows, in pre-rotation pixel space.
+  const { ex, ey } = rotatedViewportHalfExtents(width, height, northDirection);
+  const vMinX = width / 2 - ex;
+  const vMaxX = width / 2 + ex;
+  const vMinY = height / 2 - ey;
+  const vMaxY = height / 2 + ey;
 
   let scale = 1;
   let tx = 0;
@@ -194,16 +272,20 @@ function blitStaticContent(
     tx = offsetX - entry.vOx * scale;
     ty = offsetY - entry.vOy * scale;
     // Viewport corners in offscreen pixel space must fall inside the snapshot.
-    const pMinX = (0 - tx) / scale;
-    const pMaxX = (width - tx) / scale;
-    const pMinY = (0 - ty) / scale;
-    const pMaxY = (height - ty) / scale;
+    const pMinX = (vMinX - tx) / scale;
+    const pMaxX = (vMaxX - tx) / scale;
+    const pMinY = (vMinY - ty) / scale;
+    const pMaxY = (vMaxY - ty) / scale;
     usable = pMinX >= 0 && pMinY >= 0 && pMaxX <= entry.off.width && pMaxY <= entry.off.height;
   }
 
   if (!usable) {
-    const padX = Math.ceil(width * STATIC_PAD_RATIO);
-    const padY = Math.ceil(height * STATIC_PAD_RATIO);
+    const pad = computeStaticPad(width, height, northDirection);
+    if (pad == null) {
+      draw(ctx, offsetX, offsetY, width, height, northDirection);
+      return;
+    }
+    const { padX, padY } = pad;
     const off = entry?.off ?? activeWindow.createEl('canvas');
     const ow = width + padX * 2;
     const oh = height + padY * 2;
@@ -212,13 +294,13 @@ function blitStaticContent(
     const octx = off.getContext('2d');
     if (!octx) {
       // Offscreen unavailable: draw directly (previous behavior).
-      draw(ctx, offsetX, offsetY, width, height);
+      draw(ctx, offsetX, offsetY, width, height, northDirection);
       return;
     }
     if (entry?.settleTimer != null) window.clearTimeout(entry.settleTimer);
     octx.save();
     octx.clearRect(0, 0, ow, oh);
-    draw(octx, offsetX + padX, offsetY + padY, ow, oh);
+    draw(octx, offsetX + padX, offsetY + padY, ow, oh, 0);
     octx.restore();
     entry = { off, zoom, vOx: offsetX + padX, vOy: offsetY + padY, key, imageVersion, settleTimer: null };
     staticLayerCaches.set(canvas, entry);
@@ -242,8 +324,9 @@ function blitStaticContent(
 
   if (!entry) return;
   ctx.save();
-  // Pixel-exact at scale 1; smooth when scale-blitting mid-zoom.
-  ctx.imageSmoothingEnabled = scale !== 1;
+  // Pixel-exact at scale 1; smooth when scale-blitting mid-zoom or when the
+  // blit lands under a rotation transform (nearest-neighbour would jag).
+  ctx.imageSmoothingEnabled = scale !== 1 || rotated;
   ctx.drawImage(entry.off, tx, ty, entry.off.width * scale, entry.off.height * scale);
   ctx.restore();
 }
@@ -516,7 +599,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // transform). The parameters deliberately SHADOW the outer ctx/offsetX/
   // offsetY/width/height so the pass bodies below run unchanged whether they
   // target the live canvas (rotated maps) or the offscreen cache. ----
-  const drawStaticContent: DrawStaticFn = (ctx, offsetX, offsetY, width, height): void => {
+  const drawStaticContent: DrawStaticFn = (ctx, offsetX, offsetY, width, height, cullNorth): void => {
 
   // Draw background image (both grid and hex maps)
   const bgImage = mapData.backgroundImage?.path != null && mapData.backgroundImage.path !== '' ? getCachedImage(mapData.backgroundImage.path) : null;
@@ -561,7 +644,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     renderLayerCellsAndEdges(ctx, ghostLayer, geometry, rendererViewState, THEME, renderer, {
       opacity: ghostOpacity,
       showGrid: visibility.grid !== false,
-      northDirection: northDirection ?? 0
+      northDirection: cullNorth
     });
     const hasTiles = ghostLayer.tiles != null && ghostLayer.tiles.length > 0;
     const hasStrokes = ghostLayer.terrainStrokes != null && ghostLayer.terrainStrokes.length > 0;
@@ -602,7 +685,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   renderer.renderGrid(ctx, geometry, rendererViewState, { width, height }, visibility.grid !== false, {
     lineColor: THEME.grid.lines,
     lineWidth: THEME.grid.lineWidth ?? 1,
-    rotated: (northDirection ?? 0) % 360 !== 0
+    rotated: cullNorth % 360 !== 0
   });
 
   // Draw board-below ghost (floor beneath the active board) if enabled. Works in
@@ -669,7 +752,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
             renderLayerCellsAndEdges(ctx, layer, geometry, shiftedViewState, THEME, renderer, {
               opacity: 0.25,
               showGrid: false,
-              northDirection: northDirection ?? 0
+              northDirection: cullNorth
             });
           }
         }
@@ -774,7 +857,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       opacity: layerOpacity,
       showGrid: visibility.grid !== false,
       mergeIndex,
-      northDirection: northDirection ?? 0
+      northDirection: cullNorth
     });
 
     // Freehand curves (between cells and tiles)
@@ -951,13 +1034,9 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     JSON.stringify(THEME), JSON.stringify(visibility),
   ];
 
-  if (((northDirection ?? 0) % 360) !== 0) {
-    // Rotated maps draw under a canvas rotation transform whose interaction
-    // with the cached snapshot isn't worth the complexity — draw directly.
-    drawStaticContent(ctx, offsetX, offsetY, width, height);
-  } else {
-    blitStaticContent(canvas, ctx, drawStaticContent, offsetX, offsetY, zoom, width, height, staticKey, getImageCacheVersion());
-  }
+  // Rotated maps share the cache: the snapshot is unrotated and the blit runs
+  // under the rotation transform applied above (MEM-09).
+  blitStaticContent(canvas, ctx, drawStaticContent, offsetX, offsetY, zoom, width, height, staticKey, getImageCacheVersion(), northDirection ?? 0);
 
   // =========================================================================
   // FOG OF WAR RENDERING
@@ -1111,4 +1190,4 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
   return { scheduleRender };
 };
 
-export { useCanvasRenderer, renderCanvas };
+export { useCanvasRenderer, renderCanvas, computeStaticPad, rotatedViewportHalfExtents };

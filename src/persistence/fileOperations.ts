@@ -194,26 +194,41 @@ async function backupIsGuarded(app: App, path: string, content: string, mapCount
 /**
  * One backup round (inside the mutex, before the save writes): the rolling
  * slot, then the daily slot. A rolling slot holding a much larger copy is
- * skipped for the other one; if both are guarded nothing rolls (the warning
- * says so). The daily slot is written at most once per local day.
+ * skipped for the other one. When BOTH are guarded one is preserved (the
+ * larger; on a tie the older) and the other still rolls: "both guarded" must
+ * never mean "nothing rolls", or a legitimate shrink at the same map count
+ * leaves no fresh backup for up to BAK_GUARD_MAX_AGE_MS (wave-5 finding 3).
+ * The daily slot is written at most once per local day.
  */
 async function rotateBackups(app: App, dataPath: string, content: string, mapCount: number, now: number): Promise<void> {
-  let slot: BakSlot | null = nextBakSlot;
+  let slot: BakSlot = nextBakSlot;
   if (await backupIsGuarded(app, bakPathForSlot(dataPath, slot), content, mapCount, now)) {
     const other = otherBakSlot(slot);
-    slot = (await backupIsGuarded(app, bakPathForSlot(dataPath, other), content, mapCount, now)) ? null : other;
-    console.warn('[saveMapData] The data file shrank sharply; preserving the larger backup.', slot == null ? 'No slot rolled.' : '');
+    if (await backupIsGuarded(app, bakPathForSlot(dataPath, other), content, mapCount, now)) {
+      slot = slotToRollWhenBothGuarded(app, dataPath, slot);
+    } else {
+      slot = other;
+    }
+    console.warn('[saveMapData] The data file shrank sharply; preserving the larger backup, rolling slot', slot);
   }
-  if (slot != null) {
-    nextBakSlot = otherBakSlot(slot);
-    await writeBackupSlot(app, dataPath, slot, content);
-  }
+  nextBakSlot = otherBakSlot(slot);
+  await writeBackupSlot(app, dataPath, slot, content);
 
   const dailyPath = dailyBakPath(dataPath);
   const daily = app.vault.getAbstractFileByPath(dailyPath);
   if (daily instanceof TFile && sameLocalDay(daily.stat.mtime, now)) return;
   if (await backupIsGuarded(app, dailyPath, content, mapCount, now)) return;
   await writeBackupFile(app, dailyPath, content);
+}
+
+/** Both rolling slots guarded: roll the smaller one; on a size tie roll the newer (keep the older). */
+function slotToRollWhenBothGuarded(app: App, dataPath: string, preferred: BakSlot): BakSlot {
+  const other = otherBakSlot(preferred);
+  const a = app.vault.getAbstractFileByPath(bakPathForSlot(dataPath, preferred));
+  const b = app.vault.getAbstractFileByPath(bakPathForSlot(dataPath, other));
+  if (!(a instanceof TFile) || !(b instanceof TFile)) return preferred;
+  if (a.stat.size !== b.stat.size) return a.stat.size < b.stat.size ? preferred : other;
+  return a.stat.mtime >= b.stat.mtime ? preferred : other;
 }
 
 /** `yyyymmdd-hhmmss` in local time, for the preserved-corrupt-file suffix. */

@@ -12,7 +12,7 @@ import type { TerrainStroke } from '#types/core/terrainstroke.types';
 import { resolveTileRender } from '../../assets/tileRenderResolution';
 import { effectiveSpan } from '../../assets/tileFootprint';
 import { getRenderSource } from '../../assets/imageOperations';
-import { tileIdBasename } from '../../assets/tilesetOperations';
+import { resolveTileEntryIndexed } from '../../assets/tilesetOperations';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import { strokeBoundsWorld } from '../strokes/terrainStrokeGeometry';
 
@@ -767,65 +767,35 @@ function tileOrientationAdaptation(
 }
 
 // ===========================================
-// Entry Map Cache
+// Entry Lookup
 // ===========================================
 
-let _cachedEntryMap: Map<string, { entry: { vaultPath: string }; tileset: TilesetDef }> | null = null;
-let _cachedEntryMapSig = '';
-let _cachedEntryMapTiles: Array<readonly unknown[]> = [];
+type EntryLookup = (tilesetId: string, tileId: string) => { entry: { vaultPath: string }; tileset: TilesetDef } | undefined;
 
-function getEntryMap(tilesets: TilesetDef[]): Map<string, { entry: { vaultPath: string }; tileset: TilesetDef }> {
-  // Signature MUST include every render-affecting field that can change without
-  // altering tile count, or the cache serves a stale tileset reference (e.g. a
-  // live renderMode/fitMode override would never reach the renderer).
-  let sig = '';
+/**
+ * Per-call (tilesetId, tileId) resolver. Entry resolution goes through the
+ * shared per-tileset index in tilesetOperations (resolveTileEntry semantics,
+ * WeakMap-keyed on each `tiles` array), and the tileset object is read fresh
+ * from the array passed in, so render-affecting tileset fields (renderMode,
+ * fitMode, artScale, ...) can never be served stale. Replaces the old
+ * single-slot module cache that thrashed with two maps open (STRUCT-B-08).
+ * Duplicate tileset ids: first tileset that resolves the tile wins, as before.
+ */
+function makeEntryLookup(tilesets: TilesetDef[]): EntryLookup {
+  const byId = new Map<string, TilesetDef[]>();
   for (const ts of tilesets) {
-    sig += ts.id + ':' + ts.tiles.length
-      + ':' + (ts.renderMode ?? '')
-      + ':' + (ts.worldRepeat ?? '')
-      + ':' + (ts.edgeFeather ?? '')
-      + ':' + (ts.fitMode ?? '')
-      + ':' + (ts.stampThreshold ?? '')
-      + ':' + (ts.minStampScale ?? '')
-      + ':' + (ts.artOrientation ?? '')
-      + ':' + (ts.hexWidth ?? '')
-      + ':' + (ts.artOffsetY ?? '')
-      + ':' + (ts.artScale ?? '')
-      + ':' + (isFolderTileset(ts) ? (ts.hexHeight ?? '') + ':' + (ts.overflowTop ?? '') + ':' + (ts.overflowBottom ?? '') : '')
-      + ',';
+    const list = byId.get(ts.id);
+    if (list) list.push(ts); else byId.set(ts.id, [ts]);
   }
-  // Tile IDS can change without altering tile count (a rescan re-mints ids in
-  // place — same 5497 tiles, every key different), which the string sig cannot
-  // see. Rescans always REPLACE the tiles arrays, so reference identity on
-  // each ts.tiles is the reliable staleness check for entry-level changes.
-  const tilesUnchanged = tilesets.length === _cachedEntryMapTiles.length
-    && tilesets.every((ts, i) => ts.tiles === _cachedEntryMapTiles[i]);
-  if (_cachedEntryMap && sig === _cachedEntryMapSig && tilesUnchanged) return _cachedEntryMap;
-
-  // Must mirror resolveTileEntry (tilesetOperations.ts) semantics exactly:
-  // exact id match first-wins, then legacy basename aliases for folder-relative
-  // ids. Dungeondraft packs duplicate basenames across subfolders — last-wins
-  // here made the renderer resolve a different twin than the preloader, so the
-  // cache lookup missed and placements rendered invisible.
-  const map = new Map<string, { entry: { vaultPath: string }; tileset: TilesetDef }>();
-  for (const ts of tilesets) {
-    for (const entry of ts.tiles) {
-      const key = ts.id + ':' + entry.id;
-      if (!map.has(key)) map.set(key, { entry, tileset: ts });
+  return (tilesetId, tileId) => {
+    const candidates = byId.get(tilesetId);
+    if (!candidates) return undefined;
+    for (const ts of candidates) {
+      const entry = resolveTileEntryIndexed(ts, tileId);
+      if (entry) return { entry, tileset: ts };
     }
-  }
-  for (const ts of tilesets) {
-    for (const entry of ts.tiles) {
-      const base = tileIdBasename(entry.id);
-      if (base === entry.id) continue;
-      const key = ts.id + ':' + base;
-      if (!map.has(key)) map.set(key, { entry, tileset: ts });
-    }
-  }
-  _cachedEntryMapSig = sig;
-  _cachedEntryMapTiles = tilesets.map(ts => ts.tiles);
-  _cachedEntryMap = map;
-  return map;
+    return undefined;
+  };
 }
 
 // ===========================================
@@ -851,7 +821,7 @@ function renderTiles(
   const getCachedImage = options?.getCachedImage;
   if (!getCachedImage) return;
 
-  const entryMap = getEntryMap(tilesets);
+  const lookupEntry = makeEntryLookup(tilesets);
 
   // Per-tile metadata drives render-mode resolution (terrain → seamless region
   // fill vs. discrete cell stamp). Read fresh each frame from the global accessor
@@ -886,7 +856,7 @@ function renderTiles(
 
     // Divert seamless terrain tiles into a grouped region-fill pass.
     if (canRegion && t.freeform !== true) {
-      const lookup = entryMap.get(t.tilesetId + ':' + t.tileId);
+      const lookup = lookupEntry(t.tilesetId, t.tileId);
       if (lookup != null) {
         // Resolution chain: per-placement → per-tile metadata → tileset fallback
         // (the tileset tier is temporary, removed once the legacy override UI dies).
@@ -929,7 +899,7 @@ function renderTiles(
       if (s.points.length < 2) continue;
       const depth = s.depth ?? 'ground';
       if (hiddenLayers != null && hiddenLayers.size > 0 && hiddenLayers.has(depth)) continue;
-      const lookup = entryMap.get(s.tilesetId + ':' + s.tileId);
+      const lookup = lookupEntry(s.tilesetId, s.tileId);
       if (lookup == null) continue;
       const resolved = resolveTileRender(undefined, metaStore[lookup.entry.vaultPath], lookup.tileset);
       // Per-stroke softness wins over the tile default; feather is part of
@@ -960,7 +930,7 @@ function renderTiles(
   const canvasH = options?.canvasHeight ?? 4000;
 
   const drawCellTile = (tile: TileAssignment): void => {
-    const lookup = entryMap.get(tile.tilesetId + ':' + tile.tileId);
+    const lookup = lookupEntry(tile.tilesetId, tile.tileId);
     if (!lookup) return;
 
     const { entry, tileset } = lookup;

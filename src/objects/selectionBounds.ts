@@ -28,7 +28,7 @@ interface ContainerRef {
 }
 
 interface SelectedItem {
-  type: 'object' | 'text' | 'notePin' | 'shapeOverlay';
+  type: 'object' | 'text' | 'shapeOverlay';
   id: string;
   data?: MapObject;
 }
@@ -165,7 +165,7 @@ function getSelectionBounds(
     const item = selectedItems[0];
     const activeLayer = getActiveLayer(mapData);
 
-    if (item.type === 'object' || item.type === 'notePin') {
+    if (item.type === 'object') {
       const obj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
       if (!obj) return null;
       return getObjectBounds(obj, canvasRef, containerRef, mapData, geometry);
@@ -242,7 +242,7 @@ function getSelectionBounds(
   let maxScreenY = -Infinity;
 
   for (const item of selectedItems) {
-    if (item.type === 'object' || item.type === 'notePin') {
+    if (item.type === 'object') {
       const obj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
       if (!obj) continue;
 

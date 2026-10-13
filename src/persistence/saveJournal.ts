@@ -59,8 +59,13 @@ const JOURNAL_VERSION = 1;
  */
 const KEPT_MAX_PER_MAP = 5;
 
-/** Live payloads up to this many characters are stored as plain JSON; larger ones are deflated. */
-const RAW_PAYLOAD_LIMIT = 1_000_000;
+/**
+ * Live payloads up to this many characters are stored as plain JSON; larger
+ * ones are deflated (level 1: this runs synchronously on the UI thread before
+ * every save, so speed beats ratio). Kept low so a plain slot never costs more
+ * than ~300 KB of the shared UTF-16 localStorage quota (wave-5 finding 11).
+ */
+const RAW_PAYLOAD_LIMIT = 150_000;
 
 /**
  * Stored (possibly compressed) live payloads larger than this are refused.
@@ -69,7 +74,15 @@ const RAW_PAYLOAD_LIMIT = 1_000_000;
  */
 const MAX_JOURNAL_PAYLOAD = 1_500_000;
 
-const LIVE_META_VERSION = 2;
+/**
+ * v3: the metadata is ALSO embedded as a header line in the payload string, so
+ * one localStorage write carries a self-consistent pair (wave-5 finding 6: a
+ * quota failure between two writes tore the pair and both copies read as
+ * null). The separate meta key is a cache for cheap reads; v2 slots (meta key
+ * only, length-checked) still read.
+ */
+const LIVE_META_VERSION = 3;
+const PAYLOAD_HEADER = 'WJ3:';
 
 type PayloadEncoding = 'json' | 'deflate64';
 
@@ -84,6 +97,12 @@ interface LiveMeta {
   enc: PayloadEncoding;
   /** Stored payload length, to detect a payload/meta pair torn by a quota failure. */
   len: number;
+  /**
+   * Writerless slot only: when a load-time restore wrote it. A landed save
+   * clears it only if that writer journaled after this moment (wave-5
+   * finding 5: a sibling pane's older tree must not erase a restored copy).
+   */
+  restoredAt?: number | null;
 }
 
 /** Live entries older than a week are assumed abandoned (kept/conflict are not aged out). */
@@ -181,28 +200,44 @@ function liveSlotsFor(app: App, mapId: string): string[] {
 function encodePayload(json: string): { enc: PayloadEncoding; data: string } {
   if (json.length <= RAW_PAYLOAD_LIMIT) return { enc: 'json', data: json };
   // Base64 never needs JSON escaping; map JSON deflates roughly tenfold.
-  return { enc: 'deflate64', data: btoa(strFromU8(deflateSync(strToU8(json), { level: 6 }), true)) };
+  return { enc: 'deflate64', data: btoa(strFromU8(deflateSync(strToU8(json), { level: 1 }), true)) };
 }
 
 function decodePayload(enc: PayloadEncoding, data: string): string {
   return enc === 'deflate64' ? strFromU8(inflateSync(strToU8(atob(data), true))) : data;
 }
 
+function normalizeMeta(raw: string, slot: string): LiveMeta | null {
+  const meta = JSON.parse(raw) as Partial<LiveMeta>;
+  if ((meta.v !== 2 && meta.v !== LIVE_META_VERSION) || typeof meta.len !== 'number') return null;
+  return {
+    v: meta.v,
+    mapId: typeof meta.mapId === 'string' ? meta.mapId : mapIdOfSlot(slot),
+    writerId: typeof meta.writerId === 'string' ? meta.writerId : null,
+    savedAt: typeof meta.savedAt === 'number' ? meta.savedAt : 0,
+    version: typeof meta.version === 'number' ? meta.version : null,
+    enc: meta.enc === 'deflate64' ? 'deflate64' : 'json',
+    len: meta.len,
+    restoredAt: typeof meta.restoredAt === 'number' ? meta.restoredAt : null,
+  };
+}
+
+/** Split a v3 framed payload into its header metadata and data; null when not framed. */
+function unframePayload(stored: string, slot: string): { meta: LiveMeta; data: string } | null {
+  if (!stored.startsWith(PAYLOAD_HEADER)) return null;
+  const nl = stored.indexOf('\n');
+  if (nl < 0) return null;
+  const meta = normalizeMeta(stored.slice(PAYLOAD_HEADER.length, nl), slot);
+  return meta != null ? { meta, data: stored.slice(nl + 1) } : null;
+}
+
 function readMeta(app: App, slot: string): LiveMeta | null {
   try {
     const raw = app.loadLocalStorage(JOURNAL_META_PREFIX + slot) as string | null;
-    if (raw == null || raw === '') return null;
-    const meta = JSON.parse(raw) as Partial<LiveMeta>;
-    if (meta.v !== LIVE_META_VERSION || typeof meta.len !== 'number') return null;
-    return {
-      v: LIVE_META_VERSION,
-      mapId: typeof meta.mapId === 'string' ? meta.mapId : mapIdOfSlot(slot),
-      writerId: typeof meta.writerId === 'string' ? meta.writerId : null,
-      savedAt: typeof meta.savedAt === 'number' ? meta.savedAt : 0,
-      version: typeof meta.version === 'number' ? meta.version : null,
-      enc: meta.enc === 'deflate64' ? 'deflate64' : 'json',
-      len: meta.len,
-    };
+    if (raw != null && raw !== '') return normalizeMeta(raw, slot);
+    // Meta key missing (its write failed after the payload's): the payload header carries it.
+    const stored = app.loadLocalStorage(JOURNAL_KEY_PREFIX + slot) as string | null;
+    return stored != null ? unframePayload(stored, slot)?.meta ?? null : null;
   } catch {
     return null;
   }
@@ -213,6 +248,14 @@ function readLiveSlot(app: App, slot: string): LiveEntry | null {
   try {
     const stored = app.loadLocalStorage(JOURNAL_KEY_PREFIX + slot) as string | null;
     if (stored == null || stored === '') return null;
+    const framed = unframePayload(stored, slot);
+    if (framed != null) {
+      const m = framed.meta;
+      return {
+        v: JOURNAL_VERSION, mapId: m.mapId, savedAt: m.savedAt,
+        payload: decodePayload(m.enc, framed.data), slot, writerId: m.writerId, version: m.version,
+      };
+    }
     const meta = readMeta(app, slot);
     if (meta == null) {
       // Legacy (pre-split) entry: the whole JournalEntry JSON under the payload key.
@@ -255,26 +298,42 @@ function warnJournalTooLarge(mapId: string, size: number): void {
 
 /**
  * Write one live slot. Index first (it is how the slot is found again), then
- * payload, then metadata. Never deletes an older entry first: on a quota
- * failure the previous copy (if any) stays as it was.
+ * the cached meta key is dropped (a removal cannot hit the quota), then ONE
+ * write of the framed payload (header + data), then the meta cache. Never
+ * deletes the older payload first: on a quota failure the previous framed
+ * copy stays readable through its own header.
  */
-function writeLiveSlot(app: App, mapId: string, writerId: string | null, version: number | null, json: string, savedAt: number): boolean {
+function writeLiveSlot(
+  app: App,
+  mapId: string,
+  writerId: string | null,
+  version: number | null,
+  json: string,
+  savedAt: number,
+  restoredAt: number | null = null
+): boolean {
   const { enc, data } = encodePayload(json);
   if (data.length > MAX_JOURNAL_PAYLOAD) {
     warnJournalTooLarge(mapId, json.length);
     return false;
   }
   const slot = slotId(mapId, writerId);
-  const meta: LiveMeta = { v: LIVE_META_VERSION, mapId, writerId, savedAt, version, enc, len: data.length };
+  const meta: LiveMeta = { v: LIVE_META_VERSION, mapId, writerId, savedAt, version, enc, len: data.length, restoredAt };
+  const metaJson = JSON.stringify(meta);
   try {
     addToIdList(app, JOURNAL_INDEX_KEY, slot);
-    app.saveLocalStorage(JOURNAL_KEY_PREFIX + slot, data);
-    app.saveLocalStorage(JOURNAL_META_PREFIX + slot, JSON.stringify(meta));
-    return true;
+    app.saveLocalStorage(JOURNAL_META_PREFIX + slot, null);
+    app.saveLocalStorage(JOURNAL_KEY_PREFIX + slot, PAYLOAD_HEADER + metaJson + '\n' + data);
   } catch (e) {
     console.warn('[Windrose] Save journal write failed (storage full?) for map:', mapId, e);
     return false;
   }
+  try {
+    app.saveLocalStorage(JOURNAL_META_PREFIX + slot, metaJson);
+  } catch {
+    // The payload header carries the same metadata; the cache is optional.
+  }
+  return true;
 }
 
 /**
@@ -328,11 +387,18 @@ function clearJournal(
   const writerId = options?.writerId;
   if (writerId != null && options?.includeKept !== true) {
     const own = slotId(mapId, writerId);
-    const ownVersion = readMeta(app, own)?.version ?? null;
+    const ownMeta = readMeta(app, own);
+    const ownVersion = ownMeta?.version ?? null;
     if (options?.upToVersion == null || ownVersion == null || ownVersion <= options.upToVersion) {
       removeLiveSlot(app, own);
     }
-    removeLiveSlot(app, mapId);
+    // A restored writerless copy is cleared only by a writer that journaled
+    // after the restore (its tree can contain the restored edits); a sibling
+    // pane landing an older tree leaves it (wave-5 finding 5).
+    const restoredAt = readMeta(app, mapId)?.restoredAt ?? null;
+    if (restoredAt == null || (ownMeta != null && ownMeta.savedAt >= restoredAt)) {
+      removeLiveSlot(app, mapId);
+    }
   } else {
     for (const slot of liveSlotsFor(app, mapId)) removeLiveSlot(app, slot);
   }
@@ -345,6 +411,22 @@ function clearJournal(
 /** Whether `mapId` holds at least one "keep for later" entry. */
 function isJournalKept(app: App, mapId: string): boolean {
   return readKeptEntries(app, mapId).length > 0;
+}
+
+// Live writer registry (wave-5 finding 4). Fed by saveCoordinator's
+// register/unregisterSaveInstance (the registry lives here only to avoid an
+// import cycle). A slot whose writer is still mounted is that pane's crash
+// copy for an in-flight save, NOT an orphan: it must never be offered for
+// restore to another pane, dropped by that pane's choice, or pruned.
+const liveWriters = new Set<string>();
+
+function setJournalWriterLive(writerId: string, live: boolean): void {
+  if (live) liveWriters.add(writerId);
+  else liveWriters.delete(writerId);
+}
+
+function isLiveWriterSlot(entry: LiveEntry): boolean {
+  return entry.writerId != null && liveWriters.has(entry.writerId);
 }
 
 /** Every live entry of `mapId`, newest first. */
@@ -486,6 +568,10 @@ function pruneJournal(app: App, options?: { liveMapIds?: string[] }): void {
 
     for (const slot of index) {
       const entry = readLiveSlot(app, slot);
+      if (entry != null && isLiveWriterSlot(entry)) {
+        kept.push(slot);
+        continue;
+      }
       const stale = entry == null
         || now - entry.savedAt > JOURNAL_MAX_AGE_MS
         || (live != null && !live.has(mapIdOfSlot(slot)));
@@ -687,7 +773,11 @@ async function resolveJournalOnLoad(
 ): Promise<MapData | null> {
   const candidates: JournalCandidate[] = [];
   // One live candidate per writer slot (several panes may have crashed), newest first.
-  for (const entry of readLiveEntries(app, mapId)) candidates.push({ source: 'live', entry, slot: entry.slot });
+  // A mounted sibling pane's slot is skipped: it is that pane's in-flight crash copy.
+  for (const entry of readLiveEntries(app, mapId)) {
+    if (isLiveWriterSlot(entry)) continue;
+    candidates.push({ source: 'live', entry, slot: entry.slot });
+  }
   for (const entry of [...readKeptEntries(app, mapId)].reverse()) candidates.push({ source: 'kept', entry });
   const conflictEntry = readConflictJournal(app, mapId);
   if (conflictEntry != null) candidates.push({ source: 'conflict', entry: conflictEntry });
@@ -729,8 +819,10 @@ async function resolveJournalOnLoad(
     // clears, so the app dying before the save still leaves a copy. If the
     // move fails the entry stays where it was and is offered once more
     // (comparing clean once the save has landed).
-    if (c.source !== 'live' || c.slot !== mapId) {
-      if (writeLiveSlot(app, mapId, null, null, c.entry.payload, c.entry.savedAt)) dropCandidate(app, mapId, c);
+    // The writerless copy is stamped with the restore time (see clearJournal).
+    const inPlace = c.source === 'live' && c.slot === mapId;
+    if (writeLiveSlot(app, mapId, null, null, c.entry.payload, c.entry.savedAt, Date.now()) && !inPlace) {
+      dropCandidate(app, mapId, c);
     }
     return restored;
   }
@@ -746,6 +838,7 @@ export {
   readConflictJournal,
   readJournal,
   pruneJournal,
+  setJournalWriterLive,
   compareJournalToDisk,
   resolveJournalOnLoad,
   formatRelativeTime,

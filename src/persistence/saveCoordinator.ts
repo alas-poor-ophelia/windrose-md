@@ -13,7 +13,7 @@
 import type { MapData } from '#types/core/map.types';
 import type { App } from 'obsidian';
 
-import { journalPending } from './saveJournal';
+import { journalPending, setJournalWriterLive } from './saveJournal';
 
 interface SaveInstance {
   /** The un-saved map data for this instance, or null when everything is saved. */
@@ -24,12 +24,18 @@ interface SaveInstance {
 
 const instances = new Map<string, SaveInstance>();
 
+/**
+ * `id` is also the instance's journal writer id: while registered, its live
+ * journal slot is never offered to another pane for restore, nor pruned.
+ */
 function registerSaveInstance(id: string, instance: SaveInstance): void {
   instances.set(id, instance);
+  setJournalWriterLive(id, true);
 }
 
 function unregisterSaveInstance(id: string): void {
   instances.delete(id);
+  setJournalWriterLive(id, false);
 }
 
 /**

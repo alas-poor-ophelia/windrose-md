@@ -24,7 +24,7 @@ import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
 import { renderWallPaths, flattenWallPath, quadPoint } from '../../geometry/renderers/wallPathRenderer';
 import { getActiveLayer } from '../../persistence/layerAccessor';
-import { getTileMetadataForRender } from '../../persistence/tileMetadata';
+import { useTileMetadata } from '../../hooks/state/useTileMetadata';
 import { getCachedImage, preloadImage } from '../../assets/imageOperations';
 import { createWallPath, distanceToWallPath as distanceToWall } from '../../drawing/wallPathOperations';
 import {
@@ -41,6 +41,7 @@ import {
 import { DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
 import { useApp } from '../../context/AppContext';
 import { useLiveOverlayRedraw } from '../../hooks/canvas/useLiveOverlayRedraw';
+import { useOverlayCanvas } from '../../hooks/canvas/useOverlayCanvas';
 import { Notice } from 'obsidian';
 import { resolveTileEntry } from '../../assets/tilesetOperations';
 import { shouldHandleMapKey } from '../../utils/keyboardTargets';
@@ -180,6 +181,8 @@ const WallLayer = ({
 }: WallLayerProps): VNode | null => {
   const app = useApp();
   const { mapData, geometry, screenToWorld, getClientCoords, canvasRef, viewController } = useMapState();
+  // Subscribed, so a classification change re-renders the layer (STRUCT-A-20).
+  const tileMetadata = useTileMetadata(app);
 
   // ---- Draw state ----
   const [vertices, setVertices] = useState<WallVertex[]>([]);
@@ -192,7 +195,6 @@ const WallLayer = ({
   const angleSnapRef = useRef(angleSnapEnabled);
   angleSnapRef.current = angleSnapEnabled;
   const cursorRef = useRef<{ x: number; y: number } | null>(null);
-  const overlayRef = useRef<HTMLCanvasElement | null>(null);
   const pressActiveRef = useRef(false);
 
   // ---- Edit state ----
@@ -235,7 +237,7 @@ const WallLayer = ({
     // resolveTileEntry also accepts legacy basename ids (recents / MCP selects).
     return resolveTileEntry(ts, selectedTileId) ?? null;
   })();
-  const selectedMeta = selectedEntry != null ? getTileMetadataForRender()[selectedEntry.vaultPath] : undefined;
+  const selectedMeta = selectedEntry != null ? tileMetadata[selectedEntry.vaultPath] : undefined;
   const isStripAsset = selectedMeta?.ddSourceType === 'walls' || selectedMeta?.ddSourceType === 'paths';
   // Opening mode: a DD portal is armed → click a wall to seat a door/window.
   // Detected via metadata (mirrors isStripAsset), NOT the 'opening' subtool —
@@ -284,25 +286,11 @@ const WallLayer = ({
   }, []);
 
   // ---- Overlay ----
-  const createOverlay = useCallback((): HTMLCanvasElement | null => {
-    if (overlayRef.current != null) return overlayRef.current;
-    const mainCanvas = canvasRef.current;
-    if (!mainCanvas || !mainCanvas.parentElement) return null;
-    const overlay = activeWindow.createEl('canvas');
-    overlay.width = mainCanvas.width;
-    overlay.height = mainCanvas.height;
-    overlay.classList.add('windrose-overlay-layer');
-    mainCanvas.parentElement.appendChild(overlay);
-    overlayRef.current = overlay;
-    return overlay;
-  }, [canvasRef]);
-
-  const removeOverlay = useCallback(() => {
-    if (overlayRef.current?.parentElement != null) {
-      overlayRef.current.parentElement.removeChild(overlayRef.current);
-    }
-    overlayRef.current = null;
-  }, []);
+  // Shared lifecycle; follows the main canvas size (it used to be sized once at
+  // creation, STRUCT-A-20). A resize clears it, so repaint what owns it.
+  const { overlayRef, ensure: createOverlay, remove: removeOverlay, sized: sizedOverlay } = useOverlayCanvas(canvasRef, {
+    onResize: () => { redrawAfterResize(); },
+  });
 
   const getViewTransform = useCallback((overlay: HTMLCanvasElement): { offsetX: number; offsetY: number; zoom: number } | null => {
     if (mapData == null || geometry == null) return null;
@@ -325,7 +313,7 @@ const WallLayer = ({
 
   // ---- Draw-mode preview ----
   const drawPreview = useCallback(() => {
-    const overlay = overlayRef.current;
+    const overlay = sizedOverlay();
     if (overlay == null || mapData == null) return;
     const ctx = overlay.getContext('2d');
     if (ctx == null) return;
@@ -395,13 +383,13 @@ const WallLayer = ({
     }
 
     ctx.restore();
-  }, [mapData, getViewTransform, selectedEntry, selectedTilesetId, selectedTileId, cellSize, snapDistance]);
+  }, [mapData, getViewTransform, selectedEntry, selectedTilesetId, selectedTileId, cellSize, snapDistance, sizedOverlay]);
 
   // ---- Edit-mode handles ----
   // `append` skips the clear so opening mode can layer handles ON TOP of the
   // insert ghost (each draw otherwise owns the whole overlay).
   const drawEditHandles = useCallback((opts?: { append?: boolean }) => {
-    const overlay = overlayRef.current;
+    const overlay = sizedOverlay();
     if (overlay == null) return;
     const ctx = overlay.getContext('2d');
     if (ctx == null) return;
@@ -511,7 +499,7 @@ const WallLayer = ({
     }
 
     ctx.restore();
-  }, [mapData, getViewTransform, cellSize, isOpeningMode]);
+  }, [mapData, getViewTransform, cellSize, isOpeningMode, sizedOverlay]);
 
   // Keep handles in sync with selection, data, and view changes.
   useEffect(() => {
@@ -544,8 +532,14 @@ const WallLayer = ({
   const redrawHandlesLive = useCallback(() => {
     if (!isWallTool || isDrawing || isOpeningMode || selectedWallId == null || overlayRef.current == null) return;
     drawEditHandles();
-  }, [isWallTool, isDrawing, isOpeningMode, selectedWallId, drawEditHandles]);
+  }, [isWallTool, isDrawing, isOpeningMode, selectedWallId, drawEditHandles, overlayRef]);
   useLiveOverlayRedraw(viewController, redrawHandlesLive);
+  // Mid-draw the preview owns the overlay; otherwise the edit handles. The
+  // opening ghost is pointer-move-owned and returns on the next move.
+  const redrawAfterResize = (): void => {
+    if (isDrawing) drawPreview();
+    else redrawHandlesLive();
+  };
 
   // ---- Wall mutation helpers ----
   const updateWall = useCallback((wallId: string, mutate: (w: WallPath) => WallPath, suppress: boolean) => {
@@ -600,7 +594,7 @@ const WallLayer = ({
   // WYSIWYG hover ghost (§5.2): render the target wall WITH the pending gap at
   // 50% alpha via the real render path. Off any wall → cleared overlay, no ghost.
   const drawOpeningGhost = useCallback((wx: number, wy: number) => {
-    const overlay = overlayRef.current;
+    const overlay = sizedOverlay();
     if (overlay == null || mapData?.tilesets == null || mapData.tilesets.length === 0) return;
     const ctx = overlay.getContext('2d');
     if (ctx == null) return;
@@ -625,7 +619,7 @@ const WallLayer = ({
       opacity: 0.5,
       getCachedImage,
     });
-  }, [mapData?.tilesets, getViewTransform, cellSize, nearestOpeningWall, selectedTilesetId, selectedTileId, deriveOpeningWidthCells, isBareThreshold]);
+  }, [mapData?.tilesets, getViewTransform, cellSize, nearestOpeningWall, selectedTilesetId, selectedTileId, deriveOpeningWidthCells, isBareThreshold, sizedOverlay]);
 
   // Click commits a single gap insert (one undo entry via suppress=false, G-F2).
   // Alt-click omits the art → a bare capped threshold (§5.3 secondary trigger).
@@ -1281,7 +1275,6 @@ const WallLayer = ({
     setSelectedVertexIndex(null);
     setSelectedGapId(null);
   }, [isOpeningMode]);
-  useEffect(() => () => removeOverlay(), [removeOverlay]);
 
   useLayerHandlers('wall', { handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick });
 

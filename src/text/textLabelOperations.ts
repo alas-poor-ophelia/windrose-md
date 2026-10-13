@@ -8,6 +8,7 @@
 // Type-only imports
 import type { Point } from '#types/core/geometry.types';
 import type { HexColor } from '#types/core/common.types';
+import { updateById, removeById } from '../objects/entityList';
 
 // ===========================================
 // Type Definitions
@@ -108,11 +109,7 @@ function updateTextLabel(
   id: TextLabelId,
   updates: TextLabelUpdate
 ): TextLabel[] {
-  if (!labels || !Array.isArray(labels)) return [];
-  
-  return labels.map(label => 
-    label.id === id ? { ...label, ...updates } : label
-  );
+  return updateById<TextLabel>(labels, id, updates);
 }
 
 /**
@@ -122,8 +119,7 @@ function removeTextLabel(
   labels: TextLabel[] | null | undefined,
   id: TextLabelId
 ): TextLabel[] {
-  if (!labels || !Array.isArray(labels)) return [];
-  return labels.filter(label => label.id !== id);
+  return removeById<TextLabel>(labels, id);
 }
 
 // ===========================================

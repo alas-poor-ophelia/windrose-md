@@ -186,6 +186,46 @@ function resolveTileEntry(
   return legacy;
 }
 
+/**
+ * Lookup index over one tileset's entries: every exact id plus every legacy
+ * basename alias, with resolveTileEntry's precedence baked in (exact id
+ * first-wins beats any alias; among aliases the first folder-relative entry
+ * wins). Built once per `tiles` array identity — rescans and id re-mints
+ * always REPLACE the array, so a WeakMap keyed on it never goes stale and is
+ * collected with it. Per-tileset (not per-map), so two open maps sharing or
+ * not sharing tilesets never evict each other (STRUCT-B-08 / MEM-10).
+ */
+const tileEntryIndexCache = new WeakMap<readonly TileEntry[], Map<string, TileEntry>>();
+
+function getTileEntryIndex(tileset: Pick<TilesetDef, 'tiles'>): Map<string, TileEntry> {
+  const tiles = tileset.tiles;
+  let index = tileEntryIndexCache.get(tiles);
+  if (index === undefined) {
+    index = new Map<string, TileEntry>();
+    for (const entry of tiles) {
+      if (!index.has(entry.id)) index.set(entry.id, entry);
+    }
+    for (const entry of tiles) {
+      const base = tileIdBasename(entry.id);
+      if (base !== entry.id && !index.has(base)) index.set(base, entry);
+    }
+    tileEntryIndexCache.set(tiles, index);
+  }
+  return index;
+}
+
+/**
+ * Constant-time resolveTileEntry for hot paths (the renderer resolves every
+ * placed tile every frame). Same contract and same answer as resolveTileEntry.
+ */
+function resolveTileEntryIndexed(
+  tileset: Pick<TilesetDef, 'tiles'> | undefined,
+  tileId: string | undefined
+): TileEntry | undefined {
+  if (tileset == null || tileId == null || tileId === '') return undefined;
+  return getTileEntryIndex(tileset).get(tileId);
+}
+
 // ===========================================
 // Tileset Creation
 // ===========================================
@@ -793,5 +833,5 @@ function createTilesetFromTiles(
 // Module Exports
 // ===========================================
 
-export { scanTilesetFolder, createTilesetFromTiles, probeFirstTileImage, probeCandidateOrder, measureAlphaCoverage, autoDetectOverflow, generateTilesetId, classifyTileArtMask, analyzeTileArtMask, detectHexArtAnalysis, fitHexCellCenterY, readTileImageBinary, resolveTileEntry, tileIdBasename, mintTileId, ALPHA_COVERAGE_THRESHOLD };
+export { scanTilesetFolder, createTilesetFromTiles, probeFirstTileImage, probeCandidateOrder, measureAlphaCoverage, autoDetectOverflow, generateTilesetId, classifyTileArtMask, analyzeTileArtMask, detectHexArtAnalysis, fitHexCellCenterY, readTileImageBinary, resolveTileEntry, resolveTileEntryIndexed, getTileEntryIndex, tileIdBasename, mintTileId, ALPHA_COVERAGE_THRESHOLD };
 export type { HexArtMask, HexArtAnalysis };

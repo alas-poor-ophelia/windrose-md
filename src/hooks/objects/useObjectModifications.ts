@@ -9,8 +9,7 @@
 import type { MapObject } from '#types/objects/object.types';
 
 import { useCallback } from 'preact/hooks';
-import { getNextRotation } from '../../drawing/rotationOperations';
-import { findDuplicateTarget, generateObjectId } from '../../objects/objectOperations';
+import { findDuplicateTarget, generateObjectId, rotateObjectInList } from '../../objects/objectOperations';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { useMapState } from '../../context/MapContext';
 import { useMapOperations } from '../../context/MapContext';
@@ -109,17 +108,9 @@ const useObjectModifications = (): {
       return;
     }
 
-    const currentObject = getActiveLayer(mapData).objects?.find((obj: MapObject) => obj.id === targetId);
-    const currentRotation = currentObject?.rotation ?? 0;
-    const nextRotation = getNextRotation(currentRotation);
-
-    const updatedObjects = updateObject(
-      getActiveLayer(mapData).objects,
-      targetId,
-      { rotation: nextRotation }
-    );
+    const updatedObjects = rotateObjectInList(getActiveLayer(mapData).objects, targetId);
     onObjectsChange(updatedObjects);
-  }, [resolveTargetId, mapData, updateObject, onObjectsChange]);
+  }, [resolveTargetId, mapData, onObjectsChange]);
 
   const handleObjectDeletion = useCallback((target?: string | Event): void => {
     const targetId = resolveTargetId(target);

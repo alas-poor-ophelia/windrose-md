@@ -6,7 +6,7 @@
  */
 
 import type { MapObject, ObjectUpdate } from '../objects/object.types';
-import type { TextLabel, NotePin } from '../objects/note.types';
+import type { TextLabel } from '../objects/note.types';
 import type { IGeometry, Point } from '../core/geometry.types';
 import type { Curve } from '../core/curve.types';
 import type { LayerId, MapData, MapType, ShapeOverlay, StoredViewState, TextLabelSettings } from '../core/map.types';
@@ -174,10 +174,8 @@ export interface MapOperationsContextValue {
   addObject: (objects: MapObject[], typeId: string, x: number, y: number, mapType?: MapType, objectSetId?: string | null) => MapObject[];
   updateObject: (objects: MapObject[] | null | undefined, objectId: string, updates: ObjectUpdate) => MapObject[];
   removeObject: (objects: MapObject[] | null | undefined, objectId: string) => MapObject[];
-  removeObjectAtPosition: (objects: MapObject[] | null | undefined, x: number, y: number) => MapObject[];
   removeObjectsInRectangle: (objects: MapObject[] | null | undefined, x1: number, y1: number, x2: number, y2: number) => MapObject[];
   isAreaFree: (objects: MapObject[] | null | undefined, x: number, y: number, width: number, height: number, excludeId?: string | null) => boolean;
-  canResizeObject: (objects: MapObject[], objectId: string, newWidth: number, newHeight: number, maxSize?: number) => boolean;
   onObjectsChange: (objects: MapObject[], skipHistory?: boolean) => void;
 
   // Text label operations
@@ -201,10 +199,6 @@ export interface MapOperationsContextValue {
   onWallPathsChange?: (wallPaths: WallPath[], suppressHistory?: boolean) => void;
   onTerrainStrokesChange?: (strokes: TerrainStroke[], suppressHistory?: boolean) => void;
 
-  // Note pin operations (optional — not all providers include these)
-  onNotePinsChange?: (pins: NotePin[]) => void;
-  getNotePinAtPosition?: (pins: NotePin[], worldX: number, worldY: number, cellSize: number) => NotePin | null;
-
   // Map-level operations
   onMapDataUpdate?: (updates: MapDataUpdate) => void;
   [key: string]: unknown;
@@ -216,13 +210,12 @@ export interface MapOperationsContextValue {
 // Moved from MapSelectionContext.tsx to be importable by hooks via #types/
 
 /** Selected item types */
-export type SelectableItemType = 'object' | 'text' | 'notePin' | 'shapeOverlay';
+export type SelectableItemType = 'object' | 'text' | 'shapeOverlay';
 
 /** A selected item — discriminated union enables type-safe data narrowing */
 export type SelectedItem =
   | { type: 'object'; id: string; data?: MapObject }
   | { type: 'text'; id: string; data?: TextLabel }
-  | { type: 'notePin'; id: string; data?: NotePin }
   | { type: 'shapeOverlay'; id: string; data?: ShapeOverlay };
 
 /** World position for area select start */
@@ -303,19 +296,14 @@ export interface ItemUpdate {
 export interface MapSelectionContextValue {
   // Multi-select state
   selectedItems: SelectedItem[];
-  setSelectedItems: (items: SelectedItem[] | ((prev: SelectedItem[]) => SelectedItem[])) => void;
   hasMultiSelection: boolean;
   selectionCount: number;
 
   // Selection helpers
   selectItem: (item: SelectedItem | null) => void;
   selectMultiple: (items: SelectedItem[] | null) => void;
-  addToSelection: (item: SelectedItem | null) => void;
-  removeFromSelection: (id: string) => void;
   clearSelection: () => void;
   isSelected: (id: string) => boolean;
-  /** Underscore alias — destructured but unused in some consumers */
-  _isSelected?: (id: string) => boolean;
   updateSelectedItemsData: (updates: ItemUpdate[]) => void;
 
   // Area select state
@@ -346,8 +334,6 @@ export interface MapSelectionContextValue {
 
   // Note pin modal state
   showNoteLinkModal: boolean;
-  /** Underscore alias — destructured but unused in some consumers */
-  _showNoteLinkModal?: boolean;
   setShowNoteLinkModal: (value: boolean | ((prev: boolean) => boolean)) => void;
   pendingNotePinId: string | null;
   setPendingNotePinId: (value: string | null | ((prev: string | null) => string | null)) => void;

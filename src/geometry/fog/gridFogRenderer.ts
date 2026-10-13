@@ -6,6 +6,7 @@
  */
 
 import type { FoggedCell } from '#types/core/map.types';
+import { getFoggedCellSet } from './foggedCellIndex';
 
 interface GridFogRenderContext {
   ctx: CanvasRenderingContext2D;
@@ -179,7 +180,8 @@ function renderGridFog(
   visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number },
   zoom: number
 ): void {
-  const foggedSet = new Set(fogCells.map(c => `${c.col},${c.row}`));
+  // Cached per foggedCells identity (MEM-02); was rebuilt every frame.
+  const foggedSet = getFoggedCellSet(fogCells);
 
   // Identify visible and edge cells
   const { visibleFogCells, edgeCells } = identifyEdgeCells(

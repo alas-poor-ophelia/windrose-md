@@ -16,8 +16,6 @@ interface ObjectSidebarProps {
   selectedObjectType: string | null;
   onObjectTypeSelect: (id: string | null) => void;
   onToolChange?: (tool: ToolId) => void;
-  isCollapsed: boolean;
-  onCollapseChange: (collapsed: boolean) => void;
   mapType?: MapType;
   objectSetId?: string | null;
   onObjectSetChange: (id: string | null) => void;
@@ -39,7 +37,7 @@ interface ObjectSidebarProps {
 // memo: the map root re-renders on EVERY pointermove (viewState lives in its
 // state). Its sibling TileAssetBrowser is memoized for the same reason — without
 // it this whole tree re-renders and re-diffs per touch event.
-const ObjectSidebar = memo(({ selectedObjectType, onObjectTypeSelect, onToolChange, isCollapsed, onCollapseChange, mapType = 'grid', objectSetId, onObjectSetChange, isFreeformMode = false, onFreeformToggle, hideHeader = false, viewMode = 'grid', onViewModeChange, onCollapse, ribbon }: ObjectSidebarProps): VNode => {
+const ObjectSidebar = memo(({ selectedObjectType, onObjectTypeSelect, onToolChange, mapType = 'grid', objectSetId, onObjectSetChange, isFreeformMode = false, onFreeformToggle, hideHeader = false, viewMode = 'grid', onViewModeChange, onCollapse, ribbon }: ObjectSidebarProps): VNode => {
   const app = useApp();
   const [searchFilter, setSearchFilter] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
@@ -89,10 +87,6 @@ const ObjectSidebar = memo(({ selectedObjectType, onObjectTypeSelect, onToolChan
     }
   };
 
-  const handleToggleCollapse = (): void => {
-    onCollapseChange(!isCollapsed);
-  };
-
   const handleToggleCategory = (categoryId: string): void => {
     setCollapsedCategories(prev => {
       const next = new Set(prev);
@@ -117,29 +111,6 @@ const ObjectSidebar = memo(({ selectedObjectType, onObjectTypeSelect, onToolChan
     }
     return <span>{objType.symbol ?? '?'}</span>;
   };
-
-  if (isCollapsed) {
-    return (
-      <div className="windrose-object-sidebar windrose-object-sidebar-collapsed">
-        <button
-          className="windrose-sidebar-toggle interactive-child"
-          onClick={handleToggleCollapse}
-          ref={tooltipRef('Show objects')}
-        >
-          <Icon icon="lucide-panel-left-open" size={14} />
-        </button>
-        {isFreeformMode && (
-          <button
-            className="windrose-freeform-collapsed-indicator interactive-child"
-            ref={tooltipRef('Freeform placement active (tap to disable)')}
-            onClick={onFreeformToggle}
-          >
-            <Icon icon="lucide-diamond" size={12} />
-          </button>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="windrose-object-sidebar">

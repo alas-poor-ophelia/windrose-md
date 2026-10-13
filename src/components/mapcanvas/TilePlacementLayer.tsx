@@ -10,7 +10,7 @@
 
 import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
-import type { TileAssignment, TileRotation, TileLayerRole, TilesetDef } from '#types/tiles/tile.types';
+import type { TileAssignment, TileRotation, TileLayerRole, TilesetDef, TileMetadataStore } from '#types/tiles/tile.types';
 import type { TileSubtoolId } from '../../assets/tileForm';
 
 import { Notice } from 'obsidian';
@@ -21,7 +21,7 @@ import { useApp } from '../../context/AppContext';
 import { getActiveLayer, getActiveBoardLayers } from '../../persistence/layerAccessor';
 import { preloadImage } from '../../assets/imageOperations';
 import { resolveTileEntry } from '../../assets/tilesetOperations';
-import { getTileMetadataForRender } from '../../persistence/tileMetadata';
+import { useTileMetadata } from '../../hooks/state/useTileMetadata';
 import type { ResolvedTileRender } from '../../assets/tileRenderResolution';
 import { resolveTileRender, EDGE_BLEND_FEATHER } from '../../assets/tileRenderResolution';
 import { cellsCoveredByAssignment, assignmentsOverlap } from '../../assets/tileFootprint';
@@ -39,9 +39,10 @@ function resolvePaintTimeRender(
   isGrid: boolean,
   entry: { vaultPath?: string } | undefined,
   tileset: TilesetDef | undefined,
-  paintEdgeBlend: boolean
+  paintEdgeBlend: boolean,
+  tileMetadata: TileMetadataStore
 ): { resolved: ResolvedTileRender | undefined; feather: number | undefined } {
-  const meta = isGrid && entry?.vaultPath != null && entry.vaultPath !== '' ? getTileMetadataForRender()[entry.vaultPath] : undefined;
+  const meta = isGrid && entry?.vaultPath != null && entry.vaultPath !== '' ? tileMetadata[entry.vaultPath] : undefined;
   const resolved = isGrid ? resolveTileRender(undefined, meta, tileset) : undefined;
   const feather = resolved?.renderMode === 'region'
     ? (paintEdgeBlend ? EDGE_BLEND_FEATHER : (resolved.edgeFeather > 0 ? 0 : undefined))
@@ -88,6 +89,8 @@ const TilePlacementLayer = ({
 }: TilePlacementLayerProps): VNode | null => {
   const { mapData, geometry, screenToGrid, screenToWorld } = useMapState();
   const app = useApp();
+  // Subscribed, so a classification change re-renders the layer (STRUCT-A-20).
+  const tileMetadata = useTileMetadata(app);
 
   const isTileTool = currentTool === 'tilePaint';
   const hasTileSelected = selectedTilesetId != null && selectedTilesetId !== '' && selectedTileId != null && selectedTileId !== '';
@@ -100,7 +103,7 @@ const TilePlacementLayer = ({
     if (!hasTileSelected || mapData?.tilesets == null) return false;
     const ts = mapData.tilesets.find(t => t.id === selectedTilesetId);
     const entry = ts != null ? resolveTileEntry(ts, selectedTileId ?? '') : null;
-    return entry?.vaultPath != null && getTileMetadataForRender()[entry.vaultPath]?.ddSourceType === 'portals';
+    return entry?.vaultPath != null && tileMetadata[entry.vaultPath]?.ddSourceType === 'portals';
   })();
 
   const paintedInStrokeRef = useRef<Set<string>>(new Set());
@@ -131,7 +134,7 @@ const TilePlacementLayer = ({
     // brush size and places a single footprint at the anchor. Resolution goes
     // through resolveTileRender so region tiles never carry a span (a seamless
     // texture's footprint would make each placement swallow its neighbours).
-    const { resolved, feather } = resolvePaintTimeRender(geometry?.type === 'grid', entry, ts, paintEdgeBlend);
+    const { resolved, feather } = resolvePaintTimeRender(geometry?.type === 'grid', entry, ts, paintEdgeBlend, tileMetadata);
     const spanW = resolved != null && resolved.spanW > 1 ? resolved.spanW : undefined;
     const spanH = resolved != null && resolved.spanH > 1 ? resolved.spanH : undefined;
     const hasFootprint = spanW != null || spanH != null;
@@ -174,7 +177,7 @@ const TilePlacementLayer = ({
       if (isBatchedStroke) strokeTilesRef.current = currentTiles;
       onTilesChange(currentTiles, isBatchedStroke);
     }
-  }, [mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, brushSize, paintEdgeBlend, tileDepth, onTilesChange, app]);
+  }, [mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, brushSize, paintEdgeBlend, tileDepth, onTilesChange, app, tileMetadata]);
 
   const eraseTilesInBrush = useCallback((col: number, row: number) => {
     if (!mapData) return;
@@ -214,7 +217,7 @@ const TilePlacementLayer = ({
     const entry = resolveTileEntry(ts, selectedTileId);
     if (entry?.vaultPath != null && entry.vaultPath !== '') void preloadImage(app, entry.vaultPath);
 
-    const { feather } = resolvePaintTimeRender(geometry?.type === 'grid', entry, ts, paintEdgeBlend);
+    const { feather } = resolvePaintTimeRender(geometry?.type === 'grid', entry, ts, paintEdgeBlend, tileMetadata);
 
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles ?? [];
@@ -299,7 +302,7 @@ const TilePlacementLayer = ({
     }
 
     onTilesChange(newTiles);
-  }, [app, mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, paintEdgeBlend, tileDepth, onTilesChange]);
+  }, [app, mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, paintEdgeBlend, tileDepth, onTilesChange, tileMetadata]);
 
   const placeStampAtWorld = useCallback((
     worldX: number,

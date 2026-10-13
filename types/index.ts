@@ -134,8 +134,6 @@ export type {
 } from './objects/object.types';
 
 export type {
-  NotePinId,
-  NotePin,
   TextLabelId,
   TextAlign,
   FontWeight,

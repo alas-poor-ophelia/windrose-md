@@ -3,9 +3,9 @@ import { Notice } from 'obsidian';
 import { scanTilesetFolder } from '../../assets/tilesetOperations';
 import { runImportDetectionPass } from '../../assets/importDetectionPass';
 import {
-  loadTileMetadata,
-  saveTileMetadata,
-  setTileMetadataForRender,
+  ensureTileMetadataLoaded,
+  isTileMetadataCorrupt,
+  commitTileMetadataDelta,
 } from '../../persistence/tileMetadata';
 
 // folderDetection.ts
@@ -31,7 +31,9 @@ async function runFolderDetection(app: App, rawPath: string): Promise<void> {
     const tiles = await scanTilesetFolder(app, folder);
     if (tiles.length === 0) return;
 
-    const metadata = await loadTileMetadata(app);
+    // Snapshot of the shared store; only the scan's delta is merged back.
+    const metadata = await ensureTileMetadataLoaded(app);
+    if (isTileMetadataCorrupt()) return;
     // Import-moment guard (2026-06-09 RCA): prior metadata for any tile in
     // the folder means this set was known before — and may have placements —
     // so render-mode predictions are withheld; signals/depth/span are safe.
@@ -52,8 +54,7 @@ async function runFolderDetection(app: App, rawPath: string): Promise<void> {
         },
       });
       if (stats.scanned + stats.depth + stats.region + stats.spans === 0) return;
-      await saveTileMetadata(app, next);
-      setTileMetadataForRender(next);
+      if (!await commitTileMetadataDelta(app, metadata, next)) return;
       new Notice(
         `Tile detection ("${folder}"): ${stats.scanned} scanned · ` +
         `${stats.depth} tiered · ${stats.region} terrain · ${stats.spans} multi-cell`,

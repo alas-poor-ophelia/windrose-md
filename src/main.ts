@@ -17,7 +17,7 @@ import { writeCanvasCapabilityReport } from './utils/canvasCapabilityReport';
 import { recordInputEventProbe } from './utils/inputEventProbe';
 import { recordZoomTrace } from './utils/zoomTraceProbe';
 import { scanTilesetFolder } from './assets/tilesetOperations';
-import { buildMapEntry, createMapEntry, getSaveQueue } from './persistence/fileOperations';
+import { buildMapEntry, createMapEntry, getSaveQueue, listMapsResult } from './persistence/fileOperations';
 import { disposeImageCache } from './assets/imageOperations';
 import { clearAll as clearThumbnailCache } from './assets/thumbnailCache';
 import { flushAll, installLifecycleJournaling, journalAll } from './persistence/saveCoordinator';
@@ -25,10 +25,10 @@ import { pruneJournal } from './persistence/saveJournal';
 import { notifyPartyNoteRenamed } from './persistence/partyNoteOperations';
 import { runImportDetectionPass } from './assets/importDetectionPass';
 import {
-  loadTileMetadata,
-  saveTileMetadata,
+  ensureTileMetadataLoaded,
+  isTileMetadataCorrupt,
+  commitTileMetadataDelta,
   bulkSetDdSourceType,
-  setTileMetadataForRender,
 } from './persistence/tileMetadata';
 import type { TileEntry } from '#types/tiles/tile.types';
 
@@ -294,7 +294,15 @@ export default class WindrosePlugin extends Plugin {
 
     // Suspend/hide has no such guarantee, so those paths journal synchronously.
     this.register(installLifecycleJournaling(this.app));
+    // Age-only prune now; once the layout is ready, also drop journal entries
+    // (live, kept, conflict) for maps that no longer exist. Skipped when the
+    // data file is unreadable: a failed read must never look like "no maps".
     pruneJournal(this.app);
+    this.app.workspace.onLayoutReady(() => {
+      void listMapsResult(this.app).then((result) => {
+        if (result.status === 'ok') pruneJournal(this.app, { liveMapIds: result.maps.map(m => m.id) });
+      });
+    });
   }
 
   /**
@@ -317,7 +325,15 @@ export default class WindrosePlugin extends Plugin {
       for (const folder of folders) {
         allTiles.push(...await scanTilesetFolder(this.app, folder));
       }
-      let metadata = await loadTileMetadata(this.app);
+      // `base` is the shared store as of now; the scan below runs against it
+      // and only the fields it changes are merged back, so edits made while
+      // the scan is decoding tiles survive (wave-5 finding 1).
+      const base = await ensureTileMetadataLoaded(this.app);
+      if (isTileMetadataCorrupt()) {
+        new Notice('Windrose: tile metadata file is unreadable; rescan skipped — see console.');
+        return;
+      }
+      let metadata = base;
 
       // DD extraction names strip folders by their source type ("strips →
       // source dir"), so a lost ddSourceType is recoverable from the folder
@@ -347,12 +363,11 @@ export default class WindrosePlugin extends Plugin {
         applyRenderMode: false,
         skipPredictions: skip,
       });
-      const saved = await saveTileMetadata(this.app, next);
+      const saved = await commitTileMetadataDelta(this.app, base, next);
       if (!saved) {
         new Notice('Windrose: rescan finished but the metadata save was refused — see console.');
         return;
       }
-      setTileMetadataForRender(next);
       window.dispatchEvent(new Event('windrose-settings-changed'));
       new Notice(
         `Windrose: classification rescan done — ${stats.scanned} scanned, ` +

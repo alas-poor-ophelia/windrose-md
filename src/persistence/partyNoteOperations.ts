@@ -228,15 +228,18 @@ function buildPartyNoteContent(
 /**
  * Merge freshly generated note content into the note's current content.
  * Only the marker region is replaced; frontmatter and user text outside it
- * are kept. A legacy note (generated before the markers existed) has no
- * region and was wholly generated, so it is replaced in full.
+ * are kept. A legacy note (generated before the markers existed) has NEITHER
+ * marker and was wholly generated, so it is replaced in full. A damaged region
+ * (only one marker, or end before start) means the user edited around it: the
+ * note is left as it is rather than replacing their prose (wave-5 finding 8).
  */
 function mergePartyNoteContent(current: string, generated: string): string {
   const genStart = generated.indexOf(PARTY_NOTE_REGION_START);
   const genEnd = generated.indexOf(PARTY_NOTE_REGION_END);
+  if (!current.includes(PARTY_NOTE_REGION_START) && !current.includes(PARTY_NOTE_REGION_END)) return generated;
   const curStart = current.indexOf(PARTY_NOTE_REGION_START);
   const curEnd = curStart === -1 ? -1 : current.indexOf(PARTY_NOTE_REGION_END, curStart);
-  if (genStart === -1 || genEnd === -1 || curStart === -1 || curEnd === -1) return generated;
+  if (genStart === -1 || genEnd === -1 || curStart === -1 || curEnd === -1) return current;
   const region = generated.slice(genStart, genEnd + PARTY_NOTE_REGION_END.length);
   return current.slice(0, curStart) + region + current.slice(curEnd + PARTY_NOTE_REGION_END.length);
 }

@@ -11,11 +11,10 @@
  */
 
 // Type-only imports
-import type { MapObject } from '#types/objects/object.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { UseObjectInteractionsResult } from '#types/hooks/objectInteractions.types';
 import { useCallback, useEffect, useRef } from 'preact/hooks';
-import { getNextRotation } from '../../drawing/rotationOperations';
+import { rotateObjectInList } from '../../objects/objectOperations';
 import { useEdgeSnapModifiers } from './useEdgeSnapModifiers';
 import { useObjectModifications } from './useObjectModifications';
 import { useObjectHover } from './useObjectHover';
@@ -35,7 +34,7 @@ const useObjectInteractions = (
   freeformPlacementModeRef?: { current: boolean }
 ): UseObjectInteractionsResult => {
   const { mapData } = useMapState();
-  const { updateObject, removeObject, onObjectsChange } = useMapOperations();
+  const { removeObject, onObjectsChange } = useMapOperations();
   const { selectedItem, setSelectedItem, setHoveredObject, isResizeMode, setIsResizeMode } = useMapSelection();
 
   // Sub-hooks
@@ -81,15 +80,7 @@ const useObjectInteractions = (
     if (e.key === 'r' || e.key === 'R') {
       e.preventDefault();
       if (!mapData) return false;
-      const currentObject = getActiveLayer(mapData).objects?.find((obj: MapObject) => obj.id === selectedItem.id);
-      const currentRotation = currentObject?.rotation ?? 0;
-      const nextRotation = getNextRotation(currentRotation);
-
-      const updatedObjects = updateObject(
-        getActiveLayer(mapData).objects,
-        selectedItem.id,
-        { rotation: nextRotation }
-      );
+      const updatedObjects = rotateObjectInList(getActiveLayer(mapData).objects, selectedItem.id);
       onObjectsChange(updatedObjects);
 
       return true;
@@ -112,7 +103,7 @@ const useObjectInteractions = (
     }
 
     return false;
-  }, [selectedItem, isResizeMode, mapData, removeObject, updateObject, onObjectsChange, setSelectedItem, setIsResizeMode]
+  }, [selectedItem, isResizeMode, mapData, removeObject, onObjectsChange, setSelectedItem, setIsResizeMode]
   );
 
   useEffect(() => {

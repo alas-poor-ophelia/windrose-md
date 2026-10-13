@@ -10,10 +10,11 @@
 
 import type { Curve } from '#types/core/curve.types';
 
-import { useCallback, useEffect, useRef } from 'preact/hooks';
+import { useCallback, useRef } from 'preact/hooks';
 import { useMapState, useMapOperations } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useLiveOverlayRedraw } from '../../hooks/canvas/useLiveOverlayRedraw';
+import { useOverlayCanvas } from '../../hooks/canvas/useOverlayCanvas';
 import { fitPointsToBezier } from '../../geometry/curves/curveFitting';
 import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
 import { getActiveLayer } from '../../persistence/layerAccessor';
@@ -45,43 +46,21 @@ const FreehandLayer = ({
   // Drawing state
   const isDrawingRef = useRef(false);
   const pointsRef = useRef<{ x: number; y: number }[]>([]);
-  // Overlay canvas for live preview (avoids interfering with main render loop)
-  const overlayRef = useRef<HTMLCanvasElement | null>(null);
+  // Overlay canvas for live preview (avoids interfering with main render loop).
+  // ensure() is guarded: a second pointerdown before stopDrawing (multi-touch,
+  // lost pointerup) reuses the overlay instead of orphaning one (DUP-04).
+  const { ensure: createOverlay, remove: removeOverlay, sized: sizedOverlay } = useOverlayCanvas(canvasRef, {
+    onResize: () => { redrawLive(); },
+  });
 
   // Closure snap threshold: half a cell size
   const snapDistance = geometry ? geometry.getScaledCellSize(1) * 0.5 : 20;
 
   /**
-   * Create the overlay canvas, sized and positioned to match the main canvas.
-   */
-  const createOverlay = useCallback((): HTMLCanvasElement | null => {
-    const mainCanvas = canvasRef.current;
-    if (!mainCanvas || !mainCanvas.parentElement) return null;
-
-    const overlay = activeWindow.createEl('canvas');
-    overlay.width = mainCanvas.width;
-    overlay.height = mainCanvas.height;
-    overlay.classList.add('windrose-overlay-layer');
-    mainCanvas.parentElement.appendChild(overlay);
-    overlayRef.current = overlay;
-    return overlay;
-  }, [canvasRef]);
-
-  /**
-   * Remove the overlay canvas.
-   */
-  const removeOverlay = useCallback(() => {
-    if (overlayRef.current && overlayRef.current.parentElement) {
-      overlayRef.current.parentElement.removeChild(overlayRef.current);
-    }
-    overlayRef.current = null;
-  }, []);
-
-  /**
    * Draw the live preview polyline on the overlay canvas.
    */
   const drawPreview = useCallback((points: { x: number; y: number }[]) => {
-    const overlay = overlayRef.current;
+    const overlay = sizedOverlay();
     if (!overlay || points.length < 2 || !mapData || !geometry) return;
 
     const ctx = overlay.getContext('2d');
@@ -169,7 +148,7 @@ const FreehandLayer = ({
     }
 
     ctx.restore();
-  }, [mapData, geometry, selectedColor, snapDistance, viewController]);
+  }, [mapData, geometry, selectedColor, snapDistance, viewController, sizedOverlay]);
 
   // Redraw the in-progress stroke when a pan/zoom gesture moves the view
   // between pointer events (otherwise the preview freezes until commit).
@@ -261,11 +240,6 @@ const FreehandLayer = ({
 
     pointsRef.current = [];
   }, [mapData, selectedColor, selectedOpacity, snapDistance, onCurvesChange, removeOverlay]);
-
-  // Clean up overlay on unmount
-  useEffect(() => {
-    return () => removeOverlay();
-  }, [removeOverlay]);
 
   useLayerHandlers('freehand', { handlePointerDown, handlePointerMove, stopDrawing });
 

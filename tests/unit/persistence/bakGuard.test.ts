@@ -121,18 +121,27 @@ describe('backup size-drop guard', () => {
     expect(fake.contents.get(DAILY)).toBe(large);
   });
 
-  it('nothing rolls when both slots hold much larger copies', async () => {
+  it('both slots hold the large copy and the file legitimately halves: one slot is preserved, the other rolls fresh', async () => {
     const ops = await freshOps();
     const fake = makeVault();
     const large = store(ops, { a: 'A' }, 50_000);
+    const halved = store(ops, { a: 'A' });
     fake.put(BAK1, large, NOW - 60_000);
     fake.put(BAK2, large, NOW - 120_000);
-    fake.put(DATA_PATH, store(ops, { a: 'A' }), NOW - 1000);
+    fake.put(DATA_PATH, halved, NOW - 1000);
 
     await ops.saveMapData(fake.app, 'a', ops.createNewMap('Edit', 'grid'));
 
-    expect(fake.contents.get(BAK1)).toBe(large);
+    // Same size: the older (BAK2) is preserved, the newer (BAK1) rolls.
     expect(fake.contents.get(BAK2)).toBe(large);
+    expect(fake.contents.get(BAK1)).toBe(halved);
+
+    // The next rotation (past the throttle) still writes a fresh backup.
+    vi.setSystemTime(NOW + 20 * 60 * 1000);
+    const before = fake.contents.get(DATA_PATH);
+    await ops.saveMapData(fake.app, 'a', ops.createNewMap('Edit 2', 'grid'));
+    expect(fake.contents.get(BAK2)).toBe(large);
+    expect(fake.contents.get(BAK1)).toBe(before);
   });
 
   it('a shrink explained by fewer maps rotates normally', async () => {
