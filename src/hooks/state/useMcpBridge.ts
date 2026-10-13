@@ -21,7 +21,8 @@ import type { MapData } from '#types/core/map.types';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { Cell } from '#types/core/cell.types';
-import type { TileAssignment, TileRotation, TileLayerRole, TileForm } from '#types/tiles/tile.types';
+import type { TileAssignment, TileLayerRole, TileForm } from '#types/tiles/tile.types';
+import { rotationStepsFor, tileGeometryKind } from '../../assets/tileRotation';
 import type { MapObject } from '#types/objects/object.types';
 import type { WindroseWallGapDebug, WindroseRawGap, WindroseMcpInstance, WindroseMcpOps } from '#types/core/global.types';
 import { getActiveLayer, getActiveBoardLayers } from '../../persistence/layerAccessor';
@@ -270,12 +271,18 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
         if (ts == null || tile == null) {
           return { ok: false, tileCount: activeLayer.tiles?.length ?? 0, error: `Unknown tile ${a.tilesetId}/${a.tileId}` };
         }
+        // place_tile is a cell-snapped placement: its rotation must sit on the
+        // map's snapped step grid (grid 90, hex 60).
+        const snappedSteps = rotationStepsFor(tileGeometryKind(mapData.mapType), false);
+        if (a.rotation != null && !snappedSteps.includes(a.rotation)) {
+          return { ok: false, tileCount: activeLayer.tiles?.length ?? 0, error: `Rotation ${a.rotation} is not a valid step here (allowed: ${snappedSteps.join(', ')})` };
+        }
         const newTile: TileAssignment = {
           col: a.col,
           row: a.row,
           tilesetId: a.tilesetId,
           tileId: tile.id,
-          rotation: (a.rotation != null && a.rotation !== 0 ? a.rotation : undefined) as TileRotation | undefined,
+          rotation: a.rotation != null && a.rotation !== 0 ? a.rotation : undefined,
           depth: (a.depth != null && a.depth !== 'ground' ? a.depth : undefined) as TileLayerRole | undefined,
           scale: a.scale != null && a.scale !== 1 ? a.scale : undefined,
           spanW: 1,

@@ -11,10 +11,6 @@
     "scripts/**/*.{ts,mjs,js,cjs}",
     "tests/**/*.{ts,cjs}"
   ],
-  "ignore": [
-    "src/components/WindroseHoverPreview.tsx",
-    "src/settings/DeeplinkHover.ts"
-  ],
   "ignoreDependencies": [
     "ajv",
     "brace-expansion",

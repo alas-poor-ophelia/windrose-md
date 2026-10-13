@@ -5,7 +5,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  width: 240px;
+  /* width comes inline from the "Link preview size" slider */
   background: var(--background-secondary);
   border-radius: 4px;
   overflow: hidden;
@@ -18,8 +18,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 240px;
-    min-height: 180px;
   }
 
   &-header {
@@ -48,8 +46,7 @@
 
   canvas {
     display: block;
-    width: 240px;
-    height: 180px;
+    /* size comes inline from the "Link preview size" slider */
   }
 
   &-state {

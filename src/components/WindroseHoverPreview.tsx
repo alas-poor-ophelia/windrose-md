@@ -5,29 +5,23 @@
 
 import type { MapData } from '#types/index';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
-import type { RendererTheme } from '#types/hooks/canvasRenderer.types';
 
 import type { VNode } from 'preact';
 import { render } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { loadMapData } from '../persistence/fileOperations';
-import { renderCanvas } from '../hooks/canvas/useCanvasRenderer';
+import { renderCanvas } from '../geometry/renderers/mapRenderer';
 import { GridGeometry } from '../geometry/core/GridGeometry';
 import { HexGeometry } from '../geometry/core/HexGeometry';
-import { getApp, getSettings, getTheme, getEffectiveSettings } from '../core/settingsAccessor';
+import { getApp, getSettings, resolveTheme } from '../core/settingsAccessor';
 import { DEFAULTS } from '../core/dmtConstants';
-
-
-
-
-
-
 
 const BASE_WIDTH = 240;
 const BASE_HEIGHT = 180;
 const DEFAULT_PREVIEW_SCALE = 1.0;
 const DEFAULT_PREVIEW_ZOOM = 0.5;
 
+/** Preview canvas size and zoom from the "Link preview size" / "Link preview zoom" sliders. */
 function getPreviewDimensions(): { width: number; height: number; zoom: number } {
   try {
     const s = getSettings();
@@ -43,7 +37,6 @@ interface WindroseHoverPreviewProps {
   mapId: string;
   x: number;
   y: number;
-  zoom?: number;
   layerId?: string;
   notePath?: string;
 }
@@ -55,13 +48,13 @@ function noteBasename(notePath?: string): string {
   return base.replace(/\.md$/i, '');
 }
 
-function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }: WindroseHoverPreviewProps): VNode {
+function WindroseHoverPreview({ mapId, x, y, layerId, notePath }: WindroseHoverPreviewProps): VNode {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
   const [mapName, setMapName] = useState<string>('');
 
   const preview = getPreviewDimensions();
-  const zoom = zoomProp ?? preview.zoom;
+  const zoom = preview.zoom;
 
   useEffect(() => {
     let cancelled = false;
@@ -92,18 +85,8 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
             )
           : new GridGeometry((focused.gridSize as number) || (DEFAULTS.gridSize));
 
-        const effective = getEffectiveSettings(focused.settings);
-        const theme = {
-          grid: {
-            lines: effective.gridLineColor,
-            lineWidth: effective.gridLineWidth,
-            background: effective.backgroundColor
-          },
-          cells: {
-            border: effective.borderColor,
-            borderWidth: getTheme().cells.borderWidth
-          },
-        } as RendererTheme;
+        // Per-map theme: global settings with this map's overrides applied.
+        const theme = resolveTheme(focused.settings);
 
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -171,7 +154,7 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
   const showHeader = status === 'ready' && (headerMapName !== '' || noteLabel !== '');
 
   return (
-    <div className="windrose-hover-preview">
+    <div className="windrose-hover-preview" style={{ width: `${preview.width}px` }}>
       {showHeader && (
         <div className="windrose-hover-preview-header">
           {headerMapName && <div className="windrose-hover-preview-header-map">{headerMapName}</div>}
@@ -182,7 +165,7 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
         ref={canvasRef}
         width={preview.width}
         height={preview.height}
-        style={{ display: status === 'ready' ? 'block' : 'none' }}
+        style={{ display: status === 'ready' ? 'block' : 'none', width: `${preview.width}px`, height: `${preview.height}px` }}
       />
       {status === 'loading' && <div className="windrose-hover-preview-state">Loading…</div>}
       {status === 'missing' && <div className="windrose-hover-preview-state">Map not found</div>}
@@ -203,4 +186,4 @@ function unmountHoverPreview(el: HTMLElement): void {
   try { render(null, el); } catch { /* ignore */ }
 }
 
-export { WindroseHoverPreview, renderHoverPreview, unmountHoverPreview };
+export { renderHoverPreview, unmountHoverPreview, getPreviewDimensions };

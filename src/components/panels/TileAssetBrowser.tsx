@@ -23,6 +23,7 @@ import { useApp } from '../../context/AppContext';
 import { useThumbnailPipeline } from '../../hooks/state/useThumbnailPipeline';
 import { usePreactVirtualizer } from '../../hooks/state/useVirtualizer';
 import { Icon } from '../shared/Icon';
+import { nextRotation, rotationStepsFor, snapRotationToGrid, isOnRotationGrid, tileGeometryKind } from '../../assets/tileRotation';
 import { DrawerPaneHead, DrawerSearch } from './drawerChrome';
 import { DepthBar, depthMeta } from './DepthBar';
 import {
@@ -218,8 +219,6 @@ function displayCategory(category: string): string {
   return parts.slice(-2).join('/');
 }
 
-const ROTATION_STEPS = [0, 60, 120, 180, 240, 300];
-
 // memo: the map root re-renders on EVERY pointermove (viewState lives in its
 // state). Without memo, this entire tree — hundreds of tile nodes when any
 // tileset is configured — re-renders and re-diffs per touch event, which is
@@ -342,16 +341,26 @@ const TileAssetBrowser = memo(({
     }
   };
 
+  // Rotation steps follow the map geometry AND the placement mode: snapped
+  // grid 90, snapped hex 60, freeform (stamp/scatter) 15 on both.
+  const rotationFreeform = activeSubtool === 'stamp' || activeSubtool === 'scatter';
+  const rotationSteps = rotationStepsFor(tileGeometryKind(mapType), rotationFreeform);
+
+  // The brush's rotation must suit the armed mode: leaving freeform at 15 for
+  // snapped painting on a grid would stamp a square tile askew in its cell.
+  // Placed tiles are never touched — only the brush value is fitted.
+  useEffect(() => {
+    if (!isOnRotationGrid(rotation, rotationSteps)) {
+      onRotationChange(snapRotationToGrid(rotation, rotationSteps));
+    }
+  }, [rotation, rotationSteps, onRotationChange]);
+
   const handleRotateCW = (): void => {
-    const currentIdx = ROTATION_STEPS.indexOf(rotation);
-    const nextIdx = (currentIdx + 1) % ROTATION_STEPS.length;
-    onRotationChange(ROTATION_STEPS[nextIdx]);
+    onRotationChange(nextRotation(rotation, rotationSteps, 1));
   };
 
   const handleRotateCCW = (): void => {
-    const currentIdx = ROTATION_STEPS.indexOf(rotation);
-    const nextIdx = (currentIdx - 1 + ROTATION_STEPS.length) % ROTATION_STEPS.length;
-    onRotationChange(ROTATION_STEPS[nextIdx]);
+    onRotationChange(nextRotation(rotation, rotationSteps, -1));
   };
 
   // Latest values read by the hover-preview effect, which deliberately re-runs

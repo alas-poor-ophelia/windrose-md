@@ -9346,7 +9346,7 @@ button.windrose-breadcrumb-link {
   position: relative;
   display: flex;
   flex-direction: column;
-  width: 240px;
+  /* width comes inline from the "Link preview size" slider */
   background: var(--background-secondary);
   border-radius: 4px;
   overflow: hidden;
@@ -9358,8 +9358,6 @@ button.windrose-breadcrumb-link {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 240px;
-  min-height: 180px;
 }
 .windrose-hover-preview-header {
   padding: 6px 8px;
@@ -9384,8 +9382,7 @@ button.windrose-breadcrumb-link {
 }
 .windrose-hover-preview canvas {
   display: block;
-  width: 240px;
-  height: 180px;
+  /* size comes inline from the "Link preview size" slider */
 }
 .windrose-hover-preview-state {
   font-size: 12px;

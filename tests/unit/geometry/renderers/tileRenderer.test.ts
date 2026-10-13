@@ -568,6 +568,23 @@ describe('tileRenderer', () => {
       expect(ctx.drawImage).toHaveBeenCalledTimes(1);
     });
 
+    it('renders freeform 15-degree and legacy off-grid rotations as authored (windrose-mn1.81)', () => {
+      const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
+      for (const rotation of [15, 345, 60]) {
+        const ctx = makeCtx();
+        const tiles: TileAssignment[] = [
+          { col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1', rotation },
+        ];
+        renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom: 1 }, {
+          getCachedImage: () => fakeImg,
+          canvasWidth: 800,
+          canvasHeight: 600,
+        });
+        expect(ctx.rotate).toHaveBeenCalledWith((rotation * Math.PI) / 180);
+        expect(ctx.drawImage).toHaveBeenCalledTimes(1);
+      }
+    });
+
     it('applies horizontal flip when tile has flipH', () => {
       const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
       const ctx = makeCtx();
