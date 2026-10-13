@@ -29,9 +29,9 @@ import { predictSpan, DEFAULT_PIXELS_PER_CELL } from './spanPredictor';
 import { runDetectionScan, HEX_ART_MIN_SOURCE_PX } from './tileImageScan';
 
 /** Minimum confidence before a depth-tier prediction persists. */
-export const DEPTH_CONFIDENCE_THRESHOLD = 0.4;
+const DEPTH_CONFIDENCE_THRESHOLD = 0.4;
 /** Minimum confidence before a 'region' render-mode prediction persists. */
-export const RENDER_MODE_CONFIDENCE_THRESHOLD = 0.5;
+const RENDER_MODE_CONFIDENCE_THRESHOLD = 0.5;
 
 export interface ImportDetectionOptions {
   /**

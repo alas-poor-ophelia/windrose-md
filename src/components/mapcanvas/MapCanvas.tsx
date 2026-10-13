@@ -322,7 +322,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     // During animation, preserve canvas content
     if (isAnimating) {
       // Save current canvas content
-      const tempCanvas = activeWindow.createEl('canvas');
+      const tempCanvas = (canvas.ownerDocument.defaultView ?? activeWindow).createEl('canvas');
       tempCanvas.width = canvas.width;
       tempCanvas.height = canvas.height;
       const tempCtx = tempCanvas.getContext('2d');
@@ -403,11 +403,13 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
+    // Listen on the window that owns this map's canvas (popout-safe).
+    const win = canvasRef.current?.ownerDocument.defaultView ?? window;
+    win.addEventListener('keydown', handleKeyDown);
+    win.addEventListener('keyup', handleKeyUp);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
+      win.removeEventListener('keydown', handleKeyDown);
+      win.removeEventListener('keyup', handleKeyUp);
     };
   }, [isFocused, mapData?.mapType, setShowCoordinates]);
 

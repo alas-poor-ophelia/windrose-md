@@ -134,4 +134,4 @@ function getAlignmentScreenOffset(
   }
 }
 
-export { calculateObjectScreenPosition, getAlignmentScreenOffset };
+export { calculateObjectScreenPosition };

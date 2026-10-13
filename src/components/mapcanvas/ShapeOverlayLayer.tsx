@@ -92,8 +92,9 @@ const ShapeOverlayLayer = ({
         cancelPlacement();
       }
     };
-    activeDocument.addEventListener('keydown', handler);
-    return () => activeDocument.removeEventListener('keydown', handler);
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('keydown', handler);
+    return () => doc.removeEventListener('keydown', handler);
   }, [isShapeTool, cancelPlacement, canvasRef]);
 
   const distanceSettings = useMemo(() => {

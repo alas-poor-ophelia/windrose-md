@@ -663,8 +663,10 @@ function useWallTools({
         }
       }
     };
-    activeDocument.addEventListener('keydown', onKeyDown);
-    return () => activeDocument.removeEventListener('keydown', onKeyDown);
+    // Popout-safe: the document that owns this canvas, captured once per run.
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('keydown', onKeyDown);
+    return () => doc.removeEventListener('keydown', onKeyDown);
   }, [isWallTool, getWalls, updateWall, onWallPathsChange, cancelDrawing, commitWall, drawPreview, cellSize, isBareThreshold, isOpeningMode, onDisarmOpening, canvasRef]);
 
   // Reset transient state when the tool changes away.

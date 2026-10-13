@@ -68,14 +68,14 @@ const usePanZoomCoordinator = ({
     startTouchPan,
     updateTouchPan,
     stopTouchPan,
-    setInitialPinchDistance
+    startPinch
   } = useCanvasInteraction(canvasRef, mapData, geometry, isFocused, viewController, isInSubHex === true, subHexPath ?? null, requestEnterSubHex, requestExitSubHex);
 
   // Latest handler object, swapped in every render; the registry holds a
   // stable proxy over it (same latest-ref pattern as useLayerHandlers).
   const handlers: PanZoomHandlers = {
     startPan, updatePan, stopPan, markPanAnchorStale,
-    startTouchPan, updateTouchPan, stopTouchPan, setInitialPinchDistance,
+    startTouchPan, updateTouchPan, stopTouchPan, startPinch,
     handleWheel,
     handleGestureStart, handleGestureChange, handleGestureEnd,
     getClientCoords, getTouchCenter, getTouchDistance, screenToGrid,

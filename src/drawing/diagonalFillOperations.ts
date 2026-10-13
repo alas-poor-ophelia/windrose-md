@@ -25,26 +25,26 @@ import { isSimpleCell, hasSegments } from '#types/core/cell.types';
 // ===========================================
 
 /** Local position within a cell (0-1 range) */
-export interface LocalPosition {
+interface LocalPosition {
   localX: number;
   localY: number;
 }
 
 /** Valid corner result with coordinates */
-export interface ValidCornerResult {
+interface ValidCornerResult {
   x: number;
   y: number;
   corner: CornerName;
 }
 
 /** Color inheritance result */
-export interface InheritedColor {
+interface InheritedColor {
   color: string;
   opacity: number;
 }
 
 /** Diagonal path validation result */
-export interface DiagonalPathValidation {
+interface DiagonalPathValidation {
   valid: boolean;
   endX: number;
   endY: number;
@@ -52,7 +52,7 @@ export interface DiagonalPathValidation {
 }
 
 /** Start point for diagonal fill */
-export interface DiagonalStartPoint {
+interface DiagonalStartPoint {
   x: number;
   y: number;
   corner: CornerName;

@@ -123,14 +123,11 @@ export interface PanHandlers {
 // ===========================================
 
 /**
- * Remaining direct setter. The raw state setters (isPanning, panStart, ...)
- * are not exposed: every writer must set ref and state together inside the
- * hook. Prefer startPinch; this stays until the event coordinator switches.
+ * No direct setters remain: every writer sets ref and state together inside
+ * the hook (the pinch baseline is seeded through startPinch).
+ * @deprecated Empty; kept only for the types/index.ts re-export. Delete both together.
  */
-export interface CanvasInteractionSetters {
-  /** Seeds the pinch baseline into ref and state together — plain values only. */
-  setInitialPinchDistance: (distance: number | null) => void;
-}
+export type CanvasInteractionSetters = Record<string, never>;
 
 // ===========================================
 // Ref Types
@@ -157,8 +154,7 @@ export interface UseCanvasInteractionResult extends
   CanvasInteractionStateValues,
   CoordinateHelpers,
   ZoomHandlers,
-  PanHandlers,
-  CanvasInteractionSetters {
+  PanHandlers {
   lastTouchTimeRef: LastTouchTimeRef;
   isTouchPanningRef: { current: boolean };
   touchPanStartRef: { current: TouchCenter | null };

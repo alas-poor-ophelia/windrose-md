@@ -1,6 +1,7 @@
 import type { App} from 'obsidian';
 import { Modal, Setting, Notice } from 'obsidian';
 import type { PluginSettings, CustomCategory } from '#types/settings/settings.types';
+import { mintId } from '../../core/ids';
 
 interface WindrosePlugin {
   settings: PluginSettings;
@@ -102,7 +103,7 @@ class CategoryEditModal extends Modal {
       }
     } else {
       const newCategory: CustomCategory = {
-        id: 'custom-cat-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11),
+        id: mintId('custom-cat'),
         label: this.label.trim(),
         order: this.order
       };

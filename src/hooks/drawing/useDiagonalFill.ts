@@ -123,6 +123,13 @@ const useDiagonalFill = (currentTool: ToolId): UseDiagonalFillResult => {
     [geometry, mapData, onCellsChange]
   );
 
+  // Declared before handleDiagonalFillClick so it can be an honest dependency.
+  const executeFill = useCallback((): void => {
+    if (!fillStart || !fillEnd) return;
+    executeFillPath(fillStart, fillEnd);
+    resetState();
+  }, [fillStart, fillEnd, executeFillPath, resetState]);
+
   const handleDiagonalFillClick = useCallback(
     (e: PointerEvent | MouseEvent | TouchEvent, isTouch: boolean = false): boolean => {
       if (currentTool !== 'diagonalFill' || !geometry || !mapData) {
@@ -207,7 +214,7 @@ const useDiagonalFill = (currentTool: ToolId): UseDiagonalFillResult => {
 
       return true;
     },
-    [currentTool, geometry, mapData, cellMap, fillStart, fillEnd, isEndLocked, getClientCoords, screenToWorld, screenToGrid, executeFillPath, resetState]
+    [currentTool, geometry, mapData, cellMap, fillStart, fillEnd, isEndLocked, getClientCoords, screenToWorld, screenToGrid, executeFillPath, executeFill, resetState]
   );
 
   const handleDiagonalFillMove = useCallback(
@@ -236,12 +243,6 @@ const useDiagonalFill = (currentTool: ToolId): UseDiagonalFillResult => {
     },
     [currentTool, geometry, fillStart, isEndLocked, cellMap, getClientCoords, screenToGrid]
   );
-
-  const executeFill = useCallback((): void => {
-    if (!fillStart || !fillEnd) return;
-    executeFillPath(fillStart, fillEnd);
-    resetState();
-  }, [fillStart, fillEnd, executeFillPath, resetState]);
 
   const cancelFill = useCallback((): void => {
     resetState();

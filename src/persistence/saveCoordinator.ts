@@ -76,17 +76,43 @@ function journalAll(app: App): void {
  * Returns a disposer — register it with `Plugin.register`.
  */
 function installLifecycleJournaling(app: App): () => void {
-  const onHide = (): void => {
-    if (document.visibilityState === 'hidden') journalAll(app);
-  };
-  const onPageHide = (): void => { journalAll(app); };
+  // Listeners are attached once per WINDOW: the main window now, plus every
+  // popout window as it opens (a map in a popout must journal on THAT
+  // window's pagehide, which never fires on the main window).
+  const detachers = new Map<Window, () => void>();
 
-  document.addEventListener('visibilitychange', onHide);
-  window.addEventListener('pagehide', onPageHide);
+  const attach = (win: Window): void => {
+    if (detachers.has(win)) return;
+    const doc = win.document;
+    const onHide = (): void => {
+      if (doc.visibilityState === 'hidden') journalAll(app);
+    };
+    const onPageHide = (): void => { journalAll(app); };
+    doc.addEventListener('visibilitychange', onHide);
+    win.addEventListener('pagehide', onPageHide);
+    detachers.set(win, () => {
+      doc.removeEventListener('visibilitychange', onHide);
+      win.removeEventListener('pagehide', onPageHide);
+    });
+  };
+  const detach = (win: Window): void => {
+    detachers.get(win)?.();
+    detachers.delete(win);
+  };
+
+  attach(window);
+  app.workspace.iterateAllLeaves((leaf) => { attach(leaf.view.containerEl.win); });
+  const openRef = app.workspace.on('window-open', (_ws, win) => { attach(win); });
+  const closeRef = app.workspace.on('window-close', (_ws, win) => {
+    journalAll(app);
+    detach(win);
+  });
 
   return () => {
-    document.removeEventListener('visibilitychange', onHide);
-    window.removeEventListener('pagehide', onPageHide);
+    app.workspace.offref(openRef);
+    app.workspace.offref(closeRef);
+    for (const off of detachers.values()) off();
+    detachers.clear();
   };
 }
 
@@ -103,4 +129,4 @@ export {
   installLifecycleJournaling,
   registeredInstanceCount,
 };
-export type { SaveInstance };
+

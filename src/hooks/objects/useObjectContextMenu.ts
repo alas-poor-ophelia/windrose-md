@@ -76,7 +76,7 @@ export interface ObjectContextMenuOptions {
 }
 
 export function useObjectContextMenu({ handlers, idActions, measureMovement }: ObjectContextMenuOptions): void {
-  const { mapData, geometry, screenToGrid, instanceId } = useMapState();
+  const { mapData, geometry, screenToGrid, instanceId, canvasRef } = useMapState();
   const { getObjectAtPosition } = useMapOperations();
   const { selectedItems, setSelectedItem, isResizeMode } = useMapSelection();
 
@@ -139,7 +139,9 @@ export function useObjectContextMenu({ handlers, idActions, measureMovement }: O
       menu.showAtPosition({ x: detail.screenX, y: detail.screenY });
     };
 
-    activeDocument.addEventListener('windrose:selection-context-menu', handler);
-    return () => activeDocument.removeEventListener('windrose:selection-context-menu', handler);
-  }, [instanceId]);
+    // Popout-safe: the document that owns this canvas, captured once per run.
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('windrose:selection-context-menu', handler);
+    return () => doc.removeEventListener('windrose:selection-context-menu', handler);
+  }, [instanceId, canvasRef]);
 }

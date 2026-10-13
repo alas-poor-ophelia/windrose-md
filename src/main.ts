@@ -35,6 +35,7 @@ import {
 } from './persistence/tileMetadata';
 import { flushTilesetArtSaves } from './persistence/tilesetArtSettings';
 import type { TileEntry } from '#types/tiles/tile.types';
+import { mintId } from './core/ids';
 
 /** View center used when a generated dungeon has no cells to derive bounds from. */
 const DUNGEON_FALLBACK_CENTER = { x: 5, y: 5 };
@@ -618,7 +619,7 @@ export default class WindrosePlugin extends Plugin {
    * (which navigates to the new map instead).
    */
   async createRandomDungeonMap(mapName: string, cells: Record<string, unknown>[], objects: unknown[], edges: unknown[], options: DungeonGenOptions): Promise<string> {
-    const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+    const mapId = mintId('map');
     await this.saveDungeonToJson(mapId, mapName, cells as DungeonCell[], objects, edges, options);
     return mapId;
   }

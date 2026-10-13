@@ -26,8 +26,6 @@ import type { ViewController } from '#types/hooks/viewController.types';
 import { useRef } from 'preact/hooks';
 import { traceZoom } from '../../utils/zoomTraceProbe';
 
-export type { ViewController };
-
 const DEFAULT_VIEW_STATE: StoredViewState = { zoom: 1, center: { x: 0, y: 0 } };
 
 /**

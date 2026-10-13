@@ -184,4 +184,4 @@ export {
 	FilePckSource,
 	BufferPckSource,
 };
-export type { PckArchive, PckFileEntry, PckHeader, PckSource };
+export type { PckArchive, PckFileEntry, PckSource };

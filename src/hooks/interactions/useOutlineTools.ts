@@ -12,6 +12,7 @@ import type { ExtendedGeometry } from '#types/contexts/context.types';
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { updateById, removeById } from '../../objects/entityList';
+import { mintId } from '../../core/ids';
 
 interface OutlineToolsOptions {
   currentTool: ToolId;
@@ -56,7 +57,7 @@ const DEFAULT_SETTINGS: OutlineSettings = {
 };
 
 function generateOutlineId(): string {
-  return `outline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return mintId('outline', { randomLength: 6 });
 }
 
 function distanceToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {

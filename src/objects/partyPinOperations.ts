@@ -14,6 +14,7 @@
  */
 
 // Type-only imports
+import { mintId } from '../core/ids';
 import type { PartyPin, PartyRangeStyle } from '#types/core/map.types';
 import type { IGeometry, Point } from '#types/core/geometry.types';
 import type { HexOrientation } from '#types/settings/settings.types';
@@ -46,7 +47,7 @@ const PARTY_PIN_PALETTE = [
  * Generate a unique party pin ID
  */
 function generatePartyPinId(): string {
-  return 'party-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+  return mintId('party');
 }
 
 /**

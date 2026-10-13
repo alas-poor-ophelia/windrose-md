@@ -544,6 +544,5 @@ export {
 	isEndCapFilename,
 	destFolderOf,
 	analyzePckForWizard,
-	STRIP_SOURCE_TYPES,
 };
-export type { AssetCounts, DdImportResult, DdProgressFn, PluginLike, PckWizardAnalysis, DdWizardDecisions };
+export type { PluginLike, PckWizardAnalysis, DdWizardDecisions };

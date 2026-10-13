@@ -25,7 +25,7 @@ import type { IGeometry, Point } from '#types/core/geometry.types';
 import type { ShapeOverlay, ShapeOverlayType } from '#types/core/map.types';
 
 /** The subset of a ShapeOverlay that snapping touches */
-export interface ShapeOverlayGeometry {
+interface ShapeOverlayGeometry {
   worldPosition: Point;
   size: number;
   /** Rectangle half-width; falls back to `size` when absent (pre-2.4.0 squares) */
@@ -35,7 +35,7 @@ export interface ShapeOverlayGeometry {
 }
 
 /** The subset of a ShapeOverlay that extent maths needs */
-export interface ShapeOverlayExtents {
+interface ShapeOverlayExtents {
   shape?: ShapeOverlayType;
   size: number;
   halfWidth?: number;

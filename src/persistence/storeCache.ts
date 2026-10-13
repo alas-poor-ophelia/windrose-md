@@ -41,7 +41,16 @@ interface CachedStore extends StoreSnapshot {
   path: string;
   mtime: number;
   size: number;
+  /**
+   * Git's racy-timestamp rule: a coarse-granularity filesystem (mtime on a
+   * whole second) can show the same mtime+size for a later write. Until this
+   * wall-clock time the stat cannot vouch for the file. 0 = not racy.
+   */
+  racyUntil: number;
 }
+
+/** Window after a whole-second mtime during which the stat is not trusted. */
+const RACY_WINDOW_MS = 2500;
 
 let cache: CachedStore | null = null;
 
@@ -130,6 +139,7 @@ async function statStore(app: App, path: string): Promise<{ mtime: number; size:
 async function getValidStoreCache(app: App, path: string): Promise<StoreSnapshot | null> {
   const current = cache;
   if (current == null || current.path !== path) return null;
+  if (Date.now() < current.racyUntil) return null; // stat cannot yet prove freshness
   const stat = await statStore(app, path);
   if (cache !== current) return null; // dropped by an event while we awaited
   if (stat == null || stat.mtime !== current.mtime || stat.size !== current.size) {
@@ -149,7 +159,8 @@ async function commitStoreCache(app: App, path: string, snapshot: StoreSnapshot,
   cache = null;
   const stat = await statStore(app, path);
   if (stat == null || stat.size !== utf8ByteLength(written)) return;
-  cache = { path, mtime: stat.mtime, size: stat.size, rest: snapshot.rest, entries: snapshot.entries };
+  const racyUntil = stat.mtime % 1000 === 0 ? stat.mtime + RACY_WINDOW_MS : 0;
+  cache = { path, mtime: stat.mtime, size: stat.size, racyUntil, rest: snapshot.rest, entries: snapshot.entries };
 }
 
 /**

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "scripts/**/*.{ts,mjs,js,cjs}",
+    "tests/**/*.{ts,cjs}",
+    "vitest*.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "types/**/*.ts",
+    "scripts/**/*.{ts,mjs,js,cjs}",
+    "tests/**/*.{ts,cjs}"
+  ],
+  "ignore": [
+    "src/components/WindroseHoverPreview.tsx",
+    "src/settings/DeeplinkHover.ts"
+  ],
+  "ignoreDependencies": [
+    "ajv",
+    "brace-expansion",
+    "minimatch",
+    "picomatch",
+    "playwright",
+    "electron"
+  ],
+  "ignoreIssues": {
+    "tests/unit/datacore-transformer.ts": ["duplicates"]
+  },
+  "rules": {
+    "exports": "warn",
+    "types": "warn",
+    "nsExports": "warn",
+    "nsTypes": "warn"
+  }
+}

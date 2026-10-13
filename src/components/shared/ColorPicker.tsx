@@ -199,11 +199,13 @@ const ColorPicker = ({
       });
     };
 
-    window.addEventListener('resize', recompute);
-    window.addEventListener('scroll', recompute, true);
+    // The swatch's window, not the ambient one (popout-safe).
+    const win = editTargetElRef.current?.ownerDocument.defaultView ?? window;
+    win.addEventListener('resize', recompute);
+    win.addEventListener('scroll', recompute, true);
     return () => {
-      window.removeEventListener('resize', recompute);
-      window.removeEventListener('scroll', recompute, true);
+      win.removeEventListener('resize', recompute);
+      win.removeEventListener('scroll', recompute, true);
     };
   }, [editTargetId]);
 
@@ -379,7 +381,7 @@ const ColorPicker = ({
       position: 'fixed',
       left: `${rect.left}px`,
       ...(position === 'above'
-        ? { bottom: `${window.innerHeight - rect.top + gap}px` }
+        ? { bottom: `${(anchorRef.current.ownerDocument.defaultView ?? window).innerHeight - rect.top + gap}px` }
         : { top: `${rect.bottom + gap}px` }
       )
     };

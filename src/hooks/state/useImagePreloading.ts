@@ -1,7 +1,7 @@
 import type { MapData } from '#types/core/map.types';
 import type { App } from 'obsidian';
 
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { preloadImage, pinImage, unpinImage, getCachedImage } from '../../assets/imageOperations';
 import { resolveTileEntry } from '../../assets/tilesetOperations';
 import { collectWallPathImagePaths } from '../../geometry/renderers/wallPathRenderer';
@@ -95,10 +95,23 @@ function useImagePreloading(
     return undefined;
   }, [app, mapData?.backgroundImage?.path]);
 
-  useEffect(() => {
-    if (!mapData) return;
+  // Narrow effect inputs (honest deps): the effects below key on these fields,
+  // not on the whole mapData object, which changes on every edit.
+  const hasMapData = mapData != null;
+  const mapSettings = mapData?.settings;
+  const mapType = mapData?.mapType;
+  const objectSetId = mapData?.objectSetId;
+  const tilesets = mapData?.tilesets;
+  const layers = mapData?.layers;
+  // Latest-ref: collectPlacedImagePaths needs the whole map, but only a
+  // tilesets/layers change should re-run the tile preload.
+  const mapDataRef = useRef(mapData);
+  mapDataRef.current = mapData;
 
-    const effectiveSettings = getEffectiveSettings(mapData.settings);
+  useEffect(() => {
+    if (!hasMapData) return;
+
+    const effectiveSettings = getEffectiveSettings(mapSettings);
     const fowImagePath = effectiveSettings.fogOfWarImage;
 
     if (fowImagePath != null && fowImagePath !== '') {
@@ -115,12 +128,12 @@ function useImagePreloading(
     }
     setFowImageReady(false);
     return undefined;
-  }, [app, mapData?.settings]);
+  }, [app, hasMapData, mapSettings]);
 
   useEffect(() => {
-    if (!mapData) return;
+    if (!hasMapData) return;
 
-    const objectTypes = getResolvedObjectTypes(mapData.mapType, mapData.objectSetId);
+    const objectTypes = getResolvedObjectTypes(mapType, objectSetId);
     const iconPaths: string[] = [];
     for (const objType of objectTypes.filter(hasImagePath)) {
       if (objType.imagePath != null && objType.imagePath !== '') iconPaths.push(objType.imagePath);
@@ -133,17 +146,18 @@ function useImagePreloading(
       void preloadImage(app, path);
     }
     return () => { for (const path of iconPaths) unpinImage(path); };
-  }, [app, mapData?.mapType, mapData?.objectSetId, settingsVersion]);
+  }, [app, hasMapData, mapType, objectSetId, settingsVersion]);
 
   useEffect(() => {
-    if (mapData?.tilesets == null || mapData.tilesets.length === 0) {
+    const currentMap = mapDataRef.current;
+    if (currentMap == null || tilesets == null || tilesets.length === 0) {
       setTileImagesReady(false);
       return;
     }
 
     // Only preload tiles actually placed on the map, not the entire catalog.
     // The tile browser loads thumbnails on-demand via CSS background-image.
-    const placedPaths = collectPlacedImagePaths(mapData);
+    const placedPaths = collectPlacedImagePaths(currentMap);
 
     if (placedPaths.size === 0) {
       setTileImagesReady(true);
@@ -169,9 +183,9 @@ function useImagePreloading(
       promises.push(preloadImage(app, path));
     }
     void Promise.all(promises).then(() => setTileImagesReady(true));
-  }, [app, mapData?.tilesets, mapData?.layers]);
+  }, [app, tilesets, layers]);
 
   return { backgroundImageReady, fowImageReady, tileImagesReady };
 }
 
-export { useImagePreloading, collectPlacedImagePaths, prewarmMapAssets };
+export { useImagePreloading, prewarmMapAssets };

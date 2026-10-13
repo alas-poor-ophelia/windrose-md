@@ -177,7 +177,7 @@ export interface DungeonStyleColors {
   water: string;
 }
 
-export interface DungeonConfigOverrides {
+interface DungeonConfigOverrides {
   objectDensity?: number;
   monsterWeight?: number;
   emptyWeight?: number;
@@ -191,7 +191,7 @@ export interface DungeonConfigOverrides {
   waterOpacity?: number;
 }
 
-export interface DungeonStockingMetadata {
+interface DungeonStockingMetadata {
   rooms?: unknown[];
   corridorResult?: unknown;
   doorPositions?: Array<{ x: number; y: number }>;
@@ -201,7 +201,7 @@ export interface DungeonStockingMetadata {
   waterRoomIds?: string[];
 }
 
-export interface GenerationSettings {
+interface GenerationSettings {
   preset?: string;
   seed?: number;
   configOverrides?: DungeonConfigOverrides;
@@ -214,7 +214,7 @@ export interface GenerationSettings {
 
 // Full MapObject type is in object.types.ts
 // We use a minimal interface here to avoid circular imports
-export interface MapObjectRef {
+interface MapObjectRef {
   id: string;
   typeId: string;
   type?: string;

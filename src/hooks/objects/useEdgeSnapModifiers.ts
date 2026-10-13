@@ -24,7 +24,7 @@ function useEdgeSnapModifiers(): {
   setEdgeSnapMode: (v: boolean) => void;
   freeformDragPreview: boolean;
 } {
-  const { currentTool } = useMapState();
+  const { currentTool, canvasRef } = useMapState();
   const { selectedItem, setSelectedItem } = useMapSelection();
 
   const [edgeSnapMode, setEdgeSnapMode] = useState(false);
@@ -64,14 +64,16 @@ function useEdgeSnapModifiers(): {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
+    // Popout-safe: the window that owns this map's canvas, captured per run.
+    const win = canvasRef.current?.ownerDocument.defaultView ?? window;
+    win.addEventListener('keydown', handleKeyDown);
+    win.addEventListener('keyup', handleKeyUp);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
+      win.removeEventListener('keydown', handleKeyDown);
+      win.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedItem, currentTool]);
+  }, [selectedItem, currentTool, canvasRef]);
 
   useEffect(() => {
     if (!selectedItem || selectedItem.type !== 'object') {

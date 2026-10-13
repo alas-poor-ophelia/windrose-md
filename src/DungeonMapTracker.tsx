@@ -404,10 +404,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // MCP bridge can report undo exactly.
   const wrappedHandleUndo = useCallback((): boolean => {
     const event = new CustomEvent('windrose:before-undo', { cancelable: true, detail: { instanceId } });
-    activeDocument.dispatchEvent(event);
+    // Dispatch on the document that owns this map (popout-safe); RegionLayer
+    // listens on its canvas's ownerDocument.
+    (containerRef.current?.ownerDocument ?? activeDocument).dispatchEvent(event);
     if (event.defaultPrevented) return true; // a tool consumed the undo
     return handleUndo();
-  }, [handleUndo, instanceId]);
+  }, [handleUndo, instanceId, containerRef]);
 
   // Clone layer: native modal first, Preact fallback state otherwise.
   const { cloningLayerId, setCloningLayerId, handleCloneLayerRequest } = useCloneLayerRequest(app, mapData, handleLayerClone);

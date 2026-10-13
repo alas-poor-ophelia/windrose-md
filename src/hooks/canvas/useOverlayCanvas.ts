@@ -81,6 +81,7 @@ function useOverlayCanvas(canvasRef: CanvasRefLike, options: OverlayCanvasOption
 		const parent = main?.parentElement;
 		if (main == null || parent == null) return null;
 
+		// Created via activeWindow, then adopted by parent's document on append.
 		const overlay = activeWindow.createEl('canvas');
 		overlay.width = main.width;
 		overlay.height = main.height;

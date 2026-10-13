@@ -448,4 +448,4 @@ function clearUnusedTileImages(activePaths: Set<string>): void {
   }
 }
 
-export { buildImageIndex, getImageDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, preloadImage, getCachedImage, getRenderSource, getImageDimensions, getImageCacheVersion, clearCachedImage, clearUnusedTileImages, calculateGridFromImage, GRID_DENSITY_PRESETS, MAX_CACHE_SIZE, setMaxCacheSize, pinImage, unpinImage, getPinCount, disposeImageCache };
+export { getImageDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, preloadImage, getCachedImage, getRenderSource, getImageDimensions, getImageCacheVersion, clearCachedImage, clearUnusedTileImages, calculateGridFromImage, GRID_DENSITY_PRESETS, MAX_CACHE_SIZE, setMaxCacheSize, pinImage, unpinImage, getPinCount, disposeImageCache };

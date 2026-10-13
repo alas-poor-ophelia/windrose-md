@@ -89,4 +89,4 @@ interface InteractStatic {
 const interact = interactFn as unknown as InteractStatic;
 
 export { interact };
-export type { InteractDragEvent, InteractResizeEvent, DraggableOptions, ResizableOptions, Interactable, InteractStatic };
+

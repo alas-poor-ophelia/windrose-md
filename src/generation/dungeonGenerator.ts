@@ -9,6 +9,7 @@
  *   4. Cell Generation - convert to Windrose cell format
  * 
  */
+import { mintId } from '../core/ids';
 
 // =============================================================================
 // TYPES
@@ -19,7 +20,7 @@ export interface CellCoord {
   y: number;
 }
 
-export interface RoomRect extends CellCoord {
+interface RoomRect extends CellCoord {
   width: number;
   height: number;
 }
@@ -35,20 +36,20 @@ export interface DungeonRoom extends RoomRect {
   parts?: RoomRect[];
 }
 
-export interface DungeonCell extends CellCoord {
+interface DungeonCell extends CellCoord {
   color: string;
   segments?: Record<string, boolean>;
   opacity?: number;
 }
 
-export interface WallEdge {
+interface WallEdge {
   x: number;
   y: number;
   side: string;
   color: string;
 }
 
-export interface DungeonObject {
+interface DungeonObject {
   id: string;
   type: string;
   position: CellCoord;
@@ -58,19 +59,19 @@ export interface DungeonObject {
 }
 
 /** Corridor cell: plain position, or a diagonal segment cell carrying color and segments. */
-export interface CorridorCell extends CellCoord {
+interface CorridorCell extends CellCoord {
   color?: string;
   segments?: Record<string, boolean>;
 }
 
-export interface DiagonalPath {
+interface DiagonalPath {
   cells: CorridorCell[];
   orderedPath: CellCoord[];
   width: number;
   hasDiagonals: boolean;
 }
 
-export interface CorridorConnection {
+interface CorridorConnection {
   cells: CorridorCell[];
   orderedPath: CellCoord[];
   width: number;
@@ -79,7 +80,7 @@ export interface CorridorConnection {
   roomB: DungeonRoom;
 }
 
-export interface CorridorResult {
+interface CorridorResult {
   cells: CorridorCell[];
   byConnection: CorridorConnection[];
 }
@@ -107,14 +108,14 @@ export interface DungeonResult {
   };
 }
 
-export interface RoomSizeRange {
+interface RoomSizeRange {
   minWidth: number;
   maxWidth: number;
   minHeight: number;
   maxHeight: number;
 }
 
-export interface DungeonPreset {
+interface DungeonPreset {
   gridWidth: number;
   gridHeight: number;
   roomCount: { min: number; max: number };
@@ -382,7 +383,7 @@ function isCellInRoomRect(x: number, y: number, room: RoomRect): boolean {
 }
 
 function generateObjectId(): string {
-  return 'obj-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+  return mintId('obj');
 }
 
 // =============================================================================

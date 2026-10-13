@@ -123,4 +123,4 @@ async function openNoteInNewTab(notePath: string | null | undefined): Promise<bo
 // Exports
 // ===========================================
 
-export { buildNoteIndex, getNoteEntries, getFullPathFromDisplayName, getDisplayNameFromPath, openNoteInNewTab, };
+export { getNoteEntries, getFullPathFromDisplayName, getDisplayNameFromPath, openNoteInNewTab };

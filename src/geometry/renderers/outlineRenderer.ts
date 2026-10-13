@@ -212,5 +212,5 @@ function renderOutlines(
   }
 }
 
-export { renderOutlines, findEnclosedHexes, computeBoundaryEdges, pointInPolygon };
+export { renderOutlines, computeBoundaryEdges, pointInPolygon };
 export type { HexGeometryLike };

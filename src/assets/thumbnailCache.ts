@@ -200,7 +200,7 @@ function renderThumbnail(path: string, img: ImageBitmap): void {
   }
 }
 
-function clearThumbnail(path: string): void {
+export function clearThumbnail(path: string): void {
   cache.delete(path);
   pending.delete(path);
 }
@@ -213,4 +213,4 @@ function clearAll(): void {
   processing = false;
 }
 
-export { subscribe, getUrl, request, requestBatch, clearThumbnail, clearAll, THUMB_SIZE };
+export { subscribe, getUrl, request, requestBatch, clearAll, THUMB_SIZE };

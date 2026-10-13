@@ -4,6 +4,7 @@
  * tileArtAnalysis (kept so existing importers need no changes).
  */
 
+import { mintId } from '../core/ids';
 import type { FolderTileset, TileEntry, TilesetOrigin } from '#types/tiles/tile.types';
 
 /** Generate a deterministic tileset ID from folder path */
@@ -16,7 +17,7 @@ function generateTilesetId(folderPath?: string): string {
     }
     return 'tileset-' + Math.abs(hash).toString(36);
   }
-  return 'tileset-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+  return mintId('tileset');
 }
 
 // ===========================================

@@ -207,5 +207,5 @@ function pruneSubHexBackdrops(canvas: HTMLCanvasElement | null, currentPath: str
   }
 }
 
-export type { SubHexBackdropEntry, CaptureSubHexBackdropOptions };
+
 export { captureSubHexBackdrop, relabelSubHexBackdrop, getSubHexBackdrop, clearSubHexBackdrop, pruneSubHexBackdrops };

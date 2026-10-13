@@ -824,4 +824,4 @@ function buildSettingDefinitions(tab: SettingsTabThis): SettingDefinitionItem[] 
   ];
 }
 
-export { buildSettingDefinitions, getSettingControlValue, setSettingControlValue, SHORTCUT_ACTIONS, DEFAULT_SHORTCUTS, formatKeyLabel };
+export { buildSettingDefinitions, getSettingControlValue, setSettingControlValue };

@@ -141,7 +141,7 @@ type CellEdge = 'top' | 'right' | 'bottom' | 'left';
 type EdgeHalf = 'first' | 'second';
 
 /** External edge definition for a segment */
-interface ExternalEdge {
+export interface ExternalEdge {
   edge: CellEdge;
   half: EdgeHalf;
 }
@@ -434,37 +434,11 @@ const CORNER_DIAGONAL_DIRECTION: Record<CornerName, DiagonalDirection> = {
 // These are stripped at transpile time, so they must come before return
 // =============================================================================
 
-export type {
-  // Theme types
-  Theme,
-  GridTheme,
-  CellTheme,
-  FogOfWarTheme,
-  // Defaults types
-  Defaults,
-  Dimensions,
-  HexBounds,
-  CanvasSize,
-  DistanceDefaults,
-  HexOrientation,
-  MapType,
-  DiagonalRule,
-  DistanceDisplayFormat,
-  // Segment types
-  SegmentName,
-  VertexName,
-  VertexRatio,
-  TriangleDefinition,
-  InternalEdgeKey,
-  CrossCellAdjacency,
-  CellEdge,
-  EdgeHalf,
-  ExternalEdge,
-  // Diagonal fill types
-  CornerName,
-  NeighborOffset,
-  DiagonalDirection
-};
+export type { // Theme types
+  Theme, // Defaults types
+  Defaults, Dimensions, HexBounds, HexOrientation, MapType, DiagonalRule, DistanceDisplayFormat, // Segment types
+  SegmentName, VertexName, // Diagonal fill types
+  CornerName, DiagonalDirection };
 
 // =============================================================================
 // Module Exports

@@ -5,12 +5,13 @@
  * strokes painted in world space). Mirrors wallPathOperations.
  */
 
+import { mintId } from '../core/ids';
 import type { TileLayerRole } from '#types/tiles/tile.types';
 import type { TerrainStroke, TerrainStrokeId } from '#types/core/terrainstroke.types';
 
 /** Create a unique terrain stroke ID */
 function createTerrainStrokeId(): TerrainStrokeId {
-	return 'tstroke-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+	return mintId('tstroke', { randomLength: 6 });
 }
 
 interface CreateTerrainStrokeOptions {
@@ -41,4 +42,4 @@ function createTerrainStroke(opts: CreateTerrainStrokeOptions): TerrainStroke {
 }
 
 export { createTerrainStrokeId, createTerrainStroke };
-export type { CreateTerrainStrokeOptions };
+

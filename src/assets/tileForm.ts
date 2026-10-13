@@ -61,9 +61,9 @@ function deriveTileForm(
  *   available   — dimmed but clickable; unusual pairing, manual override
  *   disabled    — truly impossible (missing required metadata/machinery)
  */
-export type SubtoolGate = 'recommended' | 'available' | 'disabled';
+type SubtoolGate = 'recommended' | 'available' | 'disabled';
 
-export interface TileSubtoolDef {
+interface TileSubtoolDef {
   id: TileSubtoolId;
   label: string;
   icon: string;
@@ -247,18 +247,4 @@ function deriveOpeningWidthCells(
   return Math.max(lo, Math.min(hi, raw));
 }
 
-export {
-  deriveTileForm,
-  deriveOpeningWidthCells,
-  formDef,
-  subtoolMeta,
-  subtoolGate,
-  ribbonSubtoolsForForm,
-  FORM_DEFS,
-  SUBTOOL_META,
-  RIBBON_SUBTOOL_ORDER,
-  LINE_DD_SOURCES,
-  OPENING_DD_SOURCES,
-  THRESHOLD_ENTRY_ID,
-  THRESHOLD_ENTRY,
-};
+export { deriveTileForm, deriveOpeningWidthCells, formDef, subtoolMeta, subtoolGate, ribbonSubtoolsForForm, FORM_DEFS, SUBTOOL_META, RIBBON_SUBTOOL_ORDER, OPENING_DD_SOURCES, THRESHOLD_ENTRY };

@@ -131,13 +131,13 @@ function markStoreObserved(dataPath: string): void {
  * it. No evidence means a fresh install (first map), where creating an empty
  * store is safe. Call inside the data-file mutex.
  */
-function hasPriorStoreEvidence(app: App, dataPath: string): boolean {
+function hasPriorStoreEvidence(app: App, dataPath: string, includeElsewhere: boolean = true): boolean {
   if (observedStorePaths.has(dataPath)) return true;
   const siblings = [bakPathForSlot(dataPath, 1), bakPathForSlot(dataPath, 2), dailyBakPath(dataPath)];
   if (siblings.some(p => app.vault.getAbstractFileByPath(p) != null)) return true;
   const corruptPrefix = `${dataPath}.corrupt-`;
   if (vaultFiles(app).some(f => f.path.startsWith(corruptPrefix))) return true;
-  return storeFoundElsewhere(app, dataPath) != null;
+  return includeElsewhere && storeFoundElsewhere(app, dataPath) != null;
 }
 
 function vaultFiles(app: App): TFile[] {
@@ -600,18 +600,29 @@ async function ensureDataFileForNewMap(app: App): Promise<boolean> {
   const dataPath = getDataFilePath();
   const proceed = await enqueueDataFileOp(async () => {
     if (app.vault.getAbstractFileByPath(dataPath) != null) return 'exists' as const;
-    return hasPriorStoreEvidence(app, dataPath) ? 'refuse' as const : 'create' as const;
+    // Evidence AT the configured path (seen this session, .bak*/.corrupt-*
+    // siblings) refuses. A same-named file only ELSEWHERE does not: a user who
+    // moved or archived their store must still be able to start a new one.
+    if (hasPriorStoreEvidence(app, dataPath, false)) return { kind: 'refuse' as const };
+    return { kind: 'create' as const, elsewhere: storeFoundElsewhere(app, dataPath) };
   });
   if (proceed === 'exists') return true;
-  if (proceed === 'refuse') {
+  if (proceed.kind === 'refuse') {
     // Parallax wave-7 finding 5: say why no store was created.
     new Notice(
       `Windrose: no map data file was created at ${dataPath} because one existed before ` +
-      `(a backup, a corrupt copy or a same-named file elsewhere in the vault). ` +
+      `(a backup or a corrupt copy beside it). ` +
       `Open the map to restore it or to create a new data file from the panel.`,
       10_000
     );
     return false;
+  }
+  if (proceed.elsewhere != null) {
+    new Notice(
+      `Windrose: a file named like the map data file exists at ${proceed.elsewhere}. ` +
+      `A new data file was created at ${dataPath}; move the old one back if you meant to keep using it.`,
+      10_000
+    );
   }
   return createEmptyDataFile(app);
 }
@@ -1213,4 +1224,4 @@ export {
   shouldRotateBak, otherBakSlot, bakPathForSlot, dailyBakPath, isSuspiciousShrink, backupTimestamp,
   findBestBackup, restoreFromBackup, BAK_THROTTLE_MS
 };
-export type { MapListEntry, MapListResult, BakSlot, DataFileBackup, RestoreResult };
+export type { MapListEntry, MapListResult, BakSlot, DataFileBackup };

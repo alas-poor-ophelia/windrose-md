@@ -435,6 +435,8 @@ const ToolPalette = ({
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const [subToolSelections, setSubToolSelections] = useState<SubToolSelections>(INITIAL_SUB_TOOL_SELECTIONS);
   const featureFlags = useFeatureFlags();
+  // Root element: its ownerDocument is the window that owns this map (popout-safe).
+  const paletteRef = useRef<HTMLDivElement>(null);
 
   useEffect((): (() => void) | undefined => {
     if (!isFocused) return undefined;
@@ -483,8 +485,9 @@ const ToolPalette = ({
       e.preventDefault();
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    const win = paletteRef.current?.ownerDocument.defaultView ?? window;
+    win.addEventListener('keydown', handleKeyDown);
+    return () => win.removeEventListener('keydown', handleKeyDown);
   }, [onToolChange, isFocused, subToolSelections, currentTool, featureFlags]);
 
   const visibleSimpleTools = simpleTools.filter(tool =>
@@ -528,21 +531,22 @@ const ToolPalette = ({
       }
     };
 
+    const doc = paletteRef.current?.ownerDocument ?? activeDocument;
     const timerId = window.setTimeout(() => {
-      activeDocument.addEventListener('mousedown', handleClickOutside, true);
-      activeDocument.addEventListener('touchstart', handleClickOutside, { capture: true, passive: false });
+      doc.addEventListener('mousedown', handleClickOutside, true);
+      doc.addEventListener('touchstart', handleClickOutside, { capture: true, passive: false });
     }, 10);
 
     return () => {
       window.clearTimeout(timerId);
-      activeDocument.removeEventListener('mousedown', handleClickOutside, true);
-      activeDocument.removeEventListener('touchstart', handleClickOutside, true);
+      doc.removeEventListener('mousedown', handleClickOutside, true);
+      doc.removeEventListener('touchstart', handleClickOutside, true);
     };
   }, [openSubMenu]);
 
 
   return (
-    <div className={`windrose-tool-palette${vertical ? ' windrose-tool-palette-vertical' : ''}`}>
+    <div ref={paletteRef} className={`windrose-tool-palette${vertical ? ' windrose-tool-palette-vertical' : ''}`}>
       <CornerBrackets classPrefix="windrose-tool-palette-bracket" variant="compact" filterId="palette-bracket" />
 
       {toolGroups.slice(0, 2).map(group => (

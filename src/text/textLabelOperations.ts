@@ -6,6 +6,7 @@
  */
 
 // Type-only imports
+import { mintId } from '../core/ids';
 import type { HexColor } from '#types/core/common.types';
 import type { TextLabel, TextLabelId } from '#types/objects/note.types';
 import { updateById, removeById } from '../objects/entityList';
@@ -15,10 +16,10 @@ import { updateById, removeById } from '../objects/entityList';
 // ===========================================
 
 /** Font face options */
-export type FontFace = 'sans' | 'serif' | 'mono' | 'script' | 'fantasy';
+type FontFace = 'sans' | 'serif' | 'mono' | 'script' | 'fantasy';
 
 /** Text label styling options */
-export interface TextLabelOptions {
+interface TextLabelOptions {
   fontSize?: number;
   fontFace?: FontFace;
   color?: HexColor;
@@ -26,7 +27,7 @@ export interface TextLabelOptions {
 }
 
 /** Partial text label for updates */
-export type TextLabelUpdate = Partial<Omit<TextLabel, 'id'>>;
+type TextLabelUpdate = Partial<Omit<TextLabel, 'id'>>;
 
 // ===========================================
 // Constants
@@ -43,7 +44,7 @@ const MAX_CONTENT_LENGTH = 200;
  * Generate a unique ID for a text label
  */
 function generateTextLabelId(): TextLabelId {
-  return 'text-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+  return mintId('text');
 }
 
 // ===========================================
@@ -210,4 +211,4 @@ function getTextLabelAtPosition(
 // Exports
 // ===========================================
 
-export { generateTextLabelId, addTextLabel, updateTextLabel, removeTextLabel, getTextLabelAtPosition, };
+export { addTextLabel, updateTextLabel, removeTextLabel, getTextLabelAtPosition };

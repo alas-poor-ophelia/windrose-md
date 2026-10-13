@@ -26,6 +26,8 @@ interface UseHexContextMenuOptions {
   /** Active-level updater — sub-hex deletion writes through it to root. */
   updateMapData: MapDataUpdater;
   handleRegionsChange: (regions: Region[]) => void;
+  /** This map block's root element: the listener binds to ITS document (popout-safe). */
+  containerRef?: { current: HTMLElement | null };
 }
 
 /**
@@ -63,6 +65,7 @@ function useHexContextMenu({
   enterSubHex,
   updateMapData,
   handleRegionsChange,
+  containerRef,
 }: UseHexContextMenuOptions): void {
   // Latest props, for guards that fire after an async modal wait — the menu
   // and its onClick closures are frozen at menu-open time, but the delete
@@ -74,6 +77,8 @@ function useHexContextMenu({
   liveRef.current = { mapData, subHexPath: subHexPath ?? null };
 
   useEffect(() => {
+    // Popout-safe: the document that owns this map block, captured once per run.
+    const doc = containerRef?.current?.ownerDocument ?? activeDocument;
     const handleHexContextMenu = (event: CustomEvent<HexContextMenuDetail>): void => {
       if (isForeignInstanceEvent(event.detail, instanceId)) return;
       if (!mapData || mapData.mapType !== 'hex') return;
@@ -197,7 +202,7 @@ function useHexContextMenu({
           item.setTitle(`Edit Region: ${region.name}`);
           item.setIcon('lucide-pencil');
           item.onClick(() => {
-            activeDocument.dispatchEvent(new CustomEvent('windrose:edit-region', { detail: { regionId: region.id, instanceId } }));
+            doc.dispatchEvent(new CustomEvent('windrose:edit-region', { detail: { regionId: region.id, instanceId } }));
           });
         });
 
@@ -257,9 +262,9 @@ function useHexContextMenu({
       menu.showAtPosition({ x: screenX, y: screenY });
     };
 
-    activeDocument.addEventListener('windrose:hex-context-menu', handleHexContextMenu);
-    return () => activeDocument.removeEventListener('windrose:hex-context-menu', handleHexContextMenu);
-  }, [app, mapData, mapId, instanceId, subHexPath, enterSubHex, updateMapData, handleRegionsChange]);
+    doc.addEventListener('windrose:hex-context-menu', handleHexContextMenu);
+    return () => doc.removeEventListener('windrose:hex-context-menu', handleHexContextMenu);
+  }, [app, mapData, mapId, instanceId, subHexPath, enterSubHex, updateMapData, handleRegionsChange, containerRef]);
 }
 
 export { useHexContextMenu };

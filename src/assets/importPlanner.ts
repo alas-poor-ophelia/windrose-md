@@ -16,9 +16,9 @@ import { predictDepthTier, extractTokens } from './depthPredictor';
 import { NOISE } from './categoryMerge';
 
 /** Winning tier's mean confidence must reach this for the 'auto' badge. */
-export const TIER_AUTO_THRESHOLD = 0.3;
+const TIER_AUTO_THRESHOLD = 0.3;
 /** A mined tag must match at least this many tiles to be suggested. */
-export const TAG_MIN_COUNT = 2;
+const TAG_MIN_COUNT = 2;
 /** Cap on suggestions so a 3000-file pack doesn't produce a wall of rows. */
 export const TAG_MAX_SUGGESTIONS = 30;
 /** Tokens shorter than this are variant letters/particles, not tags. */

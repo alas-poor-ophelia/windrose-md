@@ -158,4 +158,3 @@ export interface LocalCellPosition {
 // Re-export Point for convenience
 // ===========================================
 
-export type { Point };

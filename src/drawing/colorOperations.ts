@@ -15,7 +15,7 @@ import { getColorPaletteSettings, BUILT_IN_COLORS } from '../core/settingsAccess
 // ===========================================
 
 /** Color definition in the palette */
-export interface ColorDefinition {
+interface ColorDefinition {
   id: string;
   color: string;
   label: string;
@@ -110,12 +110,4 @@ function colorsMatch(a: string | null | undefined, b: string | null | undefined)
 // Exports
 // ===========================================
 
-export {
-  DEFAULT_COLOR,
-  getColorPalette,
-  getCellColor,
-  getColorByHex,
-  isDefaultColor,
-  normalizeHexColor,
-  colorsMatch,
-};
+export { DEFAULT_COLOR, getColorPalette, getCellColor, getColorByHex, isDefaultColor, colorsMatch };

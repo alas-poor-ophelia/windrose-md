@@ -38,7 +38,7 @@ interface FogRenderContext {
 import type { IGeometry } from '#types/core/geometry.types';
 import type { HexGeometryLike as SharedHexGeometryLike } from '../hex/hexRegionMath';
 
-export interface GridGeometryLike {
+interface GridGeometryLike {
   cellSize: number;
 }
 

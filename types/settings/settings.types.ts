@@ -20,7 +20,7 @@ export type DiagonalRule = 'alternating' | 'equal' | 'euclidean';
 export type DistanceDisplayFormat = 'cells' | 'units' | 'both';
 
 /** Coordinate key interaction mode */
-export type CoordinateKeyMode = 'hold' | 'toggle';
+type CoordinateKeyMode = 'hold' | 'toggle';
 
 // ===========================================
 // Settings Tab IDs
@@ -244,25 +244,25 @@ export interface PluginSettings {
 // ===========================================
 
 /** Grid theme (lines, background) */
-export interface GridThemeSettings {
+interface GridThemeSettings {
   lines: HexColor;
   lineWidth: number;
   background: HexColor;
 }
 
 /** Cell theme (fill, border) */
-export interface CellThemeSettings {
+interface CellThemeSettings {
   fill: HexColor;
   border: HexColor;
   borderWidth: number;
 }
 
-export interface CompassThemeSettings {
+interface CompassThemeSettings {
   color: HexColor;
   size: number;
 }
 
-export interface FogOfWarThemeSettings {
+interface FogOfWarThemeSettings {
   color: HexColor;
   opacity: number;
   image: string | null;
@@ -271,7 +271,7 @@ export interface FogOfWarThemeSettings {
 }
 
 /** Decorative border theme */
-export interface DecorativeBorderTheme {
+interface DecorativeBorderTheme {
   color: HexColor;
   width: number;
   dashArray: string;
@@ -336,16 +336,6 @@ export interface ResolvedColorEntry {
 // ===========================================
 // Object Customization Types
 // ===========================================
-
-// Re-export consolidated types from objects module
-export type {
-  ObjectType,
-  ObjectTypeDefinition,
-  Category,
-  CategoryDefinition,
-  RenderChar,
-  ValidationResult,
-} from '../objects/object.types';
 
 /**
  * Override settings for built-in objects.

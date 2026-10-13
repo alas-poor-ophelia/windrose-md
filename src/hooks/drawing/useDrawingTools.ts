@@ -23,7 +23,7 @@ import type {
 } from '#types/hooks/drawingTools.types';
 import type { StateUpdater } from 'preact/hooks';
 
-import { useEffect } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
 import { useMapState, useMapOperations } from '../../context/MapContext';
 import { usePaintTool } from './usePaintTool';
 import { useEdgeDragTool } from './useEdgeDragTool';
@@ -189,8 +189,11 @@ const useDrawingTools = (
     cancelDrawing();
   };
 
+  // Latest-ref proxy: reset runs on tool change only, with current closures.
+  const resetDrawingStateRef = useRef(resetDrawingState);
+  resetDrawingStateRef.current = resetDrawingState;
   useEffect(() => {
-    resetDrawingState();
+    resetDrawingStateRef.current();
   }, [currentTool]);
 
   return {

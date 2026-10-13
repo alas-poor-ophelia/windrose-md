@@ -240,4 +240,4 @@ export {
   diceCoefficient,
   clusterCategories,
 };
-export type { FolderInput, MergeMember, MergeCluster };
+export type { FolderInput };

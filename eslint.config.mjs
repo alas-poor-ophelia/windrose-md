@@ -166,21 +166,10 @@ export default [
       "src/components/mapcanvas/PartyPinLayer.tsx",
       "src/components/mapcanvas/TextLayer.tsx",
       "src/components/modals/NativeModalPortal.tsx",
-      "src/components/overlays/ImageAlignmentMode.tsx",
       "src/components/panels/FloatingPanel.tsx",
       "src/components/panels/ObjectSidebar.tsx",
-      "src/components/panels/TileAssetBrowser.tsx",
-      "src/components/settings/NativeControls.tsx",
       "src/components/settings/SettingItem.tsx",
-      "src/context/MapSettingsContext.tsx",
-      "src/hooks/canvas/useCanvasInteraction.ts",
-      "src/hooks/drawing/useDiagonalFill.ts",
-      "src/hooks/drawing/useDrawingTools.ts",
-      "src/hooks/interactions/useShapeOverlayTools.ts",
-      "src/hooks/interactions/useSubHexNavigation.ts",
-      "src/hooks/state/useImagePreloading.ts",
-      "src/hooks/state/useToolState.ts",
-      "src/hooks/state/useVirtualizer.ts"
+      "src/context/MapSettingsContext.tsx"
     ],
     rules: {
       "react-hooks/exhaustive-deps": "off"

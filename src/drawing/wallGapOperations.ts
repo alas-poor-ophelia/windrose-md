@@ -23,6 +23,7 @@
  * survives cellSize changes and wall-shortening across save/reload.
  */
 
+import { mintId } from '../core/ids';
 import type { WallGap, WallGapTile, WallPath } from '#types/core/wallpath.types';
 
 import { projectPointToPolyline } from './segmentMath';
@@ -705,7 +706,7 @@ function planGapInsert(
 
 /** Create a unique gap ID (same scheme as createWallPathId). */
 function createWallGapId(): string {
-  return 'gap-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  return mintId('gap', { randomLength: 6 });
 }
 
 interface CreateWallGapOptions {
@@ -728,31 +729,5 @@ function createWallGap(opts: CreateWallGapOptions): WallGap {
   };
 }
 
-export {
-  GAP_ARC_SUBDIVISIONS,
-  MIN_GAP_CELLS,
-  buildGapFlatten,
-  segTToLen,
-  lenToSegT,
-  pointAtLength,
-  gapCenterWorld,
-  projectToWall,
-  projectPointOntoFlatten,
-  reprojectGap,
-  clampWidthCells,
-  clampGapToSegment,
-  gapHandleAnchors,
-  findGapOnWallAtPoint,
-  resolveGapMove,
-  resolveGapEdgeResize,
-  sweepGapInvariants,
-  remapGapsThroughEdit,
-  remapGapsAfterInsertVertex,
-  remapGapsAfterDeleteVertex,
-  snapInsertPointOutsideGaps,
-  subtractIntervals,
-  createWallGapId,
-  createWallGap,
-  planGapInsert,
-};
-export type { GapFlatten, GapProjection, ClampedGapSpan, CreateWallGapOptions, GapInsertPlan, GapHandleAnchors };
+export { GAP_ARC_SUBDIVISIONS, MIN_GAP_CELLS, buildGapFlatten, pointAtLength, gapCenterWorld, projectToWall, reprojectGap, clampWidthCells, clampGapToSegment, gapHandleAnchors, findGapOnWallAtPoint, resolveGapMove, resolveGapEdgeResize, sweepGapInvariants, remapGapsAfterInsertVertex, remapGapsAfterDeleteVertex, snapInsertPointOutsideGaps, subtractIntervals, createWallGap, planGapInsert };
+export type { GapFlatten };

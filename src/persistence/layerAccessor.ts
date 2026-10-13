@@ -7,6 +7,7 @@
  */
 
 // Type-only imports
+import { mintId } from '../core/ids';
 import type {
   MapData,
   MapLayer,
@@ -33,7 +34,7 @@ const DEFAULT_BOARD_ID = 'board-default';
 
 /** Generate a unique id for a board. */
 function generateBoardId(): BoardId {
-  return 'board-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+  return mintId('board');
 }
 
 
@@ -45,16 +46,14 @@ function generateBoardId(): BoardId {
  * Generate a unique ID for a layer
  */
 function generateLayerId(): LayerId {
-  return 'layer-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+  return mintId('layer');
 }
 
 /**
- * Fresh id with the same `<prefix>-<timestamp>-<random>` shape the entity's
- * own generator mints (obj-, text-, curve-, edge-, wall-, tstroke-, gap-).
- * Local so layerAccessor stays free of drawing/objects imports.
+ * Fresh id for a cloned entity (obj-, text-, curve-, edge-, wall-, tstroke-, gap-).
  */
 function freshEntityId(prefix: string): string {
-  return prefix + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+  return mintId(prefix);
 }
 
 /** Schema version the v1 -> v2 layer migration produces (step 2 of the runner). */
@@ -922,16 +921,8 @@ function needsMigration(mapData: MapData | LegacyMapData | null | undefined): bo
 // EXPORTS
 // ============================================================================
 
-export {
-  generateLayerId,
-  getActiveLayer, getLayersOrdered, getLayerById, getLayerIndex, getLayerBelow,
-  updateLayer, updateActiveLayer, setActiveLayer, addLayer, cloneLayer, removeLayer, reorderLayers,
-  migrateToLayerSchema, needsMigration, LAYER_SCHEMA_VERSION,
-  // Board (floor) projection
-  DEFAULT_BOARD_ID, generateBoardId, layerBoardId, getBoardsOrdered, getActiveBoardId,
-  getBoardLayers, getActiveBoardLayers, getBoardBelow, updateBoard, getRenderLayers, getExportLayers, getDefaultExportLayers, ensureBoards, addBoard, removeBoard, setActiveBoard,
-  promoteToStrata, setLayerMode
-};
+export { generateLayerId, getActiveLayer, getLayersOrdered, getLayerById, getLayerIndex, getLayerBelow, updateLayer, updateActiveLayer, setActiveLayer, addLayer, cloneLayer, removeLayer, reorderLayers, migrateToLayerSchema, needsMigration, LAYER_SCHEMA_VERSION, // Board (floor) projection
+  DEFAULT_BOARD_ID, layerBoardId, getBoardsOrdered, getActiveBoardId, getBoardLayers, getActiveBoardLayers, getBoardBelow, updateBoard, getRenderLayers, getExportLayers, getDefaultExportLayers, ensureBoards, addBoard, removeBoard, setActiveBoard, promoteToStrata, setLayerMode };
 
 export {
   initializeFogOfWar, isCellFogged, fogCell, revealCell,

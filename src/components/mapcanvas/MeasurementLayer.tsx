@@ -188,9 +188,10 @@ const MeasurementLayer = ({
         e.preventDefault();
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [isMeasuring, removeLastWaypoint, clearMeasurement, terrainPicker, handleSaveRoute]);
+    const win = canvasRef.current?.ownerDocument.defaultView ?? window;
+    win.addEventListener('keydown', handler);
+    return () => win.removeEventListener('keydown', handler);
+  }, [isMeasuring, removeLastWaypoint, clearMeasurement, terrainPicker, handleSaveRoute, canvasRef]);
 
   // Route edits shift segment indices out from under an open picker
   useEffect(() => {

@@ -62,4 +62,3 @@ function createLatestRefProxy<H extends object>(ref: { readonly current: H }): H
 }
 
 export { useLayerHandlers, createLatestRefProxy };
-export type { UseLayerHandlersOptions };

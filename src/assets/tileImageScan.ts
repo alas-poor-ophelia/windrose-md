@@ -104,7 +104,7 @@ async function loadBitmap(app: App, vaultPath: string): Promise<ImageBitmap | nu
 }
 
 /** Scan a single tile image into detection signals, or null if it can't be read. */
-export async function scanTileImageSignals(
+async function scanTileImageSignals(
   app: App,
   vaultPath: string,
 ): Promise<TileImageSignals | null> {

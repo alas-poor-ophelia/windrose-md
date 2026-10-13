@@ -35,9 +35,10 @@ function usePreactVirtualizer(options: PreactVirtualizerOptions): Virtualizer<HT
     onChange: () => { rerender(t => t + 1); },
   });
 
+  // instance is created once (instanceRef), so this still runs once per mount.
   useEffect(() => {
     return instance._didMount();
-  }, []);
+  }, [instance]);
 
   instance._willUpdate();
 

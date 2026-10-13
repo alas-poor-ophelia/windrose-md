@@ -30,7 +30,7 @@ import type {
 import { formatDistance } from '../drawing/distanceOperations';
 
 /** Vault-side metadata for a note, sourced from Obsidian's in-memory caches */
-export interface NoteMetadata {
+interface NoteMetadata {
   /** Tags without the leading #, lowercased */
   tags: string[];
   /** Frontmatter properties */
@@ -56,7 +56,7 @@ interface PartyRangeQuerySettings {
  * fields alone keeps a beacon's results cached while unrelated map edits
  * (a cell painted, a view change) churn the map object.
  */
-export type PartyRangeMapData = Pick<MapData, 'layers' | 'partyPins'>;
+type PartyRangeMapData = Pick<MapData, 'layers' | 'partyPins'>;
 
 const RANGE_EPSILON = 1e-6;
 

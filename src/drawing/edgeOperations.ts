@@ -25,6 +25,7 @@
  */
 
 // Type-only imports
+import { mintId } from '../core/ids';
 import type { HexColor } from '#types/core/common.types';
 import type { Edge } from '#types/core/rendering.types';
 
@@ -38,17 +39,17 @@ export type { Edge };
 export type EdgeSideInput = 'top' | 'right' | 'bottom' | 'left';
 
 /** Normalized edge side (storage) */
-export type EdgeSideNormalized = 'right' | 'bottom';
+type EdgeSideNormalized = 'right' | 'bottom';
 
 /** Normalized edge coordinates (without id) */
-export interface NormalizedEdge {
+interface NormalizedEdge {
   x: number;
   y: number;
   side: EdgeSideNormalized;
 }
 
 /** Edge for generation (without id) */
-export interface EdgeTemplate {
+interface EdgeTemplate {
   x: number;
   y: number;
   side: EdgeSideNormalized;
@@ -58,7 +59,7 @@ export interface EdgeTemplate {
 }
 
 /** Partial edge for updates */
-export type EdgeUpdate = Partial<Edge>;
+type EdgeUpdate = Partial<Edge>;
 
 // ===========================================
 // Normalization
@@ -91,7 +92,7 @@ function normalizeEdge(x: number, y: number, side: EdgeSideInput): NormalizedEdg
  * Generate unique edge ID
  */
 function generateEdgeId(): string {
-  return 'edge-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+  return mintId('edge');
 }
 
 // ===========================================

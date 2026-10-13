@@ -16,6 +16,7 @@ import { useMapSelection } from '../../context/MapSelectionContext';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { findDuplicateTarget, generateObjectId } from '../../objects/objectOperations';
 import { rotateByIncrement } from '../../drawing/rotationOperations';
+import { mintId } from '../../core/ids';
 
 /** The parts of a layer a selection edit reads */
 export interface SelectionLayerContent {
@@ -39,7 +40,7 @@ export interface DuplicateSelectionResult extends SelectionEdit {
   skippedObjects: number;
 }
 
-const defaultTextId = (): string => `text-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+const defaultTextId = (): string => mintId('text');
 
 /** Advance every selected object and label to the next rotation step. */
 export function rotateSelection(layer: SelectionLayerContent, items: SelectedItem[]): RotateSelectionResult {

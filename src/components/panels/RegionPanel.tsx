@@ -45,8 +45,10 @@ const RegionPanel = ({
     onRegionsChange(updated);
   };
 
-  const handleRegionClick = (regionId: string): void => {
-    activeDocument.dispatchEvent(new CustomEvent('windrose:center-on-region', {
+  const handleRegionClick = (regionId: string, e: MouseEvent): void => {
+    // Dispatch on the document that owns this panel (popout-safe).
+    const doc = e.currentTarget instanceof Node ? (e.currentTarget.ownerDocument ?? activeDocument) : activeDocument;
+    doc.dispatchEvent(new CustomEvent('windrose:center-on-region', {
       detail: { regionId, instanceId }
     }));
   };
@@ -70,7 +72,7 @@ const RegionPanel = ({
         <button
           key={region.id}
           className={`windrose-region-item ${!region.visible ? 'windrose-region-item-hidden' : ''}`}
-          onClick={() => handleRegionClick(region.id)}
+          onClick={(e) => handleRegionClick(region.id, e)}
           ref={tooltipRef(`${region.name} (${region.hexes.length} hexes)`)}
         >
           <span

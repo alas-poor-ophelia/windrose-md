@@ -16,7 +16,7 @@
 import type { TileEntry, TileLayerRole, TileMetadataEntry, TileMetadataStore } from '#types/tiles/tile.types';
 import { extractTokens, HEAD_NOUN_KEYWORDS } from './depthPredictor';
 
-export type TileRenderMode = 'cell' | 'region';
+type TileRenderMode = 'cell' | 'region';
 
 /** DD source directory -> render intent. Seamless surfaces tile; objects stamp. */
 const DD_SOURCE_TO_RENDERMODE: Record<string, TileRenderMode> = {
@@ -47,7 +47,7 @@ const CELL_CATEGORY_WORDS = new Set([
   'light', 'lights',
 ]);
 
-export interface RenderModePrediction {
+interface RenderModePrediction {
   mode: TileRenderMode;
   confidence: number;
 }

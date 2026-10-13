@@ -605,4 +605,4 @@ function renderCurves(
   }
 }
 
-export { renderCurves, buildPath2D, preprocessCurves, getUnionCacheSize, UNION_CACHE_MAX };
+export { renderCurves, preprocessCurves, getUnionCacheSize, UNION_CACHE_MAX };

@@ -14,6 +14,7 @@ import type { ExtendedGeometry } from '#types/contexts/context.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { updateById, removeById } from '../../objects/entityList';
+import { mintId } from '../../core/ids';
 import { getRegionLabelWorldPosition, computeCentroid } from '../../geometry/renderers/regionRenderer';
 import { hexKey, pointInPolygon, forEachHexInBounds } from '../../geometry/hex/hexRegionMath';
 
@@ -58,7 +59,7 @@ interface UseRegionToolsResult {
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function generateRegionId(): string {
-  return `region-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return mintId('region', { randomLength: 6 });
 }
 
 
@@ -92,6 +93,9 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
   const [draggingLabelRegionId, setDraggingLabelRegionId] = useState<string | null>(null);
   const labelDragStartRef = useRef<{ worldX: number; worldY: number } | null>(null);
   const labelDragCleanupRef = useRef<(() => void) | null>(null);
+  // Document that owns the element the label drag started on (popout-safe
+  // target for the document-level move/up listeners below).
+  const labelDragDocRef = useRef<Document | null>(null);
   const handlePointerMoveRef = useRef<((e: PointerEvent) => void) | null>(null);
   const handlePointerUpRef = useRef<((e: PointerEvent) => void) | null>(null);
 
@@ -155,6 +159,7 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     if (world) {
       const hitRegion = checkLabelHit(world.worldX, world.worldY);
       if (hitRegion) {
+        labelDragDocRef.current = e.target instanceof Node ? e.target.ownerDocument : null;
         setDraggingLabelRegionId(hitRegion.id);
         labelDragStartRef.current = { worldX: world.worldX, worldY: world.worldY };
         e.preventDefault();
@@ -226,6 +231,7 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     // Check for label drag first
     const hitRegion = checkLabelHit(world.worldX, world.worldY);
     if (hitRegion) {
+      labelDragDocRef.current = e.target instanceof Node ? e.target.ownerDocument : null;
       setDraggingLabelRegionId(hitRegion.id);
       labelDragStartRef.current = { worldX: world.worldX, worldY: world.worldY };
       e.preventDefault();
@@ -338,17 +344,18 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     const onMove = (e: PointerEvent): void => { handlePointerMoveRef.current?.(e); };
     const onUp = (e: PointerEvent): void => { handlePointerUpRef.current?.(e); };
 
-    activeDocument.addEventListener('pointermove', onMove);
-    activeDocument.addEventListener('pointerup', onUp);
+    const doc = labelDragDocRef.current ?? activeDocument;
+    doc.addEventListener('pointermove', onMove);
+    doc.addEventListener('pointerup', onUp);
 
     labelDragCleanupRef.current = () => {
-      activeDocument.removeEventListener('pointermove', onMove);
-      activeDocument.removeEventListener('pointerup', onUp);
+      doc.removeEventListener('pointermove', onMove);
+      doc.removeEventListener('pointerup', onUp);
     };
 
     return () => {
-      activeDocument.removeEventListener('pointermove', onMove);
-      activeDocument.removeEventListener('pointerup', onUp);
+      doc.removeEventListener('pointermove', onMove);
+      doc.removeEventListener('pointerup', onUp);
     };
   }, [draggingLabelRegionId]);
 

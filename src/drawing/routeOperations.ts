@@ -11,6 +11,7 @@
  */
 
 // Type-only imports
+import { mintId } from '../core/ids';
 import type { Point, IGeometry } from '#types/core/geometry.types';
 import type { MeasurementRoute, SavedRoute } from '#types/core/map.types';
 import type { DiagonalRule } from '#types/settings/settings.types';
@@ -27,7 +28,7 @@ const SAVED_ROUTE_DEFAULTS = {
  * Generate a unique saved route ID
  */
 function generateRouteId(): string {
-  return 'route-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+  return mintId('route');
 }
 
 /**

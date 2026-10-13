@@ -37,15 +37,18 @@ function useNativeControl<C extends ValueComponent<V>, V>({ value, onChange, dis
   // Store latest onChange in ref to avoid recreating the control
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  // The control is built once per mount; read the latest factory via a ref.
+  const createRef = useRef(create);
+  createRef.current = create;
 
   useEffect((): (() => void) | undefined => {
     if (!containerRef.current) return undefined;
 
     try {
       // Create a temporary setting to extract its control component
-      const tempContainer = activeWindow.createDiv();
+      const tempContainer = (containerRef.current.ownerDocument.defaultView ?? activeWindow).createDiv();
       const setting = new Setting(tempContainer);
-      const control = create(setting, (newVal: V) => onChangeRef.current(newVal));
+      const control = createRef.current(setting, (newVal: V) => onChangeRef.current(newVal));
 
       // Move the control's elements into our container. Move ALL children,
       // not just the first: Obsidian 1.13's addSlider creates a value span

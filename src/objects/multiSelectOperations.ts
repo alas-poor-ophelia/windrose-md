@@ -24,7 +24,7 @@ import { getFontCss } from '../text/fontOptions';
 // ===========================================
 
 /** World-coordinate bounding box */
-export interface WorldBounds {
+interface WorldBounds {
   minX: number;
   minY: number;
   maxX: number;
@@ -248,4 +248,4 @@ function isWithinBounds(
 // Exports
 // ===========================================
 
-export { rectsOverlap, getObjectWorldBounds, getTextLabelWorldBounds, getItemsInWorldRect, isWithinBounds, };
+export { getItemsInWorldRect, isWithinBounds };

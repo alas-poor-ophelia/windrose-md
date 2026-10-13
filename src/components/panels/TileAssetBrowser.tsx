@@ -354,7 +354,15 @@ const TileAssetBrowser = memo(({
     onRotationChange(ROTATION_STEPS[nextIdx]);
   };
 
-  // Manage hover preview portal on document.body
+  // Latest values read by the hover-preview effect, which deliberately re-runs
+  // only when the hovered tile or its transform changes.
+  // (tileToTilesetIdRef is assigned below, after the filter pipeline.)
+  const previewInputsRef = useRef({ app, getCachedImage });
+  previewInputsRef.current = { app, getCachedImage };
+  const tileToTilesetIdRef = useRef<{ get(key: string): string | undefined }>(new Map<string, string>());
+
+  // Manage hover preview portal on the body of the document that owns this
+  // browser (popout-safe).
   useEffect(() => {
     if (!hoveredTile) {
       if (portalRef.current) {
@@ -364,17 +372,15 @@ const TileAssetBrowser = memo(({
     }
 
     if (!portalRef.current) {
-      const div = activeWindow.createDiv();
+      const doc = browserRef.current?.ownerDocument ?? activeDocument;
+      const div = doc.body.createDiv();
       div.className = 'windrose-tile-preview-portal';
-      const canvas = activeWindow.createEl('canvas');
+      const canvas = div.createEl('canvas');
       canvas.width = PREVIEW_SIZE;
       canvas.height = PREVIEW_SIZE;
       canvas.classList.add('windrose-tile-preview-canvas');
-      const label = activeWindow.createDiv();
+      const label = div.createDiv();
       label.className = 'windrose-tile-preview-label';
-      div.appendChild(canvas);
-      div.appendChild(label);
-      activeDocument.body.appendChild(div);
       portalRef.current = div;
       previewRef.current = canvas;
       previewLabelRef.current = label;
@@ -396,7 +402,8 @@ const TileAssetBrowser = memo(({
 
     label.textContent = hoveredTile.filename + (rotation ? ` (${rotation}°)` : '') + (flipH ? ' [flipped]' : '');
 
-    const isHoveredSelected = selectedTilesetId === tileToTilesetId.get(hoveredTile.vaultPath) && selectedTileId === hoveredTile.id;
+    const { app: previewApp, getCachedImage: previewGetCachedImage } = previewInputsRef.current;
+    const isHoveredSelected = selectedTilesetId === tileToTilesetIdRef.current.get(hoveredTile.vaultPath) && selectedTileId === hoveredTile.id;
     if (isHoveredSelected && (rotation || flipH)) {
       const transformVal = `rotate(${rotation}deg)${flipH ? ' scaleX(-1)' : ''}`;
       canvas.style.setProperty('transform', transformVal);
@@ -404,7 +411,7 @@ const TileAssetBrowser = memo(({
       canvas.style.removeProperty('transform');
     }
 
-    return loadVaultImage(app, hoveredTile.vaultPath, getCachedImage, (img) => {
+    return loadVaultImage(previewApp, hoveredTile.vaultPath, previewGetCachedImage, (img) => {
       drawTileToCanvas(canvas, img, PREVIEW_SIZE, hoveredTile.vaultPath);
     });
   }, [hoveredTile, rotation, flipH, selectedTilesetId, selectedTileId]);
@@ -413,7 +420,7 @@ const TileAssetBrowser = memo(({
   useEffect(() => {
     return () => {
       if (portalRef.current) {
-        activeDocument.body.removeChild(portalRef.current);
+        portalRef.current.remove();
         portalRef.current = null;
         previewLabelRef.current = null;
       }
@@ -594,6 +601,7 @@ const TileAssetBrowser = memo(({
     railSel,
     wallsEnabled: featureFlags.walls,
   });
+  tileToTilesetIdRef.current = tileToTilesetId;
 
   // Resolve the selected tile entry for the loaded-brush footer
   const selectedTile = useMemo((): TileEntry | null => {

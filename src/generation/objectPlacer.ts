@@ -7,17 +7,18 @@
  */
 
 import { getRoomCells, isCellInRoom } from './dungeonGenerator';
+import { mintId } from '../core/ids';
 
 // =============================================================================
 // TYPE DEFINITIONS
 // =============================================================================
 
-export interface CellPosition {
+interface CellPosition {
   x: number;
   y: number;
 }
 
-export interface PlacementZones {
+interface PlacementZones {
   center: CellPosition[];
   corners: CellPosition[];
   walls: CellPosition[];
@@ -25,7 +26,7 @@ export interface PlacementZones {
   scattered: CellPosition[];
 }
 
-export type CategoryWeights = {
+type CategoryWeights = {
   monster: number;
   empty: number;
   feature: number;
@@ -33,7 +34,7 @@ export type CategoryWeights = {
 };
 
 /** Room bounds used for zone classification (no id needed). */
-export interface RoomGeometry {
+interface RoomGeometry {
   x: number;
   y: number;
   width: number;
@@ -48,7 +49,7 @@ export interface RoomLike extends RoomGeometry {
   parts?: Array<{ x: number; y: number; width: number; height: number }>;
 }
 
-export interface PlacementContext {
+interface PlacementContext {
   /** Room category ('monster', 'trap', 'feature', 'empty') */
   category?: string;
   isTreasure?: boolean;
@@ -56,7 +57,7 @@ export interface PlacementContext {
   isCorridor?: boolean;
 }
 
-export type PlacedObject = {
+type PlacedObject = {
   id: string;
   type: string;
   position: CellPosition;
@@ -68,7 +69,7 @@ export type PlacedObject = {
   customTooltip?: string;
 };
 
-export type RoomAssignment = {
+type RoomAssignment = {
   category: string;
   hasSecondaryTreasure: boolean;
   template?: string;
@@ -80,19 +81,19 @@ export interface CorridorResult {
   byConnection: unknown[];
 }
 
-export interface TemplateObjectSpec {
+interface TemplateObjectSpec {
   type: string;
   count: { min: number; max: number };
   placement: string;
 }
 
-export interface RoomTemplate {
+interface RoomTemplate {
   name: string;
   objects: TemplateObjectSpec[];
   minRoomSize: number;
 }
 
-export interface StockingOptions {
+interface StockingOptions {
   entryRoomId?: number | string;
   exitRoomId?: number | string;
   waterRoomIds?: (number | string)[];
@@ -304,7 +305,7 @@ function randomInt(min: number, max: number): number {
 }
 
 function generateObjectId(): string {
-  return 'obj-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+  return mintId('obj');
 }
 
 /** Narrow an untyped config value: the number itself, or the fallback when absent. */

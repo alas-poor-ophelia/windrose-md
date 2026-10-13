@@ -61,12 +61,12 @@ function useToolState(options: ToolStateOptions = {}): UseToolStateResult {
   const [freeformPlacementMode, setFreeformPlacementMode] = useState(false);
 
   // Initialize opacity from mapData when loaded
+  const lastSelectedOpacity = mapData?.lastSelectedOpacity;
   useEffect(() => {
-    if (!mapData) return;
-    if (mapData.lastSelectedOpacity !== undefined) {
-      setSelectedOpacity(mapData.lastSelectedOpacity);
+    if (lastSelectedOpacity !== undefined) {
+      setSelectedOpacity(lastSelectedOpacity);
     }
-  }, [mapData?.lastSelectedOpacity]);
+  }, [lastSelectedOpacity]);
 
   // Handler to update opacity and persist to mapData
   const handleOpacityChange = useCallback((newOpacity: number) => {

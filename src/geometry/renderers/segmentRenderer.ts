@@ -356,11 +356,6 @@ const segmentRenderer = {
 };
 
 // Export types for consumers
-export type {
-  CellVertices,
-  InternalBorder,
-  ExternalBorder,
-  SeparatedCells
-};
+export type { InternalBorder, ExternalBorder };
 
 export { segmentRenderer };

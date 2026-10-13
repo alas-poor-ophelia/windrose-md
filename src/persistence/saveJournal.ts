@@ -857,28 +857,5 @@ async function resolveJournalOnLoad(
   return null;
 }
 
-export {
-  journalPending,
-  clearJournal,
-  dropRestoredSlot,
-  isJournalKept,
-  readKeptEntries,
-  moveJournalToConflict,
-  readConflictJournal,
-  readJournal,
-  pruneJournal,
-  setJournalWriterLive,
-  compareJournalToDisk,
-  resolveJournalOnLoad,
-  formatRelativeTime,
-  MAX_JOURNAL_PAYLOAD,
-  JOURNAL_MAX_AGE_MS,
-  JOURNAL_INDEX_KEY,
-  JOURNAL_KEY_PREFIX,
-  JOURNAL_META_PREFIX,
-  RAW_PAYLOAD_LIMIT,
-  KEPT_KEY_PREFIX,
-  KEPT_MAX_PER_MAP,
-  CONFLICT_KEY_PREFIX,
-};
-export type { JournalEntry, LiveEntry, JournalChoice, JournalSource, ConflictMoveResult };
+export { journalPending, clearJournal, dropRestoredSlot, isJournalKept, readKeptEntries, moveJournalToConflict, readConflictJournal, readJournal, pruneJournal, setJournalWriterLive, compareJournalToDisk, resolveJournalOnLoad, MAX_JOURNAL_PAYLOAD, JOURNAL_MAX_AGE_MS, JOURNAL_INDEX_KEY, JOURNAL_KEY_PREFIX, JOURNAL_META_PREFIX, RAW_PAYLOAD_LIMIT, KEPT_KEY_PREFIX, KEPT_MAX_PER_MAP, CONFLICT_KEY_PREFIX };
+export type { LiveEntry, JournalSource, ConflictMoveResult };

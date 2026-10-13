@@ -21,12 +21,14 @@ const ModalPortal = ({ children }: ModalPortalProps): VNode => {
   const [isInPortal, setIsInPortal] = useState(false);
 
   useEffect(() => {
-    let portal = activeDocument.getElementById('windrose-modal-portal') as HTMLDivElement | null;
+    // The wrapper renders inline first, so its ownerDocument is the window
+    // that owns this map (popout-safe); the portal mounts into THAT body.
+    const doc = wrapperRef.current?.ownerDocument ?? activeDocument;
+    let portal = doc.getElementById('windrose-modal-portal') as HTMLDivElement | null;
     if (!portal) {
-      portal = activeWindow.createDiv();
+      portal = doc.body.createDiv();
       portal.id = 'windrose-modal-portal';
       portal.className = 'windrose-modal-portal';
-      activeDocument.body.appendChild(portal);
     }
     portalContainerRef.current = portal;
 

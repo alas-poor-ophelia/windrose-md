@@ -10,7 +10,7 @@
 
 import type { TileRotation } from '#types/tiles/tile.types';
 
-export interface ScatterDrop {
+interface ScatterDrop {
   worldX: number;
   worldY: number;
   /** Absolute scale for the placement (already includes the brush tileScale). */

@@ -135,7 +135,7 @@ export interface NotePinHandlers {
 }
 
 /** Party pin handlers */
-export interface PartyPinHandlers {
+interface PartyPinHandlers {
   handlePartyPinPointerDown?(this: void, gridX: number, gridY: number, clientX?: number, clientY?: number): void;
   /** Select-tool grab: true when the press hit the pin's cell (handled) */
   handlePartyPinSelectPointerDown?(this: void, gridX: number, gridY: number, clientX?: number, clientY?: number): boolean;
@@ -159,7 +159,8 @@ export interface PanZoomHandlers {
   startTouchPan(this: void, center: { x: number; y: number }): void;
   updateTouchPan(this: void, touches: TouchList): void;
   stopTouchPan(this: void): void;
-  setInitialPinchDistance(this: void, distance: number): void;
+  /** Two-finger gesture start: opens the touch pan and seeds the pinch baseline. */
+  startPinch(this: void, center: { x: number; y: number }, distance: number): void;
   spaceKeyPressed: boolean;
   isPanning: boolean;
   isTouchPanningRef: { current: boolean };
@@ -208,7 +209,7 @@ export interface ShapeOverlayHandlers {
 }
 
 /** Freehand drawing handlers */
-export interface FreehandHandlers {
+interface FreehandHandlers {
   handlePointerDown?(this: void, e: Event | SyntheticPointerEvent, gridX?: number, gridY?: number, isTouch?: boolean): void;
   handlePointerMove?(this: void, e: Event): void;
   stopDrawing?(this: void): void;
@@ -218,7 +219,7 @@ export interface FreehandHandlers {
  * Region tool handlers. No pointer-up: a region label drag ends through
  * useRegionTools' own document pointerup listener.
  */
-export interface RegionHandlers {
+interface RegionHandlers {
   handlePointerDown?(this: void, e: Event | SyntheticPointerEvent): void;
   handlePointerMove?(this: void, e: Event): void;
   handleDoubleClick?(this: void, e: MouseEvent): void;

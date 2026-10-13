@@ -200,4 +200,3 @@ export {
   useLiveOverlayTransform,
   useLiveViewTick
 };
-export type { OverlayMetrics };

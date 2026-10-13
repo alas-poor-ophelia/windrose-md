@@ -247,5 +247,4 @@ async function downloadAndInstallPackInner(
   return installed;
 }
 
-export { downloadAndInstallPack, getExtractPath, resolveEntryPath, assertHttpsUrl, assertSafePackId, verifySha256, MAX_UNCOMPRESSED_BYTES };
-export type { PluginLike };
+export { downloadAndInstallPack, getExtractPath, resolveEntryPath, assertHttpsUrl, verifySha256, MAX_UNCOMPRESSED_BYTES };

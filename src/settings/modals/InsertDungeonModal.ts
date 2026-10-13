@@ -590,4 +590,4 @@ class InsertDungeonModal extends Modal {
 }
 
 export { InsertDungeonModal };
-export type { OnInsertCallback, DungeonInsertOptions };
+export type { DungeonInsertOptions };

@@ -5,6 +5,7 @@
  * (textures swept along editable polylines).
  */
 
+import { mintId } from '../core/ids';
 import type { WallPath, WallPathId, WallVertex } from '#types/core/wallpath.types';
 
 import { flattenWallPath } from './wallPathFlatten';
@@ -19,7 +20,7 @@ function distanceToWallPath(wall: WallPath, wx: number, wy: number): number {
 
 /** Create a unique wall path ID */
 function createWallPathId(): WallPathId {
-	return 'wall-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+	return mintId('wall', { randomLength: 6 });
 }
 
 interface CreateWallPathOptions {
@@ -49,4 +50,4 @@ function createWallPath(opts: CreateWallPathOptions): WallPath {
 }
 
 export { createWallPathId, createWallPath, distanceToWallPath, projectPointToPolyline };
-export type { CreateWallPathOptions, PolylineProjection };
+export type { PolylineProjection };

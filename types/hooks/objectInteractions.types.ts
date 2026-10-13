@@ -47,7 +47,6 @@ export interface ObjectDragStart {
 
 // MousePosition is canonical in contexts/context.types.ts
 import type { MousePosition } from '../contexts/context.types';
-export type { MousePosition };
 
 // ===========================================
 // State Values

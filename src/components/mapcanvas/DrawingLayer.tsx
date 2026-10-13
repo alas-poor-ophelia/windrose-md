@@ -158,9 +158,11 @@ const DrawingLayer = ({
   }, [rectangleStart, circleStart, edgeLineStart, touchConfirmPending, cancelShapePreview, segmentPickerOpen, closeSegmentPicker]);
 
   useEffect(() => {
-    activeDocument.addEventListener('keydown', handleKeyDown);
-    return () => activeDocument.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+    // Listen on the document that owns this map's canvas (popout-safe).
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('keydown', handleKeyDown);
+    return () => doc.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown, canvasRef]);
 
   useLayerHandlers('drawing', {
     handleDrawingPointerDown, handleDrawingPointerMove,

@@ -80,4 +80,4 @@ function decideOnboardingState(rawLoaded: unknown, mapDataExists: boolean): Onbo
 }
 
 export { FEATURE_DEFINITIONS, isFeatureEnabled, getFeatureFlags, decideOnboardingState };
-export type { FeatureDefinition };
+

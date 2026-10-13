@@ -48,10 +48,10 @@ export interface PartyNoteContext {
 }
 
 /** Outcome of an upsert, for caller feedback */
-export type PartyNoteWriteResult = 'created' | 'updated' | 'unchanged' | 'blocked';
+type PartyNoteWriteResult = 'created' | 'updated' | 'unchanged' | 'blocked';
 
 /** Outcome of a delete request */
-export type PartyNoteDeleteResult = 'deleted' | 'not-found' | 'not-owned';
+type PartyNoteDeleteResult = 'deleted' | 'not-found' | 'not-owned';
 
 /**
  * Make a label safe to use as a note file name.

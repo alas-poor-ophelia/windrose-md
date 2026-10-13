@@ -198,4 +198,4 @@ function renderRegions(
   }
 }
 
-export { renderRegions, renderRegionFill, renderRegionBorder, renderRegionLabel, computeBoundaryEdges, computeCentroid, getRegionLabelWorldPosition };
+export { renderRegions, computeBoundaryEdges, computeCentroid, getRegionLabelWorldPosition };

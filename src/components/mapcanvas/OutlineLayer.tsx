@@ -217,9 +217,10 @@ const OutlineLayer = ({
         deleteOutline(selectedOutlineId);
       }
     };
-    activeDocument.addEventListener('keydown', handler);
-    return () => activeDocument.removeEventListener('keydown', handler);
-  }, [isOutlineTool, cancelDrawing, selectedOutlineId, deleteOutline]);
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('keydown', handler);
+    return () => doc.removeEventListener('keydown', handler);
+  }, [isOutlineTool, cancelDrawing, selectedOutlineId, deleteOutline, canvasRef]);
 
   // Context menu via windrose:hex-context-menu
   useEffect(() => {
@@ -289,9 +290,10 @@ const OutlineLayer = ({
       menu.showAtPosition({ x: screenX, y: screenY });
     };
 
-    activeDocument.addEventListener('windrose:hex-context-menu', handler);
-    return () => activeDocument.removeEventListener('windrose:hex-context-menu', handler);
-  }, [isOutlineTool, mapData?.outlines, geometry, screenToWorld, deleteOutline, updateOutline, onOutlinesChange, instanceId]);
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('windrose:hex-context-menu', handler);
+    return () => doc.removeEventListener('windrose:hex-context-menu', handler);
+  }, [isOutlineTool, mapData?.outlines, geometry, screenToWorld, deleteOutline, updateOutline, onOutlinesChange, instanceId, canvasRef]);
 
   // ── Live-drag inputs (colour dialog, fill-opacity sliders) ────────
   // See useLiveInputCommit: each of these fires `input` on every pointer move

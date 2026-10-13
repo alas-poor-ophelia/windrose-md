@@ -3,6 +3,7 @@
  * Operations for managing map objects - placement, removal, updates.
  */
 
+import { mintId } from '../core/ids';
 import type { MapType } from '#types/core/map.types';
 import type {
   ObjectId,
@@ -34,7 +35,7 @@ import { assignSlot, getObjectsInCell, canAddObjectToCell, getOccupiedSlots, reo
  * Generate a unique ID for an object
  */
 function generateObjectId(): ObjectId {
-  return 'obj-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+  return mintId('obj');
 }
 
 // ===========================================
@@ -619,8 +620,8 @@ function snapObjectToGrid(
 
 export { // Core operations
   getObjectType, generateObjectId, getObjectAtPosition, updateObject, rotateObjectInList, isAreaFree, canResizeObject, // Grid-specific operations (legacy, prefer unified API)
-  addObject, removeObject, removeObjectAtPosition, removeObjectsInRectangle, calculateEdgeAlignment, getAlignmentOffset, // Hex-specific operations (internal, prefer unified API)
-  addObjectToHex, removeObjectFromHex, removeOneObjectFromHex, // Unified API (preferred for new code)
+  addObject, removeObject, removeObjectAtPosition, removeObjectsInRectangle, calculateEdgeAlignment, // Hex-specific operations (internal, prefer unified API)
+  addObjectToHex, removeObjectFromHex, // Unified API (preferred for new code)
   placeObject, eraseObjectAt, canPlaceObjectAt, findDuplicateTarget, // Freeform placement API
   placeObjectFreeform, convertObjectToFreeform, snapObjectToGrid };
 export type { DuplicateTarget };

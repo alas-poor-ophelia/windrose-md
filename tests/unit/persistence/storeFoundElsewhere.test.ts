@@ -44,6 +44,16 @@ describe('store found at another path', () => {
     expect(error).toBeInstanceOf(MapDataFileMissingError);
     expect((error as MapDataFileMissingError).foundAt).toBe('Campaign/Data/windrose-md-data.json');
     expect((await saveMapData(v.app, 'm1', createNewMap('x'))).status).toBe('failed');
+  });
+
+  it('elsewhere-only evidence does not block first-use creation (a Notice names the found path)', async () => {
+    const v = makeVault(['Campaign/Data/windrose-md-data.json']);
+    expect(await ensureDataFileForNewMap(v.app)).toBe(true);
+    expect(v.creates).toEqual([DATA_PATH]);
+  });
+
+  it('a backup sibling at the configured path still refuses creation', async () => {
+    const v = makeVault(['windrose-md-data.bak1.json']);
     expect(await ensureDataFileForNewMap(v.app)).toBe(false);
     expect(v.creates).toEqual([]);
   });

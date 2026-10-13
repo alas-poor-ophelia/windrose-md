@@ -89,8 +89,7 @@ const useEventCoordinator = ({
       getTouchCenter,
       getTouchDistance,
       startPan,
-      startTouchPan,
-      setInitialPinchDistance,
+      startPinch,
       spaceKeyPressed
     } = panZoomHandlers;
 
@@ -118,8 +117,9 @@ const useEventCoordinator = ({
 
     if (touchEvent.touches != null && touchEvent.touches.length === 2) {
       if (isColorPickerOpen || showObjectColorPicker) {
-        const touch1Target = activeDocument.elementFromPoint(touchEvent.touches[0].clientX, touchEvent.touches[0].clientY);
-        const touch2Target = activeDocument.elementFromPoint(touchEvent.touches[1].clientX, touchEvent.touches[1].clientY);
+        const hitDoc = canvasRef.current?.ownerDocument ?? activeDocument;
+        const touch1Target = hitDoc.elementFromPoint(touchEvent.touches[0].clientX, touchEvent.touches[0].clientY);
+        const touch2Target = hitDoc.elementFromPoint(touchEvent.touches[1].clientX, touchEvent.touches[1].clientY);
 
         const pickerOrButton1 = touch1Target?.closest('.windrose-color-picker, .windrose-color-tool-btn, .windrose-object-color-button');
         const pickerOrButton2 = touch2Target?.closest('.windrose-color-picker, .windrose-color-tool-btn, .windrose-object-color-button');
@@ -144,8 +144,7 @@ const useEventCoordinator = ({
       const center = getTouchCenter(touchEvent.touches);
       const distance = getTouchDistance(touchEvent.touches);
       if (center != null && distance != null) {
-        startTouchPan(center);
-        setInitialPinchDistance(distance);
+        startPinch(center, distance);
       }
       return;
     }
@@ -305,7 +304,7 @@ const useEventCoordinator = ({
     } else {
       executeToolAction();
     }
-  }, [currentTool, isColorPickerOpen, showObjectColorPicker, recentMultiTouch, selectedItem, hasMultiSelection, clearSelection, screenToWorld, getClickedSelectedItem, startGroupDrag, getHandlers, isAlignmentMode, setSelectedItem, interactionLocked]);
+  }, [currentTool, isColorPickerOpen, showObjectColorPicker, recentMultiTouch, selectedItem, hasMultiSelection, clearSelection, screenToWorld, getClickedSelectedItem, startGroupDrag, getHandlers, isAlignmentMode, setSelectedItem, interactionLocked, canvasRef]);
 
   const handlePointerMove = useCallback((e: MouseEvent | TouchEvent): void => {
     const layerVisibility = layerVisibilityRef.current;
@@ -633,7 +632,9 @@ const useEventCoordinator = ({
     // Try object/text context menu first — dispatch event for handlers to claim
     const contextDetail = { screenX: e.clientX, screenY: e.clientY, clientX: e.clientX, clientY: e.clientY, handled: false, instanceId: instanceId ?? undefined };
     const contextEvent = new CustomEvent('windrose:selection-context-menu', { detail: contextDetail });
-    activeDocument.dispatchEvent(contextEvent);
+    // Popout-safe: dispatch on the document that owns this canvas.
+    const ownerDoc = canvasRef.current?.ownerDocument ?? activeDocument;
+    ownerDoc.dispatchEvent(contextEvent);
     if (contextDetail.handled) return;
 
     // General hex context menu (dispatch for DungeonMapTracker to handle)
@@ -641,7 +642,7 @@ const useEventCoordinator = ({
       const coords = screenToGrid(e.clientX, e.clientY);
       if (coords) {
         const ctxCanvas = canvasRef.current;
-        activeDocument.dispatchEvent(new CustomEvent('windrose:hex-context-menu', {
+        ownerDoc.dispatchEvent(new CustomEvent('windrose:hex-context-menu', {
           detail: {
             q: coords.x,
             r: coords.y,
@@ -858,16 +859,18 @@ const useEventCoordinator = ({
       }
     };
 
-    window.addEventListener('mouseup', handleGlobalPointerUp);
-    window.addEventListener('touchend', handleGlobalPointerUp as EventListener, { passive: true });
-    window.addEventListener('mousemove', handleGlobalMouseMove);
-    window.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
+    // Popout-safe: the window that owns this canvas, captured once per run.
+    const win = canvasRef.current?.ownerDocument.defaultView ?? window;
+    win.addEventListener('mouseup', handleGlobalPointerUp);
+    win.addEventListener('touchend', handleGlobalPointerUp as EventListener, { passive: true });
+    win.addEventListener('mousemove', handleGlobalMouseMove);
+    win.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
 
     return () => {
-      window.removeEventListener('mouseup', handleGlobalPointerUp);
-      window.removeEventListener('touchend', handleGlobalPointerUp as EventListener);
-      window.removeEventListener('mousemove', handleGlobalMouseMove);
-      window.removeEventListener('touchmove', handleGlobalTouchMove);
+      win.removeEventListener('mouseup', handleGlobalPointerUp);
+      win.removeEventListener('touchend', handleGlobalPointerUp as EventListener);
+      win.removeEventListener('mousemove', handleGlobalMouseMove);
+      win.removeEventListener('touchmove', handleGlobalTouchMove);
     };
   }, [isDraggingSelection, dragStart, setIsDraggingSelection, setDragStart, isGroupDragging, stopGroupDrag, getHandlers, canvasRef, scheduleMultiTouchReset]);
 
@@ -900,10 +903,11 @@ const useEventCoordinator = ({
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    const win = canvasRef.current?.ownerDocument.defaultView ?? window;
+    win.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      win.removeEventListener('keydown', handleKeyDown);
     };
   }, [getHandlers, canvasRef]);
 

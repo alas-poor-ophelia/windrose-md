@@ -256,4 +256,4 @@ function buildWallBarrier(
 }
 
 export { getBrushCells, bresenhamLine, floodFillCells, buildWallBarrier, segmentsIntersect, FLOOD_FILL_LIMIT };
-export type { FloodFillOptions, FloodFillResult, WallBarrier, WallPolyline };
+

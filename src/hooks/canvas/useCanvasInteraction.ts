@@ -177,15 +177,19 @@ function useCanvasInteraction(
     const onBlur = (): void => {
       zoomModifierHeldRef.current = false;
     };
-    activeDocument.addEventListener('keydown', onKeyDown, true);
-    activeDocument.addEventListener('keyup', onKeyUp, true);
-    window.addEventListener('blur', onBlur);
+    // Popout-safe: listen on the window that owns this canvas, captured once
+    // so add and remove always target the same document.
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    const win = doc.defaultView ?? window;
+    doc.addEventListener('keydown', onKeyDown, true);
+    doc.addEventListener('keyup', onKeyUp, true);
+    win.addEventListener('blur', onBlur);
     return () => {
-      activeDocument.removeEventListener('keydown', onKeyDown, true);
-      activeDocument.removeEventListener('keyup', onKeyUp, true);
-      window.removeEventListener('blur', onBlur);
+      doc.removeEventListener('keydown', onKeyDown, true);
+      doc.removeEventListener('keyup', onKeyUp, true);
+      win.removeEventListener('blur', onBlur);
     };
-  }, []);
+  }, [canvasRef]);
 
   // Keep boolean gate refs in sync with state for stable effect closures.
   // The ROLLED anchors (touchPanStartRef / initialPinchDistanceRef /
@@ -610,7 +614,7 @@ function useCanvasInteraction(
   // Seed the pinch baseline into ref AND state together (the render body no
   // longer re-seeds rolled refs from state — see the comment on the gate-ref
   // sync above). The ref is the live per-tick baseline; the state is only the
-  // gesture-start gate. This is the setter handed to the event coordinator.
+  // gesture-start gate. Internal: callers go through startPinch.
   const seedInitialPinchDistance = (distance: number | null): void => {
     initialPinchDistanceRef.current = distance;
     setInitialPinchDistance(distance);
@@ -702,12 +706,18 @@ function useCanvasInteraction(
     commitActiveGesture();
   };
 
+  // Latest-ref proxy for the gesture-end actions read by the long-lived
+  // listeners below, so those effects attach once per mount/focus change and
+  // still call the current closures.
+  const gestureEndRef = useRef({ stopPan, stopTouchPan, commitActiveGesture });
+  gestureEndRef.current = { stopPan, stopTouchPan, commitActiveGesture };
+
   useEffect(() => {
     if (!focused) {
       if (spaceKeyPressedRef.current) {
         setSpaceKeyPressed(false);
         if (isPanningRef.current) {
-          stopPan();
+          gestureEndRef.current.stopPan();
         }
       }
       return undefined;
@@ -725,18 +735,19 @@ function useCanvasInteraction(
       if (e.key === ' ') {
         setSpaceKeyPressed(false);
         if (isPanningRef.current) {
-          stopPan();
+          gestureEndRef.current.stopPan();
         }
       }
     };
 
-    window.addEventListener('keydown', handleSpaceDown);
-    window.addEventListener('keyup', handleSpaceUp);
+    const win = canvasRef.current?.ownerDocument.defaultView ?? window;
+    win.addEventListener('keydown', handleSpaceDown);
+    win.addEventListener('keyup', handleSpaceUp);
     return () => {
-      window.removeEventListener('keydown', handleSpaceDown);
-      window.removeEventListener('keyup', handleSpaceUp);
+      win.removeEventListener('keydown', handleSpaceDown);
+      win.removeEventListener('keyup', handleSpaceUp);
     };
-  }, [focused]);
+  }, [focused, canvasRef]);
 
   // Safety nets for gestures that never see a normal pointerup: a window blur
   // (alt-tab / OS focus steal) or a pointercancel (browser aborts the pointer)
@@ -745,21 +756,23 @@ function useCanvasInteraction(
   // syncCommitted no-op forever and freeze external navigate/undo/load.
   useEffect(() => {
     const finish = (): void => {
-      if (isPanningRef.current) stopPan();
-      else if (isTouchPanningRef.current) stopTouchPan();
-      else commitActiveGesture();
+      const end = gestureEndRef.current;
+      if (isPanningRef.current) end.stopPan();
+      else if (isTouchPanningRef.current) end.stopTouchPan();
+      else end.commitActiveGesture();
     };
-    window.addEventListener('blur', finish);
-    window.addEventListener('pointercancel', finish);
+    const win = canvasRef.current?.ownerDocument.defaultView ?? window;
+    win.addEventListener('blur', finish);
+    win.addEventListener('pointercancel', finish);
     return () => {
-      window.removeEventListener('blur', finish);
-      window.removeEventListener('pointercancel', finish);
+      win.removeEventListener('blur', finish);
+      win.removeEventListener('pointercancel', finish);
       // On unmount, commit the live viewState directly — skip stopPan's setState
       // calls (the component is going away; state cleanup is meaningless and would
       // warn), but still persist any in-flight gesture so it isn't lost.
-      commitActiveGesture();
+      gestureEndRef.current.commitActiveGesture();
     };
-  }, []);
+  }, [canvasRef]);
 
   return {
     isPanning,
@@ -792,8 +805,7 @@ function useCanvasInteraction(
     updateTouchPan,
     stopTouchPan,
 
-    startPinch,
-    setInitialPinchDistance: seedInitialPinchDistance
+    startPinch
   };
 }
 

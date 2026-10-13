@@ -4,6 +4,7 @@ import type { PluginSettings, CustomObject } from '#types/settings/settings.type
 import { ObjectHelpers } from '../helpers/objectHelpers';
 import { RPGAwesomeHelpers } from '../helpers/rpgAwesomeHelpers';
 import { OBJECT_TYPES as BUILT_IN_OBJECTS } from '../../objects/objectTypes';
+import { mintId } from '../../core/ids';
 
 interface WindrosePlugin {
   settings: PluginSettings;
@@ -646,7 +647,7 @@ class ObjectEditModal extends Modal {
       this.plugin.settings[customObjectsKey] ??= [];
 
       const newObject: Record<string, string> = {
-        id: 'custom-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11),
+        id: mintId('custom'),
         label: this.label.trim(),
         category: this.category
       };

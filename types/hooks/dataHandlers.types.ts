@@ -60,10 +60,10 @@ export type HandleCurvesChange = LayerDataChangeHandler<Curve[]>;
 export type HandleTilesChange = LayerDataChangeHandler<TileAssignment[]>;
 
 /** Handle wall paths change */
-export type HandleWallPathsChange = LayerDataChangeHandler<WallPath[]>;
+type HandleWallPathsChange =LayerDataChangeHandler<WallPath[]>;
 
 /** Handle terrain strokes change */
-export type HandleTerrainStrokesChange = LayerDataChangeHandler<TerrainStroke[]>;
+type HandleTerrainStrokesChange =LayerDataChangeHandler<TerrainStroke[]>;
 
 /** Handle map name change */
 export type HandleNameChange = (newName: string) => void;

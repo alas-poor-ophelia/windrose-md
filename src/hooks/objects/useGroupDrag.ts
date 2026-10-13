@@ -37,7 +37,8 @@ const useGroupDrag = (): UseGroupDragResult => {
     mapData,
     screenToGrid,
     screenToWorld,
-    getClientCoords
+    getClientCoords,
+    canvasRef
   } = useMapState();
 
   const {
@@ -71,13 +72,15 @@ const useGroupDrag = (): UseGroupDragResult => {
       if (e.key === 'Alt') altKeyRef.current = false;
       if (e.key === 'Shift') shiftKeyRef.current = false;
     };
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
+    // Popout-safe: the window that owns this map's canvas, captured once.
+    const win = canvasRef.current?.ownerDocument.defaultView ?? window;
+    win.addEventListener('keydown', onKeyDown);
+    win.addEventListener('keyup', onKeyUp);
     return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
+      win.removeEventListener('keydown', onKeyDown);
+      win.removeEventListener('keyup', onKeyUp);
     };
-  }, []);
+  }, [canvasRef]);
 
   const getClickedSelectedItem = useCallback((
     x: number,

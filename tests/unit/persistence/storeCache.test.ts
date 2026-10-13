@@ -233,3 +233,32 @@ describe('store cache helpers', () => {
     expect(snapshotFromParsed({})?.entries.size).toBe(0);
   });
 });
+
+describe('store cache: racy timestamps', () => {
+  function stubApp(mtime: number, size: number): App {
+    return { vault: { adapter: { stat: async () => ({ type: 'file', mtime, size }) } } } as unknown as App;
+  }
+
+  it('a whole-second mtime is not trusted until 2.5 s later; a precise mtime is', async () => {
+    const written = '{"maps":{}}';
+    const snap = snapshotFromParsed({ maps: {} });
+    if (snap == null) throw new Error('snapshot');
+    const size = utf8ByteLength(written);
+    const { commitStoreCache, getValidStoreCache } = await import('../../../src/persistence/storeCache');
+    const now = Date.now();
+    const coarse = Math.floor(now / 1000) * 1000;
+
+    invalidateStoreCache();
+    await commitStoreCache(stubApp(coarse, size), DATA_PATH, snap, written);
+    expect(hasStoreCache()).toBe(true);
+    expect(await getValidStoreCache(stubApp(coarse, size), DATA_PATH)).toBeNull();
+
+    invalidateStoreCache();
+    await commitStoreCache(stubApp(coarse + 7, size), DATA_PATH, snap, written);
+    expect(await getValidStoreCache(stubApp(coarse + 7, size), DATA_PATH)).not.toBeNull();
+
+    invalidateStoreCache();
+    await commitStoreCache(stubApp(coarse - 10_000, size), DATA_PATH, snap, written);
+    expect(await getValidStoreCache(stubApp(coarse - 10_000, size), DATA_PATH)).not.toBeNull();
+  });
+});

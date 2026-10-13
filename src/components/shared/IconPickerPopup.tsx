@@ -78,7 +78,7 @@ const IconPickerPopup = ({
       position: 'fixed',
       left: `${rect.left}px`,
       ...(position === 'above'
-        ? { bottom: `${window.innerHeight - rect.top + gap}px` }
+        ? { bottom: `${(anchorRef.current.ownerDocument.defaultView ?? window).innerHeight - rect.top + gap}px` }
         : { top: `${rect.bottom + gap}px` }
       )
     };

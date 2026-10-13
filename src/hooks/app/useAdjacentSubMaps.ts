@@ -120,8 +120,10 @@ function useAdjacentSubMaps({ app, isInSubHex, adjacentSubHexes, adjacentEmptySl
       }
     };
 
-    activeDocument.addEventListener('click', handleAdjacentClick, true);
-    return () => activeDocument.removeEventListener('click', handleAdjacentClick, true);
+    // Popout-safe: the document that owns this map block, captured once per run.
+    const doc = containerRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('click', handleAdjacentClick, true);
+    return () => doc.removeEventListener('click', handleAdjacentClick, true);
   }, [showAdjacentSubMaps, isInSubHex, adjacentSubHexes, adjacentEmptySlots, geometry, renderMapData, navigateToSibling, containerRef]);
 
   return { showAdjacentSubMaps, setShowAdjacentSubMaps };

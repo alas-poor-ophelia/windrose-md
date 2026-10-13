@@ -98,9 +98,10 @@ const RegionLayer = ({
         startEditingRegion(regionId);
       }
     };
-    activeDocument.addEventListener('windrose:edit-region', handler);
-    return () => activeDocument.removeEventListener('windrose:edit-region', handler);
-  }, [startEditingRegion, instanceId]);
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('windrose:edit-region', handler);
+    return () => doc.removeEventListener('windrose:edit-region', handler);
+  }, [startEditingRegion, instanceId, canvasRef]);
 
   // Name input state
   const [showNameInput, setShowNameInput] = useState(false);
@@ -120,9 +121,10 @@ const RegionLayer = ({
         setRegionName('');
       }
     };
-    activeDocument.addEventListener('windrose:before-undo', handler);
-    return () => activeDocument.removeEventListener('windrose:before-undo', handler);
-  }, [pendingHexes.length, editingRegionId, showNameInput, cancelRegion, instanceId]);
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('windrose:before-undo', handler);
+    return () => doc.removeEventListener('windrose:before-undo', handler);
+  }, [pendingHexes.length, editingRegionId, showNameInput, cancelRegion, instanceId, canvasRef]);
 
   const handleCreateClick = useCallback(() => {
     setShowNameInput(true);

@@ -280,14 +280,15 @@ const ObjectLayer = ({
       }
     };
 
-    activeDocument.addEventListener('mousedown', handleClickOutside);
-    activeDocument.addEventListener('touchstart', handleClickOutside, { passive: true });
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('mousedown', handleClickOutside);
+    doc.addEventListener('touchstart', handleClickOutside, { passive: true });
 
     return () => {
-      activeDocument.removeEventListener('mousedown', handleClickOutside);
-      activeDocument.removeEventListener('touchstart', handleClickOutside);
+      doc.removeEventListener('mousedown', handleClickOutside);
+      doc.removeEventListener('touchstart', handleClickOutside);
     };
-  }, [showObjectColorPicker, handleObjectColorSelect, onAddCustomColor, pendingObjectCustomColorRef]);
+  }, [showObjectColorPicker, handleObjectColorSelect, onAddCustomColor, pendingObjectCustomColorRef, canvasRef]);
 
   // Single-object action handlers: shared by the selection toolbar and the
   // right-click menu (which reads them at click time).

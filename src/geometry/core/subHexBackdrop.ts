@@ -48,7 +48,7 @@ export interface SubHexBackdropCapture {
 }
 
 /** Destination canvas a backdrop is being drawn onto. */
-export interface SubHexBackdropTarget {
+interface SubHexBackdropTarget {
   width: number;
   height: number;
   /** Sub-map rotation, in degrees. */
@@ -56,7 +56,7 @@ export interface SubHexBackdropTarget {
 }
 
 /** drawImage destination rect for the snapshot, in target canvas pixels. */
-export interface SubHexBackdropPlacement {
+interface SubHexBackdropPlacement {
   dx: number;
   dy: number;
   drawW: number;

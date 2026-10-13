@@ -10,6 +10,7 @@
  * arrays on `curve.innerRings`.
  */
 
+import { mintId } from '../../core/ids';
 import type { Curve, BezierSegment } from '#types/core/curve.types';
 
 import { difference, union } from './polygonClipping';
@@ -685,7 +686,7 @@ function subtractCellFromCurve(
 
     const id = i === 0
       ? curve.id
-      : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+      : mintId(curve.id, { randomLength: 6 });
 
     resultCurves.push(polygonToCurve(simplified, curve, id));
   }
@@ -836,7 +837,7 @@ function eraseRectangleFromCurves(
       const simplified: Polygon = poly.map(ring => simplifyRing(ring));
       const id = j === 0
         ? curve.id
-        : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+        : mintId(curve.id, { randomLength: 6 });
       newCurves.push(polygonToCurve(simplified, curve, id));
       anyKept = true;
     }
@@ -920,7 +921,7 @@ function eraseWorldPolygonFromCurves(
       const simplified: Polygon = poly.map(r => simplifyRing(r));
       const id = j === 0
         ? curve.id
-        : curve.id + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+        : mintId(curve.id, { randomLength: 6 });
       newCurves.push(polygonToCurve(simplified, curve, id));
       anyKept = true;
     }
