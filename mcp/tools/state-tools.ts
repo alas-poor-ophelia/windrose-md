@@ -18,7 +18,7 @@ export function registerStateTools(server: McpServer): void {
       ),
     },
     async ({ toolId }) => {
-      const code = opCall(`ops.setTool(${jsStr(toolId)});return JSON.stringify({ok:true,tool:${jsStr(toolId)}})`);
+      const code = opCall(`return JSON.stringify(ops.setTool(${jsStr(toolId)}))`);
       const result = await obsidianEvalJson<{ ok?: boolean; error?: string }>(code);
       if (result.error) {
         return { content: [{ type: "text" as const, text: result.error }], isError: true };

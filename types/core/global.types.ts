@@ -51,7 +51,8 @@ interface WindroseLevelWriteResult {
 }
 
 interface WindroseMcpOps {
-  setTool: (toolId: string) => void;
+  /** Refuses an id outside the ToolId union (the paint tool is `draw`). */
+  setTool: (toolId: string) => { ok: true; tool: string } | { ok: false; error: string };
   setColor: (color: string) => void;
   setOpacity: (opacity: number) => void;
   /** Level omitted or 0: legacy boolean. Level >= 1: rung write result. */

@@ -7663,13 +7663,31 @@ button.windrose-breadcrumb-link {
 
 /* Lattice ladder level chips (LadderLevelOverlay). Chips reuse the breadcrumb
    link/current classes; this block only places the row and adds the lock. */
-.windrose-ladder-levels {
+/* The host spans the canvas container's bottom edge and is the size container
+   the row queries: narrow embeds drop the readout, then the "L" prefixes. The
+   row is centred inside a side reserve that clears the bottom-left compass in
+   full-pane (12px inset + 60px compass + 12px gap). */
+.windrose-ladder-host {
+  --windrose-ladder-reserve: 8px;
   position: absolute;
+  left: 0;
+  right: 0;
   bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
   z-index: 3;
   display: flex;
+  justify-content: center;
+  container: windrose-ladder/inline-size;
+  pointer-events: none;
+}
+.windrose-full-pane-canvas .windrose-ladder-host {
+  --windrose-ladder-reserve: 84px;
+}
+
+.windrose-ladder-levels {
+  display: flex;
+  min-width: 0;
+  max-width: calc(100% - 2 * var(--windrose-ladder-reserve));
+  overflow: hidden;
   align-items: center;
   gap: 2px;
   padding: 2px 6px;
@@ -7728,6 +7746,31 @@ button.windrose-ladder-lock.is-locked {
   color: var(--windrose-accent-blue);
 }
 
+/* Narrow host: the padlock outline already marks a locked edit rung, so the
+   text readout is the first thing to go. */
+@container windrose-ladder (width < 520px) {
+  .windrose-ladder-readout {
+    display: none;
+  }
+}
+/* Very narrow host: chips show the bare rung number with tighter padding. */
+@container windrose-ladder (width < 400px) {
+  .windrose-ladder-chip-prefix {
+    display: none;
+  }
+  .windrose-ladder-levels {
+    gap: 0;
+    padding: 2px 3px;
+  }
+  /* Two classes outrank the breadcrumb's button.windrose-breadcrumb-link
+     padding and the .is-tablet lock twin. */
+  .windrose-ladder-levels .windrose-ladder-chip {
+    padding-inline: 3px;
+  }
+  .windrose-ladder-levels button.windrose-ladder-lock {
+    margin-left: 2px;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   button.windrose-ladder-lock {
     transition: none;

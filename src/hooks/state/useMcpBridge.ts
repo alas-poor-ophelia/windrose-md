@@ -10,7 +10,8 @@
  * ItemViews) > notePath (block mode).
  */
 
-import { useEffect } from 'preact/hooks';
+import { isToolId } from '../../core/toolIds';
+import { useEffect} from 'preact/hooks';
 import type { MapData } from '#types/core/map.types';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { ToolId } from '#types/tools/tool.types';
@@ -236,7 +237,14 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
       textLabelCount,
       context: fullPane ? 'fullPane' : 'block',
       ops: {
-        setTool: (toolId: string) => setCurrentTool(toolId as ToolId),
+        // A wrong id used to be accepted and echoed back as currentTool, then
+        // fell through every coordinator branch in silence (the paint tool is
+        // `draw`, there is no `paint`). Refuse it loudly instead.
+        setTool: (toolId: string): { ok: true; tool: ToolId } | { ok: false; error: string } => {
+          if (!isToolId(toolId)) return { ok: false, error: 'unknown tool id: ' + toolId + ' (paint cells is "draw"; see TOOL_IDS)' };
+          setCurrentTool(toolId);
+          return { ok: true, tool: toolId };
+        },
         setColor: (color: string) => setSelectedColor(color),
         setOpacity: (opacity: number) => handleOpacityChange(opacity),
         paintCell: (x: number, y: number, color?: string, opacity?: number, level?: number): boolean | WindroseLevelWriteResult => {

@@ -13,7 +13,7 @@ vi.mock('../../../src/core/settingsAccessor', async (importOriginal) => ({
 }));
 
 const { createNewMap, loadMapDataWithGeneration, setPendingNewMapOptions } = await import('../../../src/persistence/fileOperations');
-const { ladderOpensAt, mergeLadderConfig } = await import('../../../src/core/lodFlags');
+const { ladderOpensAt, mergeLadderConfig, ladderSettingsPatch } = await import('../../../src/core/lodFlags');
 const { chooseLevel, LADDER_DEFAULTS } = await import('../../../src/geometry/core/lattice');
 const { settingsReducer, buildInitialState, Actions } = await import('../../../src/components/settings/settingsReducer');
 
@@ -96,6 +96,38 @@ describe('mergeLadderConfig', () => {
   });
 });
 
+describe('ladderSettingsPatch', () => {
+  const stored: LadderConfig = { m: 4, minCellPx: 64, maxLevel: 3, distanceOverrides: { 1: { distancePerCell: 1 } as never } };
+  const defaults = { m: LADDER_DEFAULTS.m, minCellPx: LADDER_DEFAULTS.minCellPx, maxLevel: LADDER_DEFAULTS.maxLevel };
+
+  it('keeps when nothing was touched', () => {
+    expect(ladderSettingsPatch(undefined, false, null, false)).toEqual({ kind: 'keep' });
+    expect(ladderSettingsPatch(stored, true, stored, false)).toEqual({ kind: 'keep' });
+  });
+
+  it('sets when enabling a classic map, even at the default values', () => {
+    expect(ladderSettingsPatch(undefined, true, defaults, false)).toEqual({ kind: 'set', lod: defaults });
+    expect(ladderSettingsPatch(null, true, null, false)).toEqual({ kind: 'set', lod: defaults });
+  });
+
+  it('removes when disabling a map with no depth content', () => {
+    expect(ladderSettingsPatch(stored, false, stored, false)).toEqual({ kind: 'remove' });
+  });
+
+  it('keeps (never removes) when disabling would drop depth content', () => {
+    expect(ladderSettingsPatch(stored, false, stored, true)).toEqual({ kind: 'keep' });
+  });
+
+  it("sets when editing an enabled map's values, keeping distanceOverrides", () => {
+    expect(ladderSettingsPatch(stored, true, { m: 4, minCellPx: 40, maxLevel: 5 }, false))
+      .toEqual({ kind: 'set', lod: { m: 4, minCellPx: 40, maxLevel: 5, distanceOverrides: stored.distanceOverrides } });
+  });
+
+  it('keeps when the edit equals the stored values', () => {
+    expect(ladderSettingsPatch(stored, true, { m: 4, minCellPx: 64, maxLevel: 3 }, true)).toEqual({ kind: 'keep' });
+  });
+});
+
 describe('settingsReducer ladder field', () => {
   const init = (currentLod?: LadderConfig | null) =>
     buildInitialState({ mapType: 'hex', currentLod }, {} as never);
@@ -114,6 +146,25 @@ describe('settingsReducer ladder field', () => {
   it('SET_LADDER_CONFIG merges over the stored config', () => {
     const next = settingsReducer(init({ m: 2, minCellPx: 50, maxLevel: 4 }), { type: Actions.SET_LADDER_CONFIG, payload: { maxLevel: 6 } });
     expect(next.lod).toEqual({ m: 2, minCellPx: 50, maxLevel: 6 });
+  });
+
+  it('ladderEnabled starts on only for a map that stores a lod', () => {
+    expect(init().ladderEnabled).toBe(false);
+    expect(init({ m: 2, minCellPx: 50, maxLevel: 4 }).ladderEnabled).toBe(true);
+  });
+
+  it('SET_LADDER_ENABLED seeds the defaults when nothing is stored', () => {
+    const next = settingsReducer(init(), { type: Actions.SET_LADDER_ENABLED, payload: true });
+    expect(next.ladderEnabled).toBe(true);
+    expect(next.lod).toEqual({ m: LADDER_DEFAULTS.m, minCellPx: LADDER_DEFAULTS.minCellPx, maxLevel: LADDER_DEFAULTS.maxLevel });
+  });
+
+  it('SET_LADDER_ENABLED off keeps the pending config for a re-enable', () => {
+    const edited = settingsReducer(init({ m: 2, minCellPx: 50, maxLevel: 4 }), { type: Actions.SET_LADDER_CONFIG, payload: { maxLevel: 6 } });
+    const off = settingsReducer(edited, { type: Actions.SET_LADDER_ENABLED, payload: false });
+    expect(off.ladderEnabled).toBe(false);
+    const on = settingsReducer(off, { type: Actions.SET_LADDER_ENABLED, payload: true });
+    expect(on.lod).toEqual({ m: 2, minCellPx: 50, maxLevel: 6 });
   });
 });
 

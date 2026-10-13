@@ -68,6 +68,17 @@ Canvas note: the render canvas is the non-`position:absolute` one; `windrose-can
 const setVal = (el, v) => { Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value').set.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); };
 ```
 
+**Paint a cell by synthetic events** (VERIFIED LIVE 2026-10-12 on lod-fixture: paints at any rung and honours the edit-level lock). Prefer `windrose_paint_cell` / `windrose_paint_cells`; use this only to exercise the real pointer path. `windrose_set_tool` now REFUSES an id outside the ToolId union (`{ok:false, error}`), so the old silent failure cannot recur.The canvas listens for plain `mousedown`/`mouseup`/`mousemove` (`useEventCoordinator.ts:1065-1072`), NOT pointer events, so pointerdown/pointerup recipes do nothing. No `isTrusted`, `pointerId`, `buttons` or `detail` check exists on this path; only `button === 0` is required (`:1006-1014`, `:166-168`).
+1. The tool id must be `windrose_set_tool` `draw` (palette "Paint Cells", `ToolPalette.tsx:309`). `paint` is NOT a tool id: only `draw`/`erase`/`rectangle`/`circle`/`clearArea`/`edgeDraw`/`edgeErase`/`edgeLine`/`segmentDraw` reach the paint code (`DRAWING_TOOL_SET`, `useEventCoordinator.ts:26-29,292`). Any other id falls through every branch silently, which matches "selects/places but never paints, no notice".
+2. Fire on the visible render canvas (see above), with coordinates inside it:
+```js
+const cv = [...document.querySelectorAll('.windrose-container')].find(c => c.getBoundingClientRect().width > 50 && c.offsetParent != null).querySelector('canvas:not([style*="absolute"])');
+const r = cv.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+const ev = (t) => cv.dispatchEvent(new MouseEvent(t, { clientX: x, clientY: y, button: 0, buttons: t === 'mouseup' ? 0 : 1, bubbles: true, cancelable: true }));
+ev('mousedown'); await new Promise(r => setTimeout(r, 100)); ev('mousemove'); await new Promise(r => setTimeout(r, 50)); ev('mouseup');
+```
+Path: `handleMouseDown` (`:1006`) -> `handlePointerDown` (`:70`, mouse runs `executeToolAction` immediately, `:410-424`) -> `handleDrawingPointerDown` (`useDrawingTools.ts:124`, `draw` branch `:152`) -> `usePaintTool.startDrawing` (`:434`) -> `processCellDuringDrag` -> `toggleCell` -> `onCellsChange(batched)`. The batched write is committed to history on `mouseup` via `stopDrawing` (`:480-498`, `flushStrokeHistory`). The extra mousemove is belt-and-braces (it only feeds `processCellDuringDrag`, `useEventCoordinator.ts:533-538`). On a ladder map zoomed onto a rung the press may instead raise a Notice (`usePaintTool.ts:445-452`); at level 0 nothing blocks it. If this still paints nothing, check `windrose_get_state` for the real `currentTool`, and that a mouse event within 500 ms of a touch is dropped (`useEventCoordinator.ts:100-105`).
+
 **Which CSS rules match an element** (specificity debugging):
 ```js
 const el = document.querySelector(SEL); const hits = []; for (const sh of document.styleSheets) { let rules; try { rules = sh.cssRules; } catch (e) { continue; } for (const r of rules) { if (r.style && r.selectorText) { let m = false; try { m = el.matches(r.selectorText); } catch (e) {} if (m) hits.push(r.selectorText); } } }

@@ -33,11 +33,38 @@ interface NewMapOptions {
  * through, so the preset waits here until that load consumes it. Cleared once
  * the entry exists in the data file.
  */
-const pendingNewMapOptions = new Map<string, NewMapOptions>();
+const pendingNewMapOptions = new Map<string, { options: NewMapOptions; at: number }>();
+const PENDING_NEW_MAP_CAP = 32;
+const PENDING_NEW_MAP_TTL_MS = 10 * 60 * 1000;
+
+/** Drop presets for maps that were created and abandoned before their first save. */
+function prunePendingNewMapOptions(): void {
+  const now = Date.now();
+  for (const [id, entry] of pendingNewMapOptions) {
+    if (now - entry.at > PENDING_NEW_MAP_TTL_MS) pendingNewMapOptions.delete(id);
+  }
+}
+
+function getPendingNewMapOptions(mapId: string): NewMapOptions | undefined {
+  prunePendingNewMapOptions();
+  return pendingNewMapOptions.get(mapId)?.options;
+}
 
 /** Record creation presets for a map id that has not been created yet. */
 function setPendingNewMapOptions(mapId: string, options: NewMapOptions): void {
-  pendingNewMapOptions.set(mapId, options);
+  prunePendingNewMapOptions();
+  pendingNewMapOptions.delete(mapId);
+  while (pendingNewMapOptions.size >= PENDING_NEW_MAP_CAP) {
+    const oldest = pendingNewMapOptions.keys().next().value;
+    if (oldest === undefined) break;
+    pendingNewMapOptions.delete(oldest);
+  }
+  pendingNewMapOptions.set(mapId, { options, at: Date.now() });
+}
+
+/** Test hook: forget every pending preset. */
+function clearPendingNewMapOptions(): void {
+  pendingNewMapOptions.clear();
 }
 
 // Serializes EVERY data-file operation (reads as well as writes) so concurrent
@@ -527,7 +554,7 @@ function applyLockedViewState(mapData: MapData): MapData {
  */
 async function loadMapDataWithGeneration(app: App, mapId: string, mapName: string = '', mapType: MapType = 'grid', options?: NewMapOptions): Promise<{ data: MapData; generation: number }> {
   const dataPath = getDataFilePath();
-  const newMapOptions = options ?? pendingNewMapOptions.get(mapId);
+  const newMapOptions = options ?? getPendingNewMapOptions(mapId);
   return enqueueDataFileOp(async () => {
     // Captured INSIDE the mutex: the returned snapshot is exactly the state
     // at this generation — no save can land between the read and the stamp.
@@ -1023,7 +1050,7 @@ async function listMaps(app: App): Promise<MapListEntry[]> {
 export type { SaveMapResult };
 export {
   loadMapData, loadMapDataWithGeneration, getEntryGeneration,
-  saveMapData, deleteMapData, createNewMap, setPendingNewMapOptions, listMaps, migrateMapData,
+  saveMapData, deleteMapData, createNewMap, setPendingNewMapOptions, clearPendingNewMapOptions, listMaps, migrateMapData,
   canonicalizeTileIds, applyLockedViewState, enqueueDataFileOp, getSaveQueue,
   notifyCorruptedDataFile, readRawMapEntry, isMapTombstoned, MapDataUnreadableError,
   shouldRotateBak, otherBakSlot, bakPathForSlot, backupTimestamp,

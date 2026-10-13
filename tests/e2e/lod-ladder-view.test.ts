@@ -7,6 +7,8 @@ import {
   setupErrorTracking,
   navigateToMap,
   waitForContainer,
+  openSettingsModal,
+  closeSettingsModal,
   TEST_MAPS,
 } from "./helpers";
 
@@ -85,6 +87,9 @@ interface McpOps {
 interface McpInstance {
   notePath: string;
   ops: McpOps;
+  /** Phase 6 level accessors (camera rung / rung edits land on). */
+  getActiveLevel?: () => number;
+  getEditLevel?: () => number;
 }
 
 interface WindrosePageWindow {
@@ -318,4 +323,159 @@ describe("Lattice ladder view", () => {
 
     expect(errors).toHaveLength(0);
   });
+});
+
+// ===========================================
+// Phase 6 UI: level overlay, edit-level lock, settings section
+//
+// The numbers quoted in the design notes (zoom 8 -> L2; clicking the L1 chip
+// -> zoom 3.2 = crossingZoom(1) 1.6 * sqrt(m=4)) belong to the dev vault's
+// `lod-fixture` map, which is NOT in tests/fixtures/test-vault. These tests
+// therefore run on the smoke-test hex map and derive every expected level from
+// the DOM / the instance accessors instead of hardcoding rungs.
+// ===========================================
+
+interface OverlayState {
+  present: boolean;
+  chips: Array<{ level: number; current: boolean; locked: boolean; isButton: boolean }>;
+  lockLabel: string | null;
+  lockIsLocked: boolean;
+  readout: string;
+  activeLevel: number | null;
+  editLevel: number | null;
+}
+
+async function readOverlay(page: any): Promise<OverlayState> {
+  return page.evaluate((notePath: string) => {
+    const w = window as unknown as WindrosePageWindow;
+    const inst = Object.values(w.__windrose?.mcpInstances ?? {}).find((c) => c.notePath === notePath);
+    const root = document.querySelector(".windrose-ladder-levels");
+    const chips = Array.from(document.querySelectorAll(".windrose-ladder-chip")).map((el) => ({
+      level: Number((el.textContent ?? "").replace(/\D/g, "")),
+      current: el.classList.contains("windrose-breadcrumb-current"),
+      locked: el.classList.contains("windrose-ladder-chip-locked"),
+      isButton: el.tagName === "BUTTON",
+    }));
+    const lock = document.querySelector(".windrose-ladder-lock");
+    return {
+      present: root != null,
+      chips,
+      lockLabel: lock?.getAttribute("aria-label") ?? null,
+      lockIsLocked: lock?.classList.contains("is-locked") ?? false,
+      readout: document.querySelector(".windrose-ladder-readout")?.textContent ?? "",
+      activeLevel: inst?.getActiveLevel?.() ?? null,
+      editLevel: inst?.getEditLevel?.() ?? null,
+    };
+  }, TEST_MAPS.hex);
+}
+
+/** Never leave the edit-level lock set: it is per-mount state. */
+async function ensureUnlocked(page: any): Promise<void> {
+  const lock = page.locator('.windrose-ladder-lock[aria-label="Unlock edit level"]');
+  if (await lock.count() > 0) await lock.first().click();
+}
+
+describe("Lattice ladder phase 6 UI", () => {
+  test("level overlay chips, readout and chip click agree with the active level", async ({ page }) => {
+    const errors = setupErrorTracking(page);
+    await gotoLadderHexMap(page);
+    try {
+      await setHexViewport(page, 0, 0, 8);
+      await page.waitForTimeout(400);
+
+      const before = await readOverlay(page);
+      expect(before.present, "expected .windrose-ladder-levels on a ladder map").toBe(true);
+      expect(before.chips.length, "expected >=2 rung chips").toBeGreaterThanOrEqual(2);
+      const current = before.chips.filter((c) => c.current);
+      expect(current, "exactly one current chip").toHaveLength(1);
+      expect(current[0].isButton, "the camera rung is a span, not a button").toBe(false);
+      expect(before.readout).toContain(`level: L${current[0].level}`);
+      if (before.activeLevel != null) expect(before.activeLevel).toBe(current[0].level);
+
+      // Click a rung other than the camera's; zoom jumps to that rung and the
+      // readout follows (fixture: L1 chip -> zoom 3.2, see header comment).
+      const target = before.chips.find((c) => !c.current)!;
+      await page.locator(`.windrose-ladder-chip[aria-label="Zoom to level ${target.level}"]`).click();
+      await page.waitForTimeout(500);
+
+      const after = await readOverlay(page);
+      expect(after.readout).toContain(`level: L${target.level}`);
+      expect(after.chips.find((c) => c.current)?.level).toBe(target.level);
+      if (after.activeLevel != null) expect(after.activeLevel).toBe(target.level);
+    } finally {
+      await ensureUnlocked(page);
+      await setHexViewport(page, 0, 0, 0.8);
+    }
+    expect(errors).toHaveLength(0);
+  });
+
+  test("edit-level lock pins edits to the locked rung while the camera moves", async ({ page }) => {
+    const errors = setupErrorTracking(page);
+    await gotoLadderHexMap(page);
+    try {
+      await setHexViewport(page, 0, 0, 0.5);
+      await page.waitForTimeout(400);
+      const low = await readOverlay(page);
+      const lockedLevel = low.chips.find((c) => c.current)!.level;
+
+      await page.locator('.windrose-ladder-lock[aria-label="Lock edit level"]').click();
+      await setHexViewport(page, 0, 0, 8);
+      await page.waitForTimeout(500);
+
+      const locked = await readOverlay(page);
+      const cameraLevel = locked.chips.find((c) => c.current)!.level;
+      expect(cameraLevel, "zoom 8 vs 0.5 must land on different rungs for this test to mean anything").not.toBe(lockedLevel);
+      expect(locked.lockLabel).toBe("Unlock edit level");
+      expect(locked.lockIsLocked).toBe(true);
+      expect(locked.readout).toContain(`edit: L${lockedLevel}`);
+      expect(locked.chips.find((c) => c.level === lockedLevel)?.locked).toBe(true);
+      if (locked.activeLevel != null) expect(locked.activeLevel).toBe(cameraLevel);
+      if (locked.editLevel != null) expect(locked.editLevel).toBe(lockedLevel);
+
+      await page.locator('.windrose-ladder-lock[aria-label="Unlock edit level"]').click();
+      await page.waitForTimeout(200);
+      const unlocked = await readOverlay(page);
+      expect(unlocked.lockIsLocked).toBe(false);
+      expect(unlocked.readout).not.toContain("edit:");
+      if (unlocked.editLevel != null) expect(unlocked.editLevel).toBe(cameraLevel);
+    } finally {
+      await ensureUnlocked(page);
+      await setHexViewport(page, 0, 0, 0.8);
+    }
+    expect(errors).toHaveLength(0);
+  });
+
+  test("level overlay is absent on a classic grid map", async ({ page }) => {
+    const errors = setupErrorTracking(page);
+    await enableLadder(page);
+    await navigateToMap(page, TEST_MAPS.grid);
+    await waitForContainer(page);
+    await page.waitForTimeout(500);
+    expect(await page.locator(".windrose-ladder-levels").count()).toBe(0);
+    expect(errors).toHaveLength(0);
+  });
+
+  test("hex settings tab shows the detail ladder section", async ({ page }) => {
+    const errors = setupErrorTracking(page);
+    await enableLadder(page);
+    await navigateToMap(page, TEST_MAPS.hex);
+    await waitForContainer(page);
+    await openSettingsModal(page);
+    await page.locator('.windrose-settings-tab:has-text("Hex Grid")').click();
+    const modal = page.locator(".windrose-settings-modal");
+    for (const label of ["Enable detail ladder", "Subdivision", "Minimum cell size", "Deepest level"]) {
+      expect(await modal.getByText(label, { exact: false }).count(), `missing "${label}"`).toBeGreaterThan(0);
+    }
+    await closeSettingsModal(page);
+    expect(errors).toHaveLength(0);
+  });
+
+  // Needs a map holding depth content (toggle ON + disabled, reason "(this map
+  // holds depth content)"); the E2E vault has no such map (the dev-vault
+  // `lod-fixture` lives outside tests/fixtures), so there is nothing to assert on.
+  test.skip("settings toggle is on and disabled on a map holding depth content", async () => {});
+
+  // NewMapModal "Detail ladder" dropdown: no existing E2E test creates a map
+  // through the modal, so the open/create path is unestablished.
+  test.skip("new hex map modal offers a Detail ladder preset", async () => {});
 });

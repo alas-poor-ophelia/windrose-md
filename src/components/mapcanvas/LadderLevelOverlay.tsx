@@ -47,54 +47,58 @@ const LadderLevelOverlay = (): VNode | null => {
   // Keep chip clicks off the canvas interaction handlers.
   const stop = (e: Event): void => { e.stopPropagation(); };
 
+  // The host spans the canvas width and is the CSS size container the row
+  // queries (narrow embeds hide the readout, then the chip "L" prefixes).
   return (
-    <div
-      className="windrose-ladder-levels"
-      role="group"
-      aria-label="Ladder levels"
-      onPointerDown={stop}
-      onMouseDown={stop}
-      onTouchStart={stop}
-      onWheel={stop}
-    >
-      {levels.map((level) => {
-        const lockClass = locked && level === editLevelLock ? ' windrose-ladder-chip-locked' : '';
-        if (level === camera) {
-          return (
-            <span
-              key={level}
-              className={`windrose-breadcrumb-current windrose-ladder-chip${lockClass}`}
-              aria-current="true"
-            >
-              {`L${level}`}
-            </span>
-          );
-        }
-        return (
-          <button
-            key={level}
-            type="button"
-            className={`windrose-breadcrumb-link windrose-ladder-chip${lockClass}`}
-            aria-label={`Zoom to level ${level}`}
-            onClick={() => zoomToRung(level)}
-          >
-            {`L${level}`}
-          </button>
-        );
-      })}
-      <button
-        type="button"
-        className={`windrose-ladder-lock${locked ? ' is-locked' : ''}`}
-        aria-label={locked ? 'Unlock edit level' : 'Lock edit level'}
-        aria-pressed={locked}
-        onClick={toggleLock}
+    <div className="windrose-ladder-host">
+      <div
+        className="windrose-ladder-levels"
+        role="group"
+        aria-label="Ladder levels"
+        onPointerDown={stop}
+        onMouseDown={stop}
+        onTouchStart={stop}
+        onWheel={stop}
       >
-        <Icon icon={locked ? 'lucide-lock' : 'lucide-lock-open'} size={14} />
-      </button>
-      <span className="windrose-ladder-readout">
-        {`level: L${camera}`}
-        {edit !== camera && <span className="windrose-ladder-readout-edit">{`edit: L${edit}`}</span>}
-      </span>
+        {levels.map((level) => {
+          const lockClass = locked && level === editLevelLock ? ' windrose-ladder-chip-locked' : '';
+          if (level === camera) {
+            return (
+              <span
+                key={level}
+                className={`windrose-breadcrumb-current windrose-ladder-chip${lockClass}`}
+                aria-current="true"
+              >
+                <span className="windrose-ladder-chip-prefix">L</span>{level}
+              </span>
+            );
+          }
+          return (
+            <button
+              key={level}
+              type="button"
+              className={`windrose-breadcrumb-link windrose-ladder-chip${lockClass}`}
+              aria-label={`Zoom to level ${level}`}
+              onClick={() => zoomToRung(level)}
+            >
+              <span className="windrose-ladder-chip-prefix">L</span>{level}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          className={`windrose-ladder-lock${locked ? ' is-locked' : ''}`}
+          aria-label={locked ? 'Unlock edit level' : 'Lock edit level'}
+          aria-pressed={locked}
+          onClick={toggleLock}
+        >
+          <Icon icon={locked ? 'lucide-lock' : 'lucide-lock-open'} size={14} />
+        </button>
+        <span className="windrose-ladder-readout">
+          {`level: L${camera}`}
+          {edit !== camera && <span className="windrose-ladder-readout-edit">{`edit: L${edit}`}</span>}
+        </span>
+      </div>
     </div>
   );
 };

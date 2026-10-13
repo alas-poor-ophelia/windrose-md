@@ -76,6 +76,7 @@ function createMockState(overrides: Partial<SettingsModalState> = {}): SettingsM
     deleteOrphanedContent: false,
     boundsShape: 'rectangular',
     objectSetId: null,
+    ladderEnabled: false,
     lod: null,
     ...overrides,
   };

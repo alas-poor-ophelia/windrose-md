@@ -13,7 +13,8 @@ import type {
   UIPreferences, MapSettings,
 } from '#types/index';
 import { isHexCell } from '#types/core/cell.types';
-import type { HexBounds, LadderConfig } from '#types/core/map.types';
+import type { HexBounds } from '#types/core/map.types';
+import type { LadderPatch } from '../../core/lodFlags';
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { getLayerById } from '../../persistence/layerAccessor';
@@ -51,7 +52,7 @@ interface UsePanelStateResult {
     backgroundImage?: BackgroundImage | null,
     hexSize?: number | null,
     deleteOrphanedContent?: boolean,
-    lod?: LadderConfig | null
+    ladderPatch?: LadderPatch
   ) => void;
   handleSettingsClose: () => void;
 }
@@ -97,7 +98,7 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
     backgroundImage: BackgroundImage | null = null,
     hexSize: number | null = null,
     deleteOrphanedContent: boolean = false,
-    lod: LadderConfig | null = null
+    ladderPatch: LadderPatch = { kind: 'keep' }
   ): void => {
     if (!mapData) return;
 
@@ -198,11 +199,16 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
       newMapData.hexSize = hexSize;
     }
 
-    // Ladder settings arrive already merged over the stored lod (the settings
-    // context sends null unless its ladder section produced a change), so a
-    // null here leaves the stored lod exactly as it was.
-    if (lod !== null && mapData.mapType === 'hex') {
-      newMapData.lod = lod;
+    // Ladder patch from the settings opt-in (ladderSettingsPatch): `set`
+    // arrives already merged over the stored lod; `remove` only ever comes for
+    // a map without depth content, so there are no layer levels to clean up;
+    // `keep` leaves the stored lod exactly as it was.
+    if (mapData.mapType === 'hex') {
+      if (ladderPatch.kind === 'set') {
+        newMapData.lod = ladderPatch.lod;
+      } else if (ladderPatch.kind === 'remove') {
+        delete newMapData.lod;
+      }
     }
 
     updateMapData(newMapData);

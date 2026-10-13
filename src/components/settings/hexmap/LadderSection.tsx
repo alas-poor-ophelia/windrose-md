@@ -2,22 +2,26 @@
  * LadderSection.tsx
  *
  * Lattice ladder settings for a hex map (design 06, section 10). Shown only
- * while the ladder capability flag is on. Edits m / minCellPx / maxLevel into
- * the settings reducer; the save path writes them as the top-level
- * `mapData.lod`, merged over whatever is stored (distanceOverrides kept).
+ * while the ladder capability flag is on. An explicit "Enable detail ladder"
+ * toggle is the opt-in: a classic hex map never gains a `lod` block from a
+ * nudged number. The parameters (m / minCellPx / maxLevel) show only while the
+ * toggle is on; the save path turns toggle + edits into a LadderPatch
+ * (ladderSettingsPatch: set / remove / keep, distanceOverrides kept).
  *
+ * - Toggle disabled on a map with depth content (it cannot be switched off)
+ *   or with classic sub-hex maps (design s9), with the reason in its description.
  * - "Opens at L<n>" readout, recomputed from the pending edits.
  * - m is read-only once the map has depth content (rung >= 1 cells or homed
  *   elements): changing it would re-key every authored rung.
  * - maxLevel never drops below the deepest authored rung (the quarantine rule
  *   in isDepthQuarantined), so a save can never quarantine the map.
- * - Whole section disabled on a map with classic sub-hex maps (design s9).
  */
 
 import type { VNode } from 'preact';
 
 import { useModalShell, useHexGrid } from '../../../context/MapSettingsContext';
 import { SettingItem } from '../SettingItem';
+import { NativeToggle } from '../NativeControls';
 import { DEFAULTS } from '../../../core/dmtConstants';
 import { deepestAuthoredRung, hasDepthContent, hasSubHexChildren, ladderOpensAt } from '../../../core/lodFlags';
 import { LADDER_DEFAULTS, LADDER_M_ALLOWLIST } from '../../../geometry/core/lattice';
@@ -27,12 +31,14 @@ const MAX_LEVEL_CEILING = 6;
 
 function LadderSection(): VNode | null {
   const { mapData } = useModalShell();
-  const { lod, setLadderConfig } = useHexGrid();
+  const { lod, setLadderConfig, ladderEnabled, setLadderEnabled } = useHexGrid();
 
   if (mapData === null || mapData.mapType !== 'hex') return null;
 
   const sectionDisabled = hasSubHexChildren(mapData);
-  const mLocked = sectionDisabled || hasDepthContent(mapData);
+  const depth = hasDepthContent(mapData);
+  const toggleDisabled = sectionDisabled || depth;
+  const mLocked = sectionDisabled || depth;
   const deepest = deepestAuthoredRung(mapData);
   const minMaxLevel = Math.min(deepest, MAX_LEVEL_CEILING);
 
@@ -76,63 +82,76 @@ function LadderSection(): VNode | null {
     setLadderConfig({ maxLevel: next });
   };
 
-  const sectionReason = sectionDisabled ? ' (this map has sub-maps)' : '';
+  const toggleReason = sectionDisabled
+    ? ' (this map has sub-maps)'
+    : depth ? ' (this map holds depth content)' : '';
+  const opensAtText = ladderEnabled ? `. Opens at L${opensAt}` : '';
 
   return (
     <div style={{ opacity: sectionDisabled ? 0.6 : 1 }}>
       <SettingItem
-        name="Detail ladder"
-        description={`Opens at L${opensAt}${sectionReason}`}
-      />
-
-      <SettingItem
-        name="Subdivision"
-        description={`Child hexes per parent edge on each deeper level${mLocked && !sectionDisabled ? ' (fixed once the map has depth content)' : ''}`}
+        name="Enable detail ladder"
+        description={`Lets this map subdivide into finer hexes as you zoom in${opensAtText}${toggleReason}`}
       >
-        <select
-          value={String(effective.m)}
-          onChange={(e: Event) => setLadderConfig({ m: Number((e.target as HTMLSelectElement).value) })}
-          disabled={mLocked}
-          style={controlStyle(mLocked)}
-        >
-          {LADDER_M_ALLOWLIST.map((m: number) => (
-            <option key={m} value={String(m)}>{m}</option>
-          ))}
-        </select>
-      </SettingItem>
-
-      <SettingItem
-        name="Minimum cell size"
-        description="On-screen width in pixels at which the map steps down a level"
-      >
-        <input
-          type="number"
-          min={String(MIN_CELL_PX_FLOOR)}
-          step="1"
-          value={lod !== null ? String(lod.minCellPx) : ''}
-          placeholder={String(LADDER_DEFAULTS.minCellPx)}
-          onChange={(e: Event) => handleMinCellPx(e.target as HTMLInputElement)}
-          disabled={sectionDisabled}
-          style={controlStyle(sectionDisabled)}
+        <NativeToggle
+          value={ladderEnabled}
+          onChange={setLadderEnabled}
+          disabled={toggleDisabled}
         />
       </SettingItem>
 
-      <SettingItem
-        name="Deepest level"
-        description={`Deepest level that can be painted${deepest > 0 ? ` (at least ${deepest}, which holds content)` : ''}`}
-      >
-        <input
-          type="number"
-          min={String(minMaxLevel)}
-          max={String(MAX_LEVEL_CEILING)}
-          step="1"
-          value={lod !== null ? String(lod.maxLevel) : ''}
-          placeholder={String(LADDER_DEFAULTS.maxLevel)}
-          onChange={(e: Event) => handleMaxLevel(e.target as HTMLInputElement)}
-          disabled={sectionDisabled}
-          style={controlStyle(sectionDisabled)}
-        />
-      </SettingItem>
+      {ladderEnabled && (
+        <>
+          <SettingItem
+            name="Subdivision"
+            description={`Child hexes per parent edge on each deeper level${mLocked && !sectionDisabled ? ' (fixed once the map has depth content)' : ''}`}
+          >
+            <select
+              value={String(effective.m)}
+              onChange={(e: Event) => setLadderConfig({ m: Number((e.target as HTMLSelectElement).value) })}
+              disabled={mLocked}
+              style={controlStyle(mLocked)}
+            >
+              {LADDER_M_ALLOWLIST.map((m: number) => (
+                <option key={m} value={String(m)}>{m}</option>
+              ))}
+            </select>
+          </SettingItem>
+
+          <SettingItem
+            name="Minimum cell size"
+            description="On-screen width in pixels at which the map steps down a level"
+          >
+            <input
+              type="number"
+              min={String(MIN_CELL_PX_FLOOR)}
+              step="1"
+              value={lod !== null ? String(lod.minCellPx) : ''}
+              placeholder={String(LADDER_DEFAULTS.minCellPx)}
+              onChange={(e: Event) => handleMinCellPx(e.target as HTMLInputElement)}
+              disabled={sectionDisabled}
+              style={controlStyle(sectionDisabled)}
+            />
+          </SettingItem>
+
+          <SettingItem
+            name="Deepest level"
+            description={`Deepest level that can be painted${deepest > 0 ? ` (at least ${deepest}, which holds content)` : ''}`}
+          >
+            <input
+              type="number"
+              min={String(minMaxLevel)}
+              max={String(MAX_LEVEL_CEILING)}
+              step="1"
+              value={lod !== null ? String(lod.maxLevel) : ''}
+              placeholder={String(LADDER_DEFAULTS.maxLevel)}
+              onChange={(e: Event) => handleMaxLevel(e.target as HTMLInputElement)}
+              disabled={sectionDisabled}
+              style={controlStyle(sectionDisabled)}
+            />
+          </SettingItem>
+        </>
+      )}
     </div>
   );
 }

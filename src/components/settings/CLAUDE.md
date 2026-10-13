@@ -16,7 +16,7 @@ MapSettingsModal.tsx         # Main modal container, tab navigation
 ├── ResizeConfirmDialog.tsx  # Confirmation for destructive resizes
 ├── settingsReducer.ts       # Settings state reducer
 ├── gridmap/                 # Grid-specific settings sections
-└── hexmap/                  # Hex-specific settings sections (incl. LadderSection: lattice ladder params + opens-at readout, shown only with the lodLadder capability)
+└── hexmap/                  # Hex-specific settings sections (incl. LadderSection: "Enable detail ladder" opt-in toggle, then ladder params + opens-at readout; shown only with the lodLadder capability; save emits a LadderPatch keep/set/remove via ladderSettingsPatch)
 ```
 
 Note: `CollapsibleSection` and `ColorPicker` now live in `components/shared/`.

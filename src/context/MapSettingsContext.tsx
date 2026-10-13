@@ -55,7 +55,7 @@ import { getActiveLayer } from '../persistence/layerAccessor';
 import { countLevelOrphansForBounds } from '../persistence/resizeOperations';
 import type { CurrentSettings, CurrentBackgroundImage, CurrentDistanceSettings } from '../components/settings/settingsReducer';
 import { getSettings } from '../core/settingsAccessor';
-import { isLodLadderEnabled, hasSubHexChildren, mergeLadderConfig } from '../core/lodFlags';
+import { isLodLadderEnabled, hasSubHexChildren, hasDepthContent, ladderSettingsPatch, type LadderPatch } from '../core/lodFlags';
 import { THEME } from '../core/dmtConstants';
 import { getImageDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, getImageDimensions } from '../assets/imageOperations';
 import type { FineTuneRange } from '../geometry/core/hexMeasurements';
@@ -162,6 +162,7 @@ interface MapSettingsHandlers {
 
   // Lattice ladder parameters (hex, capability flag on)
   setLadderConfig: (updates: Partial<Pick<LadderConfig, 'm' | 'minCellPx' | 'maxLevel'>>) => void;
+  setLadderEnabled: (enabled: boolean) => void;
 
   // Color picker
   setActiveColorPicker: (picker: string | null) => void;
@@ -325,6 +326,9 @@ export interface HexGridContextValue {
   handleResizeConfirmCancel: () => void;
   showParentBackdrop: boolean | undefined;
   setShowParentBackdrop: (value: boolean | undefined) => void;
+  /** Explicit ladder opt-in (initially: the map stores a lod). */
+  ladderEnabled: boolean;
+  setLadderEnabled: (enabled: boolean) => void;
   /** Pending ladder settings: stored `lod` merged with edits; null = none stored and none edited. */
   lod: LadderConfig | null;
   setLadderConfig: (updates: Partial<Pick<LadderConfig, 'm' | 'minCellPx' | 'maxLevel'>>) => void;
@@ -342,8 +346,8 @@ export interface MapSettingsProviderProps {
     backgroundImage: BackgroundImage | null,
     hexSize: number | null,
     deleteOrphanedContent: boolean,
-    /** Ladder config to write as `mapData.lod`; null/absent = leave the stored lod untouched. */
-    lod?: LadderConfig | null
+    /** What to do with the stored `mapData.lod`; absent = keep. */
+    ladderPatch?: LadderPatch
   ) => void;
   onOpenAlignmentMode?: (currentX: number, currentY: number) => void;
   initialTab?: SettingsTabId | null;
@@ -679,10 +683,12 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       showParentBackdrop: settingsData.showParentBackdrop,
     };
     // Ladder settings: only from the shown section (hex, flag on, no classic
-    // sub-maps), and only when the edit differs from what is stored.
+    // sub-maps). The opt-in toggle decides set / remove; see ladderSettingsPatch.
     const ladderShown = mapType === 'hex' && isLodLadderEnabled() && !(mapData !== null && hasSubHexChildren(mapData));
-    const lodToSave = ladderShown ? mergeLadderConfig(mapData?.lod, state.lod) : null;
-    onSave(mapSettings, state.preferences, mapType === 'hex' ? state.hexBounds : null, backgroundImageData, calculatedHexSize, forceDelete, lodToSave);
+    const ladderPatch: LadderPatch = ladderShown
+      ? ladderSettingsPatch(mapData?.lod, state.ladderEnabled, state.lod, mapData !== null && hasDepthContent(mapData))
+      : { kind: 'keep' };
+    onSave(mapSettings, state.preferences, mapType === 'hex' ? state.hexBounds : null, backgroundImageData, calculatedHexSize, forceDelete, ladderPatch);
     dispatch({ type: Actions.CLEAR_DELETE_FLAG });
     dispatch({ type: Actions.SET_LOADING, payload: false });
     onClose();
@@ -752,6 +758,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     setCoordinateDisplayMode: (mode) => dispatch({ type: Actions.SET_COORDINATE_MODE, payload: mode }),
     setShowParentBackdrop: (value) => dispatch({ type: Actions.SET_PARENT_BACKDROP, payload: value }),
     setLadderConfig: (updates) => dispatch({ type: Actions.SET_LADDER_CONFIG, payload: updates }),
+    setLadderEnabled: (enabled) => dispatch({ type: Actions.SET_LADDER_ENABLED, payload: enabled }),
     setActiveColorPicker: (picker) => dispatch({ type: Actions.SET_ACTIVE_COLOR_PICKER, payload: picker as ColorPickerId }),
     setBackgroundImageDisplayName: (name) => dispatch({ type: Actions.SET_IMAGE_DISPLAY_NAME, payload: name }),
     handleImageClear: () => dispatch({ type: Actions.CLEAR_IMAGE }),
@@ -946,16 +953,18 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     handleResizeConfirmCancel: handlers.handleResizeConfirmCancel,
     showParentBackdrop: state.showParentBackdrop,
     setShowParentBackdrop: handlers.setShowParentBackdrop,
+    ladderEnabled: state.ladderEnabled,
+    setLadderEnabled: handlers.setLadderEnabled,
     lod: state.lod,
     setLadderConfig: handlers.setLadderConfig,
   }), [
     state.hexBounds, state.boundsShape, state.boundsLocked,
     state.coordinateDisplayMode, state.showResizeConfirm,
-    state.pendingBoundsChange, state.orphanInfo, state.showParentBackdrop, state.lod,
+    state.pendingBoundsChange, state.orphanInfo, state.showParentBackdrop, state.lod, state.ladderEnabled,
     stableHandleResizeConfirmDelete,
     handlers.handleBoundsLockToggle, handlers.handleBoundsShapeChange, handlers.handleHexBoundsChange,
     handlers.handleRadiusChange, handlers.handleResizeConfirmCancel, handlers.setCoordinateDisplayMode,
-    handlers.setShowParentBackdrop, handlers.setLadderConfig
+    handlers.setShowParentBackdrop, handlers.setLadderConfig, handlers.setLadderEnabled
   ]);
 
   return (

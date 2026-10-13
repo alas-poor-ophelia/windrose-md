@@ -219,13 +219,57 @@ function ladderOpensAt(hexSize: number, config: Omit<LadderConfig, 'distanceOver
 function mergeLadderConfig(stored: LadderConfig | null | undefined, edited: LadderConfig | null | undefined): LadderConfig | null {
   if (edited === null || edited === undefined) return null;
   // Unchanged against what the map already holds (or, with nothing stored,
-  // against the defaults it would inherit anyway) writes nothing: a classic
-  // hex map only gains a `lod` block from a real edit.
+  // against the defaults) writes nothing. Whether a classic map gains a block
+  // at all is the opt-in toggle's call (ladderSettingsPatch), not this one's.
   const baseline = stored ?? LADDER_DEFAULTS;
   if (baseline.m === edited.m && baseline.minCellPx === edited.minCellPx && baseline.maxLevel === edited.maxLevel) {
     return null;
   }
   return { ...(stored ?? {}), m: edited.m, minCellPx: edited.minCellPx, maxLevel: edited.maxLevel };
+}
+
+/**
+ * What a settings save does to the stored `mapData.lod`. `keep` leaves it
+ * exactly as it was; `set` writes a full block; `remove` deletes the key and
+ * turns the map back into a classic hex map.
+ */
+type LadderPatch =
+  | { kind: 'keep' }
+  | { kind: 'set'; lod: LadderConfig }
+  | { kind: 'remove' };
+
+/**
+ * Decide the ladder save from the settings panel's explicit opt-in toggle.
+ *
+ * | enabled | stored lod | edit                    | depth | patch  |
+ * |---------|------------|-------------------------|-------|--------|
+ * | on      | none       | any (null = defaults)   | -     | set    |
+ * | on      | present    | null or equal to stored | -     | keep   |
+ * | on      | present    | differs                 | -     | set    |
+ * | off     | present    | -                       | no    | remove |
+ * | off     | present    | -                       | yes   | keep   |
+ * | off     | none       | -                       | -     | keep   |
+ *
+ * Enabling a classic map writes a block even at the default values: the toggle
+ * is the opt-in, not the numbers. A map holding depth content is never
+ * stripped of its ladder (the UI disables the toggle; this is the backstop).
+ */
+function ladderSettingsPatch(
+  stored: LadderConfig | null | undefined,
+  enabled: boolean,
+  edited: LadderConfig | null | undefined,
+  hasDepth: boolean
+): LadderPatch {
+  const hasStored = stored !== null && stored !== undefined;
+  if (!enabled) {
+    return hasStored && !hasDepth ? { kind: 'remove' } : { kind: 'keep' };
+  }
+  if (!hasStored) {
+    const c = edited ?? LADDER_DEFAULTS;
+    return { kind: 'set', lod: { m: c.m, minCellPx: c.minCellPx, maxLevel: c.maxLevel } };
+  }
+  const merged = mergeLadderConfig(stored, edited);
+  return merged === null ? { kind: 'keep' } : { kind: 'set', lod: merged };
 }
 
 /**
@@ -245,6 +289,6 @@ function zoomForLevel(mapData: MapData | null | undefined, level: number): numbe
 export {
   zoomForLevel, isLodLadderEnabled, getLadderOverrides, ladderTileClipAt, isLadderView, isDepthQuarantined, canAuthorDepth,
   ladderParamsFor, getMaxZoom, hasDepthContent, hasSubHexChildren, deepestAuthoredRung,
-  ladderOpensAt, mergeLadderConfig
+  ladderOpensAt, mergeLadderConfig, ladderSettingsPatch
 };
-export type { LadderTileClipMode };
+export type { LadderTileClipMode, LadderPatch };

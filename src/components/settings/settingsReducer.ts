@@ -141,7 +141,10 @@ export interface SettingsModalState {
   // Sub-hex parent map backdrop override (undefined = inherit global)
   showParentBackdrop?: boolean;
 
-  // Lattice ladder settings (hex). null = no stored lod and no edit (inherit defaults)
+  // Lattice ladder settings (hex). `ladderEnabled` is the explicit opt-in
+  // (initially: the map stores a lod). `lod` is the pending config; null = no
+  // stored lod and no edit (enabling seeds it from LADDER_DEFAULTS).
+  ladderEnabled: boolean;
   lod: LadderConfig | null;
 
   // Background image
@@ -283,7 +286,8 @@ const Actions = {
   SET_OBJECT_SET_ID: 'SET_OBJECT_SET_ID',
   SET_BOUNDS_SHAPE: 'SET_BOUNDS_SHAPE',
   SET_PARENT_BACKDROP: 'SET_PARENT_BACKDROP',
-  SET_LADDER_CONFIG: 'SET_LADDER_CONFIG'
+  SET_LADDER_CONFIG: 'SET_LADDER_CONFIG',
+  SET_LADDER_ENABLED: 'SET_LADDER_ENABLED'
 } as const;
 
 /** Action type union */
@@ -477,6 +481,12 @@ interface SetLadderConfigAction {
   payload: Partial<Pick<LadderConfig, 'm' | 'minCellPx' | 'maxLevel'>>;
 }
 
+interface SetLadderEnabledAction {
+  type: typeof Actions.SET_LADDER_ENABLED;
+  /** Opt the map in or out of the detail ladder; enabling with no config seeds LADDER_DEFAULTS. */
+  payload: boolean;
+}
+
 /** Discriminated union of all actions */
 type SettingsAction =
   | InitializeAction
@@ -516,7 +526,8 @@ type SettingsAction =
   | SetObjectSetIdAction
   | SetBoundsShapeAction
   | SetParentBackdropAction
-  | SetLadderConfigAction;
+  | SetLadderConfigAction
+  | SetLadderEnabledAction;
 
 // ===========================================
 // Constants
@@ -695,6 +706,7 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
 
     showParentBackdrop: currentSettings?.showParentBackdrop,
 
+    ladderEnabled: props.currentLod != null,
     lod: props.currentLod ?? null,
 
     backgroundImagePath: currentBackgroundImage?.path ?? null,
@@ -890,6 +902,15 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
 
     case Actions.SET_LADDER_CONFIG:
       return { ...state, lod: { ...(state.lod ?? LADDER_DEFAULTS), ...action.payload } };
+
+    case Actions.SET_LADDER_ENABLED:
+      // Disabling keeps the pending config, so toggling back restores the edits.
+      if (!action.payload) return { ...state, ladderEnabled: false };
+      return {
+        ...state,
+        ladderEnabled: true,
+        lod: state.lod ?? { m: LADDER_DEFAULTS.m, minCellPx: LADDER_DEFAULTS.minCellPx, maxLevel: LADDER_DEFAULTS.maxLevel }
+      };
 
     case Actions.SET_IMAGE_SEARCH_RESULTS:
       return { ...state, imageSearchResults: action.payload };
