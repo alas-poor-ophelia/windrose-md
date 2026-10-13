@@ -2,10 +2,12 @@
  * partyNoteOperations Unit Tests
  *
  * Covers the pure pieces: file naming, path building, content generation,
- * and the ownership marker check. Vault I/O is exercised in E2E.
+ * the ownership marker check, region merge, and upsert against a fake vault.
  */
 
 import { describe, it, expect } from 'vitest';
+import type { App } from 'obsidian';
+import { TFile } from 'obsidian';
 
 import type { PartyPin } from '#types/core/map.types';
 import type { PartyRangeResults } from '../../../src/objects/partyRangeQuery';
@@ -15,6 +17,10 @@ import {
   buildPartyNotePath,
   buildPartyNoteContent,
   isOwnedPartyNoteContent,
+  mergePartyNoteContent,
+  upsertPartyNote,
+  onPartyNoteRenamed,
+  notifyPartyNoteRenamed,
   PARTY_NOTE_MARKER_KEY,
 } from '../../../src/persistence/partyNoteOperations';
 
@@ -276,5 +282,133 @@ describe('buildPartyNoteContent beacons table', () => {
     expect(content).toContain('| Beacon | Distance | Travel | Map |');
     expect(content).toContain('| [[Beacons/Scouts - Nearby\\|Scouts]] | 10 ft | 2h on foot | [show](');
     expect(content).toContain('| Rival \\| Band | 20 ft | — | [show](');
+  });
+});
+
+/** Minimal in-memory vault: files by path, frontmatter marker via metadataCache */
+function makeVault(initial: Record<string, string> = {}, opts: { raceOnCreate?: string } = {}) {
+  const files = new Map<string, string>(Object.entries(initial));
+  const handles = new Map<string, TFile>();
+  const handle = (path: string): TFile => {
+    let file = handles.get(path);
+    if (!file) {
+      file = new TFile();
+      file.path = path;
+      handles.set(path, file);
+    }
+    return file;
+  };
+  let processCalls = 0;
+  const app = {
+    vault: {
+      getAbstractFileByPath: (path: string) => (files.has(path) ? handle(path) : null),
+      getMarkdownFiles: () => [...files.keys()].map(handle),
+      read: (file: TFile) => Promise.resolve(files.get(file.path) ?? ''),
+      process: (file: TFile, fn: (data: string) => string) => {
+        processCalls++;
+        const next = fn(files.get(file.path) ?? '');
+        files.set(file.path, next);
+        return Promise.resolve(next);
+      },
+      create: (path: string, data: string) => {
+        if (opts.raceOnCreate != null) {
+          files.set(path, opts.raceOnCreate);
+          return Promise.reject(new Error('File already exists.'));
+        }
+        files.set(path, data);
+        return Promise.resolve(handle(path));
+      },
+      createFolder: () => Promise.resolve(),
+    },
+    metadataCache: {
+      getFileCache: (file: TFile) => {
+        const marker = /windrose-party-pin:\s*(\S+)/.exec(files.get(file.path) ?? '');
+        return marker ? { frontmatter: { [PARTY_NOTE_MARKER_KEY]: marker[1] } } : null;
+      },
+    },
+  };
+  return { app: app as unknown as App, files, processCalls: () => processCalls };
+}
+
+describe('mergePartyNoteContent', () => {
+  it('replaces only the marker region, keeping user text and frontmatter', () => {
+    const pin = makePin();
+    const old = buildPartyNoteContent(pin, makeResults(), context);
+    const edited = old.replace('---\n', '---\ntags: [party]\n') + '\nMy session notes.\n';
+    const fresh = buildPartyNoteContent({ ...pin, range: 60 }, makeResults(), context);
+    const merged = mergePartyNoteContent(edited, fresh);
+    expect(merged).toContain('tags: [party]');
+    expect(merged).toContain('My session notes.');
+    expect(merged).toContain('**60**');
+    expect(merged).not.toContain('**30**');
+  });
+
+  it('replaces a legacy note without markers in full', () => {
+    const legacy = `---\n${PARTY_NOTE_MARKER_KEY}: party-test-1\n---\n\nOld table`;
+    const fresh = buildPartyNoteContent(makePin(), makeResults(), context);
+    expect(mergePartyNoteContent(legacy, fresh)).toBe(fresh);
+  });
+});
+
+describe('upsertPartyNote', () => {
+  const path = 'Notes/The Party - Nearby.md';
+  const pin = makePin({ partyNote: { enabled: true, path } });
+
+  it('creates a missing note', async () => {
+    const vault = makeVault();
+    const content = buildPartyNoteContent(pin, makeResults(), context);
+    expect(await upsertPartyNote(vault.app, pin, content)).toBe('created');
+    expect(vault.files.get(path)).toBe(content);
+  });
+
+  it('updates through vault.process and keeps user text', async () => {
+    const original = buildPartyNoteContent(pin, makeResults(), context) + '\nUser text\n';
+    const vault = makeVault({ [path]: original });
+    const fresh = buildPartyNoteContent({ ...pin, range: 60 }, makeResults(), context);
+    expect(await upsertPartyNote(vault.app, pin, fresh)).toBe('updated');
+    expect(vault.processCalls()).toBe(1);
+    expect(vault.files.get(path)).toContain('User text');
+    expect(vault.files.get(path)).toContain('**60**');
+  });
+
+  it('does not touch an unchanged note', async () => {
+    const content = buildPartyNoteContent(pin, makeResults(), context);
+    const vault = makeVault({ [path]: content });
+    expect(await upsertPartyNote(vault.app, pin, content)).toBe('unchanged');
+    expect(vault.processCalls()).toBe(0);
+  });
+
+  it('blocks on a note it does not own', async () => {
+    const vault = makeVault({ [path]: '# Mine' });
+    expect(await upsertPartyNote(vault.app, pin, buildPartyNoteContent(pin, makeResults(), context))).toBe('blocked');
+    expect(vault.files.get(path)).toBe('# Mine');
+  });
+
+  it('follows a renamed note by its marker instead of recreating it', async () => {
+    const renamed = 'Elsewhere/Renamed.md';
+    const vault = makeVault({ [renamed]: buildPartyNoteContent(pin, makeResults(), context) });
+    const fresh = buildPartyNoteContent({ ...pin, range: 60 }, makeResults(), context);
+    expect(await upsertPartyNote(vault.app, pin, fresh)).toBe('updated');
+    expect(vault.files.has(path)).toBe(false);
+    expect(vault.files.get(renamed)).toContain('**60**');
+  });
+
+  it('falls back to update when another pane wins the create race', async () => {
+    const racer = buildPartyNoteContent(pin, makeResults(), context);
+    const vault = makeVault({}, { raceOnCreate: racer });
+    const fresh = buildPartyNoteContent({ ...pin, range: 60 }, makeResults(), context);
+    expect(await upsertPartyNote(vault.app, pin, fresh)).toBe('updated');
+    expect(vault.files.get(path)).toContain('**60**');
+  });
+});
+
+describe('party note rename broadcast', () => {
+  it('delivers renames to subscribers until they unsubscribe', () => {
+    const seen: Array<[string, string]> = [];
+    const off = onPartyNoteRenamed((a, b) => seen.push([a, b]));
+    notifyPartyNoteRenamed('a.md', 'b.md');
+    off();
+    notifyPartyNoteRenamed('b.md', 'c.md');
+    expect(seen).toEqual([['a.md', 'b.md']]);
   });
 });

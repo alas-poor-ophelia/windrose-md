@@ -58,10 +58,35 @@ const SQRT3 = Math.sqrt(3);
  *  pattern-transform fallback; per-tile resolution supplies the live value. */
 const DEFAULT_WORLD_REPEAT = 4;
 
+/**
+ * Viewport-sized scratch canvases (feather, mask, pyramid pair) are reused
+ * across frames to avoid per-frame allocation, but released to 0x0 once
+ * region rendering has been idle for SCRATCH_RELEASE_MS (MEM-17): WebKit caps
+ * total canvas backing store per page, and four viewport-sized singletons held
+ * for the whole session count against it on iPad.
+ */
+const SCRATCH_RELEASE_MS = 3000;
+let _scratchReleaseTimer: number | null = null;
+function scheduleScratchRelease(): void {
+  if (typeof window === 'undefined') return;
+  if (_scratchReleaseTimer != null) window.clearTimeout(_scratchReleaseTimer);
+  _scratchReleaseTimer = window.setTimeout(releaseTileScratchCanvases, SCRATCH_RELEASE_MS);
+}
+
+/** Shrink every scratch canvas to 0x0 (frees its backing store; reused lazily). */
+function releaseTileScratchCanvases(): void {
+  if (_scratchReleaseTimer != null) window.clearTimeout(_scratchReleaseTimer);
+  _scratchReleaseTimer = null;
+  for (const c of [_featherCanvas, _maskCanvas, _pyrCanvasA, _pyrCanvasB]) {
+    if (c != null) { c.width = 0; c.height = 0; }
+  }
+}
+
 /** Reusable offscreen canvas for feathered region fills (avoids per-frame allocs). */
 let _featherCanvas: HTMLCanvasElement | null = null;
 function getFeatherCanvas(w: number, h: number): HTMLCanvasElement | null {
   if (typeof document === 'undefined') return null;
+  scheduleScratchRelease();
   _featherCanvas ??= activeWindow.createEl('canvas');
   if (_featherCanvas.width !== w) _featherCanvas.width = w;
   if (_featherCanvas.height !== h) _featherCanvas.height = h;
@@ -74,6 +99,7 @@ function getFeatherCanvas(w: number, h: number): HTMLCanvasElement | null {
 let _maskCanvas: HTMLCanvasElement | null = null;
 function getMaskCanvas(w: number, h: number): HTMLCanvasElement | null {
   if (typeof document === 'undefined') return null;
+  scheduleScratchRelease();
   _maskCanvas ??= activeWindow.createEl('canvas');
   if (_maskCanvas.width !== w) _maskCanvas.width = w;
   if (_maskCanvas.height !== h) _maskCanvas.height = h;
@@ -231,6 +257,7 @@ let _pyrCanvasA: HTMLCanvasElement | null = null;
 let _pyrCanvasB: HTMLCanvasElement | null = null;
 function getPyrPair(w: number, h: number): { a: HTMLCanvasElement; b: HTMLCanvasElement } | null {
   if (typeof document === 'undefined') return null;
+  scheduleScratchRelease();
   _pyrCanvasA ??= activeWindow.createEl('canvas');
   _pyrCanvasB ??= activeWindow.createEl('canvas');
   for (const c of [_pyrCanvasA, _pyrCanvasB]) {
@@ -1092,4 +1119,4 @@ function renderTiles(
   }
 }
 
-export { renderTiles, sortTilesForRendering, calculateTileDrawRect, computeRegionPatternTransform, regionFeatherPx, shadowBlurImage, pyramidLevels, pyramidBlurImage, canvasBlurCapabilities, tileOrientationAdaptation };
+export { renderTiles, sortTilesForRendering, calculateTileDrawRect, computeRegionPatternTransform, regionFeatherPx, shadowBlurImage, pyramidLevels, pyramidBlurImage, canvasBlurCapabilities, tileOrientationAdaptation, releaseTileScratchCanvases };

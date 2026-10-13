@@ -13,37 +13,123 @@ import type { TileMetadataStore, TileMetadataEntry, TileEntry, TileLayerRole } f
 const METADATA_FILE = 'windrose-tile-metadata.json';
 
 let saveTimer: number | null = null;
+let saveApp: App | null = null;
 const SAVE_DEBOUNCE_MS = 2000;
 
 // ===========================================
-// Render Accessor (module singleton)
+// Shared store (module singleton)
 // ===========================================
 //
-// The canvas renderer needs the vault-global tile metadata store to resolve each
-// tile's render mode (cell vs seamless region) per-tile. The store is the same
-// shape as plugin settings — vault-global, not per-map — so it follows the same
-// `settingsAccessor` idiom: a module singleton read fresh each frame rather than
-// threaded through every renderCanvas call site. Populated on map mount and kept
-// in sync by the tile browser.
+// ONE in-memory copy of the vault-global tile metadata, shared by the canvas
+// renderer and every mounted tile browser (STRUCT-A-10). Components never keep
+// their own copy: they read through useTileMetadata() and write through
+// updateTileMetadata(), which applies the mutator to THIS store and persists
+// from it. A per-mount copy saved as a whole file was last-writer-wins across
+// mounts (a star in one embed erased by a tag in another).
+//
+// Writers outside the component tree (pack import, classification rescan,
+// folder detection) still load -> mutate -> saveTileMetadata, then hand the
+// result to setTileMetadataForRender, which replaces this store and notifies
+// subscribers.
 
-let _renderStore: TileMetadataStore = {};
-/** Bumped on every setTileMetadataForRender so render caches can key on it (STRUCT-A-31). */
-let _renderStoreVersion = 0;
+let _store: TileMetadataStore = {};
+let _loaded = false;
+let _loadPromise: Promise<TileMetadataStore> | null = null;
+/** Bumped on every store change so render caches can key on it (STRUCT-A-31). */
+let _version = 0;
+const _listeners = new Set<() => void>();
 
-/** Current metadata store for the renderer. Empty until populated on map mount. */
+function commitStore(store: TileMetadataStore): void {
+  _store = store;
+  _version++;
+  for (const listener of [..._listeners]) listener();
+}
+
+/** Current shared metadata store. Empty until the first load lands. */
 function getTileMetadataForRender(): TileMetadataStore {
-  return _renderStore;
+  return _store;
 }
 
-/** Replace the renderer's metadata store (call after load or edit). */
+/** Replace the shared store wholesale (external writers, after their own save). */
 function setTileMetadataForRender(store: TileMetadataStore): void {
-  _renderStore = store;
-  _renderStoreVersion++;
+  _loaded = true;
+  commitStore(store);
 }
 
-/** Monotonic version of the render store; changes whenever it is replaced. */
+/** Monotonic version of the shared store; changes whenever it changes. */
 function getTileMetadataRenderVersion(): number {
-  return _renderStoreVersion;
+  return _version;
+}
+
+function isTileMetadataLoaded(): boolean {
+  return _loaded;
+}
+
+/** Subscribe to store changes. Returns the unsubscribe function. */
+function subscribeTileMetadata(listener: () => void): () => void {
+  _listeners.add(listener);
+  return () => { _listeners.delete(listener); };
+}
+
+/**
+ * Load the store from disk ONCE per session; concurrent callers share the
+ * in-flight read. Later calls resolve immediately with the shared store.
+ */
+function ensureTileMetadataLoaded(app: App): Promise<TileMetadataStore> {
+  if (_loaded) return Promise.resolve(_store);
+  _loadPromise ??= loadTileMetadata(app).then(store => {
+    _loadPromise = null;
+    // A writer may have replaced the store while the read was in flight;
+    // its copy is newer than what we just read.
+    if (!_loaded) setTileMetadataForRender(store);
+    return _store;
+  });
+  return _loadPromise;
+}
+
+/**
+ * Apply `mutator` to the shared store and schedule a debounced save OF THE
+ * SHARED STORE. Returning the same object is a no-op. Mutations issued before
+ * the first load are applied after it lands, so they can never be overwritten
+ * by (or save over) the on-disk store.
+ */
+function updateTileMetadata(app: App, mutator: (store: TileMetadataStore) => TileMetadataStore): void {
+  const apply = (): void => {
+    const next = mutator(_store);
+    if (next === _store) return;
+    commitStore(next);
+    scheduleSave(app);
+  };
+  if (_loaded) apply();
+  else void ensureTileMetadataLoaded(app).then(apply);
+}
+
+function scheduleSave(app: App): void {
+  saveApp = app;
+  if (saveTimer != null) window.clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => {
+    saveTimer = null;
+    void saveTileMetadata(app, _store);
+  }, SAVE_DEBOUNCE_MS);
+}
+
+/** Write a pending debounced save now (before a raw file read, or on unload). */
+async function flushTileMetadataSave(): Promise<void> {
+  if (saveTimer == null || saveApp == null) return;
+  window.clearTimeout(saveTimer);
+  saveTimer = null;
+  await saveTileMetadata(saveApp, _store);
+}
+
+/** Drop all module state (tests; plugin unload after flushTileMetadataSave). */
+function resetTileMetadataStore(): void {
+  if (saveTimer != null) window.clearTimeout(saveTimer);
+  saveTimer = null;
+  saveApp = null;
+  _store = {};
+  _loaded = false;
+  _loadPromise = null;
+  _listeners.clear();
 }
 
 // Throttle the corrupted-file notice so we don't spam the user with a toast
@@ -63,7 +149,13 @@ function notifyCorruptedMetadataFile(): void {
   );
 }
 
+/**
+ * Raw read of the store file. Flushes a pending debounced save first so a
+ * load -> mutate -> save writer outside the component tree starts from a file
+ * that already holds every in-memory edit.
+ */
 async function loadTileMetadata(app: App): Promise<TileMetadataStore> {
+  await flushTileMetadataSave();
   const file = app.vault.getAbstractFileByPath(METADATA_FILE);
   if (!(file instanceof TFile)) return {};
   try {
@@ -115,14 +207,6 @@ async function saveTileMetadata(app: App, metadata: TileMetadataStore): Promise<
     console.error('[Windrose] Failed to save tile metadata:', e);
     return false;
   }
-}
-
-function saveTileMetadataDebounced(app: App, metadata: TileMetadataStore): void {
-  if (saveTimer != null) window.clearTimeout(saveTimer);
-  saveTimer = window.setTimeout(() => {
-    void saveTileMetadata(app, metadata);
-    saveTimer = null;
-  }, SAVE_DEBOUNCE_MS);
 }
 
 function pruneEmptyEntries(metadata: TileMetadataStore): TileMetadataStore {
@@ -458,10 +542,15 @@ function collectDepthAwareTags(
 export {
   loadTileMetadata,
   saveTileMetadata,
-  saveTileMetadataDebounced,
   getTileMetadataForRender,
   setTileMetadataForRender,
   getTileMetadataRenderVersion,
+  isTileMetadataLoaded,
+  subscribeTileMetadata,
+  ensureTileMetadataLoaded,
+  updateTileMetadata,
+  flushTileMetadataSave,
+  resetTileMetadataStore,
   pruneEmptyEntries,
   getEntryMetadata,
   setEntryMetadata,

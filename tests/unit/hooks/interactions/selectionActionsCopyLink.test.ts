@@ -11,7 +11,7 @@ vi.mock('../../../../src/core/featureFlags', () => ({
   isFeatureEnabled: (feature: string) => (feature === 'notePins' ? flags.notePins : true),
 }));
 
-import { buildObjectActions, buildTextActions } from '../../../../src/hooks/interactions/useSelectionActions';
+import { buildObjectActions, buildTextActions } from '../../../../src/components/toolbars/selectionActionBuilders';
 import type { MapData } from '../../../../types/core/map.types';
 import type { SelectedItem } from '../../../../types/contexts/context.types';
 

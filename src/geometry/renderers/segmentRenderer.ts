@@ -23,7 +23,8 @@ import type { RenderViewState, BorderTheme } from '#types/core/rendering.types';
 import type { VertexName } from '../../core/dmtConstants';
 
 import { SEGMENT_VERTICES, SEGMENT_TRIANGLES } from '../../core/dmtConstants';
-import { hasSegments, buildCellMap } from '../core/cellAccessor';
+import { hasSegments } from '#types/core/cell.types';
+import { buildCellMap } from '../core/cellAccessor';
 import { getInternalBorders, getExternalBorders } from '../../drawing/segmentBorderCalculator';
 
 

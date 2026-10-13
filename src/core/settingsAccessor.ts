@@ -211,6 +211,26 @@ function resolveTheme(
 }
 
 /**
+ * The one settings merge: fallback defaults < global user settings < per-map
+ * overrides. Override keys whose value is undefined fall through (JSON never
+ * stores undefined, so persisted data merges exactly like a spread).
+ * Returns raw stored values; light/dark display resolution is applied by
+ * getEffectiveSettings, not here, so editors can seed from this safely.
+ */
+function mergeSettingsOverrides(
+  globals: Partial<PluginSettings>,
+  overrides?: Partial<PluginSettings> | null
+): PluginSettings {
+  const merged: PluginSettings = { ...FALLBACK_SETTINGS, ...globals };
+  if (overrides) {
+    for (const [key, value] of Object.entries(overrides)) {
+      if (value !== undefined) (merged as unknown as Record<string, unknown>)[key] = value;
+    }
+  }
+  return merged;
+}
+
+/**
  * Get effective settings for a map, merging map-specific overrides with global settings
  */
 function getEffectiveSettings(
@@ -230,7 +250,7 @@ function getEffectiveSettings(
   }
 
   // Merge global settings with map overrides (map overrides take precedence)
-  const merged = { ...globals, ...mapSettings.overrides };
+  const merged = mergeSettingsOverrides(globals, mapSettings.overrides);
   return {
     ...merged,
     gridLineColor: resolveGridLineColor(merged.gridLineColor),
@@ -348,5 +368,5 @@ function getTilesetFolders(): string[] {
   }
 }
 
-export { setPlugin, clearPlugin, getApp, getDataFilePath, getSettings, getSetting, getTheme, resolveTheme, getEffectiveSettings, getObjectSettings, getObjectSettingsForSet, getColorPaletteSettings, getTilesetFolders, FALLBACK_SETTINGS, BUILT_IN_COLORS };
+export { setPlugin, clearPlugin, getApp, getDataFilePath, getSettings, getSetting, getTheme, resolveTheme, getEffectiveSettings, mergeSettingsOverrides, getObjectSettings, getObjectSettingsForSet, getColorPaletteSettings, getTilesetFolders, FALLBACK_SETTINGS, BUILT_IN_COLORS };
 export type { WindrosePluginRef };

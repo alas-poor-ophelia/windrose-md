@@ -153,8 +153,8 @@ const MODULE_MAP: Record<string, string> = {
   'useSubHexNavigation.ts': './hooks/interactions/useSubHexNavigation.ts',
   'useAlignmentMode.ts': './hooks/interactions/useAlignmentMode.ts',
   'useCustomEventHandlers.ts': './hooks/interactions/useCustomEventHandlers.ts',
-  'useToolbarPosition.ts': './hooks/interactions/useToolbarPosition.ts',
-  'useSelectionActions.ts': './hooks/interactions/useSelectionActions.ts',
+  'toolbarPosition.ts': './components/toolbars/toolbarPosition.ts',
+  'selectionActionBuilders.ts': './components/toolbars/selectionActionBuilders.ts',
 
   // Generation
   'dungeonGenerator.js': './generation/dungeonGenerator.js',

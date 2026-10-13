@@ -33,9 +33,9 @@ vi.mock('../../../../src/persistence/fileOperations', async (importOriginal) => 
   };
 });
 
-import { useDebouncedSave, retryDelayMs } from '../../../../src/hooks/state/useDebouncedSave';
+import { useDebouncedSave, retryDelayMs, MAX_SAVE_RETRIES } from '../../../../src/hooks/state/useDebouncedSave';
 import { createNewMap } from '../../../../src/persistence/fileOperations';
-import { JOURNAL_KEY_PREFIX, CONFLICT_KEY_PREFIX, KEPT_KEY_PREFIX, MAX_JOURNAL_PAYLOAD } from '../../../../src/persistence/saveJournal';
+import { JOURNAL_KEY_PREFIX, CONFLICT_KEY_PREFIX, KEPT_KEY_PREFIX, MAX_JOURNAL_PAYLOAD, readJournal } from '../../../../src/persistence/saveJournal';
 
 type Hook = ReturnType<typeof useDebouncedSave>;
 
@@ -117,16 +117,17 @@ describe('useDebouncedSave: failed save (DATA-03)', () => {
     expect(saveMock).toHaveBeenCalledTimes(1);
     expect(m.hook().saveStatus).toBe('Save failed');
     // Journaled immediately on failure.
-    const journal = store.get(JOURNAL_KEY_PREFIX + 'ds-fail');
-    expect(journal).toBeDefined();
-    expect(JSON.parse(JSON.parse(journal as string).payload as string).description).toBe('first edit');
+    const journal = readJournal(app, 'ds-fail');
+    expect(journal).not.toBeNull();
+    expect(JSON.parse(journal?.payload as string).description).toBe('first edit');
 
     // Retry after 2 s with the same (kept) data.
     await advance(2000);
     expect(saveMock).toHaveBeenCalledTimes(2);
     expect(saveMock.mock.calls[1][2].description).toBe('first edit');
     expect(m.hook().saveStatus).toBe('Saved');
-    expect(store.has(JOURNAL_KEY_PREFIX + 'ds-fail')).toBe(false);
+    expect(readJournal(app, 'ds-fail')).toBeNull();
+    expect(store.size).toBeGreaterThanOrEqual(0);
     m.unmount();
   });
 
@@ -174,14 +175,15 @@ describe('useDebouncedSave: stale refusal at unmount is reported truthfully (Par
     store.set(JOURNAL_KEY_PREFIX + 'ds-big', JSON.stringify({ v: 1, mapId: 'ds-big', savedAt: 1, payload: '{"description":"older"}' }));
     const m = mount(app, 'ds-big');
 
-    edit(m, 'x'.repeat(MAX_JOURNAL_PAYLOAD + 10));
+    edit(m, noise(MAX_JOURNAL_PAYLOAD * 2));
     m.unmount();
     await advance(0);
 
     expect(store.has(CONFLICT_KEY_PREFIX + 'ds-big')).toBe(false);
     expect(store.has(JOURNAL_KEY_PREFIX + 'ds-big')).toBe(false);
-    expect(noticeMessages).toHaveLength(1);
-    expect(noticeMessages[0]).toMatch(/No recovery copy/);
+    // One stale-conflict notice (plus the once-per-map "too large" notice).
+    expect(noticeMessages.filter(n => /No recovery copy/.test(n))).toHaveLength(1);
+    expect(noticeMessages.some(n => /too large for its crash-recovery copy/.test(n))).toBe(true);
   });
 
   it('with a kept entry present, the edits still reach the conflict slot and the kept entry survives', async () => {
@@ -285,5 +287,109 @@ describe('useDebouncedSave: in-flight dedupe (MEM-15)', () => {
     await advance(0);
     expect(forced).toBe(true);
     expect(saveMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** Random incompressible text (deflate cannot shrink it below the cap). */
+function noise(length: number): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let out = '';
+  for (let i = 0; i < length; i++) {
+    out += alphabet[Math.floor(Math.random() * 64)];
+  }
+  return out;
+}
+
+describe('useDebouncedSave: journal before every save (DATA-05) and per-writer slots', () => {
+  beforeEach(() => { noticeMessages.length = 0; });
+
+  it('journals a routine debounced save before the write lands', async () => {
+    const { app } = makeApp();
+    let resolveSave: (r: { status: 'saved'; generation: number }) => void = () => undefined;
+    saveMock.mockImplementationOnce(() => new Promise((r) => { resolveSave = r; }));
+    const m = mount(app, 'ds-pre');
+
+    edit(m, 'routine edit');
+    await advance(2000);
+    expect(saveMock).toHaveBeenCalledTimes(1);
+    // The write is still in flight: the journal already holds the edit.
+    expect(JSON.parse(readJournal(app, 'ds-pre')?.payload as string).description).toBe('routine edit');
+
+    await act(async () => { resolveSave({ status: 'saved', generation: 1 }); await Promise.resolve(); });
+    expect(readJournal(app, 'ds-pre')).toBeNull();
+    m.unmount();
+  });
+
+  it("two panes: pane A's landed save does not erase pane B's failed-save copy", async () => {
+    const { app } = makeApp();
+    saveMock.mockImplementation((_app: unknown, _id: unknown, data: MapData) =>
+      Promise.resolve(data.description === 'pane B' ? { status: 'failed' } : { status: 'saved', generation: 1 }));
+    const a = mount(app, 'ds-two');
+    const b = mount(app, 'ds-two');
+
+    edit(b, 'pane B');
+    await advance(2000);
+    edit(a, 'pane A');
+    await advance(2000);
+
+    expect(b.hook().saveStatus).toBe('Save failed');
+    expect(a.hook().saveStatus).toBe('Saved');
+    expect(JSON.parse(readJournal(app, 'ds-two')?.payload as string).description).toBe('pane B');
+    a.unmount();
+    b.unmount();
+  });
+
+  it('an older save settling keeps the newer unmount journal', async () => {
+    const { app } = makeApp();
+    let resolveFirst: (r: { status: 'saved'; generation: number }) => void = () => undefined;
+    saveMock
+      .mockImplementationOnce(() => new Promise((r) => { resolveFirst = r; }))
+      .mockImplementation(() => new Promise(() => undefined)); // unmount write never lands
+    const m = mount(app, 'ds-order');
+
+    edit(m, 'v1');
+    await advance(2000);
+    edit(m, 'v2');
+    m.unmount();
+    await act(async () => { resolveFirst({ status: 'saved', generation: 1 }); await Promise.resolve(); });
+
+    expect(JSON.parse(readJournal(app, 'ds-order')?.payload as string).description).toBe('v2');
+  });
+
+  it('stops retrying after MAX_SAVE_RETRIES and says so once; edits stay journaled', async () => {
+    const { app } = makeApp();
+    saveMock.mockResolvedValue({ status: 'failed' });
+    const m = mount(app, 'ds-cap');
+
+    edit(m, 'stuck');
+    await advance(2000);
+    await advance(120_000);
+
+    expect(saveMock).toHaveBeenCalledTimes(1 + MAX_SAVE_RETRIES);
+    expect(noticeMessages.filter(n => /retries have stopped/.test(n))).toHaveLength(1);
+    expect(JSON.parse(readJournal(app, 'ds-cap')?.payload as string).description).toBe('stuck');
+
+    // The next edit tries again.
+    saveMock.mockResolvedValue({ status: 'saved', generation: 1 });
+    edit(m, 'unstuck');
+    await advance(2000);
+    expect(m.hook().saveStatus).toBe('Saved');
+    expect(readJournal(app, 'ds-cap')).toBeNull();
+    m.unmount();
+  });
+
+  it('a rejected save is treated as failed and retried', async () => {
+    const { app } = makeApp();
+    saveMock
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce({ status: 'saved', generation: 1 });
+    const m = mount(app, 'ds-reject');
+
+    edit(m, 'edit');
+    await advance(2000);
+    expect(m.hook().saveStatus).toBe('Save failed');
+    await advance(2000);
+    expect(m.hook().saveStatus).toBe('Saved');
+    m.unmount();
   });
 });

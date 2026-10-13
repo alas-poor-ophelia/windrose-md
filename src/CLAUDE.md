@@ -126,8 +126,6 @@ src/
 ├── persistence/           # Data I/O & vault interaction (fileOperations, saveCoordinator, schemaMigration, exportOperations, layerAccessor)
 ├── utils/                 # Dev/diagnostic probes (perfTelemetry, zoomTraceProbe, inputEventProbe, canvasCapabilityReport)
 ├── views/                 # WindroseMapView.ts (full-pane Obsidian view)
-├── templates/             # Static markdown templates
-├── windrose-objects/      # Bundled object set data
 ├── geometry/
 │   ├── core/              # Geometry abstractions (Base/Grid/Hex), createGeometry, contentFitView, subHexBackdrop
 │   ├── renderers/         # Canvas draw functions
@@ -161,7 +159,7 @@ src/
 └── generation/            # Random map generation
 ```
 
-Loose files `Windrose Changelogs.md` (read by the release workflow) and `Windrose Feature docs.md` also sit in `src/`; they are not code.
+Non-source files live outside `src/`: `CHANGELOG.md` (read by the release workflow) at the repo root, and the sample map-block template and object set under `examples/`.
 
 ## Feature Map (post-2.0 features to files)
 

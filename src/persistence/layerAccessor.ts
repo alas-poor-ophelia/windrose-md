@@ -616,6 +616,25 @@ function cloneLayer(mapData: MapData, layerId: LayerId, mode: 'all' | 'mapOnly')
     w.gaps != null ? { ...w, gaps: w.gaps.map(g => ({ ...g, id: freshEntityId('gap') })) } : w
   );
 
+  // Object links are pairs ({layerId, objectId} on both ends). A cloned object
+  // must not point at the source's partner: that partner links back to the
+  // source, and unlinking from the clone would strip the original pair. A
+  // link inside the source layer is remapped to the cloned partner; a link to
+  // another layer is dropped (the partner stays paired with the original).
+  const sourceObjects = sourceLayer.objects ?? [];
+  const freshObjects = mode === 'all' ? withFreshIds(sourceObjects, 'obj') : [];
+  const objectIdMap = new Map<string, string>();
+  freshObjects.forEach((o, i) => { objectIdMap.set(sourceObjects[i].id, o.id); });
+  const objects = freshObjects.map((o) => {
+    const next = o.layerId != null ? { ...o, layerId: cloneId } : { ...o };
+    const link = next.linkedObject;
+    if (link == null) return next;
+    const partner = link.layerId === sourceLayer.id ? objectIdMap.get(link.objectId) : undefined;
+    if (partner != null) return { ...next, linkedObject: { ...link, layerId: cloneId, objectId: partner } };
+    delete next.linkedObject;
+    return next;
+  });
+
   const clonedLayer: MapLayer = {
     id: cloneId,
     name: `Copy of ${sourceName}`,
@@ -624,7 +643,7 @@ function cloneLayer(mapData: MapData, layerId: LayerId, mode: 'all' | 'mapOnly')
     cells: deepCopy(sourceLayer.cells),
     curves: withFreshIds(sourceLayer.curves, 'curve'),
     edges: withFreshIds(sourceLayer.edges, 'edge'),
-    objects: mode === 'all' ? withFreshIds(sourceLayer.objects, 'obj') : [],
+    objects,
     textLabels: mode === 'all' ? withFreshIds(sourceLayer.textLabels, 'text') : [],
     fogOfWar: mode === 'all' && sourceLayer.fogOfWar ? deepCopy(sourceLayer.fogOfWar) : null,
     tiles: deepCopy(sourceLayer.tiles ?? []),

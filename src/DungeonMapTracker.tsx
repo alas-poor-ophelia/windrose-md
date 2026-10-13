@@ -82,7 +82,7 @@ import { tooltipRef } from './components/shared/obsidianTooltip';
 import { listMaps, deleteMapData } from './persistence/fileOperations';
 import type { MapListEntry } from './persistence/fileOperations';
 import { ConfirmModal } from './settings/modals/ConfirmModal';
-import { loadTileMetadata, setTileMetadataForRender, getTileMetadataForRender } from './persistence/tileMetadata';
+import { ensureTileMetadataLoaded, getTileMetadataForRender } from './persistence/tileMetadata';
 import { NewMapModal } from './components/modals/NewMapModal';
 import { InsertDungeonModal } from './settings/modals/InsertDungeonModal';
 import type { DungeonInsertOptions } from './settings/modals/InsertDungeonModal';
@@ -192,7 +192,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // panel is never opened. Also refresh on import (windrose-settings-changed)
   // so a pack imported while a map is open picks up the new classifications.
   useEffect(() => {
-    const refresh = (): void => { void loadTileMetadata(app).then(setTileMetadataForRender); };
+    const refresh = (): void => { void ensureTileMetadataLoaded(app); };
     refresh();
     window.addEventListener('windrose-settings-changed', refresh);
     return () => window.removeEventListener('windrose-settings-changed', refresh);
@@ -459,8 +459,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const handleGenerateDungeon = useCallback(() => {
     const plugin = app.plugins.plugins['windrose-md'] as unknown as
       {
-        loadDungeonGenerator(): Promise<{ generateDungeon(...args: unknown[]): unknown }>;
-        loadObjectPlacer(): Promise<{ stockDungeon(...args: unknown[]): unknown }>;
         createRandomDungeonMap(
           mapName: string,
           cells: Record<string, unknown>[],
@@ -470,7 +468,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         ): Promise<string>;
       } | undefined;
     if (plugin == null) return;
-    new InsertDungeonModal(app, plugin, async (newMapName, cells, objects, edges, options) => {
+    new InsertDungeonModal(app, async (newMapName, cells, objects, edges, options) => {
       const newId = await plugin.createRandomDungeonMap(newMapName, cells, objects, edges, options);
       onMapChange?.(newId, newMapName, 'grid');
     }).open();

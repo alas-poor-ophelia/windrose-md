@@ -19,7 +19,7 @@ import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useShapeOverlayTools } from '../../hooks/interactions/useShapeOverlayTools';
 import { snapShapeOverlayToGrid } from '../../objects/shapeOverlayOperations';
 import { getNextRotation } from '../../drawing/rotationOperations';
-import { buildShapeOverlayActions } from '../../hooks/interactions/useSelectionActions';
+import { buildShapeOverlayActions } from '../toolbars/selectionActionBuilders';
 import { SelectionActionsOverlay } from '../toolbars/SelectionActionsOverlay';
 import { ShapePreviewOverlay } from './ShapePreviewOverlay';
 import { Icon } from '../shared/Icon';

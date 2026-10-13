@@ -17,7 +17,7 @@ import { journalPending } from './saveJournal';
 
 interface SaveInstance {
   /** The un-saved map data for this instance, or null when everything is saved. */
-  getPending: () => { mapId: string; data: MapData } | null;
+  getPending: () => { mapId: string; data: MapData; writerId?: string; version?: number } | null;
   /** Cancel the debounce and run the pending save now. Resolves when it lands. */
   flush: () => Promise<void>;
 }
@@ -55,7 +55,9 @@ function journalAll(app: App): void {
   for (const instance of instances.values()) {
     try {
       const pending = instance.getPending();
-      if (pending != null) journalPending(app, pending.mapId, pending.data);
+      if (pending != null) {
+        journalPending(app, pending.mapId, pending.data, { writerId: pending.writerId, version: pending.version });
+      }
     } catch (e) {
       console.debug('[Windrose] Journaling an instance failed:', e);
     }

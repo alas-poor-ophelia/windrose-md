@@ -11,12 +11,12 @@ import type { VNode } from 'preact';
 import type { IGeometry } from '#types/core/geometry.types';
 import type { SelectedItem } from '#types/contexts/context.types';
 import type { MapObject } from '#types/objects/object.types';
-import type { SelectionAction } from '../../hooks/interactions/useSelectionActions.ts';
+import type { SelectionAction } from './selectionActionBuilders';
 import type { CustomColor } from '#types/core/common.types';
 import type { MenuItem } from 'obsidian';
 
 import { useEffect, useState } from 'preact/hooks';
-import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition';
+import { computeToolbarPosition } from './toolbarPosition';
 import { openNoteInNewTab } from '../../persistence/noteOperations';
 import { ColorPicker } from '../shared/ColorPicker';
 import { CornerBrackets } from '../shared/CornerBrackets';
@@ -254,7 +254,7 @@ const SelectionActionsOverlay = ({
   const linkedNoteHeight = linkedNote != null && linkedNote !== '' ? 32 : 0;
   const linkedNoteGap = linkedNote != null && linkedNote !== '' ? 4 : 0;
 
-  const toolbarPos = useToolbarPosition({
+  const toolbarPos = computeToolbarPosition({
     bounds,
     containerRef,
     toolbarWidth: cardWidth,

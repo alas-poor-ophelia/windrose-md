@@ -22,6 +22,22 @@ function retryDelayMs(attempt: number): number {
   return Math.min(2000 * 2 ** attempt, 8000);
 }
 
+/**
+ * Consecutive failed attempts after which the automatic retry stops (2 + 4 +
+ * 8 x 4 s, about 40 s). Each attempt re-reads and re-parses the whole data
+ * file, so a persistent failure must not loop forever. The edits stay pending
+ * and journaled; the next edit or forceSave (quit, close) tries again.
+ */
+const MAX_SAVE_RETRIES = 6;
+
+function notifySaveRetriesStopped(): void {
+  new Notice(
+    'Windrose: this map could not be saved after several attempts, so automatic retries have stopped. ' +
+    'Your changes are kept in memory and in the crash-recovery copy; the next edit tries again.',
+    10_000
+  );
+}
+
 /** A save currently being written (MEM-15: never write the same version twice). */
 interface InFlightSave {
   version: number;
@@ -80,6 +96,12 @@ function useDebouncedSave(
   const saveTimerRef = useRef<number | null>(null);
   const retryTimerRef = useRef<number | null>(null);
   const retryAttemptRef = useRef(0);
+  // True once MAX_SAVE_RETRIES was hit and the user was told (reset by a landed save).
+  const retriesStoppedRef = useRef(false);
+  // The tree/version last written to this writer's journal slot, so a retry
+  // (or a failure right after the pre-save journal) does not re-serialize an
+  // unchanged payload (MEM-22). Reset whenever the slot is cleared.
+  const lastJournalRef = useRef<{ data: MapData; version: number; ok: boolean } | null>(null);
   // Bumped synchronously by every edit (and by delete/acknowledge to
   // invalidate in-flight bookkeeping). A save result only settles state when
   // its version is still the latest.
@@ -107,6 +129,21 @@ function useDebouncedSave(
   const flushRef = useRef({ app, mapId, pendingData });
   flushRef.current = { app, mapId, pendingData };
 
+  /** Journal `data` into this writer's live slot, skipping an unchanged re-write. */
+  const journalNow = (data: MapData, version: number): boolean => {
+    const last = lastJournalRef.current;
+    if (last != null && last.ok && last.data === data && last.version === version) return true;
+    const ok = journalPending(flushRef.current.app, flushRef.current.mapId, data, { writerId: instanceIdRef.current, version });
+    lastJournalRef.current = { data, version, ok };
+    return ok;
+  };
+
+  /** Drop this writer's live journal slot (conditioned on `upToVersion` when given). */
+  const clearOwnJournal = (upToVersion?: number): void => {
+    clearJournal(flushRef.current.app, flushRef.current.mapId, { writerId: instanceIdRef.current, upToVersion });
+    lastJournalRef.current = null;
+  };
+
   const clearTimers = (): void => {
     if (saveTimerRef.current != null) {
       window.clearTimeout(saveTimerRef.current);
@@ -131,9 +168,18 @@ function useDebouncedSave(
     // write instead of queueing a second copy of the same tree.
     const inflight = inFlightRef.current;
     if (inflight != null && inflight.version === version) {
-      await inflight.promise;
+      try {
+        await inflight.promise;
+      } catch {
+        /* the owner of that write settles it */
+      }
       return;
     }
+
+    // DATA-05: journal synchronously BEFORE every save, so a crash, kill or
+    // power loss during the async write leaves a recoverable copy. Cleared
+    // by settleResult once this version lands.
+    journalNow(data, version);
 
     if (!unmountedRef.current) setSaveStatus('Saving...');
     const promise = saveMapData(app, mapId, data, baseGenRef.current, instanceIdRef.current);
@@ -141,6 +187,11 @@ function useDebouncedSave(
     let result: SaveMapResult;
     try {
       result = await promise;
+    } catch (e) {
+      // saveMapData resolves 'failed' rather than rejecting today; a future
+      // rejection must still go through the retry/journal path.
+      console.error('[Windrose] Save rejected unexpectedly:', e);
+      result = { status: 'failed' };
     } finally {
       if (inFlightRef.current?.promise === promise) inFlightRef.current = null;
     }
@@ -157,6 +208,7 @@ function useDebouncedSave(
   const shutForDeletion = (): void => {
     deletedRef.current = true;
     clearJournal(flushRef.current.app, flushRef.current.mapId, { includeKept: true });
+    lastJournalRef.current = null;
     clearTimers();
     // Invalidate any in-flight save's completion bookkeeping and drop pending
     // data so nothing re-enqueues after the delete.
@@ -174,6 +226,7 @@ function useDebouncedSave(
   const settleResult = (result: SaveMapResult, version: number, data: MapData): void => {
     const a = flushRef.current.app;
     const m = flushRef.current.mapId;
+    const writerId = instanceIdRef.current;
 
     if (result.status === 'deleted') {
       // DATA-02: terminal. Nothing was written and nothing ever will be: no
@@ -190,7 +243,9 @@ function useDebouncedSave(
 
     if (result.status === 'saved') {
       baseGenRef.current = result.generation;
-      clearJournal(a, m);
+      // Only this writer's slot, and only if no newer edit was journaled
+      // since (an unmount flush may have journaled a newer tree).
+      clearOwnJournal(version);
     } else if (result.status === 'stale') {
       if (unmountedRef.current && hasRealEditRef.current) {
         // DATA-13: nobody is left to show the conflict panel. Set the
@@ -198,22 +253,25 @@ function useDebouncedSave(
         // Only move what was just written: if journaling was skipped
         // (oversized, quota) the live slot may hold an OLDER tree, which
         // must not be set aside as if it were these edits.
-        if (journalPending(a, m, data)) {
-          notifyStaleUnmountConflict(moveJournalToConflict(a, m) === 'moved');
+        if (journalNow(data, version)) {
+          notifyStaleUnmountConflict(moveJournalToConflict(a, m, writerId) === 'moved');
+          lastJournalRef.current = null;
         } else {
-          clearJournal(a, m);
+          clearOwnJournal();
           notifyStaleUnmountConflict(false);
         }
       } else {
         // NEVER leave a refused stale tree in the journal — restoring it on
         // next load would be a user-consented whole-entry clobber.
-        clearJournal(a, m);
+        clearOwnJournal();
       }
     } else {
-      // DATA-03: the edits now exist only in memory. Journal them at once so
-      // a crash before the retry lands can still recover them (the newest
-      // unsaved tree, which a later edit may have superseded).
-      journalPending(a, m, flushRef.current.pendingData ?? data);
+      // DATA-03: the edits now exist only in memory. Make sure the journal
+      // holds the newest unsaved tree (a later edit may have superseded the
+      // one journaled before this save; an unchanged tree is not rewritten).
+      const newest = flushRef.current.pendingData;
+      if (newest != null && newest !== data) journalNow(newest, saveVersionRef.current);
+      else journalNow(data, version);
     }
 
     if (deletedRef.current || unmountedRef.current) return;
@@ -237,14 +295,20 @@ function useDebouncedSave(
 
     if (result.status === 'failed') {
       if (isLatest) {
-        // Keep pendingData and retry with backoff.
+        // Keep pendingData and retry with backoff, up to MAX_SAVE_RETRIES.
         setSaveStatus('Save failed');
-        scheduleRetry(version);
+        if (retryAttemptRef.current < MAX_SAVE_RETRIES) {
+          scheduleRetry(version);
+        } else if (!retriesStoppedRef.current) {
+          retriesStoppedRef.current = true;
+          notifySaveRetriesStopped();
+        }
       }
       return;
     }
 
     retryAttemptRef.current = 0;
+    retriesStoppedRef.current = false;
     if (isLatest) {
       setSaveStatus('Saved');
       setPendingData(null);
@@ -312,7 +376,7 @@ function useDebouncedSave(
     // Journal FIRST and synchronously: the unmount flush is unawaited by
     // construction (cleanup functions can't be async), so if the event loop
     // dies before the vault write finishes, the journal is the only record.
-    journalPending(a, m, pd);
+    journalNow(pd, saveVersionRef.current);
 
     // MEM-15: the same tree is already being written; its completion
     // (settleResult) clears or sets aside the journal entry above.
@@ -398,7 +462,7 @@ function useDebouncedSave(
       getPending: () => {
         const { mapId: m, pendingData: pd } = flushRef.current;
         if (!pd || deletedRef.current) return null;
-        return { mapId: m, data: pd };
+        return { mapId: m, data: pd, writerId: id, version: saveVersionRef.current };
       },
       flush: async () => { await forceSaveRef.current(); },
     });
@@ -408,4 +472,4 @@ function useDebouncedSave(
   return { saveStatus, updateMapData, forceSave, markDeleted, mapDeleted, staleConflict, acknowledgeStaleConflict };
 }
 
-export { useDebouncedSave, retryDelayMs };
+export { useDebouncedSave, retryDelayMs, MAX_SAVE_RETRIES };

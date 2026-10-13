@@ -28,7 +28,7 @@ import type { MenuItem } from 'obsidian';
 import { Menu } from 'obsidian';
 import { useObjectModals } from '../../hooks/objects/useObjectModals';
 import { SelectionActionsOverlay } from '../toolbars/SelectionActionsOverlay';
-import { buildObjectActions, buildMultiActions } from '../../hooks/interactions/useSelectionActions';
+import { buildObjectActions, buildMultiActions } from '../toolbars/selectionActionBuilders';
 import { calculateObjectScreenPosition } from '../../objects/screenPositionUtils';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { convertObjectToFreeform, findDuplicateTarget, generateObjectId, snapObjectToGrid } from '../../objects/objectOperations';

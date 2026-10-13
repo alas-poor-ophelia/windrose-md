@@ -23,7 +23,7 @@ import { useApp } from '../../context/AppContext';
 import { openNativeTextLabelEditor } from '../modals/TextLabelEditor';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { SelectionActionsOverlay } from '../toolbars/SelectionActionsOverlay';
-import { buildTextActions } from '../../hooks/interactions/useSelectionActions';
+import { buildTextActions } from '../toolbars/selectionActionBuilders';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { copyDeepLinkToClipboard } from '../../persistence/deepLinkHandler';
 

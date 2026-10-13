@@ -121,13 +121,18 @@ function useImagePreloading(
     if (!mapData) return;
 
     const objectTypes = getResolvedObjectTypes(mapData.mapType, mapData.objectSetId);
-    const imageObjects = objectTypes.filter(hasImagePath);
-
-    for (const objType of imageObjects) {
-      if (objType.imagePath != null && objType.imagePath !== '') {
-        void preloadImage(app, objType.imagePath);
-      }
+    const iconPaths: string[] = [];
+    for (const objType of objectTypes.filter(hasImagePath)) {
+      if (objType.imagePath != null && objType.imagePath !== '') iconPaths.push(objType.imagePath);
     }
+
+    // Pinned while this map uses them (MEM-11): another mount's tileset-rebuild
+    // sweep only knows ITS OWN object set and would otherwise evict these.
+    for (const path of iconPaths) {
+      pinImage(path);
+      void preloadImage(app, path);
+    }
+    return () => { for (const path of iconPaths) unpinImage(path); };
   }, [app, mapData?.mapType, mapData?.objectSetId, settingsVersion]);
 
   useEffect(() => {

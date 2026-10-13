@@ -331,6 +331,11 @@ function migrateOneMap(input: MapData, options: MigrateOptions): MapData {
   }
 
   // Schema migration: version-stepped, never rebuilds an existing layers array.
+  // ORDER: the root defaults above (settings, hexBounds, backgroundImage) run
+  // BEFORE the stepped runner, so a future migrations[N] step sees those
+  // fields already filled in. A step that must detect a legacy shape by the
+  // ABSENCE of one of them cannot; it must key on schemaVersion instead (or
+  // this block must move below the runner in the same change).
   mapData = runSchemaMigrations(mapData);
 
   // Tileset source migration: add source: 'folder' to legacy tilesets

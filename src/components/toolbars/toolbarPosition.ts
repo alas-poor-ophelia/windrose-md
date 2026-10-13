@@ -1,5 +1,5 @@
 /**
- * useToolbarPosition.ts
+ * toolbarPosition.ts
  *
  * Shared positioning logic for selection toolbars.
  * Handles flip-above/below detection and horizontal clamping.
@@ -45,7 +45,7 @@ interface ToolbarPositionResult {
   anchorBottom?: number;
 }
 
-function useToolbarPosition({
+function computeToolbarPosition({
   bounds,
   containerRef,
   toolbarWidth,
@@ -127,4 +127,4 @@ function useToolbarPosition({
   };
 }
 
-export { useToolbarPosition };
+export { computeToolbarPosition };

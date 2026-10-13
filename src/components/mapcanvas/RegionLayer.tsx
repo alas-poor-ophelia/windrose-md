@@ -452,71 +452,10 @@ const RegionLayer = ({
     dismissContextMenu();
   }, [contextMenu, mapData?.regions, app, deleteRegion, dismissContextMenu, startEditingRegion, updateRegion]);
 
-  // ── Long-press touch support for context menu (500ms) ──────────────
-  const longPressTimerRef = useRef<number | null>(null);
-  const longPressPosRef = useRef<{ x: number; y: number } | null>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return undefined;
-
-    const handleTouchStart = (e: TouchEvent): void => {
-      if (e.touches.length !== 1) return;
-      const touch = e.touches[0];
-      longPressPosRef.current = { x: touch.clientX, y: touch.clientY };
-
-      longPressTimerRef.current = window.setTimeout(() => {
-        if (!longPressPosRef.current) return;
-        const synth = new MouseEvent('contextmenu', {
-          clientX: longPressPosRef.current.x,
-          clientY: longPressPosRef.current.y,
-          bubbles: true
-        });
-        const hex = screenToGrid != null ? screenToGrid(longPressPosRef.current.x, longPressPosRef.current.y) : null;
-        if (hex && mapData?.regions) {
-          const key = `${hex.x},${hex.y}`;
-          const region = mapData.regions.find(r => r.hexes.some(h => `${h.x},${h.y}` === key));
-          if (region) {
-            handleContextMenu(synth);
-          }
-        }
-        longPressPosRef.current = null;
-      }, 500);
-    };
-
-    const handleTouchMove = (e: TouchEvent): void => {
-      if (longPressPosRef.current && e.touches.length === 1) {
-        const touch = e.touches[0];
-        const dx = touch.clientX - longPressPosRef.current.x;
-        const dy = touch.clientY - longPressPosRef.current.y;
-        if (dx * dx + dy * dy > 100) {
-          if (longPressTimerRef.current != null) window.clearTimeout(longPressTimerRef.current);
-          longPressPosRef.current = null;
-        }
-      }
-    };
-
-    const handleTouchEnd = (): void => {
-      if (longPressTimerRef.current != null) {
-        window.clearTimeout(longPressTimerRef.current);
-        longPressTimerRef.current = null;
-      }
-      longPressPosRef.current = null;
-    };
-
-    canvas.addEventListener('touchstart', handleTouchStart, { passive: true });
-    canvas.addEventListener('touchmove', handleTouchMove, { passive: true });
-    canvas.addEventListener('touchend', handleTouchEnd);
-    canvas.addEventListener('touchcancel', handleTouchEnd);
-
-    return () => {
-      canvas.removeEventListener('touchstart', handleTouchStart);
-      canvas.removeEventListener('touchmove', handleTouchMove);
-      canvas.removeEventListener('touchend', handleTouchEnd);
-      canvas.removeEventListener('touchcancel', handleTouchEnd);
-      if (longPressTimerRef.current != null) window.clearTimeout(longPressTimerRef.current);
-    };
-  }, [canvasRef, screenToGrid, mapData?.regions, handleContextMenu]);
+  // Touch long-press needs no timer here: the event coordinator's long-press
+  // synthesizes a contextmenu that reaches the same handlers as a right-click
+  // (the hex menu carries the region items; non-hex maps fall back to the
+  // 'region' handleContextMenu registered above).
 
   // ── JSX ────────────────────────────────────────────────────────────
   return (

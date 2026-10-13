@@ -141,6 +141,81 @@ function bakPathForSlot(dataPath: string, slot: BakSlot): string {
   return `${base}.bak${slot}.json`;
 }
 
+/** `<dataPath minus .json>.bak-daily.json`: the first rotation of each local day (DATA-11). */
+function dailyBakPath(dataPath: string): string {
+  const base = dataPath.endsWith('.json') ? dataPath.slice(0, -'.json'.length) : dataPath;
+  return `${base}.bak-daily.json`;
+}
+
+/**
+ * A rotation that would replace a backup with content less than this
+ * fraction of its size is suspicious (DATA-11: a wipe or bulk delete that
+ * still parses), unless the map count dropped too.
+ */
+const BAK_SHRINK_RATIO = 0.5;
+
+/** A guarded (preserved) backup is released after this long, so a legitimate shrink is not frozen out forever. */
+const BAK_GUARD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Whether replacing a backup of `oldSize` chars / `oldMaps` maps with one of
+ * `newSize` / `newMaps` looks like a logically bad save. Pure.
+ */
+function isSuspiciousShrink(newSize: number, newMaps: number, oldSize: number, oldMaps: number): boolean {
+  return newSize < oldSize * BAK_SHRINK_RATIO && newMaps >= oldMaps;
+}
+
+function sameLocalDay(a: number, b: number): boolean {
+  const da = new Date(a);
+  const db = new Date(b);
+  return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
+}
+
+/**
+ * Whether the backup at `path` must be preserved instead of being replaced
+ * with `content` (size-drop guard). Reads the old backup only when it is
+ * young enough to be guarded; parses it only when the size check trips.
+ */
+async function backupIsGuarded(app: App, path: string, content: string, mapCount: number, now: number): Promise<boolean> {
+  const existing = app.vault.getAbstractFileByPath(path);
+  if (!(existing instanceof TFile)) return false;
+  if (now - existing.stat.mtime > BAK_GUARD_MAX_AGE_MS) return false;
+  try {
+    const old = await app.vault.read(existing);
+    if (content.length >= old.length * BAK_SHRINK_RATIO) return false; // cheap size check before any parse
+    const parsed = JSON.parse(old) as DataFile;
+    const oldMaps = parsed.maps != null && typeof parsed.maps === 'object' ? Object.keys(parsed.maps).length : 0;
+    return isSuspiciousShrink(content.length, mapCount, old.length, oldMaps);
+  } catch {
+    return false; // an unreadable backup protects nothing; let it be replaced
+  }
+}
+
+/**
+ * One backup round (inside the mutex, before the save writes): the rolling
+ * slot, then the daily slot. A rolling slot holding a much larger copy is
+ * skipped for the other one; if both are guarded nothing rolls (the warning
+ * says so). The daily slot is written at most once per local day.
+ */
+async function rotateBackups(app: App, dataPath: string, content: string, mapCount: number, now: number): Promise<void> {
+  let slot: BakSlot | null = nextBakSlot;
+  if (await backupIsGuarded(app, bakPathForSlot(dataPath, slot), content, mapCount, now)) {
+    const other = otherBakSlot(slot);
+    slot = (await backupIsGuarded(app, bakPathForSlot(dataPath, other), content, mapCount, now)) ? null : other;
+    console.warn('[saveMapData] The data file shrank sharply; preserving the larger backup.', slot == null ? 'No slot rolled.' : '');
+  }
+  if (slot != null) {
+    nextBakSlot = otherBakSlot(slot);
+    await writeBackupSlot(app, dataPath, slot, content);
+  }
+
+  const dailyPath = dailyBakPath(dataPath);
+  const daily = app.vault.getAbstractFileByPath(dailyPath);
+  if (daily instanceof TFile && sameLocalDay(daily.stat.mtime, now)) return;
+  if (await backupIsGuarded(app, dailyPath, content, mapCount, now)) return;
+  await writeBackupFile(app, dailyPath, content);
+}
+
 /** `yyyymmdd-hhmmss` in local time, for the preserved-corrupt-file suffix. */
 function backupTimestamp(when: Date): string {
   const pad = (n: number): string => String(n).padStart(2, '0');
@@ -158,7 +233,10 @@ function backupTimestamp(when: Date): string {
  * backup is a smaller problem than a skipped save.
  */
 async function writeBackupSlot(app: App, dataPath: string, slot: BakSlot, knownGood: string): Promise<void> {
-  const bakPath = bakPathForSlot(dataPath, slot);
+  await writeBackupFile(app, bakPathForSlot(dataPath, slot), knownGood);
+}
+
+async function writeBackupFile(app: App, bakPath: string, knownGood: string): Promise<void> {
   try {
     const existing = app.vault.getAbstractFileByPath(bakPath);
     if (existing instanceof TFile) {
@@ -194,8 +272,9 @@ async function findBestBackup(app: App): Promise<DataFileBackup | null> {
   const adapter = app.vault.adapter;
   let best: DataFileBackup | null = null;
 
-  for (const slot of BAK_SLOTS) {
-    const path = bakPathForSlot(dataPath, slot);
+  // The daily slot is a last resort: older by design, so only chosen when it
+  // is the newest that still parses.
+  for (const path of [...BAK_SLOTS.map(slot => bakPathForSlot(dataPath, slot)), dailyBakPath(dataPath)]) {
     try {
       if (!(await adapter.exists(path))) continue;
       const content = await adapter.read(path);
@@ -590,12 +669,11 @@ async function writeMapEntryLocked(app: App, mapId: string, mapData: MapData, wr
     // Runs before vault.modify, inside the mutex.
     const now = Date.now();
     if (shouldRotateBak(lastBakAt, now)) {
-      const slot = nextBakSlot;
       // Stamped BEFORE the write: a slot that keeps failing must not retry
       // on every autosave (see BAK_THROTTLE_MS).
       lastBakAt = now;
-      nextBakSlot = otherBakSlot(slot);
-      await writeBackupSlot(app, dataPath, slot, content);
+      const mapCount = allData.maps != null && typeof allData.maps === 'object' ? Object.keys(allData.maps).length : 0;
+      await rotateBackups(app, dataPath, content, mapCount, now);
     }
   }
 
@@ -923,7 +1001,7 @@ export {
   saveMapData, deleteMapData, createNewMap, buildMapEntry, createMapEntry, listMaps, listMapsResult, migrateMapData,
   canonicalizeTileIds, applyLockedViewState, enqueueDataFileOp, getSaveQueue,
   notifyCorruptedDataFile, readRawMapEntry, isMapTombstoned, MapDataUnreadableError, MapDeletedError, MapSchemaError,
-  shouldRotateBak, otherBakSlot, bakPathForSlot, backupTimestamp,
+  shouldRotateBak, otherBakSlot, bakPathForSlot, dailyBakPath, isSuspiciousShrink, backupTimestamp,
   findBestBackup, restoreFromBackup, BAK_THROTTLE_MS
 };
 export type { MapListEntry, MapListResult, BakSlot, DataFileBackup, RestoreResult };

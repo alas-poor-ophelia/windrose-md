@@ -6,7 +6,7 @@
  * body (jump rail + tile grid) → loaded-brush footer.
  */
 
-import type { TilesetDef, TileEntry, TileForm, TilesetOverrides, TileLayerRole, TileMetadataStore, TilesetOrigin } from '#types/tiles/tile.types';
+import type { TilesetDef, TileEntry, TileForm, TilesetOverrides, TileLayerRole, TilesetOrigin } from '#types/tiles/tile.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { WallToolSurface } from '#types/core/wallpath.types';
 import type { FlyoutTile } from './DrawerDock';
@@ -21,9 +21,8 @@ import { Icon } from '../shared/Icon';
 import { DrawerPaneHead, DrawerSearch } from './drawerChrome';
 import { DepthBar, depthMeta } from './DepthBar';
 import {
-  loadTileMetadata,
-  saveTileMetadataDebounced,
-  setTileMetadataForRender,
+  ensureTileMetadataLoaded,
+  updateTileMetadata,
   bulkSetDepthAffinity,
   bulkSetDetectionSignals,
   isStarred,
@@ -37,7 +36,8 @@ import type { TileSubtoolId } from '../../assets/tileForm';
 import { clusterCategories, NOISE, humanizePackName, detectTileGeometry } from '../../assets/categoryMerge';
 import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
 import type { FolderInput } from '../../assets/categoryMerge';
-import { runDetectionScan } from '../../assets/tileImageScan';
+import { runDetectionScan, claimDetectionScanPaths, releaseDetectionScanPaths } from '../../assets/tileImageScan';
+import { useTileMetadata } from '../../hooks/state/useTileMetadata';
 import { resolveTileEntry } from '../../assets/tilesetOperations';
 import { drawTileToCanvas, loadVaultImage, observeWidth, TileThumbnail, PREVIEW_SIZE } from './tileBrowserCommon';
 import { TileOrganizePane } from './TileOrganizePane';
@@ -423,7 +423,7 @@ const TileAssetBrowser = memo(({
   const [viewModeLocal, setViewModeLocal] = useState<TileViewMode>('grid');
   const viewMode = viewModeProp ?? viewModeLocal;
   const setViewMode = onViewModeChange ?? setViewModeLocal;
-  const [tileMetadata, setTileMetadata] = useState<TileMetadataStore>({});
+  const tileMetadata = useTileMetadata(app);
   const { getThumbUrl, requestThumbs } = useThumbnailPipeline();
   const gridWrapRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -577,25 +577,8 @@ const TileAssetBrowser = memo(({
   };
 
   // ---- Tile metadata ----
-
-  useEffect(() => {
-    // Load at mount AND whenever the settings-changed event fires: pack imports,
-    // the classification-rescan command, and the folder-add detection pass all
-    // rewrite the store outside this component and dispatch the event when done.
-    // A mount-once load left the browser rendering a frozen copy until a full
-    // app reload (stale strata/walls-pane/portal classification).
-    const reload = (): void => { void loadTileMetadata(app).then(setTileMetadata); };
-    reload();
-    window.addEventListener('windrose-settings-changed', reload);
-    return () => window.removeEventListener('windrose-settings-changed', reload);
-  }, []);
-
-  // Keep the renderer's global metadata accessor in sync with browser edits
-  // (detection scans, render-mode toggles) so placed tiles resolve their mode
-  // from the latest classification.
-  useEffect(() => {
-    setTileMetadataForRender(tileMetadata);
-  }, [tileMetadata]);
+  // One shared store (persistence/tileMetadata.ts) across every mount and the
+  // renderer; writes go through updateTileMetadata, never a local copy.
 
   // Report starred tiles to parent for spine flyout
   const prevStarredRef = useRef<string>('');
@@ -618,94 +601,75 @@ const TileAssetBrowser = memo(({
 
   // Thumbnail requests are driven by virtualizer visibility — see effect after virtualizer setup
 
-  // Auto-predict depth affinity for tiles that don't have one yet (deferred to idle)
+  // Auto-predict depth affinity for tiles that don't have one yet (deferred to
+  // idle). Runs against the LOADED shared store and fills only missing rows
+  // inside the mutator, so it can never save a stale or empty copy over the
+  // library (the 2026-07-30 wipe).
   const predictionRanRef = useRef(false);
   useEffect(() => {
     if (predictionRanRef.current) return;
     if (tilesets.length === 0) return;
 
+    let cancelled = false;
     const run = (): void => {
-      if (predictionRanRef.current) return;
-      const allTiles = tilesets.flatMap(ts => ts.tiles);
-      if (allTiles.length === 0) return;
-      const missing: Array<{ vaultPath: string; depth: TileLayerRole }> = [];
-      for (const tile of allTiles) {
-        const entry = tileMetadata[tile.vaultPath];
-        if (entry?.depthAffinity != null) continue;
-        const { tier, confidence } = predictDepthTier(tile, entry);
-        if (confidence >= 0.4) {
-          missing.push({ vaultPath: tile.vaultPath, depth: tier });
-        }
-      }
-      if (missing.length > 0) {
+      void ensureTileMetadataLoaded(app).then(() => {
+        if (cancelled || predictionRanRef.current) return;
+        const allTiles = tilesets.flatMap(ts => ts.tiles);
+        if (allTiles.length === 0) return;
         predictionRanRef.current = true;
-        // Merge into a FRESH load, never the captured state: an import or
-        // rescan may have rewritten the store since this component mounted,
-        // and saving the stale copy replaces the whole file with it (the
-        // 2026-07-30 wipe: a mount over a corrupt load saved 2046 predicted
-        // rows over the entire library). Re-filter against the fresh store so
-        // fill-missing stays true.
-        void loadTileMetadata(app).then(fresh => {
-          const stillMissing = missing.filter(m => fresh[m.vaultPath]?.depthAffinity == null);
-          if (stillMissing.length === 0) return;
-          const updated = bulkSetDepthAffinity(fresh, stillMissing);
-          setTileMetadata(updated);
-          saveTileMetadataDebounced(app, updated);
+        updateTileMetadata(app, store => {
+          const missing: Array<{ vaultPath: string; depth: TileLayerRole }> = [];
+          for (const tile of allTiles) {
+            const entry = store[tile.vaultPath];
+            if (entry?.depthAffinity != null) continue;
+            const { tier, confidence } = predictDepthTier(tile, entry);
+            if (confidence >= 0.4) missing.push({ vaultPath: tile.vaultPath, depth: tier });
+          }
+          return missing.length > 0 ? bulkSetDepthAffinity(store, missing) : store;
         });
-      } else if (allTiles.some(t => tileMetadata[t.vaultPath]?.depthAffinity != null)) {
-        predictionRanRef.current = true;
-      }
+      });
     };
 
     const id = typeof requestIdleCallback === 'function'
       ? requestIdleCallback(run)
       : window.setTimeout(run, 200);
     return () => {
+      cancelled = true;
       if (typeof cancelIdleCallback === 'function') { cancelIdleCallback(id); } else { window.clearTimeout(id); }
     };
-  }, [tilesets, tileMetadata, app]);
+  }, [tilesets, app]);
 
   // Eager detection scan: caches per-tile alpha coverage + opaque bounds + natural
   // dims (decoupled from thumbnails, which are lazy + LRU-evicted). Signals only —
   // render-mode/footprint predictions are applied at import time, never bulk-persisted
-  // for an existing library (see comment inside).
-  const detectionScanRanRef = useRef(false);
+  // for an existing library (2026-06-09: 304 tiles silently flipped to 'region',
+  // breaking placed terrain; per-tile metadata outranks the per-tileset setting).
+  // Keyed on tilesets only (STRUCT-A-12): a metadata change mid-scan no longer
+  // aborts it. Paths are claimed module-wide so several mounts scan each tile once.
   useEffect(() => {
-    if (detectionScanRanRef.current) return;
     if (tilesets.length === 0) return;
 
     const controller = new AbortController();
+    let claimed: string[] = [];
     const run = async (): Promise<void> => {
-      if (detectionScanRanRef.current) return;
-      detectionScanRanRef.current = true;
-
-      const allTiles = tilesets.flatMap(ts => ts.tiles);
-      const needsScan = allTiles
+      const store = await ensureTileMetadataLoaded(app);
+      if (controller.signal.aborted) return;
+      const needsScan = tilesets
+        .flatMap(ts => ts.tiles)
         .filter(t => {
-          const e = tileMetadata[t.vaultPath];
+          const e = store[t.vaultPath];
           // Re-scan entries missing either signal — older scans cached
           // alphaCoverage/opaque bounds but not the natural dims footprint needs.
           return e?.alphaCoverage == null || e?.srcW == null;
         })
         .map(t => t.vaultPath);
-      const scanned = needsScan.length > 0
-        ? await runDetectionScan(app, needsScan, { concurrency: 4, signal: controller.signal })
-        : [];
+      claimed = claimDetectionScanPaths(needsScan);
+      if (claimed.length === 0) return;
+      const scanned = await runDetectionScan(app, claimed, { concurrency: 4, signal: controller.signal });
       if (controller.signal.aborted) return;
-
-      setTileMetadata(prev => {
-        // Signals only. Render-mode and footprint PREDICTIONS must not be
-        // persisted here: per-tile metadata outranks the per-tileset setting in
-        // resolveTileRender, so bulk-writing predictions for an existing library
-        // retroactively changes how already-placed tiles render on every device
-        // the metadata file syncs to (2026-06-09: 304 tiles silently flipped to
-        // 'region', breaking placed terrain). Predictions are applied at import
-        // time (DungeondraftImportModal), where no placements exist yet.
-        if (scanned.length === 0) return prev;
-        const updated = bulkSetDetectionSignals(prev, scanned);
-        saveTileMetadataDebounced(app, updated);
-        return updated;
-      });
+      claimed = [];
+      if (scanned.length === 0) return;
+      updateTileMetadata(app, prev => bulkSetDetectionSignals(prev, scanned));
     };
 
     const id = typeof requestIdleCallback === 'function'
@@ -713,9 +677,11 @@ const TileAssetBrowser = memo(({
       : window.setTimeout(() => void run(), 400);
     return () => {
       controller.abort();
+      releaseDetectionScanPaths(claimed);
+      claimed = [];
       if (typeof cancelIdleCallback === 'function') { cancelIdleCallback(id); } else { window.clearTimeout(id); }
     };
-  }, [tilesets, tileMetadata, app]);
+  }, [tilesets, app]);
 
   // Merge all tileset tiles into a single pool. Wall/path strips are browsable
   // (selecting one arms the wall tool); their `_end` caps stay hidden — caps
@@ -1289,7 +1255,6 @@ const TileAssetBrowser = memo(({
           allTiles={allTiles}
           tileToTilesetId={tileToTilesetId}
           tileMetadata={tileMetadata}
-          setTileMetadata={setTileMetadata}
           mergedCategoryLookup={mergedCategories.lookup}
           getThumbUrl={getThumbUrl}
           requestThumbs={requestThumbs}
@@ -1357,7 +1322,6 @@ const TileAssetBrowser = memo(({
           onArtOffsetChange={onTilesetArtOffsetChange}
           onArtScaleChange={onTilesetArtScaleChange}
           isGrid={isGrid}
-          setTileMetadata={setTileMetadata}
         />
       )}
 

@@ -11,9 +11,16 @@
  * before every async save that runs at a dangerous moment. If the save landed,
  * the entry is cleared; if it didn't, the next load offers to restore it.
  *
- * Three slots per map, so no one of them can disable another:
- *  - live (`windrose-journal:<id>`): the newest unconfirmed edits. Written by
- *    every journaling path, cleared by every landed save.
+ * Three kinds of slot per map, so no one of them can disable another:
+ *  - live: the newest unconfirmed edits, ONE SLOT PER WRITER (mounted
+ *    instance), so pane A's landed save can never erase pane B's crash copy.
+ *    Written before every save (useDebouncedSave) and by every shutdown
+ *    path; cleared by that writer's own landed save, and only when the
+ *    landed version is at least the journaled one. The payload is stored
+ *    unwrapped under `windrose-journal:<slot>` (one escaping level, MEM-22)
+ *    with a small metadata record under `windrose-journal-meta:<slot>`;
+ *    payloads over RAW_PAYLOAD_LIMIT are deflated (DATA-05). The writerless
+ *    slot `<mapId>` holds restored entries until the next landed save.
  *  - kept (`windrose-journal-kept:<id>`): entries the user deferred with "Keep
  *    for later". Routine saves never touch them; never aged out.
  *  - conflict (`windrose-journal-conflict:<id>`): edits refused as stale when
@@ -25,13 +32,18 @@
 
 import type { MapData } from '#types/core/map.types';
 import type { App } from 'obsidian';
-import { Modal } from 'obsidian';
+import { deflateSync, inflateSync, strFromU8, strToU8 } from 'fflate';
+import { Modal, Notice } from 'obsidian';
 
 import { canonicalizeTileIds, isMapTombstoned, readRawMapEntry } from './fileOperations';
 import { isNewerSchema, migrateMapData } from './schemaMigration';
 
 const JOURNAL_KEY_PREFIX = 'windrose-journal:';
+/** Metadata for a live slot (LiveMeta). Absent for a legacy v1 entry. */
+const JOURNAL_META_PREFIX = 'windrose-journal-meta:';
+/** Live index: slot ids (`<mapId>` or `<mapId>@@<writerId>`). */
 const JOURNAL_INDEX_KEY = 'windrose-journal-index';
+const WRITER_SEPARATOR = '@@';
 /** "Keep for later" entries (an array per map; see KEPT_MAX_PER_MAP). */
 const KEPT_KEY_PREFIX = 'windrose-journal-kept:';
 const KEPT_INDEX_KEY = 'windrose-journal-kept-index';
@@ -47,11 +59,32 @@ const JOURNAL_VERSION = 1;
  */
 const KEPT_MAX_PER_MAP = 5;
 
+/** Live payloads up to this many characters are stored as plain JSON; larger ones are deflated. */
+const RAW_PAYLOAD_LIMIT = 1_000_000;
+
 /**
- * Entries larger than this are skipped: localStorage quota is a few MB per
- * origin and a failed quota write would evict OTHER maps' journals.
+ * Stored (possibly compressed) live payloads larger than this are refused.
+ * localStorage holds UTF-16 (~2 bytes/char) in a ~5 MB origin quota shared
+ * with Obsidian (iOS). A refusal is surfaced once per map per session.
  */
-const MAX_JOURNAL_PAYLOAD = 2_000_000;
+const MAX_JOURNAL_PAYLOAD = 1_500_000;
+
+const LIVE_META_VERSION = 2;
+
+type PayloadEncoding = 'json' | 'deflate64';
+
+/** Metadata of a live slot, stored separately so reading it never touches the payload. */
+interface LiveMeta {
+  v: number;
+  mapId: string;
+  writerId: string | null;
+  savedAt: number;
+  /** The writer's save version (useDebouncedSave saveVersionRef); null when unknown. */
+  version: number | null;
+  enc: PayloadEncoding;
+  /** Stored payload length, to detect a payload/meta pair torn by a quota failure. */
+  len: number;
+}
 
 /** Live entries older than a week are assumed abandoned (kept/conflict are not aged out). */
 const JOURNAL_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -60,8 +93,15 @@ interface JournalEntry {
   v: number;
   mapId: string;
   savedAt: number;
-  /** JSON.stringify of the pending MapData, post-canonicalization. */
+  /** JSON.stringify of the pending MapData, post-canonicalization (always decoded). */
   payload: string;
+}
+
+/** A live entry plus where it lives. */
+interface LiveEntry extends JournalEntry {
+  slot: string;
+  writerId: string | null;
+  version: number | null;
 }
 
 /** What the user chose in the restore prompt. */
@@ -69,10 +109,6 @@ type JournalChoice = 'restore' | 'discard' | 'keep';
 
 /** Which slot a load-time candidate came from. */
 type JournalSource = 'live' | 'kept' | 'conflict';
-
-function journalKey(mapId: string): string {
-  return JOURNAL_KEY_PREFIX + mapId;
-}
 
 function readIdList(app: App, key: string): string[] {
   try {
@@ -127,49 +163,145 @@ function readSlot(app: App, key: string, mapId: string): JournalEntry | null {
   }
 }
 
+function slotId(mapId: string, writerId?: string | null): string {
+  return writerId != null && writerId !== '' ? mapId + WRITER_SEPARATOR + writerId : mapId;
+}
+
+function mapIdOfSlot(slot: string): string {
+  const at = slot.indexOf(WRITER_SEPARATOR);
+  return at < 0 ? slot : slot.slice(0, at);
+}
+
+/** Live slots of `mapId` named in the index (plus the writerless slot). */
+function liveSlotsFor(app: App, mapId: string): string[] {
+  const slots = readIndex(app).filter(s => mapIdOfSlot(s) === mapId);
+  return slots.includes(mapId) ? slots : [...slots, mapId];
+}
+
+function encodePayload(json: string): { enc: PayloadEncoding; data: string } {
+  if (json.length <= RAW_PAYLOAD_LIMIT) return { enc: 'json', data: json };
+  // Base64 never needs JSON escaping; map JSON deflates roughly tenfold.
+  return { enc: 'deflate64', data: btoa(strFromU8(deflateSync(strToU8(json), { level: 6 }), true)) };
+}
+
+function decodePayload(enc: PayloadEncoding, data: string): string {
+  return enc === 'deflate64' ? strFromU8(inflateSync(strToU8(atob(data), true))) : data;
+}
+
+function readMeta(app: App, slot: string): LiveMeta | null {
+  try {
+    const raw = app.loadLocalStorage(JOURNAL_META_PREFIX + slot) as string | null;
+    if (raw == null || raw === '') return null;
+    const meta = JSON.parse(raw) as Partial<LiveMeta>;
+    if (meta.v !== LIVE_META_VERSION || typeof meta.len !== 'number') return null;
+    return {
+      v: LIVE_META_VERSION,
+      mapId: typeof meta.mapId === 'string' ? meta.mapId : mapIdOfSlot(slot),
+      writerId: typeof meta.writerId === 'string' ? meta.writerId : null,
+      savedAt: typeof meta.savedAt === 'number' ? meta.savedAt : 0,
+      version: typeof meta.version === 'number' ? meta.version : null,
+      enc: meta.enc === 'deflate64' ? 'deflate64' : 'json',
+      len: meta.len,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** One live slot, decoded; null when absent, torn or unusable. Reads legacy v1 entries too. */
+function readLiveSlot(app: App, slot: string): LiveEntry | null {
+  try {
+    const stored = app.loadLocalStorage(JOURNAL_KEY_PREFIX + slot) as string | null;
+    if (stored == null || stored === '') return null;
+    const meta = readMeta(app, slot);
+    if (meta == null) {
+      // Legacy (pre-split) entry: the whole JournalEntry JSON under the payload key.
+      const legacy = parseEntry(JSON.parse(stored) as unknown, mapIdOfSlot(slot));
+      return legacy != null ? { ...legacy, slot, writerId: null, version: null } : null;
+    }
+    if (stored.length !== meta.len) return null;
+    return {
+      v: JOURNAL_VERSION, mapId: meta.mapId, savedAt: meta.savedAt,
+      payload: decodePayload(meta.enc, stored), slot, writerId: meta.writerId, version: meta.version,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function removeLiveSlot(app: App, slot: string): void {
+  try {
+    app.saveLocalStorage(JOURNAL_KEY_PREFIX + slot, null);
+    app.saveLocalStorage(JOURNAL_META_PREFIX + slot, null);
+    removeFromIdList(app, JOURNAL_INDEX_KEY, slot);
+  } catch (e) {
+    console.debug('[Windrose] Save journal clear failed:', e);
+  }
+}
+
+/** Maps already told (this session) that their journal is too large. */
+const tooLargeWarned = new Set<string>();
+
+function warnJournalTooLarge(mapId: string, size: number): void {
+  console.warn('[Windrose] Save journal skipped, payload too large even compressed:', mapId, size);
+  if (tooLargeWarned.has(mapId)) return;
+  tooLargeWarned.add(mapId);
+  new Notice(
+    'Windrose: this map is too large for its crash-recovery copy. Saves and backups still protect it, ' +
+    'but edits made in the seconds before a crash cannot be recovered.',
+    10_000
+  );
+}
+
 /**
- * Journal `pendingData` for `mapId` into the LIVE slot. Synchronous by
- * construction — call it BEFORE firing the async save it protects.
+ * Write one live slot. Index first (it is how the slot is found again), then
+ * payload, then metadata. Never deletes an older entry first: on a quota
+ * failure the previous copy (if any) stays as it was.
+ */
+function writeLiveSlot(app: App, mapId: string, writerId: string | null, version: number | null, json: string, savedAt: number): boolean {
+  const { enc, data } = encodePayload(json);
+  if (data.length > MAX_JOURNAL_PAYLOAD) {
+    warnJournalTooLarge(mapId, json.length);
+    return false;
+  }
+  const slot = slotId(mapId, writerId);
+  const meta: LiveMeta = { v: LIVE_META_VERSION, mapId, writerId, savedAt, version, enc, len: data.length };
+  try {
+    addToIdList(app, JOURNAL_INDEX_KEY, slot);
+    app.saveLocalStorage(JOURNAL_KEY_PREFIX + slot, data);
+    app.saveLocalStorage(JOURNAL_META_PREFIX + slot, JSON.stringify(meta));
+    return true;
+  } catch (e) {
+    console.warn('[Windrose] Save journal write failed (storage full?) for map:', mapId, e);
+    return false;
+  }
+}
+
+/**
+ * Journal `pendingData` for `mapId` into the writer's LIVE slot. Synchronous
+ * by construction — call it BEFORE firing the async save it protects.
+ *
+ * `writerId` is the mounted instance (one slot each); `version` is the
+ * writer's save version, so an older save settling cannot clear a newer
+ * entry (see clearJournal). Both optional: without a writer the shared
+ * writerless slot is used.
  *
  * Returns true only when the entry was actually written. False means nothing
- * protects these edits (payload over MAX_JOURNAL_PAYLOAD, quota, or a
- * serialization error); callers must not report a recovery copy.
+ * protects these edits (too large even compressed, quota, or a serialization
+ * error); callers must not report a recovery copy.
  */
-function journalPending(app: App, mapId: string, pendingData: MapData): boolean {
+function journalPending(
+  app: App,
+  mapId: string,
+  pendingData: MapData,
+  options?: { writerId?: string; version?: number }
+): boolean {
   try {
     // Match what saveMapData would write, so the on-disk comparison at load
     // time is a plain string equality. Canonicalizes a copy; the live tree is
     // never edited.
-    const payload = JSON.stringify(canonicalizeTileIds(pendingData));
-
-    if (payload.length > MAX_JOURNAL_PAYLOAD) {
-      console.debug('[Windrose] Save journal skipped, payload too large:', payload.length);
-      return false;
-    }
-
-    const entry: JournalEntry = { v: JOURNAL_VERSION, mapId, savedAt: Date.now(), payload };
-    const serialized = JSON.stringify(entry);
-
-    try {
-      app.saveLocalStorage(journalKey(mapId), serialized);
-    } catch {
-      // Quota: drop this map's own live entry (the biggest thing we're
-      // allowed to evict; never a kept or conflict entry) and try once more.
-      try {
-        removeJournalEntry(app, mapId);
-        app.saveLocalStorage(journalKey(mapId), serialized);
-      } catch {
-        console.debug('[Windrose] Save journal write failed, giving up for map:', mapId);
-        return false;
-      }
-    }
-
-    try {
-      addToIdList(app, JOURNAL_INDEX_KEY, mapId);
-    } catch {
-      /* index is a convenience for pruning; a lost update is harmless */
-    }
-    return true;
+    const json = JSON.stringify(canonicalizeTileIds(pendingData));
+    return writeLiveSlot(app, mapId, options?.writerId ?? null, options?.version ?? null, json, Date.now());
   } catch (e) {
     console.debug('[Windrose] Save journal skipped:', e);
     return false;
@@ -177,13 +309,33 @@ function journalPending(app: App, mapId: string, pendingData: MapData): boolean 
 }
 
 /**
- * Drop the LIVE journal entry for `mapId` (called after any landed save).
+ * Drop LIVE journal entries for `mapId` after a landed (or refused) save.
+ *
+ * With `writerId`: only that writer's slot (plus the shared writerless slot,
+ * which holds a restored entry), and with `upToVersion` only when the slot's
+ * journaled version is not newer than the save that landed. Without
+ * `writerId`: every live slot of the map.
+ *
  * Kept and conflict entries are untouched unless `includeKept` is set: only an
  * explicit decision (the map being deleted) may pass it, and it then clears
  * every slot for the map.
  */
-function clearJournal(app: App, mapId: string, options?: { includeKept?: boolean }): void {
-  removeJournalEntry(app, mapId);
+function clearJournal(
+  app: App,
+  mapId: string,
+  options?: { writerId?: string; upToVersion?: number; includeKept?: boolean }
+): void {
+  const writerId = options?.writerId;
+  if (writerId != null && options?.includeKept !== true) {
+    const own = slotId(mapId, writerId);
+    const ownVersion = readMeta(app, own)?.version ?? null;
+    if (options?.upToVersion == null || ownVersion == null || ownVersion <= options.upToVersion) {
+      removeLiveSlot(app, own);
+    }
+    removeLiveSlot(app, mapId);
+  } else {
+    for (const slot of liveSlotsFor(app, mapId)) removeLiveSlot(app, slot);
+  }
   if (options?.includeKept === true) {
     removeKeptEntries(app, mapId);
     removeConflictEntry(app, mapId);
@@ -195,21 +347,22 @@ function isJournalKept(app: App, mapId: string): boolean {
   return readKeptEntries(app, mapId).length > 0;
 }
 
-function removeJournalEntry(app: App, mapId: string): void {
-  try {
-    app.saveLocalStorage(journalKey(mapId), null);
-    const index = readIndex(app);
-    if (index.includes(mapId)) {
-      writeIndex(app, index.filter(id => id !== mapId));
-    }
-  } catch (e) {
-    console.debug('[Windrose] Save journal clear failed:', e);
-  }
+/** Every live entry of `mapId`, newest first. */
+function readLiveEntries(app: App, mapId: string): LiveEntry[] {
+  return liveSlotsFor(app, mapId)
+    .map(slot => readLiveSlot(app, slot))
+    .filter((e): e is LiveEntry => e != null)
+    .sort((a, b) => b.savedAt - a.savedAt);
 }
 
-/** The LIVE journal entry for `mapId`, or null when absent/unusable. */
-function readJournal(app: App, mapId: string): JournalEntry | null {
-  return readSlot(app, journalKey(mapId), mapId);
+/** The newest LIVE journal entry for `mapId` (any writer), or null. */
+function readJournal(app: App, mapId: string): LiveEntry | null {
+  return readLiveEntries(app, mapId)[0] ?? null;
+}
+
+/** Strip slot bookkeeping before storing an entry in the kept/conflict slots. */
+function plainEntry(e: JournalEntry): JournalEntry {
+  return { v: JOURNAL_VERSION, mapId: e.mapId, savedAt: e.savedAt, payload: e.payload };
 }
 
 // -------------------------------------------
@@ -282,22 +435,18 @@ type ConflictMoveResult = 'moved' | 'nothing' | 'failed';
  * the next load offer it as ordinary unsaved changes, a default-button
  * clobber of the other pane's work. The caller must say nothing was kept.
  */
-function moveJournalToConflict(app: App, mapId: string): ConflictMoveResult {
-  let raw: string | null;
+function moveJournalToConflict(app: App, mapId: string, writerId?: string): ConflictMoveResult {
+  const slot = slotId(mapId, writerId);
+  const entry = readLiveSlot(app, slot);
+  if (entry == null) return 'nothing';
   try {
-    raw = app.loadLocalStorage(journalKey(mapId)) as string | null;
-  } catch {
-    return 'failed';
-  }
-  if (raw == null || raw === '') return 'nothing';
-  try {
-    app.saveLocalStorage(CONFLICT_KEY_PREFIX + mapId, raw);
+    app.saveLocalStorage(CONFLICT_KEY_PREFIX + mapId, JSON.stringify(plainEntry(entry)));
     addToIdList(app, CONFLICT_INDEX_KEY, mapId);
-    removeJournalEntry(app, mapId);
+    removeLiveSlot(app, slot);
     return 'moved';
   } catch (e) {
     console.warn('[Windrose] Moving journal entry to conflict key failed, dropping it:', e);
-    removeJournalEntry(app, mapId);
+    removeLiveSlot(app, slot);
     return 'failed';
   }
 }
@@ -335,15 +484,16 @@ function pruneJournal(app: App, options?: { liveMapIds?: string[] }): void {
     const now = Date.now();
     const kept: string[] = [];
 
-    for (const mapId of index) {
-      const entry = readJournal(app, mapId);
+    for (const slot of index) {
+      const entry = readLiveSlot(app, slot);
       const stale = entry == null
         || now - entry.savedAt > JOURNAL_MAX_AGE_MS
-        || (live != null && !live.has(mapId));
+        || (live != null && !live.has(mapIdOfSlot(slot)));
       if (stale) {
-        app.saveLocalStorage(journalKey(mapId), null);
+        app.saveLocalStorage(JOURNAL_KEY_PREFIX + slot, null);
+        app.saveLocalStorage(JOURNAL_META_PREFIX + slot, null);
       } else {
-        kept.push(mapId);
+        kept.push(slot);
       }
     }
     if (kept.length !== index.length) writeIndex(app, kept);
@@ -456,11 +606,13 @@ class JournalRestoreModal extends Modal {
 interface JournalCandidate {
   source: JournalSource;
   entry: JournalEntry;
+  /** Live slot id (live candidates only). */
+  slot?: string;
 }
 
 /** Remove one candidate from its slot. */
 function dropCandidate(app: App, mapId: string, c: JournalCandidate): void {
-  if (c.source === 'live') removeJournalEntry(app, mapId);
+  if (c.source === 'live') removeLiveSlot(app, c.slot ?? mapId);
   else if (c.source === 'conflict') removeConflictEntry(app, mapId);
   else {
     try {
@@ -479,7 +631,7 @@ function keepCandidate(app: App, mapId: string, c: JournalCandidate): void {
   if (c.source !== 'live') return;
   // If the kept slot cannot take it, the entry stays live (it is offered
   // again next load, but new journaling may replace it).
-  if (addKeptEntry(app, mapId, c.entry)) removeJournalEntry(app, mapId);
+  if (addKeptEntry(app, mapId, plainEntry(c.entry))) removeLiveSlot(app, c.slot ?? mapId);
 }
 
 /**
@@ -534,8 +686,8 @@ async function resolveJournalOnLoad(
   prompt?: (savedAt: number, mapLabel: string, source: JournalSource) => Promise<JournalChoice>
 ): Promise<MapData | null> {
   const candidates: JournalCandidate[] = [];
-  const liveEntry = readJournal(app, mapId);
-  if (liveEntry != null) candidates.push({ source: 'live', entry: liveEntry });
+  // One live candidate per writer slot (several panes may have crashed), newest first.
+  for (const entry of readLiveEntries(app, mapId)) candidates.push({ source: 'live', entry, slot: entry.slot });
   for (const entry of [...readKeptEntries(app, mapId)].reverse()) candidates.push({ source: 'kept', entry });
   const conflictEntry = readConflictJournal(app, mapId);
   if (conflictEntry != null) candidates.push({ source: 'conflict', entry: conflictEntry });
@@ -572,18 +724,13 @@ async function resolveJournalOnLoad(
 
     // Deliberately NOT cleared. The restored data still only exists in
     // memory; the debounced save that follows clears the LIVE entry once it
-    // lands. A kept/conflict entry is moved into the live slot for exactly
-    // that, so the app dying before the save still leaves a copy.
-    if (c.source !== 'live') {
-      try {
-        app.saveLocalStorage(journalKey(mapId), JSON.stringify(c.entry));
-        addToIdList(app, JOURNAL_INDEX_KEY, mapId);
-        dropCandidate(app, mapId, c);
-      } catch (e) {
-        // Leave it in its slot; the landing save will not clear it, so it is
-        // offered once more (and compares clean if the save landed).
-        console.debug('[Windrose] Could not move the restored entry to the live slot:', e);
-      }
+    // lands. Any other slot (kept, conflict, or a dead writer's live slot) is
+    // moved into the shared writerless live slot, which every landed save
+    // clears, so the app dying before the save still leaves a copy. If the
+    // move fails the entry stays where it was and is offered once more
+    // (comparing clean once the save has landed).
+    if (c.source !== 'live' || c.slot !== mapId) {
+      if (writeLiveSlot(app, mapId, null, null, c.entry.payload, c.entry.savedAt)) dropCandidate(app, mapId, c);
     }
     return restored;
   }
@@ -606,8 +753,10 @@ export {
   JOURNAL_MAX_AGE_MS,
   JOURNAL_INDEX_KEY,
   JOURNAL_KEY_PREFIX,
+  JOURNAL_META_PREFIX,
+  RAW_PAYLOAD_LIMIT,
   KEPT_KEY_PREFIX,
   KEPT_MAX_PER_MAP,
   CONFLICT_KEY_PREFIX,
 };
-export type { JournalEntry, JournalChoice, JournalSource, ConflictMoveResult };
+export type { JournalEntry, LiveEntry, JournalChoice, JournalSource, ConflictMoveResult };

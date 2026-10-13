@@ -70,3 +70,39 @@ describe('cloneLayer ids and coverage', () => {
     expect(JSON.stringify(map.layers[0])).toBe(before);
   });
 });
+
+describe('cloneLayer object links (Parallax follow-up)', () => {
+  function linkedMap(): MapData {
+    const map = sourceMap();
+    const other = { ...map.layers[0], id: 'other', order: 5, objects: [] } as MapLayer;
+    map.layers[0].objects = [
+      { id: 'obj-a', type: 'door', position: { x: 0, y: 0 }, layerId: 'src', linkedObject: { layerId: 'src', objectId: 'obj-b', position: { x: 1, y: 1 } } },
+      { id: 'obj-b', type: 'door', position: { x: 1, y: 1 }, linkedObject: { layerId: 'src', objectId: 'obj-a', position: { x: 0, y: 0 } } },
+      { id: 'obj-c', type: 'stairs', position: { x: 2, y: 2 }, linkedObject: { layerId: 'other', objectId: 'obj-z', position: { x: 0, y: 0 } } },
+    ] as unknown as MapLayer['objects'];
+    other.objects = [
+      { id: 'obj-z', type: 'stairs', position: { x: 0, y: 0 }, linkedObject: { layerId: 'src', objectId: 'obj-c', position: { x: 2, y: 2 } } },
+    ] as unknown as MapLayer['objects'];
+    map.layers.push(other);
+    return map;
+  }
+
+  it('remaps links inside the source layer to the cloned partners', () => {
+    const clone = cloneOf(linkedMap(), 'all');
+    const [a, b] = clone.objects;
+    expect(a.linkedObject).toMatchObject({ layerId: clone.id, objectId: b.id });
+    expect(b.linkedObject).toMatchObject({ layerId: clone.id, objectId: a.id });
+    expect(a.layerId).toBe(clone.id);
+  });
+
+  it('drops links to another layer and leaves the original pair intact', () => {
+    const map = linkedMap();
+    const next = cloneLayer(map, 'src', 'all');
+    const clone = next.layers.find(l => l.id === next.activeLayerId) as MapLayer;
+    expect(clone.objects[2].linkedObject).toBeUndefined();
+    const z = (next.layers.find(l => l.id === 'other') as MapLayer).objects[0];
+    expect(z.linkedObject).toMatchObject({ layerId: 'src', objectId: 'obj-c' });
+    const c = (next.layers.find(l => l.id === 'src') as MapLayer).objects[2];
+    expect(c.linkedObject).toMatchObject({ layerId: 'other', objectId: 'obj-z' });
+  });
+});

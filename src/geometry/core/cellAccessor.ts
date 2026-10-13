@@ -17,7 +17,6 @@
 
  
 
-// Type-only imports - stripped at runtime
 import type { Point } from '#types/core/geometry.types';
 import type {
   Cell,
@@ -33,6 +32,7 @@ import type {
 } from '#types/core/cell.types';
 import type { IGeometry } from '#types/core/geometry.types';
 
+import { isGridCell, hasSegments, isSimpleCell } from '#types/core/cell.types';
 import { SEGMENT_NAMES } from '../../core/dmtConstants';
 
 // Re-export types for consumers
@@ -67,40 +67,6 @@ export type {
  */
 function isGridGeometry(geometry: IGeometry): boolean {
   return geometry.type === 'grid';
-}
-
-// ============================================================================
-// TYPE GUARDS (re-implemented locally to avoid import issues at runtime)
-// ============================================================================
-
-/**
- * Check if cell is a grid cell (has x, y)
- */
-function isGridCell(cell: Cell): cell is GridCell {
-  return 'x' in cell && 'y' in cell;
-}
-
-/**
- * Check if cell is a hex cell (has q, r)
- */
-function isHexCell(cell: Cell): cell is HexCell {
-  return 'q' in cell && 'r' in cell;
-}
-
-/**
- * Check if cell has partial fill (segments)
- */
-function hasSegments(cell: Cell): cell is SegmentGridCell {
-  return isGridCell(cell) && 
-    cell.segments !== undefined && 
-    Object.keys(cell.segments).length > 0;
-}
-
-/**
- * Check if cell is a simple (full) cell
- */
-function isSimpleCell(cell: Cell): boolean {
-  return !hasSegments(cell);
 }
 
 // ============================================================================
@@ -493,7 +459,7 @@ function getLocalCellPosition(
 
 export { // Geometry type detection
   isGridGeometry, // Type guards
-  isGridCell, isHexCell, hasSegments, isSimpleCell, // Coordinate utilities
+  // Coordinate utilities
   cellKey, cellKeyFromCell, cellToPoint, // Query functions
   getCellAt, getCellIndex, cellExists, buildCellMap, // Modification functions (immutable)
   setCell, removeCell, setCells, removeCellsInBounds, // Segment support (partial cell painting)

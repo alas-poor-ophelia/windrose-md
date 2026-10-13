@@ -2,6 +2,9 @@ import type { App, TextComponent } from 'obsidian';
 import { Modal, Setting, Notice, setTooltip } from 'obsidian';
 import { DungeonEssenceVisualizer } from '../DungeonEssenceVisualizer';
 import { resolveDungeonStyleColors } from '../../generation/dungeonStyleColors';
+import { generateDungeon } from '../../generation/dungeonGenerator';
+import type { DungeonResult } from '../../generation/dungeonGenerator';
+import { stockDungeon } from '../../generation/objectPlacer';
 
 type DungeonSize = 'small' | 'medium' | 'large';
 type DungeonStyleName = 'classic' | 'cavern' | 'fortress' | 'crypt';
@@ -51,29 +54,6 @@ interface SliderRef {
   formatFn: (v: number) => string;
 }
 
-interface DungeonGenerationResult {
-  cells: Array<Record<string, unknown>>;
-  objects: Array<Record<string, unknown>>;
-  edges: unknown[];
-  metadata: {
-    rooms: unknown[];
-    connections: unknown[];
-    gridWidth: number;
-    gridHeight: number;
-    roomCount: number;
-    doorCount: number;
-    secretDoorCount: number;
-    hasWideCorridors: boolean;
-    hasDiagonalCorridors: boolean;
-    entryRoomId?: string;
-    exitRoomId?: string;
-    waterRoomIds: string[];
-    corridorResult: unknown;
-    doorPositions: unknown[];
-    style: string;
-  };
-}
-
 interface StockResult {
   objects: Record<string, unknown>[];
   roomAssignments: Record<string, unknown>;
@@ -90,9 +70,9 @@ interface DungeonInsertOptions {
     rooms: unknown[];
     corridorResult: unknown;
     doorPositions: unknown[];
-    entryRoomId?: string;
-    exitRoomId?: string;
-    waterRoomIds: string[];
+    entryRoomId?: number | string;
+    exitRoomId?: number | string;
+    waterRoomIds: Array<number | string>;
     style: string;
   };
   [key: string]: unknown;
@@ -105,14 +85,6 @@ type OnInsertCallback = (
   edges: unknown[],
   options: DungeonInsertOptions
 ) => void | Promise<void>;
-
-interface WindrosePlugin {
-  // Method syntax (not property-arrow) so parameters are checked bivariantly:
-  // the concrete plugin's typed generateDungeon/stockDungeon signatures stay
-  // assignable to this structural duck-type without resorting to `any`.
-  loadDungeonGenerator(): Promise<{ generateDungeon(...args: unknown[]): unknown }>;
-  loadObjectPlacer(): Promise<{ stockDungeon(...args: unknown[]): unknown }>;
-}
 
 const DUNGEON_STYLE_DEFAULTS: Record<DungeonStyleName, DungeonStyleDefaults> = {
   classic: {
@@ -137,15 +109,14 @@ const DUNGEON_STYLE_DEFAULTS: Record<DungeonStyleName, DungeonStyleDefaults> = {
   }
 };
 
-async function stockGeneratedDungeon(plugin: WindrosePlugin, result: DungeonGenerationResult, overrides: Record<string, unknown>): Promise<StockResult> {
-  const objectPlacer = await plugin.loadObjectPlacer();
-  const stockResult = objectPlacer.stockDungeon(
+function stockGeneratedDungeon(result: DungeonResult, overrides: Record<string, unknown>): StockResult {
+  const stockResult = stockDungeon(
     result.metadata.rooms,
     result.metadata.corridorResult,
     result.metadata.doorPositions,
     result.metadata.style || 'classic',
     {
-      objectDensity: (overrides.objectDensity as number | undefined) ?? 1.0,
+      objectDensity: overrides.objectDensity ?? 1.0,
       monsterWeight: overrides.monsterWeight,
       emptyWeight: overrides.emptyWeight,
       featureWeight: overrides.featureWeight,
@@ -162,7 +133,6 @@ async function stockGeneratedDungeon(plugin: WindrosePlugin, result: DungeonGene
 }
 
 class InsertDungeonModal extends Modal {
-  private plugin: WindrosePlugin;
   private onInsert: OnInsertCallback;
   private mapName: string;
   private dungeonSize: DungeonSize | null;
@@ -176,9 +146,8 @@ class InsertDungeonModal extends Modal {
   private configOverrides: ConfigOverrides;
   private nameInput: TextComponent | null;
 
-  constructor(app: App, plugin: WindrosePlugin, onInsert: OnInsertCallback) {
+  constructor(app: App, onInsert: OnInsertCallback) {
     super(app);
-    this.plugin = plugin;
     this.onInsert = onInsert;
     this.mapName = '';
     this.dungeonSize = null;
@@ -253,14 +222,14 @@ class InsertDungeonModal extends Modal {
   async generateAndInsert(): Promise<void> {
     if (!this.dungeonSize) return;
     try {
-      const generator = await this.plugin.loadDungeonGenerator();
       const overrides = this.buildGenerationOverrides();
 
-      const result = generator.generateDungeon(this.dungeonSize, undefined, overrides) as DungeonGenerationResult;
-      const stockResult = await stockGeneratedDungeon(this.plugin, result, overrides);
-      const allObjects = [...result.objects, ...stockResult.objects];
+      const result = generateDungeon(this.dungeonSize, undefined, overrides);
+      const stockResult = stockGeneratedDungeon(result, overrides);
+      const allObjects = [...result.objects, ...stockResult.objects].map(obj => ({ ...obj }));
 
-      await this.onInsert(this.mapName, result.cells, allObjects, result.edges ?? [], {
+      // Spread copies: the callback takes plain records, which interface types are not
+      await this.onInsert(this.mapName, result.cells.map(cell => ({ ...cell })), allObjects, result.edges ?? [], {
         distancePerCell: this.distancePerCell,
         distanceUnit: this.distanceUnit,
         preset: this.dungeonSize,

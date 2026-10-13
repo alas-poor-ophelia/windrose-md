@@ -17,7 +17,7 @@ import type { Cell, CellMap, SegmentName } from '#types/core/cell.types';
 import type { CornerName, DiagonalDirection } from '../core/dmtConstants';
 
 import { CORNER_SEGMENT_FILL, CORNER_NEIGHBOR_CHECKS, CORNER_DIAGONAL_DIRECTION } from '../core/dmtConstants';
-import { isSimpleCell, hasSegments } from '../geometry/core/cellAccessor';
+import { isSimpleCell, hasSegments } from '#types/core/cell.types';
 
 
 // ===========================================

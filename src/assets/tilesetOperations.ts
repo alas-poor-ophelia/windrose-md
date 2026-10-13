@@ -82,7 +82,22 @@ function autoDetectOverflow(tileWidth: number, tileHeight: number): {
  * listing instead of vault.getFiles() which walks every file in the vault.
  * Returns TileEntry[] with subfolder-based categories.
  */
+// In-flight scans keyed by normalized folder (MEM-11): a settings save
+// rebuilds tilesets in EVERY mounted map at once; concurrent requests for the
+// same folder share one walk. Each caller gets its own array copy.
+const inFlightScans = new Map<string, Promise<TileEntry[]>>();
+
 async function scanTilesetFolder(app: App, folderPath: string): Promise<TileEntry[]> {
+  const key = folderPath.endsWith('/') ? folderPath.slice(0, -1) : folderPath;
+  let scan = inFlightScans.get(key);
+  if (scan == null) {
+    scan = walkTilesetFolder(app, key).finally(() => { inFlightScans.delete(key); });
+    inFlightScans.set(key, scan);
+  }
+  return [...(await scan)];
+}
+
+async function walkTilesetFolder(app: App, folderPath: string): Promise<TileEntry[]> {
   const normalizedFolder = folderPath.endsWith('/')
     ? folderPath.slice(0, -1)
     : folderPath;
@@ -265,7 +280,7 @@ function probeCandidateOrder(tiles: TileEntry[]): TileEntry[] {
  * Samples up to 5 images, skipping tiny ones (< 64px), and returns
  * the most frequently occurring size plus alpha coverage for fitMode detection.
  */
-async function probeFirstTileImage(app: App, tiles: TileEntry[]): Promise<{
+async function probeTileImages(app: App, tiles: TileEntry[]): Promise<{
   width: number;
   height: number;
   alphaCoverage?: number;
@@ -389,6 +404,23 @@ async function probeFirstTileImage(app: App, tiles: TileEntry[]): Promise<{
   }
 
   return { ...best, artOrientation: orientation };
+}
+
+type TileProbeResult = Awaited<ReturnType<typeof probeTileImages>>;
+
+// In-flight probes keyed by the scanned tile list's shape (MEM-11): every
+// mount rebuilding at once probes the same folder's first images once.
+const inFlightProbes = new Map<string, Promise<TileProbeResult>>();
+
+function probeFirstTileImage(app: App, tiles: TileEntry[]): Promise<TileProbeResult> {
+  if (tiles.length === 0) return probeTileImages(app, tiles);
+  const key = `${tiles.length}|${tiles[0].vaultPath}|${tiles[tiles.length - 1].vaultPath}`;
+  let probe = inFlightProbes.get(key);
+  if (probe == null) {
+    probe = probeTileImages(app, tiles).finally(() => { inFlightProbes.delete(key); });
+    inFlightProbes.set(key, probe);
+  }
+  return probe;
 }
 
 /** Alpha coverage threshold: above this → hex-filling (fill), below → stamp (contain) */

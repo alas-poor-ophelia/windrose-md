@@ -17,7 +17,7 @@ import type { ViewController } from '#types/hooks/viewController.types';
 
 import { cellToScreen } from '../../drawing/cellToScreenConverter';
 import { findCanvasContainer } from '../canvas/useLiveOverlayTransform';
-import { useToolbarPosition } from './useToolbarPosition';
+import { computeToolbarPosition } from '../../components/toolbars/toolbarPosition';
 
 const CARD_WIDTH = 232;
 const CARD_HEIGHT = 200;
@@ -34,7 +34,7 @@ interface PartyPinCardPositionArgs {
 }
 
 interface PartyPinCardPosition {
-  toolbarPos: ReturnType<typeof useToolbarPosition>;
+  toolbarPos: ReturnType<typeof computeToolbarPosition>;
   isViewGesturing: boolean;
 }
 
@@ -86,7 +86,7 @@ function usePartyPinCardPosition({
     }
   }
 
-  const toolbarPos = useToolbarPosition({
+  const toolbarPos = computeToolbarPosition({
     bounds,
     containerRef: { current: container },
     toolbarWidth: CARD_WIDTH,

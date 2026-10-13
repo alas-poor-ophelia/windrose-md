@@ -1,5 +1,5 @@
 /**
- * useSelectionActions.ts
+ * selectionActionBuilders.ts
  *
  * Builds a normalized action list from selection state.
  * Consumed by SelectionActionsOverlay (toolbar) and context menu.

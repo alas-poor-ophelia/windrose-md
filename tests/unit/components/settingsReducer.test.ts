@@ -12,7 +12,10 @@ import {
   Actions,
   settingsReducer,
   deriveBoundsFromRing,
+  columnsForDensity,
+  GRID_DENSITY_PRESETS,
 } from "../../../src/components/settings/settingsReducer";
+import { calculateGridFromHexSize, measurementToHexSize, MEASUREMENT_CORNER } from "../../../src/geometry/core/hexMeasurements";
 import type { SettingsModalState } from "../../../src/components/settings/settingsReducer";
 
 // Minimal state shape for testing IMAGE_SELECTED
@@ -347,5 +350,30 @@ describe("SET_HEX_BOUND_AXIS (STRUCT-B-13)", () => {
     const viaAxis = settingsReducer(state, { type: Actions.SET_HEX_BOUND_AXIS, payload: { axis: 'maxCol', value: 40 } });
     const viaFull = settingsReducer(state, { type: Actions.SET_HEX_BOUNDS, payload: { ...state.hexBounds, maxCol: 40 } });
     expect(viaAxis.hexBounds).toEqual(viaFull.hexBounds);
+  });
+});
+
+describe("hex sizing shares hexMeasurements (STRUCT-B-10)", () => {
+  it("columnsForDensity maps presets and custom", () => {
+    expect(columnsForDensity("medium", 99)).toBe(GRID_DENSITY_PRESETS.medium.columns);
+    expect(columnsForDensity("custom", 37)).toBe(37);
+  });
+
+  it.each(["flat", "pointy"] as const)("SET_FINE_TUNE sizes bounds like the measurement path (%s)", (orientation) => {
+    const state = createMockState({
+      imageDimensions: { width: 1000, height: 700 },
+      boundsLocked: true,
+      sizingMode: "measurement",
+      measurementMethod: MEASUREMENT_CORNER,
+      measurementSize: 86,
+    });
+    const base = measurementToHexSize(86, MEASUREMENT_CORNER, orientation);
+    const next = settingsReducer(state, {
+      type: Actions.SET_FINE_TUNE,
+      payload: { adjustedHexSize: base + 2, orientation },
+    });
+    const expected = calculateGridFromHexSize(1000, 700, base + 2, orientation);
+    expect(next.hexBounds).toEqual({ maxCol: expected.columns, maxRow: expected.rows });
+    expect(next.fineTuneOffset).toBeCloseTo(2);
   });
 });

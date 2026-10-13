@@ -236,21 +236,21 @@ function FogOfWarSection(): VNode {
 
         {(overrides.fogOfWarBlurEnabled ?? false) && (
           <SettingItem
-            name={`Blur Intensity: ${Math.round((overrides.fogOfWarBlurFactor ?? 0.20) * 100)}%`}
+            name={`Blur Intensity: ${Math.round((overrides.fogOfWarBlurFactor ?? THEME.fogOfWar.blurFactor) * 100)}%`}
             description="Size of blur as percentage of cell size (5-50%)"
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <NativeSlider
                 min={5}
                 max={50}
-                value={Math.round((overrides.fogOfWarBlurFactor ?? 0.20) * 100)}
+                value={Math.round((overrides.fogOfWarBlurFactor ?? THEME.fogOfWar.blurFactor) * 100)}
                 onChange={(val: number) => handleColorChange('fogOfWarBlurFactor', val / 100)}
                 disabled={useGlobalSettings}
               />
               <button
                 class="windrose-color-reset-btn"
                 disabled={useGlobalSettings}
-                onClick={() => !useGlobalSettings && handleColorChange('fogOfWarBlurFactor', 0.20)}
+                onClick={() => !useGlobalSettings && handleColorChange('fogOfWarBlurFactor', THEME.fogOfWar.blurFactor)}
                 ref={tooltipRef('Reset to default (20%)')}
                 style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
               >

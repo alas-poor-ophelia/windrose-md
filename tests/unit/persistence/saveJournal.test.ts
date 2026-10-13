@@ -12,6 +12,8 @@ import {
   readKeptEntries,
   JOURNAL_INDEX_KEY,
   JOURNAL_KEY_PREFIX,
+  JOURNAL_META_PREFIX,
+  RAW_PAYLOAD_LIMIT,
   MAX_JOURNAL_PAYLOAD,
 } from '../../../src/persistence/saveJournal';
 import { createNewMap, deleteMapData } from '../../../src/persistence/fileOperations';
@@ -123,12 +125,74 @@ describe('saveJournal size guard', () => {
   it('skips payloads over the size cap', () => {
     const h = makeApp();
     const map = createNewMap('Huge', 'grid');
-    map.description = 'x'.repeat(MAX_JOURNAL_PAYLOAD + 1);
+    // Incompressible: still over the cap after deflate + base64.
+    map.description = noise(MAX_JOURNAL_PAYLOAD * 2);
 
-    journalPending(h.app, 'j-big', map);
+    expect(journalPending(h.app, 'j-big', map)).toBe(false);
 
     expect(readJournal(h.app, 'j-big')).toBeNull();
-    expect(indexOf(h)).toEqual([]);
+  });
+
+  it('deflates a large compressible payload instead of skipping it (DATA-05)', () => {
+    const h = makeApp();
+    const map = createNewMap('Big', 'grid');
+    map.description = 'room '.repeat(600_000); // ~3 MB of JSON, far over the raw limit
+
+    expect(journalPending(h.app, 'j-deflate', map, { writerId: 'w1', version: 3 })).toBe(true);
+
+    const stored = h.store.get(JOURNAL_KEY_PREFIX + 'j-deflate@@w1') as string;
+    expect(stored.length).toBeLessThan(MAX_JOURNAL_PAYLOAD);
+    expect(stored.length).toBeLessThan(RAW_PAYLOAD_LIMIT);
+    const entry = readJournal(h.app, 'j-deflate');
+    expect(entry?.version).toBe(3);
+    expect(entry?.writerId).toBe('w1');
+    expect(entry?.payload).toBe(JSON.stringify(map));
+  });
+
+  it('stores the payload unwrapped (one escaping level) with a small metadata key (MEM-22)', () => {
+    const h = makeApp();
+    const map = createNewMap('Plain', 'grid');
+    journalPending(h.app, 'j-plain', map);
+    expect(h.store.get(JOURNAL_KEY_PREFIX + 'j-plain')).toBe(JSON.stringify(map));
+    const meta = JSON.parse(h.store.get(JOURNAL_META_PREFIX + 'j-plain') as string) as Record<string, unknown>;
+    expect(meta.enc).toBe('json');
+    expect(meta).not.toHaveProperty('payload');
+  });
+
+  it('a quota failure keeps the older entry instead of deleting it first', () => {
+    const h = makeApp();
+    const older = createNewMap('Older', 'grid');
+    journalPending(h.app, 'j-q', older, { writerId: 'w', version: 1 });
+    const writable = h.app as unknown as { saveLocalStorage: (k: string, v: unknown) => void };
+    const real = writable.saveLocalStorage;
+    writable.saveLocalStorage = (k: string, v: unknown) => {
+      if (k.startsWith(JOURNAL_KEY_PREFIX) && v != null) throw new Error('QuotaExceededError');
+      real(k, v);
+    };
+    expect(journalPending(h.app, 'j-q', createNewMap('Newer', 'grid'), { writerId: 'w', version: 2 })).toBe(false);
+    writable.saveLocalStorage = real;
+    expect(JSON.parse(readJournal(h.app, 'j-q')?.payload as string).name).toBe('Older');
+  });
+
+  it('each writer has its own slot; a writer clear never touches another writer (Parallax follow-up)', () => {
+    const h = makeApp();
+    const a = createNewMap('A', 'grid');
+    const b = createNewMap('B', 'grid');
+    journalPending(h.app, 'j-two', a, { writerId: 'pane-a', version: 1 });
+    journalPending(h.app, 'j-two', b, { writerId: 'pane-b', version: 1 });
+
+    clearJournal(h.app, 'j-two', { writerId: 'pane-a', upToVersion: 1 });
+
+    expect(JSON.parse(readJournal(h.app, 'j-two')?.payload as string).name).toBe('B');
+  });
+
+  it('an older version settling does not clear a newer journaled version', () => {
+    const h = makeApp();
+    journalPending(h.app, 'j-ver', createNewMap('V5', 'grid'), { writerId: 'w', version: 5 });
+    clearJournal(h.app, 'j-ver', { writerId: 'w', upToVersion: 4 });
+    expect(readJournal(h.app, 'j-ver')).not.toBeNull();
+    clearJournal(h.app, 'j-ver', { writerId: 'w', upToVersion: 5 });
+    expect(readJournal(h.app, 'j-ver')).toBeNull();
   });
 
   it('still journals payloads under the cap', () => {
@@ -274,3 +338,13 @@ describe('resolveJournalOnLoad restore runs the load migration (DATA-20)', () =>
     expect(readKeptEntries(h.app, 'mig-2')).toHaveLength(1);
   });
 });
+
+/** Random incompressible text (deflate cannot shrink it below the cap). */
+function noise(length: number): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let out = '';
+  for (let i = 0; i < length; i++) {
+    out += alphabet[Math.floor(Math.random() * 64)];
+  }
+  return out;
+}

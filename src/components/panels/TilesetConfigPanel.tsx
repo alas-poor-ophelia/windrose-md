@@ -2,13 +2,12 @@
 // fit, stamp threshold/size, pixels-per-cell). Overrides layer over the
 // tileset defaults; clearing a field falls back to the scanned value.
 
-import type { TilesetDef, TilesetOverrides, TileMetadataStore } from '#types/tiles/tile.types';
+import type { TilesetDef, TilesetOverrides } from '#types/tiles/tile.types';
 import type { VNode } from 'preact';
-import type { Dispatch, StateUpdater } from 'preact/hooks';
 
 import { useCallback, useMemo, useState } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
-import { saveTileMetadataDebounced, bulkSetDefaultSpan } from '../../persistence/tileMetadata';
+import { updateTileMetadata, bulkSetDefaultSpan } from '../../persistence/tileMetadata';
 import { DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
 import { predictSpanFromMeta } from './tileBrowserCommon';
 
@@ -22,7 +21,6 @@ export interface TilesetConfigPanelProps {
   /** GLOBAL per-tileset art scale multiplier (1 = auto); undefined clears. */
   onArtScaleChange?: (tilesetId: string, value: number | undefined) => void;
   isGrid: boolean;
-  setTileMetadata: Dispatch<StateUpdater<TileMetadataStore>>;
 }
 
 const TilesetConfigPanel = ({
@@ -33,7 +31,6 @@ const TilesetConfigPanel = ({
   onArtOffsetChange,
   onArtScaleChange,
   isGrid,
-  setTileMetadata,
 }: TilesetConfigPanelProps): VNode => {
   const app = useApp();
   // Which tileset the panel targets (null = follow the current selection).
@@ -76,7 +73,7 @@ const TilesetConfigPanel = ({
     if (value === undefined) delete updated.pixelsPerCell;
     onTilesetOverrideChange(configTileset.id, updated);
     const ppc = value ?? DEFAULT_PIXELS_PER_CELL;
-    setTileMetadata(prev => {
+    updateTileMetadata(app, prev => {
       const spanEntries: Array<{ vaultPath: string; spanW: number; spanH: number }> = [];
       for (const tile of configTileset.tiles) {
         const e = prev[tile.vaultPath];
@@ -86,11 +83,9 @@ const TilesetConfigPanel = ({
         spanEntries.push({ vaultPath: tile.vaultPath, spanW: span.spanW, spanH: span.spanH });
       }
       if (spanEntries.length === 0) return prev;
-      const next = bulkSetDefaultSpan(prev, spanEntries);
-      saveTileMetadataDebounced(app, next);
-      return next;
+      return bulkSetDefaultSpan(prev, spanEntries);
     });
-  }, [currentOverrides, onTilesetOverrideChange, configTileset, setTileMetadata, app]);
+  }, [currentOverrides, onTilesetOverrideChange, configTileset, app]);
 
   return (
     <div className="windrose-tb-config">

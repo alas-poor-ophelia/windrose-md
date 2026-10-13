@@ -54,6 +54,11 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
     }
   }, [isActive, offsetX, offsetY, panelPosition.x]);
   
+  // Hidden anchor rendered in this map's own DOM tree (the panel itself is
+  // portaled away): scopes the canvas-drag listeners to this mount, so with
+  // two maps open, dragging the other map never moves this background.
+  const anchorRef = useRef<HTMLSpanElement>(null);
+
   // Use refs to avoid stale closures in event handlers
   const isDraggingRef = useRef(false);
   const dragStartOffsetRef = useRef({ x: 0, y: 0 });
@@ -61,10 +66,12 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
   
   // Canvas drag event handlers - use useCallback to stabilize
   const handleCanvasPointerDown = useCallback((e: PointerEvent | TouchEvent) => {
-    // Only handle events on the canvas
-    const canvas = activeDocument.querySelector('[class^="windrose-canvas"]');
+    // Only handle events on this map's canvas
+    const anchor = anchorRef.current;
+    const scope = anchor?.closest('.windrose-container') ?? anchor?.parentElement ?? null;
     const target = e.target as HTMLElement | null;
-    if (canvas == null || !target?.closest('[class^="windrose-canvas"]')) {
+    const canvas = target?.closest('[class^="windrose-canvas"]') ?? null;
+    if (scope == null || canvas == null || !scope.contains(canvas)) {
       return;
     }    // Only handle single-finger/mouse events (let two-finger pan through)
     const touches = (e as TouchEvent).touches;
@@ -102,9 +109,6 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
   // Attach event listeners - only when isActive changes
   useEffect(() => {    if (!isActive) {      return undefined;
     }
-
-    const canvas = activeDocument.querySelector('[class^="windrose-canvas"]');
-    if (!canvas) return undefined;
 
     // Attach to document instead of canvas to avoid CodeMirror interception
     activeDocument.addEventListener('pointerdown', handleCanvasPointerDown);
@@ -257,9 +261,12 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
     }
   }, [onGridSizeChange]);
   
-  if (!isActive || panelPosition.x === null) return null;
+  const anchor = <span ref={anchorRef} hidden />;
+  if (!isActive || panelPosition.x === null) return anchor;
   
   return (
+    <>
+    {anchor}
     <ModalPortal>
       <div
         class="alignment-mode-panel"
@@ -440,6 +447,7 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
         </div>
       </div>
     </ModalPortal>
+    </>
   );
 }
 

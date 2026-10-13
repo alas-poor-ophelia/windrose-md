@@ -7,8 +7,6 @@ import { DungeonMapTracker } from './DungeonMapTracker';
 import { AppContext } from './context/AppContext';
 import { InsertMapModal } from './components/modals/InsertMapModal';
 import { InsertDungeonModal } from './settings/modals/InsertDungeonModal';
-import * as dungeonGenerator from './generation/dungeonGenerator';
-import * as objectPlacer from './generation/objectPlacer';
 import { registerDeepLinks } from './core/deepLinkRegistration';
 import { setPlugin, clearPlugin, FALLBACK_SETTINGS } from './core/settingsAccessor';
 import { decideOnboardingState, isFeatureEnabled } from './core/featureFlags';
@@ -24,6 +22,7 @@ import { disposeImageCache } from './assets/imageOperations';
 import { clearAll as clearThumbnailCache } from './assets/thumbnailCache';
 import { flushAll, installLifecycleJournaling, journalAll } from './persistence/saveCoordinator';
 import { pruneJournal } from './persistence/saveJournal';
+import { notifyPartyNoteRenamed } from './persistence/partyNoteOperations';
 import { runImportDetectionPass } from './assets/importDetectionPass';
 import {
   loadTileMetadata,
@@ -255,7 +254,7 @@ export default class WindrosePlugin extends Plugin {
       editorCheckCallback: (checking, editor) => {
         if (!isFeatureEnabled('dungeonGenerator')) return false;
         if (checking) return true;
-        new InsertDungeonModal(this.app, this, async (mapName, cells, objects, edges, options) => {
+        new InsertDungeonModal(this.app, async (mapName, cells, objects, edges, options) => {
           const mapId = await this.createRandomDungeonMap(mapName, cells, objects, edges, options as DungeonGenOptions);
 
           const codeBlock = [
@@ -288,6 +287,11 @@ export default class WindrosePlugin extends Plugin {
       })());
     }));
 
+    // Beacon notes follow renames: mounted beacons repoint their stored path.
+    this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
+      if (file instanceof TFile) notifyPartyNoteRenamed(oldPath, file.path);
+    }));
+
     // Suspend/hide has no such guarantee, so those paths journal synchronously.
     this.register(installLifecycleJournaling(this.app));
     pruneJournal(this.app);
@@ -298,7 +302,8 @@ export default class WindrosePlugin extends Plugin {
    * recovery path when an import's classification phase failed or the metadata
    * store was lost. Every write is fill-missing-only (idempotent), and render-
    * mode predictions are never applied here (RCA 2026-06-09: bulk render-mode
-   * writes retroactively re-render already-placed tiles).
+   * writes retroactively re-render already-placed tiles; the RCA doc was
+   * deleted, read it with `git show 3d42268d:docs/RCA-2026-06-09-performance-collapse.md`).
    */
   async rescanTileClassification(): Promise<void> {
     const folders = this.settings.tilesetFolders ?? [];
@@ -539,14 +544,6 @@ export default class WindrosePlugin extends Plugin {
       );
       console.warn('[Windrose] Old plugin dungeon-map-tracker-settings is still active');
     }
-  }
-
-  async loadDungeonGenerator(): Promise<typeof dungeonGenerator> {
-    return dungeonGenerator;
-  }
-
-  async loadObjectPlacer(): Promise<typeof objectPlacer> {
-    return objectPlacer;
   }
 
   private buildFogOfWar(cells: DungeonCell[], options: DungeonGenOptions): { enabled: boolean; foggedCells: Array<{ col: number; row: number }> } | null {

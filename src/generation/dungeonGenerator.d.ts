@@ -88,6 +88,8 @@ export function isCellAdjacentToRoomForOpening(
   room: DungeonRoom
 ): boolean;
 export function isCellInRoom(x: number, y: number, room: DungeonRoom): boolean;
+/** Used by objectPlacer.js (shared helper, not duplicated there) */
+export function getRoomCells(room: DungeonRoom): CellCoord[];
 export function calculateRoomOpeningWidth(
   doorPos: CellCoord,
   room: DungeonRoom,

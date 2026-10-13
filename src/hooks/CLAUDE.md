@@ -14,7 +14,7 @@ Encapsulate stateful logic, side effects, and event handling. Hooks sit between 
 | `state/` | App and document state: map data, history, tool state, saving, panels, feature flags |
 | `interactions/` | Every other tool/feature interaction (fog, regions, outlines, measure, Beacon, sub-hex, keyboard) |
 
-Only `use*` files that are real hooks belong here, with two exceptions: `interactions/useSelectionActions.ts` (exports `buildObjectActions`/`buildTextActions`/`buildMultiActions`/`buildShapeOverlayActions`) and `interactions/useToolbarPosition.ts` (a plain positioning function) contain no hook calls.
+Only real hooks use the `use*` prefix. The former non-hook files `useSelectionActions.ts` and `useToolbarPosition.ts` now live in `components/toolbars/` as `selectionActionBuilders.ts` and `toolbarPosition.ts`.
 
 ## Directory Structure
 
@@ -85,9 +85,7 @@ hooks/
     ├── usePartyPinCardPosition.ts  # Beacon controls card anchor/placement
     ├── useSubHexNavigation.ts      # Sub-hex drill-down stack
     ├── useHexContextMenu.ts        # Hex right-click menu
-    ├── useAlignmentMode.ts         # Background image alignment mode
-    ├── useSelectionActions.ts      # NOT a hook: selection action list builders
-    └── useToolbarPosition.ts       # NOT a hook: toolbar flip/clamp positioning
+    └── useAlignmentMode.ts         # Background image alignment mode
 ```
 
 ## Patterns
