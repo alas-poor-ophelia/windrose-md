@@ -35,7 +35,7 @@ import {
   getBrushCells, bresenhamLine, floodFillCells, buildWallBarrier, FLOOD_FILL_LIMIT,
   homeLevelFields, tilesOnRung, tileRung, withTilePlaced, withTilesErasedAt, withFillRegionCleared
 } from '../../drawing/tilePlacementOps';
-import { guardDepthWrite } from '../../persistence/depthAuthoring';
+import { guardDepthWrite, elementBytes } from '../../persistence/depthAuthoring';
 import { authoredCells } from '../../persistence/layerAccessor';
 import { depthRefusalMessage } from '../../drawing/depthCellOps';
 import { scatterSpacing, makeScatterDrop } from '../../drawing/scatterBrush';
@@ -131,6 +131,38 @@ const TilePlacementLayer = ({
   // One refusal notice per visit to a rung the gate refuses, re-armed by an
   // accepted pointerdown.
   const depthNoticeShownRef = useRef(false);
+  // Byte budget of a deep gesture (kgc.25): the map's serialised size at
+  // pointerdown and the tile bytes the gesture has added since. Tiles grow the
+  // map without growing the rung's cells, so they are held to the budget by
+  // their own size. Null for a level-0 gesture.
+  const gestureBudgetRef = useRef<{ serialisedBytes: number; addedBytes: number } | null>(null);
+
+  /**
+   * Refuse a deep tile write that would push the map past the depth byte
+   * budget (one notice per gesture). `prev` is the tile list the write starts
+   * from; the tiles in `next` and not in `prev` are what it adds. Level-0
+   * writes are never refused here.
+   */
+  const refuseDeepTiles = useCallback((prev: TileAssignment[], next: TileAssignment[]): boolean => {
+    const level = strokeLevelRef.current;
+    if (level === 0 || !mapData) return false;
+    const before = new Set(prev);
+    const bytes = elementBytes(next.filter(t => !before.has(t)));
+    const budget = gestureBudgetRef.current;
+    const layer = getActiveLayer(mapData);
+    const refusal = guardDepthWrite(mapData, layer.id, level, authoredCells(layer, level), budget !== null
+      ? { serialisedBytes: budget.serialisedBytes, addedBytes: budget.addedBytes + bytes }
+      : { addedBytes: bytes });
+    if (refusal !== null) {
+      if (!depthNoticeShownRef.current) {
+        depthNoticeShownRef.current = true;
+        new Notice(depthRefusalMessage(refusal));
+      }
+      return true;
+    }
+    if (budget !== null) budget.addedBytes += bytes;
+    return false;
+  }, [mapData]);
 
   /** Cell under the pointer on the latched rung (level 0 is screenToGrid exactly). */
   const cellAtLevel = useCallback((clientX: number, clientY: number, level: number) => (
@@ -146,6 +178,7 @@ const TilePlacementLayer = ({
     if (entry?.vaultPath != null && entry.vaultPath !== '') void preloadImage(app, entry.vaultPath);
 
     let currentTiles = strokeTilesRef.current ?? getActiveLayer(mapData).tiles ?? [];
+    const startTiles = currentTiles;
     let changed = false;
 
     const targetPlacement = tileLayer === 'base' ? 'fill' : 'overlay';
@@ -192,12 +225,12 @@ const TilePlacementLayer = ({
       changed = true;
     }
 
-    if (changed) {
+    if (changed && !refuseDeepTiles(startTiles, currentTiles)) {
       const isBatchedStroke = strokeTilesRef.current !== null;
       if (isBatchedStroke) strokeTilesRef.current = currentTiles;
       onTilesChange(currentTiles, isBatchedStroke);
     }
-  }, [mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, brushSize, paintEdgeBlend, tileDepth, onTilesChange, app]);
+  }, [mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, brushSize, paintEdgeBlend, tileDepth, onTilesChange, app, refuseDeepTiles]);
 
   const eraseTilesInBrush = useCallback((col: number, row: number) => {
     if (!mapData) return;
@@ -326,8 +359,11 @@ const TilePlacementLayer = ({
       });
     }
 
+    // The fill result is computed first so a deep fill is held to the byte
+    // budget by the tiles it actually adds (up to FLOOD_FILL_LIMIT).
+    if (refuseDeepTiles(currentTiles, newTiles)) return;
     onTilesChange(newTiles);
-  }, [app, mapData, geometry, ladder, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, paintEdgeBlend, tileDepth, onTilesChange]);
+  }, [app, mapData, geometry, ladder, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, paintEdgeBlend, tileDepth, onTilesChange, refuseDeepTiles]);
 
   const placeStampAtWorld = useCallback((
     worldX: number,
@@ -366,9 +402,10 @@ const TilePlacementLayer = ({
     // Scatter strokes batch into one history entry (same pattern as the grid brush).
     const isBatchedStroke = strokeTilesRef.current !== null;
     const nextTiles = [...currentTiles, newTile];
+    if (refuseDeepTiles(currentTiles, nextTiles)) return;
     if (isBatchedStroke) strokeTilesRef.current = nextTiles;
     onTilesChange(nextTiles, isBatchedStroke);
-  }, [app, mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileFitMode, tileScale, onTilesChange]);
+  }, [app, mapData, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileFitMode, tileScale, onTilesChange, refuseDeepTiles]);
 
   // Scatter: drop a jittered stamp when the pointer has traveled far enough
   // in world space since the previous drop.
@@ -404,7 +441,8 @@ const TilePlacementLayer = ({
     // passes the depth-authoring gate first: flag on, ladder view, not
     // quarantined, level in range. A nested-classic map never takes deep writes.
     // The rung's current cells are passed as the "next" content, so the gate
-    // adds nothing and the byte budget is not consulted here.
+    // adds nothing here; the byte budget is checked per write against the
+    // tiles each one adds (refuseDeepTiles), from the size measured now.
     const level = ladder !== null ? getEditLevel() : 0;
     if (level > 0) {
       if (!mapData) return;
@@ -420,6 +458,9 @@ const TilePlacementLayer = ({
     }
     depthNoticeShownRef.current = false;
     strokeLevelRef.current = level;
+    gestureBudgetRef.current = level > 0 && mapData
+      ? { serialisedBytes: JSON.stringify(mapData).length, addedBytes: 0 }
+      : null;
 
     const coords = cellAtLevel(e.clientX, e.clientY, level);
     if (!coords) return;

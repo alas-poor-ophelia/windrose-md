@@ -28,6 +28,16 @@ const MAX_CELLS_PER_DEPTH_OP = 4096;
 /** Serialised bytes per hex cell, measured on the fixture (q, r, colour). */
 const BYTES_PER_CELL_ESTIMATE = 36;
 
+/** Serialised size of one element (object, text label, tile) a deep write adds; 0 when it cannot be serialised. */
+function elementBytes(value: unknown): number {
+  try {
+    const json = JSON.stringify(value);
+    return typeof json === 'string' ? json.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
 type DepthWriteRefusal =
   | 'not-a-ladder'
   | 'nested-classic'
@@ -48,6 +58,12 @@ interface DepthWriteContext {
   baseline?: Cell[];
   /** `JSON.stringify(mapData).length` when `baseline` was taken. Default: measured now against the current cells. */
   serialisedBytes?: number;
+  /**
+   * Serialised bytes the write ADDS beyond cells (objects, text, tiles homed on
+   * the rung). Such a write grows the map even when the rung's cells do not, so
+   * it is held to the budget (kgc.25). Default 0.
+   */
+  addedBytes?: number;
 }
 
 type DepthWriteResult =
@@ -60,6 +76,19 @@ function canBeginDepthAuthoring(mapData: MapData | null | undefined): boolean {
   if (!isLodLadderEnabled()) return false;
   if (!isLadderView(mapData)) return false;
   return !isDepthQuarantined(mapData).quarantined;
+}
+
+/**
+ * Why this map may not START taking deep edits, or null when it may
+ * (`canBeginDepthAuthoring`). The reason a tool names in its refusal notice.
+ */
+function depthEntryRefusal(mapData: MapData): DepthWriteRefusal | null {
+  if (canBeginDepthAuthoring(mapData)) return null;
+  if (isDepthQuarantined(mapData).quarantined) return 'quarantined';
+  // A classic map with sub-hex children never takes the lod stamp (design s9):
+  // the stamp would hide its children behind the ladder for good (kgc.15).
+  if (mapData.lod === undefined && hasSubHexChildren(mapData)) return 'nested-classic';
+  return 'not-a-ladder';
 }
 
 /**
@@ -81,7 +110,7 @@ function withLod(mapData: MapData): MapData {
 /**
  * Check a proposed rung write without applying it. `nextCells` is the FULL
  * intended content of the rung after the write. A write that does not grow the
- * rung (identity, erase) is never refused on size: the stroke-end history write
+ * rung (identity, erase) and adds no element bytes is never refused on size: the stroke-end history write
  * re-writes the current rung and must always land (kgc.23 e).
  */
 function guardDepthWrite(
@@ -91,13 +120,8 @@ function guardDepthWrite(
   nextCells: Cell[],
   context: DepthWriteContext = {}
 ): DepthWriteRefusal | null {
-  if (!canBeginDepthAuthoring(mapData)) {
-    if (isDepthQuarantined(mapData).quarantined) return 'quarantined';
-    // A classic map with sub-hex children never takes the lod stamp (design s9):
-    // the stamp would hide its children behind the ladder for good (kgc.15).
-    if (mapData.lod === undefined && hasSubHexChildren(mapData)) return 'nested-classic';
-    return 'not-a-ladder';
-  }
+  const entry = depthEntryRefusal(mapData);
+  if (entry !== null) return entry;
   const params = ladderParamsFor(withLod(mapData));
   if (!Number.isInteger(level) || level < 1 || level > params.maxLevel) return 'level-out-of-range';
   // Never fall back to another layer: counting the active layer while
@@ -105,13 +129,15 @@ function guardDepthWrite(
   const layer = mapData.layers.find((l) => l.id === layerId);
   if (layer === undefined) return 'unknown-layer';
   const current = authoredCells(layer, level);
-  if (nextCells.length - current.length <= 0) return null;
+  const addedBytes = Math.max(0, context.addedBytes ?? 0);
+  const grownNow = nextCells.length - current.length;
+  if (grownNow <= 0 && addedBytes === 0) return null;
   const baseline = context.baseline ?? current;
-  const added = nextCells.length - baseline.length;
+  const added = Math.max(0, nextCells.length - baseline.length);
   if (added > MAX_CELLS_PER_DEPTH_OP) return 'too-many-cells';
   const projected = context.serialisedBytes !== undefined
-    ? context.serialisedBytes + added * BYTES_PER_CELL_ESTIMATE
-    : JSON.stringify(mapData).length + (nextCells.length - current.length) * BYTES_PER_CELL_ESTIMATE;
+    ? context.serialisedBytes + added * BYTES_PER_CELL_ESTIMATE + addedBytes
+    : JSON.stringify(mapData).length + Math.max(0, grownNow) * BYTES_PER_CELL_ESTIMATE + addedBytes;
   if (projected > DEPTH_BUDGET_BYTES) return 'over-budget';
   return null;
 }
@@ -131,4 +157,4 @@ function writeDepthCells(
 }
 
 export type { DepthWriteContext, DepthWriteRefusal, DepthWriteResult };
-export { BYTES_PER_CELL_ESTIMATE, DEPTH_BUDGET_BYTES, MAX_CELLS_PER_DEPTH_OP, canBeginDepthAuthoring, withLod, guardDepthWrite, writeDepthCells };
+export { BYTES_PER_CELL_ESTIMATE, elementBytes, DEPTH_BUDGET_BYTES, MAX_CELLS_PER_DEPTH_OP, canBeginDepthAuthoring, depthEntryRefusal, withLod, guardDepthWrite, writeDepthCells };

@@ -32,7 +32,7 @@ import { generateEdgeLine, mergeEdges } from '../../drawing/edgeOperations';
 import { eraseRectangleFromCurves } from '../../geometry/curves/curveBoolean';
 import { Notice } from 'obsidian';
 import { authoredCells } from '../../persistence/layerAccessor';
-import { canBeginDepthAuthoring, guardDepthWrite } from '../../persistence/depthAuthoring';
+import { guardDepthWrite } from '../../persistence/depthAuthoring';
 import { withCellsPainted, withCellsErased, depthRefusalMessage } from '../../drawing/depthCellOps';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 
@@ -123,10 +123,22 @@ function useShapeTools({
   const [touchConfirmPending, setTouchConfirmPending] = useState<boolean>(false);
   const [pendingEndPoint, setPendingEndPoint] = useState<PendingEndPoint | null>(null);
 
-  // Rung for a NEW shape, read once at its first pointerdown. 0 whenever the
-  // map cannot take deep edits (flag off, classic map, quarantine).
-  const latchShapeLevel = (): number =>
-    (ladder !== null && getEditLevel !== undefined && canBeginDepthAuthoring(mapData) ? getEditLevel() : 0);
+  // Rung for a NEW shape, read once at its first pointerdown: the edit level
+  // whenever a ladder exists. A rung the map cannot take (flag off,
+  // quarantine, nested classic, over budget) is REFUSED with a notice and
+  // null, never silently drawn at level 0 (parity with paint, objects, tiles
+  // and text). 0 on classic maps.
+  const latchShapeLevel = (): number | null => {
+    const level = ladder !== null && getEditLevel !== undefined ? getEditLevel() : 0;
+    if (level === 0 || !mapData) return level;
+    const layer = getActiveLayer(mapData);
+    const refusal = guardDepthWrite(mapData, layer.id, level, authoredCells(layer, level));
+    if (refusal !== null) {
+      new Notice(depthRefusalMessage(refusal));
+      return null;
+    }
+    return level;
+  };
 
   // Write rung `level` through the guarded deep handler (one undo entry). A
   // refusal shows one notice and changes nothing.
@@ -380,7 +392,9 @@ function useShapeTools({
       // Edit level: the stored start's rung, else latched now. At depth the
       // caller's root-level cell is replaced by the latched rung's cell.
       const activeStart = currentTool === 'circle' ? circleStart : rectangleStart;
-      const shapeLevel = activeStart != null ? (activeStart.level ?? 0) : latchShapeLevel();
+      const latched = activeStart != null ? (activeStart.level ?? 0) : latchShapeLevel();
+      if (latched === null) return true; // refused: the press is consumed, nothing starts
+      const shapeLevel = latched;
       let sx = gridX;
       let sy = gridY;
       if (shapeLevel > 0) {

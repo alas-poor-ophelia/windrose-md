@@ -11,7 +11,14 @@
 import type { Point } from '#types/core/geometry.types';
 import type { MapObject } from '#types/objects/object.types';
 import { isAreaFree } from './objectOperations';
-import { homeLevelOf } from './hexSlotPositioner';
+import {
+  homeLevelOf,
+  assignSlot,
+  getMaxObjectsPerCell,
+  getObjectsInCell,
+  getOccupiedSlots,
+  reorganizeAfterRemoval
+} from './hexSlotPositioner';
 
 /** One grid-anchored object's proposed cell during a group drag. */
 interface GroupGridMove {
@@ -71,5 +78,80 @@ function groupItemHitsCell(
     cell.y >= obj.position.y && cell.y < obj.position.y + size.height;
 }
 
-export { isGroupGridMoveBlocked, groupItemHitsCell };
+const cellKey = (home: number, x: number, y: number): string => home + ':' + x + ',' + y;
+
+const staysPut = (move: GroupGridMove): boolean =>
+  move.oldObj.position.x === move.newPosition.x && move.oldObj.position.y === move.newPosition.y;
+
+/**
+ * Hex slots for a group move, per target cell per rung, or null when any
+ * target cell would hold more than getMaxObjectsPerCell() objects (the move is
+ * refused, like an overlap). Each mover takes the next free slot against the
+ * slots already held there by static objects on its rung plus the members
+ * already placed in this move. A mover that keeps its cell (zero delta on its
+ * rung) keeps its slot; movers arriving together keep their relative order.
+ */
+function assignGroupSlots(
+  moves: readonly GroupGridMove[],
+  staticObjects: readonly MapObject[]
+): Map<string, number> | null {
+  const byCell = new Map<string, GroupGridMove[]>();
+  for (const move of moves) {
+    const key = cellKey(homeLevelOf(move.oldObj), move.newPosition.x, move.newPosition.y);
+    const bucket = byCell.get(key);
+    if (bucket === undefined) byCell.set(key, [move]); else bucket.push(move);
+  }
+
+  const statics = staticObjects as MapObject[];
+  const slots = new Map<string, number>();
+  for (const cellMoves of byCell.values()) {
+    const { x, y } = cellMoves[0].newPosition;
+    const home = homeLevelOf(cellMoves[0].oldObj);
+    const staticCount = getObjectsInCell(statics, x, y, home).length;
+    if (staticCount + cellMoves.length > getMaxObjectsPerCell()) return null;
+
+    const occupied = getOccupiedSlots(statics, x, y, home);
+    const arriving: GroupGridMove[] = [];
+    for (const move of cellMoves) {
+      const slot = move.oldObj.slot;
+      if (staysPut(move) && slot !== undefined && !occupied.includes(slot)) {
+        occupied.push(slot);
+        slots.set(move.oldObj.id, slot);
+      } else {
+        arriving.push(move);
+      }
+    }
+    arriving.sort((a, b) => (a.oldObj.slot ?? 0) - (b.oldObj.slot ?? 0));
+    for (const move of arriving) {
+      const slot = assignSlot(occupied);
+      occupied.push(slot);
+      slots.set(move.oldObj.id, slot);
+    }
+  }
+  return slots;
+}
+
+/**
+ * Compact the slots of every cell a mover LEFT (per rung), on the objects as
+ * they stand after the move. Cells a mover stayed in are untouched.
+ */
+function reorganizeVacatedCells(
+  objects: MapObject[],
+  moves: readonly GroupGridMove[]
+): MapObject[] {
+  const done = new Set<string>();
+  let result = objects;
+  for (const move of moves) {
+    if (staysPut(move)) continue;
+    const home = homeLevelOf(move.oldObj);
+    const { x, y } = move.oldObj.position;
+    const key = cellKey(home, x, y);
+    if (done.has(key)) continue;
+    done.add(key);
+    result = reorganizeAfterRemoval(result, x, y, home);
+  }
+  return result;
+}
+
+export { isGroupGridMoveBlocked, groupItemHitsCell, assignGroupSlots, reorganizeVacatedCells };
 export type { GroupGridMove, RungCellExists };

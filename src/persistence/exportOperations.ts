@@ -10,6 +10,8 @@
 import type { BoundingBox } from '#types/core/geometry.types';
 import type { MapData, MapLayer, StoredViewState } from '#types/core/map.types';
 import type { TextLabel } from '#types/objects/note.types';
+import type { Cell } from '#types/core/cell.types';
+import type { TileAssignment } from '#types/tiles/tile.types';
 import type {
   RenderParams,
   ExportResult,
@@ -29,6 +31,7 @@ import { isDepthQuarantined, isLadderView } from '../core/lodFlags';
 import { overrideRungFor } from '../geometry/renderers/elementBands';
 import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
 import { getFontCss } from '../text/fontOptions';
+import { cellsCoveredByAssignment } from '../assets/tileFootprint';
 import { renderCanvas } from '../hooks/canvas/useCanvasRenderer';
 import { getSettings } from '../core/settingsAccessor';
 
@@ -83,10 +86,35 @@ function exportLadderFor(mapData: MapData, geometry: ExtendedGeometry): Geometry
   return ladderForAuthoredRungs(mapData, geometry);
 }
 
+/** A tile's cell (col, row) as a Cell on `geometry`'s lattice. */
+function tileCell(col: number, row: number, geometry: { type: string }): Cell {
+  return geometry.type === 'hex' ? { q: col, r: row, color: '' } : { x: col, y: row, color: '' };
+}
+
+/** World bounds of one placed tile on the geometry of its rung, or null when it has no extent. */
+function tileBounds(tile: TileAssignment, geometry: { type: string; getCellBounds(cell: Cell): BoundingBox }): BoundingBox | null {
+  if (tile.freeform === true) {
+    const drop = geometry.getCellBounds(tileCell(tile.col, tile.row, geometry));
+    if (tile.worldX == null || tile.worldY == null) return drop;
+    const scale = tile.scale ?? 1;
+    const halfW = ((drop.maxX - drop.minX) / 2) * scale;
+    const halfH = ((drop.maxY - drop.minY) / 2) * scale;
+    return { minX: tile.worldX - halfW, minY: tile.worldY - halfH, maxX: tile.worldX + halfW, maxY: tile.worldY + halfH };
+  }
+  let out: BoundingBox | null = null;
+  for (const c of cellsCoveredByAssignment(tile)) {
+    const b = geometry.getCellBounds(tileCell(c.col, c.row, geometry));
+    out = out === null
+      ? b
+      : { minX: Math.min(out.minX, b.minX), minY: Math.min(out.minY, b.minY), maxX: Math.max(out.maxX, b.maxX), maxY: Math.max(out.maxY, b.maxY) };
+  }
+  return out;
+}
+
 /**
  * Calculate the world-coordinate bounding box of all content on a layer.
- * Rung (>= 1) cells are measured with their rung's own geometry and are only
- * included when a `ladder` is supplied; classic maps have none.
+ * Rung (>= 1) cells, objects and tiles are measured with their rung's own
+ * geometry and are only included when a `ladder` is supplied; classic maps have none.
  */
 function calculateContentBounds(
   layer: MapLayer,
@@ -127,7 +155,23 @@ function calculateContentBounds(
     }
   }
 
-  // 3. Text labels (need temporary canvas for measurement)
+  // 3. Tiles: a snapped tile is bounded by its cell footprint, a freeform stamp
+  // by its drop cell's box re-centred on its world position (scaled), both on
+  // the geometry of the rung it is homed on.
+  for (const tile of layer.tiles ?? []) {
+    const home = tile.homeLevel ?? 0;
+    if (home > 0 && ladder === null) continue;
+    const g = home > 0 && ladder !== null ? ladder.geometryForLevel(home) : geometry;
+    const bounds = tileBounds(tile, g);
+    if (bounds === null) continue;
+    hasContent = true;
+    minX = Math.min(minX, bounds.minX);
+    minY = Math.min(minY, bounds.minY);
+    maxX = Math.max(maxX, bounds.maxX);
+    maxY = Math.max(maxY, bounds.maxY);
+  }
+
+  // 4. Text labels (need temporary canvas for measurement)
   if (layer.textLabels.length > 0) {
     const tempCanvas = activeWindow.createEl('canvas');
     const tempCtx = tempCanvas.getContext('2d');

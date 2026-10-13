@@ -7,7 +7,7 @@ vi.mock('../../../src/core/settingsAccessor', () => ({ getSettings }));
 const { createNewMap } = await import('../../../src/persistence/fileOperations');
 const { authoredCells } = await import('../../../src/persistence/layerAccessor');
 const {
-  canBeginDepthAuthoring, withLod, guardDepthWrite, writeDepthCells, MAX_CELLS_PER_DEPTH_OP, DEPTH_BUDGET_BYTES, BYTES_PER_CELL_ESTIMATE,
+  canBeginDepthAuthoring, withLod, guardDepthWrite, writeDepthCells, MAX_CELLS_PER_DEPTH_OP, DEPTH_BUDGET_BYTES, BYTES_PER_CELL_ESTIMATE, elementBytes, depthEntryRefusal,
 } = await import('../../../src/persistence/depthAuthoring');
 
 function hexMap(): MapData {
@@ -168,6 +168,51 @@ describe('depthAuthoring', () => {
       if (!r.ok) expect(r.reason).toBe('unknown-layer');
       expect(r.mapData).toBe(m);
       expect(r.mapData.lod).toBeUndefined();
+    });
+  });
+  describe('depthEntryRefusal (paint-tool refusal parity, kgc.25)', () => {
+    it('names the reason a map cannot start deep edits, null when it can', () => {
+      const m = hexMap();
+      expect(depthEntryRefusal(m)).toBeNull();
+      expect(depthEntryRefusal({ ...m, lod: { m: 7, minCellPx: 64, maxLevel: 3 } })).toBe('quarantined');
+      const nested: MapData = { ...m, subHexMaps: { '0,0': { mapData: hexMap() } as unknown as NonNullable<MapData['subHexMaps']>[string] } };
+      expect(depthEntryRefusal(nested)).toBe('nested-classic');
+      getSettings.mockReturnValue({});
+      expect(depthEntryRefusal(m)).toBe('not-a-ladder');
+    });
+  });
+
+  describe('element byte budget (kgc.25)', () => {
+    it('elementBytes is the JSON length, 0 when unserialisable', () => {
+      expect(elementBytes({ a: 1 })).toBe(7);
+      const cyclic: Record<string, unknown> = {};
+      cyclic.self = cyclic;
+      expect(elementBytes(cyclic)).toBe(0);
+      expect(elementBytes(undefined)).toBe(0);
+    });
+
+    it('an over-budget map refuses an element write past its headroom and accepts one within it', () => {
+      const m = hexMap();
+      const id = m.layers[0].id;
+      const stamped = writeDepthCells(m, id, 1, [{ q: 0, r: 0, color: '#abcdef' }]);
+      if (!stamped.ok) throw new Error('expected the stamp to land');
+      const base = JSON.stringify(stamped.mapData).length;
+      const headroom = 200;
+      const fat: MapData = { ...stamped.mapData, name: 'x'.repeat(DEPTH_BUDGET_BYTES - base - headroom) };
+      const cells = authoredCells(fat.layers[0], 1);
+      expect(guardDepthWrite(fat, id, 1, cells, { addedBytes: headroom - 50 })).toBeNull();
+      expect(guardDepthWrite(fat, id, 1, cells, { addedBytes: headroom + 50 })).toBe('over-budget');
+      // cells-only writes are unchanged: identity still lands without addedBytes
+      expect(guardDepthWrite(fat, id, 1, cells)).toBeNull();
+      // and the cached stroke-start size is honoured for element bytes too
+      expect(guardDepthWrite(fat, id, 1, cells, { serialisedBytes: DEPTH_BUDGET_BYTES - 10, addedBytes: 11 })).toBe('over-budget');
+      expect(guardDepthWrite(fat, id, 1, cells, { serialisedBytes: DEPTH_BUDGET_BYTES - 10, addedBytes: 10 })).toBeNull();
+    });
+
+    it('element writes still pass the non-size gates first', () => {
+      getSettings.mockReturnValue({ lodLadder: false });
+      const m = hexMap();
+      expect(guardDepthWrite(m, m.layers[0].id, 1, [], { addedBytes: 1 })).toBe('not-a-ladder');
     });
   });
 });

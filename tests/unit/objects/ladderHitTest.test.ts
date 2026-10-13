@@ -21,7 +21,7 @@ import { HexGeometry } from '../../../src/geometry/core/HexGeometry';
 import { createGeometryLadder } from '../../../src/geometry/core/createGeometryLadder';
 import { crossingZoom } from '../../../src/geometry/core/lattice';
 import { scaledSizeForRung } from '../../../src/geometry/renderers/elementBands';
-import { ladderObjectFootprint, pickLadderObject } from '../../../src/objects/ladderHitTest';
+import { ladderObjectFootprint, ladderFootprintContains, pickLadderObject } from '../../../src/objects/ladderHitTest';
 import { getObjectsInCell, canAddObjectToCell } from '../../../src/objects/hexSlotPositioner';
 import { placeObject, placeObjectFreeform, canPlaceObjectAt, eraseObjectAt, getObjectAtPosition, removeObjectFromHex, isAreaFree, removeObjectsInRectangle, removeObjectAtPosition, addObject, canResizeObject } from '../../../src/objects/objectOperations';
 import { findTileHitInLayers, tileHitsCell } from '../../../src/assets/tileFootprint';
@@ -134,6 +134,24 @@ describe('pickLadderObject', () => {
     const v = view(ZOOM_RUNG2);
     const c = centreWorld(ladderObjectFootprint(over, [under, over], v)!, ZOOM_RUNG2);
     expect(pickLadderObject([under, over], c.x, c.y, v)?.id).toBe('over');
+  });
+});
+
+describe('ladderFootprintContains', () => {
+  it('is the held footprint, not the cell: group drag grabs what is drawn', () => {
+    const entrance = obj({ id: 'a' });
+    const v = view(ZOOM_RUNG2);
+    const rect = ladderObjectFootprint(entrance, [entrance], v)!;
+    const c = centreWorld(rect, ZOOM_RUNG2);
+    expect(ladderFootprintContains(entrance, [entrance], c.x, c.y, v)).toBe(true);
+    // Beside the held box, still inside the root cell the cell test would use
+    const beside = c.x + (rect.objectWidth / 2 + 2) / ZOOM_RUNG2;
+    expect(ladderFootprintContains(entrance, [entrance], beside, c.y, v)).toBe(false);
+  });
+
+  it('is false for an object that is not drawn', () => {
+    const pop = obj({ id: 'p', depthMode: 'pop' });
+    expect(ladderFootprintContains(pop, [pop], 0, 0, view(ZOOM_RUNG2))).toBe(false);
   });
 });
 

@@ -42,24 +42,32 @@ function useObjectHover(): {
     if (mapData == null) return;
     if (!('touches' in e)) {
       const { clientX, clientY } = getClientCoords(e);
-      const coords = screenToGrid(clientX, clientY);
-      if (coords) {
-        let obj: MapObject | null = null;
+      let obj: MapObject | null = null;
 
+      if (ladder !== null) {
+        // Ladder: the drawn footprint on the object's home rung is the hit
+        // area (held size and depth-mode visibility included), never the
+        // level-0 cell under the pointer. The pick is world-space, so the
+        // gate is the world point, not a root cell (rung cells may lie
+        // outside root bounds).
+        const worldCoords = screenToWorld(clientX, clientY);
+        if (!worldCoords) {
+          setHoveredObject(null);
+          return;
+        }
+        const zoom = viewController?.getLive().zoom ?? mapData.viewState?.zoom ?? 1;
+        obj = pickLadderObject(getActiveLayer(mapData).objects, worldCoords.worldX, worldCoords.worldY, {
+          ladder, level: getActiveLevel(), zoom, orientation: mapData.orientation ?? 'flat'
+        });
+      } else {
+        const coords = screenToGrid(clientX, clientY);
+        if (!coords) {
+          setHoveredObject(null);
+          return;
+        }
         const { x, y } = coords;
 
-        if (ladder !== null) {
-          // Ladder: the drawn footprint on the object's home rung is the hit
-          // area (held size and depth-mode visibility included), never the
-          // level-0 cell under the pointer.
-          const worldCoords = screenToWorld(clientX, clientY);
-          if (worldCoords) {
-            const zoom = viewController?.getLive().zoom ?? mapData.viewState?.zoom ?? 1;
-            obj = pickLadderObject(getActiveLayer(mapData).objects, worldCoords.worldX, worldCoords.worldY, {
-              ladder, level: getActiveLevel(), zoom, orientation: mapData.orientation ?? 'flat'
-            });
-          }
-        } else if (geometry?.type === 'hex') {
+        if (geometry?.type === 'hex') {
           const worldCoords = screenToWorld(clientX, clientY);
           if (worldCoords && geometry.gridToWorld != null && geometry.width != null) {
             const hexCenter = geometry.gridToWorld(x, y);
@@ -75,33 +83,31 @@ function useObjectHover(): {
           }
         }
 
-        if (ladder === null) obj ??= getObjectAtPosition(getActiveLayer(mapData).objects, x, y);
+        obj ??= getObjectAtPosition(getActiveLayer(mapData).objects, x, y);
+      }
 
-        if (obj) {
-          const activeLayer = getActiveLayer(mapData);
-          // Fog is level-0 cell data: a deep object is fogged at its root ancestor,
-          // exactly as the renderer hides it (rungFog).
-          if (activeLayer.fogOfWar?.enabled === true && geometry != null) {
-            const home = obj.homeLevel ?? 0;
-            const fogged = ladder !== null && home > 0 ? rungFogPredicate(ladder, home, isCellFogged) : isCellFogged;
-            const objOffset = geometry.toOffsetCoords(obj.position.x, obj.position.y);
-            if (fogged(activeLayer, objOffset.col, objOffset.row)) {
-              obj = null;
-            }
+      if (obj) {
+        const activeLayer = getActiveLayer(mapData);
+        // Fog is level-0 cell data: a deep object is fogged at its root ancestor,
+        // exactly as the renderer hides it (rungFog).
+        if (activeLayer.fogOfWar?.enabled === true && geometry != null) {
+          const home = obj.homeLevel ?? 0;
+          const fogged = ladder !== null && home > 0 ? rungFogPredicate(ladder, home, isCellFogged) : isCellFogged;
+          const objOffset = geometry.toOffsetCoords(obj.position.x, obj.position.y);
+          if (fogged(activeLayer, objOffset.col, objOffset.row)) {
+            obj = null;
           }
         }
+      }
 
-        setHoveredObject(obj);
+      setHoveredObject(obj);
 
-        const container = containerRef.current;
-        if (container) {
-          const rect = container.getBoundingClientRect();
-          const relativeX = clientX - rect.left;
-          const relativeY = clientY - rect.top;
-          setMousePosition({ x: relativeX, y: relativeY });
-        }
-      } else {
-        setHoveredObject(null);
+      const container = containerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const relativeX = clientX - rect.left;
+        const relativeY = clientY - rect.top;
+        setMousePosition({ x: relativeX, y: relativeY });
       }
     }
   }, [mapData, geometry, getClientCoords, screenToGrid, screenToWorld, getObjectAtPosition, setHoveredObject, setMousePosition, containerRef, ladder, getActiveLevel, viewController]

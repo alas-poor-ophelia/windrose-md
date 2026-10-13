@@ -29,7 +29,7 @@ import { eraseObjectAt } from '../../objects/objectOperations';
 import { eraseCellFromCurves, eraseWorldPolygonFromCurves } from '../../geometry/curves/curveBoolean';
 import { Notice } from 'obsidian';
 import { getActiveLayer, getActiveBoardLayers, authoredCells } from '../../persistence/layerAccessor';
-import { canBeginDepthAuthoring, guardDepthWrite, type DepthWriteContext, type DepthWriteRefusal } from '../../persistence/depthAuthoring';
+import { guardDepthWrite, type DepthWriteContext, type DepthWriteRefusal } from '../../persistence/depthAuthoring';
 import { withCellPainted, withCellErased, depthRefusalMessage } from '../../drawing/depthCellOps';
 import { findTileHitInLayers } from '../../assets/tileFootprint';
 import { distanceToWallPath } from '../../drawing/wallPathOperations';
@@ -436,12 +436,22 @@ function usePaintTool({
 
     const activeLayer = getActiveLayer(mapData);
 
+    // Zoomed onto a rung but the map cannot take this deep write: refuse with
+    // the real reason and consume the press, never painting level 0 instead
+    // (parity with objects, tiles and text; kgc.25). Classic maps (no ladder)
+    // stay on level 0 untouched.
+    const level = ladder !== null && getEditLevel !== undefined ? getEditLevel() : 0;
+    if (level > 0) {
+      const refusal = guardDepthWrite(mapData, activeLayer.id, level, authoredCells(activeLayer, level));
+      if (refusal !== null) {
+        new Notice(depthRefusalMessage(refusal));
+        return;
+      }
+    }
+
     setPaintIsDrawing(true);
     setProcessedCells(new Set());
     setProcessedEdges(new Set());
-    const level = ladder !== null && getEditLevel !== undefined && canBeginDepthAuthoring(mapData)
-      ? getEditLevel()
-      : 0;
     strokeLevelRef.current = level;
     strokeRefusedRef.current = false;
     strokeBytesRef.current = level > 0 ? JSON.stringify(mapData).length : null;

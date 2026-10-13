@@ -67,3 +67,17 @@ describe('getItemsInWorldRect without a view (classic)', () => {
     expect(ids(items)).toEqual(['deep', 'pop', 'root']);
   });
 });
+
+describe('getItemsInWorldRect classic hex honours obj.size', () => {
+  it('a 2x2 hex object is selected by a rect touching its second column; a 1x1 is not', () => {
+    // Drawn from (center - hexSize/2) at size * hexSize: the second column spans
+    // center + 40 .. center + 120 at hexSize 80, past the one-hex box (center + 80).
+    const c = root.getCellCenter(3, -1);
+    const a = { worldX: c.worldX + 100, worldY: c.worldY - 1 };
+    const b = { worldX: c.worldX + 110, worldY: c.worldY + 1 };
+    const big = obj({ id: 'big', size: { width: 2, height: 2 } });
+    const small = obj({ id: 'small' });
+    expect(ids(getItemsInWorldRect(mapWith([big]), a, b, root, null))).toEqual(['big']);
+    expect(ids(getItemsInWorldRect(mapWith([small]), a, b, root, null))).toEqual([]);
+  });
+});

@@ -28,7 +28,8 @@ import { useMapSelection } from '../../context/MapSelectionContext';
 import type { Point } from '#types/core/geometry.types';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { homeLevelOf } from '../../objects/hexSlotPositioner';
-import { isGroupGridMoveBlocked, groupItemHitsCell } from '../../objects/groupDragOps';
+import { isGroupGridMoveBlocked, groupItemHitsCell, assignGroupSlots, reorganizeVacatedCells } from '../../objects/groupDragOps';
+import { ladderFootprintContains } from '../../objects/ladderHitTest';
 
 
 /**
@@ -42,7 +43,9 @@ const useGroupDrag = (): UseGroupDragResult => {
     screenToWorld,
     getClientCoords,
     ladder,
-    screenToLevelCell
+    screenToLevelCell,
+    getActiveLevel,
+    viewController
   } = useMapState();
 
   // Geometry an object's `position` indexes into: its home rung under the
@@ -108,12 +111,21 @@ const useGroupDrag = (): UseGroupDragResult => {
       if (item.type === 'object') {
         const obj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
         if (obj != null) {
-          // Test the pointer cell on the object's own rung (home 0 = the given root cell)
-          const hit = groupItemHitsCell(obj, (home: number): Point | null => {
-            if (home === 0) return { x, y };
-            if (clientX === undefined || clientY === undefined) return null;
-            return screenToLevelCell(clientX, clientY, home);
-          });
+          // Ladder: the drawn footprint is what the pointer grabs (a held
+          // persist object is drawn smaller/larger than its cell). Classic:
+          // the pointer cell on the object's own rung (home 0 = the root cell).
+          const hit = ladder !== null
+            ? ladderFootprintContains(obj, activeLayer.objects ?? [], worldX, worldY, {
+              ladder,
+              level: getActiveLevel(),
+              zoom: viewController?.getLive().zoom ?? mapData.viewState?.zoom ?? 1,
+              orientation: mapData.orientation ?? 'flat'
+            })
+            : groupItemHitsCell(obj, (home: number): Point | null => {
+              if (home === 0) return { x, y };
+              if (clientX === undefined || clientY === undefined) return null;
+              return screenToLevelCell(clientX, clientY, home);
+            });
           if (hit) return item;
         }
       } else if (item.type === 'text') {
@@ -132,7 +144,7 @@ const useGroupDrag = (): UseGroupDragResult => {
     }
 
     return null;
-  }, [hasMultiSelection, selectedItems, mapData, screenToLevelCell]);
+  }, [hasMultiSelection, selectedItems, mapData, screenToLevelCell, ladder, getActiveLevel, viewController]);
 
   const startGroupDrag = useCallback((
     clientX: number,
@@ -226,15 +238,16 @@ const useGroupDrag = (): UseGroupDragResult => {
     const gridCoords = screenToGrid(clientX, clientY);
     const worldCoords = screenToWorld(clientX, clientY);
 
-    if (!gridCoords || !worldCoords) return true;
+    // Under the ladder the root cell may be off-canvas while a deep rung cell
+    // exists; only a home-0 grid mover needs it (pointerCellOn(0) then bails).
+    if (!worldCoords || (gridCoords === null && ladder === null)) return true;
 
-    const { x, y } = gridCoords;
-    const gridX = x;
-    const gridY = y;
+    const gridX = gridCoords?.x ?? dragStart.gridX ?? 0;
+    const gridY = gridCoords?.y ?? dragStart.gridY ?? 0;
     const { worldX, worldY } = worldCoords;
 
-    const gridDeltaX = x - (dragStart.gridX ?? 0);
-    const gridDeltaY = y - (dragStart.gridY ?? 0);
+    const gridDeltaX = gridX - (dragStart.gridX ?? 0);
+    const gridDeltaY = gridY - (dragStart.gridY ?? 0);
     const worldDeltaX = worldX - (dragStart.worldX ?? 0);
     const worldDeltaY = worldY - (dragStart.worldY ?? 0);
 
@@ -340,14 +353,19 @@ const useGroupDrag = (): UseGroupDragResult => {
     );
 
     // Bounds (root bounds at home 0, ladder existence deeper) and overlap,
-    // both scoped to each moving object's own rung
-    const blocked = isGroupGridMoveBlocked(gridUpdates, nonSelectedObjects, (home, cx, cy) =>
+    // both scoped to each moving object's own rung. Hex cells hold up to
+    // getMaxObjectsPerCell() objects in slots, so there the overlap check is
+    // replaced by per-cell slot assignment (null = a cell would overflow).
+    const isHex = mapData.mapType === 'hex';
+    const blocked = isGroupGridMoveBlocked(gridUpdates, isHex ? [] : nonSelectedObjects, (home, cx, cy) =>
       ladder !== null && home > 0 ? ladder.existsAt(home, cx, cy) : geometry.isWithinBounds(cx, cy)
     );
     if (blocked) return true;
+    const hexSlots = isHex ? assignGroupSlots(gridUpdates, nonSelectedObjects) : null;
+    if (isHex && hexSlots === null) return true;
 
     if (objectUpdates.length > 0) {
-      const updatedObjects = [...activeLayer.objects];
+      let updatedObjects = [...activeLayer.objects];
 
       for (const update of objectUpdates) {
         const idx = updatedObjects.findIndex((o: MapObject) => o.id === update.id);
@@ -360,13 +378,18 @@ const useGroupDrag = (): UseGroupDragResult => {
               ...(isInverted && offsets.get(update.id)?.freeform !== true ? { freeform: true } : {})
             };
           } else {
+            const slot = hexSlots?.get(update.id);
             updatedObjects[idx] = {
               ...updatedObjects[idx],
-              position: update.newPosition
+              position: update.newPosition,
+              ...(slot !== undefined ? { slot } : {})
             };
           }
         }
       }
+
+      // Compact the hex cells the grid movers left (per rung)
+      if (isHex) updatedObjects = reorganizeVacatedCells(updatedObjects, gridUpdates);
 
       onObjectsChange(updatedObjects, true);
     }

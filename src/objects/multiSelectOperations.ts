@@ -124,11 +124,16 @@ function getObjectWorldBounds(
       halfHeight = hexSize;
     }
     
+    // The renderer draws a hex object from (center - hexSize / 2) at
+    // size * hexSize (objectRenderer.calculateObjectPosition), so a multi-cell
+    // object reaches past its anchor hex: extend the one-hex box to cover it.
+    const drawnMinX = center.worldX - hexSize / 2;
+    const drawnMinY = center.worldY - hexSize / 2;
     return {
-      minX: center.worldX - halfWidth,
-      minY: center.worldY - halfHeight,
-      maxX: center.worldX + halfWidth,
-      maxY: center.worldY + halfHeight
+      minX: Math.min(center.worldX - halfWidth, drawnMinX),
+      minY: Math.min(center.worldY - halfHeight, drawnMinY),
+      maxX: Math.max(center.worldX + halfWidth, drawnMinX + size.width * hexSize),
+      maxY: Math.max(center.worldY + halfHeight, drawnMinY + size.height * hexSize)
     };
   }
   

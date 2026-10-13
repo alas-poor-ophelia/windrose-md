@@ -14,7 +14,7 @@ vi.mock('../../../src/core/settingsAccessor', () => ({
 }));
 
 import type { MapObject } from '#types/objects/object.types';
-import { isGroupGridMoveBlocked, groupItemHitsCell } from '../../../src/objects/groupDragOps';
+import { isGroupGridMoveBlocked, groupItemHitsCell, assignGroupSlots, reorganizeVacatedCells } from '../../../src/objects/groupDragOps';
 
 const obj = (id: string, x: number, y: number, homeLevel?: number, size?: { width: number; height: number }): MapObject =>
   ({ id, type: 'chest', position: { x, y }, ...(homeLevel !== undefined ? { homeLevel } : {}), ...(size ? { size } : {}) } as MapObject);
@@ -74,5 +74,76 @@ describe('groupItemHitsCell', () => {
     expect(groupItemHitsCell(big, () => ({ x: 1, y: 1 }))).toBe(true);
     expect(groupItemHitsCell(big, () => ({ x: 2, y: 1 }))).toBe(false);
     expect(groupItemHitsCell(obj('deep', 0, 0, 1), () => null)).toBe(false);
+  });
+});
+
+describe('assignGroupSlots (hex)', () => {
+  const slotted = (id: string, x: number, y: number, slot: number, homeLevel?: number): MapObject =>
+    ({ ...obj(id, x, y, homeLevel), slot } as MapObject);
+
+  it('two movers into one empty cell get slots 0 and 1', () => {
+    const moves = [
+      { oldObj: slotted('a', 0, 0, 0), newPosition: { x: 5, y: 5 } },
+      { oldObj: slotted('b', 1, 0, 0), newPosition: { x: 5, y: 5 } }
+    ];
+    const slots = assignGroupSlots(moves, []);
+    expect(slots).not.toBeNull();
+    expect([slots!.get('a'), slots!.get('b')].sort()).toEqual([0, 1]);
+  });
+
+  it('a mover into a cell with 3 static objects gets slot 3', () => {
+    const statics = [slotted('s0', 5, 5, 0), slotted('s1', 5, 5, 1), slotted('s2', 5, 5, 2)];
+    const slots = assignGroupSlots([{ oldObj: slotted('a', 0, 0, 0), newPosition: { x: 5, y: 5 } }], statics);
+    expect(slots?.get('a')).toBe(3);
+  });
+
+  it('a mover into a full cell blocks; so does a group that would overflow a cell', () => {
+    const full = [0, 1, 2, 3].map(i => slotted('s' + i, 5, 5, i));
+    expect(assignGroupSlots([{ oldObj: slotted('a', 0, 0, 0), newPosition: { x: 5, y: 5 } }], full)).toBeNull();
+    const three = full.slice(0, 3);
+    const moves = [
+      { oldObj: slotted('a', 0, 0, 0), newPosition: { x: 5, y: 5 } },
+      { oldObj: slotted('b', 1, 0, 0), newPosition: { x: 5, y: 5 } }
+    ];
+    expect(assignGroupSlots(moves, three)).toBeNull();
+  });
+
+  it('is rung-scoped: a static object on another rung at the same index does not count', () => {
+    const otherRung = [0, 1, 2, 3].map(i => slotted('s' + i, 5, 5, i, 2));
+    const slots = assignGroupSlots([{ oldObj: slotted('a', 0, 0, 3), newPosition: { x: 5, y: 5 } }], otherRung);
+    expect(slots?.get('a')).toBe(0);
+    // ...and on its own rung the same statics fill the cell
+    expect(assignGroupSlots([{ oldObj: slotted('d', 0, 0, 0, 2), newPosition: { x: 5, y: 5 } }], otherRung)).toBeNull();
+  });
+
+  it('a mover that keeps its cell keeps its slot', () => {
+    const statics = [slotted('s0', 5, 5, 0)];
+    const slots = assignGroupSlots([{ oldObj: slotted('a', 5, 5, 2), newPosition: { x: 5, y: 5 } }], statics);
+    expect(slots?.get('a')).toBe(2);
+  });
+});
+
+describe('reorganizeVacatedCells (hex)', () => {
+  it('compacts a vacated cell: the remaining slot-2 object moves to slot 0', () => {
+    const before = [
+      { ...obj('a', 1, 1), slot: 0 },
+      { ...obj('b', 1, 1), slot: 1 },
+      { ...obj('c', 1, 1), slot: 2 }
+    ] as MapObject[];
+    const moves = [
+      { oldObj: before[0], newPosition: { x: 4, y: 4 } },
+      { oldObj: before[1], newPosition: { x: 4, y: 4 } }
+    ];
+    const after = before.map(o => (o.id === 'c' ? o : { ...o, position: { x: 4, y: 4 } }));
+    const result = reorganizeVacatedCells(after, moves);
+    expect(result.find(o => o.id === 'c')?.slot).toBe(0);
+  });
+
+  it('leaves the same index on another rung alone', () => {
+    const deep = { ...obj('d', 1, 1, 2), slot: 2 } as MapObject;
+    const mover = { ...obj('a', 1, 1), slot: 0 } as MapObject;
+    const after = [{ ...mover, position: { x: 4, y: 4 } }, deep];
+    const result = reorganizeVacatedCells(after, [{ oldObj: mover, newPosition: { x: 4, y: 4 } }]);
+    expect(result.find(o => o.id === 'd')?.slot).toBe(2);
   });
 });

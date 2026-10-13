@@ -6,7 +6,7 @@
  */
 
 import type { ToolId } from '#types/tools/tool.types';
-import type { ObjectAlignment } from '#types/objects/object.types';
+import type { MapObject, ObjectAlignment } from '#types/objects/object.types';
 
 import { useCallback } from 'preact/hooks';
 import { Notice } from 'obsidian';
@@ -14,7 +14,7 @@ import { useMapState } from '../../context/MapContext';
 import { useMapOperations } from '../../context/MapContext';
 import { calculateEdgeAlignment, placeObject, placeObjectFreeform, canPlaceObjectAt } from '../../objects/objectOperations';
 import { getActiveLayer, authoredCells } from '../../persistence/layerAccessor';
-import { guardDepthWrite } from '../../persistence/depthAuthoring';
+import { guardDepthWrite, elementBytes } from '../../persistence/depthAuthoring';
 import { depthRefusalMessage } from '../../drawing/depthCellOps';
 
 
@@ -79,6 +79,22 @@ function useObjectPlacement(
 
     const mapType = mapData.mapType || 'grid';
 
+    // A deep placement grows the map without growing the rung's cells, so the
+    // byte budget is checked against the objects it actually adds (kgc.25).
+    const commit = (objects: MapObject[]): void => {
+      if (level > 0) {
+        const activeLayer = getActiveLayer(mapData);
+        const before = new Set(activeLayer.objects);
+        const added = objects.filter((o) => !before.has(o));
+        const refusal = guardDepthWrite(mapData, activeLayer.id, level, authoredCells(activeLayer, level), { addedBytes: elementBytes(added) });
+        if (refusal !== null) {
+          new Notice(depthRefusalMessage(refusal));
+          return;
+        }
+      }
+      onObjectsChange(objects);
+    };
+
     // Freeform placement: Alt+Shift or sidebar toggle places at exact world coordinates
     const useFreeformPlacement = (altKeyPressedRef.current && shiftKeyPressedRef.current)
                                 || (freeformPlacementModeRef?.current ?? false);
@@ -97,7 +113,7 @@ function useObjectPlacement(
         level
       );
       if (result.success) {
-        onObjectsChange(result.objects);
+        commit(result.objects);
       }
       return true;
     }
@@ -126,7 +142,7 @@ function useObjectPlacement(
     );
 
     if (result.success) {
-      onObjectsChange(result.objects);
+      commit(result.objects);
     }
     return true;
   }, [currentTool, selectedObjectType, mapData, geometry, getEditLevel, screenToLevelCell, ladder, edgeSnapMode, onObjectsChange, screenToWorld, altKeyPressedRef, freeformPlacementModeRef, shiftKeyPressedRef]);

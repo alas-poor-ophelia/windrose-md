@@ -107,6 +107,17 @@ function rectContains(rect: FootprintRect, px: number, py: number): boolean {
 }
 
 /**
+ * Whether world point (worldX, worldY) falls inside `obj`'s drawn footprint
+ * under `view` (false when the object is not drawn). The per-object test a
+ * caller uses when it already knows which objects are candidates (group drag
+ * grabbing a selected member).
+ */
+function ladderFootprintContains(obj: MapObject, allObjects: MapObject[], worldX: number, worldY: number, view: LadderHitView): boolean {
+  const rect = ladderObjectFootprint(obj, allObjects, view);
+  return rect !== null && rectContains(rect, worldX * view.zoom, worldY * view.zoom);
+}
+
+/**
  * The object drawn under world point (worldX, worldY), or null. Walks the same
  * depth-group order the renderer paints in and keeps the LAST hit, so the
  * object painted on top is the one picked.
@@ -127,4 +138,4 @@ function pickLadderObject(objects: MapObject[], worldX: number, worldY: number, 
 }
 
 export type { LadderHitView, FootprintRect };
-export { ladderObjectFootprint, pickLadderObject };
+export { ladderObjectFootprint, ladderFootprintContains, pickLadderObject };

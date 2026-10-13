@@ -14,6 +14,7 @@ import { LADDER_DEFAULTS } from "../../../src/geometry/core/lattice";
 
 import type { MapData } from "#types/core/map.types";
 import type { MapObject } from "#types/objects/object.types";
+import type { TileAssignment } from "#types/tiles/tile.types";
 
 import { makeLayer, makeMapData } from "../helpers/fixtures";
 
@@ -98,6 +99,42 @@ describe("calculateContentBounds with ladder rungs", () => {
       expect(calculateContentBounds(makeLayer({ objects: [rootObj] }), root, null)).toEqual(root.getObjectBounds(rootObj));
     });
   });
+  describe("tiles (kgc.25)", () => {
+    const rootTile = { col: 1, row: 1, tilesetId: "ts", tileId: "t" } as TileAssignment;
+    const deepTile = { col: 5, row: 7, tilesetId: "ts", tileId: "t", homeLevel: 2 } as TileAssignment;
+
+    it("a root tile is bounded by its cell (tiles used to be ignored)", () => {
+      const root = new HexGeometry(40, "flat", { maxCol: 10, maxRow: 10 });
+      expect(calculateContentBounds(makeLayer({ tiles: [rootTile] }), root, null))
+        .toEqual(root.getCellBounds({ q: 1, r: 1, color: "" }));
+    });
+
+    it("a rung-2 tile is bounded by its rung-2 cell, and skipped without a ladder", () => {
+      const mapData = ladderMap();
+      const root = new HexGeometry(40, "flat", { maxCol: 10, maxRow: 10 });
+      const ladder = ladderForAuthoredRungs(mapData, root);
+      if (ladder === null) throw new Error("expected a ladder");
+      const layer = makeLayer({ tiles: [deepTile] });
+      expect(calculateContentBounds(layer, root, ladder)).toEqual(ladder.geometryForLevel(2).getCellBounds({ q: 5, r: 7, color: "" }));
+      expect(calculateContentBounds(layer, root, null)).toBeNull();
+    });
+
+    it("a freeform stamp is its scaled drop-cell box centred on its world position", () => {
+      const root = new HexGeometry(40, "flat", { maxCol: 10, maxRow: 10 });
+      const stamp = { col: 2, row: 2, tilesetId: "ts", tileId: "t", freeform: true, worldX: 300, worldY: 200, scale: 2 } as TileAssignment;
+      const cell = root.getCellBounds({ q: 2, r: 2, color: "" });
+      const w = cell.maxX - cell.minX;
+      const h = cell.maxY - cell.minY;
+      const b = calculateContentBounds(makeLayer({ tiles: [stamp] }), root, null);
+      expect(b).not.toBeNull();
+      if (b === null) return;
+      expect(b.minX).toBeCloseTo(300 - w);
+      expect(b.maxX).toBeCloseTo(300 + w);
+      expect(b.minY).toBeCloseTo(200 - h);
+      expect(b.maxY).toBeCloseTo(200 + h);
+    });
+  });
+
   describe("exportLadderFor (kgc.23 h: bounds follow the render's deep condition)", () => {
     it("a ladder view gets a ladder, and its rung cells count", () => {
       const mapData = ladderMap();

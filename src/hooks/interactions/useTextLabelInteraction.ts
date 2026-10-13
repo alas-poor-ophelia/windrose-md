@@ -28,7 +28,7 @@ import { useMapState, useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { Notice } from 'obsidian';
-import { guardDepthWrite } from '../../persistence/depthAuthoring';
+import { guardDepthWrite, elementBytes } from '../../persistence/depthAuthoring';
 import { depthRefusalMessage } from '../../drawing/depthCellOps';
 import { authoredCells } from '../../persistence/layerAccessor';
 import { toggledDepthMode } from '../../geometry/renderers/elementBands';
@@ -303,10 +303,21 @@ const useTextLabelInteraction = (
           ...(pendingTextPosition.homeLevel !== undefined ? { homeLevel: pendingTextPosition.homeLevel } : {})
         }
       );
-      onTextLabelsChange(newLabels);
+      // A deep label grows the map without growing the rung's cells: hold it
+      // to the byte budget at commit, when its real size is known (kgc.25).
+      const homeLevel = pendingTextPosition.homeLevel ?? 0;
+      let refusal = null;
+      if (homeLevel > 0) {
+        const layer = getActiveLayer(mapData);
+        const before = new Set(layer.textLabels);
+        const added = newLabels.filter((l) => !before.has(l));
+        refusal = guardDepthWrite(mapData, layer.id, homeLevel, authoredCells(layer, homeLevel), { addedBytes: elementBytes(added) });
+        if (refusal !== null) new Notice(depthRefusalMessage(refusal));
+      }
+      if (refusal === null) onTextLabelsChange(newLabels);
 
       // Save text label settings for future new labels (per-map)
-      if (onMapDataUpdate) {
+      if (refusal === null && onMapDataUpdate) {
         onMapDataUpdate({
           lastTextLabelSettings: {
             fontSize: labelData.fontSize,
