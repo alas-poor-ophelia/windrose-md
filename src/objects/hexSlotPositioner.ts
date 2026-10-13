@@ -148,6 +148,19 @@ function homeLevelOf(obj: { homeLevel?: number }): number {
 }
 
 /**
+ * Rung scope for an index hit-test on the CLASSIC branch (no ladder view).
+ *
+ * A map carrying `lod` that is not shown as a ladder (quarantined, or rotated)
+ * draws level 0 only, so its deep objects are undrawn and must not be hit,
+ * dragged or deleted by their index (a rung-2 object at (3, -1) is not the
+ * root hex (3, -1)): scope to rung 0. A map without `lod` returns undefined,
+ * which keeps every call byte-identical to the unscoped (main) one.
+ */
+function classicHitRung(mapData: { lod?: unknown } | null | undefined): 0 | undefined {
+  return mapData !== null && mapData !== undefined && mapData.lod !== undefined && mapData.lod !== null ? 0 : undefined;
+}
+
+/**
  * Get objects in a specific cell.
  *
  * Rung cells of different ladder levels share index space: (3, -1) on rung 2 is
@@ -261,4 +274,4 @@ function getClickedObjectInCell(
   return closest;
 }
 
-export { FLAT_TOP_ARRANGEMENTS, POINTY_TOP_ARRANGEMENTS, getSlotOffset, assignSlot, reorganizeSlots, getMaxObjectsPerCell, getMultiObjectScale, getObjectsInCell, canAddObjectToCell, getOccupiedSlots, reorganizeAfterRemoval, getClickedObjectInCell, homeLevelOf };
+export { FLAT_TOP_ARRANGEMENTS, POINTY_TOP_ARRANGEMENTS, getSlotOffset, assignSlot, reorganizeSlots, getMaxObjectsPerCell, getMultiObjectScale, getObjectsInCell, canAddObjectToCell, getOccupiedSlots, reorganizeAfterRemoval, getClickedObjectInCell, homeLevelOf, classicHitRung };

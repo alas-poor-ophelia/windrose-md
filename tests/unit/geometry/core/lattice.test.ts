@@ -289,3 +289,61 @@ describe("rosette seating (T1): legacy sub-hex content on a ladder rung", () => 
     expect(16 / 15 - 1).toBeCloseTo(0.0667, 3);
   });
 });
+
+/**
+ * Cross-model review item 5: ownership (`ancestorAt`, nested nearest-centre
+ * rounding, the STORAGE key) is not geometric containment (the root hex the
+ * rung cell's centre visibly sits in). Measured 2026-10-12, m 4, hexSize 80,
+ * every rung cell whose centre lies within ring 6 of the origin (127 roots):
+ *
+ *   flat   L1 230/2045 (11.2%, all on a shared edge)   pointy L1 219/2045 (10.7%, all on an edge)
+ *   flat   L2 3815/32583 (11.7%; 2794 strictly inside)  pointy L2 3797/32569 (11.7%; 2794 strictly inside)
+ *   flat   L3 62855/520487 (12.1%; 58674 strictly inside) pointy L3 62827/520453 (12.1%; 58674 strictly inside)
+ *
+ * Every disagreement is with an ADJACENT root, so the effect is a ragged
+ * ownership edge one root-hex wide (design 06 s20). The ownership rule stays;
+ * visual questions (the smart tile clip) use containment instead. The bounds
+ * below pin the measured rates with a little headroom so a change to the tie
+ * rule or the rounding shows up here.
+ */
+describe("ancestorAt vs geometric containment (m 4, hexSize 80)", () => {
+  const RING = 6;
+  const MAX_RATE: Record<number, number> = { 1: 0.115, 2: 0.12, 3: 0.125 };
+  const MAX_INTERIOR_RATE: Record<number, number> = { 1: 0, 2: 0.09, 3: 0.115 };
+
+  it.each(["flat", "pointy"] as const)("%s: mismatch rate per rung stays within the measured bound", (orientation) => {
+    const m = 4;
+    const ladder = buildLadder(m);
+    const root = new HexGeometry(80, orientation, null);
+    for (let L = 1; L <= 3; L++) {
+      const rung = new HexGeometry(80 / Math.pow(m, L), orientation, null);
+      const reach = (RING + 1) * Math.pow(m, L);
+      let total = 0;
+      let mismatch = 0;
+      let interior = 0;
+      for (let q = -reach; q <= reach; q++) {
+        for (let r = -reach; r <= reach; r++) {
+          const c = rung.getCellCenter(q, r);
+          const geo = root.worldToGrid(c.worldX, c.worldY);
+          if (hexRing(geo.x, geo.y) > RING) continue;
+          total++;
+          const own = ladder.ancestorAt(L, q, r);
+          if (own.q === geo.x && own.r === geo.y) continue;
+          mismatch++;
+          // Always an adjacent root: the ragged edge is one hex wide.
+          expect(hexRing(own.q - geo.x, own.r - geo.y)).toBe(1);
+          const gc = root.getCellCenter(geo.x, geo.y);
+          const oc = root.getCellCenter(own.q, own.r);
+          const onEdge = Math.abs(
+            Math.hypot(c.worldX - gc.worldX, c.worldY - gc.worldY) - Math.hypot(c.worldX - oc.worldX, c.worldY - oc.worldY)
+          ) < 1e-6;
+          if (!onEdge) interior++;
+        }
+      }
+      expect(total).toBeGreaterThan(127 * Math.pow(m, 2 * L) * 0.99);
+      expect(mismatch).toBeGreaterThan(0);
+      expect(mismatch / total).toBeLessThanOrEqual(MAX_RATE[L]);
+      expect(interior / total).toBeLessThanOrEqual(MAX_INTERIOR_RATE[L]);
+    }
+  });
+});

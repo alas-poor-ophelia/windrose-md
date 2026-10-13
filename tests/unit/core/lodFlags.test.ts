@@ -266,3 +266,40 @@ describe('lodFlags: hasDepthContent', () => {
     expect(hasDepthContent(hexMap())).toBe(false);
   });
 });
+
+describe('lodFlags: bounded ladder depth and zoom (cross-model review item 1)', () => {
+  beforeEach(() => { getSettings.mockReset(); withLadderOverride(undefined); });
+  afterEach(() => { clearLadderGlobal(); });
+
+  it('exports the shared caps', async () => {
+    const { MAX_LADDER_LEVEL, MAX_LADDER_ZOOM } = await import('../../../src/core/lodFlags');
+    expect(MAX_LADDER_LEVEL).toBe(6);
+    expect(MAX_LADDER_ZOOM).toBe(2048);
+  });
+
+  it('quarantines a maxLevel past MAX_LADDER_LEVEL', () => {
+    expect(isDepthQuarantined(withLayers({ lod: { ...LOD, maxLevel: 40 } }))).toEqual({ quarantined: true, reason: 'max-level-too-deep' });
+    expect(isDepthQuarantined(withLayers({ lod: { ...LOD, maxLevel: 7 } })).reason).toBe('max-level-too-deep');
+    expect(isDepthQuarantined(withLayers({ lod: { ...LOD, maxLevel: 6 } })).quarantined).toBe(false);
+  });
+
+  it('a too-deep lod is not a ladder view and clamps at the classic zoom', () => {
+    getSettings.mockReturnValue({ lodLadder: true });
+    const deep = withLayers({ lod: { ...LOD, maxLevel: 40 } });
+    expect(isLadderView(deep)).toBe(false);
+    expect(getMaxZoom(deep)).toBe(DEFAULTS.maxZoom);
+  });
+
+  it('clamps a legal but extreme ceiling to MAX_LADDER_ZOOM (m 15, maxLevel 3 asks for ~20k)', () => {
+    getSettings.mockReturnValue({});
+    const wide = withLayers({ lod: { m: 15, minCellPx: 64, maxLevel: 3 } });
+    expect(isLadderView(wide)).toBe(true);
+    expect(getMaxZoom(wide)).toBe(2048);
+  });
+
+  it('ignores a developer maxLevel override past the cap', () => {
+    getSettings.mockReturnValue({ lodLadder: true });
+    withLadderOverride({ maxLevel: 40 });
+    expect(ladderParamsFor(hexMap()).maxLevel).toBe(3);
+  });
+});

@@ -21,7 +21,7 @@ import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 import type { StoredViewState } from '#types/core/map.types';
 
 import { DEFAULTS } from '../../core/dmtConstants';
-import { isLadderView, ladderParamsFor, getMaxZoom } from '../../core/lodFlags';
+import { isLadderView, ladderParamsFor, getMaxZoom, hasDepthContent } from '../../core/lodFlags';
 import { chooseLevel, crossingZoom, rungMiddleZoom, type LadderParams } from '../../geometry/core/lattice';
 
 type LevelsRecord = Record<number, Cell[]>;
@@ -158,9 +158,39 @@ function stampedLodOf(before: MapData, after: MapData): { lodStamped?: LadderCon
   return before.lod === undefined && after.lod !== undefined ? { lodStamped: after.lod } : {};
 }
 
-/** Undo LEAVING the entry that stamped `lod`: the map is classic again. Same map otherwise. */
+/** A `lod` stamp made on a suppressed (batched) tick, waiting for its stroke's commit. */
+type ParkedLodStamp = { channel: string; lod: LadderConfig } | null;
+
+/**
+ * The `lodStamped` a write's history entry should carry, and the new parked
+ * stamp. A suppressed tick that stamps parks the block under `channel` (a
+ * layer field, or `level:N` for a rung) and records nothing. A committing
+ * write claims a parked stamp ONLY on the same channel; every commit clears
+ * the park, so a cancelled stroke (Escape, tool switch, pointercancel) can
+ * never hand its stamp to an unrelated later edit (Codex review, blocking).
+ */
+function lodStampForCommit(
+  parked: ParkedLodStamp, before: MapData, after: MapData, suppressHistory: boolean, channel: string
+): { parked: ParkedLodStamp; stamp: { lodStamped?: LadderConfig } } {
+  const stamped = stampedLodOf(before, after);
+  if (suppressHistory) {
+    return { parked: stamped.lodStamped !== undefined ? { channel, lod: stamped.lodStamped } : parked, stamp: {} };
+  }
+  if (stamped.lodStamped !== undefined) return { parked: null, stamp: stamped };
+  return { parked: null, stamp: parked !== null && parked.channel === channel ? { lodStamped: parked.lod } : {} };
+}
+
+/**
+ * Undo LEAVING the entry that stamped `lod`: the map is classic again. Same map
+ * otherwise. `mapData` is the map being restored TO; the stamp is lifted only
+ * when it holds no authored rung and no homed element anywhere. A stamp can
+ * land on an entry that does not own every deep write (a cancelled stroke's
+ * cells stay on the map), and stripping `lod` there would leave
+ * `levels-without-lod` and quarantine the map (Codex review, blocking).
+ */
 function undoLodStamp(mapData: MapData, leaving: LayerHistorySnapshot | null | undefined): MapData {
   if (leaving?.lodStamped === undefined || mapData.lod === undefined) return mapData;
+  if (hasDepthContent(mapData)) return mapData;
   const { lod: _dropped, ...rest } = mapData;
   return rest;
 }
@@ -173,5 +203,6 @@ function redoLodStamp(mapData: MapData, entering: LayerHistorySnapshot): MapData
 
 export {
   snapshotLevelsOf, applySnapshotLevels, restoreSnapshotLevels, layerHistorySnapshotsEqual, viewStateForRung,
-  viewStateAtRung, resolveEditLevel, resolveViewportZoom, stampedLodOf, undoLodStamp, redoLodStamp
+  viewStateAtRung, resolveEditLevel, resolveViewportZoom, stampedLodOf, lodStampForCommit, undoLodStamp, redoLodStamp
 };
+export type { ParkedLodStamp };

@@ -81,3 +81,23 @@ describe('getItemsInWorldRect classic hex honours obj.size', () => {
     expect(ids(getItemsInWorldRect(mapWith([small]), a, b, root, null))).toEqual([]);
   });
 });
+
+describe('getItemsInWorldRect without a view on a lod map (cross-model review item 2)', () => {
+  const LOD = { m: 4, minCellPx: 64, maxLevel: 3 };
+  it('a quarantined/rotated lod map selects only rung-0 objects and labels', () => {
+    const [a, b] = around(root.getCellCenter(3, -1));
+    const c = root.getCellCenter(3, -1);
+    const labels = [
+      { id: 'lab-root', position: { x: c.worldX, y: c.worldY }, content: 'a', fontSize: 12, fontFace: 'sans', color: '#000' },
+      { id: 'lab-deep', position: { x: c.worldX, y: c.worldY }, content: 'b', fontSize: 12, fontFace: 'sans', color: '#000', homeLevel: 2 },
+    ];
+    const map = makeMapData({ mapType: 'hex', hexSize: 80, lod: LOD, layers: [makeLayer({ id: 'layer-1', objects: [rootObj, deepObj, popObj], textLabels: labels } as never)] } as never);
+    expect(ids(getItemsInWorldRect(map, a, b, root, null))).toEqual(['lab-root', 'pop', 'root']);
+  });
+
+  it('the same map with a ladder view is unaffected by the filter', () => {
+    const [a, b] = around(ladder.geometryForLevel(2).getCellCenter(3, -1));
+    const map = makeMapData({ mapType: 'hex', hexSize: 80, lod: LOD, layers: [makeLayer({ id: 'layer-1', objects: [rootObj, deepObj] })] } as never);
+    expect(ids(getItemsInWorldRect(map, a, b, root, null, view))).toEqual(['deep']);
+  });
+});

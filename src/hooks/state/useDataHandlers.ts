@@ -30,7 +30,7 @@ import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 
 import { useCallback, useMemo, useRef } from 'preact/hooks';
 import { getActiveLayer, updateActiveLayer, promoteToStrata, getActiveBoardLayers, setActiveLayer, authoredCells } from '../../persistence/layerAccessor';
-import { snapshotLevelsOf, stampedLodOf } from './layerHistoryOps';
+import { snapshotLevelsOf, lodStampForCommit, type ParkedLodStamp } from './layerHistoryOps';
 import { writeDepthCells, withLod, type DepthWriteContext, type DepthWriteResult } from '../../persistence/depthAuthoring';
 
 /** Does any element in the written value sit on a ladder rung >= 1? */
@@ -101,17 +101,17 @@ function useDataHandlers({
   // A batched stroke writes with suppressHistory until pointerup. If one of
   // those ticks stamped `lod` (first deep element), the stamp must still land on
   // the entry that finally records the stroke, or undo would restore the
-  // elements but leave the map a ladder map. Parked here until that commit.
-  const pendingLodStampRef = useRef<LadderConfig | null>(null);
-  const lodStampForHistory = useCallback((before: MapData, after: MapData, suppressHistory: boolean): { lodStamped?: LadderConfig } => {
-    const stamped = stampedLodOf(before, after);
-    if (suppressHistory) {
-      if (stamped.lodStamped !== undefined) pendingLodStampRef.current = stamped.lodStamped;
-      return {};
-    }
-    const carried = pendingLodStampRef.current;
-    pendingLodStampRef.current = null;
-    return stamped.lodStamped !== undefined ? stamped : carried !== null ? { lodStamped: carried } : {};
+  // elements but leave the map a ladder map. Parked here until that commit,
+  // keyed by the channel that parked it (a layer field, or `level:N` for a
+  // rung): only a commit on the SAME channel claims it. Any other commit drops
+  // it, so a cancelled stroke (Escape, tool switch, pointercancel) can never
+  // hand its stamp to an unrelated later edit (layerHistoryOps.lodStampForCommit).
+  // undoLodStamp also refuses to lift a stamp while depth content remains.
+  const pendingLodStampRef = useRef<ParkedLodStamp>(null);
+  const lodStampForHistory = useCallback((before: MapData, after: MapData, suppressHistory: boolean, channel: string): { lodStamped?: LadderConfig } => {
+    const { parked, stamp } = lodStampForCommit(pendingLodStampRef.current, before, after, suppressHistory, channel);
+    pendingLodStampRef.current = parked;
+    return stamp;
   }, []);
 
   const createLayerDataHandler = useCallback(<T,>(field: LayerField) => {
@@ -125,7 +125,7 @@ function useDataHandlers({
         // the first such write stamps `lod` exactly as the first deep cell
         // write does (and the history entry records it, so undo lifts it).
         const newMapData = stampLodForDeepElements(updateActiveLayer(currentMapData, { [field]: newValue }), newValue);
-        const lodStamp = lodStampForHistory(currentMapData, newMapData, suppressHistory);
+        const lodStamp = lodStampForHistory(currentMapData, newMapData, suppressHistory, field);
 
         if (!suppressHistory) {
           const activeLayer = getActiveLayer(currentMapData);
@@ -165,18 +165,21 @@ function useDataHandlers({
         outcome = result;
         if (!result.ok) return currentMapData;
 
+        // The first deep write also stamps `lod`; its entry remembers that, so
+        // undo takes the stamp back out with the cells (review finding kgc.15).
+        // A batched stroke stamps on a suppressed tick and records on an
+        // identity commit, so the stamp is parked under this rung's channel.
+        const lodStamp = lodStampForHistory(currentMapData, result.mapData, suppressHistory, `level:${level}`);
         if (!suppressHistory) {
           const written = getActiveLayer(result.mapData);
-          // The first deep write also stamps `lod`; its entry remembers that, so
-          // undo takes the stamp back out with the cells (review finding kgc.15).
-          addToHistory(buildLayerHistorySnapshot(written, result.mapData.name ?? '', { ...snapshotLevelsOf(written), level, ...stampedLodOf(currentMapData, result.mapData) }, result.mapData.regions ?? [], result.mapData.outlines ?? [], result.mapData.shapeOverlays ?? [], written.fogOfWar, result.mapData.partyPins ?? [], result.mapData.savedRoutes ?? []));
+          addToHistory(buildLayerHistorySnapshot(written, result.mapData.name ?? '', { ...snapshotLevelsOf(written), level, ...lodStamp }, result.mapData.regions ?? [], result.mapData.outlines ?? [], result.mapData.shapeOverlays ?? [], written.fogOfWar, result.mapData.partyPins ?? [], result.mapData.savedRoutes ?? []));
         }
 
         return result.mapData;
       });
       return outcome;
     },
-    [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot]
+    [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot, lodStampForHistory]
   );
 
   // =========================================================================
@@ -221,7 +224,7 @@ function useDataHandlers({
 
         const activeLayer = getActiveLayer(currentMapData);
         let nextMapData = stampLodForDeepElements(updateActiveLayer(currentMapData, { tiles: newValue }), newValue);
-        const lodStamp = lodStampForHistory(currentMapData, nextMapData, suppressHistory);
+        const lodStamp = lodStampForHistory(currentMapData, nextMapData, suppressHistory, 'tiles');
         if (!suppressHistory) {
           addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { tiles: newValue, ...lodStamp }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []));
         }

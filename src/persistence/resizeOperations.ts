@@ -2,14 +2,15 @@
  * resizeOperations.ts
  *
  * Pure helpers that let "what does this map contain" readers and the hex-bounds
- * resize writer see cells stored on ladder rungs >= 1 (`layer.levels`).
+ * resize writer see cells stored on ladder rungs >= 1 (`layer.levels`) and
+ * elements homed on them (objects, text labels, tiles with `homeLevel > 0`).
  *
  * Rung cells live in their rung's OWN axial coordinates, so every per-cell
  * question goes through a `GeometryLadder`: `geometryForLevel(L)` for world
  * placement, `existsAt(L, q, r)` for "is this inside the root bounds".
  *
- * Classic maps carry no rungs: `ladderForAuthoredRungs` returns null and every
- * caller reduces to its level-0 loop.
+ * Classic maps carry no depth content: `ladderForAuthoredRungs` returns null
+ * and every caller reduces to its level-0 loop.
  */
 
 import type { HexBounds, MapData, MapLayer } from '#types/core/map.types';
@@ -17,7 +18,7 @@ import { isHexCell } from '#types/core/cell.types';
 
 import { HexGeometry } from '../geometry/core/HexGeometry';
 import { createGeometryLadder, type GeometryLadder } from '../geometry/core/createGeometryLadder';
-import { isDepthQuarantined, ladderParamsFor } from '../core/lodFlags';
+import { hasDepthContent, isDepthQuarantined, ladderParamsFor } from '../core/lodFlags';
 import { DEFAULTS } from '../core/dmtConstants';
 import { authoredCells, authoredLevels, setLevelCells } from './layerAccessor';
 
@@ -28,20 +29,77 @@ function hasAuthoredRungs(mapData: MapData): boolean {
 
 /**
  * Ladder rooted at `root` (a hex geometry carrying the bounds to test against),
- * or null when no layer has rung cells. The ladder's hexSize comes from `root`;
- * m / minCellPx / maxLevel come from the map (`lod`, else defaults).
+ * or null when no layer has rung cells or elements homed on a rung >= 1. The
+ * ladder's hexSize comes from `root`; m / minCellPx / maxLevel come from the
+ * map (`lod`, else defaults).
  */
 function ladderForAuthoredRungs(mapData: MapData, root: HexGeometry): GeometryLadder | null {
-  if (!hasAuthoredRungs(mapData)) return null;
+  if (!hasDepthContent(mapData)) return null;
   // A quarantined map keeps its bytes untouched (design 06, s19 item 1): its
   // rungs are neither counted nor filtered, and an invalid `lod` never reaches
-  // createGeometryLadder, which throws on it.
+  // createGeometryLadder, which throws on it. A resize must not proceed
+  // silently over such a map: see depthResizeBlocker.
   if (isDepthQuarantined(mapData).quarantined) return null;
   const { m, minCellPx, maxLevel } = ladderParamsFor(mapData);
   return createGeometryLadder(root, { m, minCellPx, maxLevel });
 }
 
-/** Number of rung (>= 1) cells on `layer` whose lattice ancestor falls outside the ladder's root bounds. */
+type HomedList = 'objects' | 'textLabels' | 'tiles';
+const HOMED_LISTS: readonly HomedList[] = ['objects', 'textLabels', 'tiles'];
+
+/** The rung (>= 1) an element is homed on; 0 for a root element. */
+function homeOf(item: unknown): number {
+  const home = (item as { homeLevel?: number }).homeLevel ?? 0;
+  return Number.isInteger(home) && home > 0 ? home : 0;
+}
+
+/**
+ * Does a homed element's rung cell still exist under the ladder's root bounds?
+ * Objects and snapped tiles index their home rung's lattice (position, or
+ * col/row). Text labels, freeform objects and freeform tiles sit at world
+ * coordinates, which every rung shares, so they are snapped onto the home rung
+ * first.
+ */
+function homedElementExists(list: HomedList, item: unknown, home: number, ladder: GeometryLadder): boolean {
+  const atWorld = (x: number, y: number): boolean => {
+    const cell = ladder.geometryForLevel(home).worldToGrid(x, y);
+    return ladder.existsAt(home, cell.x, cell.y);
+  };
+  if (list === 'textLabels') {
+    const { position } = item as { position: { x: number; y: number } };
+    return atWorld(position.x, position.y);
+  }
+  if (list === 'tiles') {
+    const tile = item as { col: number; row: number; freeform?: boolean; worldX?: number; worldY?: number };
+    if (tile.freeform === true && tile.worldX !== undefined && tile.worldY !== undefined) return atWorld(tile.worldX, tile.worldY);
+    return ladder.existsAt(home, tile.col, tile.row);
+  }
+  const obj = item as { position: { x: number; y: number }; freeform?: boolean; worldPosition?: { x: number; y: number } | null };
+  if (obj.freeform === true && obj.worldPosition != null) return atWorld(obj.worldPosition.x, obj.worldPosition.y);
+  return ladder.existsAt(home, obj.position.x, obj.position.y);
+}
+
+/** Is `item` an element homed on a rung >= 1 whose rung cell falls outside the ladder's root bounds? */
+function isHomedOrphan(list: HomedList, item: unknown, ladder: GeometryLadder): boolean {
+  const home = homeOf(item);
+  return home > 0 && !homedElementExists(list, item, home, ladder);
+}
+
+/** Homed (rung >= 1) objects, text labels and tiles on `layer` whose rung cell falls outside the ladder's root bounds. */
+function countHomedOrphans(layer: MapLayer, ladder: GeometryLadder): number {
+  let orphans = 0;
+  for (const list of HOMED_LISTS) {
+    for (const item of (layer[list] ?? []) as unknown[]) {
+      if (isHomedOrphan(list, item, ladder)) orphans++;
+    }
+  }
+  return orphans;
+}
+
+/**
+ * Depth content on `layer` whose lattice ancestor falls outside the ladder's
+ * root bounds: rung (>= 1) cells plus homed objects, text labels and tiles.
+ */
 function countLevelOrphans(layer: MapLayer, ladder: GeometryLadder): number {
   let orphans = 0;
   for (const level of authoredLevels(layer)) {
@@ -50,24 +108,56 @@ function countLevelOrphans(layer: MapLayer, ladder: GeometryLadder): number {
       if (!isHexCell(cell) || !ladder.existsAt(level, cell.q, cell.r)) orphans++;
     }
   }
-  return orphans;
+  return orphans + countHomedOrphans(layer, ladder);
+}
+
+/** All depth content on `layer`: rung (>= 1) cells plus homed elements. */
+function countDepthContent(layer: MapLayer): number {
+  let count = 0;
+  for (const level of authoredLevels(layer)) {
+    if (level >= 1) count += authoredCells(layer, level).length;
+  }
+  for (const list of HOMED_LISTS) {
+    for (const item of (layer[list] ?? []) as unknown[]) {
+      if (homeOf(item) > 0) count++;
+    }
+  }
+  return count;
 }
 
 /**
- * Rung orphans on `layer` if the map were resized to `bounds` (the map's own
- * hexSize and orientation). 0 for classic maps (no rungs, no ladder built).
+ * Why a hex-bounds resize cannot account for this map's depth content, or null
+ * when it can. A quarantined map builds no ladder (its `lod` is missing or
+ * invalid), so its rung cells and homed elements can be neither tested nor
+ * filtered, and a shrink would strand them. Callers should refuse the shrink
+ * (or confirm with this reason) rather than proceed silently.
+ */
+function depthResizeBlocker(mapData: MapData): string | null {
+  if (mapData.mapType !== 'hex' || !hasDepthContent(mapData)) return null;
+  const { quarantined, reason } = isDepthQuarantined(mapData);
+  return quarantined ? `depth content is quarantined (${reason ?? 'unknown'})` : null;
+}
+
+/**
+ * Depth orphans on `layer` if the map were resized to `bounds` (the map's own
+ * hexSize and orientation). 0 for classic maps (no depth content, no ladder).
+ * A quarantined map with depth content cannot be tested against a ladder, so
+ * ALL of that layer's depth content is reported: the resize confirm dialog
+ * opens instead of the shrink stranding it silently (Codex review).
  */
 function countLevelOrphansForBounds(mapData: MapData, layer: MapLayer, bounds: HexBounds): number {
   if (mapData.mapType !== 'hex') return 0;
+  if (depthResizeBlocker(mapData) !== null) return countDepthContent(layer);
   const root = new HexGeometry(mapData.hexSize ?? DEFAULTS.hexSize, mapData.orientation ?? 'flat', bounds);
   const ladder = ladderForAuthoredRungs(mapData, root);
   return ladder === null ? 0 : countLevelOrphans(layer, ladder);
 }
 
 /**
- * Drop every rung (>= 1) cell, on every layer, that no longer exists under the
- * ladder's root bounds. Writes only through `setLevelCells`, so an emptied rung
- * (and an emptied `levels` container) is deleted. Level 0 is not touched.
+ * Drop every rung (>= 1) cell, and every object, text label and tile homed on
+ * a rung >= 1, on every layer, that no longer exists under the ladder's root
+ * bounds. Rung cells are written only through `setLevelCells`, so an emptied
+ * rung (and an emptied `levels` container) is deleted. Level 0 is not touched.
  * Returns the same `mapData` reference when nothing is removed.
  */
 function filterLevelsToBounds(mapData: MapData, ladder: GeometryLadder): MapData {
@@ -80,7 +170,22 @@ function filterLevelsToBounds(mapData: MapData, ladder: GeometryLadder): MapData
       if (kept.length !== cells.length) next = setLevelCells(next, layer.id, level, kept);
     }
   }
-  return next;
+  let layersChanged = false;
+  const layers = (next.layers ?? []).map((layer) => {
+    let patched: MapLayer = layer;
+    for (const list of HOMED_LISTS) {
+      const items = layer[list] as unknown[] | undefined;
+      if (items === undefined) continue;
+      const kept = items.filter(item => !isHomedOrphan(list, item, ladder));
+      if (kept.length !== items.length) patched = { ...patched, [list]: kept };
+    }
+    if (patched !== layer) layersChanged = true;
+    return patched;
+  });
+  return layersChanged ? { ...next, layers } : next;
 }
 
-export { hasAuthoredRungs, ladderForAuthoredRungs, countLevelOrphans, countLevelOrphansForBounds, filterLevelsToBounds };
+export {
+  hasAuthoredRungs, ladderForAuthoredRungs, countLevelOrphans, countHomedOrphans, countLevelOrphansForBounds,
+  depthResizeBlocker, filterLevelsToBounds
+};

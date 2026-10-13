@@ -127,6 +127,11 @@ function getObjectWorldBounds(
     // The renderer draws a hex object from (center - hexSize / 2) at
     // size * hexSize (objectRenderer.calculateObjectPosition), so a multi-cell
     // object reaches past its anchor hex: extend the one-hex box to cover it.
+    // INTENTIONAL CLASSIC BEHAVIOUR CHANGE (kept after the 2026-10-12
+    // cross-model review, item 4): main used the one-hex box only, so a
+    // multi-cell hex object was marquee-selectable by its anchor hex alone.
+    // Single-cell objects get exactly the old box. Listed in
+    // .claude/lod-rd/06-integration-design.md s20.
     const drawnMinX = center.worldX - hexSize / 2;
     const drawnMinY = center.worldY - hexSize / 2;
     return {
@@ -229,9 +234,15 @@ function getItemsInWorldRect(
   const minY = Math.min(corner1.worldY, corner2.worldY);
   const maxY = Math.max(corner1.worldY, corner2.worldY);
   
+  // A `lod` map off the ladder view (quarantined or rotated) draws rung 0
+  // only: its deep objects and labels are undrawn and must not be selected.
+  // Without `lod` nothing is filtered (byte-identical to main).
+  const rootOnly = view === undefined && mapData.lod !== undefined && mapData.lod !== null;
+
   // Check objects
   const objects = activeLayer.objects ?? [];
   for (const obj of objects) {
+    if (rootOnly && (obj.homeLevel ?? 0) !== 0) continue;
     const objBounds = getObjectWorldBounds(obj, geometry, mapData, view, objects);
     if (objBounds !== null && rectsOverlap(minX, minY, maxX, maxY, objBounds)) {
       items.push({ type: 'object', id: obj.id, data: obj });
@@ -241,6 +252,7 @@ function getItemsInWorldRect(
   // Check text labels
   const textLabels = activeLayer.textLabels ?? [];
   for (const label of textLabels) {
+    if (rootOnly && (label.homeLevel ?? 0) !== 0) continue;
     const labelBounds = getTextLabelWorldBounds(label, ctx);
     if (rectsOverlap(minX, minY, maxX, maxY, labelBounds)) {
       items.push({ type: 'text', id: label.id, data: label });

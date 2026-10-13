@@ -204,3 +204,14 @@ describe("createGeometryLadder: shipped hexSize sanity", () => {
     expect(DEFAULTS.hexSize).toBe(80);
   });
 });
+
+describe("createGeometryLadder: bounded maxLevel (cross-model review item 1)", () => {
+  it("throws on a maxLevel past MAX_LADDER_LEVEL, accepts the cap itself", async () => {
+    const { MAX_LADDER_LEVEL } = await import("../../../../src/geometry/core/lattice");
+    const root = new HexGeometry(80, "flat", null);
+    expect(() => createGeometryLadder(root, { maxLevel: MAX_LADDER_LEVEL + 1 })).toThrow(RangeError);
+    expect(() => createGeometryLadder(root, { maxLevel: 40 })).toThrow(RangeError);
+    expect(() => createGeometryLadder(root, { maxLevel: 2.5 })).toThrow(RangeError);
+    expect(createGeometryLadder(root, { maxLevel: MAX_LADDER_LEVEL }).params.maxLevel).toBe(MAX_LADDER_LEVEL);
+  });
+});

@@ -19,7 +19,7 @@ import { useMapState } from '../../context/MapContext';
 import { useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { calculateEdgeAlignment, removeObjectFromHex } from '../../objects/objectOperations';
-import { getClickedObjectInCell, getObjectsInCell, assignSlot } from '../../objects/hexSlotPositioner';
+import { getClickedObjectInCell, getObjectsInCell, assignSlot, classicHitRung } from '../../objects/hexSlotPositioner';
 import { pickLadderObject } from '../../objects/ladderHitTest';
 import { rungFogPredicate } from '../canvas/rungFog';
 import { getActiveLayer, isCellFogged } from '../../persistence/layerAccessor';
@@ -106,7 +106,9 @@ function useObjectDragSelect(
         if (cell) { cellX = cell.x; cellY = cell.y; }
       }
     } else if (geometry?.type === 'hex') {
-      const cellObjects = getObjectsInCell(getActiveLayer(mapData).objects ?? [], gridX, gridY);
+      // A `lod` map off the ladder view draws rung 0 only: scope the index match to it.
+      const rung = classicHitRung(mapData);
+      const cellObjects = getObjectsInCell(getActiveLayer(mapData).objects ?? [], gridX, gridY, rung);
 
       if (cellObjects.length > 1) {
         const worldCoords = screenToWorld(clientX, clientY);
@@ -122,14 +124,15 @@ function useObjectDragSelect(
             gridY,
             clickOffsetX,
             clickOffsetY,
-            mapData.orientation ?? 'flat'
+            mapData.orientation ?? 'flat',
+            rung
           );
         }
       } else if (cellObjects.length === 1) {
         object = cellObjects[0];
       }
     } else {
-      object = getObjectAtPosition(getActiveLayer(mapData).objects ?? [], gridX, gridY);
+      object = getObjectAtPosition(getActiveLayer(mapData).objects ?? [], gridX, gridY, classicHitRung(mapData));
     }
 
     if (object != null) {

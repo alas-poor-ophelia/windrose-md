@@ -14,7 +14,7 @@ vi.mock('../../../src/core/settingsAccessor', () => ({
 }));
 
 import type { MapObject } from '#types/objects/object.types';
-import { isGroupGridMoveBlocked, groupItemHitsCell, assignGroupSlots, reorganizeVacatedCells } from '../../../src/objects/groupDragOps';
+import { isGroupGridMoveBlocked, groupItemHitsCell, assignGroupSlots, reorganizeVacatedCells, groupMoveStacksInSlots, planGroupGridMove } from '../../../src/objects/groupDragOps';
 
 const obj = (id: string, x: number, y: number, homeLevel?: number, size?: { width: number; height: number }): MapObject =>
   ({ id, type: 'chest', position: { x, y }, ...(homeLevel !== undefined ? { homeLevel } : {}), ...(size ? { size } : {}) } as MapObject);
@@ -145,5 +145,45 @@ describe('reorganizeVacatedCells (hex)', () => {
     const after = [{ ...mover, position: { x: 4, y: 4 } }, deep];
     const result = reorganizeVacatedCells(after, [{ oldObj: mover, newPosition: { x: 4, y: 4 } }]);
     expect(result.find(o => o.id === 'd')?.slot).toBe(2);
+  });
+});
+
+describe('group move on hex: classic refuses occupied cells, ladder stacks (cross-model review item 3)', () => {
+  it('stacks only on a hex map with a ladder or a stored lod', () => {
+    expect(groupMoveStacksInSlots('hex', false, false)).toBe(false);
+    expect(groupMoveStacksInSlots('hex', true, false)).toBe(true);
+    expect(groupMoveStacksInSlots('hex', false, true)).toBe(true);
+    expect(groupMoveStacksInSlots('grid', true, true)).toBe(false);
+    expect(groupMoveStacksInSlots(undefined, false, false)).toBe(false);
+  });
+
+  it('classic hex (no ladder): a move onto an occupied cell is refused, like main', () => {
+    const moves = [{ oldObj: { ...obj('a', 0, 0), slot: 2 } as MapObject, newPosition: { x: 3, y: 3 } }];
+    expect(planGroupGridMove(moves, [obj('s', 3, 3)], everywhere, false)).toEqual({ blocked: true });
+  });
+
+  it('classic hex: a move onto a free cell keeps slots untouched (no assignment)', () => {
+    const moves = [{ oldObj: { ...obj('a', 0, 0), slot: 2 } as MapObject, newPosition: { x: 4, y: 3 } }];
+    expect(planGroupGridMove(moves, [obj('s', 3, 3)], everywhere, false)).toEqual({ blocked: false, slots: null });
+  });
+
+  it('ladder hex: the same move stacks into the next free slot', () => {
+    const moves = [{ oldObj: { ...obj('a', 0, 0), slot: 2 } as MapObject, newPosition: { x: 3, y: 3 } }];
+    const plan = planGroupGridMove(moves, [{ ...obj('s', 3, 3), slot: 0 } as MapObject], everywhere, true);
+    expect(plan.blocked).toBe(false);
+    expect(plan.blocked === false ? plan.slots?.get('a') : undefined).toBe(1);
+  });
+
+  it('ladder hex: a cell that would overflow is refused', () => {
+    const statics = [0, 1, 2, 3].map((i) => ({ ...obj('s' + i, 3, 3), slot: i } as MapObject));
+    const moves = [{ oldObj: obj('a', 0, 0), newPosition: { x: 3, y: 3 } }];
+    expect(planGroupGridMove(moves, statics, everywhere, true)).toEqual({ blocked: true });
+  });
+
+  it('both branches refuse a cell that does not exist on the rung', () => {
+    const moves = [{ oldObj: obj('a', 0, 0), newPosition: { x: 9, y: 9 } }];
+    const nowhere = (): boolean => false;
+    expect(planGroupGridMove(moves, [], nowhere, false)).toEqual({ blocked: true });
+    expect(planGroupGridMove(moves, [], nowhere, true)).toEqual({ blocked: true });
   });
 });

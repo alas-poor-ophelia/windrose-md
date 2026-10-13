@@ -22,7 +22,7 @@ import { createGeometryLadder } from '../../../src/geometry/core/createGeometryL
 import { crossingZoom } from '../../../src/geometry/core/lattice';
 import { scaledSizeForRung } from '../../../src/geometry/renderers/elementBands';
 import { ladderObjectFootprint, ladderFootprintContains, pickLadderObject } from '../../../src/objects/ladderHitTest';
-import { getObjectsInCell, canAddObjectToCell } from '../../../src/objects/hexSlotPositioner';
+import { getObjectsInCell, canAddObjectToCell, getClickedObjectInCell, classicHitRung } from '../../../src/objects/hexSlotPositioner';
 import { placeObject, placeObjectFreeform, canPlaceObjectAt, eraseObjectAt, getObjectAtPosition, removeObjectFromHex, isAreaFree, removeObjectsInRectangle, removeObjectAtPosition, addObject, canResizeObject } from '../../../src/objects/objectOperations';
 import { findTileHitInLayers, tileHitsCell } from '../../../src/assets/tileFootprint';
 import type { TileAssignment } from '#types/tiles/tile.types';
@@ -310,5 +310,32 @@ describe('calculateObjectScreenPosition under the ladder', () => {
     const entrance = obj({ id: 'a' });
     const classic = calculateObjectScreenPosition(entrance, canvas, mapWith([entrance], ZOOM_RUNG2), root, null);
     expect(classic!.objectWidth).toBeCloseTo(80 * ZOOM_RUNG2, 6);
+  });
+});
+
+describe('classicHitRung: classic-branch index hit-tests on a lod map (cross-model review item 2)', () => {
+  const at = (id: string, homeLevel?: number): MapObject =>
+    ({ id, type: 'entrance', position: { x: 3, y: -1 }, size: { width: 1, height: 1 }, ...(homeLevel !== undefined ? { homeLevel } : {}) } as MapObject);
+  const deepFirst = [at('deep', 2), at('root')];
+
+  it('is undefined without lod (unscoped, byte-identical to main) and 0 with lod', () => {
+    expect(classicHitRung(null)).toBeUndefined();
+    expect(classicHitRung({} as MapData)).toBeUndefined();
+    expect(classicHitRung({ lod: null } as unknown as MapData)).toBeUndefined();
+    expect(classicHitRung({ lod: { m: 4, minCellPx: 64, maxLevel: 3 } } as MapData)).toBe(0);
+  });
+
+  it('without lod the index match still finds the first object at the index, any rung', () => {
+    const scope = classicHitRung({} as MapData);
+    expect(getObjectAtPosition(deepFirst, 3, -1, scope)?.id).toBe('deep');
+    expect(getObjectsInCell(deepFirst, 3, -1, scope).map(o => o.id)).toEqual(['deep', 'root']);
+  });
+
+  it('with lod a rung-2 object at the same index is neither hit, listed nor clicked', () => {
+    const scope = classicHitRung({ lod: { m: 4, minCellPx: 64, maxLevel: 3 } } as MapData);
+    expect(getObjectAtPosition(deepFirst, 3, -1, scope)?.id).toBe('root');
+    expect(getObjectsInCell(deepFirst, 3, -1, scope).map(o => o.id)).toEqual(['root']);
+    expect(getClickedObjectInCell(deepFirst, 3, -1, 0, 0, 'flat', scope)?.id).toBe('root');
+    expect(getObjectAtPosition([at('deep', 2)], 3, -1, scope)).toBeNull();
   });
 });

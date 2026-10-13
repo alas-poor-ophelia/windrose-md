@@ -14,7 +14,7 @@
 import type { MapData, LadderConfig } from '#types/core/map.types';
 import { getSettings } from './settingsAccessor';
 import { DEFAULTS } from './dmtConstants';
-import { chooseLevel, crossingZoom, rungMiddleZoom, LADDER_DEFAULTS, LADDER_M_ALLOWLIST, type LadderParams } from '../geometry/core/lattice';
+import { chooseLevel, crossingZoom, rungMiddleZoom, LADDER_DEFAULTS, LADDER_M_ALLOWLIST, MAX_LADDER_LEVEL, MAX_LADDER_ZOOM, type LadderParams } from '../geometry/core/lattice';
 import { authoredLevels } from '../persistence/layerAccessor';
 import type { LadderOverrides } from '../geometry/core/createGeometryLadder';
 
@@ -39,7 +39,7 @@ function getLadderOverrides(): LadderOverrides {
   const out: LadderOverrides = {};
   if (typeof o.m === 'number' && Number.isInteger(o.m) && o.m >= 2) out.m = o.m;
   if (typeof o.minCellPx === 'number' && o.minCellPx > 0) out.minCellPx = o.minCellPx;
-  if (typeof o.maxLevel === 'number' && Number.isInteger(o.maxLevel) && o.maxLevel >= 0) out.maxLevel = o.maxLevel;
+  if (typeof o.maxLevel === 'number' && Number.isInteger(o.maxLevel) && o.maxLevel >= 0 && o.maxLevel <= MAX_LADDER_LEVEL) out.maxLevel = o.maxLevel;
   return out;
 }
 
@@ -156,6 +156,11 @@ function isDepthQuarantined(mapData: MapData): { quarantined: boolean; reason: s
   if (typeof lod.maxLevel !== 'number' || !Number.isFinite(lod.maxLevel) || lod.maxLevel < deepest) {
     return { quarantined: true, reason: 'max-level-below-content' };
   }
+  if (!Number.isInteger(lod.maxLevel) || lod.maxLevel > MAX_LADDER_LEVEL) {
+    // Unbounded depth overflows the zoom ceiling (m^maxLevel) and makes every
+    // ancestorAt walk maxLevel rungs long; createGeometryLadder throws on it.
+    return { quarantined: true, reason: 'max-level-too-deep' };
+  }
   return { quarantined: false, reason: null };
 }
 
@@ -193,12 +198,14 @@ function ladderParamsFor(mapData: MapData): LadderParams {
  * rung past `maxLevel`, i.e. the zoom at which the deepest rung's cells have
  * grown to `m * minCellPx` on screen and there is nothing finer to cross into.
  * 102.4 at the shipped defaults (hexSize 80, m 4, minCellPx 64, maxLevel 3).
+ * Never above MAX_LADDER_ZOOM (2048): legal parameters (m 15, maxLevel 3) can
+ * otherwise ask for ~20k, where float32 canvas transforms break.
  */
 function getMaxZoom(mapData: MapData | null | undefined): number {
   if (mapData === null || mapData === undefined) return DEFAULTS.maxZoom;
   if (!isLadderView(mapData)) return DEFAULTS.maxZoom;
   const params = ladderParamsFor(mapData);
-  return crossingZoom(params.maxLevel + 1, params);
+  return Math.min(MAX_LADDER_ZOOM, crossingZoom(params.maxLevel + 1, params));
 }
 
 /**
@@ -289,6 +296,6 @@ function zoomForLevel(mapData: MapData | null | undefined, level: number): numbe
 export {
   zoomForLevel, isLodLadderEnabled, getLadderOverrides, ladderTileClipAt, isLadderView, isDepthQuarantined, canAuthorDepth,
   ladderParamsFor, getMaxZoom, hasDepthContent, hasSubHexChildren, deepestAuthoredRung,
-  ladderOpensAt, mergeLadderConfig, ladderSettingsPatch
+  ladderOpensAt, mergeLadderConfig, ladderSettingsPatch, MAX_LADDER_LEVEL, MAX_LADDER_ZOOM
 };
 export type { LadderTileClipMode, LadderPatch };

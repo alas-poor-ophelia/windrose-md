@@ -5,7 +5,8 @@ const getSettings = vi.fn(() => ({} as Record<string, unknown>));
 vi.mock('../../../src/core/settingsAccessor', () => ({ getSettings }));
 
 const { createNewMap } = await import('../../../src/persistence/fileOperations');
-const { authoredCells } = await import('../../../src/persistence/layerAccessor');
+const { authoredCells, setLevelCells } = await import('../../../src/persistence/layerAccessor');
+const { MAX_JOURNAL_PAYLOAD } = await import('../../../src/persistence/saveJournal');
 const {
   canBeginDepthAuthoring, withLod, guardDepthWrite, writeDepthCells, MAX_CELLS_PER_DEPTH_OP, DEPTH_BUDGET_BYTES, BYTES_PER_CELL_ESTIMATE, elementBytes, depthEntryRefusal,
 } = await import('../../../src/persistence/depthAuthoring');
@@ -214,5 +215,44 @@ describe('depthAuthoring', () => {
       const m = hexMap();
       expect(guardDepthWrite(m, m.layers[0].id, 1, [], { addedBytes: 1 })).toBe('not-a-ladder');
     });
+  });
+});
+
+describe('depthAuthoring growth by key and size unit (Codex review)', () => {
+  beforeEach(() => { getSettings.mockReset(); getSettings.mockReturnValue({ lodLadder: true }); });
+
+  const row = (n: number, r: number) => Array.from({ length: n }, (_, i) => ({ q: i, r, color: '#abcdef' }));
+
+  it('a same-size replace of 5000 cells is refused by MAX_CELLS_PER_DEPTH_OP', () => {
+    const m = hexMap();
+    const id = m.layers[0].id;
+    const seeded = setLevelCells(withLod(m), id, 1, row(5000, 0));
+    const replaced = row(5000, 1); // erase all 5000, paint 5000 elsewhere: net length 0
+    expect(guardDepthWrite(seeded, id, 1, replaced)).toBe('too-many-cells');
+    // ...and against a stroke baseline the same way.
+    expect(guardDepthWrite(seeded, id, 1, replaced, { baseline: authoredCells(seeded.layers[0], 1) })).toBe('too-many-cells');
+  });
+
+  it('identity, erase-only and recolour writes stay unrefusable', () => {
+    const m = hexMap();
+    const id = m.layers[0].id;
+    const seeded = setLevelCells(withLod(m), id, 1, row(5000, 0));
+    const current = authoredCells(seeded.layers[0], 1);
+    expect(guardDepthWrite(seeded, id, 1, current)).toBeNull();
+    expect(guardDepthWrite(seeded, id, 1, current.slice(10))).toBeNull();
+    expect(guardDepthWrite(seeded, id, 1, current.map(c => ({ ...c, color: '#000000' })))).toBeNull();
+    const fat: MapData = { ...seeded, name: 'x'.repeat(DEPTH_BUDGET_BYTES + 10) };
+    expect(guardDepthWrite(fat, id, 1, current.map(c => ({ ...c, color: '#000000' })))).toBeNull();
+  });
+
+  it('measures the budget in UTF-16 code units, the unit the save journal caps (CJK label)', () => {
+    const m = hexMap();
+    // 600k CJK chars: .length 600k (under the budget), UTF-8 ~1.8 MB (over the 1.6 MB budget).
+    const cjk: MapData = { ...withLod(m), name: '地'.repeat(600_000) };
+    expect(JSON.stringify(cjk).length).toBeLessThan(DEPTH_BUDGET_BYTES);
+    expect(new TextEncoder().encode(JSON.stringify(cjk)).length).toBeGreaterThan(DEPTH_BUDGET_BYTES);
+    expect(JSON.stringify(cjk).length).toBeLessThanOrEqual(MAX_JOURNAL_PAYLOAD);
+    // The journal keeps this map (payload.length <= MAX_JOURNAL_PAYLOAD), so the guard must not refuse it.
+    expect(guardDepthWrite(cjk, m.layers[0].id, 1, row(1, 0))).toBeNull();
   });
 });

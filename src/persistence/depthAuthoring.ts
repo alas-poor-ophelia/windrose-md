@@ -15,13 +15,20 @@
  */
 import type { LadderConfig, MapData } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
+import { isHexCell } from '#types/core/cell.types';
 import type { LayerId } from '#types/core/map.types';
 
 import { isDepthQuarantined, isLadderView, isLodLadderEnabled, ladderParamsFor, hasSubHexChildren } from '../core/lodFlags';
 import { authoredCells, setLevelCells } from './layerAccessor';
 import { MAX_JOURNAL_PAYLOAD } from './saveJournal';
 
-/** Hard refusal threshold: 80% of the save journal's payload cap. */
+/**
+ * Hard refusal threshold: 80% of the save journal's payload cap. Unit: UTF-16
+ * code units (`string.length`), the same unit saveJournal compares against
+ * MAX_JOURNAL_PAYLOAD (`payload.length`) and that localStorage quota counts in.
+ * A UTF-8 byte estimate would refuse maps (e.g. CJK labels) the journal still
+ * protects, so the guard deliberately measures `.length` too.
+ */
 const DEPTH_BUDGET_BYTES = Math.floor(MAX_JOURNAL_PAYLOAD * 0.8);
 /** Cells one operation may ADD to a rung (design section 3.6). */
 const MAX_CELLS_PER_DEPTH_OP = 4096;
@@ -107,10 +114,37 @@ function withLod(mapData: MapData): MapData {
   return { ...mapData, lod };
 }
 
+/** Position key of a rung cell (rung cells are hex; grid cells key by x,y). */
+function cellPositionKey(cell: Cell): string {
+  return isHexCell(cell) ? `${cell.q},${cell.r}` : `${cell.x},${cell.y}`;
+}
+
+/** Key sets per cell array; rung arrays are immutable, so a stroke's baseline is keyed once. */
+const cellKeySetCache = new WeakMap<Cell[], Set<string>>();
+
+function cellKeySet(cells: Cell[]): Set<string> {
+  let keys = cellKeySetCache.get(cells);
+  if (keys === undefined) {
+    keys = new Set(cells.map(cellPositionKey));
+    cellKeySetCache.set(cells, keys);
+  }
+  return keys;
+}
+
+/** Cells in `next` whose position is not in `from` (a recolour adds nothing). */
+function countAddedCells(next: Cell[], from: Cell[]): number {
+  const existing = cellKeySet(from);
+  let added = 0;
+  for (const cell of next) {
+    if (!existing.has(cellPositionKey(cell))) added++;
+  }
+  return added;
+}
+
 /**
  * Check a proposed rung write without applying it. `nextCells` is the FULL
- * intended content of the rung after the write. A write that does not grow the
- * rung (identity, erase) and adds no element bytes is never refused on size: the stroke-end history write
+ * intended content of the rung after the write. A write that adds no cell
+ * position (identity, erase, recolour) and adds no element bytes is never refused on size: the stroke-end history write
  * re-writes the current rung and must always land (kgc.23 e).
  */
 function guardDepthWrite(
@@ -130,14 +164,16 @@ function guardDepthWrite(
   if (layer === undefined) return 'unknown-layer';
   const current = authoredCells(layer, level);
   const addedBytes = Math.max(0, context.addedBytes ?? 0);
-  const grownNow = nextCells.length - current.length;
-  if (grownNow <= 0 && addedBytes === 0) return null;
+  // Growth is counted BY KEY, not by length delta: a write that erases N cells
+  // and paints N others nets zero length but adds N cells (Codex review).
+  const addedNow = nextCells === current ? 0 : countAddedCells(nextCells, current);
+  if (addedNow === 0 && addedBytes === 0) return null;
   const baseline = context.baseline ?? current;
-  const added = Math.max(0, nextCells.length - baseline.length);
+  const added = baseline === current ? addedNow : countAddedCells(nextCells, baseline);
   if (added > MAX_CELLS_PER_DEPTH_OP) return 'too-many-cells';
   const projected = context.serialisedBytes !== undefined
     ? context.serialisedBytes + added * BYTES_PER_CELL_ESTIMATE + addedBytes
-    : JSON.stringify(mapData).length + Math.max(0, grownNow) * BYTES_PER_CELL_ESTIMATE + addedBytes;
+    : JSON.stringify(mapData).length + addedNow * BYTES_PER_CELL_ESTIMATE + addedBytes;
   if (projected > DEPTH_BUDGET_BYTES) return 'over-budget';
   return null;
 }

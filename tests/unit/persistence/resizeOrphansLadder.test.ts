@@ -9,7 +9,7 @@
 import { describe, it, expect } from "vitest";
 
 import {
-  countLevelOrphans, countLevelOrphansForBounds, filterLevelsToBounds, ladderForAuthoredRungs
+  countLevelOrphans, countLevelOrphansForBounds, depthResizeBlocker, filterLevelsToBounds, ladderForAuthoredRungs
 } from "../../../src/persistence/resizeOperations";
 import { getOrphanedContentInfo } from "../../../src/components/settings/settingsReducer";
 import { createGeometryLadder, type GeometryLadder } from "../../../src/geometry/core/createGeometryLadder";
@@ -52,6 +52,10 @@ function findRungCell(level: number, survives: boolean): HexTestCell {
 const inside2 = findRungCell(2, true);
 const outside2 = findRungCell(2, false);
 const outside3 = findRungCell(3, false);
+
+function homedObject(at: HexTestCell) {
+  return { id: at === inside2 ? "o-in" : "o-out", type: "chest", position: { x: at.q, y: at.r }, homeLevel: 2 } as never;
+}
 
 function ladderMap(): MapData {
   const layer = makeLayer({
@@ -116,7 +120,50 @@ describe("resize with ladder rungs", () => {
       layers: [makeLayer({ id: "layer-1", levels: { 2: [outside2] } })],
     });
     expect(ladderForAuthoredRungs(mapData, new HexGeometry(40, "flat", NEW_BOUNDS))).toBeNull();
-    expect(countLevelOrphansForBounds(mapData, mapData.layers[0], NEW_BOUNDS)).toBe(0);
+    // Its depth content cannot be tested, so ALL of it is reported: the resize
+    // confirm opens instead of the shrink stranding it silently (Codex review).
+    expect(countLevelOrphansForBounds(mapData, mapData.layers[0], NEW_BOUNDS)).toBe(1);
+    expect(depthResizeBlocker(mapData)).toBe("depth content is quarantined (unknown-m)");
+    // The filter still never runs (no ladder), so the bytes stay untouched.
+  });
+
+  it("a levels-without-lod map with homed elements only is blocked and fully counted", () => {
+    const mapData = makeMapData({
+      mapType: "hex", hexSize: 40, hexBounds: OLD_BOUNDS,
+      layers: [makeLayer({ id: "layer-1", objects: [homedObject(inside2), homedObject(outside2)] })],
+    });
+    expect(depthResizeBlocker(mapData)).toBe("depth content is quarantined (levels-without-lod)");
+    expect(countLevelOrphansForBounds(mapData, mapData.layers[0], NEW_BOUNDS)).toBe(2);
+    expect(depthResizeBlocker(ladderMap())).toBeNull();
+  });
+
+  it("counts and filters homed objects, text labels and tiles whose rung cell leaves the bounds", () => {
+    const rung2 = ladderOver(OLD_BOUNDS).geometryForLevel(2);
+    const worldOf = (c: HexTestCell) => { const w = rung2.gridToWorld(c.q, c.r); return { x: w.worldX, y: w.worldY }; };
+    const keptLabel = { id: "t-in", homeLevel: 2, position: worldOf(inside2), content: "in" };
+    const lostLabel = { id: "t-out", homeLevel: 2, position: worldOf(outside2), content: "out" };
+    const rootLabel = { id: "t-root", position: { x: 99999, y: 99999 }, content: "root" };
+    const keptTile = { col: inside2.q, row: inside2.r, homeLevel: 2, tilesetId: "s", tileId: "a" };
+    const lostTile = { col: outside2.q, row: outside2.r, homeLevel: 2, tilesetId: "s", tileId: "b" };
+    const lostFreeTile = { col: 0, row: 0, homeLevel: 2, tilesetId: "s", tileId: "c", freeform: true, ...{ worldX: worldOf(outside2).x, worldY: worldOf(outside2).y } };
+    const rootObject = { id: "o-root", type: "chest", position: { x: 1, y: 1 } };
+    const layer = makeLayer({
+      id: "layer-1",
+      objects: [homedObject(inside2), homedObject(outside2), rootObject],
+      textLabels: [keptLabel, lostLabel, rootLabel],
+      tiles: [keptTile, lostTile, lostFreeTile],
+    } as never);
+    const mapData = makeMapData({ mapType: "hex", hexSize: 40, orientation: "flat", hexBounds: OLD_BOUNDS, lod, layers: [layer] });
+    expect(ladderForAuthoredRungs(mapData, new HexGeometry(40, "flat", NEW_BOUNDS))).not.toBeNull();
+    expect(countLevelOrphans(mapData.layers[0], ladderOver(NEW_BOUNDS))).toBe(4);
+    expect(countLevelOrphansForBounds(mapData, mapData.layers[0], NEW_BOUNDS)).toBe(4);
+    expect(countLevelOrphansForBounds(mapData, mapData.layers[0], OLD_BOUNDS)).toBe(0);
+
+    const next = filterLevelsToBounds(mapData, ladderOver(NEW_BOUNDS));
+    expect(next.layers[0].objects.map(o => o.id)).toEqual(["o-in", "o-root"]);
+    expect(next.layers[0].textLabels.map(t => t.id)).toEqual(["t-in", "t-root"]);
+    expect((next.layers[0].tiles ?? []).map(t => t.tileId)).toEqual(["a"]);
+    expect(filterLevelsToBounds(mapData, ladderOver(OLD_BOUNDS))).toBe(mapData);
   });
 
   it("a classic map builds no ladder and reports no rung orphans", () => {

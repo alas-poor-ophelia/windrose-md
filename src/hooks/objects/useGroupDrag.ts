@@ -27,8 +27,8 @@ import { useMapState, useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import type { Point } from '#types/core/geometry.types';
 import { getActiveLayer } from '../../persistence/layerAccessor';
-import { homeLevelOf } from '../../objects/hexSlotPositioner';
-import { isGroupGridMoveBlocked, groupItemHitsCell, assignGroupSlots, reorganizeVacatedCells } from '../../objects/groupDragOps';
+import { homeLevelOf, classicHitRung } from '../../objects/hexSlotPositioner';
+import { groupItemHitsCell, reorganizeVacatedCells, groupMoveStacksInSlots, planGroupGridMove } from '../../objects/groupDragOps';
 import { ladderFootprintContains } from '../../objects/ladderHitTest';
 
 
@@ -123,6 +123,8 @@ const useGroupDrag = (): UseGroupDragResult => {
             })
             : groupItemHitsCell(obj, (home: number): Point | null => {
               if (home === 0) return { x, y };
+              // A `lod` map off the ladder view draws rung 0 only: a deep member is not grabbable.
+              if (classicHitRung(mapData) !== undefined) return null;
               if (clientX === undefined || clientY === undefined) return null;
               return screenToLevelCell(clientX, clientY, home);
             });
@@ -353,16 +355,17 @@ const useGroupDrag = (): UseGroupDragResult => {
     );
 
     // Bounds (root bounds at home 0, ladder existence deeper) and overlap,
-    // both scoped to each moving object's own rung. Hex cells hold up to
-    // getMaxObjectsPerCell() objects in slots, so there the overlap check is
-    // replaced by per-cell slot assignment (null = a cell would overflow).
-    const isHex = mapData.mapType === 'hex';
-    const blocked = isGroupGridMoveBlocked(gridUpdates, isHex ? [] : nonSelectedObjects, (home, cx, cy) =>
-      ladder !== null && home > 0 ? ladder.existsAt(home, cx, cy) : geometry.isWithinBounds(cx, cy)
+    // both scoped to each moving object's own rung. On a LADDER hex map cells
+    // hold up to getMaxObjectsPerCell() objects in slots, so there the overlap
+    // check is replaced by per-cell slot assignment (refused on overflow). A
+    // classic hex map keeps main's refusal of any occupied cell.
+    const stackInSlots = groupMoveStacksInSlots(mapData.mapType, ladder !== null, mapData.lod != null);
+    const plan = planGroupGridMove(gridUpdates, nonSelectedObjects, (home, cx, cy) =>
+      ladder !== null && home > 0 ? ladder.existsAt(home, cx, cy) : geometry.isWithinBounds(cx, cy),
+      stackInSlots
     );
-    if (blocked) return true;
-    const hexSlots = isHex ? assignGroupSlots(gridUpdates, nonSelectedObjects) : null;
-    if (isHex && hexSlots === null) return true;
+    if (plan.blocked) return true;
+    const hexSlots = plan.slots;
 
     if (objectUpdates.length > 0) {
       let updatedObjects = [...activeLayer.objects];
@@ -389,7 +392,7 @@ const useGroupDrag = (): UseGroupDragResult => {
       }
 
       // Compact the hex cells the grid movers left (per rung)
-      if (isHex) updatedObjects = reorganizeVacatedCells(updatedObjects, gridUpdates);
+      if (stackInSlots) updatedObjects = reorganizeVacatedCells(updatedObjects, gridUpdates);
 
       onObjectsChange(updatedObjects, true);
     }

@@ -11,7 +11,7 @@ import { useCallback } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
 import { useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
-import { getClickedObjectInCell } from '../../objects/hexSlotPositioner';
+import { getClickedObjectInCell, classicHitRung } from '../../objects/hexSlotPositioner';
 import { pickLadderObject } from '../../objects/ladderHitTest';
 import { rungFogPredicate } from '../canvas/rungFog';
 import { getActiveLayer, isCellFogged } from '../../persistence/layerAccessor';
@@ -78,12 +78,14 @@ function useObjectHover(): {
               getActiveLayer(mapData).objects,
               x, y,
               clickOffsetX, clickOffsetY,
-              mapData.orientation ?? 'flat'
+              mapData.orientation ?? 'flat',
+              classicHitRung(mapData)
             );
           }
         }
 
-        obj ??= getObjectAtPosition(getActiveLayer(mapData).objects, x, y);
+        // A `lod` map off the ladder view draws rung 0 only: deep objects are not hittable.
+        obj ??= getObjectAtPosition(getActiveLayer(mapData).objects, x, y, classicHitRung(mapData));
       }
 
       if (obj) {

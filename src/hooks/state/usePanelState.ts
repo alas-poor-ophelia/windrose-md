@@ -139,8 +139,11 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
             const filteredCells = layer.cells?.filter((cell: Cell) =>
               isHexCell(cell) && isInBounds(cell.q, cell.r)
             );
+            // Root-bounds filter on level-0 objects only: an object homed on a
+            // ladder rung carries RUNG coordinates, which this root test would
+            // misread; filterLevelsToBounds judges those by their root ancestor.
             const filteredObjects = layer.objects?.filter((obj: MapObject) =>
-              isInBounds(obj.position.x, obj.position.y)
+              (obj.homeLevel ?? 0) > 0 || isInBounds(obj.position.x, obj.position.y)
             );
             const filteredFog = layer.fogOfWar?.foggedCells?.filter(
               (fc: { col: number; row: number }) => isFogCellInBounds(fc.col, fc.row)

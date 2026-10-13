@@ -25,15 +25,23 @@ const NEVER_FOGGED: FogPredicate = () => false;
  * `isCellFogged` for elements homed on rung `home`, taking that rung's offset
  * coords. Level 0 returns the predicate unchanged. District rungs (home < 0)
  * have no single root ancestor and are never fogged, as before.
+ *
+ * The root hex is the one CONTAINING the rung cell's centre, not its lattice
+ * owner: `ancestorAt` (nested nearest-centre roundings) disagrees with
+ * containment for about one deep cell in eight (lattice.test.ts oracle), and
+ * fog is a visual question: what the eye sees under a fogged hex is hidden.
+ * The same rule drives the smart tile clip (tileClipRegion).
  */
 function rungFogPredicate(ladder: GeometryLadder, home: number, isCellFogged: FogPredicate): FogPredicate {
   if (home === 0) return isCellFogged;
   if (home < 0) return NEVER_FOGGED;
   const { root } = ladder;
+  const rung = ladder.geometryForLevel(home);
   return (layer, col, row) => {
     const { q, r } = offsetToAxial(col, row, root.orientation);
-    const ancestor = ladder.ladder.ancestorAt(home, q, r);
-    const offset = root.toOffsetCoords(ancestor.q, ancestor.r);
+    const centre = rung.getCellCenter(q, r);
+    const container = root.worldToGrid(centre.worldX, centre.worldY);
+    const offset = root.toOffsetCoords(container.x, container.y);
     return isCellFogged(layer, offset.col, offset.row);
   };
 }

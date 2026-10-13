@@ -18,7 +18,7 @@ import {
   layerHistorySnapshotsEqual,
 } from '../../../../src/hooks/state/layerHistoryOps';
 import { setLevelCells, authoredCells } from '../../../../src/persistence/layerAccessor';
-import { viewStateForRung, stampedLodOf, undoLodStamp, redoLodStamp } from '../../../../src/hooks/state/layerHistoryOps';
+import { viewStateForRung, stampedLodOf, lodStampForCommit, undoLodStamp, redoLodStamp } from '../../../../src/hooks/state/layerHistoryOps';
 
 const cell = (x: number, y: number): Cell => ({ x, y, color: '#4a7c59' } as Cell);
 
@@ -203,5 +203,66 @@ describe('viewStateForRung: cross-rung undo moves the camera to the rung the cha
     const classic = { ...ladderMap(1), lod: undefined } as unknown as MapData;
     expect(viewStateForRung(classic, 2)).toBeNull();
     expect(viewStateForRung(ladderMap(1), 4)).toBeNull();
+  });
+});
+
+describe('stale lod stamp (Codex review, blocking)', () => {
+  const LOD = { m: 4, minCellPx: 64, maxLevel: 3 };
+  const homedObject = { id: 'o1', type: 'chest', position: { x: 1, y: 1 }, homeLevel: 2 } as unknown as MapLayer['objects'][number];
+
+  it('undo leaving a lodStamped entry keeps lod while authored rungs remain (no levels-without-lod)', () => {
+    // A cancelled L2 stroke left rung cells; an unrelated label entry carries the stamp.
+    const restoredTo: MapData = { ...mapWith(layer({ levels: { 2: [cell(3, 3)] } })), lod: LOD };
+    const labelEntry = snap(layer(), { lodStamped: LOD });
+    expect(undoLodStamp(restoredTo, labelEntry)).toBe(restoredTo);
+  });
+
+  it('undo keeps lod while a homed element remains', () => {
+    const restoredTo: MapData = { ...mapWith(layer({ objects: [homedObject] })), lod: LOD };
+    expect(undoLodStamp(restoredTo, snap(layer(), { lodStamped: LOD }))).toBe(restoredTo);
+  });
+
+  it('undo keeps lod while ANOTHER layer holds depth content', () => {
+    const other = layer({ id: 'L2', levels: { 1: [cell(2, 2)] } });
+    const base = mapWith(layer());
+    const restoredTo: MapData = { ...base, layers: [...base.layers, other], lod: LOD };
+    expect(undoLodStamp(restoredTo, snap(layer(), { lodStamped: LOD }))).toBe(restoredTo);
+  });
+
+  it('undo strips lod when no depth content remains', () => {
+    const restoredTo: MapData = { ...mapWith(layer({ levels: {} })), lod: LOD };
+    expect('lod' in undoLodStamp(restoredTo, snap(layer(), { lodStamped: LOD }))).toBe(false);
+  });
+
+  describe('lodStampForCommit (parked stamp is claimed only by its own channel)', () => {
+    const classic = mapWith(layer());
+    const stamped: MapData = { ...classic, lod: LOD };
+
+    it('a suppressed tick that stamps parks under its channel and records nothing', () => {
+      const out = lodStampForCommit(null, classic, stamped, true, 'level:2');
+      expect(out).toEqual({ parked: { channel: 'level:2', lod: LOD }, stamp: {} });
+    });
+
+    it('the same channel commit claims the parked stamp and clears the park', () => {
+      const out = lodStampForCommit({ channel: 'level:2', lod: LOD }, stamped, stamped, false, 'level:2');
+      expect(out).toEqual({ parked: null, stamp: { lodStamped: LOD } });
+    });
+
+    it('a cancelled stroke: an unrelated commit (text label) drops the park and carries no stamp', () => {
+      const out = lodStampForCommit({ channel: 'level:2', lod: LOD }, stamped, stamped, false, 'textLabels');
+      expect(out).toEqual({ parked: null, stamp: {} });
+      // A different rung is a different channel too.
+      expect(lodStampForCommit({ channel: 'level:2', lod: LOD }, stamped, stamped, false, 'level:3').stamp).toEqual({});
+    });
+
+    it('a commit that stamps itself records its own stamp', () => {
+      const out = lodStampForCommit({ channel: 'tiles', lod: LOD }, classic, stamped, false, 'objects');
+      expect(out).toEqual({ parked: null, stamp: { lodStamped: LOD } });
+    });
+
+    it('a non-stamping suppressed tick keeps an existing park', () => {
+      const parked = { channel: 'tiles', lod: LOD };
+      expect(lodStampForCommit(parked, stamped, stamped, true, 'tiles').parked).toBe(parked);
+    });
   });
 });

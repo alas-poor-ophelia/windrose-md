@@ -9,7 +9,7 @@
  * no deep neighbour is not clipped at all (no Path2D is built).
  *
  * Hex tile (col, row) are axial (q, r) on the root lattice, the same space as
- * `ancestorAt`'s result, so keys compare directly.
+ * `root.worldToGrid`'s result, so keys compare directly.
  */
 
 import type { Cell } from '#types/core/cell.types';
@@ -40,46 +40,108 @@ const AXIAL_DIRECTIONS: ReadonlyArray<readonly [number, number]> = [
 
 const EMPTY: ReadonlySet<string> = new Set<string>();
 
-/** Memo: ladder -> layer.levels identity -> activeLevel -> root keys. A deep edit
- *  replaces `levels` (setLevelCells spreads it), so identity tracks content. */
-const memo = new WeakMap<GeometryLadder, WeakMap<object, Map<number, ReadonlySet<string>>>>();
+/**
+ * Memo: ladder -> primary key -> entry. The primary key is `layer.levels`
+ * (a deep edit replaces it: setLevelCells spreads it), or the layer itself when
+ * it has no levels. The entry also pins the identities of the layer's objects,
+ * textLabels and tiles arrays (homed elements count too, item 6 of the
+ * 2026-10-12 cross-model review) and is rebuilt when any of them changes.
+ */
+interface ClipMemoEntry {
+  objects: unknown;
+  textLabels: unknown;
+  tiles: unknown;
+  byActive: Map<number, ReadonlySet<string>>;
+}
+const memo = new WeakMap<GeometryLadder, WeakMap<object, ClipMemoEntry>>();
 
 function cellQR(cell: Cell): { q: number; r: number } {
   return 'q' in cell ? { q: cell.q, r: cell.r } : { q: cell.x, r: cell.y };
 }
 
 /**
- * Keys `${q},${r}` of every ROOT hex holding at least one authored cell on any
- * rung 1..activeLevel of `layer` (rungs finer than the active one are not
- * drawn, so they do not count). Memoised per (ladder, layer.levels identity,
- * activeLevel): the tile pass runs once per surface bake.
+ * Key of the ROOT hex whose hexagon geometrically contains a world point.
+ *
+ * Containment, NOT ownership: `ancestorAt` (nested nearest-centre rounding,
+ * the storage key) disagrees with containment for about 11-12% of rung cells
+ * at m 4 (all within one hex of the owner; measured in lattice.test.ts and
+ * design 06 s20), and the clip answers a visual question - which root hexagon
+ * does this deep paint visibly sit in.
+ */
+function containingRootKey(ladder: GeometryLadder, worldX: number, worldY: number): string {
+  const g = ladder.root.worldToGrid(worldX, worldY);
+  return `${g.x},${g.y}`;
+}
+
+/** Root key for a rung-`level` cell (q, r): containment of its centre. */
+function rungCellRootKey(ladder: GeometryLadder, level: number, q: number, r: number): string {
+  const c = ladder.geometryForLevel(level).getCellCenter(q, r);
+  return containingRootKey(ladder, c.worldX, c.worldY);
+}
+
+/** Is a home rung one whose content is drawn at `activeLevel`, for clip purposes? */
+const countsAt = (home: number | undefined, activeLevel: number): boolean =>
+  home !== undefined && home >= 1 && home <= activeLevel;
+
+/**
+ * Keys `${q},${r}` of every ROOT hex holding deep content on any rung
+ * 1..activeLevel of `layer` (rungs finer than the active one are not drawn, so
+ * they do not count): authored rung cells, plus objects, text labels and tiles
+ * homed on such a rung. Each is placed by the root hexagon that geometrically
+ * contains it (rung cell / snapped element: its cell centre; freeform object or
+ * tile: its world position; text label: its world position). Memoised per
+ * (ladder, levels, objects, textLabels, tiles identity, activeLevel): the tile
+ * pass runs once per surface bake.
  */
 function deepRootCellKeys(layer: MapLayer, ladder: GeometryLadder, activeLevel: number): ReadonlySet<string> {
+  if (activeLevel < 1) return EMPTY;
   const levels = layer.levels;
-  if (levels == null || activeLevel < 1) return EMPTY;
-  let byLevels = memo.get(ladder);
-  if (byLevels === undefined) {
-    byLevels = new WeakMap();
-    memo.set(ladder, byLevels);
+  const primary: object = levels ?? layer;
+  let byKey = memo.get(ladder);
+  if (byKey === undefined) {
+    byKey = new WeakMap();
+    memo.set(ladder, byKey);
   }
-  let byActive = byLevels.get(levels);
-  if (byActive === undefined) {
-    byActive = new Map();
-    byLevels.set(levels, byActive);
+  let entry = byKey.get(primary);
+  if (entry === undefined || entry.objects !== layer.objects || entry.textLabels !== layer.textLabels || entry.tiles !== layer.tiles) {
+    entry = { objects: layer.objects, textLabels: layer.textLabels, tiles: layer.tiles, byActive: new Map() };
+    byKey.set(primary, entry);
   }
-  const hit = byActive.get(activeLevel);
+  const hit = entry.byActive.get(activeLevel);
   if (hit !== undefined) return hit;
 
   const keys = new Set<string>();
-  for (let level = 1; level <= activeLevel; level++) {
-    for (const cell of authoredCells(layer, level)) {
-      const { q, r } = cellQR(cell);
-      const root = ladder.ladder.ancestorAt(level, q, r);
-      keys.add(`${root.q},${root.r}`);
+  if (levels != null) {
+    for (let level = 1; level <= activeLevel; level++) {
+      for (const cell of authoredCells(layer, level)) {
+        const { q, r } = cellQR(cell);
+        keys.add(rungCellRootKey(ladder, level, q, r));
+      }
     }
   }
-  byActive.set(activeLevel, keys);
-  return keys;
+  for (const obj of layer.objects ?? []) {
+    if (!countsAt(obj.homeLevel, activeLevel)) continue;
+    if (obj.freeform === true && obj.worldPosition != null) {
+      keys.add(containingRootKey(ladder, obj.worldPosition.x, obj.worldPosition.y));
+    } else {
+      keys.add(rungCellRootKey(ladder, obj.homeLevel as number, obj.position.x, obj.position.y));
+    }
+  }
+  for (const label of layer.textLabels ?? []) {
+    if (!countsAt(label.homeLevel, activeLevel)) continue;
+    keys.add(containingRootKey(ladder, label.position.x, label.position.y));
+  }
+  for (const tile of layer.tiles ?? []) {
+    if (!countsAt(tile.homeLevel, activeLevel)) continue;
+    if (tile.freeform === true) {
+      keys.add(containingRootKey(ladder, tile.worldX, tile.worldY));
+    } else {
+      keys.add(rungCellRootKey(ladder, tile.homeLevel as number, tile.col, tile.row));
+    }
+  }
+  const result: ReadonlySet<string> = keys.size === 0 ? EMPTY : keys;
+  entry.byActive.set(activeLevel, result);
+  return result;
 }
 
 /**

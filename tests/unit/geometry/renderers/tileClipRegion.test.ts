@@ -76,3 +76,76 @@ describe('unionHexClipPath', () => {
     expect(d).toBe(hexClipPathString(0, 0, 32, 'flat') + hexClipPathString(100, 0, 32, 'flat') + hexClipPathString(0, 100, 32, 'flat'));
   });
 });
+
+describe('deepRootCellKeys: containment, not ownership (cross-model review item 5)', () => {
+  /** First rung-2 cell (scanning outward) whose owner differs from the root hex containing its centre. */
+  const findDisagreement = (): { q: number; r: number; owner: string; container: string } => {
+    const rung = ladder.geometryForLevel(2);
+    for (let q = 0; q < 64; q++) {
+      for (let r = 0; r < 64; r++) {
+        const own = ladder.ladder.ancestorAt(2, q, r);
+        const c = rung.getCellCenter(q, r);
+        const g = root.worldToGrid(c.worldX, c.worldY);
+        const gc = root.getCellCenter(g.x, g.y);
+        const oc = root.getCellCenter(own.q, own.r);
+        // strictly inside the containing hexagon, not on a shared edge
+        const margin = Math.hypot(c.worldX - oc.worldX, c.worldY - oc.worldY) - Math.hypot(c.worldX - gc.worldX, c.worldY - gc.worldY);
+        if ((own.q !== g.x || own.r !== g.y) && margin > 1) {
+          return { q, r, owner: `${own.q},${own.r}`, container: `${g.x},${g.y}` };
+        }
+      }
+    }
+    throw new Error('no disagreement found');
+  };
+
+  it('keys a deep cell by the root hexagon that visibly contains it', () => {
+    const d = findDisagreement();
+    expect(d.owner).not.toBe(d.container);
+    const keys = deepRootCellKeys(layerWith({ 2: [hc(d.q, d.r)] }), ladder, 2);
+    expect([...keys]).toEqual([d.container]);
+  });
+});
+
+describe('deepRootCellKeys: homed elements protect their hex (cross-model review item 6)', () => {
+  const rung1 = ladder.geometryForLevel(1);
+  const at = (q: number, r: number): { x: number; y: number } => {
+    const c = rung1.getCellCenter(q, r);
+    return { x: c.worldX, y: c.worldY };
+  };
+  const withElements = (over: Partial<MapLayer>): MapLayer => ({ ...layerWith(), ...over } as MapLayer);
+
+  it('counts an object, a text label and a tile homed on rung 1..active', () => {
+    const obj = { id: 'o', type: 'x', position: { x: 4, y: 0 }, size: { width: 1, height: 1 }, homeLevel: 1 };
+    const p = at(0, 8);
+    const label = { id: 't', position: p, content: 'x', fontSize: 12, fontFace: 'sans', color: '#000', homeLevel: 1 };
+    const tile = { col: 0, row: -8, tilesetId: 's', tileId: 't', homeLevel: 1 };
+    const keys = deepRootCellKeys(withElements({ objects: [obj], textLabels: [label], tiles: [tile] } as unknown as Partial<MapLayer>), ladder, 1);
+    expect(new Set(keys)).toEqual(new Set(['1,0', '0,2', '0,-2']));
+  });
+
+  it('counts a freeform object and tile by world position', () => {
+    const w = at(-4, 0);
+    const obj = { id: 'o', type: 'x', position: { x: 0, y: 0 }, size: { width: 1, height: 1 }, homeLevel: 2, freeform: true, worldPosition: w };
+    const tile = { col: 0, row: 0, tilesetId: 's', tileId: 't', homeLevel: 1, freeform: true, worldX: at(0, 4).x, worldY: at(0, 4).y };
+    const keys = deepRootCellKeys(withElements({ objects: [obj], tiles: [tile] } as unknown as Partial<MapLayer>), ladder, 2);
+    expect(new Set(keys)).toEqual(new Set(['-1,0', '0,1']));
+  });
+
+  it('ignores root elements and elements homed finer than the active rung', () => {
+    const root0 = { id: 'a', type: 'x', position: { x: 3, y: 3 }, size: { width: 1, height: 1 } };
+    const deep3 = { id: 'b', type: 'x', position: { x: 64, y: 0 }, size: { width: 1, height: 1 }, homeLevel: 3 };
+    const layer = withElements({ objects: [root0, deep3] } as unknown as Partial<MapLayer>);
+    expect(deepRootCellKeys(layer, ladder, 2).size).toBe(0);
+    expect([...deepRootCellKeys(layer, ladder, 3)]).toEqual(['1,0']);
+  });
+
+  it('recomputes when the objects array changes, reuses when nothing does', () => {
+    const base = withElements({});
+    const first = deepRootCellKeys(base, ladder, 1);
+    expect(first.size).toBe(0);
+    expect(deepRootCellKeys({ ...base }, ladder, 1)).toBe(first);
+    const obj = { id: 'o', type: 'x', position: { x: 4, y: 0 }, size: { width: 1, height: 1 }, homeLevel: 1 };
+    const moved = { ...base, objects: [obj] } as unknown as MapLayer;
+    expect([...deepRootCellKeys(moved, ladder, 1)]).toEqual(['1,0']);
+  });
+});

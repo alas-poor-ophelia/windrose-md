@@ -24,10 +24,11 @@ import { SettingItem } from '../SettingItem';
 import { NativeToggle } from '../NativeControls';
 import { DEFAULTS } from '../../../core/dmtConstants';
 import { deepestAuthoredRung, hasDepthContent, hasSubHexChildren, ladderOpensAt } from '../../../core/lodFlags';
-import { LADDER_DEFAULTS, LADDER_M_ALLOWLIST } from '../../../geometry/core/lattice';
+import { LADDER_DEFAULTS, LADDER_M_ALLOWLIST, MAX_LADDER_LEVEL } from '../../../geometry/core/lattice';
 
 const MIN_CELL_PX_FLOOR = 8;
-const MAX_LEVEL_CEILING = 6;
+/** Shared with the quarantine rule and createGeometryLadder (lattice.ts). */
+const MAX_LEVEL_CEILING = MAX_LADDER_LEVEL;
 
 function LadderSection(): VNode | null {
   const { mapData } = useModalShell();

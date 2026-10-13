@@ -595,6 +595,9 @@ function getOrphanedContentInfo(
 
   if (currentObjects && currentObjects.length > 0) {
     currentObjects.forEach(obj => {
+      // Homed (rung) objects carry rung coordinates; their orphans arrive via
+      // levelOrphans (countLevelOrphansForBounds), never through this root test.
+      if ((obj.homeLevel ?? 0) > 0) return;
       if (isOutOfBounds(obj.position.x, obj.position.y)) {
         orphanedObjects++;
       }

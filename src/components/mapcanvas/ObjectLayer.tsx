@@ -34,6 +34,7 @@ import { getActiveLayer } from '../../persistence/layerAccessor';
 import { convertObjectToFreeform, snapObjectToGrid } from '../../objects/objectOperations';
 import { toggledDepthMode } from '../../geometry/renderers/elementBands';
 import { pickLadderObject } from '../../objects/ladderHitTest';
+import { classicHitRung, homeLevelOf } from '../../objects/hexSlotPositioner';
 import { isLadderView } from '../../core/lodFlags';
 import { copyDeepLinkToClipboard } from '../../persistence/deepLinkHandler';
 import { LinkingModeBanner } from '../overlays/LinkingModeBanner';
@@ -412,8 +413,10 @@ const ObjectLayer = ({
           }) ?? undefined
           : undefined;
       } else {
+        // A `lod` map off the ladder view draws rung 0 only: deep objects are not link targets.
+        const rung = classicHitRung(mapData);
         targetObject = activeLayer.objects?.find((obj: MapObject) => {
-          return obj.position.x === gridX && obj.position.y === gridY;
+          return obj.position.x === gridX && obj.position.y === gridY && (rung === undefined || homeLevelOf(obj) === rung);
         });
       }
 
@@ -695,7 +698,7 @@ const ObjectLayer = ({
       } else {
         const coords = screenToGrid(detail.clientX, detail.clientY);
         if (!coords) return;
-        obj = getObjectAtPosition(activeLayer.objects ?? [], coords.x, coords.y);
+        obj = getObjectAtPosition(activeLayer.objects ?? [], coords.x, coords.y, classicHitRung(mapData));
       }
       if (!obj) return;
 

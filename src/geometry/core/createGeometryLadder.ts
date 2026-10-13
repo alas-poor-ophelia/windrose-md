@@ -22,6 +22,7 @@ import {
   existsAt as latticeExistsAt,
   sizeOf,
   LADDER_DEFAULTS,
+  MAX_LADDER_LEVEL,
   type Ladder,
   type LadderParams,
 } from './lattice';
@@ -66,6 +67,9 @@ function rootCellKeys(root: HexGeometry): string[] | null {
 
 function createGeometryLadder(root: HexGeometry, overrides: LadderOverrides = {}): GeometryLadder {
   const params: LadderParams = { hexSize: root.hexSize, ...LADDER_DEFAULTS, ...overrides };
+  if (!Number.isInteger(params.maxLevel) || params.maxLevel < 0 || params.maxLevel > MAX_LADDER_LEVEL) {
+    throw new RangeError(`Ladder maxLevel must be an integer in [0, ${MAX_LADDER_LEVEL}], got ${params.maxLevel}`);
+  }
   const ladder = buildLadder(params.m);
   const levels = new Map<number, HexGeometry>([[0, root]]);
   const district = new Map<number, Set<string>>();

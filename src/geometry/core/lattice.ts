@@ -32,6 +32,25 @@ export interface LadderParams {
 
 export const LADDER_M_ALLOWLIST: readonly number[] = [2, 4, 15];
 
+/**
+ * Deepest rung any ladder may subdivide to. `ancestorAt` walks one `parentOf`
+ * per rung for every drawn and hit-tested cell, and the zoom ceiling grows as
+ * m^maxLevel, so an unbounded maxLevel (hand-edited JSON, an MCP write) would
+ * overflow the zoom and spin the walk. A map storing more is quarantined
+ * ('max-level-too-deep'); createGeometryLadder throws on it.
+ */
+export const MAX_LADDER_LEVEL = 6;
+
+/**
+ * Hard upper zoom clamp for a ladder map, whatever m / minCellPx / maxLevel say.
+ * Legal parameters can still ask for a ceiling near 20000 (m 15, maxLevel 3,
+ * minCellPx 64, hexSize 80 -> about 1.3e3 * 15); past a few thousand the canvas
+ * transform's float32 precision breaks (world coordinates times zoom lose
+ * sub-pixel accuracy). 2048 matches the MCP set_viewport Zod cap
+ * (mcp/tools/interact-tools.ts), so no caller can ask for more than we allow.
+ */
+export const MAX_LADDER_ZOOM = 2048;
+
 export const LADDER_DEFAULTS: Readonly<Omit<LadderParams, 'hexSize'>> = Object.freeze({
   m: 4,
   minCellPx: 64,

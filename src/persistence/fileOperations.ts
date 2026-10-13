@@ -378,6 +378,10 @@ function migrateMapData(mapData: MapData): MapData {
   mapData.expandedState ??= false;
   mapData.lastTextLabelSettings ??= null;
 
+  // A hand-edited `lod: null` means "no ladder": every ladder predicate tests
+  // `lod === undefined`, so null would pass as a ladder block (Codex review).
+  if ((mapData as { lod?: unknown }).lod === null) delete mapData.lod;
+
   // Hex-specific migration
   if (mapData.mapType === 'hex') {
     if (!mapData.hexBounds) {
@@ -428,6 +432,8 @@ function migrateMapData(mapData: MapData): MapData {
   // Layer-level arrays and curve migration
   for (const layer of mapData.layers) {
     layer.tiles ??= [];
+    // Same for a hand-edited `levels: null`: absent, not an empty rung record.
+    if ((layer as { levels?: unknown }).levels === null) delete layer.levels;
 
     // Tile assignment migration: q→col, r→row, layer→placement (boundary cast: legacy schema)
     for (const tile of layer.tiles) {

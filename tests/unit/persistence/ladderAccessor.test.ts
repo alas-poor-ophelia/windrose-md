@@ -180,6 +180,20 @@ describe('migrateMapData never destroys ladder data', () => {
     expect('levels' in e.layers[0]).toBe(false);
   });
 
+  it('normalises a hand-edited lod: null and levels: null to absent (Codex review)', () => {
+    const raw = roundTrip(mapWith(layer({ levels: { 2: [cell(1, 1)] } })));
+    (raw as unknown as Record<string, unknown>).lod = null;
+    const nulled = roundTrip(mapWith(layer()));
+    (nulled as unknown as Record<string, unknown>).lod = null;
+    (nulled.layers[0] as unknown as Record<string, unknown>).levels = null;
+    const m = migrateMapData(raw);
+    expect('lod' in m).toBe(false);
+    expect(authoredCells(m.layers[0], 2)).toEqual([cell(1, 1)]); // rungs kept; map reads as levels-without-lod
+    const n = migrateMapData(nulled);
+    expect('lod' in n).toBe(false);
+    expect('levels' in n.layers[0]).toBe(false);
+  });
+
   it('adds nothing ladder-related to a classic map', () => {
     const m = migrateMapData(roundTrip(mapWith(layer())));
     expect('lod' in m).toBe(false);

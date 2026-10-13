@@ -153,5 +153,37 @@ function reorganizeVacatedCells(
   return result;
 }
 
-export { isGroupGridMoveBlocked, groupItemHitsCell, assignGroupSlots, reorganizeVacatedCells };
-export type { GroupGridMove, RungCellExists };
+/**
+ * Do group moves on this map stack into hex slots? Only on a hex map that is a
+ * ladder map (live ladder, or a stored `lod` block even while quarantined or
+ * rotated). A classic hex map keeps main's contract: a group move onto any
+ * occupied cell is refused (bbox overlap), slots are kept as they were and
+ * vacated cells are not compacted (cross-model review item 3).
+ */
+function groupMoveStacksInSlots(mapType: string | undefined, hasLadder: boolean, hasLod: boolean): boolean {
+  return mapType === 'hex' && (hasLadder || hasLod);
+}
+
+/** Outcome of a group grid move: refused, or accepted with hex slots (null when the map does not stack). */
+type GroupGridPlan = { blocked: true } | { blocked: false; slots: Map<string, number> | null };
+
+/**
+ * The whole placement decision for a group grid move. `stackInSlots` (see
+ * groupMoveStacksInSlots): overlap is replaced by per-cell slot assignment,
+ * refused only when a cell would overflow. Otherwise every static object on
+ * the mover's rung blocks by bbox overlap, exactly like main.
+ */
+function planGroupGridMove(
+  moves: readonly GroupGridMove[],
+  staticObjects: readonly MapObject[],
+  cellExists: RungCellExists,
+  stackInSlots: boolean
+): GroupGridPlan {
+  if (isGroupGridMoveBlocked(moves, stackInSlots ? [] : staticObjects, cellExists)) return { blocked: true };
+  if (!stackInSlots) return { blocked: false, slots: null };
+  const slots = assignGroupSlots(moves, staticObjects);
+  return slots === null ? { blocked: true } : { blocked: false, slots };
+}
+
+export { isGroupGridMoveBlocked, groupItemHitsCell, assignGroupSlots, reorganizeVacatedCells, groupMoveStacksInSlots, planGroupGridMove };
+export type { GroupGridMove, RungCellExists, GroupGridPlan };
