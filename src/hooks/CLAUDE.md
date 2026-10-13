@@ -30,6 +30,7 @@ hooks/
 │   ├── toolDispatch.ts             # TOOL_ROUTES: Record<ToolId, ToolRoute> - per-tool down/move/up/leave/doubleClick routing table
 │   ├── useLayerHandlers.ts         # Layer-side registration with the coordinator (typed by HandlerTypeMap, latest-ref Proxy)
 │   ├── usePanZoomCoordinator.ts    # Wheel/drag/pinch pan-zoom input, writes through ViewController
+│   ├── canvasCursor.ts             # Per-map cursor store: tool class + one transient class (grab/grabbing/shape-active/drawing) written to the canvas element
 │   ├── useViewController.ts        # Live pan/zoom state held OFF the Preact path during a gesture
 │   ├── useLiveOverlayTransform.ts  # Keeps SVG overlay groups locked to the canvas during live gestures
 │   ├── useLiveOverlayRedraw.ts     # Same, for overlay <canvas> redraws (rAF-coalesced)

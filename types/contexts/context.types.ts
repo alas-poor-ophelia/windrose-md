@@ -18,6 +18,7 @@ import type { WallPath } from '../core/wallpath.types';
 import type { TerrainStroke } from '../core/terrainstroke.types';
 import type { ToolId } from '../tools/tool.types';
 import type { ViewController } from '../hooks/viewController.types';
+import type { CanvasCursorStore } from '../hooks/canvasCursor.types';
 import type { MapDistanceOverrides } from '../hooks/distanceMeasurement.types';
 
 // ===========================================
@@ -80,20 +81,6 @@ export interface ExtendedHexGeometry extends BaseExtendedGeometry {
 /** Extended geometry — discriminated union on `type` field for auto-narrowing */
 export type ExtendedGeometry = ExtendedGridGeometry | ExtendedHexGeometry;
 
-/** Drawing layer state change callback shape */
-export interface DrawingLayerState {
-  isDrawing: boolean;
-  rectangleStart: Point | null;
-  circleStart: Point | null;
-}
-
-/** Pan/zoom layer state change callback shape */
-export interface PanZoomLayerState {
-  isPanning: boolean;
-  isTouchPanning: boolean;
-  spaceKeyPressed: boolean;
-}
-
 // ===========================================
 // MapStateContext
 // ===========================================
@@ -153,8 +140,8 @@ export interface MapStateContextValue {
   } | null) => void;
   GridGeometry?: new (...args: unknown[]) => ExtendedGeometry;
   HexGeometry?: new (...args: unknown[]) => IGeometry;
-  onDrawingStateChange?: (state: DrawingLayerState) => void;
-  onPanZoomStateChange?: (state: PanZoomLayerState) => void;
+  /** Per-map canvas cursor store (hooks/canvas/canvasCursor.ts) */
+  cursorStore?: CanvasCursorStore;
   [key: string]: unknown;
 }
 

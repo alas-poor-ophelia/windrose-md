@@ -220,8 +220,6 @@ export type {
   ExtendedGeometry,
   ExtendedGridGeometry,
   ExtendedHexGeometry,
-  DrawingLayerState,
-  PanZoomLayerState,
   MapStateContextValue,
   MapOperationsContextValue,
   SelectableItemType,

@@ -11,7 +11,6 @@ import type {
   TextLabelSettings,
   ToolId,
   ObjectTypeId,
-  Point,
   LayerId,
   LayerVisibility
 } from '#types/index';
@@ -27,6 +26,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useCanvasRenderer } from '../../hooks/canvas/useCanvasRenderer';
 import { useCanvasInteraction } from '../../hooks/canvas/useCanvasInteraction';
 import { useViewController } from '../../hooks/canvas/useViewController';
+import { createCanvasCursorStore, toolCursorClass } from '../../hooks/canvas/canvasCursor';
 import type { ViewController } from '#types/hooks/viewController.types';
 import { GridGeometry } from '../../geometry/core/GridGeometry';
 import { DEFAULTS } from '../../core/dmtConstants';
@@ -70,18 +70,6 @@ import { useEventCoordinator } from '../../hooks/canvas/useEventCoordinator';
 interface CanvasDimensions {
   width: number;
   height: number;
-}
-
-interface DrawingLayerState {
-  isDrawing: boolean;
-  rectangleStart: Point | null;
-  circleStart: Point | null;
-}
-
-interface PanZoomLayerState {
-  isPanning: boolean;
-  isTouchPanning: boolean;
-  spaceKeyPressed: boolean;
 }
 
 interface CoordinatorsProps {
@@ -218,18 +206,20 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
   const showCoordinatesRef = useRef<boolean>(showCoordinates);
   showCoordinatesRef.current = showCoordinates;
 
-  // Refs to hold layer state for cursor coordination
-  const drawingLayerStateRef = useRef<DrawingLayerState>({ isDrawing: false, rectangleStart: null, circleStart: null });
-  const panZoomLayerStateRef = useRef<PanZoomLayerState>({ isPanning: false, isTouchPanning: false, spaceKeyPressed: false });
-
-  // Callbacks for layers to expose their state
-  const handleDrawingStateChange = useCallback((drawingState: DrawingLayerState) => {
-    drawingLayerStateRef.current = drawingState;
-  }, []);
-
-  const handlePanZoomStateChange = useCallback((panZoomState: PanZoomLayerState) => {
-    panZoomLayerStateRef.current = panZoomState;
-  }, []);
+  // Cursor classes for THIS map's canvas (REACT-04). The tool class is
+  // render-time; the transient interaction class (space-grab, panning,
+  // shape-active, drawing) is written by the store straight to the element,
+  // fed by the pan/zoom coordinator and DrawingLayer. The canvas takes no
+  // className prop so Preact never clobbers the transient class.
+  const [cursorStore] = useState(createCanvasCursorStore);
+  const toolCursor = toolCursorClass(currentTool, isDraggingSelection, selectedObjectType != null);
+  useLayoutEffect(() => {
+    cursorStore.attach(canvasRef.current);
+    return () => cursorStore.attach(null);
+  }, [cursorStore]);
+  useLayoutEffect(() => {
+    cursorStore.setBase(toolCursor);
+  }, [cursorStore, toolCursor]);
 
   // Create geometry instance based on map type
   // Return null during loading to prevent errors
@@ -428,42 +418,6 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     };
   }, [isFocused, mapData?.mapType, setShowCoordinates]);
 
-  // Determine cursor class based on current tool and interaction state
-  const getCursorClass = (): string => {
-    // Get state
-    const effectiveDrawingState = drawingLayerStateRef.current;
-    const effectivePanZoomState = panZoomLayerStateRef.current;
-
-    // Space key override - show grab cursor
-    if (effectivePanZoomState.spaceKeyPressed && !effectivePanZoomState.isPanning) return 'windrose-canvas-space-grab';
-
-    if (effectivePanZoomState.isPanning || effectivePanZoomState.isTouchPanning) return 'windrose-canvas-panning';
-    if (isDraggingSelection) return 'windrose-canvas-selecting';
-    if (currentTool === 'select') return 'windrose-canvas-select';
-    if (currentTool === 'measure') return 'windrose-canvas-measure';
-    if (currentTool === 'diagonalFill') return 'windrose-canvas-diagonal-fill';
-    if (currentTool === 'addNote') return 'windrose-canvas-add-object';
-    if (currentTool === 'addObject') {
-      return selectedObjectType != null ? 'windrose-canvas-add-object' : 'windrose-canvas';
-    }
-    if (currentTool === 'addText') {
-      return 'windrose-canvas-add-text';
-    }
-    if (currentTool === 'rectangle') {
-      return effectiveDrawingState.rectangleStart ? 'windrose-canvas-rectangle-active' : 'windrose-canvas-rectangle';
-    }
-    if (currentTool === 'circle') {
-      return effectiveDrawingState.circleStart ? 'windrose-canvas-circle-active' : 'windrose-canvas-circle';
-    }
-    if (currentTool === 'clearArea') {
-      return effectiveDrawingState.rectangleStart ? 'windrose-canvas-cleararea-active' : 'windrose-canvas-cleararea';
-    }
-    if (effectiveDrawingState.isDrawing) {
-      return currentTool === 'draw' ? 'windrose-canvas-drawing' : 'windrose-canvas-erasing';
-    }
-    return currentTool === 'erase' ? 'windrose-canvas-erase' : 'windrose-canvas';
-  };
-
   // Build context values for providers
   const mapStateValue = useMemo(() => ({
     canvasRef,
@@ -487,13 +441,11 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     instanceId: instanceId ?? null,
     requestEnterSubHex,
     requestExitSubHex,
-    // State change callbacks for layers
-    onDrawingStateChange: handleDrawingStateChange,
-    onPanZoomStateChange: handlePanZoomStateChange
+    cursorStore
   } as MapStateContextValue), [mapData, mapId, notePath, geometry, currentTool, selectedColor,
     selectedObjectType, screenToGrid, screenToWorld, getClientCoords, viewController,
     distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex,
-    handleDrawingStateChange, handlePanZoomStateChange]);
+    cursorStore]);
 
   const mapOperationsValue = useMemo(() => ({
     // Object operations
@@ -547,7 +499,6 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
                 ref={canvasRef}
                 width={canvasDimensions.width}
                 height={canvasDimensions.height}
-                className={getCursorClass()}
                 style={{ touchAction: 'none', display: 'block' }}
               />
 

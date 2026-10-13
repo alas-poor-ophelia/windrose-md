@@ -83,7 +83,8 @@
     "yaml": "^2.8.3",
     "js-yaml": "^4.3.1",
     "flatted": "^3.4.2",
-    "fast-uri": "^3.1.8"
+    "fast-uri": "^3.1.8",
+    "moment": "^2.31.0"
   },
   "resolutions": {
     "mermaid": "^11.16.0",
@@ -98,7 +99,8 @@
     "yaml": "^2.8.3",
     "js-yaml": "^4.3.1",
     "flatted": "^3.4.2",
-    "fast-uri": "^3.1.8"
+    "fast-uri": "^3.1.8",
+    "moment": "^2.31.0"
   },
   "//patchedDependencies": "obsidian-testing-framework is patched by bun's native patchedDependencies (applied at install, hash recorded in bun.lock). patch-package was removed because its find-yarn-workspace-root > micromatch > braces chain carries GHSA-vfj7-8cjw-p6xm, which has no patched braces release. Edit the patch with `bun patch obsidian-testing-framework` / `bun patch --commit`, or hand-edit it (paths are relative to the package root).",
   "patchedDependencies": {

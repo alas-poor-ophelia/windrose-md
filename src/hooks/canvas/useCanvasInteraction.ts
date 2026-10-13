@@ -761,11 +761,17 @@ function useCanvasInteraction(
       else if (isTouchPanningRef.current) end.stopTouchPan();
       else end.commitActiveGesture();
     };
+    // A blur swallows the Space keyup: drop the held flag so a later click
+    // doesn't pan (and the grab cursor doesn't stick).
+    const onBlur = (): void => {
+      if (spaceKeyPressedRef.current) setSpaceKeyPressed(false);
+      finish();
+    };
     const win = canvasRef.current?.ownerDocument.defaultView ?? window;
-    win.addEventListener('blur', finish);
+    win.addEventListener('blur', onBlur);
     win.addEventListener('pointercancel', finish);
     return () => {
-      win.removeEventListener('blur', finish);
+      win.removeEventListener('blur', onBlur);
       win.removeEventListener('pointercancel', finish);
       // On unmount, commit the live viewState directly — skip stopPan's setState
       // calls (the component is going away; state cleanup is meaningless and would
