@@ -53,10 +53,10 @@ interface LiveInputCommit {
  * hue/saturation square that is hundreds of events per second, and a range
  * slider is no better. Routing each one into updateOutline() replaced the
  * whole mapData object (rebroadcast to every layer) AND pushed a full
- * active-layer snapshot onto the undo stack, which addToHistory dedupes with
- * two JSON.stringify passes over that snapshot. One drag therefore cost
- * hundreds of whole-layer serialisations and buried the user's real undo
- * history under itself.
+ * active-layer snapshot onto the undo stack (addToHistory's dedupe, now the
+ * reference-based isSameHistoryState, cannot collapse a changing colour). One
+ * drag therefore cost hundreds of whole-map rebroadcasts and buried the
+ * user's real undo history under itself.
  *
  * A drag now only records its live value in a ref — optionally repainting the
  * overlay once per animation frame, the useLiveOverlayRedraw gate, so canvas

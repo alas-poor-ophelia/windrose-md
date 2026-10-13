@@ -165,9 +165,8 @@ export interface UseObjectInteractionsResult {
   setIsResizeMode: (value: boolean | ((prev: boolean) => boolean)) => void;
   isResizing: boolean;
   resizeCorner: ResizeCorner;
-  hoveredObject: import('../contexts/context.types').HoveredObject | null;
+  /** Hover VALUES are read via useHoverState(); only the stable setter is exposed here */
   setHoveredObject: (obj: import('../contexts/context.types').HoveredObject | null) => void;
-  mousePosition: MousePosition | null;
   objectColorBtnRef: ObjectColorBtnRef;
   pendingObjectCustomColorRef: PendingObjectCustomColorRef;
   edgeSnapMode: boolean;
@@ -185,9 +184,10 @@ export interface UseObjectInteractionsResult {
   stopObjectDragging: StopObjectDragging;
   stopObjectResizing: StopObjectResizing;
   handleObjectKeyDown: HandleObjectKeyDown;
-  handleObjectRotation: () => void;
-  handleObjectDeletion: () => void;
-  handleObjectDuplicate: () => void;
+  /** Act on the object with this id, or on the current selection when omitted (a toolbar click passes its Event). */
+  handleObjectRotation: (target?: string | Event) => void;
+  handleObjectDeletion: (target?: string | Event) => void;
+  handleObjectDuplicate: (target?: string | Event) => void;
 
   // Button position calculators
 

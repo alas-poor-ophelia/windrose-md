@@ -23,7 +23,7 @@ import type { Cell } from '#types/core/cell.types';
 import { isHexCell } from '#types/core/cell.types';
 import type { MapObject } from '#types/objects/object.types';
 
-import { axialToOffset, isWithinOffsetBounds } from '../../geometry/core/offsetCoordinates';
+import { isAxialInHexBounds } from '../../geometry/core/offsetCoordinates';
 import { calculateGridFromColumns, calculateGridFromMeasurement, measurementToHexSize, validateMeasurementSize, MEASUREMENT_CORNER } from '../../geometry/core/hexMeasurements';
 import { getDisplayNameFromPath } from '../../assets/imageOperations';
 
@@ -171,13 +171,11 @@ export interface SettingsModalState {
   
   // UI state
   activeColorPicker: ColorPickerId;
-  isLoading: boolean;
-  
+
   // Resize confirmation
   showResizeConfirm: boolean;
   pendingBoundsChange: PendingBoundsChange | null;
   orphanInfo: OrphanInfo;
-  deleteOrphanedContent: boolean;
 
   // Per-map object set
   objectSetId: string | null;
@@ -248,6 +246,7 @@ const Actions = {
   TOGGLE_PREFERENCE: 'TOGGLE_PREFERENCE',
   SET_DISTANCE_SETTING: 'SET_DISTANCE_SETTING',
   SET_HEX_BOUNDS: 'SET_HEX_BOUNDS',
+  SET_HEX_BOUND_AXIS: 'SET_HEX_BOUND_AXIS',
   SET_COORDINATE_MODE: 'SET_COORDINATE_MODE',
   SET_IMAGE_SEARCH_RESULTS: 'SET_IMAGE_SEARCH_RESULTS',
   SET_IMAGE_DISPLAY_NAME: 'SET_IMAGE_DISPLAY_NAME',
@@ -266,10 +265,8 @@ const Actions = {
   SET_IMAGE_OFFSET_Y: 'SET_IMAGE_OFFSET_Y',
   SET_IMAGE_GRID_SIZE: 'SET_IMAGE_GRID_SIZE',
   SET_ACTIVE_COLOR_PICKER: 'SET_ACTIVE_COLOR_PICKER',
-  SET_LOADING: 'SET_LOADING',
   SHOW_RESIZE_CONFIRM: 'SHOW_RESIZE_CONFIRM',
   CANCEL_RESIZE: 'CANCEL_RESIZE',
-  CLEAR_DELETE_FLAG: 'CLEAR_DELETE_FLAG',
   SET_FOG_IMAGE_DISPLAY_NAME: 'SET_FOG_IMAGE_DISPLAY_NAME',
   SET_FOG_IMAGE_SEARCH_RESULTS: 'SET_FOG_IMAGE_SEARCH_RESULTS',
   FOG_IMAGE_SELECTED: 'FOG_IMAGE_SELECTED',
@@ -322,6 +319,12 @@ interface SetDistanceSettingAction {
 interface SetHexBoundsAction {
   type: typeof Actions.SET_HEX_BOUNDS;
   payload: HexBounds;
+}
+
+/** Set one rectangular bound axis against the CURRENT bounds (keeps handlers state-free) */
+interface SetHexBoundAxisAction {
+  type: typeof Actions.SET_HEX_BOUND_AXIS;
+  payload: { axis: 'maxCol' | 'maxRow'; value: number };
 }
 
 interface SetCoordinateModeAction {
@@ -412,11 +415,6 @@ interface SetActiveColorPickerAction {
   payload: ColorPickerId;
 }
 
-interface SetLoadingAction {
-  type: typeof Actions.SET_LOADING;
-  payload: boolean;
-}
-
 interface ShowResizeConfirmAction {
   type: typeof Actions.SHOW_RESIZE_CONFIRM;
   payload: { pendingBoundsChange: PendingBoundsChange; orphanInfo: OrphanInfo };
@@ -424,10 +422,6 @@ interface ShowResizeConfirmAction {
 
 interface CancelResizeAction {
   type: typeof Actions.CANCEL_RESIZE;
-}
-
-interface ClearDeleteFlagAction {
-  type: typeof Actions.CLEAR_DELETE_FLAG;
 }
 
 interface SetFogImageDisplayNameAction {
@@ -474,6 +468,7 @@ type SettingsAction =
   | TogglePreferenceAction
   | SetDistanceSettingAction
   | SetHexBoundsAction
+  | SetHexBoundAxisAction
   | SetCoordinateModeAction
   | SetImageSearchResultsAction
   | SetImageDisplayNameAction
@@ -492,10 +487,8 @@ type SettingsAction =
   | SetImageOffsetYAction
   | SetImageGridSizeAction
   | SetActiveColorPickerAction
-  | SetLoadingAction
   | ShowResizeConfirmAction
   | CancelResizeAction
-  | ClearDeleteFlagAction
   | SetFogImageDisplayNameAction
   | SetFogImageSearchResultsAction
   | FogImageSelectedAction
@@ -519,13 +512,6 @@ const GRID_DENSITY_PRESETS: Record<Exclude<GridDensityKey, 'custom'>, GridDensit
 // ===========================================
 
 /**
- * Ring distance from origin in axial coordinates
- */
-function getHexRing(q: number, r: number): number {
-  return Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
-}
-
-/**
  * Radial bounds for a given max ring: a ring-N hex spans a (2N+1)-hex square
  */
 function deriveBoundsFromRing(maxRing: number): HexBounds {
@@ -542,15 +528,9 @@ function getOrphanedContentInfo(
 ): OrphanInfo {
   if (mapType !== 'hex') return { cells: 0, objects: 0 };
 
-  const isRadial = newBounds.maxRing !== undefined;
-
-  const isOutOfBounds = (q: number, r: number): boolean => {
-    if (isRadial) {
-      return newBounds.maxRing != null && getHexRing(q, r) > newBounds.maxRing;
-    }
-    const { col, row } = axialToOffset(q, r, orientation);
-    return !isWithinOffsetBounds(col, row, newBounds);
-  };
+  // Same predicate usePanelState's delete path uses, so the count matches the deletion
+  const isOutOfBounds = (q: number, r: number): boolean =>
+    !isAxialInHexBounds(q, r, newBounds, orientation);
 
   let orphanedCells = 0;
   let orphanedObjects = 0;
@@ -705,12 +685,10 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
     fineTuneOffset: currentBackgroundImage?.fineTuneOffset ?? 0,
     
     activeColorPicker: null,
-    isLoading: false,
-    
+
     showResizeConfirm: false,
     pendingBoundsChange: null,
     orphanInfo: { cells: 0, objects: 0 },
-    deleteOrphanedContent: false,
 
     objectSetId: props.currentObjectSetId ?? null
   };
@@ -720,9 +698,21 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
 // Helpers
 // ===========================================
 
+/**
+ * Replacement bounds that keep boundsShape and hexBounds.maxRing consistent:
+ * while the shape is radial, the current maxRing is carried over so the
+ * modal never shows radial controls over rectangular bounds (and saves the
+ * shape the user picked).
+ */
+function keepBoundsShape(state: SettingsModalState, bounds: HexBounds): HexBounds {
+  if (state.boundsShape !== 'radial' || bounds.maxRing !== undefined) return bounds;
+  const maxRing = state.hexBounds.maxRing;
+  return maxRing !== undefined ? { ...bounds, maxRing } : bounds;
+}
+
 /** Apply grid bounds from a calculation result, mutating newState.hexBounds in place. */
 function applyBoundsCalc(newState: SettingsModalState, calc: GridCalculation): SettingsModalState {
-  newState.hexBounds = { maxCol: calc.columns, maxRow: calc.rows };
+  newState.hexBounds = keepBoundsShape(newState, { maxCol: calc.columns, maxRow: calc.rows });
   return newState;
 }
 
@@ -769,7 +759,7 @@ function applyImageSelected(
     backgroundImageDisplayName: displayName,
     imageDimensions: dimensions,
     imageSearchResults: [],
-    ...(bounds ? { hexBounds: bounds, boundsLocked: true } : {})
+    ...(bounds ? { hexBounds: keepBoundsShape(state, bounds), boundsLocked: true } : {})
   };
 }
 
@@ -862,6 +852,12 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
       }
       return { ...state, hexBounds: newBounds };
     }
+
+    case Actions.SET_HEX_BOUND_AXIS: {
+      const { axis, value } = action.payload;
+      // Same semantics as SET_HEX_BOUNDS with { ...state.hexBounds, [axis]: value }
+      return settingsReducer(state, { type: Actions.SET_HEX_BOUNDS, payload: { ...state.hexBounds, [axis]: value } });
+    }
     
     case Actions.SET_COORDINATE_MODE:
       return { ...state, coordinateDisplayMode: action.payload };
@@ -936,7 +932,7 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
       return {
         ...state,
         fineTuneOffset: offset,
-        hexBounds: { maxCol: columns, maxRow: rows }
+        hexBounds: keepBoundsShape(state, { maxCol: columns, maxRow: rows })
       };
     }
     
@@ -967,9 +963,6 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
     case Actions.SET_ACTIVE_COLOR_PICKER:
       return { ...state, activeColorPicker: action.payload };
     
-    case Actions.SET_LOADING:
-      return { ...state, isLoading: action.payload };
-    
     case Actions.SHOW_RESIZE_CONFIRM:
       return {
         ...state,
@@ -984,9 +977,6 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
         showResizeConfirm: false,
         pendingBoundsChange: null
       };
-    
-    case Actions.CLEAR_DELETE_FLAG:
-      return { ...state, deleteOrphanedContent: false };
     
     // Fog of War image picker actions
     case Actions.SET_FOG_IMAGE_DISPLAY_NAME:

@@ -50,6 +50,18 @@ function generateLayerId(): LayerId {
   return 'layer-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
 }
 
+/**
+ * Fresh id with the same `<prefix>-<timestamp>-<random>` shape the entity's
+ * own generator mints (obj-, text-, curve-, edge-, wall-, tstroke-, gap-).
+ * Local so layerAccessor stays free of drawing/objects imports.
+ */
+function freshEntityId(prefix: string): string {
+  return prefix + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+}
+
+/** Schema version the v1 -> v2 layer migration produces (step 2 of the runner). */
+const LAYER_SCHEMA_VERSION = 2;
+
 // ============================================================================
 // LAYER ACCESS FUNCTIONS
 // ============================================================================
@@ -296,6 +308,13 @@ function ensureBoards(mapData: MapData): MapData {
  * (one MapLayer per DEFAULT_TILE_LAYERS role) and switch to it.
  */
 function addBoard(mapData: MapData, name: string | null = null): MapData {
+  // A map with no boards registry (e.g. a sub-map created before it was built
+  // via createNewMap) implicitly lives on the default board. Register that
+  // board first, or the new floor would be the only one and the original
+  // layers would be stranded. ensureBoards mutates, so give it copies.
+  if (!Array.isArray(mapData.boards) || mapData.boards.length === 0) {
+    mapData = ensureBoards({ ...mapData, layers: mapData.layers.map(l => ({ ...l })) });
+  }
   const boards = getBoardsOrdered(mapData);
   const boardId = generateBoardId();
   const order = boards.length > 0 ? Math.max(...boards.map(b => b.order)) + 1 : 0;
@@ -320,7 +339,7 @@ function addBoard(mapData: MapData, name: string | null = null): MapData {
 
   return {
     ...mapData,
-    boards: [...(mapData.boards ?? []), board],
+    boards: [...boards, board],
     layers: [...mapData.layers, ...newLayers],
     activeLayerId: newLayers[0].id,
     activeBoardId: boardId,
@@ -587,18 +606,32 @@ function cloneLayer(mapData: MapData, layerId: LayerId, mode: 'all' | 'mapOnly')
 
   const sourceName = sourceLayer.name || String(sourceLayer.order + 1);
 
+  // Every entity in the copy gets a fresh id: ids are looked up map-wide
+  // (party range results by objectId, travel label maps, deep links,
+  // selection restore), so a duplicate would resolve to the wrong copy.
+  const withFreshIds = <T extends { id?: string }>(items: T[] | undefined, prefix: string): T[] =>
+    deepCopy(items ?? []).map(item => (item.id != null ? { ...item, id: freshEntityId(prefix) } : item));
+
+  const wallPaths = withFreshIds(sourceLayer.wallPaths, 'wall').map(w =>
+    w.gaps != null ? { ...w, gaps: w.gaps.map(g => ({ ...g, id: freshEntityId('gap') })) } : w
+  );
+
   const clonedLayer: MapLayer = {
     id: cloneId,
     name: `Copy of ${sourceName}`,
     order: cloneOrder,
     visible: true,
     cells: deepCopy(sourceLayer.cells),
-    curves: deepCopy(sourceLayer.curves),
-    edges: deepCopy(sourceLayer.edges),
-    objects: mode === 'all' ? deepCopy(sourceLayer.objects) : [],
-    textLabels: mode === 'all' ? deepCopy(sourceLayer.textLabels) : [],
+    curves: withFreshIds(sourceLayer.curves, 'curve'),
+    edges: withFreshIds(sourceLayer.edges, 'edge'),
+    objects: mode === 'all' ? withFreshIds(sourceLayer.objects, 'obj') : [],
+    textLabels: mode === 'all' ? withFreshIds(sourceLayer.textLabels, 'text') : [],
     fogOfWar: mode === 'all' && sourceLayer.fogOfWar ? deepCopy(sourceLayer.fogOfWar) : null,
     tiles: deepCopy(sourceLayer.tiles ?? []),
+    // Map content in both modes (walls and terrain paint are drawn map
+    // features, like cells/curves/tiles). Previously omitted entirely.
+    wallPaths,
+    terrainStrokes: withFreshIds(sourceLayer.terrainStrokes, 'tstroke'),
   };
 
   // Clone stays on the same board (and same stratum, if any).
@@ -725,9 +758,9 @@ function validateMigration(originalData: LegacyMapData, migratedData: MapData): 
     errors.push(`Migration data loss: edges count mismatch (original: ${originalEdges.length}, migrated: ${layerEdges.length})`);
   }
   
-  // Check schemaVersion is set correctly
-  if (migratedData.schemaVersion !== SCHEMA_VERSION) {
-    errors.push(`Migration failed: schemaVersion incorrect (expected: ${SCHEMA_VERSION}, got: ${migratedData.schemaVersion})`);
+  // Check schemaVersion is set correctly (this step produces v2 exactly)
+  if (migratedData.schemaVersion !== LAYER_SCHEMA_VERSION) {
+    errors.push(`Migration failed: schemaVersion incorrect (expected: ${LAYER_SCHEMA_VERSION}, got: ${migratedData.schemaVersion})`);
   }
   
   return { 
@@ -737,16 +770,23 @@ function validateMigration(originalData: LegacyMapData, migratedData: MapData): 
 }
 
 /**
- * Migrate legacy (v1) map data to the new layer schema (v2)
- * Includes backup creation and validation with automatic rollback on failure
+ * Migrate legacy (v1) map data to the layer schema (v2): the v1 -> v2 step of
+ * the schema runner (schemaMigration.ts).
+ * Includes backup creation and validation with automatic rollback on failure.
+ *
+ * The rebuild runs ONLY when the map has no layers array. A map that already
+ * has layers is v2+ by shape, whatever its schemaVersion says: it is stamped
+ * (when the version is missing or below 2), never rebuilt — rebuilding would
+ * replace every real layer with one built from empty root-level arrays.
  */
 function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMapData {
-  // Already migrated? Return as-is
-  if ((legacyMapData.schemaVersion ?? 0) >= SCHEMA_VERSION && 'layers' in legacyMapData) {
-    return legacyMapData;
+  if (Array.isArray((legacyMapData as Partial<MapData>).layers)) {
+    const v = legacyMapData.schemaVersion;
+    if (typeof v === 'number' && v >= LAYER_SCHEMA_VERSION) return legacyMapData;
+    return { ...legacyMapData, schemaVersion: LAYER_SCHEMA_VERSION };
   }
-  
-  console.debug('[layerAccessor] Starting migration to schema version', SCHEMA_VERSION);
+
+  console.debug('[layerAccessor] Starting migration to schema version', LAYER_SCHEMA_VERSION);
 
   // Create backup BEFORE any modifications
   const backup = createBackup(legacyMapData);
@@ -798,7 +838,7 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
     // Build migrated structure (spread original first, then override)
     const migratedData: MapData = {
       ...legacyMapData as Partial<MapData>,
-      schemaVersion: SCHEMA_VERSION,
+      schemaVersion: LAYER_SCHEMA_VERSION,
       mapType: legacyMapData.mapType ?? 'grid',
       activeLayerId: layerId,
       layerPanelVisible: false,
@@ -825,7 +865,7 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
     // Store migration metadata for debugging
     cleanedData._migratedAt = new Date().toISOString();
     
-    console.debug('[layerAccessor] Migration successful to schema version', SCHEMA_VERSION);
+    console.debug('[layerAccessor] Migration successful to schema version', LAYER_SCHEMA_VERSION);
 
     return cleanedData;
 
@@ -837,21 +877,24 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
 }
 
 /**
- * Check if map data needs migration
+ * Whether map data needs ANY schema work on load: a v1 rebuild (no layers
+ * array), a registered step, or just a version stamp. It does NOT mean "run
+ * migrateToLayerSchema" — the version-stepped runner in schemaMigration.ts
+ * decides what each map gets; an existing layers array is never rebuilt.
  */
 function needsMigration(mapData: MapData | LegacyMapData | null | undefined): boolean {
   if (!mapData) return false;
-  
-  // Needs migration if no schemaVersion, or version is old, or no layers array
-  const needsIt = mapData.schemaVersion == null ||
-                  mapData.schemaVersion < SCHEMA_VERSION ||
-                  !('layers' in mapData);
+
+  const hasLayers = Array.isArray((mapData as Partial<MapData>).layers);
+  const needsIt = !hasLayers ||
+                  mapData.schemaVersion == null ||
+                  mapData.schemaVersion < SCHEMA_VERSION;
 
   if (needsIt) {
     console.debug('[layerAccessor] Map needs migration:', {
       currentVersion: mapData.schemaVersion ?? 'none',
       targetVersion: SCHEMA_VERSION,
-      hasLayers: 'layers' in mapData
+      hasLayers
     });
   }
 
@@ -1110,7 +1153,7 @@ export {
   generateLayerId,
   getActiveLayer, getLayersOrdered, getLayerById, getLayerIndex, getLayerBelow,
   updateLayer, updateActiveLayer, setActiveLayer, addLayer, cloneLayer, removeLayer, reorderLayers,
-  migrateToLayerSchema, needsMigration,
+  migrateToLayerSchema, needsMigration, LAYER_SCHEMA_VERSION,
   // Board (floor) projection
   DEFAULT_BOARD_ID, generateBoardId, layerBoardId, getBoardsOrdered, getActiveBoardId,
   getBoardLayers, getActiveBoardLayers, getBoardBelow, updateBoard, getRenderLayers, getExportLayers, getDefaultExportLayers, ensureBoards, addBoard, removeBoard, setActiveBoard,

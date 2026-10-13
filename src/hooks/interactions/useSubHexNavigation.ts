@@ -12,10 +12,10 @@ import type { MapDistanceOverrides, ResolvedDistanceSettings, SubHexDistanceLeve
 import type { SubHexExitDetail } from '../../core/windroseEvents';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { DEFAULTS, SCHEMA_VERSION } from '../../core/dmtConstants';
+import { DEFAULTS } from '../../core/dmtConstants';
 import { isFeatureEnabled } from '../../core/featureFlags';
 import { getSettings } from '../../core/settingsAccessor';
-import { generateLayerId } from '../../persistence/layerAccessor';
+import { buildMapEntry } from '../../persistence/fileOperations';
 import { clearSubHexBackdrop, pruneSubHexBackdrops, relabelSubHexBackdrop } from '../../core/subHexBackdropStore';
 import { calculateFitZoom, subHexAnchorToChildCenter, subHexChildPointToParentOffset, subHexContinuityZoom } from '../../geometry/core/hexMeasurements';
 import { createGeometry } from '../../geometry/core/createGeometry';
@@ -167,64 +167,36 @@ interface UseSubHexNavigationResult {
 // Sub-hex MapData creation
 // =========================================================================
 
+/**
+ * A fresh sub-hex map for hex (q, r) of `parentMapData`. Built through the same
+ * constructor as every other new map (createNewMap via buildMapEntry), so it
+ * carries the boards registry, activeBoardId and layer boardId; only the
+ * sub-hex specifics are overridden: name, the parent's hex size/orientation,
+ * the ring-bounded extent and the fit-to-rings view centred on the origin.
+ */
 function createSubHexMapData(parentMapData: MapData, q: number, r: number): SubHexMapData {
-  const layerId = generateLayerId();
   const subdivisionRings = 7;
-
-  const initialLayer: MapLayer = {
-    id: layerId,
-    name: '1',
-    order: 0,
-    visible: true,
-    cells: [],
-    curves: [],
-    edges: [],
-    objects: [],
-    textLabels: [],
-    fogOfWar: null
+  const hexSize = parentMapData.hexSize ?? DEFAULTS.hexSize;
+  const orientation = parentMapData.orientation ?? DEFAULTS.hexOrientation;
+  const hexBounds = {
+    maxCol: subdivisionRings * 2 + 1,
+    maxRow: subdivisionRings * 2 + 1,
+    maxRing: subdivisionRings
   };
 
-  const mapData: MapData = {
-    name: `Hex (${q}, ${r})`,
-    description: '',
-    mapType: 'hex',
-    northDirection: 0,
-    customColors: [],
-    sidebarCollapsed: false,
-    expandedState: false,
-    settings: {
-      useGlobalSettings: true,
-      overrides: {}
-    },
-    uiPreferences: {
-      rememberPanZoom: true,
-      rememberSidebarState: true,
-      rememberExpandedState: false
-    },
-    lastTextLabelSettings: null,
-    schemaVersion: SCHEMA_VERSION,
-    activeLayerId: layerId,
-    layerPanelVisible: false,
-    layers: [initialLayer],
-    gridSize: DEFAULTS.gridSize,
+  const mapData = buildMapEntry(`Hex (${q}, ${r})`, 'hex', {
+    hexSize,
+    orientation,
+    hexBounds,
     dimensions: { ...DEFAULTS.dimensions },
-    hexSize: parentMapData.hexSize ?? DEFAULTS.hexSize,
-    orientation: parentMapData.orientation ?? DEFAULTS.hexOrientation,
-    hexBounds: {
-      maxCol: subdivisionRings * 2 + 1,
-      maxRow: subdivisionRings * 2 + 1,
-      maxRing: subdivisionRings
-    },
     viewState: {
       zoom: calculateFitZoom(
-        parentMapData.hexSize ?? DEFAULTS.hexSize,
-        parentMapData.orientation ?? DEFAULTS.hexOrientation,
-        { maxCol: subdivisionRings * 2 + 1, maxRow: subdivisionRings * 2 + 1, maxRing: subdivisionRings },
+        hexSize, orientation, hexBounds,
         DEFAULTS.canvasSize.width, DEFAULTS.canvasSize.height
       ),
       center: { x: 0, y: 0 }
     }
-  };
+  });
 
   return {
     subdivisionRings,
@@ -256,6 +228,11 @@ function useSubHexNavigation({
   const [navigationVersion, setNavigationVersion] = useState(0);
   // Active sub-hex drill (embed auto-drill or deep-link navigation); null = idle
   const [pendingDrill, setPendingDrill] = useState<PendingDrill | null>(null);
+  // True between a real (non-cosmetic) sub-hex edit and its deferred
+  // propagation to root. Navigation writes are cosmetic (DATA-18) only when
+  // nothing real is riding along: an edit whose propagate was skipped because
+  // the user navigated first is carried by the navigation write itself.
+  const unpropagatedEditRef = useRef(false);
 
   const isInSubHex = navStack.length > 0;
   const depth = navStack.length;
@@ -292,64 +269,6 @@ function useSubHexNavigation({
     return segments;
   }, [navStack, isInSubHex, subHexMapData?.name]);
 
-  // Enter a sub-hex at the given axial coordinate. `viewOverride` opens the
-  // sub-map at that view instead of its stored one (seamless zoom dives pass
-  // the live-canvas fit so the sub-map fills the screen).
-  const enterSubHex = useCallback((q: number, r: number, viewOverride?: StoredViewState): void => {
-    const currentMapData = isInSubHex ? subHexMapData : rootMapData;
-    if (!currentMapData) return;
-
-    const hexKey = `${q},${r}`;
-
-    // Look up or create sub-hex data
-    let subHex = currentMapData.subHexMaps?.[hexKey];
-    if (!subHex) {
-      // Feature gate: entering EXISTING sub-maps always works; creating new
-      // ones requires the subMaps feature.
-      if (!isFeatureEnabled('subMaps')) return;
-      // Bounds fence: never create a sub-map at a hex outside the current
-      // map's own grid. Without this, a double-click over an adjacent-sibling
-      // ghost region resolves (via screenToGrid) to a far-out-of-bounds hex
-      // of the CURRENT map and silently spawns a nested sub-map there.
-      if (!createGeometry(currentMapData).isWithinBounds(q, r)) return;
-      subHex = createSubHexMapData(currentMapData, q, r);
-      // Write the new sub-hex into the current map's subHexMaps
-      const updatedCurrent = {
-        ...currentMapData,
-        subHexMaps: {
-          ...(currentMapData.subHexMaps ?? {}),
-          [hexKey]: subHex
-        }
-      } as MapData;
-
-      if (isInSubHex) {
-        setSubHexMapData(updatedCurrent);
-        // Propagate to root for saving
-        propagateToRoot(updatedCurrent, navStack);
-      } else {
-        rootUpdateMapData(updatedCurrent);
-      }
-    }
-
-    // Push current state onto navigation stack
-    const frame: SubHexNavFrame = {
-      parentMapData: currentMapData,
-      parentStoredViewState: currentMapData.viewState ?? { zoom: 1.0, center: { x: 0, y: 0 } },
-      hexKey
-    };
-
-    const newStack = [...navStack, frame];
-    navStackRef.current = newStack;
-    setNavStack(newStack);
-    traceZoom('enterSubHex', viewOverride != null
-      ? { hexKey, overrideZoom: viewOverride.zoom }
-      : { hexKey, storedZoom: subHex.mapData.viewState?.zoom ?? null });
-    setSubHexMapData(viewOverride != null
-      ? { ...subHex.mapData, viewState: { zoom: viewOverride.zoom, center: { ...viewOverride.center } } }
-      : subHex.mapData);
-    setNavigationVersion(prev => prev + 1);
-  }, [rootMapData, subHexMapData, isInSubHex, navStack]);
-
   // Propagate sub-hex changes up the navigation stack to root for saving.
   // `options` rides through to the root updater so cosmetic-only changes
   // (pan/zoom inside a sub-hex) keep their cosmetic flag at the save layer.
@@ -382,6 +301,78 @@ function useSubHexNavigation({
     // nestedMapData is now the fully-updated root
     rootUpdateMapData(nestedMapData, options);
   }, [rootUpdateMapData]);
+
+  // Enter a sub-hex at the given axial coordinate. `viewOverride` opens the
+  // sub-map at that view instead of its stored one (seamless zoom dives pass
+  // the live-canvas fit so the sub-map fills the screen).
+  const enterSubHex = useCallback((q: number, r: number, viewOverride?: StoredViewState): void => {
+    const currentMapData = isInSubHex ? subHexMapData : rootMapData;
+    if (!currentMapData) return;
+
+    const hexKey = `${q},${r}`;
+
+    // Look up or create sub-hex data. `parentForFrame` is what the parent looks
+    // like after this call: on create it must include the new subHexMaps entry
+    // (and its subdivisionRings), or later merges from the frame drop it.
+    let parentForFrame: MapData = currentMapData;
+    let subHex = currentMapData.subHexMaps?.[hexKey];
+    if (!subHex) {
+      // Feature gate: entering EXISTING sub-maps always works; creating new
+      // ones requires the subMaps feature.
+      if (!isFeatureEnabled('subMaps')) return;
+      // Bounds fence: never create a sub-map at a hex outside the current
+      // map's own grid. Without this, a double-click over an adjacent-sibling
+      // ghost region resolves (via screenToGrid) to a far-out-of-bounds hex
+      // of the CURRENT map and silently spawns a nested sub-map there.
+      if (!createGeometry(currentMapData).isWithinBounds(q, r)) return;
+      subHex = createSubHexMapData(currentMapData, q, r);
+      // Write the new sub-hex into the current map's subHexMaps
+      const updatedCurrent = {
+        ...currentMapData,
+        subHexMaps: {
+          ...(currentMapData.subHexMaps ?? {}),
+          [hexKey]: subHex
+        }
+      } as MapData;
+      parentForFrame = updatedCurrent;
+
+      if (isInSubHex) {
+        setSubHexMapData(updatedCurrent);
+        // Propagate to root for saving
+        propagateToRoot(updatedCurrent, navStack);
+      } else {
+        rootUpdateMapData(updatedCurrent);
+      }
+    }
+
+    // Push current state onto navigation stack
+    const frame: SubHexNavFrame = {
+      parentMapData: parentForFrame,
+      parentStoredViewState: parentForFrame.viewState ?? { zoom: 1.0, center: { x: 0, y: 0 } },
+      hexKey
+    };
+
+    const newStack = [...navStack, frame];
+    navStackRef.current = newStack;
+    setNavStack(newStack);
+    traceZoom('enterSubHex', viewOverride != null
+      ? { hexKey, overrideZoom: viewOverride.zoom }
+      : { hexKey, storedZoom: subHex.mapData.viewState?.zoom ?? null });
+    setSubHexMapData(viewOverride != null
+      ? { ...subHex.mapData, viewState: { zoom: viewOverride.zoom, center: { ...viewOverride.center } } }
+      : subHex.mapData);
+    setNavigationVersion(prev => prev + 1);
+  }, [rootMapData, subHexMapData, isInSubHex, navStack, propagateToRoot, rootUpdateMapData]);
+
+  // Options for a navigation write (exit / breadcrumb jump). Navigation only
+  // moves the view, so it is cosmetic and a stale refusal stays silent
+  // (DATA-18) - unless a real sub-hex edit has not reached root yet, in which
+  // case this write is what carries it and must count as a real edit.
+  const takeNavigationWriteOptions = useCallback((): MapDataUpdateOptions => {
+    const carriesEdit = unpropagatedEditRef.current;
+    unpropagatedEditRef.current = false;
+    return { cosmetic: !carriesEdit };
+  }, []);
 
   // Exit current sub-hex (go up one level)
   const exitSubHex = useCallback((seamlessExit?: SubHexExitDetail | null): void => {
@@ -455,19 +446,20 @@ function useSubHexNavigation({
     const newStack = navStack.slice(0, -1);
     navStackRef.current = newStack;
     setNavStack(newStack);
+    const navOptions = takeNavigationWriteOptions();
 
     if (newStack.length === 0) {
       // Back at root
       setSubHexMapData(null);
-      rootUpdateMapData(restoredParent);
+      rootUpdateMapData(restoredParent, navOptions);
     } else {
       // Still in a sub-hex, just one level up
       setSubHexMapData(restoredParent);
-      propagateToRoot(restoredParent, newStack);
+      propagateToRoot(restoredParent, newStack, navOptions);
     }
 
     setNavigationVersion(prev => prev + 1);
-  }, [navStack, subHexMapData, rootUpdateMapData, propagateToRoot, getCanvas]);
+  }, [navStack, subHexMapData, rootUpdateMapData, propagateToRoot, getCanvas, takeNavigationWriteOptions]);
 
   // Navigate to a specific breadcrumb level (0 = root)
   const navigateToLevel = useCallback((targetDepth: number): void => {
@@ -504,17 +496,18 @@ function useSubHexNavigation({
 
     navStackRef.current = stack;
     setNavStack(stack);
+    const navOptions = takeNavigationWriteOptions();
 
     if (stack.length === 0) {
       setSubHexMapData(null);
-      rootUpdateMapData(currentData as MapData);
+      rootUpdateMapData(currentData as MapData, navOptions);
     } else {
       setSubHexMapData(currentData);
-      propagateToRoot(currentData as MapData, stack);
+      propagateToRoot(currentData as MapData, stack, navOptions);
     }
 
     setNavigationVersion(prev => prev + 1);
-  }, [navStack, subHexMapData, depth, rootUpdateMapData, propagateToRoot, getCanvas]);
+  }, [navStack, subHexMapData, depth, rootUpdateMapData, propagateToRoot, getCanvas, takeNavigationWriteOptions]);
 
   // Wrapped updateMapData that routes writes to the correct level
   const activeUpdateMapData = useCallback<MapDataUpdater>((updaterOrData, options) => {
@@ -540,12 +533,14 @@ function useSubHexNavigation({
       // child). A skipped propagate loses nothing: every navigation path
       // merges the live subHexMapData into the parent itself.
       const scheduledPath = navStackRef.current.map(f => f.hexKey).join('/');
+      if (options?.cosmetic !== true) unpropagatedEditRef.current = true;
       window.setTimeout(() => {
         const currentPath = navStackRef.current.map(f => f.hexKey).join('/');
         if (currentPath !== scheduledPath) {
           traceZoom('propagateSkipped', { scheduledPath, currentPath });
           return;
         }
+        unpropagatedEditRef.current = false;
         propagateToRoot(newData, navStackRef.current, options);
       }, 0);
 

@@ -127,6 +127,12 @@ export type RenderCanvas = (
 /** Additional hook-specific options beyond RenderCanvasOptions */
 export type UseCanvasRendererOptions = RenderCanvasOptions;
 
+/** useCanvasRenderer result */
+export interface UseCanvasRendererResult {
+  /** Identity-stable: queue one coordinated repaint (coalesced per frame) with the latest inputs */
+  scheduleRender: () => void;
+}
+
 /** useCanvasRenderer hook - triggers re-render on data changes */
 export type UseCanvasRenderer = (
   canvasRef: RefObject<HTMLCanvasElement>,
@@ -136,4 +142,4 @@ export type UseCanvasRenderer = (
   selectedItems: RendererSelectedItem | RendererSelectedItem[] | undefined,
   options: UseCanvasRendererOptions | undefined,
   viewController: ViewController,
-) => void;
+) => UseCanvasRendererResult;

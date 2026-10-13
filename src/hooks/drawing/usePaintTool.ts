@@ -72,15 +72,14 @@ interface UsePaintToolOptions {
 
 interface UsePaintToolResult {
   paintIsDrawing: boolean;
-  processedCells: Set<string>;
-  processedEdges: Set<string>;
   toggleCell: (coords: Point, shouldFill: boolean, dragStart?: DragStartContext | null) => void;
   processCellDuringDrag: (e: PointerEvent | MouseEvent | TouchEvent, dragStart?: DragStartContext | null) => void;
   startDrawing: (e: PointerEvent | MouseEvent | TouchEvent, dragStart?: DragStartContext | null) => void;
   stopDrawing: () => void;
   cancelPaintDrawing: () => void;
-  setProcessedCells: (v: Set<string>) => void;
-  setProcessedEdges: (v: Set<string>) => void;
+  /** Replace the per-stroke dedupe set (ref-backed; never re-renders). */
+  setProcessedCells: (v: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
+  setProcessedEdges: (v: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
   setIsDrawing: (v: boolean) => void;
 }
 
@@ -93,8 +92,21 @@ function usePaintTool({
 }: UsePaintToolOptions): UsePaintToolResult {
 
   const [paintIsDrawing, setPaintIsDrawing] = useState<boolean>(false);
-  const [processedCells, setProcessedCells] = useState<Set<string>>(new Set());
-  const [processedEdges, setProcessedEdges] = useState<Set<string>>(new Set());
+  // Per-stroke dedupe sets. Refs mutated in place: a state Set cost a
+  // re-render plus an O(n) copy per new cell, and .has() read the previous
+  // render's set, so two events before a re-render could toggle a cell twice.
+  const processedCellsRef = useRef<Set<string>>(new Set());
+  const processedEdgesRef = useRef<Set<string>>(new Set());
+  const resetProcessed = (): void => {
+    processedCellsRef.current.clear();
+    processedEdgesRef.current.clear();
+  };
+  const setProcessedCells = (v: Set<string> | ((prev: Set<string>) => Set<string>)): void => {
+    processedCellsRef.current = typeof v === 'function' ? v(processedCellsRef.current) : v;
+  };
+  const setProcessedEdges = (v: Set<string> | ((prev: Set<string>) => Set<string>)): void => {
+    processedEdgesRef.current = typeof v === 'function' ? v(processedEdgesRef.current) : v;
+  };
 
   const strokeInitialStateRef = useRef<Cell[] | null>(null);
   const strokeInitialEdgesRef = useRef<Edge[] | null>(null);
@@ -187,11 +199,11 @@ function usePaintTool({
           if (edgeInfo) {
             const edgeKey = `${edgeInfo.x},${edgeInfo.y},${edgeInfo.side}`;
 
-            if (!processedEdges.has(edgeKey)) {
+            if (!processedEdgesRef.current.has(edgeKey)) {
               const existingEdge = getEdgeAt(activeLayer.edges, edgeInfo.x, edgeInfo.y, edgeInfo.side);
               if (existingEdge) {
                 strokeInitialEdgesRef.current ??= [...activeLayer.edges];
-                setProcessedEdges((prev: Set<string>) => new Set([...prev, edgeKey]));
+                processedEdgesRef.current.add(edgeKey);
                 const newEdges = removeEdge(activeLayer.edges, edgeInfo.x, edgeInfo.y, edgeInfo.side);
                 onEdgesChange(newEdges, isBatchedStroke);
                 return;
@@ -327,9 +339,9 @@ function usePaintTool({
 
     const cellKey = `${coords.x},${coords.y}`;
 
-    if (processedCells.has(cellKey)) return;
+    if (processedCellsRef.current.has(cellKey)) return;
 
-    setProcessedCells((prev: Set<string>) => new Set([...prev, cellKey]));
+    processedCellsRef.current.add(cellKey);
 
     const shouldFill = currentTool === 'draw';
     toggleCell(coords, shouldFill, { clientX, clientY });
@@ -341,8 +353,7 @@ function usePaintTool({
     const activeLayer = getActiveLayer(mapData);
 
     setPaintIsDrawing(true);
-    setProcessedCells(new Set());
-    setProcessedEdges(new Set());
+    resetProcessed();
     strokeInitialStateRef.current = [...activeLayer.cells];
     strokeInitialEdgesRef.current = null;
     strokeInitialCurvesRef.current = null;
@@ -356,8 +367,7 @@ function usePaintTool({
     if (!paintIsDrawing) return;
 
     setPaintIsDrawing(false);
-    setProcessedCells(new Set());
-    setProcessedEdges(new Set());
+    resetProcessed();
 
     if (mapData == null) return;
 
@@ -367,8 +377,7 @@ function usePaintTool({
   const cancelPaintDrawing = (): void => {
     if (paintIsDrawing) {
       setPaintIsDrawing(false);
-      setProcessedCells(new Set());
-      setProcessedEdges(new Set());
+      resetProcessed();
       strokeInitialStateRef.current = null;
       strokeInitialEdgesRef.current = null;
       strokeInitialCurvesRef.current = null;
@@ -379,7 +388,7 @@ function usePaintTool({
   };
 
   return {
-    paintIsDrawing, processedCells, processedEdges,
+    paintIsDrawing,
     toggleCell, processCellDuringDrag, startDrawing, stopDrawing,
     cancelPaintDrawing,
     setProcessedCells, setProcessedEdges,

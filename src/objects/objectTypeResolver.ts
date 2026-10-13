@@ -11,81 +11,34 @@
  */
 
 import type { MapType } from '#types/core/map.types';
+import type {
+  ObjectTypeDefinition,
+  CategoryDefinition,
+  RenderChar,
+  ValidationResult
+} from '#types/objects/object.types';
+import type { ObjectOverride } from '#types/settings/settings.types';
 
 import { OBJECT_TYPES, CATEGORIES } from './objectTypes';
 import { getObjectSettings, getObjectSettingsForSet } from '../core/settingsAccessor';
 import { RA_ICONS, getIconChar } from '../assets/rpgAwesomeIcons';
 
-// Types from #types/objects/object.types.ts and #types/settings/settings.types.ts
-
-/** Base object type (from objectTypes.ts) */
-
-/** Resolved object type definition */
-interface ObjectTypeDefinition {
-  id: string;
-  symbol?: string;
-  iconClass?: string;
-  imagePath?: string;  // Vault image path for custom image objects
-  label: string;
-  category: string;
-  order?: number;
-  isBuiltIn?: boolean;
-  isModified?: boolean;
-  isCustom?: boolean;
-  isHidden?: boolean;
-  isUnknown?: boolean;
-}
-
-/** Base category (from objectTypes.ts) */
-
-/** Resolved category definition */
-interface CategoryDefinition {
-  id: string;
-  label: string;
-  order?: number;
-  isBuiltIn?: boolean;
-  isCustom?: boolean;
-}
-
-/** Object override settings */
-interface ObjectOverride {
-  hidden?: boolean;
-  symbol?: string;
-  iconClass?: string;
-  label?: string;
-  category?: string;
-  order?: number;
-}
-
-/** Object settings from settings accessor */
+/**
+ * The object-related slice of settings that resolution reads. Accepts the
+ * per-map-type object settings from settingsAccessor as well as the raw
+ * settings records the settings tab passes around.
+ */
 interface ObjectSettings {
   objectOverrides?: Record<string, ObjectOverride>;
   customObjects?: ObjectTypeDefinition[];
   customCategories?: CategoryDefinition[];
 }
 
-/** Render character result */
-interface RenderChar {
-  char: string;
-  isIcon: boolean;
-  isImage?: boolean;    // True if rendering via image (imagePath)
-  imagePath?: string;   // Vault image path for image rendering
-}
+/** A resolved object type: always carries an order and a built-in flag */
+type ResolvedObjectType = ObjectTypeDefinition & { order: number; isBuiltIn: boolean };
 
-/** Validation result */
-interface ValidationResult {
-  valid: boolean;
-  errors: string[];
-}
-
-
-
-
-/** Object types module */
-
-/** Settings accessor module */
-
-/** RPG Awesome icons module */
+/** A resolved category: always carries an order and a built-in flag */
+type ResolvedCategory = CategoryDefinition & { order: number; isBuiltIn: boolean };
 
 /** Resolve object settings: per-map set -> global -> defaults */
 function resolveObjectSettings(mapType: MapType, objectSetId?: string | null): ObjectSettings {
@@ -168,7 +121,10 @@ function isValidIconClass(iconClass: string | null | undefined): boolean {
 }
 
 /**
- * Default category order for built-in categories
+ * Default sort order for built-in categories. The single source of truth for
+ * category ordering: the map palette and the settings tab both resolve
+ * through mergeBuiltInAndCustomCategories, so a custom category's "Sort
+ * order" lands in the same slot in both places.
  */
 const BUILT_IN_CATEGORY_ORDER: Record<string, number> = {
   'navigation': 10,
@@ -179,16 +135,14 @@ const BUILT_IN_CATEGORY_ORDER: Record<string, number> = {
 };
 
 /**
- * Get effective object types list (built-ins + overrides + custom)
- * This is the main function consumers should use for listing available objects.
+ * Merge built-in objects (overrides applied, hidden ones removed) with custom
+ * objects. Pure: reads only the given settings slice.
+ * Built-ins default to index*10 order; customs default to 1000+index*10.
  */
-function getResolvedObjectTypes(mapType: MapType = 'grid', objectSetId?: string | null): ObjectTypeDefinition[] {
-  const settings = resolveObjectSettings(mapType, objectSetId);
+function mergeBuiltInAndCustomObjects(settings: ObjectSettings): ResolvedObjectType[] {
   const { objectOverrides = {}, customObjects = [] } = settings;
 
-  // Apply overrides to built-ins, filter out hidden ones
-  // Built-in objects get default order based on their index in OBJECT_TYPES
-  const resolvedBuiltIns = OBJECT_TYPES
+  const resolvedBuiltIns: ResolvedObjectType[] = OBJECT_TYPES
     .filter(obj => objectOverrides[obj.id]?.hidden !== true)
     .map((obj, index) => {
       const override = objectOverrides[obj.id];
@@ -205,17 +159,11 @@ function getResolvedObjectTypes(mapType: MapType = 'grid', objectSetId?: string 
           isModified: true
         };
       }
-      return {
-        ...obj,
-        order: defaultOrder,
-        isBuiltIn: true,
-        isModified: false
-      };
+      return { ...obj, order: defaultOrder, isBuiltIn: true, isModified: false };
     });
 
-  // Add custom objects with their flag
   // Custom objects use their order or a high default to appear at the end
-  const resolvedCustom = customObjects.map((obj, index) => ({
+  const resolvedCustom: ResolvedObjectType[] = customObjects.map((obj, index) => ({
     ...obj,
     order: obj.order ?? (1000 + index * 10),
     isCustom: true,
@@ -226,47 +174,41 @@ function getResolvedObjectTypes(mapType: MapType = 'grid', objectSetId?: string 
 }
 
 /**
- * Get effective categories list (built-ins + custom), sorted by order
+ * Merge built-in categories with custom categories, sorted by order.
+ * Pure: reads only the given settings slice.
  */
-function getResolvedCategories(mapType: MapType = 'grid', objectSetId?: string | null): CategoryDefinition[] {
-  const settings = resolveObjectSettings(mapType, objectSetId);
+function mergeBuiltInAndCustomCategories(settings: ObjectSettings): ResolvedCategory[] {
   const { customCategories = [] } = settings;
 
-  // Add order to built-in categories
-  const resolvedBuiltIns = CATEGORIES.map(c => ({
+  const resolvedBuiltIns: ResolvedCategory[] = CATEGORIES.map(c => ({
     ...c,
     isBuiltIn: true,
     order: BUILT_IN_CATEGORY_ORDER[c.id] ?? 50
   }));
 
-  // Add custom categories with their flags
-  const resolvedCustom = customCategories.map(c => ({
+  const resolvedCustom: ResolvedCategory[] = customCategories.map(c => ({
     ...c,
     isCustom: true,
     isBuiltIn: false,
     order: c.order ?? 100 // Default custom categories to end
   }));
 
-  // Combine and sort by order
-  return [...resolvedBuiltIns, ...resolvedCustom]
-    .sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
+  return [...resolvedBuiltIns, ...resolvedCustom].sort((a, b) => a.order - b.order);
 }
 
 /**
- * Get list of hidden built-in objects
- * Useful for showing a "hidden objects" section in settings
+ * Get effective object types list (built-ins + overrides + custom)
+ * This is the main function consumers should use for listing available objects.
  */
-function getHiddenObjects(mapType: MapType = 'grid', objectSetId?: string | null): ObjectTypeDefinition[] {
-  const settings = resolveObjectSettings(mapType, objectSetId);
-  const { objectOverrides = {} } = settings;
+function getResolvedObjectTypes(mapType: MapType = 'grid', objectSetId?: string | null): ResolvedObjectType[] {
+  return mergeBuiltInAndCustomObjects(resolveObjectSettings(mapType, objectSetId));
+}
 
-  return OBJECT_TYPES
-    .filter(obj => objectOverrides[obj.id]?.hidden === true)
-    .map(obj => ({
-      ...obj,
-      isBuiltIn: true,
-      isHidden: true
-    }));
+/**
+ * Get effective categories list (built-ins + custom), sorted by order
+ */
+function getResolvedCategories(mapType: MapType = 'grid', objectSetId?: string | null): ResolvedCategory[] {
+  return mergeBuiltInAndCustomCategories(resolveObjectSettings(mapType, objectSetId));
 }
 
 /**
@@ -328,37 +270,6 @@ function getObjectType(typeId: string | null | undefined, mapType: MapType = 'gr
 }
 
 /**
- * Check if an object type exists (built-in or custom, not hidden)
- */
-function objectTypeExists(typeId: string, mapType: MapType = 'grid', objectSetId?: string | null): boolean {
-  const objType = getObjectType(typeId, mapType, objectSetId);
-  return objType.id !== '__unknown__' && objType.isHidden !== true;
-}
-
-/**
- * Get the original (unmodified) built-in object definition
- * Used for "reset to default" functionality
- */
-function getOriginalBuiltIn(typeId: string): ObjectTypeDefinition | null {
-  const builtIn = OBJECT_TYPES.find(t => t.id === typeId);
-  return builtIn ? { ...builtIn, isBuiltIn: true } : null;
-}
-
-/**
- * Generate a unique ID for a custom object
- */
-function generateCustomObjectId(): string {
-  return 'custom-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
-}
-
-/**
- * Generate a unique ID for a custom category
- */
-function generateCustomCategoryId(): string {
-  return 'custom-cat-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
-}
-
-/**
  * Validate a symbol string
  * Returns true if the symbol is valid (non-empty, reasonable length)
  */
@@ -417,7 +328,9 @@ function validateObjectDefinition(obj: Partial<ObjectTypeDefinition>): Validatio
 
 // Export all functions
 export { // Core resolution
-  getResolvedObjectTypes, getResolvedCategories, getObjectType, getHiddenObjects, // Icon/symbol/image helpers
+  getResolvedObjectTypes, getResolvedCategories, getObjectType,
+  mergeBuiltInAndCustomObjects, mergeBuiltInAndCustomCategories, // Icon/symbol/image helpers
   hasIconClass, hasImagePath, getRenderChar, isValidIconClass, isValidImagePath, // Utilities
-  objectTypeExists, getOriginalBuiltIn, generateCustomObjectId, generateCustomCategoryId, isValidSymbol, validateObjectDefinition, // Constants
-  UNKNOWN_OBJECT_FALLBACK, BUILT_IN_CATEGORY_ORDER };
+  isValidSymbol, validateObjectDefinition, // Constants
+  UNKNOWN_OBJECT_FALLBACK };
+export type { ResolvedObjectType, ResolvedCategory };

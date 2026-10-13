@@ -557,6 +557,16 @@ body {
   }
 }
 /* ============================================
+   MAP WRAPPER FOCUS
+   The wrapper is tabIndex -1 and takes focus on a press on the map so map
+   keys (Delete, R, Escape) reach it; a pointer focus shows no ring.
+   ============================================ */
+.windrose-canvas-wrapper:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+/* ============================================
    CANVAS CURSOR STATES
    ============================================ */
 .windrose-canvas,
@@ -1125,8 +1135,8 @@ body {
   box-sizing: border-box;
 }
 
-button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn),
-.is-tablet button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn) {
+button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-orientation-btn),
+.is-tablet button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-orientation-btn) {
   width: 35px;
   height: 35px;
   min-width: 35px;
@@ -1153,20 +1163,20 @@ button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windro
   overflow: visible;
   user-select: none;
 }
-button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn) svg,
-.is-tablet button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn) svg {
+button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-orientation-btn) svg,
+.is-tablet button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-orientation-btn) svg {
   display: block;
   width: 1em;
   height: 1em;
 }
-button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn):hover,
-.is-tablet button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn):hover {
+button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-orientation-btn):hover,
+.is-tablet button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-orientation-btn):hover {
   background-color: color-mix(in srgb, var(--windrose-bg-primary) 90%, transparent);
   border-color: oklch(from var(--windrose-border-primary) l c h/0.6);
   transform: scale(1.05);
 }
-.theme-light button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn),
-.theme-light .is-tablet button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn) {
+.theme-light button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-orientation-btn),
+.theme-light .is-tablet button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-orientation-btn) {
   color: var(--windrose-border-primary-dark);
   background-color: color-mix(in srgb, var(--windrose-bg-secondary) 90%, transparent);
   border-color: oklch(from var(--windrose-border-primary-dark) l c h/0.5);
@@ -4147,57 +4157,6 @@ button:is(.windrose-tb-iconbtn,
   z-index: 150;
 }
 
-.windrose-multi-select-toolbar {
-  align-items: center;
-}
-
-.windrose-toolbar-button {
-  width: 44px;
-  height: 44px;
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border-hover);
-  border-radius: 6px;
-  color: var(--text-normal);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: var(--windrose-transition);
-  user-select: none;
-  box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.2);
-}
-.windrose-toolbar-button:hover {
-  background: var(--background-primary-alt, var(--background-secondary));
-  border-color: var(--text-accent);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.3);
-}
-.windrose-toolbar-button:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 6px oklch(0% 0 0deg / 0.2);
-}
-.windrose-toolbar-button svg {
-  width: 20px;
-  height: 20px;
-}
-
-.windrose-toolbar-color-button {
-  border: 2px solid oklch(100% 0 0deg / 0.3);
-}
-.windrose-toolbar-color-button svg {
-  filter: drop-shadow(0 0 2px oklch(0% 0 0deg / 0.8));
-  color: oklch(0% 0 0deg);
-}
-.windrose-toolbar-color-button:hover {
-  border-color: oklch(100% 0 0deg / 0.5);
-}
-
-.windrose-toolbar-delete-button:hover {
-  background: var(--background-modifier-error);
-  border-color: var(--text-error);
-  color: var(--text-on-accent);
-}
-
 .windrose-object-hover-link.windrose-object-hover-link {
   pointer-events: auto;
   overflow: hidden;
@@ -4247,12 +4206,6 @@ button:is(.windrose-tb-iconbtn,
 }
 .windrose-linking-banner-cancel:hover {
   background: oklch(100% 0 0deg / 0.3);
-}
-
-.windrose-toolbar-button-active.windrose-toolbar-button-active,
-.windrose-toolbar-button-active.windrose-toolbar-button-active:hover {
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
 }
 
 /* ==========================================================================
@@ -6940,25 +6893,6 @@ button.windrose-fow-tool-btn:disabled svg,
 /* ==========================================================================
    Scale Slider (shown during resize mode)
    ========================================================================== */
-.windrose-scale-slider-container {
-  background: var(--windrose-bg-secondary);
-  border: 1px solid var(--windrose-border-primary);
-  border-radius: 6px;
-  padding: 6px 10px;
-  box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.3), inset 0 1px 0 oklch(100% 0 0deg / 0.05);
-}
-
-.windrose-scale-slider-inner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.windrose-scale-slider-inner svg {
-  color: var(--windrose-text-muted);
-  flex-shrink: 0;
-}
-
 .windrose-scale-slider {
   flex: 1;
   height: 4px;
@@ -7011,15 +6945,6 @@ button.windrose-fow-tool-btn:disabled svg,
   height: 4px;
   background: var(--windrose-bg-tertiary);
   border-radius: 2px;
-}
-
-.windrose-scale-value {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--windrose-text-muted);
-  min-width: 36px;
-  text-align: right;
-  font-family: var(--font-monospace);
 }
 
 /* ============================================
@@ -7175,310 +7100,9 @@ button.windrose-edge-rail-btn.on {
   color: var(--windrose-text-primary);
 }
 
-.windrose-layer-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 200ms ease-out, transform 200ms ease-out;
-  transform: translateX(-20px);
-  flex-shrink: 1;
-}
-
-.windrose-layer-controls.windrose-layer-controls-open {
-  opacity: 1;
-  transform: translateX(0);
-  pointer-events: auto;
-}
-
-.windrose-layer-controls.windrose-layer-controls-open .windrose-layer-btn,
-.windrose-layer-controls.windrose-layer-controls-open .windrose-layer-add-btn {
-  pointer-events: auto;
-}
-
-/* Remove old absolute positioning — now handled by container */
-.windrose-layer-controls.sidebar-open,
-.windrose-layer-controls.sidebar-closed {
-  left: auto;
-}
-
-/* Layer Button Wrapper (for drag handling) */
-.windrose-layer-btn-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: fit-content;
-  pointer-events: none;
-}
-
-/* Layer Button */
-.is-tablet button.windrose-layer-btn,
-button.windrose-layer-btn {
-  width: 35px;
-  height: 35px;
-  min-width: 35px;
-  min-height: 35px;
-  max-width: 35px;
-  max-height: 35px;
-  border-radius: 50%;
-  background: oklch(0% 0 0deg / 0.7);
-  border: 2px solid oklch(from var(--windrose-border-primary) l c h/0.4);
-  color: var(--windrose-border-primary);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  position: relative;
-  user-select: none;
-}
-
-.windrose-layer-btn:hover {
-  border-color: oklch(from var(--windrose-border-primary) l c h/0.6);
-  background: oklch(0% 0 0deg / 0.85);
-  transform: scale(1.05);
-}
-
-button.windrose-layer-btn.windrose-layer-btn-active,
-.is-tablet button.windrose-layer-btn.windrose-layer-btn-active {
-  background: var(--windrose-border-primary);
-  border-color: var(--windrose-border-primary-dark);
-  color: var(--windrose-bg-primary);
-  box-shadow: 0 0 8px oklch(from var(--windrose-border-primary) l c h/0.4);
-}
-
-button.windrose-layer-btn.windrose-layer-btn-active:hover,
-.is-tablet button.windrose-layer-btn.windrose-layer-btn-active:hover {
-  background: var(--windrose-border-primary-dark);
-  border-color: var(--windrose-border-primary);
-  transform: scale(1.05);
-}
-
-/* Layer Options Slide-out */
-.windrose-layer-options {
-  position: absolute;
-  left: 100%;
-  top: 0;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  padding-left: 4px;
-  gap: 4px;
-  opacity: 0;
-  transform: translateX(-10px);
-  pointer-events: none;
-  transition: all 0.2s ease;
-}
-
-.windrose-layer-options.expanded {
-  opacity: 1;
-  transform: translateX(0);
-  pointer-events: auto;
-}
-
-.is-tablet button.windrose-layer-option-btn,
-button.windrose-layer-option-btn {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  min-height: 28px;
-  max-width: 28px;
-  max-height: 28px;
-  border-radius: 50%;
-  background: oklch(0% 0 0deg / 0.8);
-  border: 2px solid oklch(from var(--windrose-border-primary) l c h/0.4);
-  color: var(--windrose-text-muted);
-  cursor: pointer;
-  display: flex;
-  flex: 0 0 auto;
-  padding: 0;
-  box-sizing: border-box;
-  overflow: hidden;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-}
-
-.windrose-layer-option-btn:hover {
-  color: var(--windrose-text-primary);
-  border-color: oklch(from var(--windrose-border-primary) l c h/0.6);
-}
-
-.windrose-layer-option-btn.delete:hover {
-  color: var(--windrose-error);
-  border-color: var(--windrose-error);
-  background: oklch(from var(--windrose-accent-red) l c h/0.1);
-}
-
-/* Layer Transparency Toggle */
-.windrose-layer-transparency-wrapper {
-  position: relative;
-}
-
-.windrose-layer-option-btn.transparency.active {
-  color: var(--windrose-accent-blue);
-  border-color: var(--windrose-accent-blue);
-  background: oklch(from var(--windrose-accent-blue) l c h/0.15);
-  box-shadow: 0 0 8px oklch(from var(--windrose-accent-blue) l c h/0.4);
-}
-
-.windrose-layer-option-btn.transparency:hover {
-  color: var(--windrose-accent-blue);
-  border-color: oklch(from var(--windrose-accent-blue) l c h/0.6);
-}
-
-.windrose-opacity-slider-popup {
-  position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
-  background: oklch(17% 0 0deg / 0.95);
-  border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.4);
-  border-radius: 6px;
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  z-index: 200;
-  box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.5);
-  white-space: nowrap;
-}
-
-.windrose-opacity-slider-popup::before {
-  content: "";
-  position: absolute;
-  right: 100%;
-  top: 50%;
-  transform: translateY(-50%);
-  border: 6px solid transparent;
-  border-right-color: oklch(from var(--windrose-border-primary) l c h/0.4);
-}
-
-.windrose-opacity-slider {
-  width: 70px;
-  height: 4px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: oklch(100% 0 0deg / 0.2);
-  border-radius: 2px;
-  cursor: pointer;
-}
-
-.windrose-opacity-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 12px;
-  height: 12px;
-  background: var(--windrose-accent-blue);
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.windrose-opacity-slider::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
-  background: var(--windrose-accent-blue);
-  border-radius: 50%;
-  border: none;
-  cursor: pointer;
-}
-
 .windrose-opacity-value {
   color: var(--windrose-text-muted);
   font-size: 11px;
-}
-
-/* Add Layer Button */
-.is-tablet button.windrose-layer-add-btn,
-button.windrose-layer-add-btn {
-  width: 35px;
-  height: 35px;
-  min-width: 35px;
-  min-height: 35px;
-  max-width: 35px;
-  max-height: 35px;
-  border-radius: 50%;
-  background: oklch(0% 0 0deg / 0.5);
-  border: 2px dashed oklch(from var(--windrose-border-primary) l c h/0.4);
-  color: var(--windrose-text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  padding: 0;
-  box-sizing: border-box;
-  overflow: hidden;
-  transition: all 0.2s ease;
-  margin-top: 4px;
-}
-
-.windrose-layer-add-btn:hover {
-  background: oklch(0% 0 0deg / 0.7);
-  border-color: oklch(from var(--windrose-border-primary) l c h/0.6);
-  border-style: solid;
-  color: var(--windrose-text-primary);
-  transform: scale(1.05);
-}
-
-.windrose-layer-add-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-/* Drag states */
-.windrose-layer-btn.dragging {
-  opacity: 0.5;
-}
-
-.windrose-layer-btn.drag-over {
-  border-color: var(--windrose-border-primary);
-  transform: scale(1.05);
-  box-shadow: 0 0 12px oklch(from var(--windrose-border-primary) l c h/0.5);
-}
-
-/* Layer Button - Pill Mode (for named layers) */
-.is-tablet button.windrose-layer-btn.windrose-layer-btn-pill,
-button.windrose-layer-btn.windrose-layer-btn-pill {
-  width: auto;
-  max-width: 180px;
-  min-width: 35px;
-  border-radius: 17.5px;
-  padding: 0 12px;
-  gap: 4px;
-}
-
-.windrose-layer-icon {
-  font-size: 14px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.windrose-layer-icon.ra {
-  font-family: "rpgawesome";
-  font-style: normal;
-  -webkit-font-feature-settings: normal;
-  font-feature-settings: normal;
-  font-variant: normal;
-  text-transform: none;
-  line-height: 1;
-  -webkit-font-smoothing: antialiased;
-}
-
-.windrose-layer-name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Edit button styling */
-.windrose-layer-option-btn.edit:hover {
-  color: var(--windrose-accent-blue);
-  border-color: var(--windrose-accent-blue);
-  background: oklch(from var(--windrose-accent-blue) l c h/0.1);
 }
 
 /* ==========================================================================
@@ -10272,56 +9896,7 @@ button.windrose-breadcrumb-link {
   border-color: var(--windrose-text-primary);
 }
 
-/* Pop-out button shown on docked panels in full-pane mode */
-.windrose-popout-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: none;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--windrose-text-muted);
-  cursor: pointer;
-  line-height: 0;
-  opacity: 0;
-  transition: var(--windrose-transition);
-}
-.windrose-popout-btn svg {
-  display: block;
-}
-.windrose-popout-btn:hover {
-  background: oklch(from var(--windrose-border-primary) l c h/0.2);
-  color: var(--windrose-text-primary);
-  opacity: 1;
-}
-
-/* Show popout button on panel hover */
-.windrose-layer-controls:hover .windrose-popout-btn,
-.windrose-region-panel:hover .windrose-popout-btn {
-  opacity: 0.6;
-}
-.windrose-layer-controls:hover .windrose-popout-btn:hover,
-.windrose-region-panel:hover .windrose-popout-btn:hover {
-  opacity: 1;
-}
-
-/* Layer controls footer: add button + popout side by side */
-.windrose-layer-controls-footer {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
 /* Override docked styles when inside a floating panel */
-.windrose-floating-panel-content .windrose-layer-controls {
-  opacity: 1;
-  transform: none;
-  pointer-events: auto;
-  padding: 8px;
-}
 .windrose-floating-panel-content {
   /* Color picker in floating mode: strip chrome that FloatingPanel provides */
 }

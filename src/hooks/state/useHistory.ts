@@ -19,6 +19,44 @@ import { DEFAULTS } from '../../core/dmtConstants';
 
 
 /**
+ * Two field values count as unchanged when they are the same reference, or
+ * when both are arrays of equal length holding the same element references
+ * (a no-op `filter`/`map` returns a fresh array of the same items).
+ */
+function isSameField(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (!Object.is(a[i], b[i])) return false;
+  }
+  return true;
+}
+
+/**
+ * Reference-based change check for history snapshots (MEM-01).
+ *
+ * Snapshots share structure with map data, so a changed field always carries a
+ * new reference. Comparing field references replaces the two full
+ * JSON.stringify passes that used to run on every history push.
+ */
+export function isSameHistoryState<T>(a: T, b: T): boolean {
+  if (Object.is(a, b)) return true;
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') {
+    return isSameField(a, b);
+  }
+  if (Array.isArray(a) || Array.isArray(b)) return isSameField(a, b);
+  const ra = a as Record<string, unknown>;
+  const rb = b as Record<string, unknown>;
+  for (const key of Object.keys(ra)) {
+    if (!isSameField(ra[key], rb[key])) return false;
+  }
+  for (const key of Object.keys(rb)) {
+    if (!(key in ra) && !isSameField(undefined, rb[key])) return false;
+  }
+  return true;
+}
+
+/**
  * Hook for managing undo/redo history of any state type.
  *
  * @template T - The type of state being tracked
@@ -37,7 +75,7 @@ function useHistory<T>(initialState: T): UseHistoryResult<T> {
     setHistoryState((prev: HistoryState<T>) => {
       // Skip if identical to current state
       const currentState = prev.history[prev.currentIndex];
-      if (JSON.stringify(newState) === JSON.stringify(currentState)) {
+      if (isSameHistoryState(newState, currentState)) {
         return prev;
       }
 

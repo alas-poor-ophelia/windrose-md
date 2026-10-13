@@ -2,7 +2,7 @@ import type { MapData } from '#types/core/map.types';
 import type { App } from 'obsidian';
 
 import { useEffect, useState } from 'preact/hooks';
-import { preloadImage, pinImage, getCachedImage } from '../../assets/imageOperations';
+import { preloadImage, pinImage, unpinImage, getCachedImage } from '../../assets/imageOperations';
 import { resolveTileEntry } from '../../assets/tilesetOperations';
 import { collectWallPathImagePaths } from '../../geometry/renderers/wallPathRenderer';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
@@ -75,19 +75,24 @@ function useImagePreloading(
   const [fowImageReady, setFowImageReady] = useState(false);
   const [tileImagesReady, setTileImagesReady] = useState(false);
 
+  // Background and fog images are pinned for as long as this map uses them and
+  // unpinned in cleanup (path change or unmount) so they can be evicted (MEM-04).
   useEffect(() => {
     const bgPath = mapData?.backgroundImage?.path;
     if (bgPath != null && bgPath !== '') {
+      let cancelled = false;
       setBackgroundImageReady(false);
+      pinImage(bgPath);
       void preloadImage(app, bgPath).then((img) => {
-        if (img) {
-          pinImage(bgPath);
-          setBackgroundImageReady(true);
-        }
+        if (img && !cancelled) setBackgroundImageReady(true);
       });
-    } else {
-      setBackgroundImageReady(false);
+      return () => {
+        cancelled = true;
+        unpinImage(bgPath);
+      };
     }
+    setBackgroundImageReady(false);
+    return undefined;
   }, [app, mapData?.backgroundImage?.path]);
 
   useEffect(() => {
@@ -97,16 +102,19 @@ function useImagePreloading(
     const fowImagePath = effectiveSettings.fogOfWarImage;
 
     if (fowImagePath != null && fowImagePath !== '') {
+      let cancelled = false;
       setFowImageReady(false);
+      pinImage(fowImagePath);
       void preloadImage(app, fowImagePath).then((img) => {
-        if (img) {
-          pinImage(fowImagePath);
-          setFowImageReady(true);
-        }
+        if (img && !cancelled) setFowImageReady(true);
       });
-    } else {
-      setFowImageReady(false);
+      return () => {
+        cancelled = true;
+        unpinImage(fowImagePath);
+      };
     }
+    setFowImageReady(false);
+    return undefined;
   }, [app, mapData?.settings]);
 
   useEffect(() => {

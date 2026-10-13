@@ -3,7 +3,7 @@
  * Path: types/index.ts
  * 
  * Re-exports all types for convenient importing:
- *   import type { Point, Cell, MapObject } from '@types';
+ *   import type { Point, Cell, MapObject } from '#types';
  */
 
 // ===========================================
@@ -345,7 +345,6 @@ export type {
 export type {
   UseEventCoordinatorOptions,
   SyntheticPointerEvent,
-  PendingToolAction,
   AreaSelectPending,
   HandlerFunction,
   LayerHandlers,
@@ -355,7 +354,6 @@ export type {
   NotePinHandlers,
   PanZoomHandlers,
   MeasureHandlers,
-  AlignmentHandlers,
   FogHandlers,
   AreaSelectHandlers,
   DiagonalFillHandlers,
@@ -454,14 +452,6 @@ export type {
   MapDataHandlers,
   UseDataHandlersResult,
 } from './hooks/dataHandlers.types';
-
-export type {
-  UseImageAlignmentOptions,
-  ImageDragOffset,
-  DragClientPosition,
-  ImageDragHandlerResult,
-  UseImageAlignmentResult,
-} from './hooks/imageAlignment.types';
 
 // ===========================================
 // Content Pack Types

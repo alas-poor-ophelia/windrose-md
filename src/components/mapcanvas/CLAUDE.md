@@ -2,90 +2,79 @@
 
 ## Purpose
 
-This directory contains the main map rendering component and its layer system. MapCanvas orchestrates all visual layers and coordinates between contexts, hooks, and user interaction.
+The main map component and its layer/overlay components. `MapCanvas` provides the contexts, owns the main canvas, and hosts the layers passed in as `children` (exposed as `MapCanvas.ObjectLayer`, `MapCanvas.DrawingLayer`, ...). `DungeonMapTracker.tsx` (root component) composes them.
 
-## Architecture
-
-MapCanvas was refactored from a 2000+ line monolith into a composition-based architecture:
+## Files
 
 ```
-MapCanvas.tsx (orchestrator)
+MapCanvas.tsx               # Providers (MapSelection, ObjectLinking, EventHandler, MapState, MapOperations),
+│                           #   main canvas + fog canvas, Coordinators (usePanZoomCoordinator + useEventCoordinator)
 ├── DrawingLayer.tsx          # Cell painting, erasing
 ├── ObjectLayer.tsx           # Placed objects (doors, traps, etc.)
+├── ObjectHoverTooltip.tsx    # Hovered-object label; sole useHoverState() subscriber (rendered by ObjectLayer)
 ├── TextLayer.tsx             # Text labels
-├── FogOfWarLayer.tsx         # Fog overlay
-├── FreehandLayer.tsx         # Freehand curve drawing
-├── RegionLayer.tsx           # Named regions
-├── NotePinLayer.tsx          # Note link indicators
-├── PartyPinLayer.tsx         # Resolves shared Beacon settings once, renders one PartyPinInstance per pin
-├── PartyPinInstance.tsx      # One Beacon: its range query, ring overlay, and controls card when selected
-├── MeasurementLayer.tsx      # Measure tool, terrain picker, automatic segment terrain via useTerrainSampling
-├── RouteLayer.tsx            # Saved measurement routes (always visible)
-├── AreaSelectLayer.tsx       # Multi-select rectangle
-├── HexCoordinateLayer.tsx    # Hex coordinate display
+├── FogOfWarLayer.tsx         # Fog tools
+├── FreehandLayer.tsx         # Freehand curves (overlay canvas)
+├── TerrainBrushLayer.tsx     # Terrain stroke brush (overlay canvas, hard-edge preview)
+├── WallLayer.tsx             # Wall/path strips, curves, openings (wall gaps), edit mode (overlay canvas)
+├── OutlineLayer.tsx          # Polygon outlines, hex (overlay canvas)
+├── RegionLayer.tsx           # Named regions, hex (overlay canvas)
 ├── TilePlacementLayer.tsx    # Tile placement tool
-├── WallLayer.tsx             # Wall/path strips: draw along polylines, drag-to-bow curves, edit mode
-├── DiagonalFillOverlay.tsx   # Diagonal fill preview
-├── ShapeOverlayLayer.tsx     # Shape overlay tools and rendering: rectangles/circles, rotate action
+├── ShapeOverlayLayer.tsx     # Shape overlays: rectangles/circles, rotate
+├── NotePinLayer.tsx          # Note link pins
+├── PartyPinLayer.tsx         # Beacon: resolves shared settings once, one PartyPinInstance per pin
+├── PartyPinInstance.tsx      # One Beacon: range query, ring overlay, controls card when selected
+├── MeasurementLayer.tsx      # Measure tool, terrain picker, auto segment terrain (useTerrainSampling)
+├── RouteLayer.tsx            # Saved measurement routes (SVG, always visible)
+├── AreaSelectLayer.tsx       # Multi-select rectangle
+├── HexCoordinateLayer.tsx    # Hex coordinates (hex only)
+├── DiagonalFillOverlay.tsx   # Diagonal fill preview/handlers
 ├── ShapePreviewOverlay.tsx   # Shape tool preview
 ├── SegmentHoverOverlay.tsx   # Segment hover feedback
 ├── SegmentPickerOverlay.tsx  # Segment picker UI
 ├── CardinalIndicators.tsx    # N/S/E/W indicators
-├── MapCanvasActionButtons.tsx # Floating action buttons
-└── RerollDungeonButton.tsx   # Dungeon generation reroll
+├── RerollDungeonButton.tsx   # Dungeon generation reroll
+└── viewportTransform.ts      # Pure world/screen viewport math shared by overlays (not a component)
 ```
+
+"Beacon" in the UI is `PartyPin` in code.
 
 ## Key Patterns
 
-### Layer Components
+### Layers
 
-Each layer:
-- Receives state via `useMapState()` and other context hooks
-- Handles its own rendering logic
-- Is independent - can be added/removed without affecting others
-- Uses geometry abstraction (never assumes grid vs hex)
+Each layer reads shared state from context (`useMapState()`, `useMapSelection()`, ...), uses the geometry abstraction (never assume grid vs hex), and registers its pointer handlers with `useLayerHandlers(name, handlers, { enabled })` (see `hooks/CLAUDE.md`). Layers do not attach their own canvas pointer listeners; `useEventCoordinator` routes events.
 
-```javascript
-function SomeLayer() {
-  const { geometry, mapData, canvasRef } = useMapState();
-  const { currentLayer } = useMapSettings();
-  
-  // Render logic using geometry methods
-  const cells = geometry.getCellsInViewport(...);
-  // ...
-}
-```
+Layers do NOT read `MapSettingsContext`: that provider exists only inside the per-map settings modal. Per-map data comes from `mapData`/`useMapState()`; global preferences from `getSetting()` (`core/settingsAccessor`).
 
 ### Overlay vs Layer
 
-- **Layers**: Render map content (cells, objects, fog)
-- **Overlays**: Render interaction feedback (hover states, previews, selection)
+- **Layers**: tool behavior plus content.
+- **Overlays**: interaction feedback (hover, previews).
 
 ### Canvas Rendering
 
-- Layers don't render directly to main canvas
-- Use `useCanvasRenderer` hook for coordinated rendering
-- Respect pan/zoom transform from `usePanZoomCoordinator`
+- Committed content is drawn by `useCanvasRenderer` onto the main canvas; do not draw map content to it from layers.
+- Layers that need live feedback own a private overlay `<canvas>` created in the layer: Freehand, TerrainBrush, Wall, Outline, Region. `MapCanvas` also owns the fog blur canvas.
+- Pan/zoom goes through `useViewController` (live state off the Preact path; commit at gesture end), driven by `usePanZoomCoordinator`. Anything positioned in screen space must follow live ticks: `useLiveOverlayRedraw` for overlay canvases, `useLiveOverlayTransform` for SVG groups (RouteLayer, MeasurementOverlay, PartyPinOverlay). See "Live Pan/Zoom" in `hooks/CLAUDE.md`.
 
 ## Context Dependencies
 
-Components here consume (never provide):
-- `MapContext` - Core map state, geometry, refs
-- `MapSettingsContext` - Current layer, visibility, preferences
-- `MapSelectionContext` - Selected objects, multi-select state
-- `EventHandlerContext` - Centralized event handling
+Layers consume `MapContext` (state + operations), `MapSelectionContext`, `ObjectLinkingContext`, `EventHandlerContext`. `MapCanvas.tsx` is the provider for all of them (`MapSelectionProvider` and `ObjectLinkingProvider` wrap `MapCanvasContent`).
 
 ## Adding a New Layer
 
-1. Create `NewLayer.tsx` following existing layer patterns
-2. Use `useMapState()` for geometry and map data
-3. Handle both grid and hex via `geometry.*` methods
-4. Add to MapCanvas.tsx layer composition
-5. Consider z-order (fog usually on top, drawing on bottom)
+1. Create `NewLayer.tsx` following an existing layer of similar kind.
+2. Use `useMapState()` for geometry and map data; handle grid and hex via `geometry.*`.
+3. Register handlers with `useLayerHandlers`; add the layer name/handler type in `types/hooks/eventCoordinator.types.ts` and routing in `useEventCoordinator` if it owns a tool.
+4. If it draws on screen-space overlays, subscribe to the ViewController (above).
+5. Add to the layer composition (`MapCanvas.NewLayer` attachment in `MapCanvas.tsx`, rendered by `DungeonMapTracker.tsx`).
+6. Mind z-order (fog on top, drawing on the bottom).
 
-## Common Gotchas
+## Gotchas
 
-- **Don't access DOM directly** - Use refs passed through context
-- **Don't store derived state** - Compute from context values
-- **Don't assume pixel coordinates** - Use geometry.cellToPixel/pixelToCell
-- **Don't forget touch** - All interactions must work on iPad
+- **DOM**: prefer refs from context; layers that own an overlay canvas (and `WallLayer`) do touch DOM directly: create via `activeWindow.createEl` and clean up on unmount.
+- **Don't store derived state**; compute from context values.
+- **Don't assume pixel coordinates**; use `geometry.cellToPixel`/`pixelToCell` and `viewController.getLive()`.
+- **Touch**: all interactions must work on iPad.
+- **Size**: `WallLayer`, `ObjectLayer`, `RegionLayer`, `OutlineLayer` are large; extract sub-hooks rather than growing them.

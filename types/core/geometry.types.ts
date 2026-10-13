@@ -231,16 +231,6 @@ export interface IGeometry {
   // ===========================================
   
   /**
-   * Euclidean (straight-line) distance between cells
-   */
-  getEuclideanDistance(x1: number, y1: number, x2: number, y2: number): number;
-  
-  /**
-   * Manhattan distance (orthogonal moves only)
-   */
-  getManhattanDistance(x1: number, y1: number, x2: number, y2: number): number;
-  
-  /**
    * Game distance with configurable diagonal rules
    * For hex, options are ignored (hex has no diagonal ambiguity)
    */

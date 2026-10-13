@@ -475,6 +475,67 @@ function canPlaceObjectAt(
 }
 
 // ===========================================
+// Duplicate Placement
+// ===========================================
+
+/** Where a duplicate of an object lands: a cell, plus the sub-cell slot on hex maps. */
+interface DuplicateTarget {
+  x: number;
+  y: number;
+  /** Hex only: the first free slot in the target cell. */
+  slot?: number;
+}
+
+/** Furthest ring searched for a free cell when every immediate neighbour is full. */
+const DUPLICATE_MAX_RING = 10;
+
+/**
+ * Find the cell a duplicate of `source` should go to: the first neighbour that
+ * can take another object (6 axial directions on hex, 4 on grid), then square
+ * rings out to DUPLICATE_MAX_RING. On hex the result carries the free slot in
+ * that cell. Returns null when nothing in range is free.
+ *
+ * `objects` must include everything already placed, including copies made
+ * earlier in the same bulk duplicate, so successive copies do not collide.
+ */
+function findDuplicateTarget(
+  objects: MapObject[] | null | undefined,
+  source: Pick<MapObject, 'position'>,
+  mapType: MapType
+): DuplicateTarget | null {
+  const list = objects ?? [];
+  const { x: sourceX, y: sourceY } = source.position;
+
+  const withSlot = (x: number, y: number): DuplicateTarget => {
+    if (mapType !== 'hex') return { x, y };
+    return { x, y, slot: assignSlot(getOccupiedSlots(list, x, y)) };
+  };
+
+  const directions = mapType === 'hex'
+    ? [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]]
+    : [[1, 0], [0, 1], [-1, 0], [0, -1]];
+
+  for (const [dx, dy] of directions) {
+    if (canPlaceObjectAt(list, sourceX + dx, sourceY + dy, mapType)) {
+      return withSlot(sourceX + dx, sourceY + dy);
+    }
+  }
+
+  for (let ring = 2; ring <= DUPLICATE_MAX_RING; ring++) {
+    for (let dx = -ring; dx <= ring; dx++) {
+      for (let dy = -ring; dy <= ring; dy++) {
+        if (Math.abs(dx) !== ring && Math.abs(dy) !== ring) continue;
+        if (canPlaceObjectAt(list, sourceX + dx, sourceY + dy, mapType)) {
+          return withSlot(sourceX + dx, sourceY + dy);
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+// ===========================================
 // Freeform Placement API
 // ===========================================
 
@@ -554,5 +615,6 @@ export { // Core operations
   getObjectType, generateObjectId, getObjectAtPosition, updateObject, isAreaFree, canResizeObject, // Grid-specific operations (legacy, prefer unified API)
   addObject, removeObject, removeObjectAtPosition, removeObjectsInRectangle, calculateEdgeAlignment, getAlignmentOffset, // Hex-specific operations (internal, prefer unified API)
   addObjectToHex, removeObjectFromHex, removeOneObjectFromHex, // Unified API (preferred for new code)
-  placeObject, eraseObjectAt, canPlaceObjectAt, // Freeform placement API
+  placeObject, eraseObjectAt, canPlaceObjectAt, findDuplicateTarget, // Freeform placement API
   placeObjectFreeform, convertObjectToFreeform, snapObjectToGrid };
+export type { DuplicateTarget };

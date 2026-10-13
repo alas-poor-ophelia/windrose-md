@@ -8,6 +8,8 @@
 import type { VNode } from 'preact';
 
 import { useBackgroundImage, useHexGrid } from '../../../context/MapSettingsContext';
+import { GRID_DENSITY_PRESETS } from '../settingsReducer';
+import { calculateGridFromColumns, hexSizeToMeasurement, measurementToHexSize, getFineTuneRange, MEASUREMENT_EDGE, MEASUREMENT_CORNER } from '../../../geometry/core/hexMeasurements';
 import { CollapsibleSection } from '../../shared/CollapsibleSection';
 import { SettingItem } from '../SettingItem';
 import { NativeSlider } from '../NativeControls';
@@ -22,11 +24,7 @@ function DensityModeContent(): VNode {
     imageDimensions,
     orientation,
     handleDensityChange,
-    handleCustomColumnsChange,
-    GRID_DENSITY_PRESETS,
-    calculateGridFromColumns,
-    hexSizeToMeasurement,
-    MEASUREMENT_EDGE
+    handleCustomColumnsChange
   } = useBackgroundImage();
   const { hexBounds } = useHexGrid();
 
@@ -114,10 +112,6 @@ function MeasurementModeContent(): VNode {
     handleMeasurementSizeChange,
     handleFineTuneChange,
     handleFineTuneReset,
-    MEASUREMENT_EDGE,
-    MEASUREMENT_CORNER,
-    measurementToHexSize,
-    getFineTuneRange,
     orientation
   } = useBackgroundImage();
   const { hexBounds } = useHexGrid();

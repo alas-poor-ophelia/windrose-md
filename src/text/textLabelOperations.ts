@@ -225,31 +225,8 @@ function getTextLabelAtPosition(
   return null;
 }
 
-/**
- * Remove all text labels within a rectangular area (for clear area tool)
- */
-function removeTextLabelsInRectangle(
-  labels: TextLabel[] | null | undefined,
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number
-): TextLabel[] {
-  if (!labels || !Array.isArray(labels)) return [];
-  
-  const minX = Math.min(x1, x2);
-  const maxX = Math.max(x1, x2);
-  const minY = Math.min(y1, y2);
-  const maxY = Math.max(y1, y2);
-  
-  return labels.filter(label => {
-    return !(label.position.x >= minX && label.position.x <= maxX && 
-             label.position.y >= minY && label.position.y <= maxY);
-  });
-}
-
 // ===========================================
 // Exports
 // ===========================================
 
-export { generateTextLabelId, addTextLabel, updateTextLabel, removeTextLabel, getTextLabelAtPosition, removeTextLabelsInRectangle };
+export { generateTextLabelId, addTextLabel, updateTextLabel, removeTextLabel, getTextLabelAtPosition, };

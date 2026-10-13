@@ -202,9 +202,6 @@ export interface AlignmentOffset {
 /** Slot position for multi-object hex cells (0-3) */
 export type HexSlot = 0 | 1 | 2 | 3;
 
-/** Maximum objects per hex cell */
-export const MAX_OBJECTS_PER_HEX = 4;
-
 // ===========================================
 // Object Linking
 // ===========================================

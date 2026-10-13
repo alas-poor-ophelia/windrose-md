@@ -163,13 +163,11 @@ export default [
       "src/components/mapcanvas/MapCanvas.tsx",
       "src/components/mapcanvas/MeasurementLayer.tsx",
       "src/components/mapcanvas/NotePinLayer.tsx",
-      "src/components/mapcanvas/ObjectLayer.tsx",
       "src/components/mapcanvas/PartyPinLayer.tsx",
       "src/components/mapcanvas/TextLayer.tsx",
       "src/components/modals/NativeModalPortal.tsx",
       "src/components/overlays/ImageAlignmentMode.tsx",
       "src/components/panels/FloatingPanel.tsx",
-      "src/components/panels/LayerControls.tsx",
       "src/components/panels/ObjectSidebar.tsx",
       "src/components/panels/TileAssetBrowser.tsx",
       "src/components/settings/NativeControls.tsx",
@@ -193,7 +191,6 @@ export default [
   {
     files: [
       "src/DungeonMapTracker.tsx",
-      "src/components/toolbars/ObjectSelectionToolbar.tsx",
       "src/drawing/tilePlacementOps.ts",
       "src/geometry/renderers/tileRenderer.ts",
       "src/settings/modals/ObjectEditModal.ts"

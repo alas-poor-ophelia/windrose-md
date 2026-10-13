@@ -9,11 +9,16 @@
 // Type-only imports
 import type { BoundingBox } from '#types/core/geometry.types';
 import type { MapData, MapLayer, StoredViewState } from '#types/core/map.types';
+import type { Cell } from '#types/core/cell.types';
+import type { Curve } from '#types/core/curve.types';
+import type { WallPath } from '#types/core/wallpath.types';
+import type { TerrainStroke } from '#types/core/terrainstroke.types';
+import type { TileAssignment } from '#types/tiles/tile.types';
 import type { TextLabel } from '#types/objects/note.types';
+import type { ResolvedTheme } from '#types/settings/settings.types';
 import type {
   RenderParams,
   ExportResult,
-  ExportTheme,
   ExportImageOptions
 } from '#types/core/export.types';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
@@ -23,7 +28,7 @@ import { TFile } from 'obsidian';
 import { getActiveLayer, getExportLayers } from './layerAccessor';
 import { getFontCss } from '../text/fontOptions';
 import { renderCanvas } from '../hooks/canvas/useCanvasRenderer';
-import { getSettings } from '../core/settingsAccessor';
+import { resolveTheme } from '../core/settingsAccessor';
 
 // ===========================================
 // Text Label Bounds
@@ -64,62 +69,196 @@ function getTextLabelBounds(label: TextLabel, ctx: CanvasRenderingContext2D): Bo
 // Content Bounds Calculation
 // ===========================================
 
+/** Mutable bounds accumulator: grows to cover every box or padded point fed to it. */
+class BoundsAccumulator {
+  minX = Infinity;
+  minY = Infinity;
+  maxX = -Infinity;
+  maxY = -Infinity;
+  hasContent = false;
+
+  addBox(b: BoundingBox): void {
+    this.hasContent = true;
+    this.minX = Math.min(this.minX, b.minX);
+    this.minY = Math.min(this.minY, b.minY);
+    this.maxX = Math.max(this.maxX, b.maxX);
+    this.maxY = Math.max(this.maxY, b.maxY);
+  }
+
+  addPoint(x: number, y: number, pad = 0): void {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    this.addBox({ minX: x - pad, minY: y - pad, maxX: x + pad, maxY: y + pad });
+  }
+
+  result(): BoundingBox | null {
+    return this.hasContent
+      ? { minX: this.minX, minY: this.minY, maxX: this.maxX, maxY: this.maxY }
+      : null;
+  }
+}
+
+/** Storage cell for a col/row (grid) or q/r (hex) position. */
+function cellAt(geometry: ExtendedGeometry, col: number, row: number): Cell {
+  return geometry.type === 'hex'
+    ? { q: col, r: row, color: '' }
+    : { x: col, y: row, color: '' };
+}
+
+/** Tiles: snapped tiles cover their (multi-cell) footprint; freeform tiles a span-sized box at their world point. */
+function addTileBounds(acc: BoundsAccumulator, tiles: TileAssignment[], geometry: ExtendedGeometry): void {
+  for (const tile of tiles) {
+    const spanW = Math.max(1, tile.spanW ?? 1);
+    const spanH = Math.max(1, tile.spanH ?? 1);
+    const scale = tile.scale ?? 1;
+    if (tile.freeform === true) {
+      const half = (geometry.cellSize * Math.max(spanW, spanH) * scale) / 2;
+      acc.addPoint(tile.worldX, tile.worldY, half);
+      continue;
+    }
+    acc.addBox(geometry.getCellBounds(cellAt(geometry, tile.col, tile.row)));
+    if (spanW > 1 || spanH > 1) {
+      acc.addBox(geometry.getCellBounds(cellAt(geometry, tile.col + spanW - 1, tile.row + spanH - 1)));
+    }
+  }
+}
+
+/** Curves: the control polygon contains a cubic bezier, so its bbox (plus half the stroke) bounds the curve. */
+function addCurveBounds(acc: BoundsAccumulator, curves: Curve[]): void {
+  for (const curve of curves) {
+    const pad = (curve.strokeWidth || 0) / 2;
+    acc.addPoint(curve.start[0], curve.start[1], pad);
+    for (const seg of curve.segments) {
+      acc.addPoint(seg[0], seg[1], pad);
+      acc.addPoint(seg[2], seg[3], pad);
+      acc.addPoint(seg[4], seg[5], pad);
+    }
+  }
+}
+
 /**
- * Calculate the world-coordinate bounding box of all content on a layer
+ * Wall/path strips: vertices padded by an estimate of the strip half-width.
+ * The true width depends on the strip image height, which is not available
+ * here; half a cell times widthScale covers typical packs.
+ */
+function addWallPathBounds(acc: BoundsAccumulator, wallPaths: WallPath[], cellSize: number): void {
+  for (const wp of wallPaths) {
+    const pad = (cellSize * (wp.widthScale > 0 ? wp.widthScale : 1)) / 2;
+    for (const v of wp.vertices) acc.addPoint(v.x, v.y, pad);
+  }
+}
+
+/** Terrain brush strokes: flat [x, y, ...] points padded by the brush radius. */
+function addTerrainStrokeBounds(acc: BoundsAccumulator, strokes: TerrainStroke[]): void {
+  for (const stroke of strokes) {
+    const pad = stroke.radius || 0;
+    for (let i = 0; i + 1 < stroke.points.length; i += 2) {
+      acc.addPoint(stroke.points[i], stroke.points[i + 1], pad);
+    }
+  }
+}
+
+/**
+ * Calculate the world-coordinate bounding box of all content on a layer:
+ * painted cells, objects, text labels, tiles, curves, wall paths and terrain strokes.
  */
 function calculateContentBounds(
   layer: MapLayer,
   geometry: ExtendedGeometry
 ): BoundingBox | null {
-  let minX = Infinity, minY = Infinity;
-  let maxX = -Infinity, maxY = -Infinity;
-  
-  let hasContent = false;
-  
-  // 1. Painted cells
-  if (layer.cells.length > 0) {
-    for (const cell of layer.cells) {
-      hasContent = true;
-      const bounds = geometry.getCellBounds(cell);
-      minX = Math.min(minX, bounds.minX);
-      minY = Math.min(minY, bounds.minY);
-      maxX = Math.max(maxX, bounds.maxX);
-      maxY = Math.max(maxY, bounds.maxY);
-    }
-  }
+  const acc = new BoundsAccumulator();
 
-  // 2. Objects
-  if (layer.objects.length > 0) {
-    for (const obj of layer.objects) {
-      hasContent = true;
-      const bounds = geometry.getObjectBounds(obj);
-      minX = Math.min(minX, bounds.minX);
-      minY = Math.min(minY, bounds.minY);
-      maxX = Math.max(maxX, bounds.maxX);
-      maxY = Math.max(maxY, bounds.maxY);
-    }
-  }
+  for (const cell of layer.cells) acc.addBox(geometry.getCellBounds(cell));
+  for (const obj of layer.objects) acc.addBox(geometry.getObjectBounds(obj));
 
-  // 3. Text labels (need temporary canvas for measurement)
+  // Text labels (need temporary canvas for measurement)
   if (layer.textLabels.length > 0) {
     const tempCanvas = activeWindow.createEl('canvas');
     const tempCtx = tempCanvas.getContext('2d');
-    
     if (tempCtx) {
-      for (const label of layer.textLabels) {
-        hasContent = true;
-        const bounds = getTextLabelBounds(label, tempCtx);
-        minX = Math.min(minX, bounds.minX);
-        minY = Math.min(minY, bounds.minY);
-        maxX = Math.max(maxX, bounds.maxX);
-        maxY = Math.max(maxY, bounds.maxY);
-      }
+      for (const label of layer.textLabels) acc.addBox(getTextLabelBounds(label, tempCtx));
     }
   }
-  
-  if (!hasContent) return null;
-  
-  return { minX, minY, maxX, maxY };
+
+  addTileBounds(acc, layer.tiles ?? [], geometry);
+  addCurveBounds(acc, layer.curves ?? []);
+  addWallPathBounds(acc, layer.wallPaths ?? [], geometry.cellSize);
+  addTerrainStrokeBounds(acc, layer.terrainStrokes ?? []);
+
+  return acc.result();
+}
+
+/**
+ * Bounds of map-level (not per-layer) content that has world extent:
+ * visible shape overlays, visible regions (hex members) and visible outlines.
+ */
+function calculateMapLevelBounds(mapData: MapData, geometry: ExtendedGeometry): BoundingBox | null {
+  const acc = new BoundsAccumulator();
+
+  for (const shape of mapData.shapeOverlays ?? []) {
+    if (shape.visible === false) continue;
+    const { x, y } = shape.worldPosition;
+    if (shape.shape === 'circle') {
+      acc.addPoint(x, y, shape.size);
+      continue;
+    }
+    const hw = shape.halfWidth ?? shape.size;
+    const hh = shape.halfHeight ?? shape.size;
+    const rot = (((shape.rotation ?? 0) % 180) + 180) % 180;
+    if (rot === 0) {
+      acc.addBox({ minX: x - hw, minY: y - hh, maxX: x + hw, maxY: y + hh });
+    } else if (rot === 90) {
+      acc.addBox({ minX: x - hh, minY: y - hw, maxX: x + hh, maxY: y + hw });
+    } else {
+      acc.addPoint(x, y, Math.hypot(hw, hh));
+    }
+  }
+
+  for (const region of mapData.regions ?? []) {
+    if (region.visible === false) continue;
+    for (const hex of region.hexes) acc.addBox(geometry.getCellBounds(cellAt(geometry, hex.x, hex.y)));
+  }
+
+  for (const outline of mapData.outlines ?? []) {
+    if (outline.visible === false) continue;
+    const pad = (outline.lineWidth || 0) / 2;
+    for (const v of outline.vertices) acc.addPoint(v.x, v.y, pad);
+  }
+
+  return acc.result();
+}
+
+/** Union of two optional bounds. */
+function unionBounds(a: BoundingBox | null, b: BoundingBox | null): BoundingBox | null {
+  if (!a) return b;
+  if (!b) return a;
+  return {
+    minX: Math.min(a.minX, b.minX),
+    minY: Math.min(a.minY, b.minY),
+    maxX: Math.max(a.maxX, b.maxX),
+    maxY: Math.max(a.maxY, b.maxY)
+  };
+}
+
+/**
+ * World bounds of everything an export of `layers` will draw: per-layer
+ * content for each selected layer plus map-level overlays.
+ */
+function calculateExportBounds(
+  mapData: MapData,
+  layers: MapLayer[],
+  geometry: ExtendedGeometry
+): BoundingBox | null {
+  let bounds: BoundingBox | null = null;
+  for (const layer of layers) bounds = unionBounds(bounds, calculateContentBounds(layer, geometry));
+  return unionBounds(bounds, calculateMapLevelBounds(mapData, geometry));
+}
+
+/**
+ * Theme used for image export: the map's effective theme (global settings
+ * with the map's per-map overrides applied), identical to the on-screen one.
+ */
+function getExportTheme(mapData: MapData): ResolvedTheme {
+  return resolveTheme(mapData.settings);
 }
 
 // ===========================================
@@ -160,30 +299,7 @@ function renderMapToCanvas(
   tempCanvas.width = width;
   tempCanvas.height = height;
 
-  const effectiveSettings = getSettings();
-
-  const theme: ExportTheme = {
-    grid: {
-      lines: effectiveSettings.gridLineColor,
-      lineWidth: effectiveSettings.gridLineWidth,
-      background: effectiveSettings.backgroundColor
-    },
-    cells: {
-      fill: '#c4a57b',
-      border: effectiveSettings.borderColor,
-      borderWidth: 2
-    },
-    compass: {
-      color: '#c4a57b',
-      size: 100
-    },
-    decorativeBorder: {
-      color: '#8b7355',
-      width: 20,
-      pattern: 'fancy'
-    },
-    coordinateKey: effectiveSettings.coordinateKeyColor
-  };
+  const theme = getExportTheme(mapData);
 
   renderCanvas(
     tempCanvas,
@@ -231,18 +347,8 @@ async function exportMapAsImage(
     ? mapData
     : { ...mapData, activeLayerId: exportLayers[exportLayers.length - 1].id };
 
-  // Calculate content bounds across every selected layer
-  let bounds: BoundingBox | null = null;
-  for (const layer of exportLayers) {
-    const layerBounds = calculateContentBounds(layer, geometry);
-    if (!layerBounds) continue;
-    bounds = bounds === null ? layerBounds : {
-      minX: Math.min(bounds.minX, layerBounds.minX),
-      minY: Math.min(bounds.minY, layerBounds.minY),
-      maxX: Math.max(bounds.maxX, layerBounds.maxX),
-      maxY: Math.max(bounds.maxY, layerBounds.maxY)
-    };
-  }
+  // Calculate content bounds across every selected layer plus map-level overlays
+  const bounds = calculateExportBounds(mapData, exportLayers, geometry);
 
   if (!bounds) {
     throw new Error('No content to export');
@@ -329,4 +435,4 @@ async function saveMapImageToVault(
 // Exports
 // ===========================================
 
-export { calculateContentBounds, exportViewStateForBounds, renderMapToCanvas, exportMapAsImage, saveMapImageToVault };
+export { calculateExportBounds, exportViewStateForBounds, getExportTheme, saveMapImageToVault };

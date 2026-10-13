@@ -428,8 +428,14 @@ const TileAssetBrowser = memo(({
   const gridWrapRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
-  // Reset rail, tags, and drill-down when depth changes
+  // Reset rail, tags, and drill-down when depth changes. Skips the first run
+  // (and any re-run where depth is unchanged, e.g. a new setRailSel identity):
+  // the rail selection is host-owned precisely so it survives the remount
+  // caused by the Objects/Tiles pane swap, and a mount-time reset would wipe it.
+  const prevDepthRef = useRef(tileDepth);
   useEffect(() => {
+    if (prevDepthRef.current === tileDepth) return;
+    prevDepthRef.current = tileDepth;
     setRailSel('all');
     setActiveTags(new Set());
     setPackFilter(new Set());
@@ -920,7 +926,9 @@ const TileAssetBrowser = memo(({
   const selectedTile = useMemo((): TileEntry | null => {
     if (selectedTileId == null || selectedTilesetId == null) return null;
     const ts = tilesets.find(t => t.id === selectedTilesetId);
-    return ts?.tiles.find(t => t.id === selectedTileId) ?? null;
+    // resolveTileEntry also accepts legacy basename ids (recents / MCP selects);
+    // the grid highlights below compare against this resolved entry's id.
+    return resolveTileEntry(ts, selectedTileId) ?? null;
   }, [selectedTileId, selectedTilesetId, tilesets]);
 
   // The selected tile's derived render-form: reported upward for the drawer
@@ -1516,7 +1524,7 @@ const TileAssetBrowser = memo(({
                   <div className="windrose-tb-list">
                     {(groupedTiles.get(openCat) ?? []).map((tile: TileEntry) => {
                       const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
-                      const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
+                      const isSelected = selectedTilesetId === tsId && selectedTile?.id === tile.id;
                       return (
                         <button
                           key={tile.vaultPath}
@@ -1538,7 +1546,7 @@ const TileAssetBrowser = memo(({
                   <div className="windrose-tb-leaf-grid">
                     {(groupedTiles.get(openCat) ?? []).map((tile: TileEntry) => {
                       const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
-                      const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
+                      const isSelected = selectedTilesetId === tsId && selectedTile?.id === tile.id;
                       return (
                         <div
                           key={tile.vaultPath}
@@ -1571,7 +1579,7 @@ const TileAssetBrowser = memo(({
                     </div>,
                     ...tiles.map((tile: TileEntry) => {
                       const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
-                      const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
+                      const isSelected = selectedTilesetId === tsId && selectedTile?.id === tile.id;
                       return (
                         <button
                           key={tile.vaultPath}
@@ -1659,7 +1667,7 @@ const TileAssetBrowser = memo(({
                       <div className="windrose-tb-list">
                         {row.tiles.map((tile: TileEntry) => {
                           const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
-                          const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
+                          const isSelected = selectedTilesetId === tsId && selectedTile?.id === tile.id;
                           return (
                             <button
                               key={tile.vaultPath}
@@ -1682,7 +1690,7 @@ const TileAssetBrowser = memo(({
                       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${fullColCount}, 1fr)`, gap: gridGap }}>
                         {row.tiles.map((tile: TileEntry) => {
                           const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
-                          const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
+                          const isSelected = selectedTilesetId === tsId && selectedTile?.id === tile.id;
                           return (
                             <div
                               key={tile.vaultPath}

@@ -126,8 +126,8 @@
 }
 
 // Map control buttons — with .is-tablet specificity override via :is()
-button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn),
-.is-tablet button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-layer-btn, .windrose-orientation-btn) {
+button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-orientation-btn),
+.is-tablet button:is(.windrose-zoom-btn, .windrose-expand-btn, .windrose-orientation-btn) {
   width: 35px;
   height: 35px;
   min-width: 35px;

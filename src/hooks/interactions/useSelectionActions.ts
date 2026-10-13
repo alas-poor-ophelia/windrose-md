@@ -8,6 +8,8 @@
 import type { MapData } from '#types/core/map.types';
 import type { SelectedItem } from '#types/contexts/context.types';
 
+import { isFeatureEnabled } from '../../core/featureFlags';
+
 export type ActionGroup = 'transform' | 'content' | 'links' | 'style' | 'player' | 'danger';
 
 export interface SelectionAction {
@@ -123,7 +125,7 @@ function buildObjectActions(
     },
     {
       id: 'copyLink', label: 'Copy Link', icon: 'lucide-link',
-      group: 'links', visible: true, invoke: handlers.onCopyLink, iconOnly: true
+      group: 'links', visible: isFeatureEnabled('notePins'), invoke: handlers.onCopyLink, iconOnly: true
     },
 
     // Style group
@@ -159,7 +161,7 @@ function buildTextActions(handlers: TextHandlers): SelectionAction[] {
     },
     {
       id: 'copyLink', label: 'Copy Link', icon: 'lucide-link',
-      group: 'links', visible: true, invoke: handlers.onCopyLink, iconOnly: true
+      group: 'links', visible: isFeatureEnabled('notePins'), invoke: handlers.onCopyLink, iconOnly: true
     },
     {
       id: 'delete', label: 'Delete', icon: 'lucide-trash-2',

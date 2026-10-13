@@ -27,6 +27,7 @@ import {
 	setTileMetadataForRender,
 } from '../persistence/tileMetadata';
 import { runImportDetectionPass } from '../assets/importDetectionPass';
+import { ensureFolder } from '../persistence/vaultFolders';
 
 interface PluginLike {
 	app: App;
@@ -277,15 +278,6 @@ function pairWallEndCaps(relativePaths: string[]): Map<string, string> {
 		if (strip != null) result.set(strip, path);
 	}
 	return result;
-}
-
-async function ensureFolder(app: App, path: string): Promise<void> {
-	const parts = path.split('/');
-	let current = '';
-	for (const part of parts) {
-		current = current === '' ? part : current + '/' + part;
-		try { await app.vault.createFolder(current); } catch { /* exists */ }
-	}
 }
 
 interface DdImportResult {

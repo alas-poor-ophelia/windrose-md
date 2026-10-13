@@ -2503,7 +2503,5 @@ function generateDungeon(presetName = 'medium', color = DEFAULT_FLOOR_COLOR, con
 // EXPORTS
 // =============================================================================
 
-export { generateDungeon, DUNGEON_PRESETS, DUNGEON_STYLES, DEFAULT_FLOOR_COLOR, DEFAULT_WATER_COLOR, DEFAULT_WATER_OPACITY, DEFAULT_WALL_COLOR, DIAGONAL_SEGMENTS, // Individual phases
-  generateRooms, buildConnectionGraph, carveCorridors, carveCorridorsWithDiagonals, carveDiagonalCorridor, generateCells, selectWaterRooms, generateWaterCells, // Utilities
-  getRoomCenter, getRoomCells, getRoomDistance, isCellInRoom, isCellInRoomRect, isCellAdjacentToRoom, carveCorridorBetween, canUseDiagonalCorridor, getDiagonalDirection, findDoorCandidates, findDoorPositions, generateDoorObjects, findEntryExitRooms, generateStairObjects, // Door/edge utilities (for testing)
+export { generateDungeon, getRoomCells, isCellInRoom, // Door/edge utilities (for testing)
   isAtCorridorIntersection, isCellAdjacentToRoomForOpening, calculateRoomOpeningWidth, generateWallEdgesForCells, generateAllRoomBoundaryEdges };

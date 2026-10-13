@@ -38,15 +38,6 @@ export interface SyntheticPointerEvent {
 }
 
 // ===========================================
-// Pending Tool Action
-// ===========================================
-
-/** Pending tool action for touch delay */
-export interface PendingToolAction {
-  execute: () => void;
-}
-
-// ===========================================
 // Pan Start Position
 // ===========================================
 
@@ -102,6 +93,7 @@ export interface RegisteredDrawingHandlers {
   updateShapeHover?: (gridX: number, gridY: number) => void;
   updateEdgeLineHover?: (intX: number, intY: number) => void;
   updateSegmentHover?: (cellX: number, cellY: number, localX: number, localY: number) => void;
+  clearSegmentHover?: () => void;
   circleStart?: Point | null;
   rectangleStart?: Point | null;
   edgeLineStart?: Point | null;
@@ -187,18 +179,14 @@ export interface MeasureHandlers {
   handleMeasureMove?: (gridX: number, gridY: number) => void;
 }
 
-/** Image alignment handlers */
-export interface AlignmentHandlers {
-  handlePointerDown?: (e: Event | SyntheticPointerEvent) => void;
-  handlePointerMove?: (e: Event) => void;
-  handlePointerUp?: (e: Event) => void;
-}
-
 /** Fog of war handlers */
 export interface FogHandlers {
   handlePointerDown?: (e: Event | SyntheticPointerEvent) => void;
   handlePointerMove?: (e: Event) => void;
   handlePointerUp?: (e: Event) => void;
+  /** Escape cancels an in-progress fog rectangle. */
+  handleKeyDown?: (e: KeyboardEvent) => void;
+  rectangleStart?: { col: number; row: number } | null;
 }
 
 /** Area select handlers */
@@ -253,12 +241,9 @@ export interface HandlerTypeMap {
   partyPin: PartyPinHandlers;
   panZoom: PanZoomHandlers;
   measure: MeasureHandlers;
-  imageAlignment: AlignmentHandlers;
   fogOfWar: FogHandlers;
   areaSelect: AreaSelectHandlers;
   diagonalFill: DiagonalFillHandlers;
-  fog: FogHandlers;
-  alignment: AlignmentHandlers;
   freehand: FreehandHandlers;
   tilePlacement: LayerHandlers;
   terrainBrush: LayerHandlers;

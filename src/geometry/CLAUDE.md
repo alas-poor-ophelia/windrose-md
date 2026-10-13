@@ -15,20 +15,33 @@ geometry/
 │   ├── createGeometry.ts  # Factory: MapData → Grid/HexGeometry with defaults
 │   ├── cellAccessor.ts    # Cell data access, manipulation, queries
 │   ├── hexMeasurements.ts # Hex-specific calculations
-│   └── offsetCoordinates.ts # Coordinate system conversions
+│   ├── offsetCoordinates.ts # Coordinate system conversions
+│   ├── contentFitView.ts  # Pure "fit to content" view (center + zoom) for the recenter control
+│   └── subHexBackdrop.ts  # Pure placement math for the parent-map snapshot behind a sub-hex map
 ├── renderers/             # Canvas draw functions
 │   ├── gridRenderer.ts, hexRenderer.ts, backgroundRenderer.ts
 │   ├── objectRenderer.ts, textLabelRenderer.ts, selectionRenderer.ts
 │   ├── badgeRenderer.ts, segmentRenderer.ts, regionRenderer.ts
-│   └── tileRenderer.ts, curveRenderer.ts, wallPathRenderer.ts
+│   ├── tileRenderer.ts, curveRenderer.ts, wallPathRenderer.ts
+│   ├── outlineRenderer.ts       # Polygon outlines (hex)
+│   ├── shapeOverlayRenderer.ts  # Rectangle/circle shape overlays
+│   └── subHexBackdropRenderer.ts # Blits the parent snapshot, right after the background fill
 ├── fog/                   # Fog-of-war rendering pipeline
 │   ├── fogRenderer.ts, gridFogRenderer.ts, hexFogRenderer.ts
+├── strokes/
+│   └── terrainStrokeGeometry.ts # Pure terrain-brush stroke math (thinning, simplification, bounds, erase hit test)
 └── curves/                # Bezier math & boolean ops
     ├── curveBoolean.ts, curveCellOverlap.ts
     ├── curveFitting.ts, polygonClipping.ts
 ```
 
 Type definitions live in `types/core/geometry.types.ts` (path alias `#types/*`).
+
+### Extended geometry types
+
+`IGeometry` is the common contract. Code that needs more (cell size, hex vertices, ring queries) uses `ExtendedGeometry`, a union of `ExtendedGridGeometry | ExtendedHexGeometry` currently defined in `types/contexts/context.types.ts` (this is what `useMapState().geometry` returns). Renderers take `IGridRenderer` / `IHexRenderer` (`types/core/rendering.types.ts`). Several modules still declare local `*GeometryLike` shapes; prefer `Pick<>` of the extended types in new code.
+
+**Discriminator**: use `geometry.type === 'hex' | 'grid'` to narrow. Never `instanceof HexGeometry` / `GridGeometry` (none exist in `src/`; the union only narrows on `type`). Build instances with `createGeometry`.
 
 ## Coordinate Philosophy
 
@@ -75,9 +88,7 @@ interface IGeometry {
   getCellsInCircle(centerX: number, centerY: number, radius: number): Point[];
   getCellsInLine(x1: number, y1: number, x2: number, y2: number): Point[];
   
-  // Distance Calculations
-  getEuclideanDistance(x1: number, y1: number, x2: number, y2: number): number;
-  getManhattanDistance(x1: number, y1: number, x2: number, y2: number): number;
+  // Distance Calculations (hex ignores options; for world-pixel distance use getCellCenter + Math.hypot)
   getCellDistance(x1: number, y1: number, x2: number, y2: number, options?: DistanceOptions): number;
   
   // Neighbors and Bounds
@@ -183,7 +194,7 @@ Always use this for stroke operations instead of setting ctx properties directly
 
 ## Adding Geometry Features
 
-1. Add abstract method signature to `IGeometry` in `geometry_types.ts`
+1. Add abstract method signature to `IGeometry` in `types/core/geometry.types.ts`
 2. Add abstract method to `BaseGeometry.ts`
 3. Implement in both `GridGeometry.ts` and `HexGeometry.ts`
 4. Test with both map types

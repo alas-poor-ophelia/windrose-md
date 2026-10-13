@@ -25,6 +25,7 @@ import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useApp } from '../../context/AppContext';
 import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
 import { getActiveLayer } from '../../persistence/layerAccessor';
+import { resolveTileEntry } from '../../assets/tilesetOperations';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import { getCachedImage, preloadImage } from '../../assets/imageOperations';
 import { resolveTileRender } from '../../assets/tileRenderResolution';
@@ -84,7 +85,8 @@ const TerrainBrushLayer = ({
   const selectedEntry = (() => {
     if (mapData?.tilesets == null || !hasTileSelected) return null;
     const ts = mapData.tilesets.find(t => t.id === selectedTilesetId);
-    return ts?.tiles.find(t => t.id === selectedTileId) ?? null;
+    // resolveTileEntry also accepts legacy basename ids (recents / MCP selects).
+    return resolveTileEntry(ts, selectedTileId ?? undefined) ?? null;
   })();
 
   // ---- Overlay (same pattern as WallLayer) ----

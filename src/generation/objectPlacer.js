@@ -6,6 +6,8 @@
  * using B/X-style random tables with configurable weights.
  */
 
+import { getRoomCells, isCellInRoom } from './dungeonGenerator';
+
 // =============================================================================
 // TYPE DEFINITIONS (JSDoc)
 // =============================================================================
@@ -423,48 +425,6 @@ function getObjectTooltip(objectType, context = {}) {
 // =============================================================================
 // ROOM ANALYSIS
 // =============================================================================
-
-/**
- * Get all cells belonging to a room.
- */
-function getRoomCells(room) {
-  const cells = [];
-  for (let x = room.x; x < room.x + room.width; x++) {
-    for (let y = room.y; y < room.y + room.height; y++) {
-      if (isCellInRoom(x, y, room)) {
-        cells.push({ x, y });
-      }
-    }
-  }
-  return cells;
-}
-
-/**
- * Check if a cell is inside a room (respects shape).
- */
-function isCellInRoom(x, y, room) {
-  if (x < room.x || x >= room.x + room.width ||
-      y < room.y || y >= room.y + room.height) {
-    return false;
-  }
-
-  if (room.shape === 'circle') {
-    const centerX = room.x + room.radius;
-    const centerY = room.y + room.radius;
-    const dx = x + 0.5 - centerX;
-    const dy = y + 0.5 - centerY;
-    return dx * dx + dy * dy <= room.radius * room.radius;
-  }
-
-  if (room.shape === 'composite') {
-    return room.parts.some(part =>
-      x >= part.x && x < part.x + part.width &&
-      y >= part.y && y < part.y + part.height
-    );
-  }
-
-  return true;
-}
 
 /**
  * Calculate object budget based on room size and density multiplier.
@@ -1085,8 +1045,5 @@ function stockDungeon(rooms, corridorResult, doorPositions, style = 'classic', c
 // EXPORTS
 // =============================================================================
 
-export { // Main entry point
-  stockDungeon, // Constants
-  ROOM_CATEGORIES, STOCKING_CONFIG, STYLE_OBJECT_POOLS, ROOM_TEMPLATES, PLACEMENT_PREFERENCES, // Utilities (exported for testing)
-  rollWeightedCategory, normalizeWeights, getObjectBudget, identifyPlacementZones, selectValidTemplate, applyRoomTemplate, placeObject, placeObjects, findCorridorOnlyCells, // Re-exports from dungeonGenerator needed by stockDungeon
-  getRoomCells, isCellInRoom };
+export { stockDungeon, STYLE_OBJECT_POOLS, ROOM_TEMPLATES, // Utilities (exported for testing)
+  rollWeightedCategory, normalizeWeights, getObjectBudget, identifyPlacementZones, selectValidTemplate };

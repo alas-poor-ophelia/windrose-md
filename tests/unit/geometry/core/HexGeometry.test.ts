@@ -279,18 +279,6 @@ describe("HexGeometry", () => {
     });
 
     describe("distance aliases", () => {
-      it("getEuclideanDistance returns hex distance", () => {
-        expect(geometry.getEuclideanDistance(0, 0, 2, 1)).toBe(
-          geometry.getHexDistance(0, 0, 2, 1)
-        );
-      });
-
-      it("getManhattanDistance returns hex distance", () => {
-        expect(geometry.getManhattanDistance(0, 0, 2, 1)).toBe(
-          geometry.getHexDistance(0, 0, 2, 1)
-        );
-      });
-
       it("getCellDistance returns hex distance (ignores options)", () => {
         const dist = geometry.getCellDistance(0, 0, 2, 1, {
           diagonalRule: "equal",

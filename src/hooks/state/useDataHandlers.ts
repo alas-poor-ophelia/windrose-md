@@ -275,19 +275,23 @@ function useDataHandlers({
   }, [updateMapData]);
 
   // Handle object set change - NOT tracked in history
+  // Cosmetic (DATA-18): a preference, so a stale refusal stays silent
+  // instead of arming the conflict panel. Still saved normally.
   const handleObjectSetChange = useCallback((setId: string | null): void => {
     updateMapData((currentMapData) => {
       if (currentMapData == null) return currentMapData;
       return { ...currentMapData, objectSetId: setId };
-    });
+    }, { cosmetic: true });
   }, [updateMapData]);
 
   // Handle text label settings change - NOT tracked in history
+  // Cosmetic (DATA-18): a preference, so a stale refusal stays silent
+  // instead of arming the conflict panel. Still saved normally.
   const handleTextLabelSettingsChange = useCallback((settings: TextLabelSettings): void => {
     updateMapData((currentMapData) => {
       if (currentMapData == null) return currentMapData;
       return { ...currentMapData, lastTextLabelSettings: settings };
-    });
+    }, { cosmetic: true });
   }, [updateMapData]);
 
   // Handle regions change (hex maps only) - tracked in history for undo/redo
@@ -350,21 +354,25 @@ function useDataHandlers({
   }, [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot]);
 
   // Handle the in-progress measurement route change - NOT tracked in history.
+  // Cosmetic (DATA-18): a preference, so a stale refusal stays silent
+  // instead of arming the conflict panel. Still saved normally.
   // This is measure-tool working state that persists with the map so a
   // measurement survives closing and reopening the view.
   const handleMeasurementRouteChange = useCallback((measurementRoute: MeasurementRoute): void => {
     updateMapData((currentMapData) => {
       if (currentMapData == null) return currentMapData;
       return { ...currentMapData, measurementRoute };
-    });
+    }, { cosmetic: true });
   }, [updateMapData]);
 
   // Handle per-map travel display selection - NOT tracked in history
+  // Cosmetic (DATA-18): a preference, so a stale refusal stays silent
+  // instead of arming the conflict panel. Still saved normally.
   const handleTravelSettingsChange = useCallback((travelSettings: MapTravelSettings): void => {
     updateMapData((currentMapData) => {
       if (currentMapData == null) return currentMapData;
       return { ...currentMapData, travelSettings };
-    });
+    }, { cosmetic: true });
   }, [updateMapData]);
 
   // Handle saved routes change - tracked in history so save-as-route,

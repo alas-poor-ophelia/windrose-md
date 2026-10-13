@@ -1,6 +1,7 @@
 import { Plugin, Notice, TFile, MarkdownRenderChild } from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type { MapType } from '#types/index';
+import type { MapData, MapLayer } from '#types/core/map.types';
 import { render, h } from 'preact';
 import { DungeonMapTracker } from './DungeonMapTracker';
 import { AppContext } from './context/AppContext';
@@ -10,7 +11,6 @@ import * as dungeonGenerator from './generation/dungeonGenerator';
 import * as objectPlacer from './generation/objectPlacer';
 import { registerDeepLinks } from './core/deepLinkRegistration';
 import { setPlugin, clearPlugin, FALLBACK_SETTINGS } from './core/settingsAccessor';
-import { DEFAULTS } from './core/dmtConstants';
 import { decideOnboardingState, isFeatureEnabled } from './core/featureFlags';
 import { WindroseMDSettingsTab } from './settings/WindroseSettingsTab';
 import { VIEW_TYPE_WINDROSE_MAP, WindroseMapView } from './views/WindroseMapView';
@@ -19,7 +19,9 @@ import { writeCanvasCapabilityReport } from './utils/canvasCapabilityReport';
 import { recordInputEventProbe } from './utils/inputEventProbe';
 import { recordZoomTrace } from './utils/zoomTraceProbe';
 import { scanTilesetFolder } from './assets/tilesetOperations';
-import { enqueueDataFileOp, getSaveQueue, notifyCorruptedDataFile } from './persistence/fileOperations';
+import { buildMapEntry, createMapEntry, getSaveQueue } from './persistence/fileOperations';
+import { disposeImageCache } from './assets/imageOperations';
+import { clearAll as clearThumbnailCache } from './assets/thumbnailCache';
 import { flushAll, installLifecycleJournaling, journalAll } from './persistence/saveCoordinator';
 import { pruneJournal } from './persistence/saveJournal';
 import { runImportDetectionPass } from './assets/importDetectionPass';
@@ -52,6 +54,65 @@ interface DungeonGenOptions {
     entryRoomId?: string;
   };
   [key: string]: unknown;
+}
+
+/**
+ * The map entry for a generated dungeon: createNewMap('grid') plus the
+ * generator's content and settings. Kept field-for-field identical to the
+ * literal it replaced (layer name 'Layer 1', zoom 1.5 centred on the cells'
+ * bounding box, per-map distance overrides) except for the createNewMap
+ * defaults the old literal omitted and load-time migration backfilled anyway:
+ * boards/activeBoardId, the layer's boardId and an empty curves array.
+ */
+function buildGeneratedDungeonMap(
+  mapName: string,
+  cells: DungeonCell[],
+  objects: unknown[],
+  edges: unknown[],
+  options: DungeonGenOptions,
+  fogOfWar: { enabled: boolean; foggedCells: Array<{ col: number; row: number }> } | null
+): MapData {
+  let centerX = DUNGEON_FALLBACK_CENTER.x, centerY = DUNGEON_FALLBACK_CENTER.y;
+  if (cells.length > 0) {
+    const minX = Math.min(...cells.map((c) => c.x));
+    const maxX = Math.max(...cells.map((c) => c.x));
+    const minY = Math.min(...cells.map((c) => c.y));
+    const maxY = Math.max(...cells.map((c) => c.y));
+    centerX = (minX + maxX) / 2;
+    centerY = (minY + maxY) / 2;
+  }
+
+  return buildMapEntry(mapName, 'grid', {
+    // Boundary cast: the persisted generation settings carry distance fields
+    // the GenerationSettings type does not declare.
+    generationSettings: {
+      preset: options.preset,
+      configOverrides: options.configOverrides ?? {},
+      distancePerCell: options.distancePerCell ?? 5,
+      distanceUnit: options.distanceUnit ?? 'ft',
+      stockingMetadata: options.stockingMetadata ?? null
+    } as unknown as MapData['generationSettings'],
+    settings: {
+      useGlobalSettings: false,
+      overrides: {
+        distancePerCellGrid: options.distancePerCell ?? 5,
+        distanceUnitGrid: options.distanceUnit ?? 'ft'
+      }
+    } as unknown as MapData['settings'],
+    viewState: {
+      zoom: 1.5,
+      center: { x: centerX, y: centerY }
+    }
+  }, {
+    name: 'Layer 1',
+    // Boundary cast: generator output is untyped JS.
+    cells: cells as unknown as MapLayer['cells'],
+    edges: (edges ?? []) as MapLayer['edges'],
+    objects: (objects ?? []) as MapLayer['objects'],
+    textLabels: [],
+    // Boundary cast: generated fog carries no texture field (as before).
+    fogOfWar: fogOfWar as MapLayer['fogOfWar']
+  });
 }
 
 export default class WindrosePlugin extends Plugin {
@@ -308,6 +369,8 @@ export default class WindrosePlugin extends Plugin {
       render(null, el);
     }
     this.mountedElements.clear();
+    disposeImageCache();
+    clearThumbnailCache();
     clearPlugin();
     delete window.__windrose;
   }
@@ -546,116 +609,19 @@ export default class WindrosePlugin extends Plugin {
   /**
    * Write a generated dungeon into the shared data file.
    *
-   * Runs inside the data-file mutex: it is a read-modify-write of the whole
-   * file, so without serialization it can interleave with an autosave and lose
-   * one of the two updates. Refuses to write over an unparseable file for the
-   * same reason saveMapData does.
+   * The map is createNewMap('grid') plus the generator's overrides, persisted
+   * through createMapEntry: the same guarded write path as every autosave
+   * (data-file mutex, unparseable-file refusal, .bak rotation, compact JSON,
+   * write-generation bump). Throws when the write fails.
    */
   private async saveDungeonToJson(mapId: string, mapName: string, cells: DungeonCell[], objects: unknown[], edges: unknown[], options: DungeonGenOptions): Promise<void> {
-    const SCHEMA_VERSION = 2;
-
-    return enqueueDataFileOp(async () => {
     try {
-      const dataFilePath = this.dataFilePath;
-      let allData: { maps: Record<string, unknown> } = { maps: {} };
-
-      const abstractFile = this.app.vault.getAbstractFileByPath(dataFilePath);
-      const file = abstractFile instanceof TFile ? abstractFile : null;
-      if (file != null) {
-        const content = await this.app.vault.read(file);
-        try {
-          allData = JSON.parse(content) as { maps: Record<string, unknown> };
-        } catch (parseError) {
-          console.error(
-            '[Windrose] Existing data file is unparseable. Refusing to overwrite it with a generated dungeon.',
-            parseError
-          );
-          notifyCorruptedDataFile(dataFilePath);
-          throw new Error('Windrose: map data file is unreadable, dungeon not saved.');
-        }
-      }
-
-      allData.maps ??= {};
-
-      const layerId = 'layer-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
-
-      let centerX = DUNGEON_FALLBACK_CENTER.x, centerY = DUNGEON_FALLBACK_CENTER.y;
-      if (cells.length > 0) {
-        const minX = Math.min(...cells.map((c) => c.x));
-        const maxX = Math.max(...cells.map((c) => c.x));
-        const minY = Math.min(...cells.map((c) => c.y));
-        const maxY = Math.max(...cells.map((c) => c.y));
-        centerX = (minX + maxX) / 2;
-        centerY = (minY + maxY) / 2;
-      }
-
-      const mapData = {
-        name: mapName,
-        description: "",
-        mapType: "grid",
-        northDirection: 0,
-        customColors: [],
-        sidebarCollapsed: false,
-        expandedState: false,
-        generationSettings: {
-          preset: options.preset,
-          configOverrides: options.configOverrides ?? {},
-          distancePerCell: options.distancePerCell ?? 5,
-          distanceUnit: options.distanceUnit ?? 'ft',
-          stockingMetadata: options.stockingMetadata ?? null
-        },
-        settings: {
-          useGlobalSettings: false,
-          overrides: {
-            distancePerCellGrid: options.distancePerCell ?? 5,
-            distanceUnitGrid: options.distanceUnit ?? 'ft'
-          }
-        },
-        uiPreferences: {
-          rememberPanZoom: true,
-          rememberSidebarState: true,
-          rememberExpandedState: false
-        },
-        lastTextLabelSettings: null,
-        schemaVersion: SCHEMA_VERSION,
-        activeLayerId: layerId,
-        layerPanelVisible: false,
-        layers: [{
-          id: layerId,
-          name: 'Layer 1',
-          order: 0,
-          visible: true,
-          cells: cells,
-          edges: edges ?? [],
-          objects: objects ?? [],
-          textLabels: [],
-          fogOfWar: this.buildFogOfWar(cells, options)
-        }],
-        gridSize: DEFAULTS.gridSize,
-        dimensions: { ...DEFAULTS.dimensions },
-        viewState: {
-          zoom: 1.5,
-          center: { x: centerX, y: centerY }
-        }
-      };
-
-      allData.maps[mapId] = mapData;
-
-      const jsonString = JSON.stringify(allData, null, 2);
-      if (file != null) {
-        await this.app.vault.modify(file, jsonString);
-      } else {
-        const dirPath = dataFilePath.substring(0, dataFilePath.lastIndexOf('/'));
-        if (dirPath !== '') {
-          try { await this.app.vault.createFolder(dirPath); } catch { /* exists */ }
-        }
-        await this.app.vault.create(dataFilePath, jsonString);
-      }
+      const mapData = buildGeneratedDungeonMap(mapName, cells, objects, edges, options, this.buildFogOfWar(cells, options));
+      await createMapEntry(this.app, mapId, mapData);
     } catch (error) {
       console.error('[Windrose] Failed to save dungeon:', error);
       throw error;
     }
-    });
   }
 
   async loadSettings(): Promise<void> {

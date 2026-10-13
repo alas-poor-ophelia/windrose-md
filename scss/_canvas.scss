@@ -1,4 +1,14 @@
 /* ============================================
+   MAP WRAPPER FOCUS
+   The wrapper is tabIndex -1 and takes focus on a press on the map so map
+   keys (Delete, R, Escape) reach it; a pointer focus shows no ring.
+   ============================================ */
+.windrose-canvas-wrapper:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+/* ============================================
    CANVAS CURSOR STATES
    ============================================ */
 .windrose-canvas,

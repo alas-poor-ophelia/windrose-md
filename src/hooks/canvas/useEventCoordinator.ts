@@ -11,7 +11,6 @@
 import type {
   UseEventCoordinatorOptions,
   SyntheticPointerEvent,
-  PendingToolAction,
   PanStartPosition,
   AreaSelectPending,
 } from '#types/hooks/eventCoordinator.types';
@@ -22,21 +21,12 @@ import { useMapSelection } from '../../context/MapSelectionContext';
 import { useRegisteredHandlers } from '../../context/EventHandlerContext';
 import { useGroupDrag } from '../objects/useGroupDrag';
 import { captureSubHexBackdrop } from '../../core/subHexBackdropStore';
+import { shouldHandleMapKey } from '../../utils/keyboardTargets';
 
 const DRAWING_TOOL_SET: Set<string> = new Set([
   'draw', 'erase', 'rectangle', 'circle', 'clearArea',
   'edgeDraw', 'edgeErase', 'edgeLine', 'segmentDraw'
 ]);
-
-
-
-
-
-
-
-
-
-
 
 const useEventCoordinator = ({
   isColorPickerOpen,
@@ -54,14 +44,27 @@ const useEventCoordinator = ({
   const subHexDiveRef = useRef({ mapData, viewController, subHexPath, requestEnterSubHex });
   subHexDiveRef.current = { mapData, viewController, subHexPath, requestEnterSubHex };
   const { selectedItem, setSelectedItem, isDraggingSelection, setIsDraggingSelection, dragStart, setDragStart, layerVisibility, hasMultiSelection, isGroupDragging, clearSelection } = useMapSelection();
+  // Read through a ref by the pointer callbacks: the selection context hands
+  // out a fresh layerVisibility object on every provider render (hover moves
+  // included), so as a dependency it rebound all canvas listeners per move.
+  const layerVisibilityRef = useRef(layerVisibility);
+  layerVisibilityRef.current = layerVisibility;
   const { getHandlers } = useRegisteredHandlers();
 
   const { getClickedSelectedItem, startGroupDrag, handleGroupDrag, stopGroupDrag } = useGroupDrag();
 
   const [recentMultiTouch, setRecentMultiTouch] = useState<boolean>(false);
-  const [, setPendingToolAction] = useState<PendingToolAction | null>(null);
   const pendingToolTimeoutRef = useRef<number | null>(null);
   const touchActiveRef = useRef(false);
+  // Pending recentMultiTouch resets (pointer-up and global touchend); cleared on unmount.
+  const multiTouchResetTimeoutsRef = useRef<Set<number>>(new Set());
+  const scheduleMultiTouchReset = useCallback((delayMs: number): void => {
+    const id = window.setTimeout(() => {
+      multiTouchResetTimeoutsRef.current.delete(id);
+      setRecentMultiTouch(false);
+    }, delayMs);
+    multiTouchResetTimeoutsRef.current.add(id);
+  }, []);
 
   const panStartPositionRef = useRef<PanStartPosition | null>(null);
   const panMoveThreshold = 5;
@@ -69,6 +72,7 @@ const useEventCoordinator = ({
   const areaSelectPendingRef = useRef<AreaSelectPending | null>(null);
 
   const handlePointerDown = useCallback((e: MouseEvent | TouchEvent): void => {
+    const layerVisibility = layerVisibilityRef.current;
     const drawingHandlers = getHandlers('drawing');
     const objectHandlers = getHandlers('object');
     const textHandlers = getHandlers('text');
@@ -138,7 +142,6 @@ const useEventCoordinator = ({
       if (pendingToolTimeoutRef.current != null) {
         window.clearTimeout(pendingToolTimeoutRef.current);
         pendingToolTimeoutRef.current = null;
-        setPendingToolAction(null);
       }
 
       setRecentMultiTouch(true);
@@ -411,18 +414,17 @@ const useEventCoordinator = ({
 
     if (isTouchEvent) {
       touchActiveRef.current = true;
-      setPendingToolAction({ execute: executeToolAction });
       pendingToolTimeoutRef.current = window.setTimeout(() => {
         executeToolAction();
-        setPendingToolAction(null);
         pendingToolTimeoutRef.current = null;
       }, 50);
     } else {
       executeToolAction();
     }
-  }, [currentTool, isColorPickerOpen, showObjectColorPicker, recentMultiTouch, selectedItem, hasMultiSelection, clearSelection, screenToWorld, getClickedSelectedItem, startGroupDrag, getHandlers, layerVisibility, isAlignmentMode, setSelectedItem, interactionLocked]);
+  }, [currentTool, isColorPickerOpen, showObjectColorPicker, recentMultiTouch, selectedItem, hasMultiSelection, clearSelection, screenToWorld, getClickedSelectedItem, startGroupDrag, getHandlers, isAlignmentMode, setSelectedItem, interactionLocked]);
 
   const handlePointerMove = useCallback((e: MouseEvent | TouchEvent): void => {
+    const layerVisibility = layerVisibilityRef.current;
     const drawingHandlers = getHandlers('drawing');
     const objectHandlers = getHandlers('object');
     const textHandlers = getHandlers('text');
@@ -461,7 +463,6 @@ const useEventCoordinator = ({
         if (pendingToolTimeoutRef.current != null) {
           window.clearTimeout(pendingToolTimeoutRef.current);
           pendingToolTimeoutRef.current = null;
-          setPendingToolAction(null);
         }
         updateTouchPan(touchEvent.touches);
       }
@@ -479,7 +480,6 @@ const useEventCoordinator = ({
       if (pendingToolTimeoutRef.current != null) {
         window.clearTimeout(pendingToolTimeoutRef.current);
         pendingToolTimeoutRef.current = null;
-        setPendingToolAction(null);
       }
     }
 
@@ -539,8 +539,10 @@ const useEventCoordinator = ({
       const isTouch = touchEvent.touches !== undefined || (e as PointerEvent).pointerType === 'touch';
       if (!isTouch && drawingHandlers?.previewEnabled === true && drawingHandlers?.updateShapeHover != null) {
 
-        if (currentTool === 'edgeLine' && drawingHandlers.edgeLineStart != null && panZoomHandlers.screenToWorld != null) {
-          const worldCoords = panZoomHandlers.screenToWorld(clientX, clientY);
+        // screenToWorld comes from MapState (the same projection the edgeLine
+        // click path uses); the panZoom registry never carried it.
+        if (currentTool === 'edgeLine' && drawingHandlers.edgeLineStart != null) {
+          const worldCoords = screenToWorld(clientX, clientY);
           if (worldCoords != null && geometry != null) {
             const cellSize = geometry.cellSize;
             const nearestX = Math.round(worldCoords.worldX / cellSize);
@@ -667,7 +669,7 @@ const useEventCoordinator = ({
     if (layerVisibility.objects && objectHandlers?.handleHoverUpdate) {
       objectHandlers.handleHoverUpdate(e);
     }
-  }, [currentTool, isDraggingSelection, dragStart, selectedItem, handleGroupDrag, getHandlers, layerVisibility, isAlignmentMode, geometry, screenToWorld]);
+  }, [currentTool, isDraggingSelection, dragStart, selectedItem, handleGroupDrag, getHandlers, isAlignmentMode, geometry, screenToWorld]);
 
   const handlePointerUp = useCallback((e: MouseEvent | TouchEvent): void => {
     const drawingHandlers = getHandlers('drawing');
@@ -694,7 +696,7 @@ const useEventCoordinator = ({
     } = panZoomHandlers;
 
     if (recentMultiTouch) {
-      window.setTimeout(() => setRecentMultiTouch(false), 300);
+      scheduleMultiTouchReset(300);
     }
 
     if (isPanning) {
@@ -803,7 +805,7 @@ const useEventCoordinator = ({
     if (fogHandlers?.handlePointerUp) {
       fogHandlers.handlePointerUp(e);
     }
-  }, [currentTool, recentMultiTouch, isDraggingSelection, dragStart, selectedItem, setSelectedItem, stopGroupDrag, getHandlers, isAlignmentMode]);
+  }, [currentTool, recentMultiTouch, isDraggingSelection, dragStart, selectedItem, setSelectedItem, stopGroupDrag, getHandlers, isAlignmentMode, scheduleMultiTouchReset]);
 
   const handlePointerLeave = useCallback((_e: MouseEvent): void => {
     const drawingHandlers = getHandlers('drawing');
@@ -812,13 +814,18 @@ const useEventCoordinator = ({
     if (pendingToolTimeoutRef.current != null) {
       window.clearTimeout(pendingToolTimeoutRef.current);
       pendingToolTimeoutRef.current = null;
-      setPendingToolAction(null);
     }
 
     if (currentTool != null && DRAWING_TOOL_SET.has(currentTool)) {
       if (drawingHandlers?.cancelDrawing) {
         drawingHandlers.cancelDrawing();
       }
+    }
+
+    // The segment highlight only updates on moves over the canvas; drop it
+    // when the pointer leaves so it does not stick at the edge.
+    if (currentTool === 'segmentDraw') {
+      drawingHandlers?.clearSegmentHover?.();
     }
 
     if (currentTool === 'diagonalFill' && diagonalFillHandlers?.cancelFill) {
@@ -1135,7 +1142,7 @@ const useEventCoordinator = ({
 
       if (panZoomHandlers?.isTouchPanningRef?.current === true) {
         panZoomHandlers.stopTouchPan();
-        window.setTimeout(() => setRecentMultiTouch(false), 100);
+        scheduleMultiTouchReset(100);
       }
 
       if (objectHandlers?.stopObjectResizing) {
@@ -1197,12 +1204,20 @@ const useEventCoordinator = ({
       window.removeEventListener('mousemove', handleGlobalMouseMove);
       window.removeEventListener('touchmove', handleGlobalTouchMove);
     };
-  }, [isDraggingSelection, dragStart, setIsDraggingSelection, setDragStart, isGroupDragging, stopGroupDrag, getHandlers, canvasRef]);
+  }, [isDraggingSelection, dragStart, setIsDraggingSelection, setDragStart, isGroupDragging, stopGroupDrag, getHandlers, canvasRef, scheduleMultiTouchReset]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+      // Ignore typing surfaces (form fields, the CodeMirror note editor) and
+      // keys aimed at another map: only the focused (pressed) or hovered map
+      // acts. Rule in utils/keyboardTargets.ts.
+      if (!shouldHandleMapKey(e, canvasRef.current)) return;
+
+      // An in-progress fog rectangle takes Escape before selection handling
+      // (the fog layer registers only while a fog tool is active).
+      const fogHandlers = getHandlers('fogOfWar');
+      if (e.key === 'Escape' && fogHandlers?.rectangleStart != null && fogHandlers.handleKeyDown) {
+        fogHandlers.handleKeyDown(e);
         return;
       }
 
@@ -1225,13 +1240,18 @@ const useEventCoordinator = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [getHandlers]);
+  }, [getHandlers, canvasRef]);
 
   useEffect(() => {
+    // The Set is created once and mutated in place, so capturing it here is
+    // the same object the cleanup must drain.
+    const resets = multiTouchResetTimeoutsRef.current;
     return () => {
       if (pendingToolTimeoutRef.current != null) {
         window.clearTimeout(pendingToolTimeoutRef.current);
       }
+      resets.forEach((id) => window.clearTimeout(id));
+      resets.clear();
     };
   }, []);
 };

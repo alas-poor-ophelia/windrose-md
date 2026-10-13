@@ -42,6 +42,8 @@ import { DEFAULT_PIXELS_PER_CELL } from '../../assets/spanPredictor';
 import { useApp } from '../../context/AppContext';
 import { useLiveOverlayRedraw } from '../../hooks/canvas/useLiveOverlayRedraw';
 import { Notice } from 'obsidian';
+import { resolveTileEntry } from '../../assets/tilesetOperations';
+import { shouldHandleMapKey } from '../../utils/keyboardTargets';
 
 export interface WallLayerProps {
   currentTool: string;
@@ -84,6 +86,8 @@ const BARE_THRESHOLD_WIDTH_CELLS = 1;
 
 /** Hide edit handles below this zoom — too small to grab, pure clutter. */
 const MIN_HANDLE_ZOOM = 0.3;
+/** Screen-px pick radius for edit handles, vertices and wall corridors (divided by live zoom). */
+const HANDLE_HIT_PX = 22;
 
 /**
  * Perpendicular offset (screen px) of a gap's CENTER handle off the centerline.
@@ -228,7 +232,8 @@ const WallLayer = ({
   const selectedEntry = (() => {
     if (selectedTilesetId == null || selectedTileId == null || mapData?.tilesets == null) return null;
     const ts = mapData.tilesets.find(t => t.id === selectedTilesetId);
-    return ts?.tiles.find(t => t.id === selectedTileId) ?? null;
+    // resolveTileEntry also accepts legacy basename ids (recents / MCP selects).
+    return resolveTileEntry(ts, selectedTileId) ?? null;
   })();
   const selectedMeta = selectedEntry != null ? getTileMetadataForRender()[selectedEntry.vaultPath] : undefined;
   const isStripAsset = selectedMeta?.ddSourceType === 'walls' || selectedMeta?.ddSourceType === 'paths';
@@ -310,6 +315,13 @@ const WallLayer = ({
     );
     return { offsetX, offsetY, zoom };
   }, [mapData, geometry, viewController]);
+
+  // Hit-testing reads the same live zoom the overlay draws with; the committed
+  // viewState lags during a pinch/wheel gesture.
+  const committedZoom = mapData?.viewState?.zoom;
+  const getLiveZoom = useCallback((): number => {
+    return viewController?.getLive().zoom ?? committedZoom ?? 1;
+  }, [viewController, committedZoom]);
 
   // ---- Draw-mode preview ----
   const drawPreview = useCallback(() => {
@@ -595,7 +607,7 @@ const WallLayer = ({
     ctx.clearRect(0, 0, overlay.width, overlay.height);
     const view = getViewTransform(overlay);
     if (view == null) return;
-    const corridor = Math.max(cellSize * 0.4, 22 / view.zoom);
+    const corridor = Math.max(cellSize * 0.4, HANDLE_HIT_PX / view.zoom);
     const wall = nearestOpeningWall(wx, wy, corridor);
     if (wall == null) return;
     // Hovering an existing opening: no insert ghost — a click there selects it
@@ -618,8 +630,8 @@ const WallLayer = ({
   // Click commits a single gap insert (one undo entry via suppress=false, G-F2).
   // Alt-click omits the art → a bare capped threshold (§5.3 secondary trigger).
   const commitOpeningInsert = useCallback((wx: number, wy: number, bare: boolean) => {
-    const zoom = mapData?.viewState?.zoom ?? 1;
-    const corridor = Math.max(cellSize * 0.4, 22 / zoom);
+    const zoom = getLiveZoom();
+    const corridor = Math.max(cellSize * 0.4, HANDLE_HIT_PX / zoom);
     const wall = nearestOpeningWall(wx, wy, corridor);
     if (wall == null) { new Notice('Click on a wall to place a door'); return; }
     // Bare threshold (ribbon entry OR Alt-click) omits the art. The ribbon entry
@@ -639,7 +651,7 @@ const WallLayer = ({
     setSelectedWallId(wall.id);
     setSelectedGapId(plan.gap.id);
     setSelectedVertexIndex(null);
-  }, [mapData?.viewState?.zoom, cellSize, nearestOpeningWall, selectedTilesetId, selectedTileId, deriveOpeningWidthCells, updateWall, isBareThreshold]);
+  }, [getLiveZoom, cellSize, nearestOpeningWall, selectedTilesetId, selectedTileId, deriveOpeningWidthCells, updateWall, isBareThreshold]);
 
   // ---- Draw-mode actions ----
   const cancelDrawing = useCallback(() => {
@@ -783,7 +795,7 @@ const WallLayer = ({
     const { clientX, clientY } = getClientCoords(e);
     const coords = screenToWorld(clientX, clientY);
     if (!coords) return;
-    const zoom = mapData?.viewState?.zoom ?? 1;
+    const zoom = getLiveZoom();
     const verts = verticesRef.current;
 
     // ---- OPENING MODE (portal armed) ----
@@ -793,7 +805,7 @@ const WallLayer = ({
     // Alt-click cuts a bare threshold (§5.2/§5.3). Never draws a wall.
     if (isOpeningMode) {
       const walls = getWalls();
-      const hitR = Math.max(8 / zoom, 22 / zoom);
+      const hitR = HANDLE_HIT_PX / zoom;
       const selWall = selectedWallIdRef.current != null ? walls.find(w => w.id === selectedWallIdRef.current) : null;
       if (selWall != null && zoom >= MIN_HANDLE_ZOOM) {
         const perpWorld = GAP_CENTER_PERP / zoom;
@@ -826,7 +838,7 @@ const WallLayer = ({
         }
       }
       // Click on an existing opening → select it for editing, don't insert.
-      const corridor = Math.max(cellSize * 0.4, 22 / zoom);
+      const corridor = Math.max(cellSize * 0.4, HANDLE_HIT_PX / zoom);
       const nearWall = nearestOpeningWall(coords.worldX, coords.worldY, corridor);
       if (nearWall != null) {
         const gapId = findGapOnWallAtPoint(nearWall, coords.worldX, coords.worldY, cellSize, corridor);
@@ -850,7 +862,7 @@ const WallLayer = ({
     // ---- EDIT MODE (not drawing) ----
     if (verts.length === 0) {
       const walls = getWalls();
-      const hitR = Math.max(8 / zoom, 22 / zoom);
+      const hitR = HANDLE_HIT_PX / zoom;
 
       // Handle hit-test on the selected wall first. Precedence (geometry F5):
       // gap-edge → gap-center → vertex → bow → centerline.
@@ -908,7 +920,7 @@ const WallLayer = ({
       // Centerline hit-test across all walls (nearest within corridor wins).
       // A cheap bbox pre-filter skips the expensive polyline flatten for any
       // wall whose bounds (+ corridor margin) can't contain the pointer.
-      const corridor = Math.max(cellSize * 0.4, 22 / zoom);
+      const corridor = Math.max(cellSize * 0.4, HANDLE_HIT_PX / zoom);
       let bestWall: WallPath | null = null;
       let bestDist = Infinity;
       for (const w of walls) {
@@ -959,14 +971,14 @@ const WallLayer = ({
     verticesRef.current = next;
     pressActiveRef.current = next.length >= 2;
     drawPreview();
-  }, [currentTool, mapData, getWalls, selectedEntry, isStripAsset, isOpeningMode, commitOpeningInsert, nearestOpeningWall, getClientCoords, screenToWorld, cellSize, snapDistance, snapWorld, angleSnap, createOverlay, commitWall, drawPreview, beginDrag]);
+  }, [currentTool, getWalls, selectedEntry, isStripAsset, isOpeningMode, commitOpeningInsert, nearestOpeningWall, getClientCoords, screenToWorld, cellSize, snapDistance, snapWorld, angleSnap, createOverlay, commitWall, drawPreview, beginDrag, getLiveZoom]);
 
   const handlePointerMove = useCallback((e: MouseEvent | TouchEvent | PointerEvent) => {
     if (currentTool !== 'wall') return;
     const { clientX, clientY } = getClientCoords(e);
     const coords = screenToWorld(clientX, clientY);
     if (!coords) return;
-    const zoom = mapData?.viewState?.zoom ?? 1;
+    const zoom = getLiveZoom();
 
     // ---- EDIT DRAG (checked before the opening ghost: opening mode's gap
     // move/resize drags resolve through this same path) ----
@@ -1060,7 +1072,7 @@ const WallLayer = ({
     const constrained = angleSnap(coords.worldX, coords.worldY, (e as MouseEvent).altKey === true);
     cursorRef.current = snapWorld(constrained.x, constrained.y);
     drawPreview();
-  }, [currentTool, mapData, cellSize, getClientCoords, screenToWorld, snapWorld, angleSnap, drawEditHandles, drawPreview, isOpeningMode, createOverlay, drawOpeningGhost]);
+  }, [currentTool, cellSize, getClientCoords, screenToWorld, snapWorld, angleSnap, drawEditHandles, drawPreview, isOpeningMode, createOverlay, drawOpeningGhost, getLiveZoom]);
 
   const handlePointerUp = useCallback((_e: MouseEvent | TouchEvent | PointerEvent) => {
     pressActiveRef.current = false;
@@ -1106,8 +1118,8 @@ const WallLayer = ({
     if (!coords) return;
     const wall = getWalls().find(w => w.id === selId);
     if (wall == null) return;
-    const zoom = mapData.viewState?.zoom ?? 1;
-    const corridor = Math.max(cellSize * 0.4, 22 / zoom);
+    const zoom = getLiveZoom();
+    const corridor = Math.max(cellSize * 0.4, HANDLE_HIT_PX / zoom);
     if (distanceToWall(wall, coords.worldX, coords.worldY) > corridor) return;
 
     // Nearest segment by chord projection
@@ -1151,14 +1163,15 @@ const WallLayer = ({
     }, false);
     setSelectedVertexIndex(bestSeg + 1);
     setSelectedGapId(null);
-  }, [currentTool, mapData, getWalls, getClientCoords, screenToWorld, cellSize, snapWorld, updateWall, commitWall]);
+  }, [currentTool, mapData, getWalls, getClientCoords, screenToWorld, cellSize, snapWorld, updateWall, commitWall, getLiveZoom]);
 
   // ---- Keyboard ----
   useEffect(() => {
     if (!isWallTool) return;
     const onKeyDown = (e: KeyboardEvent): void => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      // Ignore typing surfaces (the CodeMirror note editor is contenteditable,
+      // not an INPUT) and keys aimed at another map on the page.
+      if (!shouldHandleMapKey(e, canvasRef.current)) return;
 
       // Bare-threshold placement: Escape disarms the mode — but a selected
       // opening/wall deselects first (the Editing branch below), so Escape
@@ -1243,7 +1256,7 @@ const WallLayer = ({
     };
     activeDocument.addEventListener('keydown', onKeyDown);
     return () => activeDocument.removeEventListener('keydown', onKeyDown);
-  }, [isWallTool, getWalls, updateWall, onWallPathsChange, cancelDrawing, commitWall, drawPreview, cellSize, isBareThreshold, isOpeningMode, onDisarmOpening]);
+  }, [isWallTool, getWalls, updateWall, onWallPathsChange, cancelDrawing, commitWall, drawPreview, cellSize, isBareThreshold, isOpeningMode, onDisarmOpening, canvasRef]);
 
   // Reset transient state when the tool changes away.
   useEffect(() => {

@@ -5,7 +5,7 @@
  * Handles loading/saving map data to the Obsidian vault.
  */
 
-import type { MapData, MapLayer, MapType, ShapeOverlay } from '#types/core/map.types';
+import type { MapData, MapLayer, MapType, SubHexMapData } from '#types/core/map.types';
 import type { WallPath } from '#types/core/wallpath.types';
 import type { App } from 'obsidian';
 import { TFile, Notice } from 'obsidian';
@@ -14,7 +14,8 @@ import { DEFAULTS, SCHEMA_VERSION } from '../core/dmtConstants';
 import { getDataFilePath } from '../core/settingsAccessor';
 import { offsetToAxial } from '../geometry/core/offsetCoordinates';
 import { getSettings } from '../core/settingsAccessor';
-import { migrateToLayerSchema, needsMigration, generateLayerId, ensureBoards, DEFAULT_BOARD_ID } from './layerAccessor';
+import { generateLayerId, DEFAULT_BOARD_ID } from './layerAccessor';
+import { migrateMapData, MapSchemaError, claimedSchemaVersion, isNewerSchema } from './schemaMigration';
 import { calculateFitZoom } from '../geometry/core/hexMeasurements';
 import { resolveTileEntry } from '../assets/tilesetOperations';
 
@@ -53,6 +54,22 @@ class MapDataUnreadableError extends Error {
     super(`Map data file could not be read: ${dataPath}`);
     this.name = 'MapDataUnreadableError';
     this.dataPath = dataPath;
+  }
+}
+
+/**
+ * Thrown by loadMapData for a map deleted earlier in this session (DATA-02).
+ *
+ * The entry is gone from the store, so the plain "absent => fresh map" rule
+ * would hand back a blank, editable map whose saves are then refused. Callers
+ * show their "Map deleted" state instead.
+ */
+class MapDeletedError extends Error {
+  readonly mapId: string;
+  constructor(mapId: string) {
+    super(`Map was deleted: ${mapId}`);
+    this.name = 'MapDeletedError';
+    this.mapId = mapId;
   }
 }
 
@@ -249,224 +266,13 @@ async function restoreFromBackup(app: App, backup: DataFileBackup): Promise<Rest
   });
 }
 
-// Session-lifetime tombstones for deleted map IDs. loadMapData silently
-// re-creates missing maps, so a stale autosave from ANY still-mounted instance
-// of a deleted map (e.g. the same map open in both a note block and a
-// full-pane view) would resurrect it. saveMapData refuses tombstoned IDs.
+// Session-lifetime tombstones for deleted map IDs. A stale autosave from ANY
+// still-mounted instance of a deleted map (e.g. the same map open in both a
+// note block and a full-pane view) would resurrect it, and a fresh mount would
+// get a blank map. saveMapData refuses tombstoned IDs with status 'deleted';
+// loadMapData throws MapDeletedError for them (DATA-02).
 // Map IDs are timestamp+random, so a new map can't collide with a tombstone.
 const deletedMapIds = new Set<string>();
-
-/**
- * Sanitize a wall's openings on load. Drops ONLY structurally-invalid gaps
- * (invariants 1-2): non-object, missing id, non-integer/out-of-range `seg`,
- * non-finite `t` outside [0,1], or `widthCells <= 0`/non-finite. These are the
- * only conditions that delete a gap (integrity F1).
- *
- * Geometric invariants (3 door-wider-than-segment, 4 overlap) are NOT enforced
- * here: they are clamp/nudge-at-derive (§2.2), and computing them would require
- * flattening every wall against `cellSize`, which this migration deliberately
- * avoids (§2.5 note — the cheapest correct approach). A `gap.tile` binding is
- * NEVER destroyed (integrity F2). Empty/absent → the field is removed so
- * gapless walls stay byte-identical.
- */
-function sanitizeWallGaps(w: WallPath): void {
-  const raw = (w as { gaps?: unknown }).gaps;
-  if (!Array.isArray(raw)) {
-    delete (w as { gaps?: unknown }).gaps;
-    return;
-  }
-  const V = w.vertices.length;
-  const segCount = w.closed ? V : V - 1;
-  const valid = raw.filter((g: unknown): boolean => {
-    if (g == null || typeof g !== 'object') return false;
-    const gap = g as Record<string, unknown>;
-    return (
-      typeof gap.id === 'string' &&
-      Number.isInteger(gap.seg) && (gap.seg as number) >= 0 && (gap.seg as number) < segCount &&
-      Number.isFinite(gap.t) && (gap.t as number) >= 0 && (gap.t as number) <= 1 &&
-      Number.isFinite(gap.widthCells) && (gap.widthCells as number) > 0
-    );
-  });
-  if (valid.length > 0) w.gaps = valid;
-  else delete (w as { gaps?: unknown }).gaps;
-}
-
-/**
- * Backfill a shape overlay's per-axis half-extents. Saves written before 2.4.0
- * only carry the single `size` half-extent (every rectangle was a square), so
- * both axes default to it. Rotation is dropped when it is not a finite number.
- */
-function normalizeShapeOverlays(shapes: ShapeOverlay[]): void {
-  for (const shape of shapes) {
-    if (!Number.isFinite(shape.halfWidth) || (shape.halfWidth as number) <= 0) shape.halfWidth = shape.size;
-    if (!Number.isFinite(shape.halfHeight) || (shape.halfHeight as number) <= 0) shape.halfHeight = shape.size;
-    if (shape.rotation != null && !Number.isFinite(shape.rotation)) delete shape.rotation;
-  }
-}
-
-function migrateMapData(mapData: MapData): MapData {
-  mapData.objects ??= [];
-  mapData.textLabels ??= [];
-  mapData.customColors ??= [];
-  mapData.edges ??= [];
-  mapData.regions ??= [];
-  mapData.outlines ??= [];
-  mapData.shapeOverlays ??= [];
-  normalizeShapeOverlays(mapData.shapeOverlays);
-  mapData.partyPins ??= [];
-  mapData.savedRoutes ??= [];
-  // Legacy measurement route shape (bare waypoint array, pre-terrain)
-  if (Array.isArray(mapData.measurementRoute)) {
-    mapData.measurementRoute = { points: mapData.measurementRoute, segmentTerrains: [] };
-  }
-  if (!mapData.mapType) mapData.mapType = 'grid';
-  mapData.settings ??= { useGlobalSettings: true, overrides: {} };
-  mapData.uiPreferences ??= {
-    rememberPanZoom: true,
-    rememberSidebarState: true,
-    rememberExpandedState: false
-  };
-  mapData.expandedState ??= false;
-  mapData.lastTextLabelSettings ??= null;
-
-  // Hex-specific migration
-  if (mapData.mapType === 'hex') {
-    if (!mapData.hexBounds) {
-      mapData.hexBounds = { ...DEFAULTS.hexBounds };
-    } else if ((mapData.hexBounds as unknown as Record<string, unknown>).maxQ !== undefined) {
-      // Old axial bounds format → offset format (boundary cast: legacy schema)
-      const legacyBounds = mapData.hexBounds as unknown as Record<string, unknown>;
-      mapData.hexBounds = {
-        maxCol: legacyBounds.maxQ as number,
-        maxRow: legacyBounds.maxR as number
-      };
-    }
-
-    if (!mapData.backgroundImage) {
-      mapData.backgroundImage = {
-        path: null,
-        lockBounds: false,
-        gridDensity: 'medium',
-        customColumns: 24,
-        sizingMode: 'density',
-        measurementMethod: 'corner',
-        measurementSize: 86,
-        fineTuneOffset: 0
-      };
-    } else {
-      mapData.backgroundImage.gridDensity ??= 'medium';
-      mapData.backgroundImage.customColumns ??= 24;
-      mapData.backgroundImage.sizingMode ??= 'density';
-      mapData.backgroundImage.measurementMethod ??= 'corner';
-      mapData.backgroundImage.measurementSize ??= 86;
-      mapData.backgroundImage.fineTuneOffset ??= 0;
-    }
-  }
-
-  // Layer schema migration (v2)
-  if (needsMigration(mapData)) {
-    mapData = migrateToLayerSchema(mapData) as MapData;
-  }
-
-  // Tileset source migration: add source: 'folder' to legacy tilesets
-  mapData.tilesets ??= [];
-  for (const ts of mapData.tilesets) {
-    if (!('source' in ts)) {
-      (ts as Record<string, unknown>).source = 'folder';
-    }
-  }
-
-  // Layer-level arrays and curve migration
-  for (const layer of mapData.layers) {
-    layer.tiles ??= [];
-
-    // Tile assignment migration: q→col, r→row, layer→placement (boundary cast: legacy schema)
-    for (const tile of layer.tiles) {
-      const legacy = tile as unknown as Record<string, unknown>;
-      if ('q' in legacy && !('col' in legacy)) {
-        legacy.col = legacy.q;
-        legacy.row = legacy.r;
-        delete legacy.q;
-        delete legacy.r;
-      }
-      if ('layer' in legacy && !('placement' in legacy)) {
-        const oldLayer = legacy.layer as string;
-        legacy.placement = oldLayer === 'base' ? undefined : oldLayer;
-        delete legacy.layer;
-      }
-    }
-
-    layer.wallPaths ??= [];
-    layer.wallPaths = layer.wallPaths.filter(w => Array.isArray(w.vertices) && w.vertices.length >= 2 &&
-      typeof w.tilesetId === 'string' && typeof w.tileId === 'string');
-    for (const w of layer.wallPaths) sanitizeWallGaps(w);
-
-    layer.terrainStrokes ??= [];
-    layer.terrainStrokes = layer.terrainStrokes.filter(s =>
-      Array.isArray(s.points) && s.points.length >= 2 && s.points.length % 2 === 0 &&
-      Number.isFinite(s.radius) && s.radius > 0 &&
-      typeof s.tilesetId === 'string' && typeof s.tileId === 'string');
-
-    layer.curves ??= [];
-    layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
-    for (const curve of layer.curves) {
-      // Migrate legacy holes (flat number[]) to innerRings (boundary cast: legacy schema)
-      const legacy = (curve as unknown as Record<string, unknown>).holes as number[][] | undefined;
-      if (legacy && legacy.length > 0) {
-        const innerRings: [number, number][][] = [];
-        for (const hole of legacy) {
-          if (hole.length < 6) continue;
-          const ring: [number, number][] = [];
-          for (let i = 0; i < hole.length; i += 2) {
-            ring.push([hole[i], hole[i + 1]]);
-          }
-          innerRings.push(ring);
-        }
-        if (innerRings.length > 0) {
-          curve.innerRings = innerRings;
-        }
-        delete (curve as unknown as Record<string, unknown>).holes;
-      }
-    }
-  }
-
-  // Board (floor) projection: ensure every layer has a boardId, the boards registry
-  // exists, and activeBoardId is valid. Idempotent — safe on already-migrated maps.
-  ensureBoards(mapData);
-
-  // Sub-hex migration
-  if (mapData.subHexMaps) {
-    for (const hexKey of Object.keys(mapData.subHexMaps)) {
-      const subHex = mapData.subHexMaps[hexKey];
-      if (subHex?.mapData != null) {
-        for (const layer of subHex.mapData.layers) {
-          layer.tiles ??= [];
-          layer.curves ??= [];
-          layer.curves = layer.curves.filter(c => c.start != null && c.segments != null);
-          layer.wallPaths ??= [];
-          layer.wallPaths = layer.wallPaths.filter(w => Array.isArray(w.vertices) && w.vertices.length >= 2 &&
-            typeof w.tilesetId === 'string' && typeof w.tileId === 'string');
-          for (const w of layer.wallPaths) sanitizeWallGaps(w);
-          layer.terrainStrokes ??= [];
-          layer.terrainStrokes = layer.terrainStrokes.filter(s =>
-            Array.isArray(s.points) && s.points.length >= 2 && s.points.length % 2 === 0 &&
-            Number.isFinite(s.radius) && s.radius > 0 &&
-            typeof s.tilesetId === 'string' && typeof s.tileId === 'string');
-        }
-        subHex.mapData.regions ??= [];
-        subHex.mapData.outlines ??= [];
-        subHex.mapData.shapeOverlays ??= [];
-        normalizeShapeOverlays(subHex.mapData.shapeOverlays);
-        subHex.mapData.partyPins ??= [];
-        // Sub-hex maps get their own implicit board too (Parallax: don't leave
-        // sub-hex layers boardless or board filters would drop them).
-        ensureBoards(subHex.mapData);
-      }
-    }
-  }
-
-  return mapData;
-}
 
 /**
  * Picture frame mode reopens at the locked viewport (set via the Lock view
@@ -489,13 +295,17 @@ function applyLockedViewState(mapData: MapData): MapData {
  * bad JSON, structurally-wrong document, migration blowup) throws
  * MapDataUnreadableError so the caller can block editing — silently returning a
  * blank map here is what turned a truncated read into permanent data loss.
+ * A map deleted this session throws MapDeletedError (never a blank map).
  *
  * Serialized through the data-file mutex so it can never observe a write in
  * progress.
  */
 async function loadMapDataWithGeneration(app: App, mapId: string, mapName: string = '', mapType: MapType = 'grid'): Promise<{ data: MapData; generation: number }> {
   const dataPath = getDataFilePath();
+  if (deletedMapIds.has(mapId)) throw new MapDeletedError(mapId);
   return enqueueDataFileOp(async () => {
+    // A delete that was queued ahead of this load tombstoned the id first.
+    if (deletedMapIds.has(mapId)) throw new MapDeletedError(mapId);
     // Captured INSIDE the mutex: the returned snapshot is exactly the state
     // at this generation — no save can land between the read and the stamp.
     const generation = getEntryGeneration(mapId);
@@ -522,6 +332,15 @@ async function loadMapDataWithGeneration(app: App, mapId: string, mapName: strin
       return { data: createNewMap(mapName, mapType), generation };
     }
 
+    // A map from a newer plugin is never opened for editing by this build:
+    // everything that edits it assumes this version's shape, and the first
+    // autosave would persist the loss under the newer stamp. Not corruption,
+    // so no corrupt-file notice and no backup restore (MapSchemaError).
+    const claimed = claimedSchemaVersion(data.maps[mapId]);
+    if (isNewerSchema(data.maps[mapId])) {
+      throw new MapSchemaError('newer-version', claimed ?? 0, `map schema v${String(claimed)}, this plugin knows v${String(SCHEMA_VERSION)}`);
+    }
+
     try {
       data.maps[mapId] = migrateMapData(data.maps[mapId]);
       if (data.maps[mapId].name == null && mapName) {
@@ -529,6 +348,13 @@ async function loadMapDataWithGeneration(app: App, mapId: string, mapName: strin
       }
       return { data: applyLockedViewState(data.maps[mapId]), generation };
     } catch (error) {
+      if (error instanceof MapSchemaError) {
+        // Missing/failed schema step: a plugin defect, not a corrupt file.
+        // Restoring a backup would not help (it holds the same schema) and
+        // would discard recent edits.
+        console.error('[loadMapData] Stored map entry needs a newer or fixed plugin version:', error);
+        throw error;
+      }
       // The entry exists but is malformed enough to break migration. Same rule:
       // never hand back a blank map that a later save would merge over it.
       console.error('[loadMapData] Stored map entry could not be migrated. Refusing to substitute a blank map:', error);
@@ -592,10 +418,14 @@ function isMapTombstoned(mapId: string): boolean {
  * stale registry by construction — a registry still holding old-style ids
  * exact-matches every stored id, so nothing rewrites. Idempotent: canonical
  * ids resolve to themselves.
+ *
+ * Returns the canonicalized tree and NEVER mutates the input (it is live
+ * Preact state shared with undo snapshots). When nothing changes the input
+ * itself is returned. Covers the root and every nested sub-hex map.
  */
-function canonicalizeTileIds(mapData: MapData): void {
+function canonicalizeTileIds(mapData: MapData): MapData {
   const tilesets = mapData.tilesets;
-  if (tilesets == null || tilesets.length === 0) return;
+  if (tilesets == null || tilesets.length === 0) return mapData;
 
   // Memoized per (tilesetId, tileId) pair: placements repeat the same few
   // tiles thousands of times, and resolveTileEntry is a linear scan.
@@ -611,40 +441,76 @@ function canonicalizeTileIds(mapData: MapData): void {
     return c;
   };
 
-  const upgradeLayers = (layers: MapLayer[]): void => {
-    for (const layer of layers) {
-      for (const t of layer.tiles ?? []) {
-        const c = canon(t.tilesetId, t.tileId);
-        if (c != null) t.tileId = c;
+  // Copy-on-write: the input is live Preact state shared with undo
+  // snapshots, so nothing is edited in place. Only the objects on the path to
+  // a changed id are copied; untouched subtrees keep their identity.
+  const mapArray = <T>(arr: T[], fn: (item: T) => T): T[] => {
+    let out: T[] | null = null;
+    for (let i = 0; i < arr.length; i++) {
+      const next = fn(arr[i]);
+      if (next !== arr[i]) {
+        out ??= arr.slice();
+        out[i] = next;
       }
-      for (const s of layer.terrainStrokes ?? []) {
-        const c = canon(s.tilesetId, s.tileId);
-        if (c != null) s.tileId = c;
-      }
-      for (const w of layer.wallPaths ?? []) {
-        const c = canon(w.tilesetId, w.tileId);
-        if (c != null) w.tileId = c;
-        // Seated opening art canonicalizes exactly like the strip's tileId:
-        // resolve-only (never null an unresolved ref — the pack may be
-        // temporarily uninstalled), save-time, and inside this shared walk so
-        // sub-hex doors canonicalize too (integrity F7).
-        for (const gap of w.gaps ?? []) {
-          if (gap.tile != null) {
-            const gc = canon(gap.tile.tilesetId, gap.tile.tileId);
-            if (gc != null) gap.tile.tileId = gc;
-          }
+    }
+    return out ?? arr;
+  };
+  const upgradeRef = <T extends { tilesetId: string; tileId: string }>(item: T): T => {
+    const c = canon(item.tilesetId, item.tileId);
+    return c != null ? { ...item, tileId: c } : item;
+  };
+  const upgradeWall = (w: WallPath): WallPath => {
+    let next = upgradeRef(w);
+    // Seated opening art canonicalizes exactly like the strip's tileId:
+    // resolve-only (never null an unresolved ref — the pack may be
+    // temporarily uninstalled), save-time, and inside this shared walk so
+    // sub-hex doors canonicalize too (integrity F7).
+    if (w.gaps != null) {
+      const gaps = mapArray(w.gaps, (gap) => {
+        if (gap.tile == null) return gap;
+        const tile = upgradeRef(gap.tile);
+        return tile !== gap.tile ? { ...gap, tile } : gap;
+      });
+      if (gaps !== w.gaps) next = { ...next, gaps };
+    }
+    return next;
+  };
+  const upgradeLayer = (layer: MapLayer): MapLayer => {
+    const tiles = layer.tiles != null ? mapArray(layer.tiles, upgradeRef) : layer.tiles;
+    const terrainStrokes = layer.terrainStrokes != null ? mapArray(layer.terrainStrokes, upgradeRef) : layer.terrainStrokes;
+    const wallPaths = layer.wallPaths != null ? mapArray(layer.wallPaths, upgradeWall) : layer.wallPaths;
+    if (tiles === layer.tiles && terrainStrokes === layer.terrainStrokes && wallPaths === layer.wallPaths) return layer;
+    const next: MapLayer = { ...layer };
+    if (tiles !== layer.tiles) next.tiles = tiles;
+    if (terrainStrokes !== layer.terrainStrokes) next.terrainStrokes = terrainStrokes;
+    if (wallPaths !== layer.wallPaths) next.wallPaths = wallPaths;
+    return next;
+  };
+  // Sub-hex maps at every depth resolve against the ROOT registry (tilesets
+  // are root-owned; sub-hex views read the root's).
+  const upgradeMap = (m: MapData): MapData => {
+    const layers = Array.isArray(m.layers) ? mapArray(m.layers, upgradeLayer) : m.layers;
+    let subHexMaps = m.subHexMaps;
+    if (m.subHexMaps != null) {
+      let copy: Record<string, SubHexMapData> | null = null;
+      for (const hexKey of Object.keys(m.subHexMaps)) {
+        const sub = m.subHexMaps[hexKey];
+        if (sub?.mapData == null) continue;
+        const md = upgradeMap(sub.mapData);
+        if (md !== sub.mapData) {
+          copy ??= { ...m.subHexMaps };
+          copy[hexKey] = { ...sub, mapData: md };
         }
       }
+      if (copy != null) subHexMaps = copy;
     }
+    if (layers === m.layers && subHexMaps === m.subHexMaps) return m;
+    const next: MapData = { ...m, layers };
+    if (subHexMaps !== m.subHexMaps) next.subHexMaps = subHexMaps;
+    return next;
   };
 
-  upgradeLayers(mapData.layers);
-  if (mapData.subHexMaps) {
-    for (const hexKey of Object.keys(mapData.subHexMaps)) {
-      const sub = mapData.subHexMaps[hexKey];
-      if (sub?.mapData != null) upgradeLayers(sub.mapData.layers);
-    }
-  }
+  return upgradeMap(mapData);
 }
 
 /**
@@ -684,14 +550,99 @@ function getEntryGeneration(mapId: string): number {
 type SaveMapResult =
   | { status: 'saved'; generation: number }
   | { status: 'failed' }
-  | { status: 'stale' };
+  | { status: 'stale' }
+  /** The map was deleted this session; nothing was written (DATA-02). Terminal. */
+  | { status: 'deleted' };
+
+/**
+ * The guarded write of one map entry. MUST run inside the data-file mutex.
+ *
+ * Read-modify-write of the whole file: refuses to overwrite an unparseable
+ * file, rotates a .bak of the known-good content, canonicalizes tile ids (on a
+ * copy), serializes compactly before touching disk, and bumps the entry's
+ * write generation. Shared by saveMapData and createMapEntry so there is
+ * exactly one store-writer contract.
+ */
+async function writeMapEntryLocked(app: App, mapId: string, mapData: MapData, writerId: string | null): Promise<SaveMapResult> {
+  let allData: DataFile = { maps: {} };
+
+  // Load existing data
+  const dataPath = getDataFilePath();
+  const abstractFile = app.vault.getAbstractFileByPath(dataPath);
+  const file = abstractFile instanceof TFile ? abstractFile : null;
+  if (file) {
+    const content = await app.vault.read(file);
+    try {
+      allData = JSON.parse(content) as DataFile;
+    } catch (parseError) {
+      console.error(
+        '[saveMapData] Existing data file is unparseable. Refusing to overwrite to avoid data loss. ' +
+        'Inspect or restore the file manually before saving again.',
+        parseError
+      );
+      notifyCorruptedDataFile(dataPath);
+      return { status: 'failed' } as const;
+    }
+
+    // Backup rotation. `content` has just been proven to parse, so it is
+    // known-good — the backup captures THAT, never the merged output we are
+    // about to write (a backup of unverified new state protects nothing).
+    // Runs before vault.modify, inside the mutex.
+    const now = Date.now();
+    if (shouldRotateBak(lastBakAt, now)) {
+      const slot = nextBakSlot;
+      // Stamped BEFORE the write: a slot that keeps failing must not retry
+      // on every autosave (see BAK_THROTTLE_MS).
+      lastBakAt = now;
+      nextBakSlot = otherBakSlot(slot);
+      await writeBackupSlot(app, dataPath, slot, content);
+    }
+  }
+
+  // Update specific map with legacy tile ids upgraded. The canonical tree is
+  // a copy-on-write result: the caller's (live) object is never edited.
+  allData.maps ??= {};
+  allData.maps[mapId] = canonicalizeTileIds(mapData);
+
+  // Serialize BEFORE touching disk. A circular ref or BigInt makes
+  // JSON.stringify throw, which aborts the save here without corrupting the
+  // file; a successful stringify of a plain object is ALWAYS valid JSON, so
+  // re-parsing it to "validate" only burned a full main-thread parse. Compact
+  // output (no pretty-print): on a multi-MB multi-map file the indentation
+  // pass plus the redundant re-parse tripled per-save main-thread time,
+  // freezing the UI ~300-450ms on every autosave.
+  let jsonString: string;
+  try {
+    jsonString = JSON.stringify(allData);
+  } catch (serializeError) {
+    console.error('[saveMapData] Serialization failed, save aborted:', serializeError);
+    return { status: 'failed' } as const;
+  }
+
+  if (file) {
+    await app.vault.modify(file, jsonString);
+  } else {
+    const dirPath = dataPath.includes('/') ? dataPath.substring(0, dataPath.lastIndexOf('/')) : '';
+    if (dirPath !== '' && app.vault.getAbstractFileByPath(dirPath) == null) {
+      try { await app.vault.createFolder(dirPath); } catch { /* already exists */ }
+    }
+    await app.vault.create(dataPath, jsonString);
+  }
+
+  const generation = getEntryGeneration(mapId) + 1;
+  entryGenerations.set(mapId, { generation, writerId });
+  return { status: 'saved', generation } as const;
+}
 
 async function saveMapData(app: App, mapId: string, mapData: MapData, baseGeneration?: number, writerId?: string): Promise<SaveMapResult> {
-  // Tombstoned map: silently drop the write. Reporting 'saved' (not 'failed')
-  // lets a stale instance's save status settle to 'Saved' instead of flagging
-  // an error for an intentional no-op.
-  if (deletedMapIds.has(mapId)) return { status: 'saved', generation: getEntryGeneration(mapId) };
+  // Tombstoned map: drop the write and say so. Reporting 'saved' here let a
+  // still-mounted instance show "Saved" (and clear its journal) for edits that
+  // were never written (DATA-02).
+  if (deletedMapIds.has(mapId)) return { status: 'deleted' } as const;
   return enqueueDataFileOp(async () => {
+    // Re-checked inside the mutex: a delete queued ahead of this save
+    // tombstoned the id after the check above.
+    if (deletedMapIds.has(mapId)) return { status: 'deleted' } as const;
     try {
       // Stale-base check inside the mutex: refuse to replace an entry that
       // has been written since this caller's tree was loaded/last saved —
@@ -709,70 +660,7 @@ async function saveMapData(app: App, mapId: string, mapData: MapData, baseGenera
         console.warn(`[saveMapData] Refusing stale save of "${mapId}": base generation ${String(baseGeneration)} < current ${String(current.generation)} last written by ${current.writerId ?? 'untracked'} (map open in another pane?)`);
         return { status: 'stale' } as const;
       }
-      let allData: DataFile = { maps: {} };
-
-      // Load existing data
-      const dataPath = getDataFilePath();
-      const abstractFile = app.vault.getAbstractFileByPath(dataPath);
-      const file = abstractFile instanceof TFile ? abstractFile : null;
-      if (file) {
-        const content = await app.vault.read(file);
-        try {
-          allData = JSON.parse(content) as DataFile;
-        } catch (parseError) {
-          console.error(
-            '[saveMapData] Existing data file is unparseable. Refusing to overwrite to avoid data loss. ' +
-            'Inspect or restore the file manually before saving again.',
-            parseError
-          );
-          notifyCorruptedDataFile(dataPath);
-          return { status: 'failed' } as const;
-        }
-
-        // Backup rotation. `content` has just been proven to parse, so it is
-        // known-good — the backup captures THAT, never the merged output we are
-        // about to write (a backup of unverified new state protects nothing).
-        // Runs before vault.modify, inside the mutex.
-        const now = Date.now();
-        if (shouldRotateBak(lastBakAt, now)) {
-          const slot = nextBakSlot;
-          // Stamped BEFORE the write: a slot that keeps failing must not retry
-          // on every autosave (see BAK_THROTTLE_MS).
-          lastBakAt = now;
-          nextBakSlot = otherBakSlot(slot);
-          await writeBackupSlot(app, dataPath, slot, content);
-        }
-      }
-
-      // Update specific map — upgrading any legacy tile ids in place first so
-      // disk and memory converge on canonical ids.
-      canonicalizeTileIds(mapData);
-      allData.maps[mapId] = mapData;
-
-      // Serialize BEFORE touching disk. A circular ref or BigInt makes
-      // JSON.stringify throw, which aborts the save here without corrupting the
-      // file; a successful stringify of a plain object is ALWAYS valid JSON, so
-      // re-parsing it to "validate" only burned a full main-thread parse. Compact
-      // output (no pretty-print): on a multi-MB multi-map file the indentation
-      // pass plus the redundant re-parse tripled per-save main-thread time,
-      // freezing the UI ~300-450ms on every autosave.
-      let jsonString: string;
-      try {
-        jsonString = JSON.stringify(allData);
-      } catch (serializeError) {
-        console.error('[saveMapData] Serialization failed, save aborted:', serializeError);
-        return { status: 'failed' } as const;
-      }
-
-      if (file) {
-        await app.vault.modify(file, jsonString);
-      } else {
-        await app.vault.create(dataPath, jsonString);
-      }
-
-      const generation = getEntryGeneration(mapId) + 1;
-      entryGenerations.set(mapId, { generation, writerId: writerId ?? null });
-      return { status: 'saved', generation } as const;
+      return await writeMapEntryLocked(app, mapId, mapData, writerId ?? null);
     } catch (error) {
       console.error('Error saving map data:', error);
       return { status: 'failed' } as const;
@@ -950,42 +838,92 @@ function createNewMap(mapName: string = '', mapType: MapType = 'grid'): MapData 
   return baseMap;
 }
 
+/**
+ * A new map entry: createNewMap(name, mapType) with `overrides` spread over
+ * the map and `layerOverrides` over its single initial layer. Pure. Used by
+ * generated-content writers so their maps keep every createNewMap default
+ * (boards, layer boardId, curves array) instead of a hand-copied literal.
+ */
+function buildMapEntry(
+  name: string,
+  mapType: MapType,
+  overrides: Partial<MapData> = {},
+  layerOverrides: Partial<MapLayer> = {}
+): MapData {
+  const base = createNewMap(name, mapType);
+  const layer: MapLayer = { ...base.layers[0], ...layerOverrides };
+  return { ...base, ...overrides, layers: [layer], activeLayerId: layer.id };
+}
+
+/**
+ * Persist a brand-new map entry through the same guarded path as saveMapData
+ * (mutex, unparseable-file refusal, .bak rotation, tile-id canonicalization,
+ * compact JSON, write-generation bump). Throws when the write fails so the
+ * caller can surface it.
+ */
+async function createMapEntry(app: App, mapId: string, mapData: MapData): Promise<void> {
+  const result = await enqueueDataFileOp(() => writeMapEntryLocked(app, mapId, mapData, null));
+  if (result.status !== 'saved') {
+    throw new Error('Windrose: map data file is unreadable or could not be written, map not created.');
+  }
+}
+
 interface MapListEntry {
   id: string;
   name: string;
   type: MapType;
 }
 
-async function listMaps(app: App): Promise<MapListEntry[]> {
+/**
+ * Map list outcome. 'unreadable' means the data file EXISTS but could not be
+ * read or parsed — a picker must not present that as "no maps" (DATA-20).
+ */
+type MapListResult =
+  | { status: 'ok'; maps: MapListEntry[] }
+  | { status: 'unreadable'; dataPath: string };
+
+async function listMapsResult(app: App): Promise<MapListResult> {
   // Serialized with writes: an unserialized read can catch a chunked write
   // mid-flight and see a truncated document.
-  return enqueueDataFileOp(async () => {
+  const dataPath = getDataFilePath();
+  return enqueueDataFileOp(async (): Promise<MapListResult> => {
+    const file = app.vault.getAbstractFileByPath(dataPath);
+    if (!(file instanceof TFile)) return { status: 'ok', maps: [] };
     try {
-      const dataPath = getDataFilePath();
-      const file = app.vault.getAbstractFileByPath(dataPath);
-      if (!(file instanceof TFile)) return [];
-
       const content = await app.vault.read(file);
       const data = JSON.parse(content) as DataFile;
-
-      return Object.entries(data.maps).map(([id, mapData]) => ({
+      if (data == null || typeof data !== 'object' || data.maps == null || typeof data.maps !== 'object') {
+        throw new Error('data file has no "maps" object');
+      }
+      const maps = Object.entries(data.maps).map(([id, mapData]) => ({
         id,
         name: mapData.name != null && mapData.name !== '' ? mapData.name : id,
         type: mapData.mapType || 'grid',
       }));
-    } catch {
-      return [];
+      return { status: 'ok', maps };
+    } catch (error) {
+      console.error('[listMaps] Data file exists but could not be read:', error);
+      return { status: 'unreadable', dataPath };
     }
   });
+}
+
+/**
+ * Entries only; an unreadable store yields [] (legacy shape for callers that
+ * cannot show an error). Prefer listMapsResult where the UI can say why.
+ */
+async function listMaps(app: App): Promise<MapListEntry[]> {
+  const result = await listMapsResult(app);
+  return result.status === 'ok' ? result.maps : [];
 }
 
 export type { SaveMapResult };
 export {
   loadMapData, loadMapDataWithGeneration, getEntryGeneration,
-  saveMapData, deleteMapData, createNewMap, listMaps, migrateMapData,
+  saveMapData, deleteMapData, createNewMap, buildMapEntry, createMapEntry, listMaps, listMapsResult, migrateMapData,
   canonicalizeTileIds, applyLockedViewState, enqueueDataFileOp, getSaveQueue,
-  notifyCorruptedDataFile, readRawMapEntry, isMapTombstoned, MapDataUnreadableError,
+  notifyCorruptedDataFile, readRawMapEntry, isMapTombstoned, MapDataUnreadableError, MapDeletedError, MapSchemaError,
   shouldRotateBak, otherBakSlot, bakPathForSlot, backupTimestamp,
   findBestBackup, restoreFromBackup, BAK_THROTTLE_MS
 };
-export type { MapListEntry, BakSlot, DataFileBackup, RestoreResult };
+export type { MapListEntry, MapListResult, BakSlot, DataFileBackup, RestoreResult };

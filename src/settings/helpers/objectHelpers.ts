@@ -1,12 +1,15 @@
 import type { App } from 'obsidian';
 import { OBJECT_TYPES, CATEGORIES } from '../../objects/objectTypes';
+import {
+  mergeBuiltInAndCustomObjects,
+  mergeBuiltInAndCustomCategories,
+  type ResolvedObjectType,
+  type ResolvedCategory
+} from '../../objects/objectTypeResolver';
 import { RPGAwesomeHelpers } from './rpgAwesomeHelpers';
 
 const BUILT_IN_OBJECTS = OBJECT_TYPES;
 const BUILT_IN_CATEGORIES = CATEGORIES;
-
-const CATEGORY_ORDER: Record<string, number> = {};
-CATEGORIES.forEach((c, index) => { CATEGORY_ORDER[c.id] = index; });
 
 interface ObjectEntry {
   id: string;
@@ -33,63 +36,15 @@ interface CategoryEntry {
   order?: number;
 }
 
-interface ResolvedCategory extends CategoryEntry {
-  isBuiltIn: boolean;
-  isCustom?: boolean;
-  order: number;
-}
-
 export const ObjectHelpers = {
-  getResolved(settings: Record<string, unknown>): ResolvedObject[] {
-    const objectOverrides = (settings.objectOverrides ?? {}) as Record<string, Record<string, unknown>>;
-    const customObjects = (settings.customObjects ?? []) as ObjectEntry[];
-
-    const resolvedBuiltIns = (BUILT_IN_OBJECTS as ObjectEntry[])
-      .filter(obj => (objectOverrides[obj.id] as Record<string, unknown> | undefined)?.hidden !== true)
-      .map((obj, index) => {
-        const override = objectOverrides[obj.id];
-        const defaultOrder = index * 10;
-        if (override != null) {
-          const { hidden, ...overrideProps } = override;
-          void hidden; // excluded from the spread
-          return {
-            ...obj,
-            ...overrideProps,
-            order: (override.order as number) ?? defaultOrder,
-            isBuiltIn: true,
-            isModified: true
-          };
-        }
-        return { ...obj, order: defaultOrder, isBuiltIn: true, isModified: false };
-      });
-
-    const resolvedCustom = customObjects.map((obj, index) => ({
-      ...obj,
-      order: obj.order ?? (1000 + index * 10),
-      isCustom: true,
-      isBuiltIn: false
-    }));
-
-    return [...resolvedBuiltIns, ...resolvedCustom];
+  /** Built-ins (overrides applied, hidden removed) + custom objects. Delegates to the objects domain. */
+  getResolved(settings: Record<string, unknown>): ResolvedObjectType[] {
+    return mergeBuiltInAndCustomObjects(settings);
   },
 
+  /** Built-in + custom categories sorted by order. Same order table as the map palette. */
   getCategories(settings: Record<string, unknown>): ResolvedCategory[] {
-    const customCategories = (settings.customCategories ?? []) as CategoryEntry[];
-
-    const resolvedBuiltIns = BUILT_IN_CATEGORIES.map(c => ({
-      ...c,
-      isBuiltIn: true,
-      order: CATEGORY_ORDER[c.id] ?? 50
-    }));
-
-    const resolvedCustom = customCategories.map(c => ({
-      ...c,
-      isCustom: true,
-      isBuiltIn: false,
-      order: c.order ?? 100
-    }));
-
-    return [...resolvedBuiltIns, ...resolvedCustom].sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
+    return mergeBuiltInAndCustomCategories(settings);
   },
 
   getHidden(settings: Record<string, unknown>): ResolvedObject[] {

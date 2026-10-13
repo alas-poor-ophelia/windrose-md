@@ -23,19 +23,26 @@ import { ConfirmModal } from '../../settings/modals/ConfirmModal';
 interface DataFileRecoveryPanelProps {
   /** Vault path of the unreadable data file. */
   dataPath: string;
+  /**
+   * 'schema': the map needs a newer or fixed plugin version. The file itself
+   * is fine, so no backup restore is offered (it would discard recent edits
+   * and not help). Default 'unreadable'.
+   */
+  kind?: 'unreadable' | 'schema';
   /** Reload the map data after a successful restore. Omitted → the user is told to reopen. */
   onRestored?: () => void;
 }
 
 type ProbeState = 'probing' | 'found' | 'none';
 
-const DataFileRecoveryPanel = ({ dataPath, onRestored }: DataFileRecoveryPanelProps): VNode => {
+const DataFileRecoveryPanel = ({ dataPath, kind = 'unreadable', onRestored }: DataFileRecoveryPanelProps): VNode => {
   const app = useApp();
   const [probe, setProbe] = useState<ProbeState>('probing');
   const [backup, setBackup] = useState<DataFileBackup | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    if (kind === 'schema') return undefined;
     let cancelled = false;
     void findBestBackup(app).then((found) => {
       if (cancelled) return;
@@ -43,7 +50,7 @@ const DataFileRecoveryPanel = ({ dataPath, onRestored }: DataFileRecoveryPanelPr
       setProbe(found != null ? 'found' : 'none');
     });
     return () => { cancelled = true; };
-  }, [app]);
+  }, [app, kind]);
 
   const handleRestore = useCallback(async (): Promise<void> => {
     if (backup == null || busy) return;
@@ -76,6 +83,15 @@ const DataFileRecoveryPanel = ({ dataPath, onRestored }: DataFileRecoveryPanelPr
       setBusy(false);
     }
   }, [app, backup, busy, dataPath, onRestored]);
+
+  if (kind === 'schema') {
+    return (
+      <div className="windrose-loading">
+        <p>This map needs a newer or fixed version of the plugin. To avoid changing it, editing is disabled.</p>
+        <p>The data file is not damaged. Update the plugin, then reload Obsidian.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="windrose-loading">

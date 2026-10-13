@@ -297,4 +297,4 @@ function getSelectionBounds(
   };
 }
 
-export { getSelectionBounds, getObjectBounds, calculateTextLabelBounds };
+export { getSelectionBounds, getObjectBounds };

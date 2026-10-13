@@ -1,4 +1,7 @@
-// DungeonMapTracker.tsx - Main component with undo/redo, objects, text labels, and color support
+// DungeonMapTracker.tsx - Root component of one mounted Windrose map (grid, hex, or world; code-block embed or full-pane view).
+// Owns: map data load/save (useMapData, useDataHandlers), per-layer undo/redo (useLayerHistory), sub-hex drill-down
+// (useSubHexNavigation), tool/color state, panel and dock layout (usePanelState, useUILayout, useFloatingPanels),
+// fog, alignment mode, keyboard shortcuts, the MCP bridge, and composes MapCanvas with its layers, toolbars, docks and modals.
 
 import type { VNode } from 'preact';
 import type {
@@ -132,7 +135,7 @@ let mapInstanceCounter = 0;
 const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', initialSubHexPath, mcpKey, fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange, onMapDeleted }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
   useThemeMode();
-  const { mapData: rootMapData, isLoading, loadFailure, reload: reloadMapData, saveStatus, updateMapData: rootUpdateMapData, forceSave, markDeleted, staleConflict, acknowledgeStaleConflict, settingsVersion, getCachedImage } = useMapData(mapId, mapName, mapType);
+  const { mapData: rootMapData, isLoading, loadFailure, mapDeleted: dataMapDeleted, reload: reloadMapData, saveStatus, updateMapData: rootUpdateMapData, forceSave, markDeleted, staleConflict, acknowledgeStaleConflict, settingsVersion, getCachedImage } = useMapData(mapId, mapName, mapType);
   const [mapDeleted, setMapDeleted] = useState(false);
 
   // Per-mount instance id for event scoping (see mapInstanceCounter above).
@@ -487,6 +490,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     ];
     if (!fullPane) {
       lines.push('The windrose-map code block in your note will remain — remove it manually.');
+    } else {
+      lines.push('Note blocks that show this map will remain and show it as deleted — remove them manually.');
     }
     const confirmed = await new ConfirmModal(app, {
       message: lines.join('\n'),
@@ -1133,15 +1138,21 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     setRailOpenId, getCachedImage,
   });
 
-  if (mapDeleted) {
-    return <div className="windrose-loading">Map deleted. You can remove this windrose-map code block.</div>;
+  // Deleted by this mount (mapDeleted) or by another mount this session
+  // (dataMapDeleted: tombstoned at load, or a save came back 'deleted').
+  if (mapDeleted || dataMapDeleted) {
+    return (
+      <div className="windrose-loading">
+        {fullPane ? 'Map deleted.' : 'Map deleted. You can remove this windrose-map code block.'}
+      </div>
+    );
   }
 
   // Unreadable data file: render a blocking panel INSTEAD of the canvas. No
   // canvas means no edits, which means nothing can overwrite the file while it
   // is in an unknown state. The panel also offers the backup restore.
   if (loadFailure) {
-    return <DataFileRecoveryPanel dataPath={loadFailure.dataPath} onRestored={reloadMapData} />;
+    return <DataFileRecoveryPanel dataPath={loadFailure.dataPath} kind={loadFailure.kind} onRestored={reloadMapData} />;
   }
 
   // A save carrying real edits was refused because another mount of this map
@@ -1307,6 +1318,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         <div
           className={`windrose-canvas-wrapper${fullPane ? ' windrose-full-pane-canvas' : ''}`}
           style={canvasHeight != null ? { height: `${canvasHeight}px` } : undefined}
+          tabIndex={-1}
           onMouseEnter={() => setIsFocused(true)}
           onMouseLeave={() => setIsFocused(false)}
         >

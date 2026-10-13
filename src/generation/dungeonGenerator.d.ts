@@ -112,10 +112,3 @@ export function generateDungeon(
   configOverrides?: Partial<DungeonPreset> & Record<string, unknown>
 ): DungeonResult;
 
-export const DUNGEON_PRESETS: Record<string, DungeonPreset>;
-export const DUNGEON_STYLES: Record<string, { name: string; overrides: Partial<DungeonPreset> }>;
-export const DEFAULT_FLOOR_COLOR: string;
-export const DEFAULT_WATER_COLOR: string;
-export const DEFAULT_WATER_OPACITY: number;
-export const DEFAULT_WALL_COLOR: string;
-export const DIAGONAL_SEGMENTS: Record<string, Record<string, boolean>>;

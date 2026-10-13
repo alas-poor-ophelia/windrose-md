@@ -31,7 +31,18 @@ type GridDensityPresets = Record<string, GridDensityPreset>;
 const imageCache = new Map<string, HTMLImageElement>();
 const loadingPromises = new Map<string, Promise<HTMLImageElement | null>>();
 const dimensionsCache = new Map<string, ImageDimensions>();
-const pinnedImages = new Set<string>();
+/**
+ * Pin refcounts (MEM-04). A pinned path is exempt from LRU eviction and from
+ * clearUnusedTileImages. Each pinImage must be balanced by an unpinImage; when
+ * the count drops to 0 the image is evicted after a short grace period (so an
+ * unmount/remount of the same map does not re-read the file from disk).
+ */
+const pinCounts = new Map<string, number>();
+const unpinEvictTimers = new Map<string, number>();
+const UNPIN_EVICT_GRACE_MS = 2000;
+
+/** Bumped by disposeImageCache so in-flight loads started before it are dropped. */
+let cacheGeneration = 0;
 
 /**
  * Downscaled render-source cache. Large tile source images (e.g. Dungeondraft
@@ -60,12 +71,37 @@ function setMaxCacheSize(size: number): void {
   MAX_CACHE_SIZE = size;
 }
 
+function isPinned(path: string): boolean {
+  return (pinCounts.get(path) ?? 0) > 0;
+}
+
 function pinImage(path: string): void {
-  pinnedImages.add(path);
+  pinCounts.set(path, (pinCounts.get(path) ?? 0) + 1);
+  const timer = unpinEvictTimers.get(path);
+  if (timer !== undefined) {
+    window.clearTimeout(timer);
+    unpinEvictTimers.delete(path);
+  }
 }
 
 function unpinImage(path: string): void {
-  pinnedImages.delete(path);
+  const count = pinCounts.get(path);
+  if (count === undefined) return;
+  if (count > 1) {
+    pinCounts.set(path, count - 1);
+    return;
+  }
+  pinCounts.delete(path);
+  if (unpinEvictTimers.has(path)) return;
+  unpinEvictTimers.set(path, window.setTimeout(() => {
+    unpinEvictTimers.delete(path);
+    if (!isPinned(path)) clearCachedImage(path);
+  }, UNPIN_EVICT_GRACE_MS));
+}
+
+/** Current pin refcount for a path (test/diagnostic hook). */
+function getPinCount(path: string): number {
+  return pinCounts.get(path) ?? 0;
 }
 
 /** Move key to end of Map (most recently used position) */
@@ -82,7 +118,7 @@ function evictIfNeeded(): void {
   while (imageCache.size > MAX_CACHE_SIZE) {
     let evicted = false;
     for (const key of imageCache.keys()) {
-      if (!pinnedImages.has(key)) {
+      if (!isPinned(key)) {
         clearCachedImage(key);
         evicted = true;
         break;
@@ -173,6 +209,7 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
   }
 
   // Start new load
+  const generation = cacheGeneration;
   const loadPromise = (async (): Promise<HTMLImageElement | null> => {
     try {
       // Get file from vault
@@ -215,6 +252,13 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
         };
         img.src = url;
       });
+
+      // The cache was disposed (plugin unload) while this load was in flight:
+      // do not repopulate it, and release the blob URL now.
+      if (generation !== cacheGeneration) {
+        URL.revokeObjectURL(url);
+        return null;
+      }
 
       // Cache the loaded image — keep the blob URL alive so the browser
       // can re-decode under memory pressure. clearCachedImage revokes it
@@ -316,6 +360,27 @@ function clearCachedImage(vaultPath: string): void {
 }
 
 /**
+ * Drop every cached image (MEM-05): revoke all blob URLs, clear every map and
+ * pin, cancel pending unpin evictions. Called from plugin unload so blob URLs
+ * do not outlive the plugin. Loads still in flight are discarded on completion.
+ */
+function disposeImageCache(): void {
+  cacheGeneration++;
+  for (const img of imageCache.values()) {
+    if (img.src && img.src.startsWith('blob:')) {
+      URL.revokeObjectURL(img.src);
+    }
+  }
+  imageCache.clear();
+  loadingPromises.clear();
+  dimensionsCache.clear();
+  pinCounts.clear();
+  for (const timer of unpinEvictTimers.values()) window.clearTimeout(timer);
+  unpinEvictTimers.clear();
+  imageCacheVersion++;
+}
+
+/**
  * Calculate grid dimensions from image size and desired columns
  * Supports both flat-top and pointy-top hex orientations.
  *
@@ -377,10 +442,10 @@ function calculateGridFromImage(
  */
 function clearUnusedTileImages(activePaths: Set<string>): void {
   for (const path of imageCache.keys()) {
-    if (!activePaths.has(path) && !pinnedImages.has(path)) {
+    if (!activePaths.has(path) && !isPinned(path)) {
       clearCachedImage(path);
     }
   }
 }
 
-export { buildImageIndex, getImageDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, preloadImage, getCachedImage, getRenderSource, getImageDimensions, getImageCacheVersion, clearCachedImage, clearUnusedTileImages, calculateGridFromImage, GRID_DENSITY_PRESETS, MAX_CACHE_SIZE, setMaxCacheSize, pinImage, unpinImage };
+export { buildImageIndex, getImageDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, preloadImage, getCachedImage, getRenderSource, getImageDimensions, getImageCacheVersion, clearCachedImage, clearUnusedTileImages, calculateGridFromImage, GRID_DENSITY_PRESETS, MAX_CACHE_SIZE, setMaxCacheSize, pinImage, unpinImage, getPinCount, disposeImageCache };

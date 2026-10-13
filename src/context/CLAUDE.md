@@ -1,187 +1,83 @@
-# React Contexts
+# Preact Contexts
 
 ## Purpose
 
-Provide shared state and operations to the component tree without prop drilling. Contexts are the backbone of the composition architecture.
+Share map state and operations down the component tree without prop drilling. All contexts use `createContext` from `'preact'` and `useContext` from `'preact/hooks'`. Value types live in `types/contexts/context.types.ts`.
 
 ## Available Contexts
 
-| Context | Purpose | Key Values |
-|---------|---------|------------|
-| `MapContext` | Core map state | `canvasRef`, `geometry`, `mapData`, coordinate utils |
-| `MapSettingsContext` | Settings and preferences | Split into 4 selector sub-contexts for performance |
-| `MapSelectionContext` | Selection state | `selectedObjects`, `multiSelectRect`, selection ops |
-| `EventHandlerContext` | Centralized events | `registerHandler`, event dispatch |
-| `ObjectLinkingContext` | Object-to-note linking | `linkingSource`, linking mode state |
+| File | Provider(s) | Access hook(s) | Notes |
+|------|-------------|----------------|-------|
+| `AppContext.tsx` | `AppContext.Provider` (`main.ts` code-block mount, `views/WindroseMapView.ts`) | `useApp()` | Obsidian `App` instance |
+| `MapContext.tsx` | `MapStateProvider`, `MapOperationsProvider` | `useMapState()`, `useMapOperations()` | State vs stable operations split; state holds `canvasRef`, `geometry`, `mapData`, `viewController`, coordinate converters (`screenToGrid`, `screenToWorld`), `currentTool`, sub-hex callbacks |
+| `MapSelectionContext.tsx` | `MapSelectionProvider` | `useMapSelection()`, `useHoverState()` | Selected item/objects, drag state, multi-select, `layerVisibility` (prop); `useHoverState()` reads a separate hover sub-context (`hoveredObject`, `mousePosition`) so pointer moves re-render only `ObjectHoverTooltip` |
+| `ObjectLinkingContext.tsx` | `ObjectLinkingProvider` | `useLinkingMode()` | Note-linking mode state |
+| `EventHandlerContext.tsx` | `EventHandlerProvider` | `useEventHandlerRegistration()`, `useRegisteredHandlers()` | Registry of per-layer pointer handlers (see below) |
+| `MapSettingsContext.tsx` | `MapSettingsProvider` | `useModalShell()`, `useAppearance()`, `useBackgroundImage()`, `useHexGrid()` | Four selector sub-contexts. **Exists only inside the per-map settings modal** (mounted by `components/settings/MapSettingsModal.tsx`); map layers do NOT read it |
 
 ## Context Pattern
 
-Each context follows the same structure:
-
-```javascript
+```typescript
 // SomeContext.tsx
-const SomeStateContext = dc.createContext(null);
-const SomeOperationsContext = dc.createContext(null);
+import { createContext } from 'preact';
+import { useContext } from 'preact/hooks';
+import type { ComponentChildren, FunctionComponent } from 'preact';
 
-// Access hook with error boundary
-function useSomeState() {
-  const context = dc.useContext(SomeStateContext);
-  if (!context) {
-    throw new Error('useSomeState must be used within SomeStateProvider');
-  }
-  return context;
+const SomeContext = createContext<SomeContextValue | null>(null);
+
+function useSome(): SomeContextValue {
+  const ctx = useContext(SomeContext);
+  if (!ctx) throw new Error('useSome must be used within SomeProvider');
+  return ctx;
 }
 
-function useSomeOperations() {
-  const context = dc.useContext(SomeOperationsContext);
-  if (!context) {
-    throw new Error('useSomeOperations must be used within SomeOperationsProvider');
-  }
-  return context;
-}
+const SomeProvider: FunctionComponent<{ value: SomeContextValue; children: ComponentChildren }> =
+  ({ value, children }) => <SomeContext.Provider value={value}>{children}</SomeContext.Provider>;
 
-// Provider components
-const SomeStateProvider = ({ value, children }) => (
-  <SomeStateContext.Provider value={value}>
-    {children}
-  </SomeStateContext.Provider>
-);
-
-const SomeOperationsProvider = ({ value, children }) => (
-  <SomeOperationsContext.Provider value={value}>
-    {children}
-  </SomeOperationsContext.Provider>
-);
-
-return { 
-  SomeStateProvider, 
-  SomeOperationsProvider,
-  useSomeState, 
-  useSomeOperations 
-};
+export { SomeProvider, useSome };
 ```
 
-## State vs Operations Split
+Named exports at the bottom of the file. Memoize the `value` passed to a provider.
 
-Contexts are split into State and Operations to optimize re-renders:
+## State vs Operations Split (MapContext)
 
-- **State Context**: Read-only values that change (triggers re-render)
-- **Operations Context**: Stable function references (rarely changes)
-
-```javascript
-// Components that only call operations don't re-render on state changes
-function ActionButton() {
-  const { doSomething } = useSomeOperations();  // Stable reference
-  return <button onClick={doSomething}>Do It</button>;
-}
-
-// Components that read state re-render when state changes
-function Display() {
-  const { currentValue } = useSomeState();  // Re-renders on change
-  return <div>{currentValue}</div>;
-}
-```
+- **State context** changes with the map (consumers re-render).
+- **Operations context** holds stable function references (consumers that only call operations do not re-render on state change).
 
 ## Provider Composition
 
-Providers are composed in MapCanvas:
+`components/mapcanvas/MapCanvas.tsx` nests:
 
-```javascript
-function MapCanvas() {
-  // Compute state values...
-  
-  return (
-    <MapStateProvider value={mapState}>
-      <MapOperationsProvider value={mapOperations}>
-        <MapSettingsProvider value={settingsValue}>
-          <MapSelectionProvider value={selectionValue}>
-            <EventHandlerProvider value={eventValue}>
-              {/* Layer components */}
-            </EventHandlerProvider>
-          </MapSelectionProvider>
-        </MapSettingsProvider>
-      </MapOperationsProvider>
-    </MapStateProvider>
-  );
-}
+```
+MapSelectionProvider            (takes layerVisibility)
+└ ObjectLinkingProvider
+  └ MapCanvasContent
+    └ EventHandlerProvider
+      └ MapStateProvider
+        └ MapOperationsProvider
+          └ Coordinators + canvas + {children} (layers passed in by DungeonMapTracker)
 ```
 
-## MapContext Details
+`AppContext` is provided above this (plugin mount / view). `MapSettingsProvider` is separate: only `MapSettingsModal` mounts it.
 
-```javascript
-// State
-const mapState = {
-  canvasRef,           // Ref to main canvas element
-  geometry,            // GridGeometry or HexGeometry instance
-  mapData,             // Current map data object
-  dimensions,          // Canvas dimensions
-  transform,           // Pan/zoom transform
-};
+## EventHandlerContext
 
-// Operations  
-const mapOperations = {
-  getObjectAtPosition,
-  addObject,
-  removeObject,
-  updateObject,
-  getCellAtPosition,
-  // ...
-};
-```
+Layers register pointer handlers; `useEventCoordinator` (hooks/canvas) reads them and routes canvas pointer events by current tool.
 
-## MapSettingsContext Details
-
-```javascript
-// Uses reducer pattern
-const { settings, dispatch } = useMapSettings();
-
-// Dispatch actions
-dispatch({ type: 'UPDATE_SETTING', payload: { key: 'showGrid', value: false } });
-dispatch({ type: 'SET_CURRENT_LAYER', payload: 'layer-2' });
-```
-
-## MapSelectionContext Details
-
-```javascript
-const { 
-  selectedObjects,      // Set of selected object IDs
-  multiSelectRect,      // Current selection rectangle
-  selectObject,         // Add to selection
-  deselectObject,       // Remove from selection
-  clearSelection,       // Clear all
-  toggleSelection,      // Toggle single object
-} = useMapSelection();
-```
-
-## EventHandlerContext Details
-
-Coordinates event handling across layers:
-
-```javascript
-const { registerHandler, unregisterHandler } = useEventHandler();
-
-// Register with priority
-registerHandler('myTool', {
-  onPointerDown: (e, coords) => { /* ... */ },
-  onPointerMove: (e, coords) => { /* ... */ },
-  onPointerUp: (e, coords) => { /* ... */ },
-  priority: 10  // Higher = handled first
-});
-```
+- Registry type: `HandlersRegistry` (`Partial<Record<HandlerLayerName, LayerHandlers>>`); layer names and handler shapes are in `types/hooks/eventCoordinator.types.ts`.
+- Value: `registerHandlers(name, handlers)`, `unregisterHandlers(name)`, `getHandlers(name)`, `getAllHandlers()`. Handlers live in a ref, so registering does not re-render.
+- Layers should not call `registerHandlers` directly. Use `useLayerHandlers(name, handlers, { enabled })` (`hooks/canvas/useLayerHandlers.ts`): it registers a stable Proxy over a ref that is refreshed each render, so the coordinator always calls the latest closures without re-registering mid-gesture.
+- There is no priority system; ordering/routing is in `useEventCoordinator`.
 
 ## Adding a New Context
 
-1. Create `NewContext.tsx` following the pattern above
-2. Define State and Operations interfaces (types)
-3. Create Provider components
-4. Create access hooks with error boundaries
-5. Add to provider composition in MapCanvas
-6. Export via `return { ... }`
+1. Create `NewContext.tsx` following the pattern above; define the value type in `types/contexts/`.
+2. Add the provider to the right place in `MapCanvas.tsx` (or the modal that owns it).
+3. Export provider and hook(s) by name.
 
 ## Common Gotchas
 
-- **Context value stability** - Memoize context values to prevent re-renders
-- **Missing provider** - Hooks throw if used outside provider
-- **Circular dependencies** - Contexts shouldn't depend on each other
-- **Datacore hooks** - Use `dc.createContext`, `dc.useContext`
-- **Don't overload** - Keep contexts focused, create new ones if needed
+- **Value stability**: memoize provider values; unstable objects re-render every consumer.
+- **Missing provider**: access hooks throw outside their provider. `MapSettings` hooks throw anywhere except the settings modal.
+- **Don't overload**: keep contexts focused; split state from operations when consumers differ.
+- **Contexts shouldn't depend on each other.**

@@ -763,20 +763,6 @@ class HexGeometry extends BaseGeometry {
   }
   
   /**
-   * Alias for getHexDistance - API consistency with GridGeometry
-   */
-  getEuclideanDistance(x1: number, y1: number, x2: number, y2: number): number {
-    return this.getHexDistance(x1, y1, x2, y2);
-  }
-  
-  /**
-   * Manhattan distance - same as hex distance for hexes
-   */
-  getManhattanDistance(x1: number, y1: number, x2: number, y2: number): number {
-    return this.getHexDistance(x1, y1, x2, y2);
-  }
-  
-  /**
    * Game distance - hex grids have no diagonal rules
    */
   getCellDistance(

@@ -23,8 +23,8 @@ import type { TileAssignment } from '#types/tiles/tile.types';
 import type { WallPath } from '#types/core/wallpath.types';
 import type { TerrainStroke } from '#types/core/terrainstroke.types';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { useCanvasRenderer, renderCanvas } from '../../hooks/canvas/useCanvasRenderer';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useCanvasRenderer } from '../../hooks/canvas/useCanvasRenderer';
 import { useCanvasInteraction } from '../../hooks/canvas/useCanvasInteraction';
 import { useViewController } from '../../hooks/canvas/useViewController';
 import type { ViewController } from '#types/hooks/viewController.types';
@@ -57,6 +57,7 @@ import { ShapeOverlayLayer } from './ShapeOverlayLayer';
 import { TilePlacementLayer } from './TilePlacementLayer';
 import { TerrainBrushLayer } from './TerrainBrushLayer';
 import { WallLayer } from './WallLayer';
+import { focusMapOnPointerDown, shouldHandleMapKey } from '../../utils/keyboardTargets';
 import { RerollDungeonButton } from './RerollDungeonButton';
 import { getSetting } from '../../core/settingsAccessor';
 import { usePanZoomCoordinator } from '../../hooks/canvas/usePanZoomCoordinator';
@@ -296,21 +297,27 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     if (!container) return;
 
     // Wait one more frame to ensure CSS transition is fully complete
-    window.requestAnimationFrame(() => {
+    const rafId = window.requestAnimationFrame(() => {
       const rect = container.getBoundingClientRect();
       setCanvasDimensions({
         width: Math.max(rect.width, DEFAULTS.canvasSize.width),
         height: Math.max(rect.height, DEFAULTS.canvasSize.height)
       });
     });
+    return () => window.cancelAnimationFrame(rafId);
   }, [isAnimating]);
 
   // Render canvas whenever relevant state changes
-  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, draggingWallId, subHexPath: subHexPath ?? null }, viewController);
+  const { scheduleRender } = useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, draggingWallId, subHexPath: subHexPath ?? null }, viewController);
 
-  // Trigger redraw when canvas dimensions change (from expand/collapse)
-  useEffect(() => {
-    if (!canvasRef.current || !mapData || !geometry) return;
+  // Canvas sizing on dimension change (expand/collapse). This effect only
+  // resizes; every repaint goes through the coordinated renderer's
+  // scheduleRender so the frame carries multi-select, live view and dragged-wall
+  // state (REACT-05). Visibility/coordinate/adjacency changes are already
+  // inputs of useCanvasRenderer and are not repeated here. Layout effect: the
+  // queued frame lands before the browser paints the cleared canvas.
+  useLayoutEffect(() => {
+    if (!canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const fogCanvas = fogCanvasRef.current;
@@ -343,9 +350,25 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
       }
     } else {
       // After animation, do a proper redraw with correct dimensions
-      renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem ?? undefined, { isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, subHexPath: subHexPath ?? null });
+      scheduleRender();
     }
-  }, [canvasDimensions.width, canvasDimensions.height, isAnimating, showCoordinates, layerVisibility, adjacentSubHexes, adjacentEmptySlots]);
+  }, [canvasDimensions.width, canvasDimensions.height, isAnimating, scheduleRender]);
+
+  // Keyboard focus: a press on the map moves focus to the (tabIndex -1) map
+  // wrapper, so the next Delete/R/Escape targets the map. Without it, focus
+  // stays on the note editor in Live Preview (the canvas handlers
+  // preventDefault mousedown/touchstart) and the typing guard drops the key.
+  // Capture phase: runs before any layer's own pointer handling. Presses on
+  // inputs, buttons and other self-focusing controls keep their own focus.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return undefined;
+    const handlePointerDown = (e: PointerEvent): void => {
+      focusMapOnPointerDown(e.target, container);
+    };
+    container.addEventListener('pointerdown', handlePointerDown, true);
+    return () => container.removeEventListener('pointerdown', handlePointerDown, true);
+  }, []);
 
   // 'C' key handler for coordinate overlay (hex maps only)
   useEffect(() => {
@@ -361,9 +384,8 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     }
 
     const handleKeyDown = (e: KeyboardEvent): void => {
-      const target = e.target as HTMLElement;
       if (e.key.toLowerCase() === 'c' && !e.shiftKey && !e.ctrlKey && !e.metaKey &&
-          target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          shouldHandleMapKey(e, canvasRef.current)) {
         if (e.repeat && keyMode === 'toggle') return;
 
         e.preventDefault();

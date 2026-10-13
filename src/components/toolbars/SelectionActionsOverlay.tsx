@@ -1,8 +1,8 @@
 /**
  * SelectionActionsOverlay.tsx
  *
- * Unified selection toolbar replacing ObjectSelectionToolbar, TextSelectionToolbar,
- * and MultiSelectToolbar. Renders a bronze-themed card anchored to the selected item(s)
+ * Unified selection toolbar (replaced the old object, text and multi-select toolbars)
+ * Renders a bronze-themed card anchored to the selected item(s)
  * with labeled actions in a 2-column grid.
  */
 
@@ -21,6 +21,7 @@ import { openNoteInNewTab } from '../../persistence/noteOperations';
 import { ColorPicker } from '../shared/ColorPicker';
 import { CornerBrackets } from '../shared/CornerBrackets';
 import { getActiveLayer } from '../../persistence/layerAccessor';
+import { getObjectAtPosition } from '../../objects/objectOperations';
 import { getSelectionBounds } from '../../objects/selectionBounds';
 import { Menu } from 'obsidian';
 import { SelectionCardFiligree } from './SelectionCardFiligree';
@@ -123,7 +124,7 @@ const SelectionActionsOverlay = ({
 }: SelectionActionsOverlayProps): VNode | null => {
   // Per-mount instance id: this overlay always renders inside the MapCanvas
   // provider tree, and must only claim context-menu events from its own mount.
-  const { instanceId, viewController } = useMapState();
+  const { instanceId, viewController, screenToGrid } = useMapState();
 
   // Hide (via CSS, in the JSX below) mid pan/zoom gesture; reanchor on
   // commit. The card's bounds are computed from committed viewState and
@@ -147,6 +148,16 @@ const SelectionActionsOverlay = ({
       // Foreign mount's event: don't act on it — and don't claim it either.
       if (isForeignInstanceEvent(detail, instanceId)) return;
       if (detail.handled === true) return;
+      // Claimant rule (mirrored in ObjectLayer): a right-click that lands on
+      // an object NOT in this selection belongs to ObjectLayer, which selects
+      // that object and shows its menu. Everything else while this overlay is
+      // mounted (on the selection, or on empty map) is ours. Disjoint
+      // predicates, so listener registration order cannot pick the winner.
+      const coords = screenToGrid(detail.clientX, detail.clientY);
+      if (coords != null) {
+        const hit = getObjectAtPosition(getActiveLayer(mapData).objects ?? [], coords.x, coords.y);
+        if (hit != null && !selectedItems.some(s => s.id === hit.id)) return;
+      }
       detail.handled = true;
       const { screenX, screenY } = detail;
 
@@ -173,7 +184,7 @@ const SelectionActionsOverlay = ({
 
     activeDocument.addEventListener('windrose:selection-context-menu', handler);
     return () => activeDocument.removeEventListener('windrose:selection-context-menu', handler);
-  }, [actions, instanceId]);
+  }, [actions, instanceId, screenToGrid, mapData, selectedItems]);
 
   const hasRequiredRefs = selectedItems.length > 0 && canvasRef.current != null && containerRef.current != null;
 

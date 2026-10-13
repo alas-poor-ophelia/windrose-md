@@ -9,6 +9,7 @@ import {
   pruneJournal,
   compareJournalToDisk,
   resolveJournalOnLoad,
+  readKeptEntries,
   JOURNAL_INDEX_KEY,
   JOURNAL_KEY_PREFIX,
   MAX_JOURNAL_PAYLOAD,
@@ -228,5 +229,48 @@ describe('resolveJournalOnLoad (non-prompting paths)', () => {
 
     expect(restored).toBeNull();
     expect(readJournal(h.app, 'r-2')).toBeNull();
+  });
+});
+
+describe('resolveJournalOnLoad restore runs the load migration (DATA-20)', () => {
+  function writeRawEntry(h: Harness, mapId: string, payload: unknown): void {
+    h.store.set(JOURNAL_KEY_PREFIX + mapId, JSON.stringify({ v: 1, mapId, savedAt: Date.now(), payload: JSON.stringify(payload) }));
+  }
+
+  it('upgrades legacy shapes in the restored tree, sub-hex maps included', async () => {
+    const h = makeApp(JSON.stringify({ maps: {} }));
+    const legacy = createNewMap('Legacy', 'hex') as unknown as Record<string, unknown>;
+    const layers = legacy.layers as Array<Record<string, unknown>>;
+    layers[0].tiles = [{ q: 1, r: 2, tilesetId: 'ts', tileId: 'a.png' }];
+    delete legacy.boards;
+    const sub = createNewMap('Sub', 'hex') as unknown as Record<string, unknown>;
+    (sub.layers as Array<Record<string, unknown>>)[0].tiles = [{ q: 3, r: 4, tilesetId: 'ts', tileId: 'b.png' }];
+    legacy.subHexMaps = { '0,0': { mapData: sub } };
+    writeRawEntry(h, 'mig-1', legacy);
+
+    const restored = await resolveJournalOnLoad(h.app, 'mig-1', '', async () => 'restore');
+
+    expect(restored).not.toBeNull();
+    const tile = restored!.layers[0].tiles![0] as unknown as Record<string, unknown>;
+    expect(tile.col).toBe(1);
+    expect(tile.row).toBe(2);
+    expect('q' in tile).toBe(false);
+    expect(Array.isArray(restored!.boards)).toBe(true);
+    const subTile = restored!.subHexMaps!['0,0'].mapData!.layers[0].tiles![0] as unknown as Record<string, unknown>;
+    expect(subTile.col).toBe(3);
+    // Still journalled until the landing save clears it.
+    expect(readJournal(h.app, 'mig-1')).not.toBeNull();
+  });
+
+  it('keeps (does not discard) a payload that parses but cannot be migrated', async () => {
+    const h = makeApp(JSON.stringify({ maps: {} }));
+    // layers present but not an array of objects: the layer sanitizer throws.
+    writeRawEntry(h, 'mig-2', { name: 'Broken', mapType: 'grid', layers: [null] });
+
+    const restored = await resolveJournalOnLoad(h.app, 'mig-2', '', async () => 'restore');
+
+    expect(restored).toBeNull();
+    // Not discarded: set aside as a kept entry, offered again next load.
+    expect(readKeptEntries(h.app, 'mig-2')).toHaveLength(1);
   });
 });

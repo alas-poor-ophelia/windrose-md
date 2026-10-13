@@ -26,6 +26,7 @@ import { useMapState } from '../../context/MapContext';
 import { useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { getActiveLayer } from '../../persistence/layerAccessor';
+import { isTypingTarget } from '../../utils/keyboardTargets';
 
 
 const useObjectInteractions = (
@@ -35,7 +36,7 @@ const useObjectInteractions = (
 ): UseObjectInteractionsResult => {
   const { mapData } = useMapState();
   const { updateObject, removeObject, onObjectsChange } = useMapOperations();
-  const { selectedItem, setSelectedItem, hoveredObject, setHoveredObject, mousePosition, isResizeMode, setIsResizeMode } = useMapSelection();
+  const { selectedItem, setSelectedItem, setHoveredObject, isResizeMode, setIsResizeMode } = useMapSelection();
 
   // Sub-hooks
   const {
@@ -70,6 +71,9 @@ const useObjectInteractions = (
 
   // Keyboard shortcuts for selected objects
   const handleObjectKeyDown = useCallback((e: KeyboardEvent): boolean => {
+    // Defense in depth: the coordinator already filters typing targets, but
+    // R/Backspace must never be swallowed from the note editor.
+    if (isTypingTarget(e.target)) return false;
     if (selectedItem?.type !== 'object') {
       return false;
     }
@@ -122,9 +126,7 @@ const useObjectInteractions = (
     setIsResizeMode,
     isResizing,
     resizeCorner,
-    hoveredObject,
     setHoveredObject,
-    mousePosition,
     objectColorBtnRef,
     pendingObjectCustomColorRef,
     edgeSnapMode,

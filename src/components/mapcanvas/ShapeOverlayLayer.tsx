@@ -25,6 +25,7 @@ import { ShapePreviewOverlay } from './ShapePreviewOverlay';
 import { Icon } from '../shared/Icon';
 import { Z_INDEX } from '../../core/dmtConstants';
 import { tooltipRef } from '../shared/obsidianTooltip';
+import { shouldHandleMapKey } from '../../utils/keyboardTargets';
 
 
 export interface ShapeOverlayLayerProps {
@@ -82,6 +83,8 @@ const ShapeOverlayLayer = ({
   useEffect(() => {
     if (!isShapeTool) return undefined;
     const handler = (e: KeyboardEvent): void => {
+      // Escape in the note editor (or another map) is not ours to swallow.
+      if (!shouldHandleMapKey(e, canvasRef.current)) return;
       if (e.key === 'Escape') {
         e.preventDefault();
         cancelPlacement();
@@ -89,7 +92,7 @@ const ShapeOverlayLayer = ({
     };
     activeDocument.addEventListener('keydown', handler);
     return () => activeDocument.removeEventListener('keydown', handler);
-  }, [isShapeTool, cancelPlacement]);
+  }, [isShapeTool, cancelPlacement, canvasRef]);
 
   const distanceSettings = useMemo(() => {
     if (!mapData) return null;

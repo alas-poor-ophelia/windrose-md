@@ -60,15 +60,6 @@ async function getNoteEntries(): Promise<NoteIndexEntry[]> {
 }
 
 /**
- * Get note suggestions for autocomplete.
- * Returns array of display names only.
- */
-async function getNoteDisplayNames(): Promise<string[]> {
-  const index = await buildNoteIndex(getApp());
-  return index.map(note => note.displayName);
-}
-
-/**
  * Get full note path from display name.
  */
 async function getFullPathFromDisplayName(displayName: string): Promise<string | null> {
@@ -124,36 +115,12 @@ async function openNoteInNewTab(notePath: string | null | undefined): Promise<bo
 // Validation
 // ===========================================
 
-/**
- * Validate that a note path exists in the vault.
- */
-async function isValidNotePath(notePath: string | null | undefined): Promise<boolean> {
-  if (notePath == null || notePath === '') return false;
-
-  try {
-    const app = getApp();
-    const file = app.vault.getAbstractFileByPath(notePath);
-    return file !== null && file !== undefined;
-  } catch (error) {
-    console.error('[isValidNotePath] Error validating path:', error);
-    return false;
-  }
-}
-
 // ===========================================
 // Formatting
 // ===========================================
-
-/**
- * Format a note path for display (remove .md, show just basename).
- */
-function formatNoteForDisplay(notePath: string | null | undefined): string {
-  if (notePath == null || notePath === '') return '';
-  return getDisplayNameFromPath(notePath);
-}
 
 // ===========================================
 // Exports
 // ===========================================
 
-export { buildNoteIndex, getNoteEntries, getNoteDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, openNoteInNewTab, isValidNotePath, formatNoteForDisplay };
+export { buildNoteIndex, getNoteEntries, getFullPathFromDisplayName, getDisplayNameFromPath, openNoteInNewTab, };

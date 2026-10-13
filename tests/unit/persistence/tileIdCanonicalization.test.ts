@@ -45,76 +45,76 @@ function mapWith(tilesets: TilesetDef[], layerData: Record<string, unknown>): Ma
 
 describe('canonicalizeTileIds', () => {
   it('rewrites legacy basename ids to folder-relative ids', () => {
-    const map = mapWith(
+    let map = mapWith(
       [tileset('ts1', ['terrain/Natural/Stone', 'props/Barrel'])],
       { tiles: [placement('ts1', 'Stone'), placement('ts1', 'Barrel')] }
     );
-    canonicalizeTileIds(map);
+    map = canonicalizeTileIds(map);
     expect(map.layers[0].tiles?.map(t => t.tileId))
       .toEqual(['terrain/Natural/Stone', 'props/Barrel']);
   });
 
   it('is idempotent: canonical ids stay unchanged', () => {
-    const map = mapWith(
+    let map = mapWith(
       [tileset('ts1', ['terrain/Natural/Stone'])],
       { tiles: [placement('ts1', 'terrain/Natural/Stone')] }
     );
-    canonicalizeTileIds(map);
-    canonicalizeTileIds(map);
+    map = canonicalizeTileIds(map);
+    map = canonicalizeTileIds(map);
     expect(map.layers[0].tiles?.[0].tileId).toBe('terrain/Natural/Stone');
   });
 
   it('no-ops against a stale registry still holding old-style ids', () => {
     // Before the rescan completes, the registry exact-matches every stored id —
     // nothing may rewrite (the 304-tile RCA guard).
-    const map = mapWith(
+    let map = mapWith(
       [tileset('ts1', ['Stone'])],
       { tiles: [placement('ts1', 'Stone')] }
     );
-    canonicalizeTileIds(map);
+    map = canonicalizeTileIds(map);
     expect(map.layers[0].tiles?.[0].tileId).toBe('Stone');
   });
 
   it('leaves unresolvable ids untouched', () => {
-    const map = mapWith(
+    let map = mapWith(
       [tileset('ts1', ['terrain/Natural/Stone'])],
       { tiles: [placement('ts1', 'Ghost'), placement('missing-ts', 'Stone')] }
     );
-    canonicalizeTileIds(map);
+    map = canonicalizeTileIds(map);
     expect(map.layers[0].tiles?.map(t => t.tileId)).toEqual(['Ghost', 'Stone']);
   });
 
   it('no-ops when the map has no tilesets', () => {
-    const map = mapWith([], { tiles: [placement('ts1', 'Stone')] });
+    let map = mapWith([], { tiles: [placement('ts1', 'Stone')] });
     map.tilesets = undefined as unknown as TilesetDef[];
-    canonicalizeTileIds(map);
+    map = canonicalizeTileIds(map);
     expect(map.layers[0].tiles?.[0].tileId).toBe('Stone');
   });
 
   it('upgrades terrainStrokes and wallPaths too', () => {
-    const map = mapWith(
+    let map = mapWith(
       [tileset('ts1', ['terrain/Natural/Stone', 'walls/Brick'])],
       {
         terrainStrokes: [{ id: 's1', points: [0, 0, 5, 5], radius: 10, tilesetId: 'ts1', tileId: 'Stone' }],
         wallPaths: [wallPath('ts1', 'Brick')],
       }
     );
-    canonicalizeTileIds(map);
+    map = canonicalizeTileIds(map);
     expect(map.layers[0].terrainStrokes?.[0].tileId).toBe('terrain/Natural/Stone');
     expect(map.layers[0].wallPaths?.[0].tileId).toBe('walls/Brick');
   });
 
   it('picks the first twin for ambiguous legacy ids (matches render behavior)', () => {
-    const map = mapWith(
+    let map = mapWith(
       [tileset('ts1', ['terrain/Natural/X', 'patterns/normal/Natural/X'])],
       { tiles: [placement('ts1', 'X')] }
     );
-    canonicalizeTileIds(map);
+    map = canonicalizeTileIds(map);
     expect(map.layers[0].tiles?.[0].tileId).toBe('terrain/Natural/X');
   });
 
   it('upgrades sub-hex map layers', () => {
-    const map = mapWith(
+    let map = mapWith(
       [tileset('ts1', ['terrain/Natural/Stone'])],
       {}
     );
@@ -122,7 +122,7 @@ describe('canonicalizeTileIds', () => {
     sub.tilesets = [];
     Object.assign(sub.layers[0], { tiles: [placement('ts1', 'Stone')] });
     map.subHexMaps = { '0,0': { mapData: sub } } as unknown as MapData['subHexMaps'];
-    canonicalizeTileIds(map);
+    map = canonicalizeTileIds(map);
     expect(map.subHexMaps?.['0,0']?.mapData?.layers[0].tiles?.[0].tileId)
       .toBe('terrain/Natural/Stone');
   });

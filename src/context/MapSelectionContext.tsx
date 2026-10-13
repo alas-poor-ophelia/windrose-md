@@ -18,19 +18,51 @@ import type {
   MousePosition,
   HoveredObject,
   ItemUpdate,
-  MapSelectionContextValue
+  MapSelectionContextValue,
+  MapHoverContextValue
 } from '#types/contexts/context.types';
 import type { GroupDragInitialState } from '#types/hooks/groupDrag.types';
 
 import type { ComponentChildren, FunctionComponent } from 'preact';
 import { createContext } from 'preact';
-import { useCallback, useContext, useRef, useState } from 'preact/hooks';
+import { useCallback, useContext, useMemo, useRef, useState } from 'preact/hooks';
 
 // ===========================================
 // Context
 // ===========================================
 
 const MapSelectionContext = createContext<MapSelectionContextValue | null>(null);
+
+/**
+ * Hover state (hovered object + cursor position) lives in its own context.
+ * It changes on every mousemove over an object; keeping it out of the main
+ * selection value means the ~22 useMapSelection() consumers (layers,
+ * coordinators) do not re-render per mousemove (REACT-01). The setters stay
+ * on the selection value because they are identity-stable.
+ */
+const MapHoverContext = createContext<MapHoverContextValue | null>(null);
+
+/**
+ * Hook to read the hover state (hovered object + cursor position).
+ * Only components that actually render hover UI should subscribe.
+ * @throws If used outside MapSelectionProvider
+ */
+function useHoverState(): MapHoverContextValue {
+  const context = useContext(MapHoverContext);
+  if (!context) {
+    throw new Error('useHoverState must be used within MapSelectionProvider');
+  }
+  return context;
+}
+
+const DEFAULT_LAYER_VISIBILITY: LayerVisibility = {
+  grid: true,
+  objects: true,
+  textLabels: true,
+  hexCoordinates: true,
+  regions: true,
+  outlines: true
+};
 
 /**
  * Hook to access shared selection state
@@ -210,21 +242,19 @@ const MapSelectionProvider: FunctionComponent<MapSelectionProviderProps> = ({ ch
   // LAYER VISIBILITY
   // ============================================================================
 
-  const effectiveLayerVisibility: LayerVisibility = {
-    grid: true,
-    objects: true,
-    textLabels: true,
-    hexCoordinates: true,
-    regions: true,
-    outlines: true,
-    ...layerVisibility
-  };
+  // Memoized on the prop identity so the merged object (and everything keyed
+  // on it downstream: canvas renders, pointer handlers) only changes when the
+  // caller's visibility actually changes.
+  const effectiveLayerVisibility: LayerVisibility = useMemo(
+    () => ({ ...DEFAULT_LAYER_VISIBILITY, ...layerVisibility }),
+    [layerVisibility]
+  );
 
   // ============================================================================
   // CONTEXT VALUE
   // ============================================================================
 
-  const value: MapSelectionContextValue = {
+  const value: MapSelectionContextValue = useMemo(() => ({
     // Multi-select state
     selectedItems,
     setSelectedItems,
@@ -261,10 +291,8 @@ const MapSelectionProvider: FunctionComponent<MapSelectionProviderProps> = ({ ch
     groupDragInitialStateRef,
     isGroupDragging,
 
-    // Hover state
-    hoveredObject,
+    // Hover setters (stable); the values live in MapHoverContext
     setHoveredObject,
-    mousePosition,
     setMousePosition,
 
     // Note pin modal state
@@ -281,13 +309,27 @@ const MapSelectionProvider: FunctionComponent<MapSelectionProviderProps> = ({ ch
 
     // Layer visibility
     layerVisibility: effectiveLayerVisibility
-  };
+  }), [
+    selectedItems, hasMultiSelection, selectionCount,
+    selectItem, selectMultiple, addToSelection, removeFromSelection, clearSelection, isSelected, updateSelectedItemsData,
+    areaSelectStart, selectedItem, setSelectedItem,
+    isDraggingSelection, dragStart, isResizeMode, isGroupDragging,
+    showNoteLinkModal, pendingNotePinId, editingNoteObjectId,
+    showCoordinates, effectiveLayerVisibility
+  ]);
+
+  const hoverValue: MapHoverContextValue = useMemo(
+    () => ({ hoveredObject, mousePosition }),
+    [hoveredObject, mousePosition]
+  );
 
   return (
     <MapSelectionContext.Provider value={value}>
-      {children}
+      <MapHoverContext.Provider value={hoverValue}>
+        {children}
+      </MapHoverContext.Provider>
     </MapSelectionContext.Provider>
   );
 };
 
-export { MapSelectionProvider, useMapSelection };
+export { MapSelectionProvider, useMapSelection, useHoverState };

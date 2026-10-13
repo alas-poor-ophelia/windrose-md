@@ -18,7 +18,7 @@ import type { HexBounds } from '#types/core/map.types';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { getLayerById } from '../../persistence/layerAccessor';
 
-import { axialToOffset, offsetToAxial, isWithinOffsetBounds } from '../../geometry/core/offsetCoordinates';
+import { offsetToAxial, isAxialInHexBounds, isOffsetInHexBounds } from '../../geometry/core/offsetCoordinates';
 
 
 
@@ -108,25 +108,11 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
 
       if (deleteOrphanedContent) {
         const orientation = mapData.orientation ?? 'flat';
-        const isRadial = hexBounds.maxRing !== undefined;
-
-        const isInBounds = (q: number, r: number): boolean => {
-          if (isRadial) {
-            const ring = Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
-            return ring <= (hexBounds.maxRing ?? 0);
-          }
-          const { col, row } = axialToOffset(q, r, orientation);
-          return isWithinOffsetBounds(col, row, hexBounds);
-        };
-
-        const isFogCellInBounds = (col: number, row: number): boolean => {
-          if (isRadial) {
-            const { q, r } = offsetToAxial(col, row, orientation);
-            const ring = Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
-            return ring <= (hexBounds.maxRing ?? 0);
-          }
-          return isWithinOffsetBounds(col, row, hexBounds);
-        };
+        // Same predicate the settings modal uses to count orphans
+        const isInBounds = (q: number, r: number): boolean =>
+          isAxialInHexBounds(q, r, hexBounds, orientation);
+        const isFogCellInBounds = (col: number, row: number): boolean =>
+          isOffsetInHexBounds(col, row, hexBounds, orientation);
 
         if (newMapData.layers.length > 0) {
           newMapData.layers = newMapData.layers.map((layer: MapLayer) => {

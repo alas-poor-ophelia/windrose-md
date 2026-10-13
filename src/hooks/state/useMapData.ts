@@ -9,7 +9,7 @@ import type {
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
-import { loadMapDataWithGeneration, MapDataUnreadableError } from '../../persistence/fileOperations';
+import { loadMapDataWithGeneration, MapDataUnreadableError, MapDeletedError, MapSchemaError } from '../../persistence/fileOperations';
 import { getDataFilePath } from '../../core/settingsAccessor';
 import { resolveJournalOnLoad } from '../../persistence/saveJournal';
 import { getCachedImage } from '../../assets/imageOperations';
@@ -24,6 +24,8 @@ function useMapData(
   const [mapData, setMapData] = useState<MapData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailure, setLoadFailure] = useState<MapDataLoadFailure | null>(null);
+  // The load found the id tombstoned (see MapDeletedError).
+  const [loadDeleted, setLoadDeleted] = useState(false);
   const [settingsVersion, setSettingsVersion] = useState(0);
   // Bumped by reload() to re-run the load effect after the data file has been
   // repaired underneath us (backup restore). Nothing else touches it.
@@ -49,12 +51,21 @@ function useMapData(
         baseGenRef.current = loaded.generation;
       } catch (error) {
         if (cancelled) return;
+        if (error instanceof MapDeletedError) {
+          // Deleted this session (by any mount): never a blank editable map
+          // (DATA-02). The UI shows its "Map deleted" panel.
+          setLoadDeleted(true);
+          setIsLoading(false);
+          return;
+        }
         // Unreadable data file: do NOT fall back to a blank map. Surface the
         // failure so the UI can block editing before anything overwrites it.
         console.error('[Windrose] Map load failed:', error);
         setLoadFailure({
           dataPath: error instanceof MapDataUnreadableError ? error.dataPath : getDataFilePath(),
           message: error instanceof Error ? error.message : String(error),
+          // A schema refusal is a plugin-version problem, not a broken file.
+          kind: error instanceof MapSchemaError ? 'schema' : 'unreadable',
         });
         setIsLoading(false);
         return;
@@ -79,6 +90,7 @@ function useMapData(
    */
   const reload = useCallback((): void => {
     setLoadFailure(null);
+    setLoadDeleted(false);
     setIsLoading(true);
     setReloadNonce((prev: number) => prev + 1);
   }, []);
@@ -100,7 +112,7 @@ function useMapData(
   // with the active map and this hook's settingsVersion (windrose-1mc).
   useTilesetBuilder(app, mapData, setMapData, isLoading, settingsVersion);
 
-  const { saveStatus, updateMapData, forceSave, markDeleted, staleConflict, acknowledgeStaleConflict } =
+  const { saveStatus, updateMapData, forceSave, markDeleted, mapDeleted: saveDeleted, staleConflict, acknowledgeStaleConflict } =
     useDebouncedSave(app, mapId, setMapData, baseGenRef);
   updateMapDataRef.current = updateMapData;
 
@@ -108,6 +120,7 @@ function useMapData(
     mapData,
     isLoading,
     loadFailure,
+    mapDeleted: loadDeleted || saveDeleted,
     reload,
     saveStatus,
     updateMapData,

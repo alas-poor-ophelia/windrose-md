@@ -31,12 +31,6 @@ export interface ColorDefinition {
 /** Default cell color (tan/brown) */
 const DEFAULT_COLOR = '#c4a57b';
 
-/** 
- * Static fallback palette for backward compatibility.
- * Components should prefer getColorPalette() for dynamic colors.
- */
-const COLOR_PALETTE: ColorDefinition[] = BUILT_IN_COLORS;
-
 // ===========================================
 // Functions
 // ===========================================
@@ -118,7 +112,6 @@ function colorsMatch(a: string | null | undefined, b: string | null | undefined)
 
 export {
   DEFAULT_COLOR,
-  COLOR_PALETTE,
   getColorPalette,
   getCellColor,
   getColorByHex,

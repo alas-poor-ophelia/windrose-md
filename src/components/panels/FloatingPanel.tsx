@@ -209,26 +209,5 @@ function FloatingPanel({
   );
 }
 
-interface PopoutButtonProps {
-  onClick: (position: { x: number; y: number }) => void;
-  className?: string;
-}
-
-function PopoutButton({ onClick, className }: PopoutButtonProps): VNode {
-  return (
-    <button
-      className={`windrose-popout-btn ${className ?? ''}`}
-      onClick={(e) => {
-        e.stopPropagation();
-        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        onClick({ x: rect.left, y: rect.top });
-      }}
-      ref={tooltipRef('Pop out panel')}
-    >
-      <Icon icon="lucide-maximize-2" size={12} />
-    </button>
-  );
-}
-
-export { FloatingPanel, PopoutButton, clampPanelPosition };
-export type { FloatingPanelProps, PopoutButtonProps };
+export { FloatingPanel, clampPanelPosition };
+export type { FloatingPanelProps };

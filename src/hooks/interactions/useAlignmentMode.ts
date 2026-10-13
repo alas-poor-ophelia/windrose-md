@@ -5,7 +5,7 @@
  * tracking offsets, and coordinating with the settings modal.
  * Extracted from DungeonMapTracker.tsx.
  *
- * Note: useImageAlignment.ts handles the drag mechanics within alignment mode.
+ * Note: the background-image drag mechanics live in ImageAlignmentMode.tsx.
  * This hook handles the mode toggle and settings modal coordination.
  */
 

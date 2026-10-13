@@ -2,7 +2,7 @@ import { ItemView, Notice, type WorkspaceLeaf } from 'obsidian';
 import { h, render } from 'preact';
 import { AppContext } from '../context/AppContext';
 import { DungeonMapTracker } from '../DungeonMapTracker';
-import { listMaps } from '../persistence/fileOperations';
+import { listMapsResult } from '../persistence/fileOperations';
 import { flushAll } from '../persistence/saveCoordinator';
 import type { MapListEntry } from '../persistence/fileOperations';
 import type { MapType } from '#types/core/map.types';
@@ -141,10 +141,11 @@ class WindroseMapView extends ItemView {
   };
 
   private async renderPicker(): Promise<void> {
-    const maps = await listMaps(this.app);
+    const result = await listMapsResult(this.app);
     render(
       h(FullPaneMapPicker, {
-        maps,
+        maps: result.status === 'ok' ? result.maps : [],
+        unreadablePath: result.status === 'unreadable' ? result.dataPath : null,
         onSelect: (entry: MapListEntry) => this.selectMap(entry.id, entry.name, entry.type),
       }),
       this.contentEl
@@ -180,10 +181,25 @@ class WindroseMapView extends ItemView {
 
 interface PickerProps {
   maps: MapListEntry[];
+  /** Set when the data file exists but could not be read (DATA-20). */
+  unreadablePath: string | null;
   onSelect: (entry: MapListEntry) => void;
 }
 
-function FullPaneMapPicker({ maps, onSelect }: PickerProps): h.JSX.Element {
+function FullPaneMapPicker({ maps, unreadablePath, onSelect }: PickerProps): h.JSX.Element {
+  if (unreadablePath != null) {
+    // A corrupt store is not "no maps": say so, so nobody creates a fresh
+    // map on top of it. The in-map recovery panel offers the backup restore.
+    return h('div', { className: 'windrose-fullpane-picker' },
+      h('div', { className: 'windrose-fullpane-picker-title' }, 'Map data file could not be read'),
+      h('div', { className: 'windrose-fullpane-picker-hint' },
+        'Your maps are not shown because this file is unreadable: ',
+        h('code', null, unreadablePath),
+        '. Open any map block in a note to restore it from a backup.'
+      )
+    );
+  }
+
   if (maps.length === 0) {
     return h('div', { className: 'windrose-fullpane-picker' },
       h('div', { className: 'windrose-fullpane-picker-icon' }, '🧭'),

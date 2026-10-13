@@ -159,9 +159,10 @@ const RegionLayer = ({
   // hue/saturation square — hundreds per second on a high-poll mouse. Routing
   // each one straight to updateRegion() replaced the entire mapData object
   // (broadcast to every layer) AND pushed a full active-layer snapshot onto
-  // the undo stack per move, and addToHistory compares snapshots with a pair
-  // of JSON.stringify calls. One drag therefore cost hundreds of whole-map
-  // serialisations and buried the user's real undo history under itself.
+  // the undo stack per move (addToHistory's dedupe, now the reference-based
+  // isSameHistoryState, cannot collapse a changing colour). One drag therefore
+  // cost hundreds of whole-map rebroadcasts and buried the user's real undo
+  // history under itself.
   //
   // The drag now repaints the overlay from a preview colour held in a REF,
   // coalesced to one repaint per animation frame (the useLiveOverlayRedraw
@@ -268,11 +269,17 @@ const RegionLayer = ({
     const mainCanvas = canvasRef.current;
     if (!overlay || !mainCanvas || !geometry || geometry.type !== 'hex' || !mapData) return;
 
-    overlay.width = mainCanvas.width;
-    overlay.height = mainCanvas.height;
+    // Only resize when the size changed: assigning width/height resets the
+    // context and can reallocate the backing store on every live frame (MEM-18).
+    if (overlay.width !== mainCanvas.width) overlay.width = mainCanvas.width;
+    if (overlay.height !== mainCanvas.height) overlay.height = mainCanvas.height;
 
     const ctx = overlay.getContext('2d');
     if (!ctx) return;
+    // The size assignment no longer resets context state, so do it explicitly.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.setLineDash([]);
     ctx.clearRect(0, 0, overlay.width, overlay.height);
 
     const hexesToHighlight = editingRegion ? editingRegion.hexes : pendingHexes;

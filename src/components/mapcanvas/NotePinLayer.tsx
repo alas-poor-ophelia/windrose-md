@@ -21,6 +21,7 @@ import { useMapSelection } from '../../context/MapSelectionContext';
 import { openNativeNoteLinkModal } from '../modals/NoteLinkModal';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useApp } from '../../context/AppContext';
+import { getActiveLayer } from '../../persistence/layerAccessor';
 
 
 
@@ -63,7 +64,8 @@ const NotePinLayer = ({
   useEffect(() => {
     if (!showNoteLinkModal || pendingNotePinId == null || pendingNotePinId === '' || !mapData) return;
 
-    const currentNotePath = mapData.objects?.find(
+    // Objects live on the active layer; the root mapData.objects is legacy.
+    const currentNotePath = getActiveLayer(mapData).objects?.find(
       (obj: { id: string }) => obj.id === pendingNotePinId
     )?.linkedNote ?? null;
 

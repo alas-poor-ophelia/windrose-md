@@ -69,11 +69,9 @@ function createMockState(overrides: Partial<SettingsModalState> = {}): SettingsM
     measurementSize: 86,
     fineTuneOffset: 0,
     activeColorPicker: null,
-    isLoading: false,
     showResizeConfirm: false,
     pendingBoundsChange: null,
     orphanInfo: { cells: 0, objects: 0 },
-    deleteOrphanedContent: false,
     boundsShape: 'rectangular',
     objectSetId: null,
     ...overrides,
@@ -290,5 +288,64 @@ describe("deriveBoundsFromRing", () => {
     });
 
     expect(newState.hexBounds).toEqual(deriveBoundsFromRing(9));
+  });
+});
+
+describe("boundsShape stays consistent with hexBounds.maxRing", () => {
+  const imagePayload = {
+    path: 'images/hex-map.png',
+    displayName: 'hex-map.png',
+    dimensions: { width: 1920, height: 1080 },
+    bounds: { maxCol: 30, maxRow: 25 },
+  };
+
+  it("IMAGE_SELECTED keeps maxRing while the shape is radial", () => {
+    const state = createMockState({ boundsShape: 'radial', hexBounds: deriveBoundsFromRing(5) });
+    const newState = settingsReducer(state, { type: Actions.IMAGE_SELECTED, payload: imagePayload });
+
+    expect(newState.boundsShape).toBe('radial');
+    expect(newState.hexBounds.maxRing).toBe(5);
+  });
+
+  it("IMAGE_SELECTED leaves rectangular bounds rectangular", () => {
+    const state = createMockState({ boundsShape: 'rectangular', hexBounds: { maxCol: 10, maxRow: 10 } });
+    const newState = settingsReducer(state, { type: Actions.IMAGE_SELECTED, payload: imagePayload });
+
+    expect(newState.hexBounds).toEqual({ maxCol: 30, maxRow: 25 });
+    expect(newState.hexBounds.maxRing).toBeUndefined();
+  });
+
+  it("a bounds recalculation (SET_DENSITY on a locked image) keeps maxRing while radial", () => {
+    const state = createMockState({
+      boundsShape: 'radial',
+      hexBounds: deriveBoundsFromRing(4),
+      imageDimensions: { width: 1920, height: 1080 },
+      boundsLocked: true,
+    });
+    const newState = settingsReducer(state, {
+      type: Actions.SET_DENSITY,
+      payload: { density: 'sparse', orientation: 'flat' },
+    });
+
+    expect(newState.boundsShape).toBe('radial');
+    expect(newState.hexBounds.maxRing).toBe(4);
+  });
+});
+
+describe("SET_HEX_BOUND_AXIS (STRUCT-B-13)", () => {
+  it("merges one axis into the CURRENT bounds", () => {
+    const state = createMockState({ boundsShape: 'rectangular', hexBounds: { maxCol: 26, maxRow: 20 } });
+    const s1 = settingsReducer(state, { type: Actions.SET_HEX_BOUND_AXIS, payload: { axis: 'maxCol', value: 30 } });
+    // A second edit dispatched without re-reading state still sees the first one
+    const s2 = settingsReducer(s1, { type: Actions.SET_HEX_BOUND_AXIS, payload: { axis: 'maxRow', value: 12 } });
+    expect(s1.hexBounds).toEqual({ maxCol: 30, maxRow: 20 });
+    expect(s2.hexBounds).toEqual({ maxCol: 30, maxRow: 12 });
+  });
+
+  it("matches SET_HEX_BOUNDS with the spread payload (radial derivation included)", () => {
+    const state = createMockState({ boundsShape: 'radial', hexBounds: { maxCol: 15, maxRow: 15, maxRing: 7 } });
+    const viaAxis = settingsReducer(state, { type: Actions.SET_HEX_BOUND_AXIS, payload: { axis: 'maxCol', value: 40 } });
+    const viaFull = settingsReducer(state, { type: Actions.SET_HEX_BOUNDS, payload: { ...state.hexBounds, maxCol: 40 } });
+    expect(viaAxis.hexBounds).toEqual(viaFull.hexBounds);
   });
 });

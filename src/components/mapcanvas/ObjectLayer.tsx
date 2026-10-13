@@ -31,7 +31,7 @@ import { SelectionActionsOverlay } from '../toolbars/SelectionActionsOverlay';
 import { buildObjectActions, buildMultiActions } from '../../hooks/interactions/useSelectionActions';
 import { calculateObjectScreenPosition } from '../../objects/screenPositionUtils';
 import { getActiveLayer } from '../../persistence/layerAccessor';
-import { convertObjectToFreeform, snapObjectToGrid } from '../../objects/objectOperations';
+import { convertObjectToFreeform, findDuplicateTarget, generateObjectId, snapObjectToGrid } from '../../objects/objectOperations';
 import { copyDeepLinkToClipboard } from '../../persistence/deepLinkHandler';
 import { LinkingModeBanner } from '../overlays/LinkingModeBanner';
 import { CardinalIndicators } from './CardinalIndicators';
@@ -39,7 +39,7 @@ import { MeasurementOverlay } from '../overlays/MeasurementOverlay';
 import { formatDistance, getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
 import { getSettings } from '../../core/settingsAccessor';
 import { rotateByIncrement } from '../../drawing/rotationOperations';
-import { Z_INDEX } from '../../core/dmtConstants';
+import { ObjectHoverTooltip } from './ObjectHoverTooltip';
 import type { SelectionContextMenuDetail } from '../../core/windroseEvents';
 import { isForeignInstanceEvent } from '../../core/windroseEvents';
 
@@ -103,8 +103,6 @@ const ObjectLayer = ({
     selectedItems, hasMultiSelection, selectionCount, selectMultiple, clearSelection,
     isDraggingSelection,
     isResizeMode, setIsResizeMode,
-    hoveredObject,
-    mousePosition,
     showCoordinates,
     layerVisibility,
     updateSelectedItemsData
@@ -262,24 +260,29 @@ const ObjectLayer = ({
     const updatedObjects = [...(activeLayer.objects ?? [])];
     const updatedTextLabels = [...(activeLayer.textLabels ?? [])];
     const newSelectedItems: SelectedItem[] = [];
-
-    const offsetX = 1;
-    const offsetY = 0;
+    let skippedObjects = 0;
 
     for (const item of selectedItems) {
       if (item.type === 'object') {
         const sourceObj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
         if (!sourceObj) continue;
 
-        const newId = `obj-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-        const newObj = {
+        // Same placement rules as single duplicate: first free neighbour, then
+        // rings; hex gets a free slot. Searching updatedObjects keeps copies made
+        // earlier in this loop from landing on each other.
+        const dest = findDuplicateTarget(updatedObjects, sourceObj, mapData.mapType);
+        if (!dest) {
+          skippedObjects++;
+          continue;
+        }
+
+        const newId = generateObjectId();
+        const newObj: MapObject = {
           ...sourceObj,
           id: newId,
-          position: {
-            x: sourceObj.position.x + offsetX,
-            y: sourceObj.position.y + offsetY
-          }
+          position: { x: dest.x, y: dest.y }
         };
+        if (dest.slot !== undefined) newObj.slot = dest.slot;
         updatedObjects.push(newObj);
         newSelectedItems.push({ type: 'object', id: newId, data: newObj });
       } else if (item.type === 'text') {
@@ -304,6 +307,9 @@ const ObjectLayer = ({
     onObjectsChange(updatedObjects, true);
     onTextLabelsChange(updatedTextLabels, false);
 
+    if (skippedObjects > 0) {
+      console.warn(`No empty space found for ${skippedObjects} duplicate(s)`);
+    }
     if (newSelectedItems.length > 0) {
       selectMultiple(newSelectedItems);
     }
@@ -649,42 +655,83 @@ const ObjectLayer = ({
     };
   }, [showObjectColorPicker, handleObjectColorSelect, onAddCustomColor, pendingObjectCustomColorRef]);
 
-  // Context menu: hit-test for object, select it, show native menu
-  useEffect(() => {
-    if (!mapData || !geometry) return undefined;
+  // ---- Native right-click menu ----
+  // Claimant rule (mirrored in SelectionActionsOverlay): ObjectLayer claims a
+  // right-click ONLY when it lands on an object that is NOT already selected.
+  // It selects that object first, then shows its menu. A right-click on an
+  // already-selected item, or anywhere else while a selection exists, belongs
+  // to the selection's SelectionActionsOverlay, which never claims a click on
+  // an unselected object. The predicates are disjoint, so listener
+  // registration order no longer decides which menu appears.
+  //
+  // Everything the listener reads goes through refs so the effect registers
+  // once per mount (honest deps). Menu items deref menuHandlersRef at CLICK
+  // time: by then the setSelectedItem below has re-rendered, so handlers that
+  // act on "the selection" see the clicked object; rotate/duplicate/delete
+  // also receive its id explicitly.
+  type ObjectMenuHandlers = Parameters<typeof buildObjectActions>[1];
+  const menuHandlersRef = useRef<ObjectMenuHandlers | null>(null);
+  menuHandlersRef.current = {
+    onRotate: handleObjectRotation,
+    onDuplicate: handleObjectDuplicate,
+    onFreeformToggle: handleFreeformToggle,
+    onLabel: handleNoteButtonClick as (e?: Event) => void,
+    onLinkNote: () => { if (selectedItem != null) handleEditNoteLink(selectedItem.id); },
+    onLinkObject: handleLinkObject,
+    onFollowLink: handleFollowLink,
+    onRemoveLink: handleRemoveLink,
+    onCopyLink: handleCopyLink,
+    onColorClick: handleObjectColorButtonClick as (e?: Event) => void,
+    onResize: handleResizeButtonClick as (e?: Event) => void,
+    onDelete: handleObjectDeletion,
+    onPlayerToggle: handlePlayerToggle,
+    onMeasureToggle: handleMeasureToggle
+  };
+  const menuStateRef = useRef({ mapData, geometry, screenToGrid, getObjectAtPosition, selectedItems, setSelectedItem, isResizeMode, measureMovement, handleEditNoteLink, handleObjectRotation, handleObjectDuplicate, handleObjectDeletion });
+  menuStateRef.current = { mapData, geometry, screenToGrid, getObjectAtPosition, selectedItems, setSelectedItem, isResizeMode, measureMovement, handleEditNoteLink, handleObjectRotation, handleObjectDuplicate, handleObjectDeletion };
 
+  useEffect(() => {
     const handler = (e: CustomEvent<SelectionContextMenuDetail>): void => {
       const detail = e.detail;
       // Foreign mount's event: don't act on it — and don't claim it either.
       if (isForeignInstanceEvent(detail, instanceId)) return;
       if (detail.handled === true) return;
 
-      const coords = screenToGrid(detail.clientX, detail.clientY);
+      const state = menuStateRef.current;
+      if (!state.mapData || !state.geometry) return;
+      const mapDataNow = state.mapData;
+
+      const coords = state.screenToGrid(detail.clientX, detail.clientY);
       if (!coords) return;
 
-      const activeLayer = getActiveLayer(mapData);
-      const obj = getObjectAtPosition(activeLayer.objects ?? [], coords.x, coords.y);
+      const activeLayer = getActiveLayer(mapDataNow);
+      const obj = state.getObjectAtPosition(activeLayer.objects ?? [], coords.x, coords.y);
       if (!obj) return;
+      // Already selected: the selection's overlay owns this menu (see rule above).
+      if (state.selectedItems.some((s: SelectedItem) => s.id === obj.id)) return;
 
       detail.handled = true;
 
       const item = { type: 'object' as const, id: obj.id, data: obj };
+      state.setSelectedItem(item);
 
+      const latest = (): ObjectMenuHandlers | null => menuHandlersRef.current;
+      const targetId = obj.id;
       const actions = buildObjectActions(item, {
-        onRotate: handleObjectRotation,
-        onDuplicate: handleObjectDuplicate,
-        onFreeformToggle: handleFreeformToggle,
-        onLabel: handleNoteButtonClick as (e?: Event) => void,
-        onLinkNote: () => handleEditNoteLink(obj.id),
-        onLinkObject: handleLinkObject,
-        onFollowLink: handleFollowLink,
-        onRemoveLink: handleRemoveLink,
-        onCopyLink: handleCopyLink,
-        onColorClick: handleObjectColorButtonClick as (e?: Event) => void,
-        onResize: handleResizeButtonClick as (e?: Event) => void,
-        onDelete: handleObjectDeletion,
-        onMeasureToggle: handleMeasureToggle
-      }, mapData, { isResizeMode, isMeasuring: measureMovement });
+        onRotate: () => menuStateRef.current.handleObjectRotation(targetId),
+        onDuplicate: () => menuStateRef.current.handleObjectDuplicate(targetId),
+        onDelete: () => menuStateRef.current.handleObjectDeletion(targetId),
+        onLinkNote: () => menuStateRef.current.handleEditNoteLink(targetId),
+        onFreeformToggle: (ev?: Event) => latest()?.onFreeformToggle(ev),
+        onLabel: (ev?: Event) => latest()?.onLabel(ev),
+        onLinkObject: (ev?: Event) => latest()?.onLinkObject(ev),
+        onFollowLink: (ev?: Event) => latest()?.onFollowLink(ev),
+        onRemoveLink: (ev?: Event) => latest()?.onRemoveLink(ev),
+        onCopyLink: (ev?: Event) => latest()?.onCopyLink(ev),
+        onColorClick: (ev?: Event) => latest()?.onColorClick(ev),
+        onResize: (ev?: Event) => latest()?.onResize(ev),
+        onMeasureToggle: (ev?: Event) => latest()?.onMeasureToggle?.(ev)
+      }, mapDataNow, { isResizeMode: state.isResizeMode, isMeasuring: state.measureMovement });
 
       const menu = new Menu();
       let lastGroup: string | null = null;
@@ -703,7 +750,7 @@ const ObjectLayer = ({
 
     activeDocument.addEventListener('windrose:selection-context-menu', handler);
     return () => activeDocument.removeEventListener('windrose:selection-context-menu', handler);
-  }, [mapData, geometry, screenToGrid, isResizeMode, instanceId]);
+  }, [instanceId]);
 
   if (showCoordinates || !layerVisibility.objects) {
     return null;
@@ -869,23 +916,7 @@ const ObjectLayer = ({
       )}
 
 
-      {hoveredObject && mousePosition && hoveredObject.type !== 'note_pin' && (
-        <div
-          className="windrose-object-tooltip"
-          style={{
-            position: 'absolute',
-            left: mousePosition.x + 20,
-            top: mousePosition.y + 25,
-            pointerEvents: 'none',
-            zIndex: Z_INDEX.INTERACTIVE_LAYER
-          }}
-        >
-          {hoveredObject.customTooltip != null && hoveredObject.customTooltip !== ''
-            ? `${hoveredObject.label} - ${hoveredObject.customTooltip}`
-            : hoveredObject.label
-          }
-        </div>
-      )}
+      <ObjectHoverTooltip />
     </>
   );
 };

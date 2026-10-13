@@ -10,11 +10,6 @@ import type { SegmentHoverInfo } from '#types/hooks/drawingTools.types';
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { getSegmentAtPosition } from '../../geometry/core/cellAccessor';
 
-
-
-
-
-
 interface UseSegmentHoverOptions {
   currentTool: ToolId;
   isDrawing: boolean;

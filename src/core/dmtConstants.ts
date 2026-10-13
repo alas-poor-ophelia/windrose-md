@@ -1,5 +1,5 @@
 // Path: dmtConstants.ts
-// Converted from dmtConstants.js - Theme, defaults, and dynamic path resolution
+// Shared constants: theme, defaults, schema version, data file path, z-index, and segment geometry tables
 
 // Type-only imports
 import type { SegmentName } from '#types/core/cell.types';
@@ -393,21 +393,6 @@ const SEGMENT_CROSS_CELL_ADJACENCY: Record<SegmentName, CrossCellAdjacency> = {
   w:  { dx: -1, dy: 0, neighborSegment: 'ne' }
 };
 
-/**
- * External edge definitions for each segment
- * Maps segment to which cell boundary edge it touches
- */
-const SEGMENT_EXTERNAL_EDGES: Record<SegmentName, ExternalEdge> = {
-  nw: { edge: 'top', half: 'first' },
-  n:  { edge: 'top', half: 'second' },
-  ne: { edge: 'right', half: 'first' },
-  e:  { edge: 'right', half: 'second' },
-  se: { edge: 'bottom', half: 'second' },
-  s:  { edge: 'bottom', half: 'first' },
-  sw: { edge: 'left', half: 'second' },
-  w:  { edge: 'left', half: 'first' }
-};
-
 // =============================================================================
 // Diagonal Fill Tool Constants
 // =============================================================================
@@ -487,5 +472,5 @@ export type {
 
 export { // Theme and defaults
   THEME, DEFAULTS, DATA_FILE_PATH, SCHEMA_VERSION, Z_INDEX, resolveBackground, resolveGridLineColor, resolveThemeColor, // Segment system constants
-  SEGMENT_NAMES, SEGMENT_VERTICES, SEGMENT_TRIANGLES, SEGMENT_INTERNAL_ADJACENCY, SEGMENT_CROSS_CELL_ADJACENCY, SEGMENT_EXTERNAL_EDGES, // Diagonal fill tool constants
+  SEGMENT_NAMES, SEGMENT_VERTICES, SEGMENT_TRIANGLES, SEGMENT_INTERNAL_ADJACENCY, SEGMENT_CROSS_CELL_ADJACENCY, // Diagonal fill tool constants
   CORNER_SEGMENT_FILL, CORNER_NEIGHBOR_CHECKS, CORNER_DIAGONAL_DIRECTION };

@@ -225,26 +225,6 @@ abstract class BaseGeometry implements IGeometry {
   ): Point[];
   
   /**
-   * Calculate Euclidean distance between two cells
-   */
-  abstract getEuclideanDistance(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number
-  ): number;
-  
-  /**
-   * Calculate Manhattan distance between two cells
-   */
-  abstract getManhattanDistance(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number
-  ): number;
-  
-  /**
    * Calculate "game distance" between two cells with configurable rules
    * For grid: supports different diagonal calculation rules
    * For hex: returns hex distance (options are ignored)

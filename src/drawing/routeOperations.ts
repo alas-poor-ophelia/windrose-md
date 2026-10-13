@@ -245,8 +245,8 @@ function sumDistances(segments: number[]): number {
  * grows with the actual drawn path length — an L-shaped route reports a
  * longer euclidean length than a straight one.
  *
- * Do NOT use geometry.getEuclideanDistance for this: on HexGeometry it is
- * aliased to hex-count distance, not true Euclidean pixel distance.
+ * Measured from cell centers in world pixels; getCellDistance is a cell-count
+ * metric on hex maps, so it is not usable here.
  */
 function computeEuclideanPathLength(points: Point[], geometry: IGeometry): number {
   let total = 0;

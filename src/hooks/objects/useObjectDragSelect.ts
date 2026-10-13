@@ -20,7 +20,8 @@ import { useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { calculateEdgeAlignment, removeObjectFromHex } from '../../objects/objectOperations';
 import { getClickedObjectInCell, getObjectsInCell, assignSlot } from '../../objects/hexSlotPositioner';
-import { getActiveLayer, isCellFogged } from '../../persistence/layerAccessor';
+import { getActiveLayer } from '../../persistence/layerAccessor';
+import { isCellFoggedIndexed } from '../../geometry/fog/foggedCellIndex';
 
 
 
@@ -118,7 +119,7 @@ function useObjectDragSelect(
       const activeLayer = getActiveLayer(mapData);
       if (activeLayer.fogOfWar?.enabled === true) {
         const objOffset = geometry.toOffsetCoords(object.position.x, object.position.y);
-        if (isCellFogged(activeLayer, objOffset.col, objOffset.row)) {
+        if (isCellFoggedIndexed(activeLayer, objOffset.col, objOffset.row)) {
           object = null;
         }
       }

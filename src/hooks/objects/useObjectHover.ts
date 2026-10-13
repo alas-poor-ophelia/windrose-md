@@ -12,7 +12,8 @@ import { useMapState } from '../../context/MapContext';
 import { useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { getClickedObjectInCell } from '../../objects/hexSlotPositioner';
-import { getActiveLayer, isCellFogged } from '../../persistence/layerAccessor';
+import { getActiveLayer } from '../../persistence/layerAccessor';
+import { isCellFoggedIndexed } from '../../geometry/fog/foggedCellIndex';
 
 
 
@@ -68,15 +69,19 @@ function useObjectHover(): {
           const activeLayer = getActiveLayer(mapData);
           if (activeLayer.fogOfWar?.enabled === true && geometry != null) {
             const objOffset = geometry.toOffsetCoords(obj.position.x, obj.position.y);
-            if (isCellFogged(activeLayer, objOffset.col, objOffset.row)) {
+            if (isCellFoggedIndexed(activeLayer, objOffset.col, objOffset.row)) {
               obj = null;
             }
           }
         }
 
+        // useState bails out on an identical value, so an unchanged hover
+        // (same object, or still nothing) does not re-render.
         setHoveredObject(obj);
 
-        const container = containerRef.current;
+        // The cursor position only feeds the hover tooltip; skip the per-move
+        // state write when nothing is hovered (REACT-01).
+        const container = obj ? containerRef.current : null;
         if (container) {
           const rect = container.getBoundingClientRect();
           const relativeX = clientX - rect.left;

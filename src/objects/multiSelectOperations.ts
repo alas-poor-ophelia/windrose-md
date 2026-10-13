@@ -13,7 +13,6 @@ import type { MapData } from '#types/core/map.types';
 import type { MapObject, ObjectSize } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { SelectedItem } from '#types/contexts/context.types';
-import type { PositionUpdate } from '#types/hooks/groupDrag.types';
 import type { HexOrientation } from '#types/settings/settings.types';
 
 import { getActiveLayer } from '../persistence/layerAccessor';
@@ -221,47 +220,6 @@ function getItemsInWorldRect(
   return items;
 }
 
-/**
- * Calculate the combined bounding box for multiple selected items.
- * Used for positioning the multi-select toolbar.
- */
-function getSelectionBounds(
-  selectedItems: SelectedItem[] | null | undefined,
-  geometry: ExtendedGeometry,
-  mapData: MapData,
-  ctx: CanvasRenderingContext2D | null
-): WorldBounds | null {
-  if (!selectedItems || selectedItems.length === 0) {
-    return null;
-  }
-  
-  let minX = Infinity, minY = Infinity;
-  let maxX = -Infinity, maxY = -Infinity;
-  
-  for (const item of selectedItems) {
-    let bounds: WorldBounds | undefined;
-    
-    if (item.type === 'object' && item.data) {
-      bounds = getObjectWorldBounds(item.data, geometry, mapData);
-    } else if (item.type === 'text' && item.data) {
-      bounds = getTextLabelWorldBounds(item.data, ctx);
-    }
-    
-    if (bounds) {
-      minX = Math.min(minX, bounds.minX);
-      minY = Math.min(minY, bounds.minY);
-      maxX = Math.max(maxX, bounds.maxX);
-      maxY = Math.max(maxY, bounds.maxY);
-    }
-  }
-  
-  if (minX === Infinity) {
-    return null;
-  }
-  
-  return { minX, minY, maxX, maxY };
-}
-
 // ===========================================
 // Bounds Validation
 // ===========================================
@@ -286,26 +244,8 @@ function isWithinBounds(
   return true;
 }
 
-/**
- * Validate that all positions in a group move are within bounds
- */
-function validateGroupMove(
-  updates: PositionUpdate[],
-  geometry: ExtendedGeometry | null,
-  mapData: MapData
-): boolean {
-  for (const update of updates) {
-    if (update.position != null) {
-      if (!isWithinBounds(update.position.x, update.position.y, geometry, mapData)) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
 // ===========================================
 // Exports
 // ===========================================
 
-export { rectsOverlap, getObjectWorldBounds, getTextLabelWorldBounds, getItemsInWorldRect, getSelectionBounds, isWithinBounds, validateGroupMove };
+export { rectsOverlap, getObjectWorldBounds, getTextLabelWorldBounds, getItemsInWorldRect, isWithinBounds, };

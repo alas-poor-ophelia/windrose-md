@@ -159,25 +159,30 @@ function getSetting<K extends keyof PluginSettings>(key: K): PluginSettings[K] {
 }
 
 /**
- * Check if the settings plugin is installed and enabled
- */
-function isPluginAvailable(): boolean {
-  return getPluginSettingsRaw() !== null;
-}
-
-/**
  * Get complete theme object with configurable values from settings
  * and non-configurable values from constants.
  * This is the facade/wrapper that components should use.
  */
 function getTheme(): ResolvedTheme {
-  const settings = getSettings();
+  return resolveTheme(null);
+}
+
+/**
+ * Resolve the full theme for a map: global settings with the map's
+ * overrides applied (via getEffectiveSettings), plus the non-configurable
+ * values from THEME. Pass null/undefined for the global theme.
+ */
+function resolveTheme(
+  mapSettings?: MapSpecificSettings | null,
+  globalSettings: PluginSettings | null = null
+): ResolvedTheme {
+  const settings = getEffectiveSettings(mapSettings, globalSettings);
 
   return {
     grid: {
-      lines: resolveGridLineColor(settings.gridLineColor),
+      lines: settings.gridLineColor,
       lineWidth: settings.gridLineWidth,
-      background: resolveBackground(settings.backgroundColor)
+      background: settings.backgroundColor
     },
     cells: {
       fill: THEME.cells.fill,
@@ -188,8 +193,7 @@ function getTheme(): ResolvedTheme {
       color: THEME.compass.color,
       size: THEME.compass.size
     },
-    // Note: decorativeBorder is defined inline where needed (e.g., exportOperations)
-    // not in THEME constants
+    // decorativeBorder is not part of THEME constants
     decorativeBorder: {
       color: '#8b7355',
       width: 20,
@@ -344,5 +348,5 @@ function getTilesetFolders(): string[] {
   }
 }
 
-export { setPlugin, clearPlugin, getApp, getDataFilePath, getSettings, getSetting, isPluginAvailable, getTheme, getEffectiveSettings, getObjectSettings, getObjectSettingsForSet, getColorPaletteSettings, getTilesetFolders, FALLBACK_SETTINGS, BUILT_IN_COLORS };
+export { setPlugin, clearPlugin, getApp, getDataFilePath, getSettings, getSetting, getTheme, resolveTheme, getEffectiveSettings, getObjectSettings, getObjectSettingsForSet, getColorPaletteSettings, getTilesetFolders, FALLBACK_SETTINGS, BUILT_IN_COLORS };
 export type { WindrosePluginRef };

@@ -100,7 +100,7 @@ After structural changes (moving files, adding directories, renaming modules), c
 | `src/context/CLAUDE.md` | React contexts, provider pattern |
 | `src/components/mapcanvas/CLAUDE.md` | Layer components, canvas architecture |
 | `src/components/settings/CLAUDE.md` | Settings modal, tabs, reducer |
-| `src/settingsplugin/CLAUDE.md` | Settings plugin assembly, template strings |
+| `src/settings/CLAUDE.md` | Plugin settings tab: declarative 1.13 Settings API, definitions, modals |
 
 Keep these accurate — they're the first thing an agent reads when working in that area.
 

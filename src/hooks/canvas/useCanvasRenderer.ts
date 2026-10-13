@@ -21,7 +21,7 @@ import type {
   RendererViewState,
 } from '#types/hooks/canvasRenderer.types';
 
-import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import { getTheme, getEffectiveSettings, getSettings } from '../../core/settingsAccessor';
 import { recordPaintedView } from '../../core/paintedViewStore';
 import { traceZoom } from '../../utils/zoomTraceProbe';
@@ -51,9 +51,11 @@ import { renderSubHexBackdrop } from '../../geometry/renderers/subHexBackdropRen
 import { renderWallPaths } from '../../geometry/renderers/wallPathRenderer';
 import { buildMergeIndex } from '../../geometry/curves/curveCellOverlap';
 import { getCachedImage, getImageCacheVersion } from '../../assets/imageOperations';
+import { isCellFoggedIndexed } from '../../geometry/fog/foggedCellIndex';
+import { getTileMetadataRenderVersion } from '../../persistence/tileMetadata';
 import { getSlotOffset, getMultiObjectScale, getObjectsInCell } from '../../objects/hexSlotPositioner';
 import { offsetToAxial, axialToOffset } from '../../geometry/core/offsetCoordinates';
-import { getActiveLayer, getLayerBelow, getRenderLayers, getExportLayers, isCellFogged, getActiveBoardId, getBoardBelow, getBoardLayers } from '../../persistence/layerAccessor';
+import { getActiveLayer, getLayerBelow, getRenderLayers, getExportLayers, getActiveBoardId, getBoardBelow, getBoardLayers } from '../../persistence/layerAccessor';
 
 interface Renderer {
   // Polymorphic properties
@@ -145,6 +147,20 @@ const ZOOM_SETTLE_MS = 150;
 /** Registered by the hook so the cache can request a follow-up render after a zoom settles. */
 function setStaticSettleCallback(canvas: HTMLCanvasElement, cb: () => void): void {
   staticSettleCallbacks.set(canvas, cb);
+}
+
+/**
+ * Unmount cleanup for a canvas (MEM-19): cancel a pending settle re-render and
+ * drop the settle callback so neither the timer nor the hook closure outlives
+ * the component.
+ */
+function releaseStaticLayerCache(canvas: HTMLCanvasElement): void {
+  const entry = staticLayerCaches.get(canvas);
+  if (entry?.settleTimer != null) {
+    window.clearTimeout(entry.settleTimer);
+    entry.settleTimer = null;
+  }
+  staticSettleCallbacks.delete(canvas);
 }
 
 function staticKeysEqual(a: readonly unknown[], b: readonly unknown[]): boolean {
@@ -533,6 +549,43 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     ? { hexToWorld: geometry.hexToWorld.bind(geometry), worldToScreen: geometry.worldToScreen.bind(geometry), hexSize: geometry.hexSize, orientation: mapData.orientation ?? 'flat' }
     : { hexToWorld: geometry.getCellCenter.bind(geometry), worldToScreen: geometry.worldToScreen.bind(geometry), hexSize: geometry.cellSize, orientation: 'grid' };
 
+  // Shared by the ghost passes and the main layer loop (derived once).
+  const curveGridConfig = geometry.type === 'grid'
+    ? { cellSize: geometry.cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth ?? 1, interiorRatio: 0.5 }
+    : undefined;
+  const wallCellSize = geometry.type === 'grid' ? geometry.cellSize : geometry.hexSize;
+
+  // One ghost pass (board-below or layer-below): cells/edges, tiles + terrain
+  // strokes, curves, wall paths — in that order, at the ghost opacity.
+  const renderGhostLayer = (ghostLayer: MapLayer, ghostOpacity: number): void => {
+    renderLayerCellsAndEdges(ctx, ghostLayer, geometry, rendererViewState, THEME, renderer, {
+      opacity: ghostOpacity,
+      showGrid: visibility.grid !== false,
+      northDirection: northDirection ?? 0
+    });
+    const hasTiles = ghostLayer.tiles != null && ghostLayer.tiles.length > 0;
+    const hasStrokes = ghostLayer.terrainStrokes != null && ghostLayer.terrainStrokes.length > 0;
+    if ((hasTiles || hasStrokes) && mapData.tilesets != null && mapData.tilesets.length > 0) {
+      renderTiles(
+        ctx,
+        ghostLayer.tiles ?? [],
+        mapData.tilesets,
+        tileGeomShim,
+        rendererViewState,
+        { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, terrainStrokes: ghostLayer.terrainStrokes }
+      );
+    }
+    if (ghostLayer.curves.length > 0) {
+      renderCurves(ctx, ghostLayer.curves, rendererViewState, THEME, { opacity: ghostOpacity, gridConfig: curveGridConfig });
+    }
+    if (ghostLayer.wallPaths != null && ghostLayer.wallPaths.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
+      renderWallPaths(ctx, ghostLayer.wallPaths, mapData.tilesets, rendererViewState, wallCellSize, {
+        opacity: ghostOpacity,
+        getCachedImage
+      });
+    }
+  };
+
   // iOS defensive: Reset canvas state
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
@@ -559,36 +612,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     const ghostOpacity = activeBoard.boardBelowOpacity ?? 0.25;
     const belowLayers = getBoardLayers(mapData, boardBelow.id).filter(l => l.visible !== false);
     for (const belowLayer of belowLayers) {
-      renderLayerCellsAndEdges(ctx, belowLayer, geometry, rendererViewState, THEME, renderer, {
-        opacity: ghostOpacity,
-        showGrid: visibility.grid !== false,
-        northDirection: northDirection ?? 0
-      });
-      const hasTiles = belowLayer.tiles != null && belowLayer.tiles.length > 0;
-      const hasStrokes = belowLayer.terrainStrokes != null && belowLayer.terrainStrokes.length > 0;
-      if ((hasTiles || hasStrokes) && mapData.tilesets != null && mapData.tilesets.length > 0) {
-        renderTiles(
-          ctx,
-          belowLayer.tiles ?? [],
-          mapData.tilesets,
-          tileGeomShim,
-          rendererViewState,
-          { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, terrainStrokes: belowLayer.terrainStrokes }
-        );
-      }
-      if (belowLayer.curves.length > 0) {
-        const ghostGridConfig = geometry.type === 'grid'
-          ? { cellSize: geometry.cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth ?? 1, interiorRatio: 0.5 }
-          : undefined;
-        renderCurves(ctx, belowLayer.curves, rendererViewState, THEME, { opacity: ghostOpacity, gridConfig: ghostGridConfig });
-      }
-      if (belowLayer.wallPaths != null && belowLayer.wallPaths.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
-        const wallCellSize = geometry.type === 'grid' ? geometry.cellSize : geometry.hexSize;
-        renderWallPaths(ctx, belowLayer.wallPaths, mapData.tilesets, rendererViewState, wallCellSize, {
-          opacity: ghostOpacity,
-          getCachedImage
-        });
-      }
+      renderGhostLayer(belowLayer, ghostOpacity);
     }
   }
 
@@ -598,40 +622,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   if (!isStrata && activeLayer.showLayerBelow === true) {
     const layerBelow = getLayerBelow(mapData, activeLayer.id);
     if (layerBelow) {
-      const ghostOpacity = activeLayer.layerBelowOpacity ?? 0.25;
-      renderLayerCellsAndEdges(ctx, layerBelow, geometry, rendererViewState, THEME, renderer, {
-        opacity: ghostOpacity,
-        showGrid: visibility.grid !== false,
-        northDirection: northDirection ?? 0
-      });
-      // Ghost layer tiles (+ terrain brush strokes)
-      const ghostHasTiles = layerBelow.tiles != null && layerBelow.tiles.length > 0;
-      const ghostHasStrokes = layerBelow.terrainStrokes != null && layerBelow.terrainStrokes.length > 0;
-      if ((ghostHasTiles || ghostHasStrokes) && mapData.tilesets != null && mapData.tilesets.length > 0) {
-        renderTiles(
-          ctx,
-          layerBelow.tiles ?? [],
-          mapData.tilesets,
-          tileGeomShim,
-          rendererViewState,
-          { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, terrainStrokes: layerBelow.terrainStrokes }
-        );
-      }
-      // Ghost layer curves
-      if (layerBelow.curves.length > 0) {
-        const ghostGridConfig = geometry.type === 'grid'
-          ? { cellSize: geometry.cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth ?? 1, interiorRatio: 0.5 }
-          : undefined;
-        renderCurves(ctx, layerBelow.curves, rendererViewState, THEME, { opacity: ghostOpacity, gridConfig: ghostGridConfig });
-      }
-      // Ghost layer wall paths
-      if (layerBelow.wallPaths != null && layerBelow.wallPaths.length > 0 && mapData.tilesets != null && mapData.tilesets.length > 0) {
-        const wallCellSize = geometry.type === 'grid' ? geometry.cellSize : geometry.hexSize;
-        renderWallPaths(ctx, layerBelow.wallPaths, mapData.tilesets, rendererViewState, wallCellSize, {
-          opacity: ghostOpacity,
-          getCachedImage
-        });
-      }
+      renderGhostLayer(layerBelow, activeLayer.layerBelowOpacity ?? 0.25);
     }
   }
 
@@ -763,9 +754,6 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // strata maps stack the active board's visible layers. Objects/text/fog/region
   // stay active-layer-only (rendered after this loop) so the interaction surface
   // and the single-activeLayer fog passes remain correct.
-  const curveGridConfig = geometry.type === 'grid'
-    ? { cellSize: geometry.cellSize, lineColor: THEME.grid.lines, lineWidth: THEME.grid.lineWidth ?? 1, interiorRatio: 0.5 }
-    : undefined;
   for (const drawLayer of renderLayers) {
     // Per-layer opacity only ever comes from an image export selection.
     const layerOpacity = exportOpacityById?.get(drawLayer.id) ?? 1;
@@ -805,7 +793,6 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
         ? drawLayer.wallPaths.filter(w => w.id !== draggingWallId)
         : drawLayer.wallPaths;
       if (wallsToRender.length > 0) {
-        const wallCellSize = geometry.type === 'grid' ? geometry.cellSize : geometry.hexSize;
         renderWallPaths(ctx, wallsToRender, mapData.tilesets, rendererViewState, wallCellSize, {
           getCachedImage,
           opacity: layerOpacity
@@ -916,7 +903,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       {
         getObjectType: getObjectTypeForMap,
         getRenderChar,
-        isCellFogged,
+        isCellFogged: isCellFoggedIndexed,
         getObjectsInCell,
         getSlotOffset,
         getMultiObjectScale,
@@ -955,8 +942,12 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     mapData.dimensions, mapData.hexBounds, mapData.orientation,
     mapData.objectSetId, mapData.settings, mapData.activeLayerId, activeLayer,
     mapData.activeBoardId, mapData.layerMode, mapData.boards,
-    geometry, hiddenTileLayers, adjacentSubHexes, showCoordinates,
+    geometry, hiddenTileLayers, adjacentSubHexes, adjacentEmptySlots, showCoordinates,
     width, height, draggingWallId,
+    // Vault-global tile metadata (per-tile render mode) read by renderTiles.
+    // Object-type icons (getObjectType reads the global object-set settings)
+    // have no cheap version yet; plugin settings are mutated in place.
+    getTileMetadataRenderVersion(),
     JSON.stringify(THEME), JSON.stringify(visibility),
   ];
 
@@ -1034,13 +1025,14 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
 const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, geometry, selectedItems = [], options = {}, viewController) => {
   const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, tileImagesReady = false, adjacentSubHexes = null, adjacentEmptySlots = null, hiddenTileLayers = undefined, draggingWallId = null, subHexPath = null } = options;
-  // Coalesce renders to at most one per animation frame. Pan/zoom writes viewState
-  // (stored on mapData) on EVERY pointermove/touchmove; on a 120Hz touch device that
-  // fires far faster than the display refreshes, so rendering synchronously per update
-  // repainted the whole canvas 100-280x/sec and flooded the main thread. We stash the
-  // latest render inputs in a ref and schedule a single rAF — rapid updates collapse
-  // into one draw per frame, and the queued frame always reads the most recent inputs.
+  // Coalesce renders to at most one per animation frame. Input changes, the
+  // ViewController's live pan/zoom ticks (setLive -> scheduleRender), static-cache
+  // settles and MapCanvas resizes all funnel into scheduleRender; rapid triggers
+  // collapse into one draw per frame, and the queued frame reads the latest inputs.
   const rafIdRef = useRef<number | null>(null);
+  // The canvas the settle callback was registered on; canvasRef may already be
+  // detached by the time the unmount cleanup runs.
+  const settleCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const renderInputsRef = useRef<{
     mapData: typeof mapData;
     geometry: typeof geometry;
@@ -1057,6 +1049,30 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
     subHexPath: typeof subHexPath;
   } | null>(null);
 
+  // Latest canvas refs + controller, read by the stable scheduleRender below.
+  const hostRef = useRef({ canvasRef, fogCanvasRef, viewController });
+  hostRef.current = { canvasRef, fogCanvasRef, viewController };
+
+  // Identity-stable: returned to callers (MapCanvas resize path) and handed to
+  // the ViewController / static-cache settle hooks. A queued frame always reads
+  // the most recent inputs from renderInputsRef at fire time.
+  const scheduleRender = useCallback((): void => {
+    // A frame is already queued — it will pick up the latest inputs from the ref.
+    if (rafIdRef.current != null) return;
+    rafIdRef.current = window.requestAnimationFrame(() => {
+      rafIdRef.current = null;
+      const a = renderInputsRef.current;
+      const host = hostRef.current;
+      const canvas = host.canvasRef.current;
+      if (a && a.mapData && a.geometry && canvas) {
+        const fogCanvas = host.fogCanvasRef?.current ?? null;
+        // Read the live viewState at FIRE time so a gesture's setLive→scheduleRender
+        // path paints the current pan/zoom even though mapData hasn't changed.
+        renderCanvas(canvas, fogCanvas, a.mapData, a.geometry, a.selectedItems, { isResizeMode: a.isResizeMode, theme: a.theme, showCoordinates: a.showCoordinates, layerVisibility: a.layerVisibility, adjacentSubHexes: a.adjacentSubHexes, adjacentEmptySlots: a.adjacentEmptySlots, hiddenTileLayers: a.hiddenTileLayers, tileImagesReady: a.tileImagesReady, draggingWallId: a.draggingWallId, subHexPath: a.subHexPath, liveViewState: host.viewController.getLive() });
+      }
+    });
+  }, []);
+
   // useLayoutEffect (not useEffect): the inputs ref must refresh at COMMIT,
   // before any already-scheduled rAF can fire. The sub-hex swap boundary
   // (useCanvasInteraction) syncs the new map's view into the ViewController
@@ -1065,35 +1081,34 @@ const useCanvasRenderer: UseCanvasRenderer = (canvasRef, fogCanvasRef, mapData, 
   // "giant grid" ghost frame on surfacing, windrose-1mc trace 2026-08-20).
   useLayoutEffect(() => {
     renderInputsRef.current = { mapData, geometry, selectedItems, isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, tileImagesReady, draggingWallId, subHexPath };
-    const scheduleRender = (): void => {
-      // A frame is already queued — it will pick up the latest inputs from the ref.
-      if (rafIdRef.current != null) return;
-      rafIdRef.current = window.requestAnimationFrame(() => {
-        rafIdRef.current = null;
-        const a = renderInputsRef.current;
-        if (a && a.mapData && a.geometry && canvasRef.current) {
-          const fogCanvas = fogCanvasRef?.current ?? null;
-          // Read the live viewState at FIRE time so a gesture's setLive→scheduleRender
-          // path paints the current pan/zoom even though mapData hasn't changed.
-          renderCanvas(canvasRef.current, fogCanvas, a.mapData, a.geometry, a.selectedItems, { isResizeMode: a.isResizeMode, theme: a.theme, showCoordinates: a.showCoordinates, layerVisibility: a.layerVisibility, adjacentSubHexes: a.adjacentSubHexes, adjacentEmptySlots: a.adjacentEmptySlots, hiddenTileLayers: a.hiddenTileLayers, tileImagesReady: a.tileImagesReady, draggingWallId: a.draggingWallId, subHexPath: a.subHexPath, liveViewState: viewController.getLive() });
-        }
-      });
-    };
     // The static-layer cache requests a follow-up render to redraw crisp after
     // a zoom gesture settles.
-    if (canvasRef.current) setStaticSettleCallback(canvasRef.current, scheduleRender);
+    if (canvasRef.current) {
+      if (settleCanvasRef.current != null && settleCanvasRef.current !== canvasRef.current) {
+        releaseStaticLayerCache(settleCanvasRef.current);
+      }
+      settleCanvasRef.current = canvasRef.current;
+      setStaticSettleCallback(canvasRef.current, scheduleRender);
+    }
     // The ViewController drives imperative renders on setLive() during a gesture.
     viewController.setRenderCallback(scheduleRender);
     scheduleRender();
-  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, draggingWallId, subHexPath, viewController]);
+  }, [mapData, geometry, selectedItems, isResizeMode, theme, canvasRef, fogCanvasRef, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, draggingWallId, subHexPath, viewController, scheduleRender]);
 
-  // Cancel any frame still pending when the component unmounts.
+  // Cancel any frame still pending when the component unmounts, plus the
+  // static-layer settle timer and its callback for this canvas.
   useEffect(() => () => {
     if (rafIdRef.current != null) {
       cancelAnimationFrame(rafIdRef.current);
       rafIdRef.current = null;
     }
+    if (settleCanvasRef.current != null) {
+      releaseStaticLayerCache(settleCanvasRef.current);
+      settleCanvasRef.current = null;
+    }
   }, []);
+
+  return { scheduleRender };
 };
 
 export { useCanvasRenderer, renderCanvas };

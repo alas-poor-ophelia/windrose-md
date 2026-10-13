@@ -144,27 +144,27 @@ describe('WallGap load migration (sanitizeWallGaps)', () => {
 
 describe('canonicalizeTileIds — gap.tile.tileId', () => {
   it('rewrites a legacy basename gap tile id to its folder-relative form (resolve-only)', () => {
-    const map = mapWith(
+    let map = mapWith(
       [tileset('ts1', ['walls/Brick', 'portals/Door_256'])],
       { wallPaths: [wallWith([goodGap({ tile: { tilesetId: 'ts1', tileId: 'Door_256' } })])] },
     );
-    canonicalizeTileIds(map);
+    map = canonicalizeTileIds(map);
     expect(map.layers[0].wallPaths?.[0].gaps?.[0].tile?.tileId).toBe('portals/Door_256');
   });
 
   it('never nulls an unresolved gap tile binding (kept verbatim)', () => {
-    const map = mapWith(
+    let map = mapWith(
       [tileset('ts1', ['walls/Brick'])],
       { wallPaths: [wallWith([goodGap({ tile: { tilesetId: 'ts1', tileId: 'portals/Ghost' } })])] },
     );
-    canonicalizeTileIds(map);
+    map = canonicalizeTileIds(map);
     const tile = map.layers[0].wallPaths?.[0].gaps?.[0].tile;
     expect(tile).toBeDefined();
     expect(tile?.tileId).toBe('portals/Ghost');
   });
 
   it('leaves a bare gap (no tile) alone', () => {
-    const map = mapWith(
+    let map = mapWith(
       [tileset('ts1', ['walls/Brick', 'portals/Door_256'])],
       { wallPaths: [wallWith([goodGap()])] },
     );
@@ -173,14 +173,14 @@ describe('canonicalizeTileIds — gap.tile.tileId', () => {
   });
 
   it('canonicalizes gap tile ids in sub-hex layers', () => {
-    const map = mapWith([tileset('ts1', ['portals/Door_256'])], {});
+    let map = mapWith([tileset('ts1', ['portals/Door_256'])], {});
     const sub = createNewMap('sub', 'grid');
     sub.tilesets = [];
     Object.assign(sub.layers[0], {
       wallPaths: [wallWith([goodGap({ tile: { tilesetId: 'ts1', tileId: 'Door_256' } })])],
     });
     map.subHexMaps = { '0,0': { mapData: sub } } as unknown as MapData['subHexMaps'];
-    canonicalizeTileIds(map);
+    map = canonicalizeTileIds(map);
     expect(map.subHexMaps?.['0,0']?.mapData?.layers[0].wallPaths?.[0].gaps?.[0].tile?.tileId)
       .toBe('portals/Door_256');
   });

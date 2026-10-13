@@ -287,6 +287,12 @@ export interface HoveredObject {
   customTooltip?: string;
 }
 
+/** Hover context value — provided by MapSelectionProvider, read via useHoverState() */
+export interface MapHoverContextValue {
+  hoveredObject: HoveredObject | null;
+  mousePosition: MousePosition | null;
+}
+
 /** Item update for updateSelectedItemsData */
 export interface ItemUpdate {
   id: string;
@@ -333,10 +339,9 @@ export interface MapSelectionContextValue {
   groupDragInitialStateRef: { current: GroupDragInitialState | null };
   isGroupDragging: boolean;
 
-  // Hover state
-  hoveredObject: HoveredObject | null;
+  // Hover setters (stable). The hover VALUES live in MapHoverContextValue
+  // (useHoverState) so per-mousemove updates do not re-render selection consumers.
   setHoveredObject: (obj: HoveredObject | null | ((prev: HoveredObject | null) => HoveredObject | null)) => void;
-  mousePosition: MousePosition | null;
   setMousePosition: (pos: MousePosition | null | ((prev: MousePosition | null) => MousePosition | null)) => void;
 
   // Note pin modal state

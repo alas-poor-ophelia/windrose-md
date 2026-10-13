@@ -7,8 +7,6 @@ import type { TilesetDef, FolderTileset, TileEntry, TilesetOrigin } from '#types
 import { TFile } from 'obsidian';
 import type { App } from 'obsidian';
 
-import { getApp } from '../core/settingsAccessor';
-
 // ===========================================
 // Constants
 // ===========================================
@@ -759,26 +757,9 @@ function createTilesetFromTiles(
   };
 }
 
-async function createTileset(
-  folderPath: string,
-  name: string,
-  options?: {
-    tileWidth?: number;
-    tileHeight?: number;
-    hexHeight?: number;
-    fitMode?: 'fill' | 'contain';
-    overflowTop?: number;
-    overflowBottom?: number;
-    artOrientation?: 'flat' | 'pointy';
-  }
-): Promise<TilesetDef> {
-  const tiles = await scanTilesetFolder(getApp(), folderPath);
-  return createTilesetFromTiles(folderPath, name, tiles, options);
-}
-
 // ===========================================
 // Module Exports
 // ===========================================
 
-export { scanTilesetFolder, createTileset, createTilesetFromTiles, probeFirstTileImage, probeCandidateOrder, measureAlphaCoverage, autoDetectOverflow, generateTilesetId, classifyTileArtMask, analyzeTileArtMask, detectHexArtAnalysis, fitHexCellCenterY, readTileImageBinary, resolveTileEntry, tileIdBasename, mintTileId, ALPHA_COVERAGE_THRESHOLD };
+export { scanTilesetFolder, createTilesetFromTiles, probeFirstTileImage, probeCandidateOrder, measureAlphaCoverage, autoDetectOverflow, generateTilesetId, classifyTileArtMask, analyzeTileArtMask, detectHexArtAnalysis, fitHexCellCenterY, readTileImageBinary, resolveTileEntry, tileIdBasename, mintTileId, ALPHA_COVERAGE_THRESHOLD };
 export type { HexArtMask, HexArtAnalysis };

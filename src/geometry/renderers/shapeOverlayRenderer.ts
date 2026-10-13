@@ -75,52 +75,6 @@ function renderShapeOverlays(
   }
 }
 
-function renderShapePreview(
-  ctx: CanvasRenderingContext2D,
-  center: { x: number; y: number },
-  size: number,
-  shape: 'square' | 'circle',
-  color: string,
-  opacity: number,
-  viewState: ViewState
-): void {
-  const { sx, sy } = worldToScreen(center.x, center.y, viewState);
-  const screenSize = size * viewState.zoom;
-
-  ctx.save();
-  ctx.globalAlpha = opacity * 0.5;
-  ctx.fillStyle = color;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.setLineDash([6, 4]);
-
-  if (shape === 'circle') {
-    ctx.beginPath();
-    ctx.arc(sx, sy, screenSize, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = Math.min(opacity, 1);
-    ctx.stroke();
-  } else {
-    ctx.fillRect(sx - screenSize, sy - screenSize, screenSize * 2, screenSize * 2);
-    ctx.globalAlpha = Math.min(opacity, 1);
-    ctx.strokeRect(sx - screenSize, sy - screenSize, screenSize * 2, screenSize * 2);
-  }
-
-  // Center crosshair
-  ctx.setLineDash([]);
-  ctx.globalAlpha = 0.8;
-  ctx.lineWidth = 1;
-  const crossSize = 6;
-  ctx.beginPath();
-  ctx.moveTo(sx - crossSize, sy);
-  ctx.lineTo(sx + crossSize, sy);
-  ctx.moveTo(sx, sy - crossSize);
-  ctx.lineTo(sx, sy + crossSize);
-  ctx.stroke();
-
-  ctx.restore();
-}
-
 function renderPlayerLights(
   ctx: CanvasRenderingContext2D,
   objects: Array<{ position: { x: number; y: number }; freeform?: boolean; worldPosition?: { x: number; y: number }; isPlayer?: boolean; lightRadius?: number; lightColor?: string; lightEnabled?: boolean }>,
@@ -164,4 +118,4 @@ function renderPlayerLights(
   }
 }
 
-export { renderShapeOverlays, renderShapePreview, renderPlayerLights };
+export { renderShapeOverlays, renderPlayerLights };

@@ -27,6 +27,8 @@ const SAVE_DEBOUNCE_MS = 2000;
 // in sync by the tile browser.
 
 let _renderStore: TileMetadataStore = {};
+/** Bumped on every setTileMetadataForRender so render caches can key on it (STRUCT-A-31). */
+let _renderStoreVersion = 0;
 
 /** Current metadata store for the renderer. Empty until populated on map mount. */
 function getTileMetadataForRender(): TileMetadataStore {
@@ -36,6 +38,12 @@ function getTileMetadataForRender(): TileMetadataStore {
 /** Replace the renderer's metadata store (call after load or edit). */
 function setTileMetadataForRender(store: TileMetadataStore): void {
   _renderStore = store;
+  _renderStoreVersion++;
+}
+
+/** Monotonic version of the render store; changes whenever it is replaced. */
+function getTileMetadataRenderVersion(): number {
+  return _renderStoreVersion;
 }
 
 // Throttle the corrupted-file notice so we don't spam the user with a toast
@@ -453,6 +461,7 @@ export {
   saveTileMetadataDebounced,
   getTileMetadataForRender,
   setTileMetadataForRender,
+  getTileMetadataRenderVersion,
   pruneEmptyEntries,
   getEntryMetadata,
   setEntryMetadata,
