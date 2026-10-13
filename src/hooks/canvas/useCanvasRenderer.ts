@@ -46,6 +46,7 @@ import { renderRegions } from '../../geometry/renderers/regionRenderer';
 import { renderOutlines } from '../../geometry/renderers/outlineRenderer';
 import { renderShapeOverlays, renderPlayerLights } from '../../geometry/renderers/shapeOverlayRenderer';
 import { renderTiles } from '../../geometry/renderers/tileRenderer';
+import { deepRootCellKeys } from '../../geometry/renderers/tileClipRegion';
 import { gridRenderer } from '../../geometry/renderers/gridRenderer';
 import { hexRenderer } from '../../geometry/renderers/hexRenderer';
 import { renderCurves } from '../../geometry/renderers/curveRenderer';
@@ -759,17 +760,22 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Tiles under the ladder (kgc.6 / kgc.22), for the active layer and both ghost
   // passes alike: each tile draws ONCE on its HOME rung's geometry (world-anchored
   // at the parent's rect) and a tile homed finer than the active rung is skipped.
-  // At rungs >= 1 the draw is clipped to the parent hexagon - that single draw,
-  // baked into the per-level surface, is the parent art every fine cell under it
-  // inherits; the level-0 draw stays unclipped like the classic path. `tilesets`
-  // stay the root list. Groups run sequentially (renderTiles' scratch canvases
-  // are not reentrant); the root-anchored terrain strokes ride with home 0.
+  // At rungs >= 1 root tiles take the 'smart' clip by default (kgc.26): each is
+  // clipped to its own hexagon plus every neighbour WITHOUT deep content, so its
+  // art never covers a neighbour's deep paint yet still runs across empty ones;
+  // a tile with no deep neighbour draws unclipped. The developer knob can swap
+  // in the whole-hex clip ('hex') or none. Level 0 stays unclipped like the
+  // classic path. `tilesets` stay the root list. Groups run sequentially
+  // (renderTiles' scratch canvases are not reentrant); the root-anchored
+  // terrain strokes ride with home 0.
+  const tileClipMode = ladderTileClipAt(level);
   const renderLadderTiles = (
     layer: MapLayer,
     opacity: number,
     hiddenLayers: Set<string> | undefined
   ): void => {
     if (ladder === null) return;
+    const deepRoots = tileClipMode === 'smart' && level >= 1 ? deepRootCellKeys(layer, ladder, level) : undefined;
     for (const [home, homeTiles] of tilesByHomeForRung(layer.tiles ?? [], level)) {
       const strokes = home === 0 ? layer.terrainStrokes : undefined;
       if (homeTiles.length === 0 && (strokes == null || strokes.length === 0)) continue;
@@ -781,7 +787,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
         mapData.tilesets ?? [],
         homeShim,
         rendererViewState,
-        { opacity, getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers, terrainStrokes: strokes, clipToHex: ladderTileClipAt(level) }
+        { opacity, getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers, terrainStrokes: strokes,
+          clipToHex: tileClipMode === 'hex', deepRoots: home === 0 ? deepRoots : undefined }
       );
     }
   };

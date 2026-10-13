@@ -115,31 +115,39 @@ const withLayers = (over: Partial<MapData>, levels?: Record<number, unknown[]>):
     ...over,
   } as Partial<MapData>);
 
-describe('lodFlags: ladderTileClipAt (kgc.23 k)', () => {
+describe('lodFlags: ladderTileClipAt (kgc.23 k, kgc.26)', () => {
   beforeEach(() => { getSettings.mockReset(); getSettings.mockReturnValue({ lodLadder: true }); });
   afterEach(clearLadderGlobal);
 
-  it('never clips by default, at any rung', () => {
+  it('defaults to the smart clip on rungs and no clip at level 0', () => {
     clearLadderGlobal();
-    expect(ladderTileClipAt(0)).toBe(false);
-    expect(ladderTileClipAt(1)).toBe(false);
-    expect(ladderTileClipAt(3)).toBe(false);
+    expect(ladderTileClipAt(0)).toBe('none');
+    expect(ladderTileClipAt(1)).toBe('smart');
+    expect(ladderTileClipAt(3)).toBe('smart');
   });
 
-  it('honours the developer knob: rungs clips above level 0, all clips everywhere', () => {
+  it('honours the developer knob: none, rungs (whole hex >= 1), all (whole hex everywhere), smart', () => {
+    withLadderOverride({ tileClip: 'none' });
+    expect(ladderTileClipAt(0)).toBe('none');
+    expect(ladderTileClipAt(2)).toBe('none');
     withLadderOverride({ tileClip: 'rungs' });
-    expect(ladderTileClipAt(0)).toBe(false);
-    expect(ladderTileClipAt(1)).toBe(true);
+    expect(ladderTileClipAt(0)).toBe('none');
+    expect(ladderTileClipAt(1)).toBe('hex');
     withLadderOverride({ tileClip: 'all' });
-    expect(ladderTileClipAt(0)).toBe(true);
+    expect(ladderTileClipAt(0)).toBe('hex');
+    expect(ladderTileClipAt(2)).toBe('hex');
+    withLadderOverride({ tileClip: 'smart' });
+    expect(ladderTileClipAt(0)).toBe('none');
+    expect(ladderTileClipAt(1)).toBe('smart');
     withLadderOverride({ tileClip: 'bogus' });
-    expect(ladderTileClipAt(2)).toBe(false);
+    expect(ladderTileClipAt(2)).toBe('smart');
   });
 
-  it('ignores the knob when the capability flag is off', () => {
+  it('ignores the knob when the capability flag is off (default policy applies)', () => {
     getSettings.mockReturnValue({});
     withLadderOverride({ tileClip: 'all' });
-    expect(ladderTileClipAt(1)).toBe(false);
+    expect(ladderTileClipAt(0)).toBe('none');
+    expect(ladderTileClipAt(1)).toBe('smart');
   });
 });
 

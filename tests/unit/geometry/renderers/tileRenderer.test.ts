@@ -1354,5 +1354,35 @@ describe('tiles at depth: hexagon clip (kgc.6)', () => {
       run(ctx, 'grid', true);
       expect(ctx.clip).not.toHaveBeenCalled();
     });
+
+    it('smart clip (deepRoots): one union clip for a root tile beside deep content, none elsewhere', () => {
+      vi.stubGlobal('Path2D', Path2DStub);
+      const ctx = makeCtx();
+      const smartTiles: TileAssignment[] = [
+        ...tiles,
+        { col: 0, row: 1, tilesetId: 'ts1', tileId: 'base1', homeLevel: 1 },
+        { col: -1, row: 1, tilesetId: 'ts1', tileId: 'base1', freeform: true, worldX: 5, worldY: 5 },
+      ];
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, smartTiles, [ts], geom('flat'), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => img, canvasWidth: 800, canvasHeight: 600, deepRoots: new Set(['-1,0']),
+      });
+      // (0,0) neighbours (-1,0): clipped to self + the five clear neighbours.
+      // (1,1) has no deep neighbour; the deep tile and the freeform stamp never clip.
+      expect(ctx.drawImage).toHaveBeenCalledTimes(4);
+      expect(ctx.clip).toHaveBeenCalledTimes(1);
+      expect(ctx.save.mock.calls.length).toBe(ctx.restore.mock.calls.length);
+      expect(paths).toHaveLength(1);
+      expect(paths[0].match(/M/g)).toHaveLength(6);
+      expect(paths[0].startsWith(hexClipPathString(0, 0, 32, 'flat'))).toBe(true);
+    });
+
+    it('whole-hex clipToHex wins over deepRoots', () => {
+      vi.stubGlobal('Path2D', Path2DStub);
+      const ctx = makeCtx();
+      renderTiles(ctx as unknown as CanvasRenderingContext2D, tiles, [ts], geom('flat'), { x: 0, y: 0, zoom: 1 }, {
+        getCachedImage: () => img, canvasWidth: 800, canvasHeight: 600, clipToHex: true, deepRoots: new Set(['-1,0']),
+      });
+      expect(paths).toEqual([hexClipPathString(0, 0, 32, 'flat'), hexClipPathString(100, 100, 32, 'flat')]);
+    });
   });
 });
