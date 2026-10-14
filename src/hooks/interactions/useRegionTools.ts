@@ -26,7 +26,8 @@ interface RegionToolsOptions {
   geometry: ExtendedGeometry | null;
   screenToWorld: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
   screenToGrid: (clientX: number, clientY: number) => Point | null;
-  onRegionsChange: (regions: Region[]) => void;
+  /** suppressHistory: a live label-drag move (pins the pre-drag value; the drop commits one step). */
+  onRegionsChange: (regions: Region[], suppressHistory?: boolean) => void;
 }
 
 interface ContextMenuState {
@@ -96,6 +97,8 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
   // Document that owns the element the label drag started on (popout-safe
   // target for the document-level move/up listeners below).
   const labelDragDocRef = useRef<Document | null>(null);
+  // Regions after the last live label-drag move; committed once at drop.
+  const labelDragRegionsRef = useRef<Region[] | null>(null);
   const handlePointerMoveRef = useRef<((e: PointerEvent) => void) | null>(null);
   const handlePointerUpRef = useRef<((e: PointerEvent) => void) | null>(null);
 
@@ -318,20 +321,26 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     }
 
     // Update region with new label position (running delta)
+    // Live move: suppressed, so the whole drag is one undo step committed at drop.
     const regions = updateById<Region>(mapData.regions, draggingLabelRegionId, { labelPosition: newPos });
-    onRegionsChange(regions);
+    labelDragRegionsRef.current = regions;
+    onRegionsChange(regions, true);
   }, [draggingLabelRegionId, getWorldCoords, mapData, geometry, onRegionsChange]);
 
   const handlePointerUp = useCallback((_e: PointerEvent): void => {
     if (draggingLabelRegionId != null && draggingLabelRegionId !== '') {
       setDraggingLabelRegionId(null);
       labelDragStartRef.current = null;
+      // Commit the drag as one history step (a click without a move commits nothing).
+      const dragged = labelDragRegionsRef.current;
+      labelDragRegionsRef.current = null;
+      if (dragged != null) onRegionsChange(dragged, false);
       if (labelDragCleanupRef.current) {
         labelDragCleanupRef.current();
         labelDragCleanupRef.current = null;
       }
     }
-  }, [draggingLabelRegionId]);
+  }, [draggingLabelRegionId, onRegionsChange]);
 
   // Keep refs in sync for document-level listeners
   handlePointerMoveRef.current = handlePointerMove;

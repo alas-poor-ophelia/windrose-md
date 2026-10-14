@@ -6,11 +6,14 @@ import type { SaveMapResult } from '../../persistence/fileOperations';
 import { Notice } from 'obsidian';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { saveMapData } from '../../persistence/fileOperations';
-import { registerSaveInstance, unregisterSaveInstance } from '../../persistence/saveCoordinator';
+import { notifyRestoreLanded, onRestoreLanded, registerSaveInstance, unregisterSaveInstance } from '../../persistence/saveCoordinator';
 import { clearJournal, dropRestoredSlot, journalPending, moveJournalToConflict } from '../../persistence/saveJournal';
 import { mintId } from '../../core/ids';
 
 type MapDataSetter = (value: MapData | null | ((prev: MapData | null) => MapData | null)) => void;
+
+/** Re-reads this map from the store (tree + write generation); null when it cannot. */
+type StoreReader = () => Promise<{ data: MapData; generation: number } | null>;
 
 /**
  * Minted once per plugin load (module evaluation). Writer ids embed it so an
@@ -110,7 +113,13 @@ function useDebouncedSave(
    * load, advanced here on every successful save. Passed to saveMapData so a
    * tree that another mount has since overwritten is refused, not written.
    */
-  baseGenRef: { current: number }
+  baseGenRef: { current: number },
+  /**
+   * Re-read the store. Used to silently adopt the store when this mount's
+   * base went stale without any real edit of its own (a sibling pane
+   * restored a crash copy, or a cosmetic write was refused).
+   */
+  readStore?: StoreReader
 ): UseDebouncedSaveResult {
   // Unsaved data: set by every edit, cleared ONLY when a save of that exact
   // version lands (or is refused as stale). A failed save keeps it, so the
@@ -165,6 +174,31 @@ function useDebouncedSave(
   // shutdown registry, retry timer).
   const flushRef = useRef({ app, mapId, pendingData });
   flushRef.current = { app, mapId, pendingData };
+  const readStoreRef = useRef(readStore);
+  readStoreRef.current = readStore;
+
+  /**
+   * Adopt the store's tree and generation, but only while this mount has
+   * nothing of its own to lose: no real edit, no pending tree (unless the
+   * caller is dropping it: a stale refusal), and no edit made while the read
+   * was in flight. A pending cosmetic tree is left to save; its refusal
+   * adopts then.
+   */
+  const adoptStore = (droppingPending: boolean): void => {
+    const read = readStoreRef.current;
+    if (read == null || deletedRef.current || unmountedRef.current || hasRealEditRef.current) return;
+    if (!droppingPending && flushRef.current.pendingData != null) return;
+    const since = saveVersionRef.current;
+    void read().then((loaded) => {
+      if (loaded == null || deletedRef.current || unmountedRef.current) return;
+      if (hasRealEditRef.current || saveVersionRef.current !== since) return;
+      baseGenRef.current = loaded.generation;
+      lastLandedRef.current = loaded.data;
+      setMapData(loaded.data);
+    });
+  };
+  const adoptStoreRef = useRef(adoptStore);
+  adoptStoreRef.current = adoptStore;
 
   /** Journal `data` into this writer's live slot, skipping an unchanged re-write. */
   const journalNow = (data: MapData, version: number): boolean => {
@@ -292,6 +326,9 @@ function useDebouncedSave(
       if (restoreVersionRef.current != null && version >= restoreVersionRef.current) {
         dropRestoredSlot(a, m, writerId);
         restoreVersionRef.current = null;
+        // Sibling panes of this map loaded the pre-restore store: let the
+        // ones without edits of their own follow (multi-pane restore).
+        notifyRestoreLanded(m, writerId);
       }
     } else if (result.status === 'stale') {
       if (unmountedRef.current && hasRealEditRef.current) {
@@ -337,7 +374,10 @@ function useDebouncedSave(
         setSaveStatus('Save failed');
         setStaleConflict(true);
       } else {
+        // Nothing of the user's was refused (a cosmetic write, or a sibling
+        // pane restored a crash copy): no conflict panel, follow the store.
         setSaveStatus('Saved');
+        adoptStoreRef.current(true);
       }
       return;
     }
@@ -528,6 +568,13 @@ function useDebouncedSave(
     });
     return () => unregisterSaveInstance(id);
   }, []);
+
+  // A sibling pane's save of a journal-restored tree landed: this mount's
+  // base predates it. Follow the store unless the user edited here.
+  useEffect(() => onRestoreLanded((landedMapId, landedWriterId) => {
+    if (landedWriterId === instanceIdRef.current || landedMapId !== flushRef.current.mapId) return;
+    adoptStoreRef.current(false);
+  }), []);
 
   const applyRestored = useCallback((data: MapData): void => {
     restoredTreeRef.current = data;

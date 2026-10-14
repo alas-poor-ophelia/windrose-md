@@ -15,6 +15,7 @@ import {
   clearJournal,
   readJournal,
   resolveJournalOnLoad,
+  resetJournalLoadState,
   isJournalKept,
   readKeptEntries,
   moveJournalToConflict,
@@ -99,6 +100,7 @@ describe('Keep for later (MEM-06)', () => {
     expect(description(readJournal(app, 'keep-q')?.payload)).toBe('edit after keep');
 
     // The next load offers both: the live edit first, then the kept one.
+    resetJournalLoadState(); // a new plugin load (a keep defers the entry for the rest of this one)
     const sources: string[] = [];
     await resolveJournalOnLoad(app, 'keep-q', '', async (_t, _l, source) => { sources.push(source); return 'discard'; });
     expect(sources).toEqual(['live', 'kept']);
@@ -129,6 +131,7 @@ describe('Keep for later (MEM-06)', () => {
   it('restore releases the keep so the landing save clears it', async () => {
     const { app } = divergent('keep-4');
     await resolveJournalOnLoad(app, 'keep-4', '', async () => 'keep');
+    resetJournalLoadState(); // a new plugin load (a keep defers the entry for the rest of this one)
     const restored = await resolveJournalOnLoad(app, 'keep-4', '', async () => 'restore');
 
     expect(restored?.description).toBe('unsaved edit');

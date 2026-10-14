@@ -779,6 +779,69 @@ function preparePayload(app: App, mapId: string, c: JournalCandidate): MapData |
 }
 
 /**
+ * One restore decision per map per plugin load (multi-pane live check). Every
+ * pane mounting a map calls resolveJournalOnLoad; while one round for a map is
+ * open, later callers await it and return null instead of prompting for the
+ * same slot. The deciding pane applies a restore; the others adopt the store
+ * once that pane's save of the restored tree lands (saveCoordinator
+ * onRestoreLanded). Module state: it resets with every plugin load.
+ */
+const resolutionsInFlight = new Map<string, Promise<MapData | null>>();
+
+/** Candidates deferred ("Keep for later" or Escape) this load, per map: not offered again until the next load. */
+const deferredThisLoad = new Map<string, Set<string>>();
+
+function candidateKey(e: JournalEntry): string {
+  return String(e.savedAt) + ':' + String(e.payload.length);
+}
+
+function isDeferredThisLoad(mapId: string, e: JournalEntry): boolean {
+  return deferredThisLoad.get(mapId)?.has(candidateKey(e)) === true;
+}
+
+function markDeferredThisLoad(mapId: string, e: JournalEntry): void {
+  let set = deferredThisLoad.get(mapId);
+  if (set == null) { set = new Set<string>(); deferredThisLoad.set(mapId, set); }
+  set.add(candidateKey(e));
+}
+
+/** Test seam: forget this load's per-map decisions (a fresh plugin load). */
+function resetJournalLoadState(): void {
+  resolutionsInFlight.clear();
+  deferredThisLoad.clear();
+}
+
+/** Whether a live candidate still sits, unchanged, in its slot (another pane may have resolved it). */
+function liveCandidatePresent(app: App, c: JournalCandidate): boolean {
+  if (c.source !== 'live') return true;
+  const now = readLiveSlot(app, c.slot ?? c.entry.mapId);
+  return now != null && now.savedAt === c.entry.savedAt && now.payload === c.entry.payload;
+}
+
+async function resolveJournalOnLoad(
+  app: App,
+  mapId: string,
+  mapLabel = '',
+  prompt?: (savedAt: number, mapLabel: string, source: JournalSource) => Promise<JournalChoice>,
+  restoringWriterId?: string
+): Promise<MapData | null> {
+  const open = resolutionsInFlight.get(mapId);
+  if (open != null) {
+    // Another pane of this map is deciding: never a second prompt for the
+    // same slot. Its outcome reaches this pane through the store.
+    try { await open; } catch { /* the deciding pane reports its own failure */ }
+    return null;
+  }
+  const round = resolveJournalRound(app, mapId, mapLabel, prompt, restoringWriterId);
+  resolutionsInFlight.set(mapId, round);
+  try {
+    return await round;
+  } finally {
+    if (resolutionsInFlight.get(mapId) === round) resolutionsInFlight.delete(mapId);
+  }
+}
+
+/**
  * Load-time journal replay. Returns the recovered MapData when the user chose
  * to restore, otherwise null (nothing to do).
  *
@@ -787,7 +850,7 @@ function preparePayload(app: App, mapId: string, c: JournalCandidate): MapData |
  * is compared with disk (a landed save clears silently) and only then
  * prompted. A "keep" ends the round (no nagging through the rest).
  */
-async function resolveJournalOnLoad(
+async function resolveJournalRound(
   app: App,
   mapId: string,
   mapLabel = '',
@@ -804,12 +867,14 @@ async function resolveJournalOnLoad(
   // One live candidate per writer slot (several panes may have crashed), newest first.
   // A mounted sibling pane's slot is skipped: it is that pane's in-flight crash copy.
   for (const entry of readLiveEntries(app, mapId)) {
-    if (isLiveWriterSlot(entry)) continue;
+    if (isLiveWriterSlot(entry) || isDeferredThisLoad(mapId, entry)) continue;
     candidates.push({ source: 'live', entry, slot: entry.slot });
   }
-  for (const entry of [...readKeptEntries(app, mapId)].reverse()) candidates.push({ source: 'kept', entry });
+  for (const entry of [...readKeptEntries(app, mapId)].reverse()) {
+    if (!isDeferredThisLoad(mapId, entry)) candidates.push({ source: 'kept', entry });
+  }
   const conflictEntry = readConflictJournal(app, mapId);
-  if (conflictEntry != null) candidates.push({ source: 'conflict', entry: conflictEntry });
+  if (conflictEntry != null && !isDeferredThisLoad(mapId, conflictEntry)) candidates.push({ source: 'conflict', entry: conflictEntry });
   if (candidates.length === 0) return null;
 
   if (isMapTombstoned(mapId)) {
@@ -830,6 +895,16 @@ async function resolveJournalOnLoad(
       : await new JournalRestoreModal(app, c.entry.savedAt, mapLabel, c.source).openAndGetChoice();
 
     if (choice === 'keep') {
+      // The store may have moved while the prompt was open (another pane
+      // restored this tree and saved it): a copy identical to the store is
+      // not unsaved work, and a slot already resolved elsewhere is gone.
+      // Neither is set aside "for later".
+      if (compareJournalToDisk(c.entry.payload, await readRawMapEntry(app, mapId)) === 'clean') {
+        dropCandidate(app, mapId, c);
+        return null;
+      }
+      if (!liveCandidatePresent(app, c)) return null;
+      markDeferredThisLoad(mapId, c.entry);
       keepCandidate(app, mapId, c);
       return null;
     }
@@ -865,5 +940,5 @@ async function resolveJournalOnLoad(
   return null;
 }
 
-export { journalPending, clearJournal, dropRestoredSlot, isJournalKept, readKeptEntries, moveJournalToConflict, readConflictJournal, readJournal, pruneJournal, setJournalWriterLive, compareJournalToDisk, resolveJournalOnLoad, MAX_JOURNAL_PAYLOAD, JOURNAL_MAX_AGE_MS, JOURNAL_INDEX_KEY, JOURNAL_KEY_PREFIX, JOURNAL_META_PREFIX, RAW_PAYLOAD_LIMIT, KEPT_KEY_PREFIX, KEPT_MAX_PER_MAP, CONFLICT_KEY_PREFIX };
+export { journalPending, clearJournal, dropRestoredSlot, isJournalKept, readKeptEntries, moveJournalToConflict, readConflictJournal, readJournal, pruneJournal, setJournalWriterLive, compareJournalToDisk, resolveJournalOnLoad, resetJournalLoadState, MAX_JOURNAL_PAYLOAD, JOURNAL_MAX_AGE_MS, JOURNAL_INDEX_KEY, JOURNAL_KEY_PREFIX, JOURNAL_META_PREFIX, RAW_PAYLOAD_LIMIT, KEPT_KEY_PREFIX, KEPT_MAX_PER_MAP, CONFLICT_KEY_PREFIX };
 export type { LiveEntry, JournalSource, ConflictMoveResult };

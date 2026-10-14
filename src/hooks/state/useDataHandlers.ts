@@ -285,14 +285,16 @@ function useDataHandlers({
   }, [updateMapData]);
 
   // Handle regions change (hex maps only) - tracked in history for undo/redo
-  const handleRegionsChange = useCallback((regions: Region[]): void => {
+  // suppressHistory: a live region-label drag move; it pins the pre-drag value
+  // and the drop commit records the whole drag as one step.
+  const handleRegionsChange = useCallback((regions: Region[], suppressHistory = false): void => {
     if (isApplyingHistory()) return;
 
     updateMapData((currentMapData) => {
       if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, regions, currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []));
+      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, regions, currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []), { transient: suppressHistory });
 
       return { ...currentMapData, regions };
     });

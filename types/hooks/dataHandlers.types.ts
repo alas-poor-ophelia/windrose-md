@@ -87,7 +87,7 @@ export type HandleObjectSetChange = (setId: string | null) => void;
 export type HandleTextLabelSettingsChange = (settings: TextLabelSettings) => void;
 
 /** Handle regions change (hex maps only) */
-export type HandleRegionsChange = (regions: Region[]) => void;
+export type HandleRegionsChange = (regions: Region[], suppressHistory?: boolean) => void;
 
 // ===========================================
 // Grouped Handlers

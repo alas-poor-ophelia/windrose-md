@@ -120,8 +120,20 @@ function useMapData(
   // with the active map and this hook's settingsVersion (windrose-1mc).
   useTilesetBuilder(app, mapData, setMapData, isLoading, settingsVersion);
 
+  // Silent re-read for useDebouncedSave's adopt path (a sibling pane restored
+  // a crash copy, or a cosmetic write was refused): no loading state, no
+  // journal round. A failure leaves the pane as it is.
+  const readStore = useCallback(async (): Promise<{ data: MapData; generation: number } | null> => {
+    try {
+      return await loadMapDataWithGeneration(app, mapId, mapName, mapType);
+    } catch (e) {
+      console.warn('[Windrose] Re-reading the map after a sibling save failed:', e);
+      return null;
+    }
+  }, [app, mapId, mapName, mapType]);
+
   const { saveStatus, updateMapData, forceSave, markDeleted, mapDeleted: saveDeleted, staleConflict, acknowledgeStaleConflict, writerId, applyRestored } =
-    useDebouncedSave(app, mapId, setMapData, baseGenRef);
+    useDebouncedSave(app, mapId, setMapData, baseGenRef, readStore);
   applyRestoredRef.current = applyRestored;
   writerIdRef.current = writerId;
 

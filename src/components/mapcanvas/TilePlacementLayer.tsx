@@ -14,7 +14,7 @@ import type { TileAssignment, TileRotation, TileLayerRole, TilesetDef, TileMetad
 import type { TileSubtoolId } from '#types/tiles/tile.types';
 
 import { Notice } from 'obsidian';
-import { useCallback, useRef } from 'preact/hooks';
+import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
 import { assertNever } from '../../utils/assertNever';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
@@ -86,7 +86,7 @@ const TilePlacementLayer = ({
   tileDepth,
   onTilesChange
 }: TilePlacementLayerProps): VNode | null => {
-  const { mapData, geometry, screenToGrid, screenToWorld } = useMapState();
+  const { canvasRef, mapData, geometry, screenToGrid, screenToWorld } = useMapState();
   const app = useApp();
   // Subscribed, so a classification change re-renders the layer (STRUCT-A-20).
   const tileMetadata = useTileMetadata(app);
@@ -359,8 +359,47 @@ const TilePlacementLayer = ({
     });
   }, [geometry, tileScale, placeStampAtWorld]);
 
+  // End the open stroke: commit it as ONE history entry from the stroke ref,
+  // NOT the mapData closure (pointerup can fire before Preact re-renders from
+  // the stroke's state updates, and the stale closure would commit pre-stroke
+  // tiles). Idempotent: a second call finds no open stroke.
+  const endStroke = useCallback(() => {
+    if (strokeTilesRef.current !== null) {
+      onTilesChange(strokeTilesRef.current, false);
+      strokeTilesRef.current = null;
+    }
+    isDraggingRef.current = false;
+    paintedInStrokeRef.current = new Set();
+    lastGridPosRef.current = null;
+    scatterLastDropRef.current = null;
+  }, [onTilesChange]);
+  const endStrokeRef = useRef(endStroke);
+  endStrokeRef.current = endStroke;
+
+  // A stroke's live writes are history-suppressed, so a stroke whose release
+  // never reaches the canvas route (released outside the canvas, a mouseup the
+  // coordinator consumes first, a tool switch mid-stroke) would leave its
+  // tiles on the map with no undo step (live check A5) and the brush stuck
+  // down. Close it from the window too, and when the tool disarms or unmounts.
+  useEffect(() => {
+    if (!isTileTool) return undefined;
+    const win = canvasRef.current?.ownerDocument.defaultView ?? window;
+    const onUp = (): void => { endStrokeRef.current(); };
+    win.addEventListener('mouseup', onUp);
+    win.addEventListener('touchend', onUp);
+    win.addEventListener('touchcancel', onUp);
+    return () => {
+      win.removeEventListener('mouseup', onUp);
+      win.removeEventListener('touchend', onUp);
+      win.removeEventListener('touchcancel', onUp);
+      endStrokeRef.current();
+    };
+  }, [isTileTool, canvasRef]);
+
   const handlePointerDown = useCallback((e: PointerEvent) => {
     if (!isTileTool || !geometry) return;
+    // A stroke still open here lost its release: commit it before starting anew.
+    if (strokeTilesRef.current !== null) endStroke();
     // Openings are seated by the wall tool; tilePaint never places them (mirrors
     // the 'line'/'brush' subtool no-ops below).
     if (isOpeningAsset) return;
@@ -426,7 +465,7 @@ const TilePlacementLayer = ({
     } else {
       eraseTilesInBrush(coords.x, coords.y);
     }
-  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, isOpeningAsset, activeSubtool, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, scatterAdvance, floodFillAtCell, mapData]);
+  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, isOpeningAsset, activeSubtool, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, scatterAdvance, floodFillAtCell, mapData, endStroke]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     // Only the paint/erase grid stroke sets isDraggingRef; the click-only
@@ -462,19 +501,7 @@ const TilePlacementLayer = ({
     lastGridPosRef.current = current;
   }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, activeSubtool, placeTilesInBrush, eraseTilesInBrush, scatterAdvance]);
 
-  const handlePointerUp = useCallback(() => {
-    if (strokeTilesRef.current !== null) {
-      // Commit the history entry from the stroke ref, NOT the mapData closure:
-      // pointerup can fire before Preact re-renders from the stroke's state
-      // updates, and the stale closure would commit pre-stroke tiles.
-      onTilesChange(strokeTilesRef.current, false);
-      strokeTilesRef.current = null;
-    }
-    isDraggingRef.current = false;
-    paintedInStrokeRef.current = new Set();
-    lastGridPosRef.current = null;
-    scatterLastDropRef.current = null;
-  }, [onTilesChange]);
+  const handlePointerUp = useCallback(() => { endStroke(); }, [endStroke]);
 
   useLayerHandlers(
     'tilePlacement',

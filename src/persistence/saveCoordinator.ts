@@ -116,6 +116,30 @@ function installLifecycleJournaling(app: App): () => void {
   };
 }
 
+/**
+ * A pane's save of a journal-restored tree landed. Other panes of the same map
+ * loaded the store BEFORE that write, so their base is now stale; a pane with
+ * no real edit of its own re-reads the store instead of being refused later
+ * (multi-pane restore). Module-level so popout windows share it.
+ */
+type RestoreLandedListener = (mapId: string, writerId: string) => void;
+const restoreLandedListeners = new Set<RestoreLandedListener>();
+
+function onRestoreLanded(listener: RestoreLandedListener): () => void {
+  restoreLandedListeners.add(listener);
+  return () => { restoreLandedListeners.delete(listener); };
+}
+
+function notifyRestoreLanded(mapId: string, writerId: string): void {
+  for (const listener of [...restoreLandedListeners]) {
+    try {
+      listener(mapId, writerId);
+    } catch (e) {
+      console.error('[Windrose] Restore-landed listener failed:', e);
+    }
+  }
+}
+
 /** Test/diagnostic helper: how many instances are currently registered. */
 function registeredInstanceCount(): number {
   return instances.size;
@@ -128,5 +152,7 @@ export {
   journalAll,
   installLifecycleJournaling,
   registeredInstanceCount,
+  onRestoreLanded,
+  notifyRestoreLanded,
 };
 
