@@ -440,8 +440,16 @@ function setJournalWriterLive(writerId: string, live: boolean): void {
   else liveWriters.delete(writerId);
 }
 
+/**
+ * Pre-nonce writer ids (`windrose-save-<n>`, before live check N6) restarted
+ * at every plugin load; current ids are `<bootNonce>-<n>`, unique across loads,
+ * so no mounted pane can own a legacy slot: it is always a stale crash copy.
+ */
+const LEGACY_WRITER_ID = /^windrose-save-\d+$/;
+
+/** Exact-id match against the mounted writers; legacy-format slots are never live. */
 function isLiveWriterSlot(entry: LiveEntry): boolean {
-  return entry.writerId != null && liveWriters.has(entry.writerId);
+  return entry.writerId != null && !LEGACY_WRITER_ID.test(entry.writerId) && liveWriters.has(entry.writerId);
 }
 
 /** Every live entry of `mapId`, newest first. */

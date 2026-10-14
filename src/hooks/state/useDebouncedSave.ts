@@ -8,11 +8,31 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { saveMapData } from '../../persistence/fileOperations';
 import { registerSaveInstance, unregisterSaveInstance } from '../../persistence/saveCoordinator';
 import { clearJournal, dropRestoredSlot, journalPending, moveJournalToConflict } from '../../persistence/saveJournal';
+import { mintId } from '../../core/ids';
 
 type MapDataSetter = (value: MapData | null | ((prev: MapData | null) => MapData | null)) => void;
 
-/** Unique per mounted hook instance — the coordinator registry is keyed by it. */
+/**
+ * Minted once per plugin load (module evaluation). Writer ids embed it so an
+ * id is unique ACROSS loads: the counter below restarts at every load, and a
+ * crash slot left by `<nonce-A>-15` must never match a pane `<nonce-B>-15` of
+ * the next load in the journal's live-writer registry (live check N6: such a
+ * collision hid the restore prompt after a crash or restart).
+ */
+const WRITER_BOOT_NONCE = mintId('w');
+
+/** Per-load mount counter; only unique within one load (see WRITER_BOOT_NONCE). */
 let instanceCounter = 0;
+
+/**
+ * A fresh writer id, unique per mounted hook instance and across plugin loads:
+ * `<bootNonce>-<n>`. It keys the coordinator registry, the journal live slot
+ * (`<mapId>@@<writerId>`) and the write-generation guard; it never contains
+ * the `@@` slot separator.
+ */
+function nextWriterId(): string {
+  return `${WRITER_BOOT_NONCE}-${++instanceCounter}`;
+}
 
 /** Debounce between the last edit and its save. */
 const SAVE_DEBOUNCE_MS = 2000;
@@ -139,7 +159,7 @@ function useDebouncedSave(
   // mount as the writer in saveMapData's generation registry, so an instance
   // is never refused as stale against its own previous write.
   const instanceIdRef = useRef<string>('');
-  if (instanceIdRef.current === '') instanceIdRef.current = `windrose-save-${++instanceCounter}`;
+  if (instanceIdRef.current === '') instanceIdRef.current = nextWriterId();
 
   // Latest values for callbacks that must stay stable (unmount flush,
   // shutdown registry, retry timer).
@@ -517,4 +537,4 @@ function useDebouncedSave(
   return { saveStatus, updateMapData, forceSave, markDeleted, mapDeleted, staleConflict, acknowledgeStaleConflict, writerId: instanceIdRef.current, applyRestored };
 }
 
-export { useDebouncedSave, retryDelayMs, MAX_SAVE_RETRIES };
+export { useDebouncedSave, retryDelayMs, MAX_SAVE_RETRIES, nextWriterId, WRITER_BOOT_NONCE };
