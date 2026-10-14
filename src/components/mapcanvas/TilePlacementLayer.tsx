@@ -15,7 +15,7 @@ import type { TileSubtoolId } from '#types/tiles/tile.types';
 
 import { Notice } from 'obsidian';
 import { useCallback, useEffect, useRef } from 'preact/hooks';
-import { useMapState } from '../../context/MapContext';
+import { useMapState, useMapOperations } from '../../context/MapContext';
 import { assertNever } from '../../utils/assertNever';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useApp } from '../../context/AppContext';
@@ -400,18 +400,23 @@ const TilePlacementLayer = ({
   // NOT the mapData closure (pointerup can fire before Preact re-renders from
   // the stroke's state updates, and the stale closure would commit pre-stroke
   // tiles). Idempotent: a second call finds no open stroke.
+  const { clearTransient } = useMapOperations();
   const endStroke = useCallback(() => {
     // Skipped when the active layer changed mid-stroke (see strokeCommitFor).
+    const hadStroke = strokeTilesRef.current !== null;
     const commit = strokeCommitFor(strokeTilesRef.current, strokeLayerIdRef.current, activeLayerIdRef.current);
     strokeTilesRef.current = null;
     strokeLayerIdRef.current = null;
     strokeTouchIdRef.current = null;
     if (commit !== null) onTilesChange(commit, false);
+    // Layer switched mid-stroke: no commit, so drop the stroke's transient baseline
+    // or the next paint plus one undo would also remove the stroke's tiles.
+    else if (hadStroke) clearTransient?.();
     isDraggingRef.current = false;
     paintedInStrokeRef.current = new Set();
     lastGridPosRef.current = null;
     scatterLastDropRef.current = null;
-  }, [onTilesChange]);
+  }, [onTilesChange, clearTransient]);
   const endStrokeRef = useRef(endStroke);
   endStrokeRef.current = endStroke;
 

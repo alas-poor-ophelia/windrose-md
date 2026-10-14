@@ -124,6 +124,24 @@ describe.each(maps)('tile placement undo on a %s', (_label, make) => {
   });
 });
 
+describe('layer-switch stroke close', () => {
+  it('a stroke closed without commit then a paint: one undo removes only the paint', () => {
+    const m = mount(createNewMap('Map', 'hex'));
+    // Seed one committed tile so the layer exists with history.
+    m.tiles([tile(0, 0)]);
+    // Stroke live writes (suppressed), then the layer-switch close: no commit, clearTransient.
+    let live = [...(getActiveLayer(m.map()).tiles ?? [])];
+    for (const c of [1, 2, 3]) { live = [...live, tile(c, 5)]; m.tiles(live, true); }
+    act(() => { m.history().clearTransient(); });
+    // Back on the original layer: paint one tile on top of the stroke tiles.
+    m.tiles([...(getActiveLayer(m.map()).tiles ?? []), tile(9, 9)]);
+    expect(getActiveLayer(m.map()).tiles).toHaveLength(5);
+
+    act(() => { m.history().handleUndo(); });
+    expect(getActiveLayer(m.map()).tiles).toHaveLength(4);
+  });
+});
+
 describe('region label drag (fix-beacon-undo follow-up)', () => {
   it('a label drag of several moves is one undo step', () => {
     let map = createNewMap('Map', 'hex');
