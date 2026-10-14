@@ -254,7 +254,7 @@ interface LoadedBrushFooterProps {
   selectedTile: TileEntry;
   thumbUrl: string | null;
   /** "loaded on …" target: the depth label on grid maps, else the tile layer. */
-  loadedOnLabel: string;
+  loadedOnLabel?: string;
   selectedForm: TileForm | null;
   rotation: number;
   onRotateCW: () => void;
@@ -370,7 +370,7 @@ function LoadedBrushFooter({
         <div className="meta">
           <div className="n">{selectedTile.filename}</div>
           <div className="s">
-            {selectedTile.category ?? 'Uncategorized'} · loaded on {loadedOnLabel}
+            {selectedTile.category ?? 'Uncategorized'}{loadedOnLabel != null ? ` · loaded on ${loadedOnLabel}` : ''}
           </div>
         </div>
         <button

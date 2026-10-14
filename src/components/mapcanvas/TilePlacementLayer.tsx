@@ -61,7 +61,6 @@ export interface TilePlacementLayerProps {
   selectedTileId: string | null;
   tileRotation: number;
   tileFlipH: boolean;
-  tileLayer: 'base' | 'overlay';
   tileFitMode: 'fill' | 'contain' | 'auto';
   /** Armed placement subtool from the drawer ribbon (null = no tile selected). */
   activeSubtool: TileSubtoolId | null;
@@ -79,7 +78,6 @@ const TilePlacementLayer = ({
   selectedTileId,
   tileRotation,
   tileFlipH,
-  tileLayer,
   tileFitMode,
   activeSubtool,
   tileScale,
@@ -128,8 +126,6 @@ const TilePlacementLayer = ({
     let currentTiles = strokeTilesRef.current ?? getActiveLayer(mapData).tiles ?? [];
     let changed = false;
 
-    const targetPlacement = tileLayer === 'base' ? 'fill' : 'overlay';
-
     // Snapshot the tile's detected footprint (grid only) onto the placement so it
     // stays stable if the metadata later changes. A prop with span > 1 ignores
     // brush size and places a single footprint at the anchor. Resolution goes
@@ -152,7 +148,6 @@ const TilePlacementLayer = ({
         tileId: selectedTileId,
         rotation: (tileRotation || undefined),
         flipH: tileFlipH || undefined,
-        placement: targetPlacement === 'fill' ? undefined : targetPlacement,
         depth: tileDepth === 'ground' ? undefined : tileDepth,
         fitMode: tileFitMode === 'auto' ? undefined : tileFitMode,
         scale: tileScale !== 1 ? tileScale : undefined,
@@ -167,7 +162,7 @@ const TilePlacementLayer = ({
         paintedInStrokeRef.current.add(`${c.col},${c.row}`);
       }
       const remaining = currentTiles.filter(
-        (t: TileAssignment) => (t.placement ?? 'fill') !== targetPlacement || !assignmentsOverlap(t, newTile)
+        (t: TileAssignment) => (t.placement ?? 'fill') !== 'fill' || !assignmentsOverlap(t, newTile)
       );
       currentTiles = [...remaining, newTile];
       changed = true;
@@ -178,7 +173,7 @@ const TilePlacementLayer = ({
       if (isBatchedStroke) strokeTilesRef.current = currentTiles;
       onTilesChange(currentTiles, isBatchedStroke);
     }
-  }, [mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, brushSize, paintEdgeBlend, tileDepth, onTilesChange, app, tileMetadata]);
+  }, [mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileFitMode, tileScale, brushSize, paintEdgeBlend, tileDepth, onTilesChange, app, tileMetadata]);
 
   const eraseTilesInBrush = useCallback((col: number, row: number) => {
     if (!mapData) return;
@@ -278,11 +273,10 @@ const TilePlacementLayer = ({
     }
     if (fillCells.length === 0) return;
 
-    const targetPlacement = tileLayer === 'base' ? 'fill' : 'overlay';
     const fillKeys = new Set(fillCells.map(c => `${c.col},${c.row}`));
 
     const newTiles = currentTiles.filter((t: TileAssignment) => {
-      if ((t.placement ?? 'fill') !== targetPlacement) return true;
+      if ((t.placement ?? 'fill') !== 'fill') return true;
       return t.freeform === true
         ? !fillKeys.has(`${t.col},${t.row}`)
         : !cellsCoveredByAssignment(t).some(c => fillKeys.has(`${c.col},${c.row}`));
@@ -295,7 +289,6 @@ const TilePlacementLayer = ({
         tileId: selectedTileId,
         rotation: (tileRotation || undefined),
         flipH: tileFlipH || undefined,
-        placement: targetPlacement === 'fill' ? undefined : targetPlacement,
         depth: tileDepth === 'ground' ? undefined : tileDepth,
         fitMode: tileFitMode === 'auto' ? undefined : tileFitMode,
         feather,
@@ -303,7 +296,7 @@ const TilePlacementLayer = ({
     }
 
     onTilesChange(newTiles);
-  }, [app, mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, paintEdgeBlend, tileDepth, onTilesChange, tileMetadata]);
+  }, [app, mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileFitMode, paintEdgeBlend, tileDepth, onTilesChange, tileMetadata]);
 
   const placeStampAtWorld = useCallback((
     worldX: number,

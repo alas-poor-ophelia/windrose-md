@@ -105,7 +105,6 @@ const MapCanvasLayers = ({
         selectedTileId={selectedTileId}
         tileRotation={tileBrush.tileRotation}
         tileFlipH={tileBrush.tileFlipH}
-        tileLayer={tileBrush.tileLayer}
         tileFitMode={tileBrush.tileFitMode}
         activeSubtool={tileSubtool}
         tileScale={tileScale}

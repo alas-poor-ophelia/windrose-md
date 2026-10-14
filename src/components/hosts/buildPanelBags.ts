@@ -106,8 +106,6 @@ function buildPanelBags(src: PanelBagSources): PanelBags {
       flipH: tb.tileFlipH,
       onRotationChange: tb.setTileRotation,
       onFlipChange: tb.setTileFlipH,
-      tileLayer: tb.tileLayer,
-      onTileLayerChange: tb.setTileLayer,
       tileDepth: tb.tileDepth,
       onTileDepthChange: src.onTileDepthChange,
       hidden: tb.hiddenLayers,

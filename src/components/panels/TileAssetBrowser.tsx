@@ -127,8 +127,6 @@ interface TileAssetBrowserProps {
   flipH: boolean;
   onRotationChange: (rotation: number) => void;
   onFlipChange: (flipH: boolean) => void;
-  tileLayer: 'base' | 'overlay';
-  onTileLayerChange: (layer: 'base' | 'overlay') => void;
   tileDepth: TileLayerRole;
   onTileDepthChange: (depth: TileLayerRole) => void;
   hidden?: Set<TileLayerRole>;
@@ -236,7 +234,6 @@ const TileAssetBrowser = memo(({
   flipH,
   onRotationChange,
   onFlipChange,
-  tileLayer,
   tileDepth,
   onTileDepthChange,
   hidden,
@@ -826,7 +823,7 @@ const TileAssetBrowser = memo(({
   // ---- Main render ----
 
   const isGrid = mapType === 'grid';
-  const depthLabel = isGrid ? depthMeta(tileDepth).label.toLowerCase() : tileLayer;
+  const depthLabel = isGrid ? depthMeta(tileDepth).label.toLowerCase() : 'tiles';
 
   // Unified facet model — the quick chips AND the dedicated Filter screen share one filter state.
   const activeFilterCount = activeTags.size + packFilter.size;
@@ -1259,7 +1256,7 @@ const TileAssetBrowser = memo(({
           compact={compact}
           selectedTile={selectedTile}
           thumbUrl={getThumbUrl(selectedTile.vaultPath)}
-          loadedOnLabel={isGrid ? depthMeta(tileDepth).label : tileLayer}
+          loadedOnLabel={isGrid ? depthMeta(tileDepth).label : undefined}
           selectedForm={selectedForm}
           rotation={rotation}
           onRotateCW={handleRotateCW}

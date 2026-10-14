@@ -9,7 +9,6 @@
  * - selectedTileId: Currently selected tile within tileset
  * - tileRotation: Rotation angle for tile placement
  * - tileFlipH: Horizontal flip for tile placement
- * - tileLayer: Target layer for tile placement ('base' | 'overlay')
  * - tileFitMode: How tiles fit within cells ('fill' | 'contain' | 'auto')
  * - selectedTileForm: Selected tile's derived render-form (reported by the browser)
  * - tileSubtool: Armed placement subtool (drives TilePlacementLayer behavior)
@@ -44,8 +43,6 @@ interface UseTileBrushResult {
   setTileRotation: (v: number) => void;
   tileFlipH: boolean;
   setTileFlipH: (v: boolean) => void;
-  tileLayer: 'base' | 'overlay';
-  setTileLayer: (v: 'base' | 'overlay') => void;
   tileFitMode: 'fill' | 'contain' | 'auto';
   setTileFitMode: (v: 'fill' | 'contain' | 'auto') => void;
   selectedTileForm: TileForm | null;
@@ -76,7 +73,6 @@ function useTileBrush(): UseTileBrushResult {
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
   const [tileRotation, setTileRotation] = useState<number>(0);
   const [tileFlipH, setTileFlipH] = useState<boolean>(false);
-  const [tileLayer, setTileLayer] = useState<'base' | 'overlay'>('base');
   const [tileFitMode, setTileFitMode] = useState<'fill' | 'contain' | 'auto'>('auto');
   const [selectedTileForm, setSelectedTileForm] = useState<TileForm | null>(null);
   const [tileSubtool, setTileSubtool] = useState<TileSubtoolId | null>(null);
@@ -135,7 +131,6 @@ function useTileBrush(): UseTileBrushResult {
     selectedTileId, setSelectedTileId,
     tileRotation, setTileRotation,
     tileFlipH, setTileFlipH,
-    tileLayer, setTileLayer,
     tileFitMode, setTileFitMode,
     selectedTileForm, setSelectedTileForm,
     tileSubtool, setTileSubtool,
