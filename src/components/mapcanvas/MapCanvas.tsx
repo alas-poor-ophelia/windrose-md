@@ -95,6 +95,8 @@ interface MapCanvasContentProps {
   onTilesChange?: (tiles: TileAssignment[]) => void;
   /** Arms a layer (real layer-select: swaps the per-layer history stack). */
   onLayerSelect?: (layerId: LayerId) => void;
+  /** Drops held transient-history baselines (gesture boundary; see useLayerHistory.clearTransient). */
+  clearTransient?: () => void;
   onWallPathsChange?: (wallPaths: WallPath[], suppressHistory?: boolean) => void;
   onTerrainStrokesChange?: (strokes: TerrainStroke[], suppressHistory?: boolean) => void;
   tileImagesReady?: boolean;
@@ -171,7 +173,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, adjacentEmptySlots, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex, children }: MapCanvasContentProps): VNode => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, clearTransient, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, adjacentEmptySlots, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex, children }: MapCanvasContentProps): VNode => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -470,10 +472,11 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     onEdgesChange,
     onTilesChange,
     onLayerSelect,
+    clearTransient,
     onWallPathsChange,
     onTerrainStrokesChange,
     onMapDataUpdate
-  }), [onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange, onMapDataUpdate]);
+  }), [onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, clearTransient, onWallPathsChange, onTerrainStrokesChange, onMapDataUpdate]);
 
   return (
     <EventHandlerProvider>

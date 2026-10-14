@@ -41,7 +41,7 @@ function useObjectResize(): {
   beginResize: (corner: ResizeCorner, objects: MapObject[], dragStartData: ObjectDragStart) => void;
 } {
   const { mapData, geometry, canvasRef, screenToGrid, getClientCoords } = useMapState();
-  const { updateObject, onObjectsChange, isAreaFree } = useMapOperations();
+  const { updateObject, onObjectsChange, isAreaFree, clearTransient } = useMapOperations();
   const { selectedItem, setSelectedItem, isResizeMode, dragStart, setDragStart } = useMapSelection();
 
   const [isResizing, setIsResizing] = useState(false);
@@ -236,11 +236,14 @@ function useObjectResize(): {
       if (resizeInitialStateRef.current !== null && mapData != null) {
         onObjectsChange(getActiveLayer(mapData).objects, false);
         resizeInitialStateRef.current = null;
+      } else {
+        // No commit: drop any live-move pin so the next unrelated commit cannot absorb it.
+        clearTransient?.();
       }
       return true;
     }
     return false;
-  }, [isResizing, setIsResizing, setResizeCorner, setDragStart, onObjectsChange, mapData]
+  }, [isResizing, setIsResizing, setResizeCorner, setDragStart, onObjectsChange, mapData, clearTransient]
   );
 
   return { isResizing, resizeCorner, getClickedCorner, handleObjectResizing, stopObjectResizing, beginResize };

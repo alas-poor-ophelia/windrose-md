@@ -33,6 +33,7 @@ const noop = (): void => {};
 
 vi.mock('../../../../src/context/MapContext', () => ({
   useMapState: () => ({ ...mapState, currentTool }),
+  useMapOperations: () => ({}),
 }));
 vi.mock('../../../../src/context/MapSelectionContext', () => ({
   useMapSelection: () => ({

@@ -30,7 +30,7 @@ import {
 import { getSettings } from '../../core/settingsAccessor';
 import { PartyPinInstance } from './PartyPinInstance';
 import { useApp } from '../../context/AppContext';
-import { useMapState } from '../../context/MapContext';
+import { useMapState, useMapOperations } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { usePartyPinInteraction } from '../../hooks/interactions/usePartyPinInteraction';
 
@@ -47,6 +47,7 @@ const FLASH_DURATION_MS = 1800;
 const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): VNode | null => {
   const app = useApp();
   const { mapData, geometry, mapId, notePath, distanceOverrides, screenToWorld } = useMapState();
+  const { clearTransient } = useMapOperations();
 
   // Transient highlight for "show on map" — cleared after the pulse finishes
   const [flashMarker, setFlashMarker] = useState<Point | null>(null);
@@ -83,7 +84,7 @@ const PartyPinLayer = ({ currentTool, onPartyPinsChange }: PartyPinLayerProps): 
   // one cell can each be grabbed
   const pinLocator = useMemo(() => ({ geometry, screenToWorld }), [geometry, screenToWorld]);
   const { handlePartyPinPointerDown, handlePartyPinSelectPointerDown, handlePartyPinMove, stopPartyPinDrag, isPartyPinDragging } =
-    usePartyPinInteraction(mapData?.partyPins, onPartyPinsChange, handleActivePinChange, pinLocator);
+    usePartyPinInteraction(mapData?.partyPins, onPartyPinsChange, handleActivePinChange, pinLocator, clearTransient);
 
   useLayerHandlers('partyPin', { handlePartyPinPointerDown, handlePartyPinSelectPointerDown, handlePartyPinMove, stopPartyPinDrag, isPartyPinDragging });
 

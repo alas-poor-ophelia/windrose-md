@@ -43,7 +43,8 @@ const useGroupDrag = (): UseGroupDragResult => {
 
   const {
     onObjectsChange,
-    onTextLabelsChange
+    onTextLabelsChange,
+    clearTransient
   } = useMapOperations();
 
   const {
@@ -402,7 +403,11 @@ const useGroupDrag = (): UseGroupDragResult => {
     if (!isDraggingSelection || dragStart?.isGroupDrag !== true) {
       return false;
     }
-    if (geometry == null || mapData == null) return false;
+    if (geometry == null || mapData == null) {
+      // No commit: drop any live-move pin so the next unrelated commit cannot absorb it.
+      clearTransient?.();
+      return false;
+    }
 
     // Restore original freeform state for any objects that were inverted during drag
     {
@@ -450,12 +455,15 @@ const useGroupDrag = (): UseGroupDragResult => {
       onTextLabelsChange(activeLayer.textLabels, false);
 
       groupDragInitialStateRef.current = null;
+    } else {
+      // No commit: drop any live-move pin so the next unrelated commit cannot absorb it.
+      clearTransient?.();
     }
 
     groupDragOffsetsRef.current = new Map();
 
     return true;
-  }, [isDraggingSelection, dragStart, mapData, geometry, setIsDraggingSelection, setDragStart, onObjectsChange, onTextLabelsChange, groupDragInitialStateRef, groupDragOffsetsRef]);
+  }, [isDraggingSelection, dragStart, mapData, geometry, setIsDraggingSelection, setDragStart, onObjectsChange, onTextLabelsChange, groupDragInitialStateRef, groupDragOffsetsRef, clearTransient]);
 
   return {
     isGroupDragging,

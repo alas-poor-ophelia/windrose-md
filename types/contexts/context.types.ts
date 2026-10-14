@@ -181,6 +181,13 @@ export interface MapOperationsContextValue {
    * and undo always restores into whichever layer is active.
    */
   onLayerSelect?: (layerId: LayerId) => void;
+  /**
+   * Drop every held transient-history baseline (useLayerHistory.clearTransient).
+   * Called at gesture boundaries: a new pointer-down, pointercancel, and the
+   * cancel/no-move branches of drag hooks, so an abandoned drag's pin is not
+   * absorbed by the next unrelated commit.
+   */
+  clearTransient?: () => void;
 
   // Wall/path strip and terrain stroke operations (whole-entry erase)
   onWallPathsChange?: (wallPaths: WallPath[], suppressHistory?: boolean) => void;

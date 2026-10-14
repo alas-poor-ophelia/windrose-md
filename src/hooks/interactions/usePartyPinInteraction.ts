@@ -57,7 +57,9 @@ function usePartyPinInteraction(
   partyPins: PartyPin[] | undefined,
   onPartyPinsChange: PartyPinsChangeHandler,
   onActivePinChange?: ActivePinChangeHandler,
-  locator?: PartyPinLocator
+  locator?: PartyPinLocator,
+  /** Drops held transient-history pins (useLayerHistory.clearTransient). */
+  clearTransient?: () => void
 ): UsePartyPinInteractionResult {
   // Latest pins without re-registering handlers each render
   const pinsRef = useRef<PartyPin[]>([]);
@@ -167,10 +169,15 @@ function usePartyPinInteraction(
     dragPinIdRef.current = null;
     dragPositionRef.current = null;
     didDragMoveRef.current = false;
-    if (!pin || !finalPosition || !moved) return;
+    if (!pin || !finalPosition || !moved) {
+      // No commit (no move, or the pin is gone): drop any live-move pin so the
+      // next unrelated commit cannot absorb it.
+      clearTransient?.();
+      return;
+    }
 
     onPartyPinsChange(movePartyPin(pins, pin.id, finalPosition), false);
-  }, [onPartyPinsChange]);
+  }, [onPartyPinsChange, clearTransient]);
 
   const isPartyPinDragging = useCallback((): boolean => isDraggingRef.current, []);
 

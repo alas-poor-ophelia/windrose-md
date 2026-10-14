@@ -12,7 +12,7 @@ import type { Region, StoredViewState } from '#types/core/map.types';
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
-import { useMapState } from '../../context/MapContext';
+import { useMapState, useMapOperations } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useLiveOverlayRedraw } from '../../hooks/canvas/useLiveOverlayRedraw';
 import { useOverlayCanvas } from '../../hooks/canvas/useOverlayCanvas';
@@ -50,6 +50,7 @@ const RegionLayer = ({
 }: RegionLayerProps): VNode | null => {
   const app = useApp();
   const { canvasRef, mapData, geometry, screenToWorld, screenToGrid, instanceId, viewController } = useMapState();
+  const { clearTransient } = useMapOperations();
 
   const isRegionTool = currentTool === 'regionPaint' || currentTool === 'regionBoundary';
 
@@ -78,7 +79,8 @@ const RegionLayer = ({
     geometry,
     screenToWorld,
     screenToGrid,
-    onRegionsChange
+    onRegionsChange,
+    clearTransient
   });
 
   // Context menu handler is always present; tool handlers resolve to undefined when inactive

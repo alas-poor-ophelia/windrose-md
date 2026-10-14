@@ -28,6 +28,8 @@ interface RegionToolsOptions {
   screenToGrid: (clientX: number, clientY: number) => Point | null;
   /** suppressHistory: a live label-drag move (pins the pre-drag value; the drop commits one step). */
   onRegionsChange: (regions: Region[], suppressHistory?: boolean) => void;
+  /** Drops held transient-history pins (useLayerHistory.clearTransient). */
+  clearTransient?: () => void;
 }
 
 interface ContextMenuState {
@@ -74,7 +76,8 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     geometry,
     screenToWorld,
     screenToGrid,
-    onRegionsChange
+    onRegionsChange,
+    clearTransient
   } = options;
 
   const isActive = currentTool === 'regionPaint' || currentTool === 'regionBoundary';
@@ -335,12 +338,13 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
       const dragged = labelDragRegionsRef.current;
       labelDragRegionsRef.current = null;
       if (dragged != null) onRegionsChange(dragged, false);
+      else clearTransient?.(); // no commit: drop any stray pin
       if (labelDragCleanupRef.current) {
         labelDragCleanupRef.current();
         labelDragCleanupRef.current = null;
       }
     }
-  }, [draggingLabelRegionId, onRegionsChange]);
+  }, [draggingLabelRegionId, onRegionsChange, clearTransient]);
 
   // Keep refs in sync for document-level listeners
   handlePointerMoveRef.current = handlePointerMove;
@@ -356,15 +360,19 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     const doc = labelDragDocRef.current ?? activeDocument;
     doc.addEventListener('pointermove', onMove);
     doc.addEventListener('pointerup', onUp);
+    // A cancelled pointer ends the drag through the same path as a release.
+    doc.addEventListener('pointercancel', onUp);
 
     labelDragCleanupRef.current = () => {
       doc.removeEventListener('pointermove', onMove);
       doc.removeEventListener('pointerup', onUp);
+      doc.removeEventListener('pointercancel', onUp);
     };
 
     return () => {
       doc.removeEventListener('pointermove', onMove);
       doc.removeEventListener('pointerup', onUp);
+      doc.removeEventListener('pointercancel', onUp);
     };
   }, [draggingLabelRegionId]);
 

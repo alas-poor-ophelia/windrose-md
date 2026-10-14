@@ -58,7 +58,7 @@ function useObjectDragSelect(
 
   const edgeSnapModeRef = useRef(edgeSnapMode);
   edgeSnapModeRef.current = edgeSnapMode;
-  const { getObjectAtPosition, updateObject, onObjectsChange } = useMapOperations();
+  const { getObjectAtPosition, updateObject, onObjectsChange, clearTransient } = useMapOperations();
   const { selectedItem, setSelectedItem, isDraggingSelection, setIsDraggingSelection, dragStart, setDragStart, isResizeMode, setIsResizeMode } = useMapSelection();
 
   const longPressTimerRef = useRef<number | null>(null);
@@ -470,6 +470,9 @@ function useObjectDragSelect(
         }
 
         dragInitialStateRef.current = null;
+      } else {
+        // No commit: drop any live-move pin so the next unrelated commit cannot absorb it.
+        clearTransient?.();
       }
 
       // Refresh selectedItem.data so toolbar reflects current freeform state
@@ -483,7 +486,7 @@ function useObjectDragSelect(
       return true;
     }
     return false;
-  }, [isDraggingSelection, selectedItem, dragStart, setIsDraggingSelection, setDragStart, onObjectsChange, mapData, geometry, updateObject, setSelectedItem, instanceId, canvasRef]);
+  }, [isDraggingSelection, selectedItem, dragStart, setIsDraggingSelection, setDragStart, onObjectsChange, mapData, geometry, updateObject, setSelectedItem, instanceId, canvasRef, clearTransient]);
 
   return { handleObjectSelection, handleObjectDragging, stopObjectDragging };
 }

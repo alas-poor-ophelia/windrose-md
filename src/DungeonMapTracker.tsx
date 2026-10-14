@@ -732,6 +732,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onEdgesChange={handleEdgesChange}
               onTilesChange={handleTilesChange}
               onLayerSelect={handleLayerSelect}
+              clearTransient={layerHistory.clearTransient}
               onWallPathsChange={handleWallPathsChange}
               onTerrainStrokesChange={handleTerrainStrokesChange}
               tileImagesReady={tileImagesReady}

@@ -16,7 +16,7 @@ import type {
 } from '#types/hooks/eventCoordinator.types';
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { useMapState } from '../../context/MapContext';
+import { useMapState, useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { useRegisteredHandlers } from '../../context/EventHandlerContext';
 import { useGroupDrag } from '../objects/useGroupDrag';
@@ -47,6 +47,9 @@ const useEventCoordinator = ({
   const layerVisibilityRef = useRef(layerVisibility);
   layerVisibilityRef.current = layerVisibility;
   const { getHandlers } = useRegisteredHandlers();
+  // Gesture-boundary guard for transient (live drag) history pins: see
+  // useLayerHistory.clearTransient. Optional: absent outside DungeonMapTracker.
+  const { clearTransient } = useMapOperations();
 
   const { getClickedSelectedItem, startGroupDrag, handleGroupDrag, stopGroupDrag } = useGroupDrag();
 
@@ -157,6 +160,13 @@ const useEventCoordinator = ({
     if (e.type === 'mousedown' && (e as MouseEvent).button !== 0) {
       return;
     }
+
+    // A new gesture starts: drop pins an abandoned drag left behind, so the
+    // next commit cannot absorb its move. A tile stroke that lost its release
+    // is closed first (same as the tile layer's own pointer-down backstop),
+    // because its commit needs its pin.
+    getHandlers('tilePlacement')?.handlePointerUp?.(e);
+    clearTransient?.();
 
     e.preventDefault();
     e.stopPropagation();
@@ -304,7 +314,7 @@ const useEventCoordinator = ({
     } else {
       executeToolAction();
     }
-  }, [currentTool, isColorPickerOpen, showObjectColorPicker, recentMultiTouch, selectedItem, hasMultiSelection, clearSelection, screenToWorld, getClickedSelectedItem, startGroupDrag, getHandlers, isAlignmentMode, setSelectedItem, interactionLocked, canvasRef]);
+  }, [currentTool, isColorPickerOpen, showObjectColorPicker, recentMultiTouch, selectedItem, hasMultiSelection, clearSelection, screenToWorld, getClickedSelectedItem, startGroupDrag, getHandlers, isAlignmentMode, setSelectedItem, interactionLocked, canvasRef, clearTransient]);
 
   const handlePointerMove = useCallback((e: MouseEvent | TouchEvent): void => {
     const layerVisibility = layerVisibilityRef.current;
@@ -745,6 +755,9 @@ const useEventCoordinator = ({
     canvas.addEventListener('mousemove', handlePointerMove as EventListener);
     canvas.addEventListener('touchmove', handlePointerMove as EventListener, { passive: false });
     canvas.addEventListener('touchend', handlePointerUp as EventListener);
+    // A cancelled touch runs the release's stop paths (the window-level cancel
+    // handler then clears any pin left behind).
+    canvas.addEventListener('touchcancel', handlePointerUp as EventListener);
     canvas.addEventListener('mouseleave', handlePointerLeave);
     // Explicitly non-passive: WebKit needs preventDefault on the first wheel
     // of a trackpad scroll sequence or it hands the stream to native scrolling.
@@ -767,6 +780,7 @@ const useEventCoordinator = ({
       canvas.removeEventListener('mousemove', handlePointerMove as EventListener);
       canvas.removeEventListener('touchmove', handlePointerMove as EventListener);
       canvas.removeEventListener('touchend', handlePointerUp as EventListener);
+      canvas.removeEventListener('touchcancel', handlePointerUp as EventListener);
       canvas.removeEventListener('mouseleave', handlePointerLeave);
       canvas.removeEventListener('wheel', handleWheel);
       canvas.removeEventListener('gesturestart', handleGestureStart);
@@ -859,20 +873,32 @@ const useEventCoordinator = ({
       }
     };
 
+    // pointercancel / touchcancel: the gesture ended without a release. Run
+    // the same stop paths as a release, then drop any transient pin that no
+    // stop path committed (an abandoned drag must not ride the next commit).
+    const handleGlobalPointerCancel = (e: Event): void => {
+      handleGlobalPointerUp(e as MouseEvent | TouchEvent);
+      clearTransient?.();
+    };
+
     // Popout-safe: the window that owns this canvas, captured once per run.
     const win = canvasRef.current?.ownerDocument.defaultView ?? window;
     win.addEventListener('mouseup', handleGlobalPointerUp);
+    win.addEventListener('touchcancel', handleGlobalPointerCancel, { passive: true });
+    win.addEventListener('pointercancel', handleGlobalPointerCancel);
     win.addEventListener('touchend', handleGlobalPointerUp as EventListener, { passive: true });
     win.addEventListener('mousemove', handleGlobalMouseMove);
     win.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
 
     return () => {
       win.removeEventListener('mouseup', handleGlobalPointerUp);
+      win.removeEventListener('touchcancel', handleGlobalPointerCancel);
+      win.removeEventListener('pointercancel', handleGlobalPointerCancel);
       win.removeEventListener('touchend', handleGlobalPointerUp as EventListener);
       win.removeEventListener('mousemove', handleGlobalMouseMove);
       win.removeEventListener('touchmove', handleGlobalTouchMove);
     };
-  }, [isDraggingSelection, dragStart, setIsDraggingSelection, setDragStart, isGroupDragging, stopGroupDrag, getHandlers, canvasRef, scheduleMultiTouchReset]);
+  }, [isDraggingSelection, dragStart, setIsDraggingSelection, setDragStart, isGroupDragging, stopGroupDrag, getHandlers, canvasRef, scheduleMultiTouchReset, clearTransient]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
