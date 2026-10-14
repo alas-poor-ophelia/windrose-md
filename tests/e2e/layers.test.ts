@@ -7,6 +7,7 @@ import {
   waitForContainer,
   getCanvasCenter,
   waitForToolPalette,
+  selectToolByTitle,
   openLayerPanel,
   openLayerPanelStrata,
   getActiveLayerId,
@@ -99,6 +100,10 @@ test.skipIf(process.env.WINDROSE_TEST_MODE === "compiled")("Layer can be switche
 
   expect(layerCount).toBeGreaterThanOrEqual(2);
 
+  // The active layer id as persisted before the switch
+  const mapId = MAP_IDS.grid;
+  const originalLayerId = await getActiveLayerId(page, mapId);
+
   // Get the non-active layer row and click it to switch
   const allLayerBtns = page.locator('.windrose-dock-layer-row');
 
@@ -117,11 +122,20 @@ test.skipIf(process.env.WINDROSE_TEST_MODE === "compiled")("Layer can be switche
   const newActiveBtn = page.locator('.windrose-dock-layer-row.active');
   expect(await newActiveBtn.count()).toBe(1);
 
-  // Get the active layer ID and initial cell count
-  const mapId = MAP_IDS.grid;
-  const activeLayerId = await getActiveLayerId(page, mapId);
+  // The switch reaches the data file through the debounced autosave, so read
+  // the persisted active layer only once it has been written. Reading it right
+  // after the click returns the PREVIOUS layer and the paint below lands on
+  // the new one (diagnosed 2026-10-14).
+  await page.waitForTimeout(AUTOSAVE_WAIT);
+  let activeLayerId = await getActiveLayerId(page, mapId);
+  for (let i = 0; i < 20 && (activeLayerId === null || activeLayerId === originalLayerId); i++) {
+    await page.waitForTimeout(250);
+    activeLayerId = await getActiveLayerId(page, mapId);
+  }
   expect(activeLayerId).not.toBeNull();
+  expect(activeLayerId).not.toBe(originalLayerId);
   const initialLayerCells = await getLayerCellCount(page, mapId, activeLayerId!);
+  const initialOriginalCells = originalLayerId ? await getLayerCellCount(page, mapId, originalLayerId) : 0;
 
   // Close layer panel so canvas receives clicks
   await openLayerPanel(page);
@@ -130,9 +144,7 @@ test.skipIf(process.env.WINDROSE_TEST_MODE === "compiled")("Layer can be switche
   // Draw on this layer
   await waitForToolPalette(page);
 
-  const drawToolBtn = page.locator(".windrose-tool-palette .windrose-tool-btn").nth(1);
-  await drawToolBtn.click();
-  await page.waitForTimeout(100);
+  await selectToolByTitle(page, "Draw");
 
   const center = await getCanvasCenter(page);
   await page.mouse.click(center.x, center.y);
@@ -142,6 +154,10 @@ test.skipIf(process.env.WINDROSE_TEST_MODE === "compiled")("Layer can be switche
   await page.waitForTimeout(AUTOSAVE_WAIT);
   const newLayerCells = await getLayerCellCount(page, mapId, activeLayerId!);
   expect(newLayerCells).toBeGreaterThan(initialLayerCells);
+  // ...and not on the layer that was active before the switch
+  if (originalLayerId) {
+    expect(await getLayerCellCount(page, mapId, originalLayerId)).toBe(initialOriginalCells);
+  }
 
   expect(errors).toHaveLength(0);
 });
