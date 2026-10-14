@@ -328,3 +328,59 @@ describe('parallax wave-7 hardening', () => {
     expect(m.hook().canUndo).toBe(true);
   });
 });
+
+/**
+ * Emulates useDataHandlers.handlePartyPinsChange: the Beacon drag writes every
+ * move with suppressHistory (a transient addToHistory) and commits once at drop.
+ */
+function writePins(m: Mounted, partyPins: PartyPin[], suppressHistory: boolean): void {
+  m.update((prev: MapData) => {
+    m.hook().addToHistory(snapshot(prev, { partyPins }), { transient: suppressHistory });
+    return { ...prev, partyPins };
+  });
+}
+
+const at = (p: PartyPin, x: number, y: number): PartyPin => ({ ...p, position: { x, y } }) as PartyPin;
+
+describe('live drags commit as one undo step (live check U2)', () => {
+  it('paint, then drag a Beacon: the first undo moves the Beacon back, the second removes the paint', () => {
+    const base = createNewMap('Map', 'hex');
+    const beacon = pin('b');
+    const m = mount({ '<root>': { ...base, partyPins: [beacon] } });
+
+    paint(m, [cell(1)]);
+    // Drag: two live moves, each rendered, then the drop commit (a new array,
+    // as usePartyPinInteraction.stopPartyPinDrag builds with movePartyPin).
+    writePins(m, [at(beacon, 2, 1)], true);
+    writePins(m, [at(beacon, 3, 1)], true);
+    writePins(m, [at(beacon, 3, 1)], false);
+    expect(m.map().partyPins?.[0].position).toEqual({ x: 3, y: 1 });
+
+    let changed = false;
+    act0(() => { changed = m.hook().handleUndo(); });
+    expect(changed).toBe(true);
+    expect(m.map().partyPins?.[0].position).toEqual({ x: 1, y: 1 });
+    expect(getActiveLayer(m.map()).cells).toHaveLength(1);
+
+    act0(() => { m.hook().handleUndo(); });
+    expect(getActiveLayer(m.map()).cells).toHaveLength(0);
+
+    act0(() => { m.hook().handleRedo(); });
+    act0(() => { m.hook().handleRedo(); });
+    expect(m.map().partyPins?.[0].position).toEqual({ x: 3, y: 1 });
+  });
+
+  it('an object-style drop that commits the rendered array itself is still recorded', () => {
+    const base = createNewMap('Map', 'hex');
+    const beacon = pin('b');
+    const m = mount({ '<root>': { ...base, partyPins: [beacon] } });
+
+    writePins(m, [at(beacon, 2, 1)], true);
+    // useObjectDragSelect.stopObjectDragging commits getActiveLayer(mapData).objects:
+    // the very reference the last live move rendered.
+    writePins(m, m.map().partyPins ?? [], false);
+
+    act0(() => { m.hook().handleUndo(); });
+    expect(m.map().partyPins?.[0].position).toEqual({ x: 1, y: 1 });
+  });
+});

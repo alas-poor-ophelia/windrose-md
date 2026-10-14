@@ -16,7 +16,7 @@ import type { HexColor } from '../core/common.types';
 import type { Edge } from '../core/rendering.types';
 import type { TileAssignment } from '../tiles/tile.types';
 import type { MapDataUpdater } from '../hooks/mapData.types';
-import type { LayerHistorySnapshot } from '../hooks/layerHistory.types';
+import type { AddToHistoryOptions, LayerHistorySnapshot } from '../hooks/layerHistory.types';
 
 // ===========================================
 // Hook Options
@@ -26,7 +26,7 @@ import type { LayerHistorySnapshot } from '../hooks/layerHistory.types';
 export interface UseDataHandlersOptions {
   mapData: MapData | null;
   updateMapData: MapDataUpdater;
-  addToHistory: (state: LayerHistorySnapshot) => void;
+  addToHistory: (state: LayerHistorySnapshot, options?: AddToHistoryOptions) => void;
   isApplyingHistory: () => boolean;
 }
 

@@ -24,6 +24,12 @@
  * spends an entry on a silent no-op (parallax wave-7 finding 2). handleUndo
  * and handleRedo report whether the map changed.
  *
+ * Live drags write with suppressHistory and commit once at drop. Each live
+ * write calls addToHistory(snapshot, { transient: true }), which records
+ * nothing but pins the fields it changes at their pre-drag values; the drop
+ * commit diffs against those pins, not against the last render (which already
+ * shows the dragged position), so the whole drag is one undoable step.
+ *
  * Fog operations enter history through recordMapChange (prev -> next diff);
  * fog brush strokes coalesce into one entry, never across a layer switch.
  */
@@ -31,6 +37,7 @@
 // Type-only imports
 import type { MapData, MapLayer, LayerId } from '#types/core/map.types';
 import type {
+  AddToHistoryOptions,
   LayerHistorySnapshot,
   LayerHistoryEntry,
   LayerHistoryStacks,
@@ -144,6 +151,21 @@ export function applyLayerHistoryEntry(prev: MapData, entry: LayerHistoryEntry, 
 }
 
 /** Last known values for the open level: the last rendered map plus edits recorded since. */
+interface PinnedValues {
+  map: Partial<LayerHistoryMapValues>;
+  layers: Record<LayerId, Partial<LayerHistoryLayerValues>>;
+}
+
+/** Pin each changed field's `before` unless a pin for it is already held. */
+function pinBefore<T extends object>(pins: Partial<T>, diff: FieldDiff<T> | null): Partial<T> {
+  if (diff == null) return pins;
+  const next: Partial<T> = { ...pins };
+  for (const key of Object.keys(diff.before) as (keyof T)[]) {
+    if (!(key in next)) next[key] = diff.before[key];
+  }
+  return next;
+}
+
 interface KnownValues {
   source: MapData | null;
   activeLayerId: LayerId | null;
@@ -186,12 +208,17 @@ function useLayerHistory({
   // Layer of the last recorded entry; coalescing requires it to be unchanged
   // (no merge across an A -> B -> A round trip, parallax wave-7 finding 8).
   const lastRecordLayerRef = useRef<LayerId | null>(null);
+  // Pre-drag baselines pinned by transient (live-drag) writes, consumed by the
+  // next committed snapshot. See the file header.
+  const pinnedRef = useRef<PinnedValues>({ map: {}, layers: {} });
   if (isLoading) {
     levelRef.current = { nav: navigationVersion, key: levelKey };
     stacksRef.current = {};
     rootStacksRef.current = null;
     lastRecordLayerRef.current = null;
+    pinnedRef.current = { map: {}, layers: {} };
   } else if (levelRef.current.nav !== navigationVersion || levelRef.current.key !== levelKey) {
+    pinnedRef.current = { map: {}, layers: {} };
     const leaving = levelRef.current.key;
     if (leaving !== levelKey) {
       if (leaving === null) rootStacksRef.current = stacksRef.current;
@@ -266,17 +293,40 @@ function useLayerHistory({
    * changed fields are recorded.
    */
   const addToHistory = useCallback(
-    (state: LayerHistorySnapshot): void => {
+    (state: LayerHistorySnapshot, options?: AddToHistoryOptions): void => {
       if (isApplyingHistoryRef.current) return;
       const known = knownRef.current;
       const layerId = known.activeLayerId;
       if (layerId == null) return;
       const knownLayer = known.layers[layerId] as Partial<LayerHistoryLayerValues> | undefined;
+      const pinned = pinnedRef.current;
+      const pinnedLayer = pinned.layers[layerId] ?? {};
+
+      if (options?.transient === true) {
+        // Live drag write: pin the pre-drag values of the fields it changes.
+        // `known` still holds them on the first move (no render in between);
+        // later moves find the pin already held and leave it.
+        const liveLayerDiff = knownLayer != null
+          ? diffHistoryFields(LAYER_KEYS, knownLayer, pickLayerValues(state), true)
+          : null;
+        const liveMapDiff = diffHistoryFields(MAP_KEYS, known.map, pickMapValues(state), true);
+        pinnedRef.current = {
+          map: pinBefore(pinned.map, liveMapDiff),
+          layers: { ...pinned.layers, [layerId]: pinBefore(pinnedLayer, liveLayerDiff) }
+        };
+        return;
+      }
+
+      // Committed snapshot: diff against the pre-drag pins where held (the last
+      // render already shows the dragged value), then release them.
+      const baseLayer = knownLayer != null ? { ...knownLayer, ...pinnedLayer } : null;
+      const baseMap = { ...known.map, ...pinned.map };
+      pinnedRef.current = { map: {}, layers: { ...pinned.layers, [layerId]: {} } };
       // A layer not yet rendered has no known baseline: record only map-wide fields.
-      const layerDiff = knownLayer != null
-        ? diffHistoryFields(LAYER_KEYS, knownLayer, pickLayerValues(state), true)
+      const layerDiff = baseLayer != null
+        ? diffHistoryFields(LAYER_KEYS, baseLayer, pickLayerValues(state), true)
         : null;
-      const mapDiff = diffHistoryFields(MAP_KEYS, known.map, pickMapValues(state), true);
+      const mapDiff = diffHistoryFields(MAP_KEYS, baseMap, pickMapValues(state), true);
       recordEntry(layerId, layerDiff, mapDiff);
     },
     [recordEntry]
@@ -317,6 +367,8 @@ function useLayerHistory({
    */
   const applyStep = useCallback(
     (direction: 'undo' | 'redo'): boolean => {
+      // Pins from an uncommitted drag would mis-baseline the next entry.
+      pinnedRef.current = { map: {}, layers: {} };
       const layerId = knownRef.current.activeLayerId;
       if (layerId == null) return false;
       const startStack = stacksRef.current[layerId] as LayerHistoryStacks[LayerId] | undefined;

@@ -89,10 +89,10 @@ function useDataHandlers({
 
         const newMapData = updateActiveLayer(currentMapData, { [field]: newValue });
 
-        if (!suppressHistory) {
-          const activeLayer = getActiveLayer(currentMapData);
-          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []));
-        }
+        // A suppressed (live drag) write records nothing but pins the pre-drag
+        // value, so the commit at drop undoes the whole drag in one step.
+        const activeLayer = getActiveLayer(currentMapData);
+        addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []), { transient: suppressHistory });
 
         return newMapData;
       });
@@ -140,9 +140,8 @@ function useDataHandlers({
         if (currentMapData == null) return currentMapData;
 
         const activeLayer = getActiveLayer(currentMapData);
-        if (!suppressHistory) {
-          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { tiles: newValue }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []));
-        }
+        // Suppressed (live drag) writes pin the pre-drag value; see the cells handler.
+        addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { tiles: newValue }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []), { transient: suppressHistory });
 
         let nextMapData = updateActiveLayer(currentMapData, { tiles: newValue });
 
@@ -335,10 +334,10 @@ function useDataHandlers({
     updateMapData((currentMapData) => {
       if (currentMapData == null) return currentMapData;
 
-      if (!suppressHistory) {
-        const activeLayer = getActiveLayer(currentMapData);
-        addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, partyPins, currentMapData.savedRoutes ?? []));
-      }
+      // A suppressed (live drag) write pins the pre-drag pins instead of
+      // recording; the drop commit then records the whole move as one step.
+      const activeLayer = getActiveLayer(currentMapData);
+      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, partyPins, currentMapData.savedRoutes ?? []), { transient: suppressHistory });
 
       return { ...currentMapData, partyPins };
     });

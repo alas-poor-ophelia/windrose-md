@@ -87,6 +87,16 @@ export interface LayerHistoryEntry {
 export type LayerHistoryStacks = Record<LayerId, HistoryStack<LayerHistoryEntry>>;
 
 /** Options for recordMapChange. */
+/**
+ * Options for addToHistory. `transient` marks a live, uncommitted write (a
+ * drag move made with suppressHistory): nothing is recorded, but the fields it
+ * changes keep their pre-write values as the baseline for the next committed
+ * snapshot, so the commit at drop records the whole gesture as one step.
+ */
+export interface AddToHistoryOptions {
+  transient?: boolean;
+}
+
 export interface RecordMapChangeOptions {
   /** Merge with the previous entry when it has the same key and was pushed recently. */
   coalesceKey?: string;
@@ -151,7 +161,7 @@ export interface HistoryActions {
   /** Perform redo; returns whether the map changed */
   handleRedo: () => boolean;
   /** Add state to history (for data change handlers) */
-  addToHistory: (state: LayerHistorySnapshot) => void;
+  addToHistory: (state: LayerHistorySnapshot, options?: AddToHistoryOptions) => void;
   /** Record a prev -> next map transition (diffs the active layer + map-wide fields) */
   recordMapChange: (prev: MapData, next: MapData, options?: RecordMapChangeOptions) => void;
   /** Check if undo/redo is in progress */
@@ -191,7 +201,7 @@ export interface UseLayerHistoryResult {
   handleRedo: () => boolean;
 
   // For data change handlers
-  addToHistory: (state: LayerHistorySnapshot) => void;
+  addToHistory: (state: LayerHistorySnapshot, options?: AddToHistoryOptions) => void;
   recordMapChange: (prev: MapData, next: MapData, options?: RecordMapChangeOptions) => void;
   isApplyingHistory: () => boolean;
 }
