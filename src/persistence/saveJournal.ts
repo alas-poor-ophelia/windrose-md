@@ -786,7 +786,12 @@ function preparePayload(app: App, mapId: string, c: JournalCandidate): MapData |
  * once that pane's save of the restored tree lands (saveCoordinator
  * onRestoreLanded). Module state: it resets with every plugin load.
  */
-const resolutionsInFlight = new Map<string, Promise<MapData | null>>();
+interface ResolutionRound {
+  round: Promise<MapData | null>;
+  /** Writer id of the pane whose load opened the round (null: none given). */
+  writerId: string | null;
+}
+const resolutionsInFlight = new Map<string, ResolutionRound>();
 
 /** Candidates deferred ("Keep for later" or Escape) this load, per map: not offered again until the next load. */
 const deferredThisLoad = new Map<string, Set<string>>();
@@ -827,17 +832,22 @@ async function resolveJournalOnLoad(
 ): Promise<MapData | null> {
   const open = resolutionsInFlight.get(mapId);
   if (open != null) {
+    // The same pane re-ran its load (rename, reload) while its own prompt is
+    // open: join that round, so a Restore confirmed now is applied by this
+    // load instead of being dropped with the cancelled one (parallax-livefix 1).
+    if (restoringWriterId != null && open.writerId === restoringWriterId) return open.round;
     // Another pane of this map is deciding: never a second prompt for the
     // same slot. Its outcome reaches this pane through the store.
-    try { await open; } catch { /* the deciding pane reports its own failure */ }
+    try { await open.round; } catch { /* the deciding pane reports its own failure */ }
     return null;
   }
   const round = resolveJournalRound(app, mapId, mapLabel, prompt, restoringWriterId);
-  resolutionsInFlight.set(mapId, round);
+  const entry: ResolutionRound = { round, writerId: restoringWriterId ?? null };
+  resolutionsInFlight.set(mapId, entry);
   try {
     return await round;
   } finally {
-    if (resolutionsInFlight.get(mapId) === round) resolutionsInFlight.delete(mapId);
+    if (resolutionsInFlight.get(mapId) === entry) resolutionsInFlight.delete(mapId);
   }
 }
 

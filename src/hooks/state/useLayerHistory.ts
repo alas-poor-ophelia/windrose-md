@@ -416,6 +416,18 @@ function useLayerHistory({
     return isApplyingHistoryRef.current;
   }, []);
 
+  /**
+   * Drop the transient pins (parallax-livefix 2). A drag that ends without its
+   * commit (pointercancel, a release the drag hook never sees) would otherwise
+   * leave its pre-drag baseline held, and the next commit of ANY field would
+   * diff against it and record the abandoned move as part of that entry. The
+   * abandoned live values then count as the baseline, like any other write
+   * outside history.
+   */
+  const clearTransient = useCallback((): void => {
+    pinnedRef.current = { map: {}, layers: {} };
+  }, []);
+
   // =========================================================================
   // Layer Management Handlers (functional updates on the live map)
   // =========================================================================
@@ -513,7 +525,8 @@ function useLayerHistory({
     handleRedo,
     addToHistory,
     recordMapChange,
-    isApplyingHistory
+    isApplyingHistory,
+    clearTransient
   };
 
   return {
@@ -533,7 +546,8 @@ function useLayerHistory({
     handleRedo,
     addToHistory,
     recordMapChange,
-    isApplyingHistory
+    isApplyingHistory,
+    clearTransient
   };
 }
 

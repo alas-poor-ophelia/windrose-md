@@ -577,7 +577,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // canvas means no edits, which means nothing can overwrite the file while it
   // is in an unknown state. The panel also offers the backup restore.
   if (loadFailure) {
-    return <DataFileRecoveryPanel dataPath={loadFailure.dataPath} kind={loadFailure.kind} onRestored={reloadMapData} />;
+    return <DataFileRecoveryPanel dataPath={loadFailure.dataPath} kind={loadFailure.kind} foundAt={loadFailure.foundAt} onRestored={reloadMapData} />;
   }
 
   // A save carrying real edits was refused because another mount of this map

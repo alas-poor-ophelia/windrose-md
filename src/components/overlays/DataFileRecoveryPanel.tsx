@@ -31,13 +31,19 @@ interface DataFileRecoveryPanelProps {
    * Default 'unreadable'.
    */
   kind?: 'unreadable' | 'schema' | 'missing';
+  /**
+   * kind 'missing' only: where a same-named store was found outside the
+   * configured folder (MapDataFileMissingError.foundAt). Shown so the user
+   * can move it back instead of starting an empty store.
+   */
+  foundAt?: string | null;
   /** Reload the map data after a successful restore. Omitted → the user is told to reopen. */
   onRestored?: () => void;
 }
 
 type ProbeState = 'probing' | 'found' | 'none';
 
-const DataFileRecoveryPanel = ({ dataPath, kind = 'unreadable', onRestored }: DataFileRecoveryPanelProps): VNode => {
+const DataFileRecoveryPanel = ({ dataPath, kind = 'unreadable', foundAt = null, onRestored }: DataFileRecoveryPanelProps): VNode => {
   const app = useApp();
   const [probe, setProbe] = useState<ProbeState>('probing');
   const [backup, setBackup] = useState<DataFileBackup | null>(null);
@@ -114,7 +120,13 @@ const DataFileRecoveryPanel = ({ dataPath, kind = 'unreadable', onRestored }: Da
       <div className="windrose-loading">
         <p>Data file not found. To avoid overwriting your maps, editing is disabled.</p>
         <p><code>{dataPath}</code></p>
-        <p>If the file was moved or is still syncing, put it back and check again. Otherwise create a new empty data file here.</p>
+        {foundAt != null && foundAt !== ''
+          ? (
+            <p className="windrose-datafile-found-at">
+              A data file with this name was found at <code>{foundAt}</code>. Move it back to <code>{dataPath}</code>, or create a new data file here.
+            </p>
+          )
+          : <p>If the file was moved or is still syncing, put it back and check again. Otherwise create a new empty data file here.</p>}
         <p>
           <button className="mod-cta" disabled={busy} onClick={() => { onRestored?.(); }}>
             Check again

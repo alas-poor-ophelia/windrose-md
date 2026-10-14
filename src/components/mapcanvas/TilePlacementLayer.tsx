@@ -72,6 +72,38 @@ export interface TilePlacementLayerProps {
   onTilesChange: (tiles: TileAssignment[], suppressHistory?: boolean) => void;
 }
 
+
+/**
+ * What an ending stroke commits: its live tile array, or null when there is
+ * no open stroke or the active layer changed since it started (the tiles
+ * handler writes the ACTIVE layer, so committing would overwrite the new
+ * layer's tiles with the old layer's; parallax-livefix 3).
+ */
+export function strokeCommitFor(
+  strokeTiles: TileAssignment[] | null,
+  strokeLayerId: string | null,
+  activeLayerId: string | null
+): TileAssignment[] | null {
+  if (strokeTiles === null) return null;
+  return strokeLayerId === activeLayerId ? strokeTiles : null;
+}
+
+/**
+ * Whether a window touchend/touchcancel ends the open stroke: only when the
+ * finger that started it lifted, or (identifier unknown) no touch remains.
+ * A second finger landing and lifting mid-stroke leaves it open
+ * (parallax-livefix 5).
+ */
+export function touchEndsStroke(e: TouchEvent, strokeTouchId: number | null): boolean {
+  if (strokeTouchId != null) {
+    for (const t of Array.from(e.changedTouches)) {
+      if (t.identifier === strokeTouchId) return true;
+    }
+    return false;
+  }
+  return e.touches.length === 0;
+}
+
 const TilePlacementLayer = ({
   currentTool,
   selectedTilesetId,
@@ -112,6 +144,11 @@ const TilePlacementLayer = ({
   // self-consistent even when pointer events outrun Preact's re-render (the
   // stale closure would otherwise commit pre-stroke tiles, erasing the stroke).
   const strokeTilesRef = useRef<TileAssignment[] | null>(null);
+  // Layer the open stroke started on, and the finger that started it (touch).
+  const strokeLayerIdRef = useRef<string | null>(null);
+  const strokeTouchIdRef = useRef<number | null>(null);
+  const activeLayerIdRef = useRef<string | null>(null);
+  activeLayerIdRef.current = mapData?.activeLayerId ?? null;
   const lastGridPosRef = useRef<{ col: number; row: number } | null>(null);
   const scatterLastDropRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -364,10 +401,12 @@ const TilePlacementLayer = ({
   // the stroke's state updates, and the stale closure would commit pre-stroke
   // tiles). Idempotent: a second call finds no open stroke.
   const endStroke = useCallback(() => {
-    if (strokeTilesRef.current !== null) {
-      onTilesChange(strokeTilesRef.current, false);
-      strokeTilesRef.current = null;
-    }
+    // Skipped when the active layer changed mid-stroke (see strokeCommitFor).
+    const commit = strokeCommitFor(strokeTilesRef.current, strokeLayerIdRef.current, activeLayerIdRef.current);
+    strokeTilesRef.current = null;
+    strokeLayerIdRef.current = null;
+    strokeTouchIdRef.current = null;
+    if (commit !== null) onTilesChange(commit, false);
     isDraggingRef.current = false;
     paintedInStrokeRef.current = new Set();
     lastGridPosRef.current = null;
@@ -381,20 +420,47 @@ const TilePlacementLayer = ({
   // coordinator consumes first, a tool switch mid-stroke) would leave its
   // tiles on the map with no undo step (live check A5) and the brush stuck
   // down. Close it from the window too, and when the tool disarms or unmounts.
+  // Listeners go on the canvas's OWN window (popout-safe), never a fallback
+  // to the main one: if the ref is not set yet, retry on the next frames.
   useEffect(() => {
     if (!isTileTool) return undefined;
-    const win = canvasRef.current?.ownerDocument.defaultView ?? window;
-    const onUp = (): void => { endStrokeRef.current(); };
-    win.addEventListener('mouseup', onUp);
-    win.addEventListener('touchend', onUp);
-    win.addEventListener('touchcancel', onUp);
+    const onMouseUp = (): void => { endStrokeRef.current(); };
+    const onTouchEnd = (e: TouchEvent): void => {
+      if (touchEndsStroke(e, strokeTouchIdRef.current)) endStrokeRef.current();
+    };
+    let win: Window | null = null;
+    let frame: number | null = null;
+    let tries = 0;
+    const attach = (): void => {
+      frame = null;
+      const w = canvasRef.current?.ownerDocument.defaultView ?? null;
+      if (w == null) {
+        if (tries++ < 30) frame = window.requestAnimationFrame(attach);
+        return;
+      }
+      win = w;
+      w.addEventListener('mouseup', onMouseUp);
+      w.addEventListener('touchend', onTouchEnd);
+      w.addEventListener('touchcancel', onTouchEnd);
+    };
+    attach();
     return () => {
-      win.removeEventListener('mouseup', onUp);
-      win.removeEventListener('touchend', onUp);
-      win.removeEventListener('touchcancel', onUp);
+      if (frame != null) window.cancelAnimationFrame(frame);
+      if (win != null) {
+        win.removeEventListener('mouseup', onMouseUp);
+        win.removeEventListener('touchend', onTouchEnd);
+        win.removeEventListener('touchcancel', onTouchEnd);
+      }
       endStrokeRef.current();
     };
   }, [isTileTool, canvasRef]);
+
+  // Record where the stroke started: its layer and, for touch, its finger.
+  const beginStrokeSession = useCallback((e: PointerEvent): void => {
+    strokeLayerIdRef.current = activeLayerIdRef.current;
+    const touches = (e as unknown as Partial<TouchEvent>).changedTouches;
+    strokeTouchIdRef.current = touches != null && touches.length > 0 ? touches[0].identifier : null;
+  }, []);
 
   const handlePointerDown = useCallback((e: PointerEvent) => {
     if (!isTileTool || !geometry) return;
@@ -434,6 +500,7 @@ const TilePlacementLayer = ({
           scatterLastDropRef.current = null;
           const layer = getActiveLayer(mapData);
           strokeTilesRef.current = [...(layer.tiles ?? [])];
+          beginStrokeSession(e);
           scatterAdvance(worldCoords.worldX, worldCoords.worldY, coords.x, coords.y);
           return;
         }
@@ -459,18 +526,25 @@ const TilePlacementLayer = ({
 
     const activeLayer = getActiveLayer(mapData);
     strokeTilesRef.current = [...(activeLayer.tiles ?? [])];
+    beginStrokeSession(e);
 
     if (hasTileSelected) {
       placeTilesInBrush(coords.x, coords.y);
     } else {
       eraseTilesInBrush(coords.x, coords.y);
     }
-  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, isOpeningAsset, activeSubtool, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, scatterAdvance, floodFillAtCell, mapData, endStroke]);
+  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, isOpeningAsset, activeSubtool, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, scatterAdvance, floodFillAtCell, mapData, endStroke, beginStrokeSession]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     // Only the paint/erase grid stroke sets isDraggingRef; the click-only
     // subtools (stamp/fill/scatter-for-now) return from pointerdown early.
     if (!isDraggingRef.current || !isTileTool || !geometry) return;
+    // The active layer changed mid-stroke: further live writes would land the
+    // old layer's tiles on the new one. Close the stroke without a commit.
+    if (strokeTilesRef.current !== null && strokeLayerIdRef.current !== activeLayerIdRef.current) {
+      endStroke();
+      return;
+    }
 
     const coords = screenToGrid(e.clientX, e.clientY);
     if (!coords) return;
@@ -499,7 +573,7 @@ const TilePlacementLayer = ({
     }
 
     lastGridPosRef.current = current;
-  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, activeSubtool, placeTilesInBrush, eraseTilesInBrush, scatterAdvance]);
+  }, [isTileTool, geometry, screenToGrid, screenToWorld, hasTileSelected, activeSubtool, placeTilesInBrush, eraseTilesInBrush, scatterAdvance, endStroke]);
 
   const handlePointerUp = useCallback(() => { endStroke(); }, [endStroke]);
 

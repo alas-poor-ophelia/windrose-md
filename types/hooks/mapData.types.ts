@@ -58,6 +58,11 @@ export interface MapDataLoadFailure {
    * version (MapSchemaError); the file is fine and NO restore is offered.
    */
   kind?: 'unreadable' | 'schema' | 'missing';
+  /**
+   * kind 'missing' only: vault path of a same-named store (or one of its
+   * backups) found outside the configured folder, or null when none.
+   */
+  foundAt?: string | null;
 }
 
 // ===========================================

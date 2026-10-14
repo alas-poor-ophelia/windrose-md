@@ -72,6 +72,33 @@ describe('one restore decision per map per load', () => {
     expect(prompts).toBe(1);
   });
 
+  it('the same pane re-running its load joins its own open round: Restore reaches load #2', async () => {
+    const onDisk = createNewMap('Disk', 'grid');
+    const { app } = makeApp('mp-5', onDisk);
+    journalPending(app, 'mp-5', { ...onDisk, description: 'crash edit' }, { writerId: 'w-dead-5', version: 3 });
+
+    let prompts = 0;
+    let release: (c: Choice) => void = () => undefined;
+    const prompt = (): Promise<Choice> => {
+      prompts++;
+      return new Promise<Choice>((resolve) => { release = resolve; });
+    };
+
+    // Load #1 opens the prompt; a rename re-runs the same pane's load effect.
+    const load1 = resolveJournalOnLoad(app, 'mp-5', '', prompt, 'w-pane-a');
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0));
+    const load2 = resolveJournalOnLoad(app, 'mp-5', '', prompt, 'w-pane-a');
+    expect(prompts).toBe(1);
+
+    release('restore');
+    const second = await load2;
+    expect(second?.description).toBe('crash edit');
+    // Load #1 also resolves to the tree; its caller is cancelled and ignores it.
+    expect((await load1)?.description).toBe('crash edit');
+    expect(prompts).toBe(1);
+  });
+
   it('a re-mount in the same load is not prompted again for a deferred slot', async () => {
     const onDisk = createNewMap('Disk', 'grid');
     const { app } = makeApp('mp-2', onDisk);

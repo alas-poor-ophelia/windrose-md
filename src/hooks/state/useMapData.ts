@@ -62,7 +62,7 @@ function useMapData(
         if (error instanceof MapDataFileMissingError) {
           // Store file absent: never a blank editable map whose first edit
           // would create a one-map store (DATA-08).
-          setLoadFailure({ dataPath: error.dataPath, message: error.message, kind: 'missing' });
+          setLoadFailure({ dataPath: error.dataPath, message: error.message, kind: 'missing', foundAt: error.foundAt });
           setIsLoading(false);
           return;
         }

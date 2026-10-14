@@ -166,6 +166,13 @@ export interface HistoryActions {
   recordMapChange: (prev: MapData, next: MapData, options?: RecordMapChangeOptions) => void;
   /** Check if undo/redo is in progress */
   isApplyingHistory: () => boolean;
+  /**
+   * Drop every pre-drag baseline pinned by transient writes. Call when a
+   * gesture ends or is cancelled without its commit, and at the pointer-down
+   * that starts a new gesture, so an abandoned drag is never folded into the
+   * next unrelated entry.
+   */
+  clearTransient: () => void;
 }
 
 // ===========================================
@@ -204,4 +211,6 @@ export interface UseLayerHistoryResult {
   addToHistory: (state: LayerHistorySnapshot, options?: AddToHistoryOptions) => void;
   recordMapChange: (prev: MapData, next: MapData, options?: RecordMapChangeOptions) => void;
   isApplyingHistory: () => boolean;
+  /** See HistoryActions.clearTransient. */
+  clearTransient: () => void;
 }
