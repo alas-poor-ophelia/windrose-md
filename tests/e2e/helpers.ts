@@ -207,6 +207,23 @@ export async function focusCanvas(page: any): Promise<void> {
   await page.waitForTimeout(100);
 }
 
+/**
+ * Press a map-scoped key (Enter/Escape/Delete...) with keyboard focus on the
+ * map wrapper. Map key handlers only act when focus is inside the map wrapper
+ * or the wrapper is hovered (shouldHandleMapKey, src/utils/keyboardTargets.ts).
+ * Synthetic canvas clicks and the offscreen E2E window satisfy neither, so the
+ * key would be dropped; focusing the (tabIndex -1) wrapper mirrors what a real
+ * pointerdown on the map does (MapCanvas focus hand-off) without clicking.
+ */
+export async function pressMapKey(page: any, key: string): Promise<void> {
+  await page.evaluate(() => {
+    const wrapper = document.querySelector(".windrose-canvas-wrapper") as HTMLElement | null;
+    if (wrapper == null) throw new Error("map wrapper not found");
+    wrapper.focus({ preventScroll: true });
+  });
+  await page.keyboard.press(key);
+}
+
 // ===========================================
 // Tool Palette Helpers
 // ===========================================
