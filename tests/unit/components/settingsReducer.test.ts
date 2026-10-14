@@ -13,9 +13,11 @@ import {
   settingsReducer,
   deriveBoundsFromRing,
   columnsForDensity,
+  buildInitialState,
   GRID_DENSITY_PRESETS,
 } from "../../../src/components/settings/settingsReducer";
 import { calculateGridFromHexSize, measurementToHexSize, MEASUREMENT_CORNER } from "../../../src/geometry/core/hexMeasurements";
+import type { PluginSettings } from "../../../types/settings/settings.types";
 import type { SettingsModalState } from "../../../src/components/settings/settingsReducer";
 
 // Minimal state shape for testing IMAGE_SELECTED
@@ -375,5 +377,69 @@ describe("hex sizing shares hexMeasurements (STRUCT-B-10)", () => {
     const expected = calculateGridFromHexSize(1000, 700, base + 2, orientation);
     expect(next.hexBounds).toEqual({ maxCol: expected.columns, maxRow: expected.rows });
     expect(next.fineTuneOffset).toBeCloseTo(2);
+  });
+});
+
+describe("G1: measurement size and fine-tune give the same columns x rows", () => {
+  it.each([
+    ["flat", "corner"], ["flat", "edge"], ["pointy", "corner"], ["pointy", "edge"],
+  ] as const)("typing the fine-tuned size as a measurement matches the fine-tune bounds (%s, %s)", (orientation, method) => {
+    for (const size of [40, 86, 120.5]) {
+      const base = createMockState({
+        imageDimensions: { width: 1000, height: 700 },
+        boundsLocked: true,
+        sizingMode: "measurement",
+        measurementMethod: method,
+        measurementSize: size,
+      });
+      const tunedHex = measurementToHexSize(size, method, orientation) + 3;
+      const tuned = settingsReducer(base, { type: Actions.SET_FINE_TUNE, payload: { adjustedHexSize: tunedHex, orientation } });
+      const typedSize = method === MEASUREMENT_CORNER ? tunedHex * 2 : tunedHex * Math.sqrt(3);
+      const typed = settingsReducer(base, { type: Actions.SET_MEASUREMENT_SIZE, payload: { size: typedSize, orientation } });
+      expect(typed.hexBounds).toEqual(tuned.hexBounds);
+    }
+  });
+});
+
+describe("G4: fresh map defaults match the previous release (f7442a18)", () => {
+  // Literals copied from `git show f7442a18:src/components/settings/settingsReducer.ts` buildInitialState.
+  const OLD = {
+    gridLineColor: '#666666', gridLineWidth: 1, backgroundColor: '#1a1a1a', borderColor: '#8b6842',
+    coordinateKeyColor: '#c4a57b', coordinateTextColor: '#ffffff', coordinateTextShadow: '#000000',
+    canvasHeight: 600, canvasHeightMobile: 400, pictureFrameHeight: 400, pictureFrameHeightMobile: 300,
+    fogOfWarColor: '#000000', fogOfWarOpacity: 0.9, fogOfWarImage: null,
+    fogOfWarBlurEnabled: false, fogOfWarBlurFactor: 0.99, alwaysShowControls: false,
+  };
+  const noGlobals = {} as PluginSettings;
+
+  it("initial colours, heights and fog values equal the old fallback literals", () => {
+    const state = buildInitialState({ mapType: 'hex' }, noGlobals);
+    expect(state.overrides).toMatchObject(OLD);
+    expect(state.overrides.pictureFrameWidth).toBeUndefined();
+  });
+
+  it.each([
+    ['hex', 6, 'mi'], ['grid', 5, 'ft'],
+  ] as const)("%s map distance defaults are %s %s, alternating, both", (mapType, perCell, unit) => {
+    const state = buildInitialState({ mapType }, noGlobals);
+    expect(state.distanceSettings).toMatchObject({
+      useGlobalDistance: true, distancePerCell: perCell, distanceUnit: unit,
+      gridDiagonalRule: 'alternating', displayFormat: 'both',
+    });
+  });
+
+  it("global settings and per-map overrides keep the old precedence", () => {
+    const state = buildInitialState(
+      {
+        mapType: 'hex',
+        currentSettings: { useGlobalSettings: false, overrides: { gridLineColor: '#123456' } },
+        currentDistanceSettings: { useGlobalDistance: false, distancePerCell: 9 },
+      },
+      { gridLineColor: '#abcdef', canvasHeight: 777, distanceUnitHex: 'km' } as PluginSettings,
+    );
+    expect(state.overrides.gridLineColor).toBe('#123456');
+    expect(state.overrides.canvasHeight).toBe(777);
+    expect(state.distanceSettings.distancePerCell).toBe(9);
+    expect(state.distanceSettings.distanceUnit).toBe('km');
   });
 });

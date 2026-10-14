@@ -117,3 +117,20 @@ describe('shared tile-metadata store', () => {
     expect(files.get(FILE)).toBe('{}');
   });
 });
+
+describe('S3/T1: two embeds, star then tag inside the save window', () => {
+  beforeEach(() => { vi.useFakeTimers(); resetTileMetadataStore(); });
+  afterEach(() => { resetTileMetadataStore(); vi.useRealTimers(); });
+
+  it('a star, then a tag 1.5 s later, both land in the final file after the last debounce', async () => {
+    const { app, files } = makeApp(JSON.stringify({}));
+    await ensureTileMetadataLoaded(app);
+    updateTileMetadata(app, s => toggleStar(s, 'a.png'));
+    await vi.advanceTimersByTimeAsync(1500);
+    updateTileMetadata(app, s => addUserTag(s, 'b.png', 'forest'));
+    await vi.advanceTimersByTimeAsync(5000);
+    const saved = JSON.parse(files.get(FILE) ?? '{}') as Saved;
+    expect(saved['a.png']?.starred).toBe(true);
+    expect(saved['b.png']?.userTags).toEqual(['forest']);
+  });
+});

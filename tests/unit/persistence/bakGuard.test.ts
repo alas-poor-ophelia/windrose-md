@@ -170,3 +170,62 @@ describe('backup size-drop guard', () => {
     expect(fake.contents.get(BAK1)).toBe(small);
   });
 });
+
+describe('P9: autosave on a multi-MB store', () => {
+  it('reads the store once, never re-stringifies the big map, and rotates once per 15 min', async () => {
+    const ops = await freshOps();
+    const fake = makeVault();
+    const parsed = JSON.parse(store(ops, { big: 'Big', a: 'Small' })) as { maps: Record<string, MapData> };
+    parsed.maps.big.description = 'x'.repeat(2_500_000);
+    fake.put(DATA_PATH, JSON.stringify(parsed), NOW - 1000);
+
+    type VaultLike = {
+      read: (f: TFile) => Promise<string>;
+      getAbstractFileByPath: (p: string) => TFile | null;
+      adapter?: Record<string, unknown>;
+    };
+    const vault = fake.app.vault as unknown as VaultLike;
+    let reads = 0;
+    const origRead = vault.read;
+    vault.read = (f: TFile) => { reads++; return origRead(f); };
+    vault.adapter = {
+      exists: async (p: string) => fake.contents.has(p),
+      stat: async (p: string) => {
+        const f = vault.getAbstractFileByPath(p);
+        return f ? { type: 'file', ctime: f.stat.ctime, mtime: f.stat.mtime, size: f.stat.size } : null;
+      },
+      read: async (p: string) => fake.contents.get(p) ?? '',
+    };
+
+    const bakState = (): string => `${fake.contents.get(BAK1) ?? ''}|${fake.contents.get(BAK2) ?? ''}`;
+    const realStringify = JSON.stringify;
+    const sizes: number[] = [];
+    const spy = vi.spyOn(JSON, 'stringify').mockImplementation((...args: Parameters<typeof JSON.stringify>) => {
+      const out = realStringify(...args);
+      sizes.push(out.length);
+      return out;
+    });
+
+    const rotations: string[] = [];
+    let last = bakState();
+    const saveAt = async (offsetMs: number, name: string): Promise<void> => {
+      vi.setSystemTime(NOW + offsetMs);
+      await ops.saveMapData(fake.app, 'a', ops.createNewMap(name, 'grid'));
+      const now = bakState();
+      if (now !== last) { rotations.push(name); last = now; }
+    };
+
+    await saveAt(0, 'e0');
+    const readsAfterFirst = reads;
+    sizes.length = 0;
+    for (let i = 1; i <= 8; i++) await saveAt(i * 60_000, `e${i}`);
+    const maxStringify = Math.max(0, ...sizes);
+    const readsDuring = reads - readsAfterFirst;
+    await saveAt(ops.BAK_THROTTLE_MS + 60_000, 'late');
+    spy.mockRestore();
+
+    expect(readsDuring).toBe(0);
+    expect(maxStringify).toBeLessThan(500_000);
+    expect(rotations).toEqual(['e0', 'late']);
+  });
+});
