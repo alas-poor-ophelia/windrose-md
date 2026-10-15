@@ -86,7 +86,8 @@ interface SubMenuFlyoutProps {
 /** Props for ToolButtonWithSubMenu */
 interface ToolButtonWithSubMenuProps {
   toolGroup: ToolGroup;
-  currentTool: ToolId;
+  /** Null while a fog tool is armed: no palette tool shows as active. */
+  currentTool: ToolId | null;
   currentSubTool: ToolId;
   isSubMenuOpen: boolean;
   onToolSelect: (id: ToolId) => void;
@@ -108,6 +109,8 @@ interface ToolPaletteProps {
   canRedo: boolean;
   mapType: MapType;
   isFocused?: boolean;
+  /** A fog-of-war tool is armed: it owns the canvas, so no palette tool shows as active. */
+  fogArmed?: boolean;
   /** Dock/undock button rendered at the end of the toolbar */
   dockButton?: ComponentChildren;
   /** Full-pane vertical layout: 54px left bar, right-opening flyouts */
@@ -429,9 +432,13 @@ const ToolPalette = ({
   canRedo,
   mapType,
   isFocused = false,
+  fogArmed = false,
   dockButton,
   vertical = false
 }: ToolPaletteProps): VNode => {
+  // Highlighted tool: none while fog is armed (currentTool itself is kept, so
+  // releasing fog shows the previous tool again).
+  const shownTool: ToolId | null = fogArmed ? null : currentTool;
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const [subToolSelections, setSubToolSelections] = useState<SubToolSelections>(INITIAL_SUB_TOOL_SELECTIONS);
   const featureFlags = useFeatureFlags();
@@ -553,7 +560,7 @@ const ToolPalette = ({
         <ToolButtonWithSubMenu
           key={group.id}
           toolGroup={group}
-          currentTool={currentTool}
+          currentTool={shownTool}
           currentSubTool={subToolSelections[group.id]}
           isSubMenuOpen={openSubMenu === group.id}
           onToolSelect={onToolChange}
@@ -572,7 +579,7 @@ const ToolPalette = ({
           <ToolButtonWithSubMenu
             key={group.id}
             toolGroup={group}
-            currentTool={currentTool}
+            currentTool={shownTool}
             currentSubTool={subToolSelections[group.id]}
             isSubMenuOpen={openSubMenu === group.id}
             onToolSelect={onToolChange}
@@ -589,7 +596,7 @@ const ToolPalette = ({
         <button
           key={tool.id}
           ref={tooltipRef(titleWithShortcut(tool.title, tool.actionId, tool.shortcut), { placement: vertical ? 'right' : 'top' })}
-          className={`windrose-tool-btn interactive-child ${currentTool === tool.id ? 'windrose-tool-btn-active' : ''}`}
+          className={`windrose-tool-btn interactive-child ${shownTool === tool.id ? 'windrose-tool-btn-active' : ''}`}
           onClick={() => onToolChange(tool.id)}
         >
           <Icon icon={tool.icon} />
