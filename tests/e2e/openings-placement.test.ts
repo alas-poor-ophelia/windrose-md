@@ -11,6 +11,7 @@ import {
   readWallGapsLive,
   resetDataFile,
   TEST_MAPS,
+  pressMapKey,
 } from "./helpers";
 
 // Reset the clean fixture before each test. Gap counts are read live from the
@@ -37,7 +38,7 @@ beforeEach(() => resetDataFile());
 // arming if it occludes the canvas; read failures from test-results.json.
 // ===========================================
 
-/** mousedown+mouseup on the map canvas at a fraction of its size (optionally
+/** pointerdown+mousedown, pointerup+mouseup (real browser order) on the map canvas at a fraction of its size (optionally
  *  with Alt held, for the bare-threshold path). Panels can occlude the canvas
  *  in the small E2E window, so we dispatch events directly. */
 async function canvasClick(page: any, fx: number, fy: number, altKey = false): Promise<void> {
@@ -52,7 +53,9 @@ async function canvasClick(page: any, fx: number, fy: number, altKey = false): P
       button: 0,
       altKey,
     };
+    canvas.dispatchEvent(new PointerEvent("pointerdown", { ...opts, pointerId: 1, pointerType: "mouse", isPrimary: true }));
     canvas.dispatchEvent(new MouseEvent("mousedown", opts));
+    canvas.dispatchEvent(new PointerEvent("pointerup", { ...opts, pointerId: 1, pointerType: "mouse", isPrimary: true }));
     canvas.dispatchEvent(new MouseEvent("mouseup", opts));
   }, { fx, fy, altKey });
   await page.waitForTimeout(250);
@@ -77,7 +80,7 @@ async function drawHorizontalWall(page: any): Promise<void> {
   await footer.waitFor({ state: "visible", timeout: 5000 });
   await canvasClick(page, 0.35, 0.5);
   await canvasClick(page, 0.65, 0.5);
-  await page.keyboard.press("Enter");
+  await pressMapKey(page, "Enter");
   await page.waitForTimeout(500);
 }
 

@@ -1,0 +1,3 @@
+# Run artifacts the plugin writes into the E2E test vault (rotated data-file
+# backups). tests/e2e/setup.ts also deletes them at setup and teardown.
+test-vault/_test-data/*.bak*.json

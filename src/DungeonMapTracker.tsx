@@ -52,6 +52,7 @@ import type { PanelId, PanelState } from './hooks/state/useFloatingPanels';
 import { useDockLayout } from './hooks/app/useDockLayout';
 import { useTileDrawerState } from './hooks/app/useTileDrawerState';
 import { useTileToolCoupling } from './hooks/app/useTileToolCoupling';
+import { useFogAwareToolState, useReleaseFogOnSurfaceClose } from './hooks/app/useFogToolCoupling';
 import { useDrawerRibbon } from './hooks/app/useDrawerRibbon';
 import { useMapListActions } from './hooks/app/useMapListActions';
 import { useBoardHandlers } from './hooks/app/useBoardHandlers';
@@ -169,7 +170,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // notePath is passed from the code block processor (ctx.sourcePath)
 
   // Tool and color state (extracted to useToolState hook)
-  const toolState = useToolState({ mapData, updateMapData });
+  // setCurrentTool is wrapped so any normal tool pick leaves fog mode first.
+  const { toolState, releaseFogRef } = useFogAwareToolState(useToolState({ mapData, updateMapData }));
   const {
     currentTool, setCurrentTool,
     selectedObjectType,
@@ -367,6 +369,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleFogClearAll,
     handleFogChange
   } = fog;
+  releaseFogRef.current = fog.releaseFog;
+  // Closing the last surface that shows the fog tools leaves fog mode.
+  useReleaseFogOnSurfaceClose({
+    fullPane, showVisibilityToolbar, showFogTools, railOpenId,
+    viewDockOpen: !dock.collapsed && !(dock.sectionCollapsed['view'] ?? true),
+    viewFloating: isFloating('view'),
+  }, fog.releaseFog);
 
   // Effective settings (global + map overrides), fetched fresh each render.
   const effectiveSettings = mapData ? getEffectiveSettings(mapData.settings) : null;

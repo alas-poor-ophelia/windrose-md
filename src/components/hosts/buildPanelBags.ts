@@ -175,6 +175,7 @@ function buildPanelBags(src: PanelBagSources): PanelBags {
       canRedo: lh.canRedo,
       mapType: mapData.mapType,
       isFocused: uiLayout.isFocused,
+      fogArmed: fog.fogActiveTool != null,
     },
   };
 }

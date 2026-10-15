@@ -143,6 +143,19 @@ function staticKeysEqual(a: readonly unknown[], b: readonly unknown[]): boolean 
   return true;
 }
 
+/**
+ * Schedule ONE crisp re-bake after things settle: the timer resets on every
+ * further call, then marks the snapshot stale and requests a render.
+ */
+function scheduleSettleRebake(canvas: HTMLCanvasElement, entry: StaticLayerCacheEntry): void {
+  if (entry.settleTimer != null) window.clearTimeout(entry.settleTimer);
+  entry.settleTimer = window.setTimeout(() => {
+    entry.settleTimer = null;
+    entry.key = ['__settle-stale__'];
+    staticSettleCallbacks.get(canvas)?.();
+  }, ZOOM_SETTLE_MS);
+}
+
 function blitStaticContent(
   canvas: HTMLCanvasElement,
   ctx: CanvasRenderingContext2D,
@@ -181,6 +194,16 @@ function blitStaticContent(
     usable = pMinX >= 0 && pMinY >= 0 && pMaxX <= entry.off.width && pMaxY <= entry.off.height;
   }
 
+  if (usable && entry && rotated && scale !== 1) {
+    // Rotated map mid-zoom: a scale-blit under the rotation transform is
+    // visibly soft (bilinear twice), so draw straight onto the live canvas as
+    // before the static cache existed (culling still applies inside draw), and
+    // schedule ONE re-bake at the settled zoom so later pans blit 1:1.
+    scheduleSettleRebake(canvas, entry);
+    draw(ctx, offsetX, offsetY, width, height, northDirection);
+    return;
+  }
+
   if (!usable) {
     const pad = computeStaticPad(width, height, northDirection);
     if (pad == null) {
@@ -215,13 +238,7 @@ function blitStaticContent(
     // schedule ONE crisp re-render after things settle — the timer resets on
     // every further change, so a burst of tile-image loads coalesces into a
     // single rebuild instead of one ~full-repaint per image.
-    if (entry.settleTimer != null) window.clearTimeout(entry.settleTimer);
-    const settleEntry = entry;
-    entry.settleTimer = window.setTimeout(() => {
-      settleEntry.settleTimer = null;
-      settleEntry.key = ['__settle-stale__'];
-      staticSettleCallbacks.get(canvas)?.();
-    }, ZOOM_SETTLE_MS);
+    scheduleSettleRebake(canvas, entry);
   }
 
   if (!entry) return;

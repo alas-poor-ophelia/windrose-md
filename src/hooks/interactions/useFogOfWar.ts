@@ -55,7 +55,7 @@ function useFogOfWar({
   mapData,
   geometry,
   updateMapData
-}: FogOfWarOptions): UseFogOfWarResult {
+}: FogOfWarOptions): UseFogOfWarResult & { releaseFog: () => void } {
   const [showFogTools, setShowFogTools] = useState<boolean>(false);
   const [fogActiveTool, setFogActiveTool] = useState<FogToolId | null>(null);
 
@@ -87,6 +87,14 @@ function useFogOfWar({
       setFogActiveTool(null);
     }
   }, [showFogTools]);
+
+  // Leave fog mode entirely: close the fog toolbar and disarm the fog tool.
+  // Called when a normal tool is picked or every fog surface has closed, so
+  // the canvas falls back to the (unchanged) current palette tool.
+  const releaseFog = useCallback((): void => {
+    setShowFogTools(false);
+    setFogActiveTool(null);
+  }, []);
 
   const handleFogToolSelect = useCallback((tool: FogToolId): void => {
     setFogActiveTool((prev: FogToolId | null) => prev === tool ? null : tool);
@@ -185,6 +193,7 @@ function useFogOfWar({
   return {
     fogState,
     fogActions,
+    releaseFog,
     showFogTools,
     fogActiveTool,
     currentFogState,

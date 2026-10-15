@@ -1,9 +1,35 @@
-import { test } from "obsidian-testing-framework";
+import { test as baseTest } from "obsidian-testing-framework";
 import { doWithApp } from "obsidian-testing-framework/lib/util.js";
 import { expect } from "vitest";
+import type { ElectronApplication } from "@playwright/test";
+
+/**
+ * The framework's `test`, with the vault reset BEFORE Obsidian boots.
+ *
+ * vitest 4 resolves auto fixtures for a `beforeEach` hook too, so the
+ * framework's auto `electronApp` fixture boots Obsidian before any file's
+ * `beforeEach(() => resetDataFile())` runs. Obsidian then opened the previous
+ * test's exit layout (workspace.json) and loaded its map from the previous
+ * test's exit save; the later reset rewrote the file underneath an
+ * already-loaded map, so pins and gaps leaked into the next test. Overriding
+ * `electronApp` to depend on `cleanVault` (listed first, so it resolves first)
+ * puts the reset ahead of the boot. Files keep their `beforeEach` reset; on a
+ * clean file it rewrites identical bytes.
+ */
+export const test = baseTest.extend<{ cleanVault: void; electronApp: ElectronApplication }>({
+  // eslint-disable-next-line no-empty-pattern -- vitest reads fixture deps from the destructuring pattern; {} means none
+  cleanVault: async ({}, use) => {
+    resetDataFile();
+    await use();
+  },
+  electronApp: async ({ cleanVault, electronApp }, use) => {
+    void cleanVault;
+    await use(electronApp);
+  },
+});
 
 // Re-export for convenience
-export { test, expect, doWithApp };
+export { expect, doWithApp };
 
 // Healthy map renders take ~9s on a loaded machine (measured 2026-07-26), so
 // the old 10000ms default sat right at the edge and flaked under suite load.
@@ -205,6 +231,23 @@ export async function focusCanvas(page: any): Promise<void> {
   const canvas = page.locator(".windrose-canvas-wrapper canvas").first();
   await canvas.click();
   await page.waitForTimeout(100);
+}
+
+/**
+ * Press a map-scoped key (Enter/Escape/Delete...) with keyboard focus on the
+ * map wrapper. Map key handlers only act when focus is inside the map wrapper
+ * or the wrapper is hovered (shouldHandleMapKey, src/utils/keyboardTargets.ts).
+ * Synthetic canvas clicks and the offscreen E2E window satisfy neither, so the
+ * key would be dropped; focusing the (tabIndex -1) wrapper mirrors what a real
+ * pointerdown on the map does (MapCanvas focus hand-off) without clicking.
+ */
+export async function pressMapKey(page: any, key: string): Promise<void> {
+  await page.evaluate(() => {
+    const wrapper = document.querySelector(".windrose-canvas-wrapper") as HTMLElement | null;
+    if (wrapper == null) throw new Error("map wrapper not found");
+    wrapper.focus({ preventScroll: true });
+  });
+  await page.keyboard.press(key);
 }
 
 // ===========================================

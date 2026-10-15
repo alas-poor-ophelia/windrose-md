@@ -26,6 +26,14 @@ import type { TileGeometry, TileViewState, TileRenderOptions } from './computeTi
 /** Fallbacks when a tileset does not set its own stamp threshold / minimum stamp scale. */
 const DEFAULT_STAMP_THRESHOLD = 0.5;
 const DEFAULT_MIN_STAMP_SCALE = 0.35;
+/** Draw/source width ratio above which a tile draw counts as an upscale and
+ *  gets imageSmoothingQuality 'high' instead of the default bilinear 'low'. */
+const UPSCALE_HQ_THRESHOLD = 1.25;
+
+/** Intrinsic pixel width of a draw source (image natural width, else canvas width). */
+function sourceWidth(src: HTMLImageElement | HTMLCanvasElement): number {
+  return 'naturalWidth' in src && src.naturalWidth > 0 ? src.naturalWidth : src.width;
+}
 
 
 // ===========================================
@@ -286,8 +294,18 @@ function renderTiles(
     }
 
     // Draw the capped render-source for oversized images (built at load) so the
-    // GPU never uploads a full-res 6.5MP+ texture during an interactive frame.
-    ctx.drawImage(getRenderSource(img), rect.drawX, rect.drawY, rect.drawWidth, rect.drawHeight);
+    // GPU never uploads a full-res 6.5MP+ texture at ordinary zooms; once the
+    // draw outgrows the capped copy the original image is used instead.
+    const src = getRenderSource(img, Math.abs(rect.drawWidth), Math.abs(rect.drawHeight));
+    // Upscaling painted art: the default 'low' quality is plain bilinear and
+    // reads as blur at deep zoom; 'high' only for genuine upscales (> 1.25x).
+    // Smoothing stays ON (art is painted, not pixel art).
+    const srcW = sourceWidth(src);
+    const upscale = srcW > 0 && Math.abs(rect.drawWidth) > srcW * UPSCALE_HQ_THRESHOLD;
+    const prevQuality = ctx.imageSmoothingQuality;
+    if (upscale) ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(src, rect.drawX, rect.drawY, rect.drawWidth, rect.drawHeight);
+    if (upscale) ctx.imageSmoothingQuality = prevQuality;
 
     if (needsTransform) {
       ctx.restore();

@@ -231,25 +231,54 @@ test("Party note is created in the vault and pin removal offers guarded deletion
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);
 
-  // A leftover note from an aborted earlier run carries a foreign pin id and
-  // would block Create — clear it so the test is self-healing
+  // The note is named after the pin's label ("<label> - Nearby.md", via
+  // buildPartyNotePath), and the label depends on how many pins the map
+  // already holds ("The Party" for the first, "Beacon N" after that). So the
+  // test never hard-codes the path: it records which "* - Nearby.md" notes
+  // exist before Create and takes the one Create adds.
+  const listNearbyNotes = async (): Promise<string[]> =>
+    await doWithApp(page, async (app: any) => {
+      return app.vault.getMarkdownFiles()
+        .map((f: any) => f.path as string)
+        .filter((p: string) => p.endsWith(" - Nearby.md"));
+    }, {});
+  const readPinLabels = async (): Promise<string[]> =>
+    await page.locator(".windrose-party-pin-label").allTextContents();
+
+  // Leftover notes from an aborted earlier run carry a foreign pin id and
+  // would block Create — clear them so the test is self-healing
   await doWithApp(page, async (app: any) => {
-    const stale = app.vault.getAbstractFileByPath("The Party - Nearby.md");
-    if (stale != null) await app.vault.delete(stale);
+    const stale = app.vault.getMarkdownFiles().filter((f: any) => (f.path as string).endsWith(" - Nearby.md"));
+    for (const f of stale) await app.vault.delete(f);
   }, {});
 
+  // Pins can already be on the map at boot (a previous test's pin has been
+  // seen to survive the per-test data reset), and pins sharing a cell stack
+  // under one visible label, so count pin overlays (one per pin), not labels.
+  const pinOverlays = page.locator(".windrose-party-pin-overlay");
+  const pinsBefore = await pinOverlays.count();
+  const labelsBefore = await readPinLabels();
   await placePartyPin(page);
+  const labelsAfter = await readPinLabels();
+  const pinCountBeforeRemove = await pinOverlays.count();
+  // Diagnostic: what the map held before and after the click.
+  console.log(`[party-note] pins before=${pinsBefore} after=${pinCountBeforeRemove} labels before=${JSON.stringify(labelsBefore)} after=${JSON.stringify(labelsAfter)}`);
+  expect(pinCountBeforeRemove).toBe(pinsBefore + 1);
 
-  // Create the note (default folder = vault root; label 'The Party')
+  const notesBefore = await listNearbyNotes();
+
+  // Create the note (default folder = vault root)
   const createRow = page.locator(".windrose-party-controls-note-create");
   await createRow.locator("button", { hasText: "Create" }).click();
   await page.waitForTimeout(1000);
 
-  const notePath = "The Party - Nearby.md";
-  const created = await doWithApp(page, async (app: any, params: any) => {
-    return app.vault.getAbstractFileByPath(params.notePath) != null;
-  }, { notePath });
-  expect(created).toBe(true);
+  const notesAfter = await listNearbyNotes();
+  const createdNotes = notesAfter.filter((p) => !notesBefore.includes(p));
+  console.log(`[party-note] notes before=${JSON.stringify(notesBefore)} created=${JSON.stringify(createdNotes)}`);
+  expect(createdNotes).toHaveLength(1);
+  const notePath = createdNotes[0];
+  // Named "<pin label> - Nearby.md" at the vault root (default folder)
+  expect(notePath).toMatch(/^(The Party|Beacon \d+) - Nearby\.md$/);
 
   // The card now offers open + live-update controls instead of Create
   expect(await page.locator('.windrose-party-controls button[aria-label="Open beacon note"]').isVisible()).toBe(true);
@@ -267,7 +296,7 @@ test("Party note is created in the vault and pin removal offers guarded deletion
     return app.vault.getAbstractFileByPath(params.notePath) != null;
   }, { notePath });
   expect(stillThere).toBe(false);
-  expect(await page.locator(".windrose-party-pin-overlay").count()).toBe(0);
+  expect(await page.locator(".windrose-party-pin-overlay").count()).toBe(pinCountBeforeRemove - 1);
 
   expect(errors).toHaveLength(0);
 });

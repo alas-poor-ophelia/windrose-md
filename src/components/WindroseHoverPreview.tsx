@@ -4,7 +4,6 @@
 // so the preview matches what the full map looks like.
 
 import type { MapData } from '#types/index';
-import type { ExtendedGeometry } from '#types/contexts/context.types';
 
 import type { VNode } from 'preact';
 import { render } from 'preact';
@@ -12,17 +11,18 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { loadMapData } from '../persistence/fileOperations';
 import { buildTilesetsFromSettings, applyBuiltTilesets } from '../assets/tilesetOperations';
 import { renderCanvas } from '../geometry/renderers/mapRenderer';
-import { GridGeometry } from '../geometry/core/GridGeometry';
-import { HexGeometry } from '../geometry/core/HexGeometry';
 import { getApp, getSettings, resolveTheme } from '../core/settingsAccessor';
-import { DEFAULTS } from '../core/dmtConstants';
+import { resolveHoverPreviewView } from '../core/deepLinkHoverTarget';
 
 const BASE_WIDTH = 240;
 const BASE_HEIGHT = 180;
 const DEFAULT_PREVIEW_SCALE = 1.0;
 const DEFAULT_PREVIEW_ZOOM = 0.5;
 
-/** Preview canvas size and zoom from the "Link preview size" / "Link preview zoom" sliders. */
+/**
+ * Preview canvas size and the "Link preview zoom" slider value. The slider is
+ * a multiplier on the link's own zoom (see resolvePreviewZoom).
+ */
 function getPreviewDimensions(): { width: number; height: number; zoom: number } {
   try {
     const s = getSettings();
@@ -38,7 +38,11 @@ interface WindroseHoverPreviewProps {
   mapId: string;
   x: number;
   y: number;
+  /** The link's own zoom (multiplied by the slider); absent or <= 0 uses the slider alone. */
+  zoom?: number;
   layerId?: string;
+  /** '/'-joined sub-hex drill path from the link, when it points inside a sub-hex. */
+  subHexPath?: string;
   notePath?: string;
 }
 
@@ -49,13 +53,13 @@ function noteBasename(notePath?: string): string {
   return base.replace(/\.md$/i, '');
 }
 
-function WindroseHoverPreview({ mapId, x, y, layerId, notePath }: WindroseHoverPreviewProps): VNode {
+function WindroseHoverPreview({ mapId, x, y, zoom: linkZoom, layerId, subHexPath, notePath }: WindroseHoverPreviewProps): VNode {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
   const [mapName, setMapName] = useState<string>('');
 
   const preview = getPreviewDimensions();
-  const zoom = preview.zoom;
+  const sliderZoom = preview.zoom;
 
   useEffect(() => {
     let cancelled = false;
@@ -80,30 +84,31 @@ function WindroseHoverPreview({ mapId, x, y, layerId, notePath }: WindroseHoverP
 
         setMapName((mapData.name) ?? mapId);
 
+        // Same centre/level resolution as the click navigation (hex q,r ->
+        // world px, sub-hex path -> that level's map), plus the linked item.
+        const view = resolveHoverPreviewView(
+          mapData,
+          { x, y, zoom: linkZoom ?? 0, layerId: layerId ?? '', subHexPath },
+          sliderZoom
+        );
+
         const focused: MapData = {
-          ...mapData,
-          viewState: { zoom, center: { x, y } },
-          activeLayerId: (layerId != null && layerId !== '') ? layerId : mapData.activeLayerId,
+          ...view.levelMap,
+          viewState: { zoom: view.zoom, center: view.center },
+          activeLayerId: view.layerId ?? view.levelMap.activeLayerId,
           northDirection: 0,
         };
 
-        const geometry: ExtendedGeometry = focused.mapType === 'hex'
-          ? new HexGeometry(
-              (focused.hexSize as number) || (DEFAULTS.hexSize),
-              focused.orientation ?? DEFAULTS.hexOrientation,
-              focused.hexBounds ?? null
-            )
-          : new GridGeometry((focused.gridSize as number) || (DEFAULTS.gridSize));
-
-        // Per-map theme: global settings with this map's overrides applied.
-        const theme = resolveTheme(focused.settings);
+        // Per-map theme: global settings with this map's overrides applied
+        // (a sub-map without its own settings inherits the root's).
+        const theme = resolveTheme(view.levelMap.settings ?? mapData.settings);
 
         const canvas = canvasRef.current;
         if (!canvas) return;
         canvas.width = preview.width;
         canvas.height = preview.height;
 
-        renderCanvas(canvas, null, focused, geometry, [], {
+        renderCanvas(canvas, null, focused, view.geometry, view.highlight != null ? [view.highlight] : [], {
           theme,
           layerVisibility: { grid: true, objects: true, textLabels: true, hexCoordinates: false, regions: false, outlines: false }
         });
@@ -157,7 +162,7 @@ function WindroseHoverPreview({ mapId, x, y, layerId, notePath }: WindroseHoverP
       }
     })();
     return () => { cancelled = true; };
-  }, [mapId, x, y, zoom, layerId, preview.width, preview.height]);
+  }, [mapId, x, y, linkZoom, sliderZoom, layerId, subHexPath, preview.width, preview.height]);
 
   const noteLabel = noteBasename(notePath);
   const headerMapName = mapName || mapId;

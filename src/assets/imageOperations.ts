@@ -307,9 +307,24 @@ function buildRenderSource(img: HTMLImageElement): void {
  * Render source for a cached tile image: a capped downscaled copy for oversized
  * images (built at load), else the image itself. Use ONLY for whole-image scaled
  * draws (drawCellTile) — NOT for pixel-coord source sub-rects or naturalWidth math.
+ *
+ * Pass the on-screen draw size (canvas px) when known: the capped copy is used
+ * while the draw fits within it, and the ORIGINAL image once the draw is larger
+ * than the capped copy (deep zoom), so the art is not upscaled from the 1280 px
+ * copy when more source detail exists. Without a size, the capped copy is used.
  */
-function getRenderSource(img: HTMLImageElement): HTMLImageElement | HTMLCanvasElement {
-  return renderSourceCache.get(img) ?? img;
+function getRenderSource(
+  img: HTMLImageElement,
+  drawWidth?: number,
+  drawHeight?: number
+): HTMLImageElement | HTMLCanvasElement {
+  const capped = renderSourceCache.get(img);
+  if (capped == null) return img;
+  if (drawWidth != null && drawHeight != null
+    && (drawWidth > capped.width || drawHeight > capped.height)) {
+    return img;
+  }
+  return capped;
 }
 
 /**

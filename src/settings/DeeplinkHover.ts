@@ -105,7 +105,9 @@ function show(linkEl: HTMLElement, href: string, parsed: DeepLinkData): void {
       mapId: parsed.mapId,
       x: Number.isFinite(parsed.x) ? parsed.x : 0,
       y: Number.isFinite(parsed.y) ? parsed.y : 0,
+      zoom: parsed.zoom,
       layerId: parsed.layerId || '',
+      subHexPath: parsed.subHexPath,
       notePath: parsed.notePath || ''
     });
   } catch (err: unknown) {
