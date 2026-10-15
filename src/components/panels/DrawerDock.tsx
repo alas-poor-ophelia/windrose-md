@@ -3,6 +3,7 @@ import type { TileLayerRole } from '#types/tiles/tile.types';
 
 import { useCallback, useRef, useEffect, useState } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
+import { getCachedImage, pinImage, preloadImage, unpinImage } from '../../assets/imageOperations';
 import { Icon } from '../shared/Icon';
 import { tooltipRef } from '../shared/obsidianTooltip';
 import { DepthRibbon } from './DepthBar';
@@ -45,10 +46,40 @@ interface DrawerDockProps {
   children: ComponentChildren;
 }
 
-function FlyoutThumb({ vaultPath, className = 'windrose-flyout-img' }: { vaultPath: string; className?: string }): VNode {
+/**
+ * Blob URL for a tile image via the shared image cache (which reads through
+ * readTileBytes, so bundled tiles resolve too). The cache entry is pinned
+ * while the caller is mounted so its blob URL stays valid; null until loaded.
+ */
+function useTileImageSrc(vaultPath: string): string | null {
   const app = useApp();
-  const src = app.vault.adapter.getResourcePath(vaultPath);
-  return <img className={className} src={src} loading="lazy" />;
+  // The src is stored with the path it belongs to: an unkeyed flyout that
+  // switches tiles must not show the previous tile for one render.
+  const [loaded, setLoaded] = useState<{ path: string; src: string | null }>(
+    () => ({ path: vaultPath, src: getCachedImage(vaultPath)?.src ?? null }));
+  useEffect(() => {
+    if (!vaultPath) return undefined;
+    let live = true;
+    pinImage(vaultPath);
+    setLoaded({ path: vaultPath, src: getCachedImage(vaultPath)?.src ?? null });
+    void preloadImage(app, vaultPath).then((img) => {
+      if (live) setLoaded({ path: vaultPath, src: img?.src ?? null });
+    });
+    return () => {
+      live = false;
+      unpinImage(vaultPath);
+    };
+  }, [app, vaultPath]);
+  if (loaded.path === vaultPath) return loaded.src;
+  return getCachedImage(vaultPath)?.src ?? null;
+}
+
+function FlyoutThumb({ vaultPath, className = 'windrose-flyout-img' }: { vaultPath: string; className?: string }): VNode | null {
+  const src = useTileImageSrc(vaultPath);
+  if (src == null) return null;
+  // No loading="lazy": the src is an in-memory image preloadImage already
+  // decoded, so deferring the load saves nothing.
+  return <img className={className} src={src} />;
 }
 
 function FlyoutPreview({ tile }: { tile: FlyoutTile }): VNode {

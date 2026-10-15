@@ -13,10 +13,10 @@ import type {
   GridCalculation,
   GridDensityPreset,
 } from '#types/settings/settings.types';
-import { TFile } from 'obsidian';
 import type { App } from 'obsidian';
 
 import { getApp } from '../core/settingsAccessor';
+import { readTileBlob } from './tileBytes';
 
 /** Image file index entry */
 interface ImageIndexEntry {
@@ -31,6 +31,8 @@ type GridDensityPresets = Record<string, GridDensityPreset>;
 const imageCache = new Map<string, HTMLImageElement>();
 const loadingPromises = new Map<string, Promise<HTMLImageElement | null>>();
 const dimensionsCache = new Map<string, ImageDimensions>();
+/** Paths already warned as unreadable; each missing path warns once (cleared on dispose). */
+const warnedMissing = new Set<string>();
 /**
  * Pin refcounts (MEM-04). A pinned path is exempt from LRU eviction and from
  * clearUnusedTileImages. Each pinImage must be balanced by an unpinImage; when
@@ -69,6 +71,11 @@ let MAX_CACHE_SIZE = 200;
 
 function setMaxCacheSize(size: number): void {
   MAX_CACHE_SIZE = size;
+}
+
+/** Read-only snapshot for the performance recorder. */
+function getImageCacheStats(): { size: number; pinned: number; maxSize: number } {
+  return { size: imageCache.size, pinned: pinCounts.size, maxSize: MAX_CACHE_SIZE };
 }
 
 function isPinned(path: string): boolean {
@@ -212,22 +219,18 @@ async function preloadImage(app: App, vaultPath: string): Promise<HTMLImageEleme
   const generation = cacheGeneration;
   const loadPromise = (async (): Promise<HTMLImageElement | null> => {
     try {
-      // Get file from vault
-      const file = app.vault.getAbstractFileByPath(vaultPath);
-      if (!(file instanceof TFile)) {
-        console.warn(`[imageOperations] Image file not found: ${vaultPath}`);
+      // Read through the tile-bytes seam (loose file, bundle entry, or
+      // adapter fallback); the blob is typed with the resolved mime.
+      const blob = await readTileBlob(app, vaultPath);
+      if (blob == null) {
+        if (!warnedMissing.has(vaultPath)) {
+          warnedMissing.add(vaultPath);
+          console.warn(`[imageOperations] Image file not found: ${vaultPath}`);
+        }
         loadingPromises.delete(vaultPath);
         return null;
       }
 
-      // Read as binary
-      const binary = await app.vault.readBinary(file);
-
-      // Convert to blob URL (SVGs need explicit MIME type to parse correctly)
-      const isSvg = vaultPath.toLowerCase().endsWith('.svg');
-      const blob = isSvg
-        ? new Blob([binary], { type: 'image/svg+xml' })
-        : new Blob([binary]);
       const url = URL.createObjectURL(blob);
 
       // Create and load image
@@ -373,6 +376,7 @@ function disposeImageCache(): void {
   }
   imageCache.clear();
   loadingPromises.clear();
+  warnedMissing.clear();
   dimensionsCache.clear();
   pinCounts.clear();
   for (const timer of unpinEvictTimers.values()) window.clearTimeout(timer);
@@ -448,4 +452,4 @@ function clearUnusedTileImages(activePaths: Set<string>): void {
   }
 }
 
-export { getImageDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, preloadImage, getCachedImage, getRenderSource, getImageDimensions, getImageCacheVersion, clearCachedImage, clearUnusedTileImages, calculateGridFromImage, GRID_DENSITY_PRESETS, MAX_CACHE_SIZE, setMaxCacheSize, pinImage, unpinImage, getPinCount, disposeImageCache };
+export { getImageDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, preloadImage, getCachedImage, getRenderSource, getImageDimensions, getImageCacheVersion, getImageCacheStats, clearCachedImage, clearUnusedTileImages, calculateGridFromImage, GRID_DENSITY_PRESETS, MAX_CACHE_SIZE, setMaxCacheSize, pinImage, unpinImage, getPinCount, disposeImageCache };

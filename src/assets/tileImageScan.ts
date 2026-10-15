@@ -16,6 +16,7 @@
  */
 
 import type { App } from 'obsidian';
+import { Platform } from 'obsidian';
 import { classifyTileArtMask, readTileImageBinary } from './tilesetOperations';
 
 /** Downscale target for the scan canvas (longest edge). Keeps getImageData cheap. */
@@ -154,15 +155,21 @@ export interface ScannedEntry {
  * them (bulkSetDetectionSignals) — this mirrors the depth-prediction pattern.
  *
  * @param needsScan vault paths lacking cached signals (caller pre-filters)
- * @param opts.concurrency  max images decoded at once (default 4)
+ * @param opts.concurrency  max images decoded at once (default
+ *                          defaultScanConcurrency(): 4 desktop, 2 mobile)
  * @param opts.signal       abort to stop mid-batch (e.g. component unmount)
  */
+/** Full-size decodes in flight at once: each is a whole bitmap, so mobile keeps it at 2. */
+export function defaultScanConcurrency(): number {
+  return Platform.isMobile ? 2 : 4;
+}
+
 export async function runDetectionScan(
   app: App,
   needsScan: string[],
   opts?: { concurrency?: number; signal?: AbortSignal },
 ): Promise<ScannedEntry[]> {
-  const concurrency = Math.max(1, opts?.concurrency ?? 4);
+  const concurrency = Math.max(1, opts?.concurrency ?? defaultScanConcurrency());
   const results: ScannedEntry[] = [];
   let cursor = 0;
 

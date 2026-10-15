@@ -1,9 +1,18 @@
 import type { App } from 'obsidian';
-import { TFile } from 'obsidian';
+import { Platform } from 'obsidian';
+import { readTileBlob, readTileThumbBlob } from './tileBytes';
 
 const THUMB_SIZE = 64;
 const SCAN_SIZE = 128;
-const BATCH_SIZE = 20;
+// Images decoded at once per batch. Each full-size decode is a full bitmap
+// (a 795x691 tile is ~2.2 MB), so mobile keeps the batch small: 20 at once
+// pushed an iPad over its memory limit on a 441-tile set.
+const BATCH_SIZE_DESKTOP = 20;
+const BATCH_SIZE_MOBILE = 4;
+
+function batchSize(): number {
+  return Platform.isMobile ? BATCH_SIZE_MOBILE : BATCH_SIZE_DESKTOP;
+}
 // Must exceed the largest tile-image working set. With compact (non-virtualized)
 // browser modes requesting every filtered tile, a cache smaller than the set
 // evicts entries the same pass created — every later re-render then re-reads,
@@ -14,6 +23,8 @@ const cache = new Map<string, string>();
 const pending = new Set<string>();
 const queue: Array<{ path: string; app: App }> = [];
 let processing = false;
+/** Decodes currently awaiting loadSourceImage (perf recorder snapshot). */
+let inFlightDecodes = 0;
 /** Bumped by clearAll so a batch in flight across a clear is discarded (MEM-05). */
 let queueGeneration = 0;
 const subscribers = new Set<() => void>();
@@ -23,6 +34,11 @@ scratchCanvas.width = THUMB_SIZE;
 scratchCanvas.height = THUMB_SIZE;
 
 const scanCanvas = createEl('canvas');
+
+/** Read-only snapshot for the performance recorder. */
+function getThumbnailCacheStats(): { cached: number; queued: number; inFlightDecodes: number } {
+  return { cached: cache.size, queued: queue.length, inFlightDecodes };
+}
 
 function subscribe(cb: () => void): () => void {
   subscribers.add(cb);
@@ -72,12 +88,17 @@ async function processQueue(): Promise<void> {
   processing = true;
   try {
     while (queue.length > 0 && generation === queueGeneration) {
-      const batch = queue.splice(0, BATCH_SIZE);
+      const batch = queue.splice(0, batchSize());
 
       const loaded = await Promise.all(
         batch.map(async ({ path, app }) => {
-          const img = await loadSourceImage(app, path);
-          return { path, img };
+          inFlightDecodes++;
+          try {
+            const src = await loadSourceImage(app, path);
+            return { path, img: src?.img ?? null, cropped: src?.cropped ?? false };
+          } finally {
+            inFlightDecodes--;
+          }
         })
       );
 
@@ -86,11 +107,11 @@ async function processQueue(): Promise<void> {
         return;
       }
 
-      for (const { path, img } of loaded) {
+      for (const { path, img, cropped } of loaded) {
         try {
           // A null img is a terminal failure (missing/unreadable file); the
           // sentinel below covers it.
-          if (img) renderThumbnail(path, img);
+          if (img) renderThumbnail(path, img, cropped);
         } catch (error) {
           console.warn(`[thumbnailCache] Failed to render thumbnail: ${path}`, error);
         } finally {
@@ -113,19 +134,35 @@ async function processQueue(): Promise<void> {
   }
 }
 
-async function loadSourceImage(app: App, vaultPath: string): Promise<ImageBitmap | null> {
+/**
+ * Decode the thumbnail source. A bundled tile's pre-rendered thumb (already
+ * alpha-cropped, <= 64 px) is preferred, so a bundled set never decodes its
+ * full-size art just to draw a 64 px icon; anything else decodes the full image.
+ */
+async function loadSourceImage(app: App, vaultPath: string): Promise<{ img: ImageBitmap; cropped: boolean } | null> {
   try {
-    const file = app.vault.getAbstractFileByPath(vaultPath);
-    if (!(file instanceof TFile)) return null;
-
-    const binary = await app.vault.readBinary(file);
-    const blob = new Blob([binary]);
-    return await createImageBitmap(blob);
+    const thumb = await readTileThumbBlob(app, vaultPath);
+    if (thumb != null) {
+      try {
+        return { img: await createImageBitmap(thumb), cropped: true };
+      } catch {
+        // A thumb that will not decode: fall through to the full image.
+      }
+    }
+    const blob = await readTileBlob(app, vaultPath);
+    if (blob == null) return null;
+    return { img: await createImageBitmap(blob), cropped: false };
   } catch {
     return null;
   }
 }
 
+/**
+ * Bounding box of the non-transparent pixels (alpha > 10) of `img`, padded by
+ * 2 px, in source pixels; the whole image when it is fully transparent or the
+ * scan canvas is unavailable. Scans a <= 128 px downscale. The bundle writer
+ * uses it so bundled thumbs are cropped exactly like cache-rendered ones.
+ */
 function scanBounds(img: ImageBitmap): { x: number; y: number; w: number; h: number } {
   const natW = img.width;
   const natH = img.height;
@@ -171,8 +208,8 @@ function scanBounds(img: ImageBitmap): { x: number; y: number; w: number; h: num
   return { x: bx, y: by, w: bx2 - bx, h: by2 - by };
 }
 
-function renderThumbnail(path: string, img: ImageBitmap): void {
-  const bounds = scanBounds(img);
+function renderThumbnail(path: string, img: ImageBitmap, cropped = false): void {
+  const bounds = cropped ? { x: 0, y: 0, w: img.width, h: img.height } : scanBounds(img);
   // willReadFrequently: toDataURL below reads this canvas back every call.
   const ctx = scratchCanvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) {
@@ -208,4 +245,4 @@ function clearAll(): void {
   processing = false;
 }
 
-export { subscribe, getUrl, request, requestBatch, clearAll, THUMB_SIZE };
+export { getThumbnailCacheStats, subscribe, getUrl, request, requestBatch, clearAll, scanBounds as computeAlphaBounds, THUMB_SIZE };

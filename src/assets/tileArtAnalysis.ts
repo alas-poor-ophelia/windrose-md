@@ -4,28 +4,20 @@
  */
 
 import type { TileEntry } from '#types/tiles/tile.types';
-import { TFile } from 'obsidian';
+import { isTileReadFailure, readTileBlob, readTileBytes } from './tileBytes';
+import { subscribeBundleRegistry } from './bundles/bundleRegistry';
 import type { App } from 'obsidian';
 
 /**
- * Read a tile image's bytes: vault index first, adapter fallback for files
- * the index hasn't caught up to yet. Bulk-extracting a pack into the vault
- * from outside Obsidian can drop most of the file-watcher events, leaving
- * hundreds of tiles unindexed for minutes — a TFile-only read then silently
- * starves the detection scan AND the tileset probe (a padded hex pack probed
- * through the gap loses its hexWidth mapping and draws at the wrong size).
+ * Read a tile image's bytes through the tile-bytes seam (loose vault file,
+ * bundle entry, or adapter fallback for files the index hasn't caught up to
+ * yet: bulk-extracting a pack from outside Obsidian can drop most watcher
+ * events, and a TFile-only read would starve the detection scan AND the
+ * tileset probe). Null on any failure.
  */
 async function readTileImageBinary(app: App, vaultPath: string): Promise<ArrayBuffer | null> {
-  const file = app.vault.getAbstractFileByPath(vaultPath);
-  if (file instanceof TFile) return await app.vault.readBinary(file);
-  try {
-    if (await app.vault.adapter.exists(vaultPath)) {
-      return await app.vault.adapter.readBinary(vaultPath);
-    }
-  } catch {
-    /* unreadable — treated as missing below */
-  }
-  return null;
+  const res = await readTileBytes(app, vaultPath);
+  return isTileReadFailure(res) ? null : res.bytes;
 }
 
 /**
@@ -34,11 +26,8 @@ async function readTileImageBinary(app: App, vaultPath: string): Promise<ArrayBu
  */
 async function measureAlphaCoverage(app: App, tile: TileEntry): Promise<number | null> {
   try {
-    const file = app.vault.getAbstractFileByPath(tile.vaultPath);
-    if (!(file instanceof TFile)) return null;
-
-    const binary = await app.vault.readBinary(file);
-    const blob = new Blob([binary]);
+    const blob = await readTileBlob(app, tile.vaultPath);
+    if (blob == null) return null;
     const url = URL.createObjectURL(blob);
 
     const result = await new Promise<number | null>((resolve) => {
@@ -225,19 +214,45 @@ async function probeTileImages(app: App, tiles: TileEntry[]): Promise<{
 
 type TileProbeResult = Awaited<ReturnType<typeof probeTileImages>>;
 
-// In-flight probes keyed by the scanned tile list's shape (MEM-11): every
-// mount rebuilding at once probes the same folder's first images once.
-const inFlightProbes = new Map<string, Promise<TileProbeResult>>();
+// Probes shared across mounts for one settings generation (MEM-11): every
+// mounted map rebuilding its tilesets probes each folder's first images once,
+// in flight AND after settling, until windrose-settings-changed or a bundle
+// registry change starts a new generation. A rejected probe is not kept.
+const sharedProbes = new Map<string, Promise<unknown>>();
+const MAX_SHARED_PROBES = 256;
+let probeInvalidationWired = false;
+
+/** Forget every shared probe; the next call per key probes again. */
+function invalidateSharedProbes(): void {
+  sharedProbes.clear();
+}
+
+function wireProbeInvalidation(): void {
+  if (probeInvalidationWired) return;
+  probeInvalidationWired = true;
+  // Settings changes are broadcast on the main window only.
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('windrose-settings-changed', invalidateSharedProbes);
+  }
+  subscribeBundleRegistry(invalidateSharedProbes);
+}
+
+/** Run `probe` once per key per settings generation; callers share the promise. */
+function shareProbe<T>(key: string, probe: () => Promise<T>): Promise<T> {
+  wireProbeInvalidation();
+  const hit = sharedProbes.get(key) as Promise<T> | undefined;
+  if (hit != null) return hit;
+  const p = probe();
+  if (sharedProbes.size >= MAX_SHARED_PROBES) sharedProbes.clear();
+  sharedProbes.set(key, p);
+  p.catch(() => { if (sharedProbes.get(key) === p) sharedProbes.delete(key); });
+  return p;
+}
 
 function probeFirstTileImage(app: App, tiles: TileEntry[]): Promise<TileProbeResult> {
   if (tiles.length === 0) return probeTileImages(app, tiles);
   const key = `${tiles.length}|${tiles[0].vaultPath}|${tiles[tiles.length - 1].vaultPath}`;
-  let probe = inFlightProbes.get(key);
-  if (probe == null) {
-    probe = probeTileImages(app, tiles).finally(() => { inFlightProbes.delete(key); });
-    inFlightProbes.set(key, probe);
-  }
-  return probe;
+  return shareProbe(key, () => probeTileImages(app, tiles));
 }
 
 /** Alpha coverage threshold: above this → hex-filling (fill), below → stamp (contain) */
@@ -558,5 +573,5 @@ async function detectHexArtAnalysis(app: App, tile: TileEntry): Promise<HexArtAn
   }
 }
 
-export { measureAlphaCoverage, probeCandidateOrder, probeFirstTileImage, readTileImageBinary, classifyTileArtMask, analyzeTileArtMask, detectHexArtAnalysis, fitHexCellCenterY, ALPHA_COVERAGE_THRESHOLD };
+export { invalidateSharedProbes, shareProbe, measureAlphaCoverage, probeCandidateOrder, probeFirstTileImage, readTileImageBinary, classifyTileArtMask, analyzeTileArtMask, detectHexArtAnalysis, fitHexCellCenterY, ALPHA_COVERAGE_THRESHOLD };
 export type { HexArtMask, HexArtAnalysis };

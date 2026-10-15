@@ -20,6 +20,8 @@ import { ConfirmModal } from './modals/ConfirmModal';
 import { TravelPackEditModal } from './modals/TravelPackEditModal';
 import { AddTilesModal } from './modals/AddTilesModal';
 import type { SettingsTabThis } from './tabs/settingsTabContext';
+import { scanTilesetFolder, isBundleFailureState, bundleFailureLabel } from '../assets/tilesetScan';
+import { entriesFor } from '../assets/bundles/bundleRegistry';
 
 // settingDefinitionLists.ts
 // Declarative Settings API (Obsidian 1.13+) list sections: Color palette,
@@ -442,22 +444,27 @@ function buildTilesetSections(tab: SettingsTabThis): SettingDefinitionItem[] {
         name: 'Preview',
         desc: 'Check what tiles would be loaded from configured folders',
         action: () => {
-          let totalTiles = 0;
-          const results: string[] = [];
-          const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
-          for (const folder of tab.plugin.settings.tilesetFolders ?? []) {
-            if (!folder) continue;
-            const normalizedFolder = folder.endsWith('/') ? folder.slice(0, -1) : folder;
-            let count = 0;
-            for (const file of tab.app.vault.getFiles()) {
-              if (!file.path.startsWith(normalizedFolder + '/')) continue;
-              const ext = file.extension ? file.extension.toLowerCase() : '';
-              if (IMAGE_EXTENSIONS.has(ext)) count++;
+          void (async () => {
+            let totalTiles = 0;
+            const results: string[] = [];
+            for (const folder of tab.plugin.settings.tilesetFolders ?? []) {
+              if (!folder) continue;
+              const normalizedFolder = folder.endsWith('/') ? folder.slice(0, -1) : folder;
+              // Folder-scoped walk (loose images unioned with any mounted
+              // bundle's entries), not a whole-vault getFiles() pass.
+              const tiles = await scanTilesetFolder(tab.app, normalizedFolder);
+              const bundle = entriesFor(normalizedFolder);
+              let line = folder + ': ' + tiles.length + ' tile(s)';
+              if (bundle.state === 'mounted' || bundle.state === 'partial') {
+                line += ' (' + bundle.entries.length + ' bundled' + (bundle.state === 'partial' ? ', some unreadable' : '') + ')';
+              } else if (isBundleFailureState(bundle.state)) {
+                line += ' (tile bundle could not be loaded: ' + bundleFailureLabel(bundle.state) + ')';
+              }
+              totalTiles += tiles.length;
+              results.push(line);
             }
-            totalTiles += count;
-            results.push(folder + ': ' + count + ' tile(s)');
-          }
-          new Notice(results.join('\n') + '\nTotal: ' + totalTiles + ' tiles');
+            new Notice(results.join('\n') + '\nTotal: ' + totalTiles + ' tiles');
+          })();
         }
       }]
     });

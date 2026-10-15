@@ -183,6 +183,37 @@ export default [
   },
 
   // ===========================================
+  // Tile-bytes fence: tile image bytes must be read through readTileBytes
+  // (src/assets/tileBytes.ts) so bundled tiles (virtual vault paths with no
+  // file on disk) resolve everywhere. Direct vault/adapter reads, existence
+  // checks and resource-path URLs are errors in the tile-touching dirs.
+  // tileBytes.ts and the bundle core implement the seam; ObjectSidebar.tsx
+  // renders object icons (not tiles) via getResourcePath.
+  // ===========================================
+  {
+    files: [
+      "src/assets/**/*.{ts,tsx}",
+      "src/components/panels/**/*.{ts,tsx}",
+      "src/components/tiles/**/*.{ts,tsx}",
+      "src/hooks/**/*.{ts,tsx}",
+      "src/geometry/**/*.{ts,tsx}"
+    ],
+    ignores: [
+      "src/assets/tileBytes.ts",
+      "src/assets/bundles/**",
+      "src/components/panels/ObjectSidebar.tsx"
+    ],
+    rules: {
+      "no-restricted-syntax": ["error",
+        ...["readBinary", "getResourcePath", "getAbstractFileByPath", "exists"].map(name => ({
+          selector: `CallExpression[callee.property.name='${name}']`,
+          message: "Tile bytes must go through readTileBytes (src/assets/tileBytes.ts)"
+        }))
+      ]
+    }
+  },
+
+  // ===========================================
   // Test files (E2E + unit) — not shipped; relax type-checked + style noise
   // ===========================================
   {

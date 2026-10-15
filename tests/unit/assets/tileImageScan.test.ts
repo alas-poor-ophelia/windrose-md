@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { analyzeAlphaPixels } from '../../../src/assets/tileImageScan';
+import { Platform } from 'obsidian';
+import { analyzeAlphaPixels, defaultScanConcurrency } from '../../../src/assets/tileImageScan';
 
 /** Build RGBA data with the given opaque pixels set to `alpha`, rest transparent. */
 function makeData(scanW: number, scanH: number, opaque: Array<[number, number]>, alpha = 255): Uint8ClampedArray {
@@ -46,5 +47,18 @@ describe('analyzeAlphaPixels', () => {
     const r = analyzeAlphaPixels(new Uint8ClampedArray(0), 0, 0);
     expect(r.alphaCoverage).toBe(0);
     expect(r.bounds).toBeNull();
+  });
+});
+
+describe('defaultScanConcurrency', () => {
+  it('is 4 on desktop and 2 on mobile', () => {
+    Platform.isMobile = false;
+    expect(defaultScanConcurrency()).toBe(4);
+    Platform.isMobile = true;
+    try {
+      expect(defaultScanConcurrency()).toBe(2);
+    } finally {
+      Platform.isMobile = false;
+    }
   });
 });
