@@ -463,6 +463,31 @@ describe('tileRenderer', () => {
       expect(ctx.drawImage).toHaveBeenCalledTimes(1);
     });
 
+    it('draws upscaled tiles with high smoothing quality and restores it after', () => {
+      const fakeImg = { naturalWidth: 64, naturalHeight: 64 } as HTMLImageElement;
+      const seen: Array<{ w: number; q: string }> = [];
+      const run = (zoom: number) => {
+        const ctx = { ...makeCtx(), imageSmoothingQuality: 'low' };
+        ctx.drawImage.mockImplementation((_img: HTMLImageElement, _x: number, _y: number, w: number) => {
+          seen.push({ w, q: ctx.imageSmoothingQuality });
+        });
+        renderTiles(ctx as unknown as CanvasRenderingContext2D,
+          [{ col: 0, row: 0, tilesetId: 'ts1', tileId: 'base1' }], [makeTileset()], makeGeometry(), { x: 0, y: 0, zoom }, {
+            getCachedImage: () => fakeImg,
+            canvasWidth: 4000,
+            canvasHeight: 4000,
+          });
+        expect(ctx.imageSmoothingQuality).toBe('low');
+      };
+      run(8);
+      run(0.5);
+      expect(seen).toHaveLength(2);
+      expect(seen[0].w).toBeGreaterThan(64 * 1.25);
+      expect(seen[0].q).toBe('high');
+      expect(seen[1].w).toBeLessThanOrEqual(64 * 1.25);
+      expect(seen[1].q).toBe('low');
+    });
+
     it('treats tiles without layer field as base (rendered before overlays)', () => {
       const baseImg = { naturalWidth: 64, naturalHeight: 64, _tag: 'noLayer' } as unknown as HTMLImageElement;
       const overlayImg = { naturalWidth: 64, naturalHeight: 64, _tag: 'overlay' } as unknown as HTMLImageElement;

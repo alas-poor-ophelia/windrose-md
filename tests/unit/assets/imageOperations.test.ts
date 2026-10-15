@@ -44,6 +44,7 @@ import {
   GRID_DENSITY_PRESETS,
   MAX_CACHE_SIZE,
   setMaxCacheSize,
+  getRenderSource,
 } from '../../../src/assets/imageOperations';
 
 /**
@@ -460,6 +461,48 @@ describe('imageOperations', () => {
       expect(result).not.toBeNull();
       // Should NOT have called vault again — served from cache
       expect(mockVault.getAbstractFileByPath).not.toHaveBeenCalled();
+    });
+  });
+
+  // ============================================
+  // getRenderSource — capped copy vs original by draw size
+  // ============================================
+  describe('getRenderSource', () => {
+    it('uses the 1280px capped copy for small draws and the original above it', async () => {
+      const made: Array<{ width: number; height: number }> = [];
+      vi.stubGlobal('activeWindow', {
+        createEl: vi.fn(() => {
+          const c = { width: 0, height: 0, getContext: () => ({ imageSmoothingQuality: 'low', drawImage: vi.fn() }) };
+          made.push(c);
+          return c;
+        }),
+      });
+      try {
+        await seedCache('Tiles/huge-2000.png', 2000, 1000);
+        const img = getCachedImage('Tiles/huge-2000.png')!;
+        expect(made).toHaveLength(1);
+        const capped = made[0];
+        expect(capped.width).toBe(1280);
+        expect(capped.height).toBe(640);
+
+        expect(getRenderSource(img, 400, 200)).toBe(capped);
+        expect(getRenderSource(img, 1280, 640)).toBe(capped);
+        expect(getRenderSource(img, 1600, 800)).toBe(img);
+        // No size given: capped copy (legacy behaviour).
+        expect(getRenderSource(img)).toBe(capped);
+      } finally {
+        clearCachedImage('Tiles/huge-2000.png');
+        vi.unstubAllGlobals();
+        vi.stubGlobal('app', { vault: mockVault });
+        vi.stubGlobal('URL', { ...globalThis.URL, createObjectURL: vi.fn(() => 'blob:mock-url'), revokeObjectURL: vi.fn() });
+      }
+    });
+
+    it('returns the image itself when it was never capped', async () => {
+      await seedCache('Tiles/small.png', 224, 194);
+      const img = getCachedImage('Tiles/small.png')!;
+      expect(getRenderSource(img, 2500, 2200)).toBe(img);
+      clearCachedImage('Tiles/small.png');
     });
   });
 });
