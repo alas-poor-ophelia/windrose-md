@@ -1,6 +1,7 @@
 /** In-memory fake of the slice of Obsidian's App the bundle code uses. */
 import type { App } from 'obsidian';
-import { TFile } from 'obsidian';
+import { TFile, TFolder } from 'obsidian';
+import type { TAbstractFile } from 'obsidian';
 
 export interface FakeVault {
   app: App;
@@ -17,6 +18,14 @@ export interface FakeVault {
   existsCalls: string[];
   /** Awaited before every adapter.readBinary; may reject to simulate an I/O failure. */
   readHook: ((path: string) => Promise<void>) | null;
+  /** Paths passed to fileManager.trashFile, in call order. */
+  trashed: string[];
+  /** Awaited before every fileManager.trashFile (assert ordering invariants here). */
+  trashHook: ((path: string) => void) | null;
+  /** fileManager.trashFile rejects for these paths (an injected I/O failure). */
+  trashFails: Set<string>;
+  /** Values vault.getConfig returns (e.g. trashOption); set getConfig = false to drop the API. */
+  config: Record<string, unknown>;
 }
 
 function parentsOf(path: string): string[] {
@@ -33,7 +42,13 @@ export function makeFakeVault(): FakeVault {
   const indexed = new Set<string>();
   const inFlight = { now: 0, max: 0 };
   const existsCalls: string[] = [];
-  const fv = { files, folders, reads, indexed, inFlight, readDelayMs: 0, existsCalls, readHook: null } as unknown as FakeVault;
+  const trashed: string[] = [];
+  const trashFails = new Set<string>();
+  const config: Record<string, unknown> = {};
+  const fv = {
+    files, folders, reads, indexed, inFlight, readDelayMs: 0, existsCalls, readHook: null, trashed, trashHook: null,
+    trashFails, config,
+  } as unknown as FakeVault;
   const toBuf = (u: Uint8Array): ArrayBuffer => u.slice().buffer;
   const exists = (p: string): boolean => files.has(p) || folders.has(p);
 
@@ -94,13 +109,41 @@ export function makeFakeVault(): FakeVault {
     },
     getAbstractFileByPath: (p: string) => {
       if (!indexed.has(p)) return null;
+      if (folders.has(p)) {
+        const d = new TFolder();
+        d.path = p;
+        return d;
+      }
       const f = new TFile();
       f.path = p;
       return f;
     },
     readBinary: (f: TFile) => adapter.readBinary(f.path),
+    getConfig: (key: string) => config[key],
   };
-  fv.app = { vault } as unknown as App;
+  const fileManager = {
+    trashFile: (file: TAbstractFile) => {
+      fv.trashHook?.(file.path);
+      if (trashFails.has(file.path)) return Promise.reject(new Error(`EBUSY ${file.path}`));
+      trashed.push(file.path);
+      if (file instanceof TFolder) {
+        const prefix = file.path + '/';
+        if ([...files.keys(), ...folders].some(k => k.startsWith(prefix))) {
+          return Promise.reject(new Error(`folder not empty ${file.path}`));
+        }
+        folders.delete(file.path);
+      } else {
+        // Moved, not deleted: the bytes stay recoverable under .trash/.
+        const bytes = files.get(file.path);
+        if (!bytes) return Promise.reject(new Error(`ENOENT ${file.path}`));
+        files.delete(file.path);
+        files.set(`.trash/${file.path}`, bytes);
+      }
+      indexed.delete(file.path);
+      return Promise.resolve();
+    },
+  };
+  fv.app = { vault, fileManager } as unknown as App;
   return fv;
 }
 

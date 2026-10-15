@@ -191,6 +191,42 @@ function fail(kind: BundleReadFailureKind, detail: string): BundleReadFailure {
 }
 
 // ===========================================
+// Write-in-progress guard (importers writing a bundle into a folder)
+// ===========================================
+
+const _writesInProgress = new Map<string, number>();
+
+/**
+ * Mark a bundle write as running in `folder`. The vault watcher in main.ts
+ * ignores marker/index/shard events for the folder until the matching
+ * endBundleWrite, and the scan stays quiet about `index-missing` meanwhile:
+ * the importer mounts and broadcasts itself once the index is committed.
+ * Calls nest (a counter per folder).
+ */
+export function beginBundleWrite(folder: string): void {
+  const f = normFolder(folder);
+  _writesInProgress.set(f, (_writesInProgress.get(f) ?? 0) + 1);
+}
+
+/** End a write started with beginBundleWrite (call from a finally). */
+export function endBundleWrite(folder: string): void {
+  const f = normFolder(folder);
+  const n = (_writesInProgress.get(f) ?? 0) - 1;
+  if (n > 0) _writesInProgress.set(f, n);
+  else _writesInProgress.delete(f);
+}
+
+/** True when a bundle write is running in `folder` or in a folder containing it. */
+export function isBundleWriteInProgress(folder: string): boolean {
+  if (_writesInProgress.size === 0) return false;
+  const f = normFolder(folder);
+  for (const w of _writesInProgress.keys()) {
+    if (f === w || f.startsWith(w + '/')) return true;
+  }
+  return false;
+}
+
+// ===========================================
 // Loose-shadow answers (positive only; see tileBytes.ts)
 // ===========================================
 
@@ -791,6 +827,7 @@ export function _resetBundleRegistryForTests(): void {
   _mountTokens.clear();
   _mountInflight.clear();
   _looseShadowed.clear();
+  _writesInProgress.clear();
   _shards.clear();
   _listeners.clear();
   _version = 0;

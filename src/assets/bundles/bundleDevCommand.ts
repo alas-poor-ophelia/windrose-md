@@ -26,8 +26,8 @@ import type { PluginSettings } from '#types/settings/settings.types';
 
 import { scanTilesetFolder } from '../tilesetScan';
 import { isTileReadFailure, readTileBytes } from '../tileBytes';
-import { computeAlphaBounds, THUMB_SIZE } from '../thumbnailCache';
 import { BundleWriter } from './bundleWriter';
+import { decodeTile } from './bundleThumbs';
 import { INDEX_DIR, INDEX_EXT, SHARDS_DIR, THUMBS_DIR } from './bundleFormat';
 
 const TARGET_SHARD_BYTES = 4 * 1024 * 1024;
@@ -60,54 +60,6 @@ class TilesetFolderSuggestModal extends SuggestModal<string> {
 
 function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'tiles';
-}
-
-/** Encode a canvas as PNG bytes; null when the browser yields no blob. */
-function canvasPng(canvas: HTMLCanvasElement): Promise<Uint8Array | null> {
-  return new Promise(resolve => {
-    canvas.toBlob(blob => {
-      if (blob == null) { resolve(null); return; }
-      blob.arrayBuffer().then(buf => resolve(new Uint8Array(buf)), () => resolve(null));
-    }, 'image/png');
-  });
-}
-
-/**
- * Render the bundle thumbnail: the opaque-pixel crop (computeAlphaBounds, as
- * the thumbnail cache does) fitted into THUMB_SIZE px, aspect preserved, never
- * upscaled. Null on any failure: the tile is bundled without a thumb.
- */
-async function renderThumbPng(bmp: ImageBitmap): Promise<Uint8Array | null> {
-  try {
-    const b = computeAlphaBounds(bmp);
-    if (b.w <= 0 || b.h <= 0) return null;
-    const scale = Math.min(1, THUMB_SIZE / Math.max(b.w, b.h));
-    const canvas = createEl('canvas');
-    canvas.width = Math.max(1, Math.round(b.w * scale));
-    canvas.height = Math.max(1, Math.round(b.h * scale));
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(bmp, b.x, b.y, b.w, b.h, 0, 0, canvas.width, canvas.height);
-    return await canvasPng(canvas);
-  } catch {
-    return null;
-  }
-}
-
-/** Decode once for the index dims and the thumbnail; null when the image will not decode. */
-async function decodeTile(bytes: ArrayBuffer, mime: string): Promise<{ dims: { w: number; h: number }; thumb: Uint8Array | null } | null> {
-  let bmp: ImageBitmap;
-  try {
-    bmp = await createImageBitmap(new Blob([bytes], { type: mime }));
-  } catch {
-    return null;
-  }
-  try {
-    return { dims: { w: bmp.width, h: bmp.height }, thumb: await renderThumbPng(bmp) };
-  } finally {
-    bmp.close();
-  }
 }
 
 async function listOrEmpty(app: App, dir: string): Promise<string[]> {

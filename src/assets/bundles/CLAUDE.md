@@ -7,6 +7,7 @@ Design: `.claude/TILE-BUNDLES-DESIGN.md` sections 4-6.
 
 - `bundleFormat.ts` — pure codecs, constants, union winner rule (`compareSegmentPrecedence`), magic sniffing.
 - `bundleRegistry.ts` — module singleton: `mountBundleFolder` (forced remount), `ensureMounted` (reuses a serving record or joins an in-flight mount; what scans call), unmount/`remountOnRename`, `entriesFor`, `lookupEntry`, `readEntryBytes`, ShardCache, version + listeners.
+  `beginBundleWrite`/`endBundleWrite`/`isBundleWriteInProgress`: importers bracket a write; the main.ts vault watcher skips remounts for that folder and the scan stays silent about `index-missing` meanwhile.
 - `bundleWriter.ts` — `BundleWriter.add()/finish()`; marker first, shards as they fill, index segment LAST (commit point). `targetShardBytes` must be a finite integer, clamped to [64 KiB, 12 MiB]; one id reused for a different key throws.
 - `bundleDevCommand.ts` — dev command: bundle a loose folder; writes a <= 64 px alpha-cropped PNG thumb per tile (`computeAlphaBounds` from `../thumbnailCache`), skipping only the thumb (never the tile) when it fails.
 - `../tileBytes.ts` — `readTileBytes`, the single seam every tile byte read should go through (indexed TFile > loose file on disk > bundle; `clearTileBytesNegativeCache(pathOrPrefix?)` on vault `create`). `readTileThumbBlob` returns the bundle thumb or null (loose, shadowed, no thumb, failure), never the full image; `thumbnailCache` tries it first and skips its alpha scan for a thumb.

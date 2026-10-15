@@ -18,7 +18,7 @@ import { writeCanvasCapabilityReport } from './utils/canvasCapabilityReport';
 import { recordInputEventProbe } from './utils/inputEventProbe';
 import { recordZoomTrace } from './utils/zoomTraceProbe';
 import { scanTilesetFolder } from './assets/tilesetOperations';
-import { mountBundleFolder, remountOnRename } from './assets/bundles/bundleRegistry';
+import { isBundleWriteInProgress, mountBundleFolder, remountOnRename } from './assets/bundles/bundleRegistry';
 import { clearTileBytesNegativeCache } from './assets/tileBytes';
 import { openBundleTileFolderDev } from './assets/bundles/bundleDevCommand';
 import { buildMapEntry, createMapEntry, getSaveQueue, listMapsResult } from './persistence/fileOperations';
@@ -325,6 +325,8 @@ export default class WindrosePlugin extends Plugin {
       for (const folder of this.settings.tilesetFolders ?? []) {
         const root = folder.endsWith('/') ? folder.slice(0, -1) : folder;
         if (!root || !file.path.startsWith(root + '/')) continue;
+        // An importer writing this bundle mounts and broadcasts on its own.
+        if (isBundleWriteInProgress(root)) continue;
         const rel = file.path.slice(root.length + 1);
         if (rel === 'bundle.wrbundle'
           || (rel.startsWith('index/') && rel.endsWith('.wridx'))
@@ -722,6 +724,7 @@ export default class WindrosePlugin extends Plugin {
       void (async () => {
         // mountBundleFolder replaces the record atomically; no unmount first
         // (that would open a window where bundled reads return not-found).
+        if (isBundleWriteInProgress(root)) return;
         await mountBundleFolder(this.app, root);
         window.dispatchEvent(new CustomEvent('windrose-settings-changed'));
       })();

@@ -22,7 +22,7 @@ import type { TileEntry } from '#types/tiles/tile.types';
 import type { App } from 'obsidian';
 import { Notice } from 'obsidian';
 import { mintTileId } from './tileIds';
-import { ensureMounted, entriesFor, getBundleStateInfo } from './bundles/bundleRegistry';
+import { ensureMounted, entriesFor, getBundleStateInfo, isBundleWriteInProgress } from './bundles/bundleRegistry';
 import type { BundleState } from './bundles/bundleRegistry';
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
@@ -35,6 +35,9 @@ const STATE_LABELS: Partial<Record<BundleState, string>> = {
   'unsupported-version': 'unsupported bundle version',
   'not-on-device': 'bundle files not on this device yet',
 };
+
+/** Label for `index-missing`: a marker and shards but no committed index (an import that did not finish). */
+const INCOMPLETE_LABEL = 'import did not finish';
 
 /** Folders already told about a failed bundle this session. */
 const noticedBundleFailures = new Set<string>();
@@ -113,10 +116,15 @@ async function walkTilesetFolder(app: App, folderPath: string): Promise<TileEntr
   } else if (isBundleFailureState(state) && !noticedBundleFailures.has(normalizedFolder)) {
     const reason = getBundleStateInfo(normalizedFolder)?.reason ?? '';
     // A deleted or renamed plain folder is not a bundle failure: stay silent.
-    if (reason !== 'folder-absent') {
+    // Nor is an index that an import is still writing (no Notice, and the
+    // folder is not marked noticed, so a real failure later still speaks).
+    const writing = reason === 'index-missing' && isBundleWriteInProgress(normalizedFolder);
+    if (reason !== 'folder-absent' && !writing) {
       noticedBundleFailures.add(normalizedFolder);
       console.warn(`[tilesetScan] Tile bundle in ${normalizedFolder} not mounted (${state})${reason !== '' ? `: ${reason}` : ''}`);
-      new Notice(`Tile bundle in ${normalizedFolder} could not be loaded (${bundleFailureLabel(state)}).`);
+      new Notice(reason === 'index-missing'
+        ? `Tile bundle in ${normalizedFolder} is incomplete (${INCOMPLETE_LABEL}).`
+        : `Tile bundle in ${normalizedFolder} could not be loaded (${bundleFailureLabel(state)}).`);
     }
   }
 

@@ -10,7 +10,9 @@ vi.mock('obsidian', async (importOriginal) => {
 });
 
 import { BundleWriter } from '../../../src/assets/bundles/bundleWriter';
-import { _resetBundleRegistryForTests, getBundleState } from '../../../src/assets/bundles/bundleRegistry';
+import {
+  _resetBundleRegistryForTests, getBundleState, beginBundleWrite, endBundleWrite,
+} from '../../../src/assets/bundles/bundleRegistry';
 import { _resetBundleNoticesForTests, scanTilesetFolder } from '../../../src/assets/tilesetScan';
 import { fakeImage, makeFakeVault, putFile } from './bundles/fakeVault';
 import type { FakeVault } from './bundles/fakeVault';
@@ -105,6 +107,18 @@ describe('scanTilesetFolder with a tile bundle', () => {
     await scanTilesetFolder(fv.app, FOLDER);
     const notices = warn.mock.calls.filter((c: unknown[]) => String(c[0]).includes('[tilesetScan]'));
     expect(notices).toHaveLength(1);
+  });
+
+  it('index-missing stays silent while an import writes the folder, then reads as an unfinished import', async () => {
+    await mixedFolder();
+    for (const p of [...fv.files.keys()]) if (p.endsWith('.wridx')) fv.files.delete(p);
+    beginBundleWrite(FOLDER);
+    await scanTilesetFolder(fv.app, FOLDER);
+    expect(getBundleState(FOLDER)).toBe('not-on-device');
+    expect(notices).toEqual([]);
+    endBundleWrite(FOLDER);
+    await scanTilesetFolder(fv.app, FOLDER);
+    expect(notices).toEqual([`Tile bundle in ${FOLDER} is incomplete (import did not finish).`]);
   });
 
   it('a folder with no bundle scans exactly as before', async () => {

@@ -670,12 +670,32 @@ class AddTilesModal extends Modal {
         return;
       }
 
+      if (result.error != null) {
+        progress.empty();
+        progress.createEl('p', {
+          cls: 'windrose-wz-error',
+          text: `Import of ${result.packName} failed: ${result.error}. No tile set was added (see developer console).`,
+        });
+        new Notice(`${result.packName} import failed: ${result.error}.`);
+        finishBtn.setText('Finish import');
+        finishBtn.disabled = false;
+        return;
+      }
+
       progressBar.value = 100;
       progress.empty();
+      const replaced = result.looseReplaced ?? 0;
+      const kept = result.looseKept?.length ?? 0;
+      const keptPermanent = result.looseKeptPermanentDelete ?? 0;
       progress.createEl('p', {
-        cls: result.failed > 0 ? 'windrose-wz-warning' : 'windrose-wz-done',
+        cls: result.failed > 0 || kept > 0 || keptPermanent > 0 ? 'windrose-wz-warning' : 'windrose-wz-done',
         text: `Imported ${result.imported} of ${result.total} textures from ${result.packName}.` +
-          (result.failed > 0 ? ` ${result.failed} file(s) failed (see developer console).` : ''),
+          (result.failed > 0 ? ` ${result.failed} file(s) failed (see developer console).` : '') +
+          (replaced > 0 ? ` Replaced ${replaced} loose ${replaced === 1 ? 'file' : 'files'} with the bundle.` : '') +
+          (kept > 0 ? ` Kept ${kept} loose ${kept === 1 ? 'file' : 'files'} the bundle does not replace with identical bytes (see developer console).` : '') +
+          (keptPermanent > 0
+            ? ` Kept ${keptPermanent} loose ${keptPermanent === 1 ? 'file' : 'files'} from the earlier import because your trash setting deletes files permanently; remove them yourself once the bundle looks right.`
+            : ''),
       });
       new Notice(`${result.packName} imported (${result.imported}/${result.total} textures).`);
 
