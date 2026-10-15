@@ -75,20 +75,36 @@ function cachedEntry(id: string, value: unknown): CachedEntry {
 /**
  * Split a parsed store into its cacheable form. Returns null when the document
  * is not a store (root not an object, or `maps` present but not an object).
- * A missing `maps` is an empty store. Throws only if an entry cannot be
- * stringified (never for parsed JSON).
+ * A missing `maps` is an empty store. `toStored` maps each raw entry to its
+ * persisted form before it is stringified (the save path strips derived data
+ * here, so a full rewrite cleans every entry, mounted or not). Throws only if
+ * an entry cannot be stringified (never for parsed JSON).
  */
-function snapshotFromParsed(data: unknown): StoreSnapshot | null {
+function snapshotFromParsed(data: unknown, toStored?: (entry: unknown) => unknown): StoreSnapshot | null {
   if (data == null || typeof data !== 'object' || Array.isArray(data)) return null;
   const { maps, ...rest } = data as Record<string, unknown>;
   if (maps != null && (typeof maps !== 'object' || Array.isArray(maps))) return null;
   const entries = new Map<string, CachedEntry>();
   if (maps != null) {
     for (const [id, value] of Object.entries(maps as Record<string, unknown>)) {
-      entries.set(id, cachedEntry(id, value));
+      entries.set(id, cachedEntry(id, toStored != null ? storedOrRaw(id, value, toStored) : value));
     }
   }
   return { rest, entries };
+}
+
+/**
+ * `toStored(value)`, or the raw entry when the transform throws on an odd
+ * shape: one strange entry must never fail the whole save (the caller reports
+ * a throw here as an unparseable store).
+ */
+function storedOrRaw(id: string, value: unknown, toStored: (entry: unknown) => unknown): unknown {
+  try {
+    return toStored(value);
+  } catch (e) {
+    console.warn('[Windrose] Kept a stored map entry as-is; its store-form transform failed:', id, e);
+    return value;
+  }
 }
 
 /** The compact store text. Equivalent JSON to JSON.stringify({...rest, maps}). */

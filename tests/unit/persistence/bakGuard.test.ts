@@ -229,3 +229,226 @@ describe('P9: autosave on a multi-MB store', () => {
     expect(rotations).toEqual(['e0', 'late']);
   });
 });
+
+describe('backup guard reads the old backup only when the stat size says it might shrink', () => {
+  function countBackupReads(fake: Fake): { reads: string[] } {
+    const vault = fake.app.vault as unknown as { read: (f: TFile) => Promise<string> };
+    const log = { reads: [] as string[] };
+    const orig = vault.read;
+    vault.read = (f: TFile) => { log.reads.push(f.path); return orig(f); };
+    return log;
+  }
+
+  it('does not read a young backup whose size equals the new backup content', async () => {
+    const ops = await freshOps();
+    const fake = makeVault();
+    const current = store(ops, { a: 'A' }, 1000);
+    const sameSize = current.replace(/p/g, 'q'); // same byte length, different text
+    fake.put(BAK1, sameSize, NOW - 60_000);
+    fake.put(DATA_PATH, current, NOW - 1000);
+    const log = countBackupReads(fake);
+
+    await ops.saveMapData(fake.app, 'a', ops.createNewMap('Edit', 'grid'));
+
+    expect(log.reads).not.toContain(BAK1);
+    expect(fake.contents.get(BAK1)).toBe(current);
+  });
+
+  it('does not read a young backup when the size drop clears the ratio', async () => {
+    const ops = await freshOps();
+    const fake = makeVault();
+    fake.put(BAK1, store(ops, { a: 'A' }, 1200), NOW - 60_000);
+    const current = store(ops, { a: 'A' }, 1000);
+    fake.put(DATA_PATH, current, NOW - 1000);
+    const log = countBackupReads(fake);
+
+    await ops.saveMapData(fake.app, 'a', ops.createNewMap('Edit', 'grid'));
+
+    expect(log.reads).not.toContain(BAK1);
+    expect(fake.contents.get(BAK1)).toBe(current);
+  });
+
+  it('reads (and guards) the backup when the sizes say it may be a sharp shrink', async () => {
+    const ops = await freshOps();
+    const fake = makeVault();
+    const large = store(ops, { a: 'A' }, 50_000);
+    fake.put(BAK1, large, NOW - 60_000);
+    fake.put(DATA_PATH, store(ops, { a: 'A' }), NOW - 1000);
+    const log = countBackupReads(fake);
+
+    await ops.saveMapData(fake.app, 'a', ops.createNewMap('Edit', 'grid'));
+
+    expect(log.reads).toContain(BAK1);
+    expect(fake.contents.get(BAK1)).toBe(large);
+  });
+});
+
+describe('derived folder tile lists in an old store', () => {
+  function oldStore(ops: FileOps): string {
+    const tileList = [{ id: 't/A', filename: 'A.webp', vaultPath: 'P/t/A.webp' }, { id: 't/B', filename: 'B.webp', vaultPath: 'P/t/B.webp' }];
+    const other = ops.createNewMap('Other', 'hex') as unknown as Record<string, unknown>;
+    other.tilesets = [
+      { id: 'stale', name: 'stale', tiles: tileList, tileWidth: 256, tileHeight: 256 }, // legacy: no source
+      { id: 'sheet', name: 'sheet', source: 'sheet', tiles: tileList, tileWidth: 64, tileHeight: 64 },
+    ];
+    const nested = ops.createNewMap('Nested', 'hex') as unknown as Record<string, unknown>;
+    nested.tilesets = [{ id: 'n', name: 'n', source: 'folder', tiles: tileList }];
+    other.subHexMaps = { '0,0': { subdivisionRings: 7, mapData: nested, lastModified: '' } };
+    return JSON.stringify({ settings: { keep: true }, maps: { a: ops.createNewMap('A', 'grid'), other } });
+  }
+
+  it('loading an old map yields empty folder tiles and keeps sheet tiles', async () => {
+    const ops = await freshOps();
+    const fake = makeVault();
+    fake.put(DATA_PATH, oldStore(ops), NOW - 1000);
+
+    const map = await ops.loadMapData(fake.app, 'other');
+    expect(map.tilesets?.find(t => t.id === 'stale')?.tiles).toEqual([]);
+    expect(map.tilesets?.find(t => t.id === 'stale')?.source).toBe('folder');
+    expect(map.tilesets?.find(t => t.id === 'sheet')?.tiles).toHaveLength(2);
+    expect(map.subHexMaps?.['0,0']?.mapData.tilesets?.[0].tiles).toEqual([]);
+  });
+
+  it('one full save rewrites an UNMOUNTED map without its tile lists', async () => {
+    const ops = await freshOps();
+    const fake = makeVault();
+    fake.put(DATA_PATH, oldStore(ops), NOW - 1000);
+
+    await ops.saveMapData(fake.app, 'a', ops.createNewMap('A edited', 'grid'));
+
+    const written = JSON.parse(fake.contents.get(DATA_PATH) as string) as { settings: unknown; maps: Record<string, MapData> };
+    const other = written.maps.other;
+    expect(written.settings).toEqual({ keep: true });
+    expect(other.tilesets?.find(t => t.id === 'stale')?.tiles).toEqual([]);
+    expect(other.tilesets?.find(t => t.id === 'stale')?.tileWidth).toBe(256);
+    expect(other.tilesets?.find(t => t.id === 'sheet')?.tiles).toHaveLength(2);
+    expect(other.subHexMaps?.['0,0']?.mapData.tilesets?.[0].tiles).toEqual([]);
+    expect(written.maps.a.name).toBe('A edited');
+  });
+});
+
+describe('backup guard sizes: adapter stat, fallback, bytes not chars', () => {
+  type VaultLike = {
+    read: (f: TFile) => Promise<string>;
+    getAbstractFileByPath: (p: string) => TFile | null;
+    adapter?: Record<string, unknown>;
+  };
+  const bytes = (s: string): number => new TextEncoder().encode(s).length;
+  function withAdapter(fake: Fake, stat: (p: string) => Promise<unknown>): string[] {
+    const vault = fake.app.vault as unknown as VaultLike;
+    const reads: string[] = [];
+    const orig = vault.read;
+    vault.read = (f: TFile) => { reads.push(f.path); return orig(f); };
+    vault.adapter = {
+      exists: async (p: string) => fake.contents.has(p),
+      stat,
+      read: async (p: string) => fake.contents.get(p) ?? '',
+    };
+    return reads;
+  }
+  function fileOf(fake: Fake, path: string): TFile {
+    return (fake.app.vault as unknown as VaultLike).getAbstractFileByPath(path) as TFile;
+  }
+
+  it('uses the adapter stat (bytes) over a wrong TFile size', async () => {
+    const ops = await freshOps();
+    const fake = makeVault();
+    const current = store(ops, { a: 'A' }, 1000);
+    fake.put(BAK1, current.replace(/p/g, 'q'), NOW - 60_000);
+    fake.put(DATA_PATH, current, NOW - 1000);
+    fileOf(fake, BAK1).stat.size = 1e9; // the TFile size alone would trip a read
+    const reads = withAdapter(fake, async (p: string) => ({ type: 'file', size: bytes(fake.contents.get(p) ?? '') }));
+
+    await ops.saveMapData(fake.app, 'a', ops.createNewMap('Edit', 'grid'));
+
+    expect(reads).not.toContain(BAK1);
+    expect(fake.contents.get(BAK1)).toBe(current);
+  });
+
+  it('a throwing adapter stat falls back to the TFile size', async () => {
+    const ops = await freshOps();
+    const fake = makeVault();
+    const large = store(ops, { a: 'A' }, 50_000);
+    fake.put(BAK1, large, NOW - 60_000);
+    fake.put(DATA_PATH, store(ops, { a: 'A' }), NOW - 1000);
+    const reads = withAdapter(fake, async () => { throw new Error('stat failed'); });
+
+    await ops.saveMapData(fake.app, 'a', ops.createNewMap('Edit', 'grid'));
+
+    // The TFile size said "may shrink": the backup was read and guarded.
+    expect(reads).toContain(BAK1);
+    expect(fake.contents.get(BAK1)).toBe(large);
+  });
+
+  it('compares bytes, not chars: a multibyte store that clears the ratio in bytes rolls without a read', async () => {
+    const ops = await freshOps();
+    const fake = makeVault();
+    const old = store(ops, { a: 'A' }, 30_000); // ASCII: ~30k bytes
+    const parsed = JSON.parse(store(ops, { a: 'A' })) as { maps: Record<string, MapData> };
+    parsed.maps.a.description = '€'.repeat(10_000); // 10k chars, 30k bytes
+    const unicode = JSON.stringify(parsed);
+    expect(unicode.length).toBeLessThan(old.length * 0.5); // in chars it would look like a sharp shrink
+    expect(bytes(unicode)).toBeGreaterThan(bytes(old) * 0.5);
+    fake.put(BAK1, old, NOW - 60_000);
+    fake.put(DATA_PATH, unicode, NOW - 1000);
+    const reads = withAdapter(fake, async (p: string) => ({ type: 'file', size: bytes(fake.contents.get(p) ?? '') }));
+
+    await ops.saveMapData(fake.app, 'a', ops.createNewMap('Edit', 'grid'));
+
+    expect(reads).not.toContain(BAK1);
+    expect(fake.contents.get(BAK1)).toBe(unicode);
+  });
+});
+
+describe('the one-time tile-list strip is not a suspicious shrink', () => {
+  it('a pre-strip backup is replaced by the stripped store with the same maps', async () => {
+    const ops = await freshOps();
+    const fake = makeVault();
+    const tiles = Array.from({ length: 2000 }, (_, i) => ({ id: `t/${i}`, filename: `${i}.webp`, vaultPath: `Pack/some/long/folder/path/${i}.webp` }));
+    const withTiles = ops.createNewMap('A', 'hex') as unknown as Record<string, unknown>;
+    withTiles.tilesets = [{ id: 'ts', name: 'ts', source: 'folder', folderPath: 'Pack', tiles }];
+    const preStrip = JSON.stringify({ maps: { a: withTiles } });
+    const stripped = JSON.stringify({ maps: { a: { ...withTiles, tilesets: [{ id: 'ts', name: 'ts', source: 'folder', folderPath: 'Pack', tiles: [] }] } } });
+    expect(stripped.length).toBeLessThan(preStrip.length * 0.5);
+    fake.put(BAK1, preStrip, NOW - 60_000);
+    fake.put(DATA_PATH, stripped, NOW - 1000);
+
+    await ops.saveMapData(fake.app, 'a', ops.createNewMap('Edit', 'hex'));
+
+    expect(fake.contents.get(BAK1)).toBe(stripped);
+  });
+});
+
+describe('odd entry shapes never fail a full save', () => {
+  it('array subHexMaps and string tilesets are kept verbatim and the save lands', async () => {
+    const ops = await freshOps();
+    const fake = makeVault();
+    const arraySub = { ...ops.createNewMap('Arr', 'hex'), subHexMaps: [] } as unknown as MapData;
+    const arraySubFull = { ...ops.createNewMap('Arr2', 'hex'), subHexMaps: [{ mapData: { tilesets: [{ id: 'x', tiles: [1] }] } }] } as unknown as MapData;
+    const garbage = { ...ops.createNewMap('Garbage', 'hex'), tilesets: 'garbage' } as unknown as MapData;
+    fake.put(DATA_PATH, JSON.stringify({ maps: { a: ops.createNewMap('A', 'grid'), arraySub, arraySubFull, garbage } }), NOW - 1000);
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const res = await ops.saveMapData(fake.app, 'a', ops.createNewMap('A edited', 'grid'));
+    errors.mockRestore();
+
+    expect(res.status).toBe('saved');
+    const written = JSON.parse(fake.contents.get(DATA_PATH) as string) as { maps: Record<string, unknown> };
+    expect(written.maps.arraySub).toEqual(JSON.parse(JSON.stringify(arraySub)));
+    expect(written.maps.arraySubFull).toEqual(JSON.parse(JSON.stringify(arraySubFull)));
+    expect(written.maps.garbage).toEqual(JSON.parse(JSON.stringify(garbage)));
+  });
+
+  it('snapshotFromParsed keeps the raw entry when the transform throws', async () => {
+    const { snapshotFromParsed } = await import('../../../src/persistence/storeCache');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const snap = snapshotFromParsed({ maps: { a: { n: 1 }, b: { n: 2 } } }, (e) => {
+      if ((e as { n: number }).n === 2) throw new Error('boom');
+      return { n: 10 };
+    });
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+    expect(snap?.entries.get('a')?.json).toBe('{"n":10}');
+    expect(snap?.entries.get('b')?.json).toBe('{"n":2}');
+  });
+});

@@ -15,11 +15,11 @@ import { getDataFilePath } from '../core/settingsAccessor';
 import { offsetToAxial } from '../geometry/core/offsetCoordinates';
 import { getSettings } from '../core/settingsAccessor';
 import { generateLayerId, DEFAULT_BOARD_ID } from './layerAccessor';
-import { migrateMapData, MapSchemaError, claimedSchemaVersion, isNewerSchema } from './schemaMigration';
+import { migrateMapData, MapSchemaError, claimedSchemaVersion, isNewerSchema, stripDerivedTileLists } from './schemaMigration';
 import { calculateFitZoom } from '../geometry/core/hexMeasurements';
 import { resolveTileEntry } from '../assets/tilesetOperations';
 import {
-  invalidateStoreCache, getValidStoreCache, commitStoreCache, snapshotFromParsed, serializeStore, cachedEntry,
+  invalidateStoreCache, getValidStoreCache, commitStoreCache, snapshotFromParsed, serializeStore, cachedEntry, utf8ByteLength,
 } from './storeCache';
 import type { StoreSnapshot } from './storeCache';
 
@@ -255,6 +255,18 @@ function sameLocalDay(a: number, b: number): boolean {
   return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
 }
 
+/** Byte size of a backup file: a fresh adapter stat, else the TFile stat; null when unknown. */
+async function backupByteSize(app: App, file: TFile): Promise<number | null> {
+  const adapter = (app.vault as { adapter?: { stat?: (p: string) => Promise<{ size: number } | null> } }).adapter;
+  if (adapter != null && typeof adapter.stat === 'function') {
+    try {
+      const stat = await adapter.stat(file.path);
+      if (stat != null && typeof stat.size === 'number') return stat.size;
+    } catch { /* fall through to the TFile stat */ }
+  }
+  return typeof file.stat?.size === 'number' ? file.stat.size : null;
+}
+
 /**
  * Whether the backup at `path` must be preserved instead of being replaced
  * with `content` (size-drop guard). Reads the old backup only when it is
@@ -265,11 +277,24 @@ async function backupIsGuarded(app: App, path: string, content: string, mapCount
   if (!(existing instanceof TFile)) return false;
   if (now - existing.stat.mtime > BAK_GUARD_MAX_AGE_MS) return false;
   try {
+    // Cheap pre-check from the stat (bytes): an unchanged size cannot be a
+    // shrink, and a byte size that clears the ratio cannot trip it, so the
+    // (multi-MB) old backup is read only when it might actually be guarded.
+    const oldBytes = await backupByteSize(app, existing);
+    if (oldBytes != null) {
+      const newBytes = utf8ByteLength(content);
+      if (newBytes === oldBytes || newBytes >= oldBytes * BAK_SHRINK_RATIO) return false;
+    }
     const old = await app.vault.read(existing);
     if (content.length >= old.length * BAK_SHRINK_RATIO) return false; // cheap size check before any parse
     const parsed = JSON.parse(old) as DataFile;
     const oldMaps = parsed.maps != null && typeof parsed.maps === 'object' ? Object.keys(parsed.maps).length : 0;
-    return isSuspiciousShrink(content.length, mapCount, old.length, oldMaps);
+    if (!isSuspiciousShrink(content.length, mapCount, old.length, oldMaps)) return false;
+    // A backup written before derived folder tile lists were stripped shrinks
+    // by most of its size on the first upgraded rewrite. Judge it in store
+    // form (rare: only a tripped guard on a pre-strip backup pays this).
+    const storedOld = snapshotFromParsed(parsed, stripDerivedTileLists);
+    return storedOld == null || isSuspiciousShrink(content.length, mapCount, serializeStore(storedOld).length, oldMaps);
   } catch {
     return false; // an unreadable backup protects nothing; let it be replaced
   }
@@ -782,6 +807,16 @@ function canonicalizeTileIds(mapData: MapData): MapData {
 }
 
 /**
+ * The exact tree persisted for a map: legacy tile ids upgraded (needs the
+ * live `tiles[]` registry, so it runs first), then the derived folder tile
+ * lists stripped. Copy-on-write throughout. Shared by the store write and the
+ * crash journal so their texts stay string-equal.
+ */
+function toStoredMap(mapData: MapData): MapData {
+  return stripDerivedTileLists(canonicalizeTileIds(mapData));
+}
+
+/**
  * In-process per-mapId write generation. Every successful saveMapData write
  * increments the map's generation; loadMapDataWithGeneration reports the
  * generation its snapshot reflects. A save whose caller loaded (or last
@@ -864,7 +899,9 @@ async function writeMapEntryLocked(app: App, mapId: string, mapData: MapData, wr
     const content = await app.vault.read(file);
     let parsed: StoreSnapshot | null;
     try {
-      parsed = snapshotFromParsed(JSON.parse(content));
+      // Every entry goes through the store form, so this one full rewrite also
+      // drops the derived tile lists of maps that are not mounted.
+      parsed = snapshotFromParsed(JSON.parse(content), stripDerivedTileLists);
       if (parsed == null) throw new Error('data file is not a map store object');
     } catch (parseError) {
       console.error(
@@ -901,7 +938,7 @@ async function writeMapEntryLocked(app: App, mapId: string, mapData: MapData, wr
   // stringified; the others are spliced in as their stored text.
   let jsonString: string;
   try {
-    snapshot.entries.set(mapId, cachedEntry(mapId, canonicalizeTileIds(mapData)));
+    snapshot.entries.set(mapId, cachedEntry(mapId, toStoredMap(mapData)));
     jsonString = serializeStore(snapshot);
   } catch (serializeError) {
     console.error('[saveMapData] Serialization failed, save aborted:', serializeError);
@@ -1219,7 +1256,7 @@ export type { SaveMapResult };
 export {
   loadMapData, loadMapDataWithGeneration, getEntryGeneration,
   saveMapData, deleteMapData, createNewMap, buildMapEntry, createMapEntry, listMaps, listMapsResult, migrateMapData,
-  canonicalizeTileIds, applyLockedViewState, enqueueDataFileOp, getSaveQueue,
+  canonicalizeTileIds, toStoredMap, applyLockedViewState, enqueueDataFileOp, getSaveQueue,
   notifyCorruptedDataFile, readRawMapEntry, storeFoundElsewhere, isMapTombstoned, MapDataUnreadableError, MapDeletedError, MapDataFileMissingError, MapSchemaError, createEmptyDataFile, ensureDataFileForNewMap,
   shouldRotateBak, otherBakSlot, bakPathForSlot, dailyBakPath, isSuspiciousShrink, backupTimestamp,
   findBestBackup, restoreFromBackup, BAK_THROTTLE_MS

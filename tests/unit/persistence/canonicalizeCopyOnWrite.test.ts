@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import type { App } from 'obsidian';
 import { TFile } from 'obsidian';
 
-import { canonicalizeTileIds, createNewMap, saveMapData } from '../../../src/persistence/fileOperations';
+import { canonicalizeTileIds, createNewMap, saveMapData, toStoredMap } from '../../../src/persistence/fileOperations';
 import { journalPending, readJournal } from '../../../src/persistence/saveJournal';
 import type { MapData, MapLayer } from '../../../types/core/map.types';
 import type { TilesetDef, TileAssignment } from '../../../types/tiles/tile.types';
@@ -104,5 +104,74 @@ describe('save and journal serialize the canonical copy', () => {
     expect(JSON.stringify(live)).toBe(before);
     const payload = JSON.parse(readJournal(app, 'cow-journal')?.payload as string) as MapData;
     expect(payload.layers[0].tiles?.[0].tileId).toBe('terrain/Stone');
+  });
+});
+
+describe('derived folder tile lists are not persisted', () => {
+  function sheetTileset(): TilesetDef {
+    return { ...tileset('sheet1', ['a', 'b']), source: 'sheet' } as unknown as TilesetDef;
+  }
+  function withNestedTilesets(): MapData {
+    const map = fixture();
+    map.tilesets = [...(map.tilesets ?? []), sheetTileset()];
+    // A nested level that carries its own (legacy) folder tileset list.
+    const d1 = map.subHexMaps?.['0,0']?.mapData as MapData;
+    d1.tilesets = [tileset('nested', ['x/Y'])];
+    return map;
+  }
+
+  it('toStoredMap strips folder tiles (root + nested), keeps sheet tiles, still upgrades ids, never mutates', () => {
+    const live = withNestedTilesets();
+    const before = JSON.stringify(live);
+    const out = toStoredMap(live);
+
+    expect(JSON.stringify(live)).toBe(before);
+    expect(out.layers[0].tiles?.[0].tileId).toBe('terrain/Stone');
+    const d2 = out.subHexMaps?.['0,0']?.mapData.subHexMaps?.['1,0']?.mapData;
+    expect(d2?.layers[0].tiles?.[0].tileId).toBe('props/Barrel');
+    expect(out.tilesets?.find(t => t.id === 'ts1')?.tiles).toEqual([]);
+    expect(out.tilesets?.find(t => t.id === 'ts1')?.tileWidth).toBe(256);
+    expect(out.tilesets?.find(t => t.id === 'sheet1')?.tiles).toHaveLength(2);
+    expect(out.subHexMaps?.['0,0']?.mapData.tilesets?.[0].tiles).toEqual([]);
+    // Idempotent and identity-preserving once stripped.
+    expect(toStoredMap(out)).toBe(out);
+  });
+
+  it('saveMapData writes no folder tiles[] while layer ids are upgraded; the journal matches', async () => {
+    const contents = new Map<string, string>();
+    const file = new TFile();
+    file.path = 'windrose-md-data.json';
+    contents.set(file.path, JSON.stringify({ maps: {} }));
+    const app = {
+      vault: {
+        getAbstractFileByPath: (p: string) => (p === file.path ? file : null),
+        read: async () => contents.get(file.path) ?? '',
+        modify: async (_f: TFile, data: string) => { contents.set(file.path, data); },
+        create: async () => undefined,
+      },
+      saveLocalStorage: () => undefined,
+      loadLocalStorage: () => null,
+    } as unknown as App;
+
+    const live = withNestedTilesets();
+    expect((await saveMapData(app, 'strip-save', live)).status).toBe('saved');
+    const stored = (JSON.parse(contents.get(file.path) as string) as { maps: Record<string, MapData> }).maps['strip-save'];
+    expect(stored.layers[0].tiles?.[0].tileId).toBe('terrain/Stone');
+    expect(stored.tilesets?.find(t => t.id === 'ts1')?.tiles).toEqual([]);
+    expect(stored.tilesets?.find(t => t.id === 'sheet1')?.tiles).toHaveLength(2);
+    expect(stored.subHexMaps?.['0,0']?.mapData.tilesets?.[0].tiles).toEqual([]);
+    expect(live.tilesets?.[0].tiles).toHaveLength(2);
+  });
+
+  it('journalPending journals the stripped form', () => {
+    const store = new Map<string, string>();
+    const app = {
+      saveLocalStorage: (k: string, v: unknown) => { if (v == null) store.delete(k); else store.set(k, String(v)); },
+      loadLocalStorage: (k: string) => store.get(k) ?? null,
+    } as unknown as App;
+    journalPending(app, 'strip-journal', withNestedTilesets());
+    const payload = JSON.parse(readJournal(app, 'strip-journal')?.payload as string) as MapData;
+    expect(payload.tilesets?.find(t => t.id === 'ts1')?.tiles).toEqual([]);
+    expect(payload.tilesets?.find(t => t.id === 'sheet1')?.tiles).toHaveLength(2);
   });
 });

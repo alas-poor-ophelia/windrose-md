@@ -338,12 +338,17 @@ function migrateOneMap(input: MapData, options: MigrateOptions): MapData {
   // this block must move below the runner in the same change).
   mapData = runSchemaMigrations(mapData);
 
-  // Tileset source migration: add source: 'folder' to legacy tilesets
+  // Tileset source migration: add source: 'folder' to legacy tilesets.
+  // Folder tile lists are DERIVED (useTilesetBuilder rescans the registered
+  // folders/bundles on every mount) and are no longer persisted; an old store
+  // still carrying them (multi-MB, often stale packs) drops them here so the
+  // `tiles: TileEntry[]` invariant holds with an empty list until the rebuild.
   if (options.isRoot) mapData.tilesets ??= [];
   for (const ts of mapData.tilesets ?? []) {
     if (!('source' in ts)) {
       (ts as Record<string, unknown>).source = 'folder';
     }
+    if (isDerivedTileList(ts) && ts.tiles.length > 0) ts.tiles = [];
   }
 
   for (const layer of mapData.layers) sanitizeLayer(layer);
@@ -367,6 +372,73 @@ function migrateOneMap(input: MapData, options: MigrateOptions): MapData {
   return mapData;
 }
 
+/**
+ * Whether a tileset's `tiles` list is derived from a folder/bundle scan (and so
+ * must not be persisted). A missing source is a legacy folder tileset. Sheet
+ * tilesets have no builder; their tiles are authored data and always kept.
+ */
+function isDerivedTileList(ts: unknown): ts is { source?: string; tiles: unknown[] } {
+  if (ts == null || typeof ts !== 'object') return false;
+  const t = ts as { source?: unknown; tiles?: unknown };
+  return (t.source === undefined || t.source === 'folder') && Array.isArray(t.tiles);
+}
+
+/**
+ * The storable form of a map: every folder tileset's derived `tiles` list
+ * replaced with [] at the root and in every nested sub-hex map. Copy-on-write
+ * (the input may be live Preact state shared with undo snapshots, or a parsed
+ * store entry); returns the input itself when nothing needed stripping. All
+ * other tileset fields (overrides, art offsets/scales, ids) are kept. An entry
+ * claiming a NEWER schema is returned untouched: this build cannot know what
+ * its tilesets mean.
+ */
+function stripDerivedTileLists<T>(mapData: T): T {
+  if (mapData == null || typeof mapData !== 'object' || Array.isArray(mapData) || isNewerSchema(mapData as unknown as MapData)) return mapData;
+  const strip = (m: Record<string, unknown>): Record<string, unknown> => {
+    let tilesets: unknown = m.tilesets;
+    if (Array.isArray(m.tilesets)) {
+      const src = m.tilesets as unknown[];
+      let out: unknown[] | null = null;
+      for (let i = 0; i < src.length; i++) {
+        const ts = src[i];
+        if (isDerivedTileList(ts) && ts.tiles.length > 0) {
+          out ??= src.slice();
+          out[i] = { ...ts, tiles: [] };
+        }
+      }
+      if (out != null) tilesets = out;
+    }
+    let subHexMaps = m.subHexMaps;
+    // Only a keyed object is walked: an odd shape (array, primitive) is left
+    // exactly as stored rather than reshaped by the object spread below.
+    if (subHexMaps != null && typeof subHexMaps === 'object' && !Array.isArray(subHexMaps)) {
+      let copy: Record<string, unknown> | null = null;
+      for (const [key, sub] of Object.entries(subHexMaps as Record<string, unknown>)) {
+        if (sub == null || typeof sub !== 'object') continue;
+        const md = (sub as { mapData?: unknown }).mapData;
+        if (md == null || typeof md !== 'object' || Array.isArray(md)) continue;
+        const next = strip(md as Record<string, unknown>);
+        if (next !== md) {
+          copy ??= { ...(subHexMaps as Record<string, unknown>) };
+          copy[key] = { ...sub, mapData: next };
+        }
+      }
+      if (copy != null) subHexMaps = copy;
+    }
+    if (tilesets === m.tilesets && subHexMaps === m.subHexMaps) return m;
+    const next = { ...m };
+    if (tilesets !== m.tilesets) next.tilesets = tilesets;
+    if (subHexMaps !== m.subHexMaps) next.subHexMaps = subHexMaps;
+    return next;
+  };
+  try {
+    return strip(mapData as Record<string, unknown>) as T;
+  } catch (e) {
+    console.warn('[Windrose] Kept a map entry unstripped; unexpected shape:', e);
+    return mapData;
+  }
+}
+
 /** Load-time migration of one stored map entry (root plus every nested sub-hex map). */
 function migrateMapData(mapData: MapData): MapData {
   return migrateOneMap(mapData, { isRoot: true });
@@ -378,6 +450,8 @@ export {
   isNewerSchema,
   migrateMapData,
   migrateOneMap,
+  stripDerivedTileLists,
+  isDerivedTileList,
   sanitizeLayer,
   sanitizeWallGaps,
   normalizeShapeOverlays,

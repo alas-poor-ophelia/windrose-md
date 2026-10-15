@@ -9,6 +9,7 @@ import { saveMapData } from '../../persistence/fileOperations';
 import { notifyRestoreLanded, onRestoreLanded, registerSaveInstance, unregisterSaveInstance } from '../../persistence/saveCoordinator';
 import { clearJournal, dropRestoredSlot, journalPending, moveJournalToConflict } from '../../persistence/saveJournal';
 import { mintId } from '../../core/ids';
+import { carryLiveTileLists } from '../../assets/tilesetOperations';
 
 type MapDataSetter = (value: MapData | null | ((prev: MapData | null) => MapData | null)) => void;
 
@@ -119,7 +120,9 @@ function useDebouncedSave(
    * base went stale without any real edit of its own (a sibling pane
    * restored a crash copy, or a cosmetic write was refused).
    */
-  readStore?: StoreReader
+  readStore?: StoreReader,
+  /** Ask the tileset builder to rescan (an installed tree had folder tilesets the live map could not fill). */
+  requestTilesetRebuild?: () => void
 ): UseDebouncedSaveResult {
   // Unsaved data: set by every edit, cleared ONLY when a save of that exact
   // version lands (or is refused as stale). A failed save keeps it, so the
@@ -176,6 +179,8 @@ function useDebouncedSave(
   flushRef.current = { app, mapId, pendingData };
   const readStoreRef = useRef(readStore);
   readStoreRef.current = readStore;
+  const requestTilesetRebuildRef = useRef(requestTilesetRebuild);
+  requestTilesetRebuildRef.current = requestTilesetRebuild;
 
   /**
    * Adopt the store's tree and generation, but only while this mount has
@@ -193,8 +198,13 @@ function useDebouncedSave(
       if (loaded == null || deletedRef.current || unmountedRef.current) return;
       if (hasRealEditRef.current || saveVersionRef.current !== since) return;
       baseGenRef.current = loaded.generation;
-      lastLandedRef.current = loaded.data;
-      setMapData(loaded.data);
+      // The store tree's folder tile lists are stripped: carry the live ones.
+      setMapData((prev) => {
+        const { data, needsRebuild } = carryLiveTileLists(loaded.data, prev);
+        if (needsRebuild) requestTilesetRebuildRef.current?.();
+        lastLandedRef.current = data;
+        return data;
+      });
     });
   };
   const adoptStoreRef = useRef(adoptStore);
@@ -577,8 +587,14 @@ function useDebouncedSave(
   }), []);
 
   const applyRestored = useCallback((data: MapData): void => {
-    restoredTreeRef.current = data;
-    updateMapData(data);
+    // A journal copy is in store form (folder tile lists stripped): carry the
+    // live lists, or ask the builder to rescan when nothing live matches.
+    updateMapData((prev) => {
+      const { data: carried, needsRebuild } = carryLiveTileLists(data, prev);
+      if (needsRebuild) requestTilesetRebuildRef.current?.();
+      restoredTreeRef.current = carried;
+      return carried;
+    });
   }, [updateMapData]);
 
   return { saveStatus, updateMapData, forceSave, markDeleted, mapDeleted, staleConflict, acknowledgeStaleConflict, writerId: instanceIdRef.current, applyRestored };
