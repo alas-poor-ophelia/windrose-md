@@ -242,7 +242,7 @@ function FogOfWarSection(): VNode {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <NativeSlider
                 min={5}
-                max={50}
+                max={100}
                 value={Math.round((overrides.fogOfWarBlurFactor ?? THEME.fogOfWar.blurFactor) * 100)}
                 onChange={(val: number) => handleColorChange('fogOfWarBlurFactor', val / 100)}
                 disabled={useGlobalSettings}
@@ -251,7 +251,7 @@ function FogOfWarSection(): VNode {
                 class="windrose-color-reset-btn"
                 disabled={useGlobalSettings}
                 onClick={() => !useGlobalSettings && handleColorChange('fogOfWarBlurFactor', THEME.fogOfWar.blurFactor)}
-                ref={tooltipRef('Reset to default (20%)')}
+                ref={tooltipRef('Reset to default (99%)')}
                 style={{ cursor: useGlobalSettings ? 'not-allowed' : 'pointer' }}
               >
                 <Icon icon="lucide-rotate-ccw" />
