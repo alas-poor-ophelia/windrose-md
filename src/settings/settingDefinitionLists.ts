@@ -21,7 +21,9 @@ import { TravelPackEditModal } from './modals/TravelPackEditModal';
 import { AddTilesModal } from './modals/AddTilesModal';
 import type { SettingsTabThis } from './tabs/settingsTabContext';
 import { scanTilesetFolder, isBundleFailureState, bundleFailureLabel } from '../assets/tilesetScan';
-import { entriesFor } from '../assets/bundles/bundleRegistry';
+import { entriesFor, getBundleStateInfo, subscribeBundleRegistry } from '../assets/bundles/bundleRegistry';
+import { SHARDS_DIR, SHARD_EXT } from '../assets/bundles/bundleFormat';
+import { formatBundleBadge, isBundleBadgeProblem } from './helpers/bundleStatus';
 
 // settingDefinitionLists.ts
 // Declarative Settings API (Obsidian 1.13+) list sections: Color palette,
@@ -371,11 +373,97 @@ function buildTravelPackSections(tab: SettingsTabThis): SettingDefinitionItem[] 
 
 // --- Tile sets ---
 
+function normalizeFolder(folder: string): string {
+  return folder.trim().replace(/\/+$/, '');
+}
+
+/** Shard file count and total size for a bundled folder (list + stat; no bytes read). */
+async function statBundleShards(tab: SettingsTabThis, folder: string): Promise<{ count: number; bytes: number }> {
+  const adapter = tab.app.vault.adapter;
+  let files: string[] = [];
+  try {
+    files = (await adapter.list(`${folder}/${SHARDS_DIR}`)).files.filter(f => f.endsWith(SHARD_EXT));
+  } catch {
+    return { count: 0, bytes: 0 };
+  }
+  const sizes = await Promise.all(files.map(async f => {
+    try { return (await adapter.stat(f))?.size ?? 0; } catch { return 0; }
+  }));
+  return { count: files.length, bytes: sizes.reduce((a, b) => a + b, 0) };
+}
+
+/**
+ * Status line under a tile folder row, recomputed on every bundle registry
+ * change. The loose count reuses the Preview scan (scanTilesetFolder), which
+ * also mounts the folder; it runs at most once per folder value, because a
+ * mount bumps the registry and a per-bump rescan would loop. Shard stats are
+ * keyed on state + entry count, so unrelated bumps reuse them.
+ */
+function attachBundleBadge(tab: SettingsTabThis, descEl: HTMLElement, initialFolder: string): { setFolder: (folder: string) => void; dispose: () => void } {
+  const badgeEl = descEl.createDiv({ cls: 'windrose-tileset-bundle-badge' });
+  let folder = normalizeFolder(initialFolder);
+  let generation = 0;
+  let scanStarted = false;
+  let looseFiles: number | null = null;
+  let shardKey = '';
+  let shards: { count: number; bytes: number } | null = null;
+  let disposed = false;
+
+  const refresh = (): void => {
+    if (disposed) return;
+    if (folder === '') { badgeEl.setText(''); return; }
+    const info = getBundleStateInfo(folder);
+    const gen = generation;
+    if (!scanStarted && (info == null || info.state === 'loose')) {
+      scanStarted = true;
+      void scanTilesetFolder(tab.app, folder).then(tiles => {
+        if (gen !== generation) return;
+        looseFiles = tiles.length;
+        refresh();
+      }, () => { /* the scan already reports its own failures */ });
+    }
+    let tiles = 0;
+    if (info != null && (info.state === 'mounted' || info.state === 'partial')) {
+      tiles = entriesFor(folder).entries.length;
+      const key = `${info.state}:${tiles}`;
+      if (key !== shardKey) {
+        shardKey = key;
+        shards = null;
+        void statBundleShards(tab, folder).then(result => {
+          if (gen !== generation || key !== shardKey) return;
+          shards = result;
+          refresh();
+        });
+      }
+    }
+    badgeEl.setText(formatBundleBadge(info, { looseFiles, tiles, shards }));
+    badgeEl.toggleClass('is-problem', isBundleBadgeProblem(info));
+  };
+
+  const unsubscribe = subscribeBundleRegistry(refresh);
+  refresh();
+  return {
+    setFolder: (next: string) => {
+      const normalized = normalizeFolder(next);
+      if (normalized === folder) return;
+      folder = normalized;
+      generation++;
+      scanStarted = false;
+      looseFiles = null;
+      shardKey = '';
+      shards = null;
+      refresh();
+    },
+    dispose: () => { disposed = true; unsubscribe(); },
+  };
+}
+
 function tilesetFolderRow(tab: SettingsTabThis, folderPath: string, index: number): SettingGroupItem {
   return {
     name: `Tile folder ${index + 1}`,
     render: (setting) => {
       let detectTimer: number | undefined;
+      const badge = attachBundleBadge(tab, setting.descEl, folderPath);
       setting.addSearch(search => {
         new FolderSuggest(tab.app, search.inputEl);
         search
@@ -392,12 +480,14 @@ function tilesetFolderRow(tab: SettingsTabThis, folderPath: string, index: numbe
             if (detectTimer != null) window.clearTimeout(detectTimer);
             detectTimer = window.setTimeout(() => {
               void runFolderDetection(tab.app, value);
+              badge.setFolder(value);
             }, FOLDER_DETECT_DEBOUNCE_MS);
           });
       });
       // Drop a pending detection if the row is torn down mid-debounce
       return () => {
         if (detectTimer != null) window.clearTimeout(detectTimer);
+        badge.dispose();
       };
     }
   };

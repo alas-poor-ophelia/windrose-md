@@ -50,6 +50,10 @@ import type { FilterFacet } from './TileFilterScreen';
 import { TilesetConfigPanel } from './TilesetConfigPanel';
 import { tooltipRef } from '../shared/obsidianTooltip';
 import { assertNever } from '../../utils/assertNever';
+import { getBundleStateInfo, getBundleRegistryVersion, subscribeBundleRegistry } from '../../assets/bundles/bundleRegistry';
+import { getTilesetFolders } from '../../core/settingsAccessor';
+import { collectBundleNotices, shouldShowBundleNotice } from '../../settings/helpers/bundleStatus';
+import type { BundleNotice } from '../../settings/helpers/bundleStatus';
 
 /** Compact (non-virtualized) leaf/list views request thumbnails this many at a time. */
 const COMPACT_THUMB_STEP = 60;
@@ -110,6 +114,25 @@ function HScroll({ className, children }: { className?: string; children: Compon
       onClickCapture={clickCapture}
     >
       {children}
+    </div>
+  );
+}
+
+/**
+ * Empty-state panel for folders whose tile bundle serves nothing (bundle files
+ * not synced yet, or a bundle that could not be loaded). Shown in place of the
+ * plain "No tiles" text; the scan's one Notice per folder stays the only toast.
+ */
+function BundleNoticePanel({ notices }: { notices: BundleNotice[] }): VNode {
+  return (
+    <div className="windrose-tb-bundle-notice" role="status">
+      <Icon icon="lucide-package" size={22} />
+      {notices.map(n => (
+        <div key={n.folder} className={`windrose-tb-bundle-notice-item is-${n.kind}`}>
+          {n.title != null && <span className="windrose-tb-bundle-notice-folder">{n.title}</span>}
+          <span className="windrose-tb-bundle-notice-text">{n.message}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -807,6 +830,20 @@ const TileAssetBrowser = memo(({
     if (paths.length > 0) requestThumbs(paths);
   }, [active, tilesets, organize, compact, fullRows, fullRange, requestThumbs, fullVirtualizer, showRail, groupedTiles, openCat, viewMode, compactLimit, growCompactIfNearEnd]);
 
+  // Bundle problems for the empty states. The registry subscription only
+  // forces a re-render; the derivation is a few map lookups per configured
+  // folder, so it runs every render and always sees the current folder list.
+  const [, setBundleVersion] = useState(getBundleRegistryVersion);
+  useEffect(() => subscribeBundleRegistry(() => setBundleVersion(getBundleRegistryVersion())), []);
+  const tilesetFolders = getTilesetFolders();
+  const bundleNotices = collectBundleNotices(tilesetFolders, getBundleStateInfo);
+  const showBundleNotice = filteredTiles.length === 0 && shouldShowBundleNotice({
+    notices: bundleNotices,
+    folders: tilesetFolders,
+    scopedTileCount: allTiles.length,
+    filtersActive: searchFilter !== '' || activeTags.size > 0 || packFilter.size > 0 || railSel !== 'all',
+  });
+
   // ---- Empty state: no tilesets ----
 
   if (tilesets.length === 0) {
@@ -839,17 +876,21 @@ const TileAssetBrowser = memo(({
         )}
         <div className="windrose-tb-body">
           {ribbon}
-          <div className="windrose-tile-browser-empty-message">
-            <Icon icon="lucide-image" size={24} />
-            <span>No tilesets configured</span>
-            <button
-              className="windrose-tile-browser-configure-btn"
-              onClick={openTilesetSettings}
-            >
-              <Icon icon="lucide-settings" size={14} />
-              <span>Configure Tilesets</span>
-            </button>
-          </div>
+          {bundleNotices.length > 0 ? (
+            <BundleNoticePanel notices={bundleNotices} />
+          ) : (
+            <div className="windrose-tile-browser-empty-message">
+              <Icon icon="lucide-image" size={24} />
+              <span>No tilesets configured</span>
+              <button
+                className="windrose-tile-browser-configure-btn"
+                onClick={openTilesetSettings}
+              >
+                <Icon icon="lucide-settings" size={14} />
+                <span>Configure Tilesets</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1173,11 +1214,11 @@ const TileAssetBrowser = memo(({
                     }),
                   ])}
                 </div>
-                {groupedTiles.size === 0 && (
+                {groupedTiles.size === 0 && (showBundleNotice ? <BundleNoticePanel notices={bundleNotices} /> : (
                   <div className="windrose-tb-empty">
                     {searchFilter !== '' ? 'No matching tiles' : 'No tiles loaded'}
                   </div>
-                )}
+                ))}
               </>
             ) : (
               // Compact category cards view
@@ -1194,13 +1235,15 @@ const TileAssetBrowser = memo(({
                     />
                   ))}
                 </div>
-                {groupedTiles.size === 0 && (
+                {groupedTiles.size === 0 && (showBundleNotice ? <BundleNoticePanel notices={bundleNotices} /> : (
                   <div className="windrose-tb-empty">
                     {searchFilter !== '' ? 'No matching tiles' : 'No tiles loaded'}
                   </div>
-                )}
+                ))}
               </>
             )
+          ) : showBundleNotice ? (
+            <BundleNoticePanel notices={bundleNotices} />
           ) : (
             // Full mode — virtualized grid
             <div style={{ height: fullVirtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
