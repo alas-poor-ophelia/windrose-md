@@ -29,7 +29,7 @@ import { runImportDetectionPass } from '../assets/importDetectionPass';
 import { ensureFolder } from '../persistence/vaultFolders';
 import { mintTileId } from '../assets/tileIds';
 import { BundleWriter } from '../assets/bundles/bundleWriter';
-import { sniffImageMime } from '../assets/bundles/bundleFormat';
+import { isSafeBundleKey, sha256Hex, sniffImageMime } from '../assets/bundles/bundleFormat';
 import {
 	beginBundleWrite, endBundleWrite, isBundleReadFailure, mountBundleFolder, readEntryBytes,
 } from '../assets/bundles/bundleRegistry';
@@ -330,13 +330,110 @@ interface TexturePlan {
 	isStrip: boolean;
 	/** Destination folder under the pack folder (= drawer category). */
 	folder: string;
-	/** Bundle key: `${folder}/${filename}`, relative to the pack folder. */
+	/** Bundle key relative to the pack folder: `${folder}/${filename}`, or the key of a byte-identical loose file from an earlier import (preferLooseKeys). */
 	key: string;
 	/** Vault path of the tile (a real file when loose, virtual when bundled). */
 	destPath: string;
 }
 
 const BUNDLE_TARGET_SHARD_BYTES = 4 * 1024 * 1024;
+
+/** Folder part of a bundle key ("" at the root). */
+function keyDirOf(key: string): string {
+	const i = key.lastIndexOf('/');
+	return i >= 0 ? key.slice(0, i) : '';
+}
+
+/** Filename part of a bundle key. */
+function keyBaseOf(key: string): string {
+	return key.slice(key.lastIndexOf('/') + 1);
+}
+
+/**
+ * Loose images from an earlier import, indexed by content: sha256 -> their
+ * folder-relative keys (sorted), plus the set of byte lengths so textures
+ * of any other length are never read twice. Unreadable files and keys a
+ * bundle cannot hold are left out (default routing applies and retirement
+ * keeps them).
+ */
+async function indexLooseByContent(
+	app: App,
+	basePath: string,
+	loosePaths: string[],
+): Promise<{ sizes: Set<number>; byHash: Map<string, string[]> }> {
+	const sizes = new Set<number>();
+	const byHash = new Map<string, string[]>();
+	for (const path of loosePaths) {
+		const key = path.slice(basePath.length + 1);
+		if (!isSafeBundleKey(key)) continue;
+		let bytes: Uint8Array;
+		try {
+			bytes = new Uint8Array(await app.vault.adapter.readBinary(path));
+		} catch {
+			continue;
+		}
+		if (bytes.byteLength === 0) continue;
+		sizes.add(bytes.byteLength);
+		const hash = await sha256Hex(bytes);
+		const keys = byHash.get(hash);
+		if (keys != null) keys.push(key);
+		else byHash.set(hash, [key]);
+	}
+	for (const keys of byHash.values()) keys.sort();
+	return { sizes, byHash };
+}
+
+/**
+ * The existing loose layout wins: a texture whose bytes are identical to a
+ * loose image from an earlier import (possibly routed by an older rule) is
+ * bundled under that file's key, so its tile id stays the one the loose
+ * scan minted (placed maps keep resolving) and retirement can replace the
+ * file. Each loose key is claimed once, by an exact default-key match
+ * first, then a same-basename texture, then any. Textures with no
+ * byte-identical loose file keep the default routing. `folder` is left as
+ * routed: it is the wizard's decision group for the texture.
+ */
+async function preferLooseKeys(
+	app: App,
+	source: PckSource,
+	plans: TexturePlan[],
+	basePath: string,
+	loosePaths: string[],
+): Promise<TexturePlan[]> {
+	if (loosePaths.length === 0) return plans;
+	const { sizes, byHash } = await indexLooseByContent(app, basePath, loosePaths);
+	if (byHash.size === 0) return plans;
+	const hashes = new Map<number, string>();
+	for (let i = 0; i < plans.length; i++) {
+		if (!sizes.has(plans[i].entry.size)) continue;
+		try {
+			const data = await extractFileData(source, plans[i].entry);
+			if (data.byteLength > 0 && sizes.has(data.byteLength)) hashes.set(i, await sha256Hex(data));
+		} catch {
+			// Unreadable here means unreadable in the extraction loop too: it reports it.
+		}
+	}
+	const claimed = new Set<string>();
+	const chosen = new Map<number, string>();
+	const passes: Array<(plan: TexturePlan, key: string) => boolean> = [
+		(plan, key) => key === plan.key,
+		(plan, key) => keyBaseOf(key) === plan.filename,
+		() => true,
+	];
+	for (const accepts of passes) {
+		for (const [i, hash] of hashes) {
+			if (chosen.has(i)) continue;
+			const key = byHash.get(hash)?.find(k => !claimed.has(k) && accepts(plans[i], k));
+			if (key == null) continue;
+			claimed.add(key);
+			chosen.set(i, key);
+		}
+	}
+	return plans.map((p, i) => {
+		const key = chosen.get(i);
+		return key == null || key === p.key ? p : { ...p, key, destPath: basePath + '/' + key };
+	});
+}
 
 /** Dungeondraft-shipped thumbnails keyed by their file stem (md5 of the texture's res:// path). */
 function indexShippedThumbs(archive: PckArchive): Map<string, PckFileEntry> {
@@ -374,8 +471,11 @@ async function extractToBundle(
 	/** Why nothing was committed; null when an index segment with at least one tile was written. */
 	commitError: string | null;
 }> {
+	// Key folder, then key filename: for default-routed plans this is the
+	// folder-then-filename order; a key kept from an earlier loose layout
+	// sorts among its own folder's files, as the loose scan would.
 	const plans = [...plansIn].sort((a, b) =>
-		a.folder.localeCompare(b.folder) || a.filename.localeCompare(b.filename));
+		keyDirOf(a.key).localeCompare(keyDirOf(b.key)) || keyBaseOf(a.key).localeCompare(keyBaseOf(b.key)));
 	const shippedThumbs = indexShippedThumbs(archive);
 	const writer = new BundleWriter(app, basePath, {
 		packId: meta.id, name: meta.name, mode: 'exact', targetShardBytes: BUNDLE_TARGET_SHARD_BYTES,
@@ -507,7 +607,7 @@ async function listLooseImages(app: App, basePath: string): Promise<string[]> {
 }
 
 /** Why a loose image from an earlier import was left in place. */
-type LooseKeptReason = 'differs' | 'not-indexed' | 'not-served' | 'trash-failed';
+type LooseKeptReason = 'differs' | 'not-in-bundle' | 'not-indexed' | 'not-served' | 'trash-failed';
 
 /** Same length and every byte equal. */
 function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
@@ -538,7 +638,9 @@ function trashOptionOf(app: App): string | null {
  * (a real shard read, not an index lookup) and compared byte-for-byte with
  * the loose file; anything else stays, loose-wins keeps it in force, and it
  * is reported with a reason: `differs` (pack update or user override),
- * `not-served` (the bundle read failed or the loose file could not be read),
+ * `not-in-bundle` (this run bundled nothing at that key and no mounted
+ * segment serves it), `not-served` (the bundle has the key but the read
+ * failed, or the loose file could not be read),
  * `not-indexed` (the vault has no TFile for it), `trash-failed`. Folders left
  * empty below basePath are trashed too. fileManager.trashFile honours the
  * user's trash setting; the caller skips this entirely when that setting
@@ -548,6 +650,8 @@ async function retireLooseImages(
 	app: App,
 	basePath: string,
 	loosePaths: string[],
+	/** Folder-relative keys this run bundled. */
+	bundledKeys: ReadonlySet<string>,
 ): Promise<{ replaced: number; kept: Array<{ path: string; reason: LooseKeptReason }> }> {
 	const kept: Array<{ path: string; reason: LooseKeptReason }> = [];
 	if (loosePaths.length === 0) return { replaced: 0, kept };
@@ -562,7 +666,7 @@ async function retireLooseImages(
 		}
 		const served = await readEntryBytes(app, path);
 		if (isBundleReadFailure(served)) {
-			kept.push({ path: rel, reason: 'not-served' });
+			kept.push({ path: rel, reason: bundledKeys.has(rel) ? 'not-served' : 'not-in-bundle' });
 			continue;
 		}
 		let looseBytes: Uint8Array;
@@ -733,7 +837,8 @@ async function runDdImportUnlocked(
 		let out: Awaited<ReturnType<typeof extractToBundle>>;
 		try {
 			const loose = await listLooseImages(app, basePath);
-			out = await extractToBundle(app, source, archive, plans, basePath, meta, onProgress, isCancelled);
+			const routed = await preferLooseKeys(app, source, plans, basePath, loose);
+			out = await extractToBundle(app, source, archive, routed, basePath, meta, onProgress, isCancelled);
 			// A cancelled run holds a partial bundle: it may still register
 			// (below), but it never retires the earlier loose files.
 			if (out.commitError == null && !out.cancelled && loose.length > 0) {
@@ -746,7 +851,7 @@ async function runDdImportUnlocked(
 					// here must not skip registration of an already committed bundle.
 					let retired: Awaited<ReturnType<typeof retireLooseImages>> = { replaced: 0, kept: [] };
 					try {
-						retired = await retireLooseImages(app, basePath, loose);
+						retired = await retireLooseImages(app, basePath, loose, new Set(out.landed.map(p => p.key)));
 					} catch (e) {
 						console.warn('[Windrose] Retiring loose files failed for', basePath, e);
 					}

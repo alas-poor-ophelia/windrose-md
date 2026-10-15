@@ -447,6 +447,64 @@ describe('retiring an earlier loose import', () => {
 		expect(fv.trashed).toEqual([]);
 	});
 
+	/** A pack whose one texture is tagged Vehicles, so today's routing puts it at Vehicles/Anchor.webp. */
+	const anchor = fakeImage('webp', 240, 5);
+	function anchorPack(): Array<{ path: string; data: Uint8Array }> {
+		const tags = JSON.stringify({ tags: { Vehicles: ['textures/objects/Anchor.webp'] } });
+		return [
+			{ path: `${PACK}/pack.json`, data: new TextEncoder().encode('{}') },
+			{ path: `${PACK}/data/default.dungeondraft_tags`, data: new TextEncoder().encode(tags) },
+			{ path: `${PACK}/textures/objects/Anchor.webp`, data: anchor },
+		];
+	}
+
+	it('bundles a texture under the key of a byte-identical loose file an older routing rule placed', async () => {
+		const fv = makeFakeVault();
+		seedLoose(fv, [['[EA]/Anchor.webp', anchor.slice()]]);
+		const res = await importInto(fv, true, anchorPack());
+		expect(res.error).toBeUndefined();
+		expect(res.looseReplaced).toBe(1);
+		expect(res.looseKept).toEqual([]);
+		expect(fv.files.has(`${BASE}/[EA]/Anchor.webp`)).toBe(false);
+		expect(fv.trashed).toContain(`${BASE}/[EA]/Anchor.webp`);
+		expect(entriesFor(BASE).entries.map(e => e.key)).toEqual(['[EA]/Anchor.webp']);
+		const tiles = await scanTilesetFolder(fv.app, BASE);
+		expect(tiles.map(t => [t.id, t.vaultPath])).toEqual([['[EA]/Anchor', `${BASE}/[EA]/Anchor.webp`]]);
+		const meta = committed[committed.length - 1];
+		expect(meta[`${BASE}/[EA]/Anchor.webp`]?.importTags).toEqual(['Vehicles']);
+		expect(meta[`${BASE}/Vehicles/Anchor.webp`]).toBeUndefined();
+	});
+
+	it('keeps same-named loose files whose bytes differ and routes the texture by the default rule', async () => {
+		const fv = makeFakeVault();
+		const other = fakeImage('webp', 240, 6);
+		seedLoose(fv, [['Vehicles/Anchor.webp', other], ['[EA]/Anchor.webp', other.slice()]]);
+		const res = await importInto(fv, true, anchorPack());
+		expect(res.error).toBeUndefined();
+		expect(entriesFor(BASE).entries.map(e => e.key)).toEqual(['Vehicles/Anchor.webp']);
+		expect(res.looseReplaced).toBe(0);
+		expect(res.looseKeptReasons).toEqual([
+			{ path: 'Vehicles/Anchor.webp', reason: 'differs' },
+			{ path: '[EA]/Anchor.webp', reason: 'not-in-bundle' },
+		]);
+		expect(fv.files.get(`${BASE}/[EA]/Anchor.webp`)).toEqual(other);
+		expect(fv.trashed).toEqual([]);
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining('not-in-bundle (1):'));
+		const meta = committed[committed.length - 1];
+		expect(meta[`${BASE}/Vehicles/Anchor.webp`]?.importTags).toEqual(['Vehicles']);
+	});
+
+	it('gives each of several byte-identical loose files to the texture with its basename', async () => {
+		const fv = makeFakeVault();
+		seedLoose(fv, [['old/BarrelCopy.webp', barrel.slice()], ['old/Barrel.webp', barrel.slice()]]);
+		const res = await importInto(fv);
+		expect(res.looseReplaced).toBe(2);
+		expect(res.looseKept).toEqual([]);
+		const tiles = await scanTilesetFolder(fv.app, BASE);
+		const ids = tiles.map(t => t.id).sort();
+		expect(ids).toEqual(['objects/Rock', 'objects/Rock.webp', 'old/Barrel', 'old/BarrelCopy']);
+	});
+
 	it('keeps the one file the trash refuses and still trashes the rest and registers', async () => {
 		const fv = makeFakeVault();
 		seedLoose(fv, THREE);
