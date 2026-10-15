@@ -1,7 +1,7 @@
 import { test as baseTest } from "obsidian-testing-framework";
 import { doWithApp } from "obsidian-testing-framework/lib/util.js";
 import { expect } from "vitest";
-import type { ElectronApplication } from "playwright-core";
+import type { ElectronApplication } from "@playwright/test";
 
 /**
  * The framework's `test`, with the vault reset BEFORE Obsidian boots.
