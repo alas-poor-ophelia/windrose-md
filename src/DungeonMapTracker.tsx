@@ -521,6 +521,23 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     if (role != null && role !== tileDepth) setTileDepth(role);
   }, [mapData, tileDepth, setTileDepth]);
 
+  // Obsidian's reading view delegates img,video clicks on .markdown-preview-sizer
+  // to its full-screen image viewer. Our embed lives inside the sizer, so stop
+  // media clicks here (bubble phase, after our own handlers) before they arrive.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const stop = (e: Event): void => {
+      if (e.target instanceof HTMLImageElement || e.target instanceof HTMLVideoElement) e.stopPropagation();
+    };
+    el.addEventListener('click', stop);
+    el.addEventListener('contextmenu', stop);
+    return () => {
+      el.removeEventListener('click', stop);
+      el.removeEventListener('contextmenu', stop);
+    };
+  }, [containerRef]);
+
   // Custom event listeners (deep links, regions, object links, hex context
   // menu) + the direct sub-hex dive/surface callbacks the canvas layer calls.
   const { requestEnterSubHex, requestExitSubHex } = useCustomEventHandlers({

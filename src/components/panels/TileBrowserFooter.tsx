@@ -103,7 +103,7 @@ function TileScaleSlider({ value, onChange, compact = false }: {
 
 const LoadedChipThumb = memo(({ url }: { url: string | null }): VNode => {
   return url != null && url !== ''
-    ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+    ? <img src={url} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }} />
     : <div style={{ width: '100%', height: '100%' }} />;
 });
 

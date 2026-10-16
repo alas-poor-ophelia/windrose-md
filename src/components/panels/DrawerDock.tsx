@@ -48,7 +48,7 @@ interface DrawerDockProps {
 function FlyoutThumb({ vaultPath, className = 'windrose-flyout-img' }: { vaultPath: string; className?: string }): VNode {
   const app = useApp();
   const src = app.vault.adapter.getResourcePath(vaultPath);
-  return <img className={className} src={src} loading="lazy" />;
+  return <img className={className} src={src} loading="lazy" draggable={false} />;
 }
 
 function FlyoutPreview({ tile }: { tile: FlyoutTile }): VNode {

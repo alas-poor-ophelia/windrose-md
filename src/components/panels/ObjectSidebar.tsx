@@ -105,7 +105,7 @@ const ObjectSidebar = memo(({ selectedObjectType, onObjectTypeSelect, onToolChan
   type ObjType = (typeof allObjectTypes)[number];
   const renderObjectVisual = (objType: ObjType): VNode => {
     if (hasImagePath(objType)) {
-      return <img src={app.vault.adapter.getResourcePath(objType.imagePath ?? '')} alt={objType.label} className="windrose-object-grid-image" />;
+      return <img src={app.vault.adapter.getResourcePath(objType.imagePath ?? '')} alt={objType.label} className="windrose-object-grid-image" draggable={false} />;
     }
     if (hasIconClass(objType)) {
       return <span className="ra">{getIconChar(objType.iconClass ?? '') ?? '?'}</span>;
