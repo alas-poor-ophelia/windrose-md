@@ -12,8 +12,8 @@
  * ladder.activeLevel(zoom) unless options.level overrides it; the static
  * cache keeps one surface per rung (staticLayerCache.ts); the lattice is
  * stroked live after the blit; objects and text labels draw live per home
- * rung (elementBands.ts floors and holds) and their selection chrome follows
- * the same bands. One-shot canvases (previews, export) pass
+ * rung after it (ladderElementPass.ts: elementBands floors and holds, culled
+ * to the view) and their selection chrome reads the same banded set. One-shot canvases (previews, export) pass
  * bypassSurfaceCache and draw the static scene directly.
  */
 
@@ -29,14 +29,12 @@ import { traceZoom } from '../../utils/zoomTraceProbe';
 import { renderGridFog } from '../fog/gridFogRenderer';
 import { renderHexFog } from '../fog/hexFogRenderer';
 import { getFogSettings, clearFogCanvas, renderFog } from '../fog/fogRenderer';
-import { renderSelections, renderObjectSelections, renderTextLabelSelections } from './selectionRenderer';
-import { renderObjects } from './objectRenderer';
-import { renderTextLabels } from './textLabelRenderer';
-import { OBJECT_FLOOR_PX, LABEL_FLOOR_PX, groupByDepth, groupVisibleAt, elementZoom, elementScale, objectRenderedPx, scaledSizeForRung } from './elementBands';
+import { renderSelections } from './selectionRenderer';
+import { bandedMembersByRung, renderLadderElements, renderLadderSelectionChrome } from './ladderElementPass';
+import type { BandedMembers, LadderElementFrame } from './ladderElementPass';
 import { createLatticeClipCache, drawLadderLattice } from './latticeRenderer';
 import type { LatticeClipCache } from './latticeRenderer';
 import type { GeometryLadder } from '../core/createGeometryLadder';
-import { fogDepsForRung } from '../fog/rungFog';
 import { recordFrame, recordRebuild, recordPhase } from './ladderTelemetry';
 import { canvasIdOf } from './surfaceBudget';
 import { isLodLadderEnabled } from '../../core/lodFlags';
@@ -51,7 +49,7 @@ import { getActiveLayer, getRenderLayers, getExportLayers, getActiveBoardId, get
 import { getRenderer } from './layerCellsRenderer';
 import { blitStaticContent } from './staticLayerCache';
 import type { DrawStaticFn } from './staticLayerCache';
-import { drawStaticScene, makeRenderFrame, objectRenderDeps, LADDER_EPOCH } from './staticPasses';
+import { drawStaticScene, makeRenderFrame, LADDER_EPOCH } from './staticPasses';
 import type { StaticScene } from './staticPasses';
 
 /**
@@ -88,11 +86,12 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   const { isResizeMode = false, theme = null, showCoordinates = false, layerVisibility = null, adjacentSubHexes = null, adjacentEmptySlots = null, hiddenTileLayers = undefined, draggingWallId = null, subHexPath = null, liveViewState = null, exportLayers = null, ladder = null, level: levelOverride = undefined, bypassSurfaceCache = false } = options;
   if (canvas == null) return;
 
-  // Every ladder branch in this function is guarded by `ladder !== null`, which is
-  // null for classic maps and for previews/export of maps with no authored rung —
-  // those paths are byte-identical to the shipped renderer. A one-shot canvas that
-  // does carry a ladder also sets `bypassSurfaceCache`, which keeps it out of the
-  // surface cache, the budget's active slot and the live telemetry.
+  // Two gates, on purpose. `ladder !== null` decides WHAT is drawn (rung, lattice,
+  // element bands): it is null for classic maps and for previews/export of maps
+  // with no authored rung, and those paths are byte-identical to the shipped
+  // renderer. `ladderOn` additionally excludes one-shot canvases (previews,
+  // export: `bypassSurfaceCache`), which draw the same ladder picture but stay out
+  // of the surface cache, the budget's active slot and the live telemetry.
   const ladderOn = ladder !== null && !bypassSurfaceCache;
   // Frame telemetry is measurement, not rendering: recorded only while the ladder
   // capability is on (read once per frame), so other users pay no timing cost.
@@ -281,42 +280,14 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     if (telemetryOn) recordPhase('lattice', performance.now() - latticeStart);
   }
 
-  // Elements at depth (objects and labels on their home rung, shown per their
-  // element band), LIVE after the blit (or the direct
-  // draw of a one-shot preview/export canvas) so they stay crisp under the
-  // crossing scale-blit. Same layer and draw order as the classic bake: the
-  // active layer's objects, then its text labels.
-  if (ladder !== null && !showCoordinates) {
-    if (visibility.objects && activeLayer.objects.length > 0) {
-      const objectDeps = objectRenderDeps(mapData);
-      for (const group of groupByDepth(activeLayer.objects)) {
-        if (!groupVisibleAt(group, level, 'object')) continue;
-        const { home, mode, members } = group;
-        // The floor judges each object's own rendered width, not the cell's.
-        const objects = members.filter((o) => objectRenderedPx(ladder, home, zoom, o.size?.width ?? 1, mode) >= OBJECT_FLOOR_PX);
-        if (objects.length === 0) continue;
-        renderObjects(
-          { ...activeLayer, objects },
-          { ctx, offsetX, offsetY, zoom, scaledSize: scaledSizeForRung(ladder, home, zoom), elementScale: elementScale(ladder, home, zoom, mode), slotObjects: activeLayer.objects },
-          ladder.geometryForLevel(home),
-          true,
-          mapData.orientation ?? 'flat',
-          // Fog is level-0 cell data: a deep object is fogged by its root ancestor hex.
-          fogDepsForRung(ladder, home, objectDeps)
-        );
-      }
-    }
-    if (visibility.textLabels && activeLayer.textLabels.length > 0) {
-      for (const group of groupByDepth(activeLayer.textLabels)) {
-        if (!groupVisibleAt(group, level, 'label')) continue;
-        const { home, mode, members } = group;
-        const fontZoom = elementZoom(ladder, home, zoom, mode);
-        const labels = members.filter(label => label.fontSize * fontZoom >= LABEL_FLOOR_PX);
-        if (labels.length === 0) continue;
-        // Position at the real zoom (world px are level-invariant); font at the held zoom.
-        renderTextLabels(labels, { ctx, zoom: fontZoom, getFontCss }, geometry, { offsetX, offsetY, zoom });
-      }
-    }
+  // Elements at depth: objects and labels on their home rung per their element
+  // band, LIVE after the blit (or the one-shot direct draw) and the lattice, so
+  // they sit over the grid lines and stay crisp under the crossing scale-blit.
+  // The band decision is made once here; the selection chrome below reuses it.
+  const elementFrame: LadderElementFrame = { ctx, offsetX, offsetY, zoom, width, height, northDirection: northDirection ?? 0 };
+  const banded: BandedMembers | null = ladder !== null && !showCoordinates ? bandedMembersByRung(ladder, activeLayer, level, zoom) : null;
+  if (ladder !== null && banded !== null) {
+    renderLadderElements(elementFrame, banded, ladder, mapData, activeLayer, geometry, visibility);
   }
 
   // =========================================================================
@@ -366,42 +337,9 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     getMultiObjectScale,
   };
   if (ladder !== null) {
-    // Under the ladder the chrome follows the live element pass: one call per
-    // depth group, on the home rung's geometry, with the same hold the element
-    // was drawn with. Hidden groups (pop mode below home) get no chrome.
-    if (itemsArray.length > 0 && !showCoordinates) {
-      if (visibility.textLabels !== false) {
-        for (const group of groupByDepth(activeLayer.textLabels)) {
-          if (!groupVisibleAt(group, level, 'label')) continue;
-          const { home, mode, members } = group;
-          const fontZoom = elementZoom(ladder, home, zoom, mode);
-          const labels = members.filter(label => label.fontSize * fontZoom >= LABEL_FLOOR_PX);
-          if (labels.length === 0) continue;
-          renderTextLabelSelections(itemsArray, labels, { ctx, offsetX, offsetY, zoom, scaledSize, fontZoom }, geometry, getFontCss);
-        }
-      }
-      if (visibility.objects !== false) {
-        for (const group of groupByDepth(activeLayer.objects)) {
-          if (!groupVisibleAt(group, level, 'object')) continue;
-          const { home, mode, members } = group;
-          // Same floor as the draw pass: no chrome around an element that was not drawn.
-          const ids = new Set(members.filter((o) => objectRenderedPx(ladder, home, zoom, o.size?.width ?? 1, mode) >= OBJECT_FLOOR_PX).map((o) => o.id));
-          const items = itemsArray.filter((it) => it.type === 'object' && ids.has(it.id));
-          if (items.length === 0) continue;
-          const homeGeom = ladder.geometryForLevel(home);
-          renderObjectSelections(
-            items,
-            activeLayer.objects,
-            { ctx, offsetX, offsetY, zoom, scaledSize: scaledSizeForRung(ladder, home, zoom), elementScale: elementScale(ladder, home, zoom, mode) },
-            homeGeom,
-            homeGeom,
-            true,
-            isResizeMode,
-            mapData.orientation ?? 'flat',
-            selectionDeps
-          );
-        }
-      }
+    // Under the ladder the chrome follows the live element pass's banded set.
+    if (banded !== null) {
+      renderLadderSelectionChrome(elementFrame, banded, itemsArray, activeLayer, geometry, scaledSize, visibility, isResizeMode, mapData.orientation ?? 'flat');
     }
   } else {
     renderSelections(

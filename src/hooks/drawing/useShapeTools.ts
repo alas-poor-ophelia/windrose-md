@@ -30,10 +30,9 @@ import { useCallback, useState } from 'preact/hooks';
 import { setCells, removeCellsInBounds } from '../../geometry/core/cellAccessor';
 import { generateEdgeLine, mergeEdges } from '../../drawing/edgeOperations';
 import { eraseRectangleFromCurves } from '../../geometry/curves/curveBoolean';
-import { Notice } from 'obsidian';
 import { authoredCells } from '../../persistence/layerAccessor';
 import { guardDepthWrite } from '../../persistence/depthAuthoring';
-import { withCellsPainted, withCellsErased, depthRefusalMessage } from '../../drawing/depthCellOps';
+import { withCellsPainted, withCellsErased, showDepthRefusal, removeDrawnObjectsInRect } from '../../drawing/depthCellOps';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 
 
@@ -128,17 +127,17 @@ function useShapeTools({
   // quarantine, nested classic, over budget) is REFUSED with a notice and
   // null, never silently drawn at level 0 (parity with paint, objects, tiles
   // and text). 0 on classic maps.
-  const latchShapeLevel = (): number | null => {
+  const latchShapeLevel = useCallback((): number | null => {
     const level = ladder !== null && getEditLevel !== undefined ? getEditLevel() : 0;
     if (level === 0 || !mapData) return level;
     const layer = getActiveLayer(mapData);
     const refusal = guardDepthWrite(mapData, layer.id, level, authoredCells(layer, level));
     if (refusal !== null) {
-      new Notice(depthRefusalMessage(refusal));
+      showDepthRefusal(refusal);
       return null;
     }
     return level;
-  };
+  }, [ladder, getEditLevel, mapData]);
 
   // Write rung `level` through the guarded deep handler (one undo entry). A
   // refusal shows one notice and changes nothing.
@@ -150,7 +149,7 @@ function useShapeTools({
     if (proposed === current) return;
     const refusal = guardDepthWrite(mapData, layer.id, level, proposed);
     if (refusal !== null) {
-      new Notice(depthRefusalMessage(refusal));
+      showDepthRefusal(refusal);
       return;
     }
     onLevelCellsChange(level, next, false);
@@ -218,8 +217,21 @@ function useShapeTools({
 
     const activeLayer = getActiveLayer(mapData);
 
-    // Level-0 clear (deep shapes write cells only): objects on other rungs stay.
-    const newObjects = removeObjectsInRectangle(activeLayer.objects, x1, y1, x2, y2, 0);
+    // Level-0 clear (deep shapes write cells only). On a ladder map the clear
+    // removes what is DRAWN in the rectangle (a home-1 object shows at level
+    // 0; INT-08), judged by its drawn footprint; classic maps keep the cell test.
+    let newObjects: MapObject[];
+    if (ladder !== null) {
+      const a = geometry.gridToWorld(Math.min(x1, x2), Math.min(y1, y2));
+      const b = geometry.gridToWorld(Math.max(x1, x2) + 1, Math.max(y1, y2) + 1);
+      newObjects = removeDrawnObjectsInRect(
+        activeLayer.objects ?? [], ladder, mapData,
+        Math.min(a.worldX, b.worldX), Math.min(a.worldY, b.worldY),
+        Math.max(a.worldX, b.worldX), Math.max(a.worldY, b.worldY)
+      );
+    } else {
+      newObjects = removeObjectsInRectangle(activeLayer.objects, x1, y1, x2, y2, 0);
+    }
     onObjectsChange(newObjects);
 
     const minX = Math.min(x1, x2);

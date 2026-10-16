@@ -230,3 +230,48 @@ export function coarseCells(ladder: Ladder, rootKeys: Iterable<string>, level: n
   }
   return current;
 }
+
+const SQRT3 = Math.sqrt(3);
+
+/**
+ * Every cell centre of a hex lattice of centre-to-vertex size `cellSize` in the band covering
+ * the world rect, plus a one-cell slop ring. Centres outside the rect are the caller's to
+ * reject. The axial-to-world math is `HexGeometry.hexToWorld` at `cellSize`: flat
+ * `x = 1.5 s q`, `y = sqrt3 s (r + q/2)`; pointy `x = sqrt3 s (q + r/2)`, `y = 1.5 s r`.
+ *
+ * The one enumerator shared by the live lattice (latticeRenderer) and the level
+ * materialiser, so the two can never disagree on which cells a rect holds.
+ */
+export function forEachCellInWorldRect(
+  orientation: 'flat' | 'pointy',
+  cellSize: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  fn: (q: number, r: number, worldX: number, worldY: number) => void,
+): void {
+  const s = cellSize;
+  if (orientation === 'pointy') {
+    // rows advance in y (1.5 s), columns in x (sqrt3 s) with the r/2 shear
+    const rA = Math.floor(y0 / (1.5 * s)) - 1;
+    const rB = Math.ceil(y1 / (1.5 * s)) + 1;
+    for (let r = rA; r <= rB; r++) {
+      const qA = Math.floor(x0 / (SQRT3 * s) - r / 2) - 1;
+      const qB = Math.ceil(x1 / (SQRT3 * s) - r / 2) + 1;
+      for (let q = qA; q <= qB; q++) {
+        fn(q, r, SQRT3 * s * (q + r / 2), 1.5 * s * r);
+      }
+    }
+    return;
+  }
+  const qA = Math.floor(x0 / (1.5 * s)) - 1;
+  const qB = Math.ceil(x1 / (1.5 * s)) + 1;
+  for (let q = qA; q <= qB; q++) {
+    const rA = Math.floor(y0 / (SQRT3 * s) - q / 2) - 1;
+    const rB = Math.ceil(y1 / (SQRT3 * s) - q / 2) + 1;
+    for (let r = rA; r <= rB; r++) {
+      fn(q, r, 1.5 * s * q, SQRT3 * s * (r + q / 2));
+    }
+  }
+}

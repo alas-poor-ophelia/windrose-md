@@ -43,6 +43,7 @@ import { setLevelCells } from '../../../../src/persistence/layerAccessor';
 import { MAX_CELLS_PER_DEPTH_OP } from '../../../../src/persistence/depthAuthoring';
 import { usePaintTool } from '../../../../src/hooks/drawing/usePaintTool';
 import { useShapeTools } from '../../../../src/hooks/drawing/useShapeTools';
+import { resetDepthRefusalNotices } from '../../../../src/drawing/depthCellOps';
 
 const LOD = { m: 4, minCellPx: 64, maxLevel: 3 };
 const LEVEL = 2;
@@ -93,6 +94,7 @@ describe('depth refusal at the call sites', () => {
   beforeEach(() => {
     runtime.refs = [];
     notices.messages.length = 0;
+    resetDepthRefusalNotices();
     getSettings.mockReset();
     getSettings.mockReturnValue({ lodLadder: true });
   });

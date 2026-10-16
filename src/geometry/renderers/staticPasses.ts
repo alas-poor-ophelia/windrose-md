@@ -16,7 +16,8 @@
  * lattice is stroked after the blit), the cells pass draws the active rung's
  * materialised layer at level >= 1, tiles draw per home rung with the
  * crossing clip, adjacent sub-hex previews are skipped, and objects/labels
- * are drawn live after the blit (mapRenderer.ts) instead of baked here.
+ * are drawn live after the blit and the lattice (ladderElementPass.ts) instead
+ * of baked here, so they stay above the live lattice.
  */
 
 import type { MapData, MapLayer, Board } from '#types/core/map.types';
@@ -117,7 +118,8 @@ function makeRenderFrame(
 
 /**
  * Object renderer dependencies, shared by the baked pass (classic maps) and the
- * live element pass (ladder maps, mapRenderer.ts).
+ * live element pass (ladder maps, ladderElementPass.ts, which swaps in the
+ * indexed cell lookup).
  */
 function objectRenderDeps(mapData: MapData): Parameters<typeof renderObjects>[5] {
   const mapType = mapData.mapType ?? 'grid';

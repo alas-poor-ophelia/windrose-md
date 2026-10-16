@@ -71,6 +71,14 @@ class HexGeometry extends BaseGeometry {
   height: number;
   horizSpacing: number;
   vertSpacing: number;
+  /**
+   * When true, `drawCells` builds its fill path as one SVG string parsed by a single
+   * `new Path2D(d)` (`drawCellsBatched`) instead of per-vertex moveTo/lineTo bindings
+   * (about 3 us per call, H-1485). Off by default, so every classic map keeps issuing the
+   * exact context calls it always has; only the ladder's depth bake turns it on, for the
+   * rung geometries it draws materialised layers with (`materialiseLevelLayer`).
+   */
+  batchedFills = false;
 
   /**
    * @param hexSize - Radius from hex center to vertex in pixels
@@ -566,6 +574,10 @@ class HexGeometry extends BaseGeometry {
     zoom: number,
     color: string
   ): void {
+    if (this.batchedFills) {
+      this.drawCellsBatched(ctx, cells, offsetX, offsetY, zoom, color);
+      return;
+    }
     // Accumulate every hexagon into one Path2D and fill once, instead of a
     // beginPath/fill per cell — one GPU draw call per color group.
     const path = new Path2D();
@@ -583,6 +595,36 @@ class HexGeometry extends BaseGeometry {
     }
     ctx.fillStyle = color;
     ctx.fill(path);
+  }
+
+  /**
+   * `drawCells` for large batches: the same hexagons, assembled as ONE SVG path string and
+   * parsed natively by a single `new Path2D(d)`. A depth bake fills thousands of rung cells
+   * per colour group; through moveTo/lineTo that is about 7 binding calls per hex (MEM-12).
+   * Screen coordinates carry 3 decimals (1/1000 px), well under any visible difference.
+   */
+  drawCellsBatched(
+    ctx: CanvasRenderingContext2D,
+    cells: Point[],
+    offsetX: number,
+    offsetY: number,
+    zoom: number,
+    color: string
+  ): void {
+    const corners = this.getHexVertices(0, 0);
+    const parts: string[] = [];
+    for (const cell of cells) {
+      const { worldX, worldY } = this.hexToWorld(cell.x, cell.y);
+      let d = '';
+      for (let i = 0; i < corners.length; i++) {
+        const sx = offsetX + (worldX + corners[i].worldX) * zoom;
+        const sy = offsetY + (worldY + corners[i].worldY) * zoom;
+        d += `${i === 0 ? 'M' : 'L'}${sx.toFixed(3)} ${sy.toFixed(3)}`;
+      }
+      parts.push(d + 'Z');
+    }
+    ctx.fillStyle = color;
+    ctx.fill(new Path2D(parts.join('')));
   }
   
   /**

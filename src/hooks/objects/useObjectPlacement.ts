@@ -9,13 +9,12 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { MapObject, ObjectAlignment } from '#types/objects/object.types';
 
 import { useCallback } from 'preact/hooks';
-import { Notice } from 'obsidian';
 import { useMapState } from '../../context/MapContext';
 import { useMapOperations } from '../../context/MapContext';
 import { calculateEdgeAlignment, placeObject, placeObjectFreeform, canPlaceObjectAt } from '../../objects/objectOperations';
 import { getActiveLayer, authoredCells } from '../../persistence/layerAccessor';
 import { guardDepthWrite, elementBytes } from '../../persistence/depthAuthoring';
-import { depthRefusalMessage } from '../../drawing/depthCellOps';
+import { showDepthRefusal } from '../../drawing/depthCellOps';
 
 
 
@@ -60,13 +59,13 @@ function useObjectPlacement(
     let cellY = gridY;
     if (level > 0) {
       if (ladder === null) {
-        new Notice(depthRefusalMessage('not-a-ladder'));
+        showDepthRefusal('not-a-ladder');
         return true;
       }
       const activeLayer = getActiveLayer(mapData);
       const refusal = guardDepthWrite(mapData, activeLayer.id, level, authoredCells(activeLayer, level));
       if (refusal !== null) {
-        new Notice(depthRefusalMessage(refusal));
+        showDepthRefusal(refusal);
         return true;
       }
       const cell = screenToLevelCell(clientX, clientY, level);
@@ -88,7 +87,7 @@ function useObjectPlacement(
         const added = objects.filter((o) => !before.has(o));
         const refusal = guardDepthWrite(mapData, activeLayer.id, level, authoredCells(activeLayer, level), { addedBytes: elementBytes(added) });
         if (refusal !== null) {
-          new Notice(depthRefusalMessage(refusal));
+          showDepthRefusal(refusal);
           return;
         }
       }

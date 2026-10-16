@@ -18,10 +18,11 @@
  */
 
 import type { VNode } from 'preact';
+import { useState } from 'preact/hooks';
 
 import { useModalShell, useHexGrid } from '../../../context/MapSettingsContext';
 import { SettingItem } from '../SettingItem';
-import { NativeToggle } from '../NativeControls';
+import { NativeToggle, NativeDropdown } from '../NativeControls';
 import { DEFAULTS } from '../../../core/dmtConstants';
 import { deepestAuthoredRung, hasDepthContent, hasSubHexChildren, ladderOpensAt } from '../../../core/lodFlags';
 import { LADDER_DEFAULTS, LADDER_M_ALLOWLIST, MAX_LADDER_LEVEL } from '../../../geometry/core/lattice';
@@ -33,6 +34,9 @@ const MAX_LEVEL_CEILING = MAX_LADDER_LEVEL;
 function LadderSection(): VNode | null {
   const { mapData } = useModalShell();
   const { lod, setLadderConfig, ladderEnabled, setLadderEnabled } = useHexGrid();
+
+  // Why the last typed value changed on commit (the field is rewritten to the held value).
+  const [clampHint, setClampHint] = useState<string | null>(null);
 
   if (mapData === null || mapData.mapType !== 'hex') return null;
 
@@ -47,16 +51,6 @@ function LadderSection(): VNode | null {
   const openZoom = mapData.viewState?.zoom ?? DEFAULTS.initialZoom;
   const opensAt = ladderOpensAt(mapData.hexSize ?? DEFAULTS.hexSize, effective, openZoom);
 
-  const controlStyle = (disabled: boolean): Record<string, string> => ({
-    width: '70px',
-    padding: '4px 8px',
-    borderRadius: '4px',
-    border: '1px solid var(--background-modifier-border)',
-    background: disabled ? 'var(--background-secondary)' : 'var(--background-primary)',
-    color: disabled ? 'var(--text-muted)' : 'var(--text-normal)',
-    fontSize: '13px'
-  });
-
   // Both handlers run on the native change event (bare Preact: onChange is
   // NOT per-keystroke), so typing is free and the clamp applies on commit.
   // The clamped value is written back into the field: an entry under the
@@ -69,6 +63,7 @@ function LadderSection(): VNode | null {
     }
     const next = Math.max(MIN_CELL_PX_FLOOR, n);
     input.value = String(next);
+    setClampHint(next !== n ? `Minimum cell size cannot go below ${MIN_CELL_PX_FLOOR} pixels, so ${n} was raised to ${next}.` : null);
     setLadderConfig({ minCellPx: next });
   };
 
@@ -80,12 +75,15 @@ function LadderSection(): VNode | null {
     }
     const next = Math.min(MAX_LEVEL_CEILING, Math.max(minMaxLevel, n));
     input.value = String(next);
+    if (next === n) setClampHint(null);
+    else if (n < minMaxLevel) setClampHint(`Deepest level cannot go below ${minMaxLevel}, which holds content. Remove that content to lower it.`);
+    else setClampHint(`Deepest level cannot go above ${MAX_LEVEL_CEILING}.`);
     setLadderConfig({ maxLevel: next });
   };
 
   const toggleReason = sectionDisabled
-    ? ' (this map has sub-maps)'
-    : depth ? ' (this map holds depth content)' : '';
+    ? ' (unavailable while this map has sub-maps)'
+    : depth ? ' (locked on while this map holds depth content; remove that content to turn it off)' : '';
   const opensAtText = ladderEnabled ? `. Opens at L${opensAt}` : '';
 
   return (
@@ -105,33 +103,29 @@ function LadderSection(): VNode | null {
         <>
           <SettingItem
             name="Subdivision"
-            description={`Child hexes per parent edge on each deeper level${mLocked && !sectionDisabled ? ' (fixed once the map has depth content)' : ''}`}
+            description={`Child hexes per parent edge on each deeper level${mLocked && !sectionDisabled ? ' (fixed while the map has depth content; remove that content to change it)' : ''}`}
           >
-            <select
+            <NativeDropdown
               value={String(effective.m)}
-              onChange={(e: Event) => setLadderConfig({ m: Number((e.target as HTMLSelectElement).value) })}
+              options={LADDER_M_ALLOWLIST.map((m: number) => ({ value: String(m), label: String(m) }))}
+              onChange={(v: string) => setLadderConfig({ m: Number(v) })}
               disabled={mLocked}
-              style={controlStyle(mLocked)}
-            >
-              {LADDER_M_ALLOWLIST.map((m: number) => (
-                <option key={m} value={String(m)}>{m}</option>
-              ))}
-            </select>
+            />
           </SettingItem>
 
           <SettingItem
             name="Minimum cell size"
-            description="On-screen width in pixels at which the map steps down a level"
+            description={`On-screen width in pixels at which the map steps down a level (at least ${MIN_CELL_PX_FLOOR})`}
           >
             <input
               type="number"
+              className="windrose-ladder-number"
               min={String(MIN_CELL_PX_FLOOR)}
               step="1"
               value={lod !== null ? String(lod.minCellPx) : ''}
               placeholder={String(LADDER_DEFAULTS.minCellPx)}
               onChange={(e: Event) => handleMinCellPx(e.target as HTMLInputElement)}
               disabled={sectionDisabled}
-              style={controlStyle(sectionDisabled)}
             />
           </SettingItem>
 
@@ -141,6 +135,7 @@ function LadderSection(): VNode | null {
           >
             <input
               type="number"
+              className="windrose-ladder-number"
               min={String(minMaxLevel)}
               max={String(MAX_LEVEL_CEILING)}
               step="1"
@@ -148,9 +143,12 @@ function LadderSection(): VNode | null {
               placeholder={String(LADDER_DEFAULTS.maxLevel)}
               onChange={(e: Event) => handleMaxLevel(e.target as HTMLInputElement)}
               disabled={sectionDisabled}
-              style={controlStyle(sectionDisabled)}
             />
           </SettingItem>
+          {clampHint !== null && <div className="windrose-ladder-hint" role="status">{clampHint}</div>}
+          {sectionDisabled && (
+            <div className="windrose-ladder-hint">These settings are locked while this map has sub-maps.</div>
+          )}
         </>
       )}
     </div>

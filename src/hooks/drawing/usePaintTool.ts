@@ -27,10 +27,9 @@ import { setCell as accessorSetCell, removeCell as accessorRemoveCell, getCellIn
 import { removeEdge, getEdgeAt } from '../../drawing/edgeOperations';
 import { eraseObjectAt } from '../../objects/objectOperations';
 import { eraseCellFromCurves, eraseWorldPolygonFromCurves } from '../../geometry/curves/curveBoolean';
-import { Notice } from 'obsidian';
 import { getActiveLayer, getActiveBoardLayers, authoredCells } from '../../persistence/layerAccessor';
 import { guardDepthWrite, depthBudgetBytesOf, type DepthWriteContext, type DepthWriteRefusal } from '../../persistence/depthAuthoring';
-import { withCellPainted, withCellErased, depthRefusalMessage } from '../../drawing/depthCellOps';
+import { withCellPainted, withCellErased, showDepthRefusal, drawnObjectAt } from '../../drawing/depthCellOps';
 import { findTileHitInLayers } from '../../assets/tileFootprint';
 import { distanceToWallPath } from '../../drawing/wallPathOperations';
 import { distancePointToPolyline } from '../../geometry/strokes/terrainStrokeGeometry';
@@ -219,7 +218,7 @@ function usePaintTool({
       : {};
     const refuse = (reason: DepthWriteRefusal): void => {
       strokeRefusedRef.current = true;
-      new Notice(depthRefusalMessage(reason));
+      showDepthRefusal(reason);
     };
     const refusal = guardDepthWrite(mapData, layer.id, level, next, context);
     if (refusal !== null) {
@@ -303,13 +302,22 @@ function usePaintTool({
       const coordX = coords.x;
       const coordY = coords.y;
       // This is the level-0 erase (deep strokes go through toggleDeepCell and
-      // touch cells only): an index match on another rung is a different place.
-      const obj = getObjectAtPosition(activeLayer.objects, coordX, coordY, 0);
+      // touch cells only). On a ladder map it removes the object DRAWN under
+      // the pointer, whatever its home rung (INT-08: a home-1 object shows at
+      // level 0); classic maps keep the index match on rung 0.
+      const mapType = mapData.mapType ?? 'grid';
+      const drawnObj = ladder !== null && worldCoords
+        ? drawnObjectAt(activeLayer.objects ?? [], ladder, mapData, worldCoords.worldX, worldCoords.worldY)
+        : null;
+      const obj = ladder !== null ? drawnObj : getObjectAtPosition(activeLayer.objects, coordX, coordY, 0);
       if (obj != null) {
-        const mapType = mapData.mapType ?? 'grid';
-        const result = eraseObjectAt(activeLayer.objects, coordX, coordY, mapType, 0);
-        if (result.success) {
-          onObjectsChange(result.objects);
+        if (ladder !== null) {
+          onObjectsChange((activeLayer.objects ?? []).filter(o => o.id !== obj.id));
+        } else {
+          const result = eraseObjectAt(activeLayer.objects, coordX, coordY, mapType, 0);
+          if (result.success) {
+            onObjectsChange(result.objects);
+          }
         }
       } else {
         // Erase tile at cell coords. In strata mode every depth band is its own
@@ -453,7 +461,7 @@ function usePaintTool({
     if (level > 0) {
       const refusal = guardDepthWrite(mapData, activeLayer.id, level, authoredCells(activeLayer, level));
       if (refusal !== null) {
-        new Notice(depthRefusalMessage(refusal));
+        showDepthRefusal(refusal);
         return;
       }
     }

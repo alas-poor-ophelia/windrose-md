@@ -291,6 +291,47 @@ describe("materialiseLevelLayer", () => {
   });
 
   describe("memo", () => {
+    it("a contained rect hits the memo", () => {
+      const fixture = makeFixture("memo-contain", new HexGeometry(HEX_SIZE, "flat", { maxCol: 6, maxRow: 5 }));
+      const wide = rectAroundRootCell(fixture, fixture.anchor.q, fixture.anchor.r);
+      const first = materialiseLevelLayer(fixture.layer, fixture.ladder, 1, wide, 1);
+      expect(first.stats.missReason).toBe("no-entry");
+
+      // A rect strictly inside the first (a zoom-in, or a smaller settle bake) is served
+      // from it: same layer object, nothing enumerated.
+      const inner: WorldRect = { x0: wide.x0 + 20, y0: wide.y0 + 15, x1: wide.x1 - 25, y1: wide.y1 - 10 };
+      const hit = materialiseLevelLayer(fixture.layer, fixture.ladder, 1, inner, 1);
+      expect(hit.stats.missReason).toBe("hit");
+      expect(hit.layer).toBe(first.layer);
+      expect(hit.stats.enumerated).toBe(0);
+
+      // A rect reaching past the cached one misses, and the larger result then covers both.
+      const shifted: WorldRect = { x0: wide.x0 + 60, y0: wide.y0, x1: wide.x1 + 60, y1: wide.y1 };
+      const miss = materialiseLevelLayer(fixture.layer, fixture.ladder, 1, shifted, 1);
+      expect(miss.stats.missReason).toBe("key-changed");
+      expect(materialiseLevelLayer(fixture.layer, fixture.ladder, 1, shifted, 1).layer).toBe(miss.layer);
+
+      // Containment never crosses a key: another level or epoch over the inner rect misses.
+      expect(materialiseLevelLayer(fixture.layer, fixture.ladder, 2, inner, 1).stats.missReason).toBe("key-changed");
+      expect(materialiseLevelLayer(fixture.layer, fixture.ladder, 1, inner, 2).stats.missReason).toBe("key-changed");
+    });
+
+    it("a contained hit draws the same fills as a fresh materialisation inside the request", () => {
+      const fixture = makeFixture("memo-contain-fills", new HexGeometry(HEX_SIZE, "pointy", { maxCol: 6, maxRow: 5 }));
+      const wide = rectAroundRootCell(fixture, fixture.anchor.q, fixture.anchor.r);
+      const inner: WorldRect = { x0: wide.x0 + 30, y0: wide.y0 + 30, x1: wide.x1 - 30, y1: wide.y1 - 30 };
+      // Fresh answer for the inner rect, computed against a ladder with an empty memo.
+      const freshLadder = createGeometryLadder(new HexGeometry(HEX_SIZE, "pointy", { maxCol: 6, maxRow: 5 }));
+      const fresh = materialiseLevelLayer(fixture.layer, freshLadder, 1, inner, 1).layer;
+      materialiseLevelLayer(fixture.layer, fixture.ladder, 1, wide, 1);
+      const served = materialiseLevelLayer(fixture.layer, fixture.ladder, 1, inner, 1);
+      expect(served.stats.missReason).toBe("hit");
+      const servedKeys = new Map(asHexCells(served.layer.cells).map((c) => [cellKey(c.q, c.r), c.color]));
+      for (const cell of asHexCells(fresh.cells)) {
+        expect(servedKeys.get(cellKey(cell.q, cell.r))).toBe(cell.color);
+      }
+    });
+
     it("returns the same layer object for identical inputs and reports why it missed", () => {
       const fixture = makeFixture("memo", new HexGeometry(HEX_SIZE, "flat", { maxCol: 6, maxRow: 5 }));
       const rect = rectAroundRootCell(fixture, fixture.anchor.q, fixture.anchor.r);

@@ -30,7 +30,7 @@
  * level-0 pass and must never be drawn twice.
  */
 import { hasSegments, isHexCell } from '#types/core/cell.types';
-import { cellKey } from './lattice';
+import { cellKey, forEachCellInWorldRect } from './lattice';
 import { authoredCells } from '../../persistence/layerAccessor';
 
 import type { Cell, HexCell } from '#types/core/cell.types';
@@ -78,6 +78,13 @@ function estimateCellsInRect(cellSize: number, x0: number, y0: number, x1: numbe
 }
 
 interface MemoEntry {
+  /** level | epoch | rung ids: everything but the rect. */
+  key: string;
+  /** The dilated world rect this entry enumerated; any request inside it is served from it. */
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
   layer: MapLayer;
   cells: number;
 }
@@ -98,14 +105,15 @@ const MEMO_LIMIT = 4;
  * The synthetic layer may therefore be read ONLY for `cells` (the materialised
  * fills) and the deliberately emptied arrays (`edges`, `curves`, `objects`,
  * `textLabels`, `tiles`, `wallPaths`, `terrainStrokes`, `fogOfWar: null`).
- * Today its sole consumer is `renderLayerCellsAndEdges` in useCanvasRenderer,
- * which reads `cells` and `edges` and nothing else. A renderer that needs any
+ * Today its sole consumer is the cells pass of `renderLayerComposite` in
+ * renderers/staticPasses.ts, which hands it to `renderLayerCellsAndEdges`;
+ * that reads `cells` and `edges` and nothing else. A renderer that needs any
  * other layer field (opacity, visibility, fog, rungs, ...) must read it from the
  * real layer, never from this result. Keying on layer identity instead would
  * defeat the memo: the layer is re-spread on cosmetic changes that leave
  * `cells` untouched, so every such frame would re-materialise.
  */
-const memo =new WeakMap<GeometryLadder, WeakMap<Cell[], Map<string, MemoEntry>>>();
+const memo = new WeakMap<GeometryLadder, WeakMap<Cell[], MemoEntry[]>>();
 
 const SQRT3 = Math.sqrt(3);
 
@@ -135,49 +143,6 @@ function rungKeyTerm(rungs: Cell[][]): string {
 }
 
 /**
- * Every cell centre of a hex lattice of size `cellSize` in the band covering
- * the world rect, plus a little slop. Centres outside the rect are the caller's
- * to reject. The axial-to-world math is `HexGeometry.hexToWorld` at `cellSize`:
- * flat `x = 1.5 s q`, `y = sqrt3 s (r + q/2)`; pointy `x = sqrt3 s (q + r/2)`,
- * `y = 1.5 s r`.
- *
- * Private to this module on purpose — the public enumerator lives in the
- * lattice renderer; the two are deduped by the integrator, not here.
- */
-function forEachCellInWorldRect(
-  orientation: 'flat' | 'pointy',
-  cellSize: number,
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-  fn: (q: number, r: number, worldX: number, worldY: number) => void
-): void {
-  const s = cellSize;
-  if (orientation === 'pointy') {
-    const rA = Math.floor(y0 / (1.5 * s)) - 1;
-    const rB = Math.ceil(y1 / (1.5 * s)) + 1;
-    for (let r = rA; r <= rB; r++) {
-      const qA = Math.floor(x0 / (SQRT3 * s) - r / 2) - 1;
-      const qB = Math.ceil(x1 / (SQRT3 * s) - r / 2) + 1;
-      for (let q = qA; q <= qB; q++) {
-        fn(q, r, SQRT3 * s * (q + r / 2), 1.5 * s * r);
-      }
-    }
-    return;
-  }
-  const qA = Math.floor(x0 / (1.5 * s)) - 1;
-  const qB = Math.ceil(x1 / (1.5 * s)) + 1;
-  for (let q = qA; q <= qB; q++) {
-    const rA = Math.floor(y0 / (SQRT3 * s) - q / 2) - 1;
-    const rB = Math.ceil(y1 / (SQRT3 * s) - q / 2) + 1;
-    for (let r = rA; r <= rB; r++) {
-      fn(q, r, 1.5 * s * q, SQRT3 * s * (r + q / 2));
-    }
-  }
-}
-
-/**
  * Level-0 plain fills, keyed `"q,r"` (the `lattice.cellKey` / `buildCellLookup`
  * format). Only hex cells with a plain fill colour are inheritable: segment
  * (half-filled) cells and colourless cells are deliberately absent, so a fine
@@ -195,12 +160,36 @@ function buildRootFillLookup(cells: Cell[]): Map<string, string> {
   return fills;
 }
 
-function roundForKey(value: number): number {
-  return Math.round(value * 1000) / 1000;
+function memoKey(level: number, epoch: number): string {
+  return `${level}|${epoch}`;
 }
 
-function memoKey(level: number, epoch: number, x0: number, y0: number, x1: number, y1: number): string {
-  return `${level}|${epoch}|${roundForKey(x0)},${roundForKey(y0)},${roundForKey(x1)},${roundForKey(y1)}`;
+/** Slack on the containment test, in world px: float noise between two bakes of the same view. */
+const RECT_SLACK = 1e-3;
+
+/**
+ * The entry that can answer this request: same key, and a dilated rect that CONTAINS the
+ * requested one (MEM-12). A held layer that covers more than asked is still correct: its
+ * extra cells lie outside the target and are culled at draw, and every cell inside the
+ * request was resolved exactly as a fresh materialisation would resolve it. Containment is
+ * what lets a zoom-in within a rung, or a settle bake inside an earlier larger one, hit.
+ */
+function findContaining(
+  entries: MemoEntry[] | undefined,
+  key: string,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number
+): MemoEntry | undefined {
+  if (entries === undefined) return undefined;
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i];
+    if (e.key === key
+      && x0 >= e.x0 - RECT_SLACK && y0 >= e.y0 - RECT_SLACK
+      && x1 <= e.x1 + RECT_SLACK && y1 <= e.y1 + RECT_SLACK) return e;
+  }
+  return undefined;
 }
 
 /**
@@ -220,6 +209,12 @@ function materialiseLevelLayer(
     throw new RangeError(`materialiseLevelLayer needs an integer level >= 1, got ${level}; level 0 is the real layer`);
   }
 
+  // The depth bake draws this layer with exactly `ladder.geometryForLevel(level)`, and it
+  // fills every existing rung cell in the padded offscreen: opt that rung geometry into
+  // string-built fills (MEM-12). Root geometry (level 0) is never touched, so classic
+  // maps keep their exact context calls.
+  ladder.geometryForLevel(level).batchedFills = true;
+
   // Dilate by one whole cell: the corner-to-corner extent is 2 * cellSize, and a
   // neighbour centre is only sqrt3 * cellSize away, so 2 * cellSize on every side
   // is guaranteed to include the complete neighbour ring of any cell inside rect.
@@ -233,15 +228,15 @@ function materialiseLevelLayer(
   // rungs[k - 1] is rung k, for k = 1..level. Deeper rungs are never read (D4).
   const rungs: Cell[][] = [];
   for (let k = 1; k <= level; k++) rungs.push(authoredCells(layer, k));
-  const key = memoKey(level, epoch, x0, y0, x1, y1) + rungKeyTerm(rungs);
+  const key = memoKey(level, epoch) + rungKeyTerm(rungs);
   const byCells = memo.get(ladder);
   const entries = byCells === undefined ? undefined : byCells.get(layer.cells);
-  const cached = entries === undefined ? undefined : entries.get(key);
+  const cached = findContaining(entries, key, x0, y0, x1, y1);
   if (cached !== undefined) {
     return { layer: cached.layer, stats: { cells: cached.cells, enumerated: 0, missReason: 'hit' } };
   }
   const missReason: MaterialiseStats['missReason'] =
-    entries === undefined || entries.size === 0 ? 'no-entry' : 'key-changed';
+    entries === undefined || entries.length === 0 ? 'no-entry' : 'key-changed';
 
   if (estimateCellsInRect(cellSize, x0, y0, x1, y1) > MATERIALISE_CELL_CAP) {
     const { cells: _dropped, ...rest } = layer;
@@ -308,15 +303,14 @@ function materialiseLevelLayer(
     fogOfWar: null
   };
 
-  const bucket = entries ?? new Map<string, MemoEntry>();
-  bucket.set(key, { layer: result, cells: synthetic.length });
-  while (bucket.size > MEMO_LIMIT) {
-    const oldest = bucket.keys().next();
-    if (oldest.done === true) break;
-    bucket.delete(oldest.value);
-  }
-  const ladderBucket = byCells ?? new WeakMap<Cell[], Map<string, MemoEntry>>();
-  ladderBucket.set(layer.cells, bucket);
+  const bucket = entries ?? [];
+  // An entry this one now covers (same key, rect inside the new one) can never be
+  // the better answer again: drop it so the four slots hold distinct coverage.
+  const kept = bucket.filter(e => !(e.key === key && e.x0 >= x0 && e.y0 >= y0 && e.x1 <= x1 && e.y1 <= y1));
+  kept.push({ key, x0, y0, x1, y1, layer: result, cells: synthetic.length });
+  while (kept.length > MEMO_LIMIT) kept.shift();
+  const ladderBucket = byCells ?? new WeakMap<Cell[], MemoEntry[]>();
+  ladderBucket.set(layer.cells, kept);
   memo.set(ladder, ladderBucket);
 
   return { layer: result, stats: { cells: synthetic.length, enumerated, missReason } };

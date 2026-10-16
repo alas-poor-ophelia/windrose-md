@@ -13,6 +13,12 @@
  */
 import type { Cell, HexCell } from '#types/core/cell.types';
 import type { Point } from '#types/core/geometry.types';
+import { Notice } from 'obsidian';
+import type { MapData } from '#types/core/map.types';
+import type { MapObject } from '#types/objects/object.types';
+import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
+import { ladderObjectFootprint, pickLadderObject } from '../objects/ladderHitTest';
+import type { LadderHitView } from '../objects/ladderHitTest';
 import type { DepthWriteRefusal } from '../persistence/depthAuthoring';
 
 /** Anything that can map world px to a cell (every geometry, and a ladder rung). */
@@ -102,19 +108,71 @@ function levelCellAtWorld(
 /** Sentence-case notice text for a refused deep write. */
 function depthRefusalMessage(reason: DepthWriteRefusal): string {
   switch (reason) {
-    case 'over-budget': return 'Deep edit refused: over the map\'s size budget.';
-    case 'too-many-cells': return 'Deep edit refused: too many cells in one operation.';
-    case 'level-out-of-range': return 'Deep edit refused: this zoom level cannot be edited.';
-    case 'quarantined': return 'Deep edit refused: this map\'s detail levels are read-only here.';
-    case 'nested-classic': return 'Deep edit refused: this map has sub-maps, and converting it is not available yet.';
+    case 'over-budget': return 'Cannot edit this level: over the map\'s size budget.';
+    case 'too-many-cells': return 'Cannot edit this level: too many cells in one operation.';
+    case 'level-out-of-range': return 'Cannot edit this level: this zoom level cannot be edited.';
+    case 'quarantined': return 'Cannot edit this level: this map\'s detail levels are read-only here.';
+    case 'nested-classic': return 'Cannot edit this level: this map has sub-maps, and converting it is not available yet.';
     case 'nested-level': return 'Detail levels are not available inside a sub-hex map.';
-    case 'not-a-ladder': return 'Deep edit refused: this map cannot take detail edits.';
-    case 'unknown-layer': return 'Deep edit refused: that layer no longer exists.';
+    case 'not-a-ladder': return 'Cannot edit this level: this map cannot take detail edits.';
+    case 'unknown-layer': return 'Cannot edit this level: that layer no longer exists.';
   }
+}
+
+/** Window in which a repeated refusal for the same reason shows no second Notice. */
+const REFUSAL_DEDUPE_MS = 4000;
+const lastRefusalAt = new Map<DepthWriteRefusal, number>();
+
+/**
+ * Tell the user a deep write was refused, once per reason within a few
+ * seconds: shape and object presses refuse on every pointerdown, and a stack
+ * of identical Notices helps nobody.
+ */
+function showDepthRefusal(reason: DepthWriteRefusal, now: number = Date.now()): void {
+  const last = lastRefusalAt.get(reason);
+  if (last !== undefined && now - last < REFUSAL_DEDUPE_MS) return;
+  lastRefusalAt.set(reason, now);
+  new Notice(depthRefusalMessage(reason));
+}
+
+/** Forget recent refusals (tests, and a map switch). */
+function resetDepthRefusalNotices(): void {
+  lastRefusalAt.clear();
+}
+
+/** The camera the level-0 eraser hit-tests against: what is drawn at the live zoom. */
+function drawnHitView(ladder: GeometryLadder, mapData: MapData): LadderHitView {
+  const zoom = mapData.viewState?.zoom ?? 1;
+  return { ladder, level: ladder.activeLevel(zoom), zoom, orientation: mapData.orientation ?? 'flat' };
+}
+
+/** The object drawn under a world point on a ladder map (INT-08: erase what is drawn). */
+function drawnObjectAt(objects: MapObject[], ladder: GeometryLadder, mapData: MapData, worldX: number, worldY: number): MapObject | null {
+  return pickLadderObject(objects, worldX, worldY, drawnHitView(ladder, mapData));
+}
+
+/**
+ * `objects` without those DRAWN inside a world rectangle (centre of the drawn
+ * footprint). An object that is not drawn at the live zoom stays, whatever its
+ * home rung.
+ */
+function removeDrawnObjectsInRect(
+  objects: MapObject[], ladder: GeometryLadder, mapData: MapData,
+  minWorldX: number, minWorldY: number, maxWorldX: number, maxWorldY: number
+): MapObject[] {
+  const view = drawnHitView(ladder, mapData);
+  return objects.filter((obj) => {
+    const rect = ladderObjectFootprint(obj, objects, view);
+    if (rect === null) return true;
+    const cx = (rect.screenX + rect.objectWidth / 2) / view.zoom;
+    const cy = (rect.screenY + rect.objectHeight / 2) / view.zoom;
+    return !(cx >= minWorldX && cx <= maxWorldX && cy >= minWorldY && cy <= maxWorldY);
+  });
 }
 
 export type { LevelGeometrySource, WorldToGridSource };
 export {
   withCellPainted, withCellErased, withCellsPainted, withCellsErased,
-  levelCellAtWorld, depthRefusalMessage
+  levelCellAtWorld, depthRefusalMessage, showDepthRefusal, resetDepthRefusalNotices,
+  drawnObjectAt, removeDrawnObjectsInRect
 };

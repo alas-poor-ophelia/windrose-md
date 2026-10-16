@@ -179,6 +179,37 @@ function getObjectsInCell(objects: MapObject[], x: number, y: number, homeLevel?
   );
 }
 
+/** Per-cell buckets of one objects array, keyed `home:x,y`, plus the length it was built at. */
+interface ObjectCellIndex { length: number; byCell: Map<string, MapObject[]> }
+
+const objectCellIndexes = new WeakMap<readonly MapObject[], ObjectCellIndex>();
+
+/**
+ * `getObjectsInCell` through a per-cell index of `objects`, built once per
+ * array identity (objects arrays are replaced, never edited, on every write;
+ * the length check also rebuilds after an in-place push). Same members in the
+ * same order as the filter, so slot layouts are identical. The render pass
+ * asks for every drawn object's cell-mates, which made the plain filter O(n^2)
+ * per frame. Without `homeLevel` it falls back to the index-only filter.
+ */
+function getObjectsInCellIndexed(objects: MapObject[], x: number, y: number, homeLevel?: number): MapObject[] {
+  if (objects == null || !Array.isArray(objects)) return [];
+  if (homeLevel === undefined) return getObjectsInCell(objects, x, y);
+  let index = objectCellIndexes.get(objects);
+  if (index === undefined || index.length !== objects.length) {
+    const byCell = new Map<string, MapObject[]>();
+    for (const obj of objects) {
+      if (obj.position == null) continue;
+      const key = homeLevelOf(obj) + ':' + obj.position.x + ',' + obj.position.y;
+      const bucket = byCell.get(key);
+      if (bucket === undefined) byCell.set(key, [obj]); else bucket.push(obj);
+    }
+    index = { length: objects.length, byCell };
+    objectCellIndexes.set(objects, index);
+  }
+  return index.byCell.get(homeLevel + ':' + x + ',' + y) ?? [];
+}
+
 /**
  * Check if a cell can accept another object
  */
@@ -274,4 +305,4 @@ function getClickedObjectInCell(
   return closest;
 }
 
-export { getSlotOffset, assignSlot, getMaxObjectsPerCell, getMultiObjectScale, getObjectsInCell, canAddObjectToCell, getOccupiedSlots, reorganizeAfterRemoval, getClickedObjectInCell, homeLevelOf, classicHitRung };
+export { getSlotOffset, assignSlot, getMaxObjectsPerCell, getMultiObjectScale, getObjectsInCell, getObjectsInCellIndexed, canAddObjectToCell, getOccupiedSlots, reorganizeAfterRemoval, getClickedObjectInCell, homeLevelOf, classicHitRung };

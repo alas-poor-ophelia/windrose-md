@@ -23,7 +23,9 @@
  * still apply either way. Every per-element decision goes through
  * `elementVisibleAt`.
  *
- * Pure functions only: the renderer applies them per frame in its live pass.
+ * Pure functions only: the renderer applies them per frame in its live pass
+ * (ladderElementPass.ts). Party pins are band-exempt: they draw at every level
+ * and never come through here.
  */
 
 import type { GeometryLadder } from '../core/createGeometryLadder';
@@ -34,10 +36,19 @@ type DepthMode = 'pop' | 'persist';
 /** Elements without an explicit mode persist: nothing a reader placed vanishes under them. */
 const DEFAULT_DEPTH_MODE: DepthMode = 'persist';
 
-/** An object smaller than this on screen (rendered width, px) is not drawn. */
+/**
+ * An object smaller than this on screen (rendered width, px) is not drawn. The
+ * ladder hit-test (objects/ladderHitTest.ts) applies the same constant, so an
+ * object under the floor is neither painted nor pickable.
+ */
 const OBJECT_FLOOR_PX = 6;
 
-/** A text label whose on-screen font size (px) is under this is not drawn. */
+/**
+ * A text label whose on-screen font size (px) is under this is not drawn (nor
+ * hit, textLabelOperations.ts). Independent of OBJECT_FLOOR_PX: one measures an
+ * object's rendered width, the other a font size. They share the value 6 only
+ * because both are "too small to read"; tune either alone.
+ */
 const LABEL_FLOOR_PX = 6;
 
 function depthModeOf(element: { depthMode?: DepthMode }): DepthMode {
@@ -66,6 +77,8 @@ interface BandedElement {
 
 type BandKind = 'object' | 'label';
 
+const depthGroupMemo = new WeakMap<readonly BandedElement[], { length: number; groups: readonly DepthGroup<BandedElement>[] }>();
+
 /**
  * Buckets elements by (home rung, depth mode, explicit levels): every member of a group is
  * visible, sized and held identically, so the renderer draws one group per call.
@@ -73,7 +86,13 @@ type BandKind = 'object' | 'label';
  * appearance of each key, so toggling an element's mode can change its stacking
  * against overlapping elements of another group.
  */
-function groupByDepth<T extends BandedElement>(elements: readonly T[]): DepthGroup<T>[] {
+function groupByDepth<T extends BandedElement>(elements: readonly T[]): readonly DepthGroup<T>[] {
+  // Memoised on the array identity: element arrays are replaced on every write,
+  // and one frame groups the same array for the draw pass, the selection chrome
+  // and the hit-test. The length check rebuilds after an in-place push. The
+  // groups are shared between callers: never mutate them.
+  const held = depthGroupMemo.get(elements);
+  if (held !== undefined && held.length === elements.length) return held.groups as readonly DepthGroup<T>[];
   const groups = new Map<string, DepthGroup<T>>();
   for (const element of elements) {
     const home = element.homeLevel ?? 0;
@@ -84,7 +103,9 @@ function groupByDepth<T extends BandedElement>(elements: readonly T[]): DepthGro
     if (group !== undefined) group.members.push(element);
     else groups.set(key, { home, mode, levels, members: [element] });
   }
-  return [...groups.values()];
+  const result = [...groups.values()];
+  depthGroupMemo.set(elements, { length: elements.length, groups: result });
+  return result;
 }
 
 /**
@@ -95,7 +116,7 @@ function elementVisibleAt(element: BandedElement, activeLevel: number, kind: Ban
   if (element.visibleLevels !== undefined) return element.visibleLevels.includes(activeLevel);
   const home = element.homeLevel ?? 0;
   const mode = depthModeOf(element);
-  return kind === 'label' ? labelVisible(home, activeLevel, mode) : objectVisible(home, activeLevel, mode);
+  return kind === 'label' ? labelInBand(home, activeLevel, mode) : objectInBand(home, activeLevel, mode);
 }
 
 /** A depth group's decision: its members share home, mode and level set. */
@@ -116,14 +137,19 @@ function effectiveVisibleLevels(element: BandedElement, maxLevel: number, kind: 
   return out;
 }
 
-/** Objects appear one rung above their home; `pop` hides them past it, `persist` keeps them at every finer rung. */
-function objectVisible(homeLevel: number, activeLevel: number, mode: DepthMode = DEFAULT_DEPTH_MODE): boolean {
+/**
+ * The Auto BAND only, for objects: one rung above home, and `pop` hides them past
+ * it while `persist` keeps them at every finer rung. Not the final draw answer:
+ * the explicit `visibleLevels` set (elementVisibleAt) and the size floor
+ * (OBJECT_FLOOR_PX via objectRenderedPx) still apply.
+ */
+function objectInBand(homeLevel: number, activeLevel: number, mode: DepthMode = DEFAULT_DEPTH_MODE): boolean {
   if (activeLevel < homeLevel - 1) return false;
   return mode === 'persist' || activeLevel <= homeLevel;
 }
 
-/** Text labels appear two rungs above their home; `pop` hides them past it, `persist` keeps them at every finer rung. */
-function labelVisible(homeLevel: number, activeLevel: number, mode: DepthMode = DEFAULT_DEPTH_MODE): boolean {
+/** The Auto band only, for text labels: two rungs above home, otherwise as objectInBand (LABEL_FLOOR_PX applies separately). */
+function labelInBand(homeLevel: number, activeLevel: number, mode: DepthMode = DEFAULT_DEPTH_MODE): boolean {
   if (activeLevel < homeLevel - 2) return false;
   return mode === 'persist' || activeLevel <= homeLevel;
 }
@@ -140,11 +166,6 @@ function withLevelMembership(element: BandedElement, level: number, on: boolean,
   else set.delete(level);
   const next = [...set].sort((a, b) => a - b);
   return next.length === 0 ? undefined : next;
-}
-
-/** Party pins are drawn at every level. */
-function pinVisible(): boolean {
-  return true;
 }
 
 /**
@@ -235,9 +256,8 @@ export {
   withLevelMembership,
   tilesByHomeForRung,
   overrideRungFor,
-  objectVisible,
-  labelVisible,
-  pinVisible,
+  objectInBand,
+  labelInBand,
   elementZoom,
   elementScale,
   objectRenderedPx,

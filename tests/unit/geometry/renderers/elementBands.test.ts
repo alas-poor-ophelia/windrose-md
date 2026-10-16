@@ -21,9 +21,8 @@ import {
   withLevelMembership,
   tilesByHomeForRung,
   overrideRungFor,
-  objectVisible,
-  labelVisible,
-  pinVisible,
+  objectInBand,
+  labelInBand,
   elementZoom,
   elementScale,
   objectRenderedPx,
@@ -43,48 +42,42 @@ describe("depth mode default", () => {
   });
 });
 
-describe("objectVisible", () => {
+describe("objectInBand", () => {
   it("persist (default): one rung above home, then every finer rung", () => {
-    expect(objectVisible(0, 0)).toBe(true);
-    expect(objectVisible(0, 1)).toBe(true);
-    expect(objectVisible(0, 2)).toBe(true);
-    expect(objectVisible(0, 3)).toBe(true);
-    expect(objectVisible(0, 9)).toBe(true);
-    expect(objectVisible(2, 0)).toBe(false);
-    expect(objectVisible(2, 1)).toBe(true);
-    expect(objectVisible(2, 5, "persist")).toBe(true);
+    expect(objectInBand(0, 0)).toBe(true);
+    expect(objectInBand(0, 1)).toBe(true);
+    expect(objectInBand(0, 2)).toBe(true);
+    expect(objectInBand(0, 3)).toBe(true);
+    expect(objectInBand(0, 9)).toBe(true);
+    expect(objectInBand(2, 0)).toBe(false);
+    expect(objectInBand(2, 1)).toBe(true);
+    expect(objectInBand(2, 5, "persist")).toBe(true);
   });
 
   it("pop: one rung above home through home, hidden at the first finer rung", () => {
-    expect(objectVisible(0, 0, "pop")).toBe(true);
-    expect(objectVisible(0, 1, "pop")).toBe(false);
-    expect(objectVisible(2, 0, "pop")).toBe(false);
-    expect(objectVisible(2, 1, "pop")).toBe(true);
-    expect(objectVisible(2, 2, "pop")).toBe(true);
-    expect(objectVisible(2, 3, "pop")).toBe(false);
+    expect(objectInBand(0, 0, "pop")).toBe(true);
+    expect(objectInBand(0, 1, "pop")).toBe(false);
+    expect(objectInBand(2, 0, "pop")).toBe(false);
+    expect(objectInBand(2, 1, "pop")).toBe(true);
+    expect(objectInBand(2, 2, "pop")).toBe(true);
+    expect(objectInBand(2, 3, "pop")).toBe(false);
   });
 });
 
-describe("labelVisible", () => {
+describe("labelInBand", () => {
   it("persist (default): two rungs above home, then every finer rung", () => {
-    for (let level = 0; level <= 10; level++) expect(labelVisible(0, level)).toBe(true);
-    expect(labelVisible(3, 0)).toBe(false);
-    expect(labelVisible(3, 1)).toBe(true);
-    expect(labelVisible(3, 9)).toBe(true);
+    for (let level = 0; level <= 10; level++) expect(labelInBand(0, level)).toBe(true);
+    expect(labelInBand(3, 0)).toBe(false);
+    expect(labelInBand(3, 1)).toBe(true);
+    expect(labelInBand(3, 9)).toBe(true);
   });
 
   it("pop: two rungs above home through home, hidden at the first finer rung", () => {
-    expect(labelVisible(3, 0, "pop")).toBe(false);
-    expect(labelVisible(3, 1, "pop")).toBe(true);
-    expect(labelVisible(3, 3, "pop")).toBe(true);
-    expect(labelVisible(3, 4, "pop")).toBe(false);
-    expect(labelVisible(0, 1, "pop")).toBe(false);
-  });
-});
-
-describe("pinVisible", () => {
-  it("is always true", () => {
-    expect(pinVisible()).toBe(true);
+    expect(labelInBand(3, 0, "pop")).toBe(false);
+    expect(labelInBand(3, 1, "pop")).toBe(true);
+    expect(labelInBand(3, 3, "pop")).toBe(true);
+    expect(labelInBand(3, 4, "pop")).toBe(false);
+    expect(labelInBand(0, 1, "pop")).toBe(false);
   });
 });
 
@@ -135,6 +128,17 @@ describe("depth hold (elementZoom / elementScale)", () => {
 });
 
 describe("groupByDepth", () => {
+  it("memoises on the array identity and regroups a new or grown array", () => {
+    const elements: Array<{ id: string; homeLevel?: number }> = [{ id: "a" }, { id: "b", homeLevel: 2 }];
+    const first = groupByDepth(elements);
+    expect(groupByDepth(elements)).toBe(first);
+    expect(groupByDepth([...elements])).not.toBe(first);
+    elements.push({ id: "c", homeLevel: 2 });
+    const grown = groupByDepth(elements);
+    expect(grown).not.toBe(first);
+    expect(grown.map((g) => g.members.map((m) => m.id))).toEqual([["a"], ["b", "c"]]);
+  });
+
   it("buckets by (home, mode) and keeps insertion order", () => {
     type Placed = { id: string; homeLevel?: number; depthMode?: DepthMode };
     const a: Placed = { id: "a" };
@@ -221,12 +225,12 @@ describe("floors and sizing", () => {
 });
 
 describe("explicit visibleLevels (kgc.31)", () => {
-  it("absent = the Auto band, exactly as objectVisible / labelVisible", () => {
+  it("absent = the Auto band, exactly as objectInBand / labelInBand", () => {
     for (const home of [0, 1, 2, 3]) {
       for (const mode of ["pop", "persist"] as DepthMode[]) {
         for (let active = 0; active <= 3; active++) {
-          expect(elementVisibleAt({ homeLevel: home, depthMode: mode }, active, "object")).toBe(objectVisible(home, active, mode));
-          expect(elementVisibleAt({ homeLevel: home, depthMode: mode }, active, "label")).toBe(labelVisible(home, active, mode));
+          expect(elementVisibleAt({ homeLevel: home, depthMode: mode }, active, "object")).toBe(objectInBand(home, active, mode));
+          expect(elementVisibleAt({ homeLevel: home, depthMode: mode }, active, "label")).toBe(labelInBand(home, active, mode));
         }
       }
     }

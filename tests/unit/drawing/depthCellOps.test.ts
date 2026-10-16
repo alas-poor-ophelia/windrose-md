@@ -2,13 +2,20 @@
  * depthCellOps: next rung content after paint / erase at depth, the per-level
  * hit-test, and erase-at-depth isolation (design section 19 item 4).
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const notices = vi.hoisted(() => ({ messages: [] as string[] }));
+vi.mock("obsidian", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("obsidian")>();
+  return { ...actual, Notice: class { constructor(message: string) { notices.messages.push(message); } } };
+});
 
 import type { Cell, HexCell } from "../../../types/core/cell.types";
 import type { MapLayer } from "../../../types/core/map.types";
 import {
   withCellPainted, withCellErased, withCellsPainted, withCellsErased,
-  levelCellAtWorld, depthRefusalMessage
+  levelCellAtWorld, depthRefusalMessage, showDepthRefusal, resetDepthRefusalNotices,
+  drawnObjectAt, removeDrawnObjectsInRect
 } from "../../../src/drawing/depthCellOps";
 import { createGeometryLadder } from "../../../src/geometry/core/createGeometryLadder";
 import { HexGeometry } from "../../../src/geometry/core/HexGeometry";
@@ -110,8 +117,47 @@ describe("levelCellAtWorld", () => {
 
 describe("depthRefusalMessage", () => {
   it("names the budget refusal in sentence case", () => {
-    expect(depthRefusalMessage("over-budget")).toBe("Deep edit refused: over the map's size budget.");
-    expect(depthRefusalMessage("too-many-cells")).toMatch(/^Deep edit refused: /);
-    expect(depthRefusalMessage("unknown-layer")).toMatch(/^Deep edit refused: /);
+    expect(depthRefusalMessage("over-budget")).toBe("Cannot edit this level: over the map's size budget.");
+    expect(depthRefusalMessage("too-many-cells")).toMatch(/^Cannot edit this level: /);
+    expect(depthRefusalMessage("unknown-layer")).toMatch(/^Cannot edit this level: /);
+  });
+});
+
+describe("showDepthRefusal", () => {
+  beforeEach(() => { notices.messages.length = 0; resetDepthRefusalNotices(); });
+
+  it("shows one Notice per reason inside the dedupe window", () => {
+    showDepthRefusal("over-budget", 1000);
+    showDepthRefusal("over-budget", 2000);
+    showDepthRefusal("quarantined", 2100);
+    expect(notices.messages).toHaveLength(2);
+  });
+
+  it("shows the reason again after the window", () => {
+    showDepthRefusal("over-budget", 1000);
+    showDepthRefusal("over-budget", 9000);
+    expect(notices.messages).toHaveLength(2);
+  });
+});
+
+describe("level-0 erase of drawn objects (INT-08)", () => {
+  const root = new HexGeometry(80, "flat", null);
+  const ladder = createGeometryLadder(root, { m: 4, minCellPx: 64, maxLevel: 3 });
+  const mapData = { orientation: "flat", viewState: { zoom: 1 } } as never;
+  const home0 = { id: "a", position: { x: 2, y: 2 }, size: { width: 1, height: 1 }, type: "x" } as never;
+  const home1 = { id: "b", position: { x: 9, y: 9 }, size: { width: 1, height: 1 }, type: "x", homeLevel: 1 } as never;
+  const home3 = { id: "c", position: { x: 3, y: 3 }, size: { width: 1, height: 1 }, type: "x", homeLevel: 3 } as never;
+
+  it("removes drawn objects in the rectangle and keeps undrawn ones", () => {
+    const all = [home0, home1, home3];
+    const out = removeDrawnObjectsInRect(all, ladder, mapData, -1e6, -1e6, 1e6, 1e6);
+    const ids = out.map((o: { id: string }) => o.id);
+    expect(ids).not.toContain("a");
+    expect(ids).not.toContain("b"); // home 1 is drawn one rung above its home
+    expect(ids).toContain("c"); // homed three rungs down: not drawn at level 0
+  });
+
+  it("drawnObjectAt finds nothing in empty space", () => {
+    expect(drawnObjectAt([home0], ladder, mapData, -5000, -5000)).toBeNull();
   });
 });

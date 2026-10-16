@@ -17,12 +17,12 @@ import { createGeometryLadder } from "../../../../src/geometry/core/createGeomet
 import type { GeometryLadder } from "../../../../src/geometry/core/createGeometryLadder";
 import {
   createLatticeClipCache,
-  forEachCellInWorldRect,
   strokeLattice,
   withMapClip,
   drawLadderLattice
 } from "../../../../src/geometry/renderers/latticeRenderer";
 import type { LatticeView } from "../../../../src/geometry/renderers/latticeRenderer";
+import { forEachCellInWorldRect } from "../../../../src/geometry/core/lattice";
 
 // Path2D does not exist in node. Install a recording stub BEFORE the module under test is
 // imported (vi.hoisted runs above the import block) so `new Path2D()` resolves.
@@ -30,8 +30,11 @@ const pathStats = vi.hoisted(() => {
   const stats = { constructed: 0 };
   class Path2DStub {
     ops: string[] = [];
-    constructor() {
+    /** The SVG string a string-built path was constructed from ('' for an empty Path2D()). */
+    d: string;
+    constructor(d?: string) {
       stats.constructed += 1;
+      this.d = d ?? "";
     }
     moveTo(x: number, y: number): void {
       this.ops.push(`moveTo:${x},${y}`);
@@ -78,6 +81,11 @@ function createRecordingCtx(): RecordingCtx {
   let penX = 0;
   let penY = 0;
   let passStart = 0;
+  // the current transform as translate + uniform scale (all the renderer ever composes)
+  let tx = 0;
+  let ty = 0;
+  let sc = 1;
+  const stack: Array<[number, number, number]> = [];
 
   const stub = {
     globalAlpha: 1,
@@ -85,9 +93,12 @@ function createRecordingCtx(): RecordingCtx {
     lineWidth: 1,
     save(): void {
       calls.push("save");
+      stack.push([tx, ty, sc]);
     },
     restore(): void {
       calls.push("restore");
+      const top = stack.pop();
+      if (top !== undefined) [tx, ty, sc] = top;
     },
     beginPath(): void {
       calls.push("beginPath");
@@ -104,11 +115,25 @@ function createRecordingCtx(): RecordingCtx {
       penX = x;
       penY = y;
     },
-    stroke(): void {
+    stroke(path?: { d: string }): void {
       calls.push("stroke");
+      if (path !== undefined) {
+        // a string-built path: every subpath is one "M x y L x y" edge, mapped to screen
+        passStart = segments.length;
+        const nums = path.d.match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? [];
+        for (let i = 0; i + 3 < nums.length; i += 4) {
+          segments.push({
+            ax: tx + nums[i] * sc,
+            ay: ty + nums[i + 1] * sc,
+            bx: tx + nums[i + 2] * sc,
+            by: ty + nums[i + 3] * sc
+          });
+        }
+      }
       passes.push({
         alpha: stub.globalAlpha,
-        lineWidth: stub.lineWidth,
+        // the on-screen width: path strokes run under a uniform scale
+        lineWidth: stub.lineWidth * sc,
         colour: stub.strokeStyle,
         segments: segments.length - passStart
       });
@@ -116,11 +141,14 @@ function createRecordingCtx(): RecordingCtx {
     clip(): void {
       calls.push("clip");
     },
-    translate(): void {
+    translate(x: number, y: number): void {
       calls.push("translate");
+      tx += x * sc;
+      ty += y * sc;
     },
-    scale(): void {
+    scale(k: number): void {
       calls.push("scale");
+      sc *= k;
     },
     getTransform(): unknown {
       calls.push("getTransform");
@@ -128,6 +156,9 @@ function createRecordingCtx(): RecordingCtx {
     },
     setTransform(): void {
       calls.push("setTransform");
+      tx = 0;
+      ty = 0;
+      sc = 1;
     }
   };
 
@@ -183,6 +214,32 @@ function viewWorldRect(view: LatticeView): { x0: number; y0: number; x1: number;
  * plus the map silhouette. Endpoints are built the way the renderer builds them so the
  * comparison is about edge OWNERSHIP, not about float association order.
  */
+/**
+ * The stroke path carries 1e-4 cell units (under 0.01 px here), so its endpoints are snapped
+ * to the nearest true hex corner (within 0.05 px) before keying; a corner that is not near
+ * any true one stays where it is and shows up as an unexpected edge.
+ */
+function snapSegments(ladder: GeometryLadder, view: LatticeView, segments: Segment[]): Segment[] {
+  const corners = ladder.root.getHexVertices(0, 0);
+  const rect = viewWorldRect(view);
+  const truth: Array<{ x: number; y: number }> = [];
+  forEachCellInWorldRect(ladder.root.orientation, ladder.cellSizeAt(0), rect.x0, rect.y0, rect.x1, rect.y1, (cq, cr, wx, wy) => {
+    if (!ladder.existsAt(0, cq, cr)) return;
+    for (const c of corners) {
+      truth.push({ x: view.offsetX + wx * view.zoom + c.worldX * view.zoom, y: view.offsetY + wy * view.zoom + c.worldY * view.zoom });
+    }
+  });
+  const snap = (x: number, y: number): { x: number; y: number } => {
+    for (const t of truth) if (Math.abs(t.x - x) < 0.05 && Math.abs(t.y - y) < 0.05) return t;
+    return { x, y };
+  };
+  return segments.map((seg) => {
+    const a = snap(seg.ax, seg.ay);
+    const b = snap(seg.bx, seg.by);
+    return { ax: a.x, ay: a.y, bx: b.x, by: b.y };
+  });
+}
+
 function expectedEdgeKeys(ladder: GeometryLadder, view: LatticeView): Set<string> {
   const corners = ladder.root.getHexVertices(0, 0);
   const rect = viewWorldRect(view);
@@ -320,7 +377,7 @@ describe("latticeRenderer: strokeLattice edge ownership", () => {
           colour: "#000"
         });
 
-        const keys = rec.segments.map(segKey);
+        const keys = snapSegments(ladder, WHOLE_MAP_VIEW, rec.segments).map(segKey);
         const unique = new Set(keys);
         const duplicates = keys.length - unique.size;
         expect(duplicates).toBe(0);
@@ -348,6 +405,72 @@ describe("latticeRenderer: strokeLattice edge ownership", () => {
     );
     expect(rec.segments).toEqual([]);
     expect(rec.calls).toEqual([]);
+  });
+});
+
+describe("latticeRenderer: stroke path cache (MEM-02)", () => {
+  const view: LatticeView = { offsetX: 150, offsetY: 150, zoom: 1, width: 300, height: 300 };
+  const style = { alpha: 1, width: 1, colour: "#000" };
+
+  it.each(ORIENTATIONS)("%s: steady frames reuse one Path2D", (orientation) => {
+    const ladder = createGeometryLadder(rectRoot(orientation));
+    const rec = createRecordingCtx();
+    const before = pathStats.constructed;
+    strokeLattice(rec.ctx, ladder, 0, view, style);
+    expect(pathStats.constructed).toBe(before + 1);
+    const firstSegments = rec.passes[0].segments;
+    expect(firstSegments).toBeGreaterThan(0);
+
+    // pans and zooms inside the padded rect: no rebuild, no per-edge path calls
+    strokeLattice(rec.ctx, ladder, 0, { ...view, offsetX: 180, offsetY: 120 }, style);
+    strokeLattice(rec.ctx, ladder, 0, { ...view, zoom: 1.2 }, style);
+    expect(pathStats.constructed).toBe(before + 1);
+    expect(rec.calls).not.toContain("moveTo");
+    expect(rec.calls).not.toContain("lineTo");
+    expect(rec.passes).toHaveLength(3);
+    // a uniform scale keeps the on-screen width exactly the style's width
+    for (const pass of rec.passes) expect(pass.lineWidth).toBeCloseTo(1, 10);
+
+    // a bumped epoch rebuilds
+    strokeLattice(rec.ctx, ladder, 0, view, style, 1);
+    expect(pathStats.constructed).toBe(before + 2);
+  });
+
+  it.each(ORIENTATIONS)("%s: a crossing frame does not build", (orientation) => {
+    const ladder = createGeometryLadder(rectRoot(orientation));
+    const rec = createRecordingCtx();
+    const phases: string[] = [];
+    const onPhase = (name: string): void => {
+      phases.push(name);
+    };
+
+    // crossing with nothing cached: the viewport is still stroked (one-shot canvases need
+    // it), from a transient unpadded path, and nothing enters the cache
+    strokeLattice(rec.ctx, ladder, 0, view, style, 0, true, onPhase);
+    expect(rec.passes).toHaveLength(1);
+    expect(rec.passes[0].segments).toBeGreaterThan(0);
+    expect(phases).toEqual(["strokeDeferred"]);
+
+    // the next steady frame builds the padded path once...
+    strokeLattice(rec.ctx, ladder, 0, view, style, 0, false, onPhase);
+    expect(phases).toEqual(["strokeDeferred", "strokeBuild"]);
+    // ...a later crossing inside it reuses it, and steady frames after that too
+    const built = pathStats.constructed;
+    strokeLattice(rec.ctx, ladder, 0, view, style, 0, true, onPhase);
+    strokeLattice(rec.ctx, ladder, 0, view, style, 0, false, onPhase);
+    expect(pathStats.constructed).toBe(built);
+    expect(phases).toEqual(["strokeDeferred", "strokeBuild"]);
+  });
+
+  it.each(ORIENTATIONS)("%s: each canvas keeps its own cache", (orientation) => {
+    const ladder = createGeometryLadder(rectRoot(orientation));
+    const a = createRecordingCtx();
+    const b = createRecordingCtx();
+    const before = pathStats.constructed;
+    strokeLattice(a.ctx, ladder, 0, view, style);
+    strokeLattice(b.ctx, ladder, 0, view, style);
+    strokeLattice(a.ctx, ladder, 0, view, style);
+    expect(pathStats.constructed).toBe(before + 2);
   });
 });
 
