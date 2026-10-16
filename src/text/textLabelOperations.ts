@@ -12,6 +12,7 @@ import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
 import { LABEL_FLOOR_PX, depthModeOf, elementScale, elementVisibleAt, elementZoom } from '../geometry/renderers/elementBands';
 import type { TextLabel, TextLabelId } from '#types/objects/note.types';
 import { updateById, removeById } from '../objects/entityList';
+import { getFontCss } from './fontOptions';
 
 // ===========================================
 // Type Definitions
@@ -158,6 +159,46 @@ function isPointInRotatedRect(
   return Math.abs(rotatedX) <= halfWidth && Math.abs(rotatedY) <= halfHeight;
 }
 
+/** Camera for `ladderLabelBounds`: a ladder view, never the classic path. */
+interface LadderLabelView {
+  ladder: GeometryLadder;
+  /** Live camera zoom (screen px per world px). */
+  zoom: number;
+  activeLevel: number;
+}
+
+/**
+ * Size of a label's selection box on the ladder view, in world px, unrotated and
+ * centred on `label.position`; null when the label is not drawn at this rung
+ * (outside its band or its explicit `visibleLevels`, or under the label floor).
+ * The text is measured at the held size (`elementScale`); the 4/2 px selection
+ * padding is screen px, so it is divided by zoom. The one definition shared by
+ * the point pick and the marquee, so hit-testing agrees with what is drawn.
+ * Without a ctx the width is estimated (0.6 em per character).
+ */
+function ladderLabelBounds(
+  label: TextLabel,
+  ctx: CanvasRenderingContext2D | null,
+  view: LadderLabelView
+): { width: number; height: number } | null {
+  const { ladder, zoom, activeLevel } = view;
+  const home = label.homeLevel ?? 0;
+  const mode = depthModeOf(label);
+  const baseSize = label.fontSize || 16;
+  if (!elementVisibleAt(label, activeLevel, 'label')) return null;
+  if (baseSize * elementZoom(ladder, home, zoom, mode) < LABEL_FLOOR_PX) return null;
+  const fontSize = baseSize * elementScale(ladder, home, zoom, mode);
+  let textWidth: number;
+  if (ctx) {
+    ctx.font = `${fontSize}px ${getFontCss(label.fontFace || 'sans')}`;
+    textWidth = ctx.measureText(label.content || '').width;
+  } else {
+    textWidth = (label.content || '').length * fontSize * 0.6;
+  }
+  const padScale = zoom > 0 ? 1 / zoom : 1;
+  return { width: textWidth + 8 * padScale, height: fontSize * 1.2 + 4 * padScale };
+}
+
 /**
  * Find text label at given coordinates using proper bounding box collision
  */
@@ -192,37 +233,33 @@ function getTextLabelAtPosition(
   for (let i = labels.length - 1; i >= 0; i--) {
     const label = labels[i];
 
-    // Ladder maps: the drawn label is hidden outside its band and sized at the held zoom.
-    let scale = 1;
+    let boundingWidth: number;
+    let boundingHeight: number;
     const ladder = view?.ladder ?? null;
     if (view !== undefined && ladder !== null) {
-      const home = label.homeLevel ?? 0;
-      const mode = depthModeOf(label);
-      if (!elementVisibleAt(label, view.activeLevel, 'label')) continue;
-      if ((label.fontSize || 16) * elementZoom(ladder, home, view.zoom, mode) < LABEL_FLOOR_PX) continue;
-      scale = elementScale(ladder, home, view.zoom, mode);
+      // Ladder maps: hidden outside its band, sized at the held zoom.
+      const box = ladderLabelBounds(label, context, { ladder, zoom: view.zoom, activeLevel: view.activeLevel });
+      if (box === null) continue;
+      boundingWidth = box.width;
+      boundingHeight = box.height;
+    } else {
+      // Set font to measure text accurately
+      const fontSize = label.fontSize || 16;
+      const fontFace = label.fontFace || 'sans';
+      const fontFamily = fontMap[fontFace] ?? 'sans-serif';
+
+      context.font = `${fontSize}px ${fontFamily}`;
+
+      // Measure text to get bounding box
+      const metrics = context.measureText(label.content);
+      const textWidth = metrics.width;
+      const textHeight = fontSize * 1.2; // Same multiplier as renderer
+
+      // Add padding (same as selection box: 4px horizontal, 2px vertical), world px.
+      boundingWidth = textWidth + 4 * 2;
+      boundingHeight = textHeight + 2 * 2;
     }
 
-    // Set font to measure text accurately
-    const fontSize = (label.fontSize || 16) * scale;
-    const fontFace = label.fontFace || 'sans';
-    const fontFamily = fontMap[fontFace] ?? 'sans-serif';
-    
-    context.font = `${fontSize}px ${fontFamily}`;
-    
-    // Measure text to get bounding box
-    const metrics = context.measureText(label.content);
-    const textWidth = metrics.width;
-    const textHeight = fontSize * 1.2; // Same multiplier as renderer
-    
-    // Add padding (same as selection box: 4px horizontal, 2px vertical)
-    // Classic: world px, as always. Ladder: the selection box pads in SCREEN px, so divide by zoom.
-    const padScale = view !== undefined && view.ladder !== null && view.zoom > 0 ? 1 / view.zoom : 1;
-    const paddingX = 4 * padScale;
-    const paddingY = 2 * padScale;
-    const boundingWidth = textWidth + paddingX * 2;
-    const boundingHeight = textHeight + paddingY * 2;
-    
     // Check if point is inside the rotated bounding box
     if (isPointInRotatedRect(
       x, y,
@@ -241,5 +278,5 @@ function getTextLabelAtPosition(
 // Exports
 // ===========================================
 
-export { addTextLabel, updateTextLabel, removeTextLabel, getTextLabelAtPosition };
+export { addTextLabel, updateTextLabel, removeTextLabel, getTextLabelAtPosition, ladderLabelBounds };
 export type { TextLabel };

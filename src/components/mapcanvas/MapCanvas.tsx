@@ -66,6 +66,7 @@ import { WallLayer } from './WallLayer';
 import { focusMapOnPointerDown, shouldHandleMapKey } from '../../utils/keyboardTargets';
 import { RerollDungeonButton } from './RerollDungeonButton';
 import { getSetting } from '../../core/settingsAccessor';
+import { setActiveCanvas, releaseActiveCanvas } from '../../hooks/canvas/surfaceBudget';
 import { usePanZoomCoordinator } from '../../hooks/canvas/usePanZoomCoordinator';
 import { useEventCoordinator } from '../../hooks/canvas/useEventCoordinator';
 
@@ -117,6 +118,12 @@ interface MapCanvasContentProps {
   /** Ladder edit-level lock (null = edit follows the camera rung). Owned by useToolState. */
   editLevelLock: number | null;
   onEditLevelLockChange: (level: number | null) => void;
+  /**
+   * Receives the canvas's live ladder-rung getter (reads the view controller,
+   * so it is current mid-gesture), and null on unmount. The host hands it to
+   * the MCP bridge so the bridge and the tools agree on the rung (WIRE-01).
+   */
+  onActiveLevelGetterChange?: (getter: (() => number) | null) => void;
   selectedObjectType: ObjectTypeId | undefined;
   selectedColor: string;
   isColorPickerOpen: boolean;
@@ -184,7 +191,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, clearTransient, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, adjacentEmptySlots, onViewStateChange, onTextLabelSettingsChange, currentTool, editLevelLock, onEditLevelLockChange, selectedObjectType, selectedColor, isColorPickerOpen, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex, children }: MapCanvasContentProps): VNode => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, clearTransient, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, adjacentEmptySlots, onViewStateChange, onTextLabelSettingsChange, currentTool, editLevelLock, onEditLevelLockChange, onActiveLevelGetterChange, selectedObjectType, selectedColor, isColorPickerOpen, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex, children }: MapCanvasContentProps): VNode => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -314,6 +321,13 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
     [ladder, viewController]
   );
 
+  // Publish the live getter to the host (MCP bridge); withdraw it on unmount.
+  useEffect(() => {
+    if (onActiveLevelGetterChange === undefined) return undefined;
+    onActiveLevelGetterChange(getActiveLevel);
+    return () => onActiveLevelGetterChange(null);
+  }, [getActiveLevel, onActiveLevelGetterChange]);
+
   // The rung authoring tools write to: the camera rung, or the locked rung when
   // shallower (a deeper lock is not on screen, so it yields to the camera).
   // Read live at pointerdown like getActiveLevel. 0 on classic maps.
@@ -430,6 +444,31 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
     container.addEventListener('pointerdown', handlePointerDown, true);
     return () => container.removeEventListener('pointerdown', handlePointerDown, true);
   }, []);
+
+  // Surface budget (MEM-04): the protected "active" canvas follows the user,
+  // not whichever canvas painted last. A press or wheel on this map, or focus,
+  // claims the slot; blur and unmount give it back (release clears the slot
+  // only while this canvas holds it).
+  useEffect(() => {
+    const container = containerRef.current;
+    const canvas = canvasRef.current;
+    if (!container || !canvas) return undefined;
+    const claim = (): void => setActiveCanvas(canvas);
+    container.addEventListener('pointerdown', claim, { capture: true, passive: true });
+    container.addEventListener('wheel', claim, { capture: true, passive: true });
+    return () => {
+      container.removeEventListener('pointerdown', claim, { capture: true });
+      container.removeEventListener('wheel', claim, { capture: true });
+      releaseActiveCanvas(canvas);
+    };
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    if (isFocused) setActiveCanvas(canvas);
+    else releaseActiveCanvas(canvas);
+  }, [isFocused]);
 
   // 'C' key handler for coordinate overlay (hex maps only)
   useEffect(() => {

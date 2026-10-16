@@ -6,9 +6,16 @@
  *    quarantine; the FIRST deep write stamps `lod` onto the map in the same
  *    update, so the map is a ladder map on every install from then on;
  *  - a single operation may not produce more than MAX_CELLS_PER_DEPTH_OP cells;
- *  - a write that would push the serialised map past DEPTH_BUDGET_BYTES is
- *    REFUSED, not warned about: the save journal silently skips payloads over
- *    its cap, so crossing it would silently drop crash protection.
+ *  - a write that would push the map's save-journal payload past
+ *    DEPTH_BUDGET_BYTES is REFUSED, not warned about: the journal refuses a
+ *    payload over its cap (with one notice per map per session), so crossing
+ *    it would drop crash protection for every later edit of the map.
+ *
+ * The budget is measured in the journal's own unit: the STORED payload length
+ * (journalPayloadLength: plain JSON up to RAW_PAYLOAD_LIMIT, deflated base64
+ * above it). It is measured once per operation (or brush stroke) and the
+ * operation's growth is added RAW on top, which over-counts (raw bytes
+ * deflate roughly tenfold) and so errs toward refusing (DATA-01).
  *
  * Tools, the MCP bridge and any future caller use `writeDepthCells`; nothing
  * else may call `setLevelCells` for a user action.
@@ -18,22 +25,34 @@ import type { Cell } from '#types/core/cell.types';
 import { isHexCell } from '#types/core/cell.types';
 import type { LayerId } from '#types/core/map.types';
 
-import { isDepthQuarantined, isLadderView, isLodLadderEnabled, ladderParamsFor, hasSubHexChildren } from '../core/lodFlags';
+import { isDepthQuarantined, isLadderView, isLodLadderEnabled, ladderParamsFor, hasSubHexChildren, hasDepthContent } from '../core/lodFlags';
 import { authoredCells, setLevelCells } from './layerAccessor';
-import { MAX_JOURNAL_PAYLOAD } from './saveJournal';
+import { MAX_JOURNAL_PAYLOAD, journalPayloadLength } from './saveJournal';
 
 /**
- * Hard refusal threshold: 80% of the save journal's payload cap. Unit: UTF-16
- * code units (`string.length`), the same unit saveJournal compares against
- * MAX_JOURNAL_PAYLOAD (`payload.length`) and that localStorage quota counts in.
- * A UTF-8 byte estimate would refuse maps (e.g. CJK labels) the journal still
- * protects, so the guard deliberately measures `.length` too.
+ * Hard refusal threshold: 80% of the save journal's payload cap. Unit: the
+ * stored journal payload's length in string units (journalPayloadLength), the
+ * value saveJournal compares against MAX_JOURNAL_PAYLOAD. That payload is
+ * deflated base64 for any large map, so a CJK-heavy or tile-heavy map is held
+ * to what the journal actually stores, not to its raw JSON or UTF-8 size.
  */
 const DEPTH_BUDGET_BYTES = Math.floor(MAX_JOURNAL_PAYLOAD * 0.8);
 /** Cells one operation may ADD to a rung (design section 3.6). */
 const MAX_CELLS_PER_DEPTH_OP = 4096;
 /** Serialised bytes per hex cell, measured on the fixture (q, r, colour). */
 const BYTES_PER_CELL_ESTIMATE = 36;
+
+/**
+ * The map's save-journal payload length now: the measurement an operation takes
+ * once at its start and passes as `DepthWriteContext.serialisedBytes`. One
+ * JSON.stringify plus, past RAW_PAYLOAD_LIMIT, one deflate.
+ *
+ * NOTE: inside a sub-hex view `mapData` is the child map while the journal
+ * stores the root entry, so this under-counts there (DATA-01, caller side).
+ */
+function depthBudgetBytesOf(mapData: MapData): number {
+  return journalPayloadLength(JSON.stringify(mapData));
+}
 
 /** Serialised size of one element (object, text label, tile) a deep write adds; 0 when it cannot be serialised. */
 function elementBytes(value: unknown): number {
@@ -63,7 +82,11 @@ type DepthWriteRefusal =
 interface DepthWriteContext {
   /** The rung's cells when the operation began; the cap counts cells added since. Default: the rung's current cells. */
   baseline?: Cell[];
-  /** `JSON.stringify(mapData).length` when `baseline` was taken. Default: measured now against the current cells. */
+  /**
+   * The map's journal payload length (depthBudgetBytesOf) when `baseline` was
+   * taken. Default: measured now. A raw `JSON.stringify(mapData).length` is
+   * accepted too: never smaller, so it only refuses earlier.
+   */
   serialisedBytes?: number;
   /**
    * Serialised bytes the write ADDS beyond cells (objects, text, tiles homed on
@@ -71,6 +94,14 @@ interface DepthWriteContext {
    * it is held to the budget (kgc.25). Default 0.
    */
   addedBytes?: number;
+  /**
+   * True when the map had no `lod` block when the operation began. A tick that
+   * leaves such a map with no depth content again (a stroke that paints a cell
+   * and erases it) returns it WITHOUT the stamp an earlier tick added, so the
+   * operation as a whole cannot turn a classic map into a ladder map (DATA-02).
+   * Default false: the stamp is kept.
+   */
+  lodAbsentAtStart?: boolean;
 }
 
 type DepthWriteResult =
@@ -171,14 +202,21 @@ function guardDepthWrite(
   const baseline = context.baseline ?? current;
   const added = baseline === current ? addedNow : countAddedCells(nextCells, baseline);
   if (added > MAX_CELLS_PER_DEPTH_OP) return 'too-many-cells';
+  // Encoded size at the operation's start plus its growth counted RAW: the
+  // growth is not deflated in the projection, so it over-counts and refuses early.
   const projected = context.serialisedBytes !== undefined
     ? context.serialisedBytes + added * BYTES_PER_CELL_ESTIMATE + addedBytes
-    : JSON.stringify(mapData).length + addedNow * BYTES_PER_CELL_ESTIMATE + addedBytes;
+    : depthBudgetBytesOf(mapData) + addedNow * BYTES_PER_CELL_ESTIMATE + addedBytes;
   if (projected > DEPTH_BUDGET_BYTES) return 'over-budget';
   return null;
 }
 
-/** Apply a guarded rung write. On refusal the original map is returned untouched. */
+/**
+ * Apply a guarded rung write. On refusal the original map is returned untouched.
+ * A write that changes nothing (setLevelCells returns the same map: an erase on
+ * an empty rung, the rung's own array) returns the SAME map without the `lod`
+ * stamp, so a no-op can never turn a classic map into a ladder map (DATA-02).
+ */
 function writeDepthCells(
   mapData: MapData,
   layerId: LayerId,
@@ -188,9 +226,15 @@ function writeDepthCells(
 ): DepthWriteResult {
   const reason = guardDepthWrite(mapData, layerId, level, nextCells, context);
   if (reason !== null) return { ok: false, reason, mapData };
-  const stamped = withLod(mapData);
-  return { ok: true, mapData: setLevelCells(stamped, layerId, level, nextCells) };
+  const written = setLevelCells(mapData, layerId, level, nextCells);
+  if (written === mapData) return { ok: true, mapData };
+  if (context.lodAbsentAtStart === true && written.lod !== undefined && !hasDepthContent(written)) {
+    const { lod: _dropped, ...unstamped } = written;
+    void _dropped;
+    return { ok: true, mapData: unstamped };
+  }
+  return { ok: true, mapData: withLod(written) };
 }
 
 export type { DepthWriteContext, DepthWriteRefusal, DepthWriteResult };
-export { BYTES_PER_CELL_ESTIMATE, elementBytes, DEPTH_BUDGET_BYTES, MAX_CELLS_PER_DEPTH_OP, canBeginDepthAuthoring, depthEntryRefusal, withLod, guardDepthWrite, writeDepthCells };
+export { BYTES_PER_CELL_ESTIMATE, elementBytes, depthBudgetBytesOf, DEPTH_BUDGET_BYTES, MAX_CELLS_PER_DEPTH_OP, canBeginDepthAuthoring, depthEntryRefusal, withLod, guardDepthWrite, writeDepthCells };

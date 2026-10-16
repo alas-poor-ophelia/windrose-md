@@ -34,13 +34,21 @@
 //
 // The cache is keyed by LEVEL for the lattice ladder: at a given zoom one rung
 // of the ladder is active, and each rung needs its own baked surface. A level
-// CROSSING is a drift, not a rebuild (design .claude/lod-rd/06-integration-design.md
-// section 3.1, decision D17): the new level has never been baked, so the nearest
-// coarser surface is scale-blitted exactly as a stale snapshot is today and the
-// fresh bake is scheduled at settle — zero synchronous bakes in a crossing frame.
-// Classic maps only ever use level 0, where this is the shipped behaviour.
+// CROSSING is a drift, not a rebuild: the crossing frame never bakes
+// synchronously. When the new level has no usable surface of its own (never
+// baked, evicted, stale key or out of pad), another level's cached surface is
+// scale-blitted exactly as a stale snapshot is today, and the fresh bake is
+// scheduled at settle. Classic maps only ever use level 0 and never cross, so
+// for them this is the shipped behaviour.
 
-import { registerSurface, touchSurface, releaseSurface, evictIfNeeded } from '../../hooks/canvas/surfaceBudget';
+import {
+  SURFACE_BYTES_PER_PX,
+  registerSurface,
+  touchSurface,
+  releaseSurface,
+  evictIfNeeded,
+  maxSurfacePixels,
+} from '../../hooks/canvas/surfaceBudget';
 import { driftAllowed, driftCandidates } from '../../hooks/canvas/levelSurfaces';
 
 interface StaticLayerCacheEntry {
@@ -96,10 +104,8 @@ const STATIC_MAX_PIXELS = 12_000_000;
 const STATIC_HARD_MAX_PIXELS = 16_777_216;
 /** Crisp re-render fires this long after the last zoom change. */
 const ZOOM_SETTLE_MS = 150;
-/** Steady state is one surface; a crossing is a transient two (design 3.1). */
+/** Steady state is one surface; a crossing is a transient two (the new level plus its drift source). */
 const MAX_SURFACES_PER_CANVAS = 2;
-/** Bytes held by one offscreen: RGBA, and Windrose never scales by DPR. */
-const SURFACE_BYTES_PER_PX = 4;
 
 /** Registered by the hook so the cache can request a follow-up render after a zoom settles. */
 function setStaticSettleCallback(canvas: HTMLCanvasElement, cb: () => void): void {
@@ -184,14 +190,19 @@ function rotatedViewportHalfExtents(width: number, height: number, northDirectio
 /**
  * Offscreen padding per side. Starts at the STATIC_PAD_RATIO pad (or the
  * rotation minimum, whichever is larger) and shrinks the extra toward that
- * minimum until the offscreen fits STATIC_MAX_PIXELS. Returns null when even
- * the minimum exceeds the hard canvas-area ceiling.
+ * minimum until the offscreen fits STATIC_MAX_PIXELS (or the smaller
+ * `maxPixels`, which budgeted ladder canvases pass so two surfaces fit the
+ * global budget). Returns null when even the minimum exceeds the hard
+ * canvas-area ceiling; a minimum above `maxPixels` but under that ceiling is
+ * still returned (an unpadded bake beats drawing every frame directly).
  */
 function computeStaticPad(
   width: number,
   height: number,
-  northDirection: number
+  northDirection: number,
+  maxPixels = STATIC_MAX_PIXELS
 ): { padX: number; padY: number } | null {
+  const cap = Math.min(STATIC_MAX_PIXELS, maxPixels);
   const { ex, ey } = rotatedViewportHalfExtents(width, height, northDirection);
   const minX = Math.max(0, Math.ceil(ex - width / 2));
   const minY = Math.max(0, Math.ceil(ey - height / 2));
@@ -201,7 +212,7 @@ function computeStaticPad(
   for (let t = 1; t > 0; t -= 0.125) {
     const px = Math.ceil(minX + (wantX - minX) * t);
     const py = Math.ceil(minY + (wantY - minY) * t);
-    if (area(px, py) <= STATIC_MAX_PIXELS) return { padX: px, padY: py };
+    if (area(px, py) <= cap) return { padX: px, padY: py };
   }
   if (area(minX, minY) <= STATIC_HARD_MAX_PIXELS) return { padX: minX, padY: minY };
   return null;
@@ -249,10 +260,10 @@ function blitStaticContent(
   imageVersion: number,
   northDirection = 0,
   level = 0,
-  // Only ladder canvases join the global surface budget (kgc.23 a). A classic
-  // canvas never claims the active slot (`setActiveCanvas` is ladder-only), so
-  // registering it would make every classic pane a 'background' canvas and LRU-
-  // evict it whenever 4+ panes are mounted. Classic keeps its pre-ladder cache.
+  // Only ladder canvases are governed by the global surface budget. A classic
+  // canvas is registered UNCOUNTED (reported, never evicted): budgeting it would
+  // make every classic pane a background canvas and LRU-evict it whenever 4+
+  // panes are mounted, and classic has no drift fallback for an evicted surface.
   budgeted = false
 ): void {
   let set = staticLayerCaches.get(canvas);
@@ -287,23 +298,26 @@ function blitStaticContent(
     return { scale: sc, tx: cx, ty: cy, usable: ok };
   };
 
-  // The level's own surface if usable. While the level has NO surface at all (a
-  // crossing in progress: never baked, or evicted), the nearest coarser USABLE
-  // surface is the drift source (D17). Once the level owns a surface, leaving its
-  // pad or invalidating its key bakes synchronously, exactly as the classic path
-  // does at level 0: a coarser surface lacks this rung's authored cells, so
-  // drifting to it mid-pan blinks the rung's paint out (kgc.19). A classic map
-  // only ever asks for level 0, so for it `sourceLevel` is always `level`.
+  // The level's own surface if usable. On a crossing frame an own surface that is
+  // not usable (stale key, out of pad) counts as absent, so the frame drifts from
+  // another level's usable surface instead of baking: a crossing frame never
+  // bakes synchronously. Outside a crossing, a level that owns a surface never
+  // drifts: leaving its pad or invalidating its key bakes synchronously, exactly
+  // as the classic path does at level 0, because a coarser surface lacks this
+  // rung's authored cells and drifting to it mid-pan would blink that paint out.
+  // A classic map only ever asks for level 0 and never crosses, so for it
+  // `sourceLevel` is always `level`.
   let entry = set.byLevel.get(level);
   let sourceLevel = level;
   let { scale, tx, ty, usable } = entry === undefined ? { scale: 1, tx: 0, ty: 0, usable: false } : usability(entry);
   // A settle asked for THIS level to bake crisp: honour it with a bake, never a
-  // drift, or the crisp rebuild is starved by an ever-usable coarser surface. A
-  // crossing frame is the exception (D17): drift now; the settle re-asks.
+  // drift, or the crisp rebuild is starved by an ever-usable neighbour surface.
+  // A crossing frame is the exception (it never bakes): drift now; the settle re-asks.
   const honourBake = set.bakeRequested === level && !crossingFrame;
   if (honourBake) set.bakeRequested = null;
-  if (driftAllowed(entry !== undefined, level, honourBake)) {
-    // Nearest coarser first, then nearest finer (a zoom-out crossing, kgc.23 i).
+  const ownsSurface = crossingFrame ? usable : entry !== undefined;
+  if (driftAllowed(ownsSurface, level, honourBake, crossingFrame)) {
+    // Nearest coarser first, then nearest finer (a zoom-out crossing).
     for (const candidateLevel of driftCandidates(level, set.byLevel.keys())) {
       const candidate = set.byLevel.get(candidateLevel);
       if (candidate === undefined) continue;
@@ -327,13 +341,13 @@ function blitStaticContent(
   }
 
   if (usable && sourceLevel !== level) {
-    // Crossing frame: the new level has never been baked, so blit the drift
+    // Crossing frame: the new level has no usable surface, so blit the drift
     // source (coarser, or finer on a zoom-out) at scale (the lattice itself is
     // stroked live elsewhere) and bake the new level once things settle. No
     // synchronous draw happens here.
     scheduleSettleRebake(canvas, set);
   } else if (!usable) {
-    const pad = computeStaticPad(width, height, northDirection);
+    const pad = budgeted ? computeStaticPad(width, height, northDirection, maxSurfacePixels()) : computeStaticPad(width, height, northDirection);
     if (pad == null) {
       draw(ctx, offsetX, offsetY, width, height, northDirection);
       return;
@@ -363,12 +377,16 @@ function blitStaticContent(
     octx.restore();
     entry = { off, zoom, vOx: offsetX + padX, vOy: offsetY + padY, key, imageVersion };
     if (ownEntry === undefined) evictSurfacesForCanvas(canvas, set, level);
+    // Other levels baked under a different key can never be blitted again (the
+    // usability test requires a key match): free them now rather than letting
+    // dead surfaces hold budget bytes.
+    for (const [otherLevel, other] of [...set.byLevel]) {
+      if (otherLevel !== level && !staticKeysEqual(other.key, key)) releaseSurfaceEntry(canvas, set, otherLevel);
+    }
     set.byLevel.delete(level);
     set.byLevel.set(level, entry);
-    if (budgeted) {
-      registerSurface(canvas, level, ow * oh * SURFACE_BYTES_PER_PX);
-      enforceSurfaceBudget(canvas, level);
-    }
+    registerSurface(canvas, level, ow * oh * SURFACE_BYTES_PER_PX, budgeted);
+    if (budgeted) enforceSurfaceBudget(canvas, level);
     sourceLevel = level;
     scale = 1;
     tx = offsetX - entry.vOx;
@@ -402,6 +420,7 @@ export {
   releaseStaticLayerCache,
   rotatedViewportHalfExtents,
   computeStaticPad,
+  staticKeysEqual,
   blitStaticContent,
 };
 export type { DrawStaticFn };

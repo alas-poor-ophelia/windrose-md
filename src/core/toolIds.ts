@@ -38,10 +38,8 @@ const TOOL_ID_TABLE = {
   measure: true
 } as const satisfies Record<ToolId, true>;
 
-const TOOL_IDS: readonly ToolId[] = Object.keys(TOOL_ID_TABLE) as ToolId[];
-
 function isToolId(value: unknown): value is ToolId {
   return typeof value === 'string' && Object.prototype.hasOwnProperty.call(TOOL_ID_TABLE, value);
 }
 
-export { TOOL_IDS, isToolId };
+export { isToolId };

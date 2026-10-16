@@ -673,21 +673,47 @@ function setLevelCells(mapData: MapData, layerId: LayerId, level: number, cells:
   };
 }
 
+/** A `levels` value shaped like a keyed record (a non-null, non-array object). */
+function isLevelsRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 /**
- * Remove empty containers only: empty rung arrays, key "0", non-integer keys,
- * and `levels` itself when nothing remains. Never invents or moves content.
- * Returns the same layer when there is nothing to fix.
+ * Whether a stored `levels` value has a shape the ladder can read (C3): true
+ * when absent, or a record whose every non-empty array sits under a rung key
+ * (`rungFromKey`). False for an array-shaped `levels`, any other non-record
+ * value, or content under a key such as "0", "01" or "1.5". Load keeps such
+ * content as stored (normaliseLevels), so this is how the depth-quarantine
+ * check finds it.
+ */
+function levelsShapeIsValid(levels: unknown): boolean {
+  if (levels === undefined || levels === null) return true;
+  if (!isLevelsRecord(levels)) return false;
+  for (const key of Object.keys(levels)) {
+    const value = levels[key];
+    if (Array.isArray(value) && value.length > 0 && rungFromKey(key) === null) return false;
+  }
+  return true;
+}
+
+/**
+ * Remove empty containers only: empty or non-array rung values, and `levels`
+ * itself when it is null, not an object, or left empty. Never deletes content:
+ * a non-empty array under a key that is not a rung ("0", "01", "1.5") and an
+ * array-shaped `levels` stay exactly as stored, for depth quarantine
+ * (levelsShapeIsValid) to report (DATA-10). Returns the same layer when there
+ * is nothing to fix.
  */
 function normaliseLevels(layer: MapLayer): MapLayer {
   if (!('levels' in layer)) return layer;
-  const levels = layer.levels as Record<string, unknown> | null | undefined;
-  const kept: Record<number, Cell[]> = {};
-  let dirty = levels === null || levels === undefined || typeof levels !== 'object' || Array.isArray(levels);
-  if (!dirty && levels) {
+  const levels: unknown = (layer as { levels?: unknown }).levels;
+  if (Array.isArray(levels)) return layer;
+  const kept: Record<string, unknown> = {};
+  let dirty = !isLevelsRecord(levels);
+  if (isLevelsRecord(levels)) {
     for (const key of Object.keys(levels)) {
-      const level = rungFromKey(key);
       const value = levels[key];
-      if (level !== null && Array.isArray(value) && value.length > 0) kept[level] = value as Cell[];
+      if (Array.isArray(value) && value.length > 0) kept[key] = value;
       else dirty = true;
     }
   }
@@ -695,7 +721,7 @@ function normaliseLevels(layer: MapLayer): MapLayer {
   if (!dirty) return layer;
   const { levels: _dropped, ...rest } = layer;
   void _dropped;
-  return Object.keys(kept).length > 0 ? { ...rest, levels: kept } : rest;
+  return Object.keys(kept).length > 0 ? { ...rest, levels: kept as Record<number, Cell[]> } : rest;
 }
 
 /**
@@ -1030,9 +1056,11 @@ function needsMigration(mapData: MapData | LegacyMapData | null | undefined): bo
   if (!mapData) return false;
 
   const hasLayers = Array.isArray((mapData as Partial<MapData>).layers);
+  // v2 is current for a classic map: v3 is a per-entry fence that only the
+  // content stamp sets (schemaMigration.stampSchemaVersions); its step is a no-op.
   const needsIt = !hasLayers ||
                   mapData.schemaVersion == null ||
-                  mapData.schemaVersion < SCHEMA_VERSION;
+                  mapData.schemaVersion < LAYER_SCHEMA_VERSION;
 
   if (needsIt) {
     console.debug('[layerAccessor] Map needs migration:', {
@@ -1050,7 +1078,7 @@ function needsMigration(mapData: MapData | LegacyMapData | null | undefined): bo
 // ============================================================================
 
 export { generateLayerId, getActiveLayer, getLayersOrdered, getLayerById, getLayerIndex, getLayerBelow, updateLayer, updateActiveLayer, setActiveLayer, addLayer, cloneLayer, removeLayer, reorderLayers, // Ladder levels (the only `levels` reader/writer)
-  authoredCells, allAuthoredCells, authoredLevels, setLevelCells, normaliseLevels,
+  authoredCells, allAuthoredCells, authoredLevels, setLevelCells, normaliseLevels, levelsShapeIsValid,
   migrateToLayerSchema, needsMigration, LAYER_SCHEMA_VERSION, // Board (floor) projection
   DEFAULT_BOARD_ID, layerBoardId, getBoardsOrdered, getActiveBoardId, getBoardLayers, getActiveBoardLayers, getBoardBelow, updateBoard, getRenderLayers, getExportLayers, getDefaultExportLayers, ensureBoards, addBoard, removeBoard, setActiveBoard, promoteToStrata, setLayerMode };
 

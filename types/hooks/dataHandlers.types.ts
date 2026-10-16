@@ -16,7 +16,7 @@ import type { HexColor } from '../core/common.types';
 import type { Edge } from '../core/rendering.types';
 import type { TileAssignment } from '../tiles/tile.types';
 import type { MapDataUpdater } from '../hooks/mapData.types';
-import type { DepthWriteContext, DepthWriteResult } from '../../src/persistence/depthAuthoring';
+import type { DepthWriteContext, DepthWriteRefusal, DepthWriteResult } from '../../src/persistence/depthAuthoring';
 import type { AddToHistoryOptions, LayerHistorySnapshot } from '../hooks/layerHistory.types';
 
 // ===========================================
@@ -39,8 +39,12 @@ export interface UseDataHandlersOptions {
 // Handler Types
 // ===========================================
 
-/** Layer data change handler */
-export type LayerDataChangeHandler<T> = (newValue: T, suppressHistory?: boolean) => void;
+/**
+ * Layer data change handler. Returns the depth gate's refusal when the write
+ * adds an element on a ladder rung >= 1 and the gate refuses it (the map is
+ * then unchanged and nothing is recorded); null otherwise.
+ */
+export type LayerDataChangeHandler<T> = (newValue: T, suppressHistory?: boolean) => DepthWriteRefusal | null;
 
 /** Handle cells change */
 export type HandleCellsChange = LayerDataChangeHandler<Cell[]>;
@@ -94,7 +98,6 @@ export type HandleRegionsChange = (regions: Region[], suppressHistory?: boolean)
 // Grouped Handlers
 // ===========================================
 
-/** Layer data handlers group */
 /**
  * Deep (ladder rung >= 1) cell write on the active layer. `update` maps the
  * rung's current cells to its next content; refused writes change nothing.
@@ -102,6 +105,7 @@ export type HandleRegionsChange = (regions: Region[], suppressHistory?: boolean)
  */
 export type HandleLevelCellsChange = (level: number, update: (current: Cell[]) => Cell[], suppressHistory?: boolean, context?: DepthWriteContext) => DepthWriteResult | null;
 
+/** Layer data handlers group */
 export interface LayerDataHandlers {
   handleCellsChange: HandleCellsChange;
   handleCurvesChange: HandleCurvesChange;

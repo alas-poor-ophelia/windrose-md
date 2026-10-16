@@ -15,7 +15,7 @@ import { getDataFilePath } from '../core/settingsAccessor';
 import { offsetToAxial } from '../geometry/core/offsetCoordinates';
 import { getSettings } from '../core/settingsAccessor';
 import { generateLayerId, DEFAULT_BOARD_ID } from './layerAccessor';
-import { migrateMapData, MapSchemaError, claimedSchemaVersion, isNewerSchema } from './schemaMigration';
+import { migrateMapData, MapSchemaError, claimedSchemaVersion, isNewerSchema, stampSchemaVersions } from './schemaMigration';
 import { calculateFitZoom } from '../geometry/core/hexMeasurements';
 import { resolveTileEntry } from '../assets/tilesetOperations';
 import {
@@ -50,9 +50,17 @@ function prunePendingNewMapOptions(): void {
   }
 }
 
+/**
+ * The preset parked for `mapId`, if any. A read refreshes its timestamp: the
+ * TTL only reaps presets nobody is using, so a new map that is re-mounted
+ * (pane switch, view change) before its first save keeps its preset (DATA-14).
+ */
 function getPendingNewMapOptions(mapId: string): NewMapOptions | undefined {
   prunePendingNewMapOptions();
-  return pendingNewMapOptions.get(mapId)?.options;
+  const entry = pendingNewMapOptions.get(mapId);
+  if (entry === undefined) return undefined;
+  entry.at = Date.now();
+  return entry.options;
 }
 
 /** Record creation presets for a map id that has not been created yet. */
@@ -948,12 +956,13 @@ async function writeMapEntryLocked(app: App, mapId: string, mapData: MapData, wr
   // output (no pretty-print): on a multi-MB multi-map file the indentation
   // pass plus the redundant re-parse tripled per-save main-thread time,
   // freezing the UI ~300-450ms on every autosave.
-  // Update this map with legacy tile ids upgraded (a copy-on-write result:
-  // the caller's live object is never edited). Only this entry is
+  // Update this map with legacy tile ids upgraded and each entry's schema
+  // version stamped by content (2 classic, 3 ladder; stampSchemaVersions). Both
+  // are copy-on-write: the caller's live object is never edited. Only this entry is
   // stringified; the others are spliced in as their stored text.
   let jsonString: string;
   try {
-    snapshot.entries.set(mapId, cachedEntry(mapId, canonicalizeTileIds(mapData)));
+    snapshot.entries.set(mapId, cachedEntry(mapId, stampSchemaVersions(canonicalizeTileIds(mapData))));
     jsonString = serializeStore(snapshot);
   } catch (serializeError) {
     console.error('[saveMapData] Serialization failed, save aborted:', serializeError);
@@ -1188,7 +1197,9 @@ function createNewMap(mapName: string = '', mapType: MapType = 'grid', options?:
     };
   }
 
-  return baseMap;
+  // Per-content version (2 classic, 3 when born a ladder map): the same stamp
+  // every write applies, so a fresh tree serialises exactly as it would load.
+  return stampSchemaVersions(baseMap);
 }
 
 /**
@@ -1281,6 +1292,6 @@ export {
   canonicalizeTileIds, applyLockedViewState, enqueueDataFileOp, getSaveQueue,
   notifyCorruptedDataFile, readRawMapEntry, storeFoundElsewhere, isMapTombstoned, MapDataUnreadableError, MapDeletedError, MapDataFileMissingError, MapSchemaError, createEmptyDataFile, ensureDataFileForNewMap,
   shouldRotateBak, otherBakSlot, bakPathForSlot, dailyBakPath, isSuspiciousShrink, backupTimestamp,
-  findBestBackup, restoreFromBackup, BAK_THROTTLE_MS
+  findBestBackup, restoreFromBackup, BAK_THROTTLE_MS, PENDING_NEW_MAP_CAP, PENDING_NEW_MAP_TTL_MS
 };
 export type { MapListEntry, MapListResult, BakSlot, DataFileBackup, NewMapOptions };

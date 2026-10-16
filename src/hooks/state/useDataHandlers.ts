@@ -31,17 +31,72 @@ import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 import { useCallback, useMemo, useRef } from 'preact/hooks';
 import { getActiveLayer, updateActiveLayer, promoteToStrata, getActiveBoardLayers, setActiveLayer, authoredCells } from '../../persistence/layerAccessor';
 import { snapshotLevelsOf, lodStampForCommit, type ParkedLodStamp } from './layerHistoryOps';
-import { writeDepthCells, withLod, type DepthWriteContext, type DepthWriteResult } from '../../persistence/depthAuthoring';
+import { writeDepthCells, guardDepthWrite, elementBytes, withLod, type DepthWriteContext, type DepthWriteRefusal, type DepthWriteResult } from '../../persistence/depthAuthoring';
 
-/** Does any element in the written value sit on a ladder rung >= 1? */
-function hasDeepElement(value: unknown): boolean {
-  return Array.isArray(value) && value.some((item: unknown) =>
-    typeof item === 'object' && item !== null && ((item as { homeLevel?: number }).homeLevel ?? 0) > 0);
+/** Rung (>= 1) an element is homed on; 0 for root or a malformed value. */
+function elementHome(item: unknown): number {
+  if (typeof item !== 'object' || item === null) return 0;
+  const home = (item as { homeLevel?: unknown }).homeLevel;
+  return typeof home === 'number' && Number.isInteger(home) && home > 0 ? home : 0;
 }
 
-/** The map with `lod` stamped when `value` carries a deep element; same reference otherwise. */
-function stampLodForDeepElements(mapData: MapData, value: unknown): MapData {
-  return mapData.lod === undefined && hasDeepElement(value) ? withLod(mapData) : mapData;
+/** Identity of an element on its rung: its id when it has one, else the object itself. */
+function elementKey(item: object, home: number): unknown {
+  const id = (item as { id?: unknown }).id;
+  return typeof id === 'string' ? `${id}@${home}` : item;
+}
+
+/**
+ * Elements of `next` homed on a rung >= 1 that `prev` did not already hold on
+ * that rung (by id, or by reference for id-less elements), grouped by rung. A
+ * move or edit of an existing deep element adds nothing; a placement, a
+ * duplicate or a re-home onto another rung does. Empty for every classic write.
+ */
+function addedDeepElements(prev: unknown, next: unknown): Map<number, unknown[]> {
+  const added = new Map<number, unknown[]>();
+  if (!Array.isArray(next)) return added;
+  let existing: Set<unknown> | null = null;
+  for (const item of next as unknown[]) {
+    const home = elementHome(item);
+    if (home === 0) continue;
+    if (existing === null) {
+      existing = new Set();
+      for (const old of (Array.isArray(prev) ? prev : []) as unknown[]) {
+        const oldHome = elementHome(old);
+        if (oldHome > 0) existing.add(elementKey(old as object, oldHome));
+      }
+    }
+    if (existing.has(elementKey(item as object, home))) continue;
+    const list = added.get(home);
+    if (list === undefined) added.set(home, [item]);
+    else list.push(item);
+  }
+  return added;
+}
+
+/**
+ * Apply an element write through the depth gate (DATA-03). Every rung that
+ * gains an element must pass `guardDepthWrite` (capability, ladder view,
+ * quarantine, byte budget) against the LIVE map; a refusal returns the reason
+ * and the caller leaves the map alone. The first newly added deep element
+ * stamps `lod` exactly as the first deep cell write does. The gate has already
+ * refused a quarantined map, so a stamp never re-activates one, and a write
+ * that only moves or edits existing deep elements never stamps (PX-02).
+ */
+function applyElementWrite(
+  current: MapData,
+  prevValue: unknown,
+  newValue: unknown,
+  write: (mapData: MapData) => MapData
+): { refusal: DepthWriteRefusal } | { refusal: null; mapData: MapData } {
+  const added = addedDeepElements(prevValue, newValue);
+  if (added.size === 0) return { refusal: null, mapData: write(current) };
+  const layer = getActiveLayer(current);
+  for (const [home, items] of added) {
+    const refusal = guardDepthWrite(current, layer.id, home, authoredCells(layer, home), { addedBytes: elementBytes(items) });
+    if (refusal !== null) return { refusal };
+  }
+  return { refusal: null, mapData: withLod(write(current)) };
 }
 
 
@@ -85,8 +140,14 @@ function useDataHandlers({
     fogOfWar: overrides.fogOfWar ?? fogOfWar,
     partyPins: overrides.partyPins ?? partyPins,
     savedRoutes: overrides.savedRoutes ?? savedRoutes,
-    // Ladder rungs by reference, only when present (an override that names
-    // `levels` wins, including one that removes them); `level` is UI-only.
+    // Ladder rungs by reference, only when the layer has them (an override
+    // that names `levels` wins); `level` is UI-only. A snapshot with no
+    // `levels` key is not "unknown" for history: when it comes from a rung
+    // write (`level` set) or the layer's last recorded value still had rungs,
+    // useLayerHistory records it as the frozen EMPTY_LEVELS sentinel, i.e.
+    // "all rungs removed". Erasing the last rung to empty (setLevelCells strips
+    // `levels`) is therefore its own undoable entry, and undo/redo strip the
+    // key rather than writing the sentinel or `levels: undefined`.
     ...snapshotLevelsOf('levels' in overrides ? overrides : layer),
     ...(overrides.level !== undefined ? { level: overrides.level } : {}),
     ...(overrides.lodStamped !== undefined ? { lodStamped: overrides.lodStamped } : {})
@@ -115,25 +176,36 @@ function useDataHandlers({
   }, []);
 
   const createLayerDataHandler = useCallback(<T,>(field: LayerField) => {
-    return (newValue: T, suppressHistory = false): void => {
-      if (isApplyingHistory()) return;
+    return (newValue: T, suppressHistory = false): DepthWriteRefusal | null => {
+      if (isApplyingHistory()) return null;
 
+      // Like handleLevelCellsChange: Preact runs the functional update
+      // synchronously, so the gate's verdict against the LIVE map is handed
+      // back to the caller (the MCP bridge reports it).
+      let refusal: DepthWriteRefusal | null = null;
       updateMapData((currentMapData) => {
         if (currentMapData == null) return currentMapData;
 
         // An element homed on a rung >= 1 is laid out on the ladder's lattice:
-        // the first such write stamps `lod` exactly as the first deep cell
-        // write does (and the history entry records it, so undo lifts it).
-        const newMapData = stampLodForDeepElements(updateActiveLayer(currentMapData, { [field]: newValue }), newValue);
+        // adding one passes the depth gate, and the first such write stamps
+        // `lod` (the history entry records it, so undo lifts it). A refusal
+        // leaves the map untouched and records nothing.
+        const activeLayer = getActiveLayer(currentMapData);
+        const applied = applyElementWrite(currentMapData, activeLayer[field], newValue, (m) => updateActiveLayer(m, { [field]: newValue }));
+        if (applied.refusal !== null) {
+          refusal = applied.refusal;
+          return currentMapData;
+        }
+        const newMapData = applied.mapData;
         const lodStamp = lodStampForHistory(currentMapData, newMapData, suppressHistory, field);
 
         // A suppressed (live drag) write records nothing but pins the pre-drag
         // value, so the commit at drop undoes the whole drag in one step.
-        const activeLayer = getActiveLayer(currentMapData);
         addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue, ...lodStamp }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []), { transient: suppressHistory });
 
         return newMapData;
       });
+      return refusal;
     };
   }, [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot, lodStampForHistory]);
 
@@ -216,14 +288,21 @@ function useDataHandlers({
   // surface the Board→Strata→Layer hierarchy by default. promoteToStrata is the
   // same idempotent operation the Simple/Strata toggle runs.
   const handleTilesChange = useCallback(
-    (newValue: TileAssignment[], suppressHistory = false): void => {
-      if (isApplyingHistory()) return;
+    (newValue: TileAssignment[], suppressHistory = false): DepthWriteRefusal | null => {
+      if (isApplyingHistory()) return null;
 
+      let refusal: DepthWriteRefusal | null = null;
       updateMapData((currentMapData) => {
         if (currentMapData == null) return currentMapData;
 
+        // Deep tiles pass the same gate as deep objects (createLayerDataHandler).
         const activeLayer = getActiveLayer(currentMapData);
-        let nextMapData = stampLodForDeepElements(updateActiveLayer(currentMapData, { tiles: newValue }), newValue);
+        const applied = applyElementWrite(currentMapData, activeLayer.tiles, newValue, (m) => updateActiveLayer(m, { tiles: newValue }));
+        if (applied.refusal !== null) {
+          refusal = applied.refusal;
+          return currentMapData;
+        }
+        let nextMapData = applied.mapData;
         const lodStamp = lodStampForHistory(currentMapData, nextMapData, suppressHistory, 'tiles');
         // Suppressed (live drag) writes pin the pre-drag value; see the cells handler.
         addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { tiles: newValue, ...lodStamp }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []), { transient: suppressHistory });
@@ -245,6 +324,7 @@ function useDataHandlers({
 
         return nextMapData;
       });
+      return refusal;
     },
     [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot, lodStampForHistory]
   );

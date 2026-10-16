@@ -101,6 +101,29 @@ describe('ladder byte oracle: a classic map is byte-identical with the capabilit
     expect(off).toContain('"x":3,"y":4');
   });
 
+  it('classic map saves schemaVersion 2 byte-identical, flag on and off', async () => {
+    const versionOf = (bytes: string): unknown => (JSON.parse(bytes) as { maps: Record<string, { schemaVersion?: unknown }> }).maps.oracle.schemaVersion;
+    expect(versionOf(initial)).toBe(2);
+
+    getSettings.mockReturnValue({ lodLadder: false });
+    const off = await loadEditSave(initial);
+    getSettings.mockReturnValue({ lodLadder: true });
+    const on = await loadEditSave(initial);
+
+    expect(on).toBe(off);
+    expect(versionOf(off)).toBe(2);
+    // Once load-time defaults have settled, load + save with no edit leaves
+    // the classic bytes exactly as they were.
+    const h = makeApp(initial);
+    expect((await saveMapData(h.app, 'oracle', await loadMapData(h.app, 'oracle', 'Oracle', 'hex'))).status).toBe('saved');
+    const settled = h.read();
+    const loaded = await loadMapData(h.app, 'oracle', 'Oracle', 'hex');
+    expect(loaded.schemaVersion).toBe(2);
+    expect((await saveMapData(h.app, 'oracle', loaded)).status).toBe('saved');
+    expect(h.read()).toBe(settled);
+    expect(versionOf(settled)).toBe(2);
+  });
+
   it('never writes a lod block, a levels key, or an empty container', async () => {
     getSettings.mockReturnValue({ lodLadder: true });
     const on = await loadEditSave(initial);
@@ -140,5 +163,22 @@ describe('ladder byte oracle: a LADDER map round-trips byte-identically', () => 
     expect((await saveMapData(h2.app, 'oracle', erased)).status).toBe('saved');
     expect(h2.read()).not.toContain('"levels"');
     expect(h2.read()).toMatch(/"lod"\s*:/);
+  });
+
+  it('ladder map saves schemaVersion 3', async () => {
+    const versionOf = (bytes: string): unknown => (JSON.parse(bytes) as { maps: Record<string, { schemaVersion?: unknown }> }).maps.oracle.schemaVersion;
+    const fresh = createNewMap('Oracle', 'hex');
+    expect(fresh.schemaVersion).toBe(2);
+    const withLod = { ...fresh, lod: { m: 4, minCellPx: 64, maxLevel: 3 } };
+    const ladder = setLevelCells(withLod, withLod.layers[0].id, 2, [{ x: 16, y: 0, color: '#8b5a2b' }]);
+    // The live tree is still stamped 2; the writer stamps by content.
+    expect(ladder.schemaVersion).toBe(2);
+
+    const h = makeApp();
+    expect((await saveMapData(h.app, 'oracle', ladder)).status).toBe('saved');
+    expect(versionOf(h.read())).toBe(3);
+    expect(ladder.schemaVersion).toBe(2);
+    const loaded = await loadMapData(h.app, 'oracle', 'Oracle', 'hex');
+    expect(loaded.schemaVersion).toBe(3);
   });
 });

@@ -15,6 +15,8 @@ import type { MapObject } from '#types/objects/object.types';
 import { HexGeometry } from '../../../src/geometry/core/HexGeometry';
 import { createGeometryLadder } from '../../../src/geometry/core/createGeometryLadder';
 import { getItemsInWorldRect } from '../../../src/objects/multiSelectOperations';
+import { ladderLabelBounds } from '../../../src/text/textLabelOperations';
+import type { TextLabel } from '#types/objects/note.types';
 import { makeLayer, makeMapData } from '../helpers/fixtures';
 
 const root = new HexGeometry(80, 'flat', null);
@@ -99,5 +101,46 @@ describe('getItemsInWorldRect without a view on a lod map (cross-model review it
     const [a, b] = around(ladder.geometryForLevel(2).getCellCenter(3, -1));
     const map = makeMapData({ mapType: 'hex', hexSize: 80, lod: LOD, layers: [makeLayer({ id: 'layer-1', objects: [rootObj, deepObj] })] } as never);
     expect(ids(getItemsInWorldRect(map, a, b, root, null, view))).toEqual(['deep']);
+  });
+});
+
+describe('getItemsInWorldRect labels with a ladder view (INT-02)', () => {
+  function textLabel(over: Partial<TextLabel> & { id: string }): TextLabel {
+    return { content: 'abcdefghij', position: { x: 0, y: 0 }, rotation: 0, fontSize: 16, fontFace: 'sans', color: '#ffffff', ...over } as TextLabel;
+  }
+  function labelMap(labels: TextLabel[]) {
+    return makeMapData({ mapType: 'hex', hexSize: 80, layers: [makeLayer({ id: 'layer-1', textLabels: labels })] });
+  }
+  const tiny = around({ worldX: 0, worldY: 0 }, 0.5);
+
+  it('marquee over a pop label at home+1 selects nothing', () => {
+    const pop = textLabel({ id: 'pop', homeLevel: 1, depthMode: 'pop' });
+    const persist = textLabel({ id: 'persist', homeLevel: 1, depthMode: 'persist' });
+    // view is rung 2 = home + 1: the pop label is not drawn, the persist one is.
+    expect(ids(getItemsInWorldRect(labelMap([pop, persist]), tiny[0], tiny[1], root, null, view))).toEqual(['persist']);
+  });
+
+  it('label whose visibleLevels exclude the current rung is not selected', () => {
+    const hidden = textLabel({ id: 'hidden', homeLevel: 2, visibleLevels: [0, 1] });
+    const shown = textLabel({ id: 'shown', homeLevel: 2, visibleLevels: [2] });
+    expect(ids(getItemsInWorldRect(labelMap([hidden, shown]), tiny[0], tiny[1], root, null, view))).toEqual(['shown']);
+  });
+
+  it('persist label box scaled by elementScale', () => {
+    // A root persist label at rung 2 is held: its drawn box is narrower in world
+    // px than the raw fontSize box the classic path measures.
+    const held = textLabel({ id: 'held', depthMode: 'persist' });
+    const box = ladderLabelBounds(held, null, { ladder, zoom: ZOOM, activeLevel: 2 })!;
+    const rawHalf = (held.content.length * held.fontSize * 0.6 + 8) / 2;
+    expect(box.width / 2).toBeLessThan(rawHalf);
+    const between = (box.width / 2 + rawHalf) / 2;
+    const map = labelMap([held]);
+    // A rect starting between the held and the raw half-width misses the label...
+    const miss = getItemsInWorldRect(map, { worldX: between, worldY: -1 }, { worldX: between + 1, worldY: 1 }, root, null, view);
+    expect(miss).toEqual([]);
+    // ...and one just inside the held box hits it.
+    const inside = box.width / 2 - 0.01;
+    const hit = getItemsInWorldRect(map, { worldX: inside, worldY: -1 }, { worldX: inside + 1, worldY: 1 }, root, null, view);
+    expect(ids(hit)).toEqual(['held']);
   });
 });

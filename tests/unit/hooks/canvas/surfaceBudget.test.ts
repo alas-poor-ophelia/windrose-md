@@ -1,5 +1,5 @@
 /**
- * Global byte budget with LRU across canvases (design section 3.5).
+ * Global byte budget with LRU across canvases.
  *
  * The registry is module global, so every test resets it first. Canvases are
  * plain objects cast to HTMLCanvasElement: the budget only ever uses them as
@@ -18,7 +18,10 @@ import {
   touchSurface,
   releaseSurface,
   setActiveCanvas,
+  releaseActiveCanvas,
   evictIfNeeded,
+  maxSurfacePixels,
+  SURFACE_BYTES_PER_PX,
   snapshot,
   resetSurfaceBudget,
 } from '../../../../src/hooks/canvas/surfaceBudget';
@@ -231,7 +234,7 @@ describe('snapshot', () => {
 
     const entry = shot.surfaces[0];
     expect(Object.keys(entry).sort()).toEqual(
-      ['active', 'alive', 'bytes', 'canvasId', 'lastUsed', 'level'].sort()
+      ['active', 'alive', 'bytes', 'canvasId', 'counted', 'lastUsed', 'level'].sort()
     );
     expect(entry.alive).toBe(true);
     expect(entry.active).toBe(true);
@@ -250,5 +253,96 @@ describe('snapshot', () => {
     touchSurface(canvas, 0);
 
     expect(snapshot().surfaces.map((surface) => surface.level)).toEqual([1, 0]);
+  });
+});
+
+describe('active slot follows focus, not paint (MEM-04)', () => {
+  it('two-canvas thrash: the active canvas keeps its current level', () => {
+    const focused = makeCanvas();
+    const other = makeCanvas();
+    setActiveCanvas(focused);
+    const big = 40 * MIB;
+    registerSurface(focused, 1, big);
+    registerSurface(focused, 2, big); // focused's current level
+    // The other pane re-renders (selection change, image decode, settle) and
+    // bakes two levels. Registering must not move the active slot.
+    registerSurface(other, 0, big);
+    registerSurface(other, 1, big); // other's current level
+    expect(snapshot().surfaces.find((surface) => surface.level === 2)?.active).toBe(true);
+
+    const plan = evictIfNeeded();
+    // Pass 0 takes the other pane's drift source, pass 1 its current level;
+    // the focused pane loses nothing.
+    expect(plan).toEqual([
+      { canvas: other, level: 0 },
+      { canvas: other, level: 1 },
+    ]);
+    expect(plan.some((victim) => victim.canvas === focused)).toBe(false);
+  });
+
+  it('pass 0 evicts background drift sources before any background current level', () => {
+    const active = makeCanvas();
+    const a = makeCanvas();
+    const b = makeCanvas();
+    setActiveCanvas(active);
+    registerSurface(a, 3, 30 * MIB); // a's current (oldest record overall)
+    registerSurface(b, 0, 30 * MIB); // b's drift source
+    registerSurface(b, 1, 30 * MIB); // b's current
+    registerSurface(active, 0, 30 * MIB);
+    // 120 MiB: one victim is enough, and it must be b's non-current level even
+    // though a's current level is older in LRU order.
+    expect(evictIfNeeded()).toEqual([{ canvas: b, level: 0 }]);
+  });
+
+  it('releaseActiveCanvas clears the slot only for the canvas that holds it', () => {
+    const first = makeCanvas();
+    const second = makeCanvas();
+    registerSurface(first, 0, 10);
+    registerSurface(second, 0, 10);
+    setActiveCanvas(first);
+    setActiveCanvas(second);
+    releaseActiveCanvas(first); // a late blur from the pane that lost focus
+    expect(snapshot().activeCanvasId).toBeGreaterThan(0);
+    expect(snapshot().surfaces.filter((surface) => surface.active)).toHaveLength(1);
+    releaseActiveCanvas(second);
+    expect(snapshot().activeCanvasId).toBe(0);
+    releaseActiveCanvas(makeCanvas()); // never registered: no-op
+    expect(snapshot().activeCanvasId).toBe(0);
+  });
+});
+
+describe('per-surface cap and classic accounting (MEM-05)', () => {
+  it('the iOS floor fits the budget', () => {
+    platformFlags.isIosApp = true;
+    const cap = maxSurfacePixels();
+    // Two capped surfaces, the floor the active canvas keeps, fit 32 MiB.
+    expect(2 * cap * SURFACE_BYTES_PER_PX).toBeLessThanOrEqual(budgetBytes());
+    const canvas = makeCanvas();
+    setActiveCanvas(canvas);
+    registerSurface(canvas, 1, cap * SURFACE_BYTES_PER_PX);
+    registerSurface(canvas, 2, cap * SURFACE_BYTES_PER_PX);
+    expect(evictIfNeeded()).toEqual([]);
+    expect(currentBytes()).toBeLessThanOrEqual(budgetBytes());
+  });
+
+  it('the desktop cap stays above the old 12M px static ceiling (desktop unchanged)', () => {
+    expect(maxSurfacePixels()).toBeGreaterThanOrEqual(12_000_000);
+  });
+
+  it('classic surfaces are reported but never counted or evicted', () => {
+    const classic = makeCanvas();
+    const ladder = makeCanvas();
+    registerSurface(classic, 0, 200 * MIB, false);
+    expect(currentBytes()).toBe(0);
+    expect(snapshot().uncountedBytes).toBe(200 * MIB);
+    expect(snapshot().surfaces[0].counted).toBe(false);
+
+    registerSurface(ladder, 0, 100 * MIB);
+    const plan = evictIfNeeded();
+    expect(plan.some((victim) => victim.canvas === classic)).toBe(false);
+
+    releaseSurface(classic, 0);
+    expect(snapshot().uncountedBytes).toBe(0);
+    expect(currentBytes()).toBe(100 * MIB);
   });
 });

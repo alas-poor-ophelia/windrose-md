@@ -119,19 +119,36 @@ describe("calculateContentBounds with ladder rungs", () => {
       expect(calculateContentBounds(layer, root, null)).toBeNull();
     });
 
-    it("a freeform stamp is its scaled drop-cell box centred on its world position", () => {
+    it("a deep freeform stamp keeps main's rule on its rung's own cell size", () => {
+      const mapData = ladderMap();
       const root = new HexGeometry(40, "flat", { maxCol: 10, maxRow: 10 });
-      const stamp = { col: 2, row: 2, tilesetId: "ts", tileId: "t", freeform: true, worldX: 300, worldY: 200, scale: 2 } as TileAssignment;
-      const cell = root.getCellBounds({ q: 2, r: 2, color: "" });
-      const w = cell.maxX - cell.minX;
-      const h = cell.maxY - cell.minY;
-      const b = calculateContentBounds(makeLayer({ tiles: [stamp] }), root, null);
-      expect(b).not.toBeNull();
-      if (b === null) return;
-      expect(b.minX).toBeCloseTo(300 - w);
-      expect(b.maxX).toBeCloseTo(300 + w);
-      expect(b.minY).toBeCloseTo(200 - h);
-      expect(b.maxY).toBeCloseTo(200 + h);
+      const ladder = ladderForAuthoredRungs(mapData, root);
+      if (ladder === null) throw new Error("expected a ladder");
+      const stamp = { col: 2, row: 2, tilesetId: "ts", tileId: "t", freeform: true, worldX: 300, worldY: 200, scale: 2, homeLevel: 2 } as TileAssignment;
+      const half = (ladder.geometryForLevel(2).cellSize * 2) / 2;
+      expect(calculateContentBounds(makeLayer({ tiles: [stamp] }), root, ladder))
+        .toEqual({ minX: 300 - half, minY: 200 - half, maxX: 300 + half, maxY: 200 + half });
+    });
+  });
+
+  describe("render level (PX-03 / DATA-07)", () => {
+    it("bounds exclude elements hidden at the render level", () => {
+      const mapData = ladderMap();
+      const root = new HexGeometry(40, "flat", { maxCol: 10, maxRow: 10 });
+      const ladder = ladderForAuthoredRungs(mapData, root);
+      if (ladder === null) throw new Error("expected a ladder");
+      // Shown at rung 2: an object homed there.
+      const shown = { id: "s", type: "entrance", position: { x: 5, y: 7 }, size: { width: 1, height: 1 }, homeLevel: 2 } as unknown as MapObject;
+      // Hidden at rung 2: a root object limited to level 0, and a pop-mode object homed on rung 0 far away.
+      const levelZeroOnly = { id: "z", type: "entrance", position: { x: 9, y: 9 }, size: { width: 1, height: 1 }, visibleLevels: [0] } as unknown as MapObject;
+      const popRoot = { id: "p", type: "entrance", position: { x: 8, y: 1 }, size: { width: 1, height: 1 }, depthMode: "pop" } as unknown as MapObject;
+      // Hidden at rung 2: a tile homed on the finer rung 3.
+      const finerTile = { col: 40, row: 40, tilesetId: "ts", tileId: "t", homeLevel: 3 } as TileAssignment;
+      const layer = makeLayer({ objects: [shown, levelZeroOnly, popRoot], tiles: [finerTile] });
+
+      expect(calculateContentBounds(layer, root, ladder, 2)).toEqual(ladder.geometryForLevel(2).getObjectBounds(shown));
+      // Without a render level every ladder element still counts (the measuring default).
+      expect(calculateContentBounds(layer, root, ladder)).not.toEqual(ladder.geometryForLevel(2).getObjectBounds(shown));
     });
   });
 

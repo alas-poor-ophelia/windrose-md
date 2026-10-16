@@ -29,7 +29,7 @@ import { eraseObjectAt } from '../../objects/objectOperations';
 import { eraseCellFromCurves, eraseWorldPolygonFromCurves } from '../../geometry/curves/curveBoolean';
 import { Notice } from 'obsidian';
 import { getActiveLayer, getActiveBoardLayers, authoredCells } from '../../persistence/layerAccessor';
-import { guardDepthWrite, type DepthWriteContext, type DepthWriteRefusal } from '../../persistence/depthAuthoring';
+import { guardDepthWrite, depthBudgetBytesOf, type DepthWriteContext, type DepthWriteRefusal } from '../../persistence/depthAuthoring';
 import { withCellPainted, withCellErased, depthRefusalMessage } from '../../drawing/depthCellOps';
 import { findTileHitInLayers } from '../../assets/tileFootprint';
 import { distanceToWallPath } from '../../drawing/wallPathOperations';
@@ -94,17 +94,6 @@ interface UsePaintToolResult {
   setIsDrawing: (v: boolean) => void;
 }
 
-/** Same cells in the same order with the same fill; a cheap content fallback for the stroke-end check. */
-function sameCells(a: Cell[], b: Cell[]): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    const x = a[i] as unknown as Record<string, unknown>;
-    const y = b[i] as unknown as Record<string, unknown>;
-    if (x.q !== y.q || x.r !== y.r || x.x !== y.x || x.y !== y.y || x.color !== y.color || x.opacity !== y.opacity) return false;
-  }
-  return true;
-}
-
 function usePaintTool({
   currentTool, mapData, geometry, selectedColor, selectedOpacity,
   canvasRef, screenToGrid, screenToWorld, getClientCoords,
@@ -150,6 +139,8 @@ function usePaintTool({
   // Serialised map size at deep-stroke start: the budget check adds a per-cell
   // estimate to it instead of stringifying the whole map on every tick (kgc.23).
   const strokeBytesRef = useRef<number | null>(null);
+  /** Whether the map had no lod block at stroke start (DepthWriteContext.lodAbsentAtStart). */
+  const strokeLodAbsentRef = useRef(false);
 
   /**
    * Commit history for whatever this stroke touched on `layer`, then clear the
@@ -218,7 +209,7 @@ function usePaintTool({
     // start, so a brush cannot add MAX_CELLS_PER_DEPTH_OP cells one tick at a time.
     const baseline = strokeInitialLevelCellsRef.current;
     const context: DepthWriteContext = baseline !== null && strokeBytesRef.current !== null
-      ? { baseline, serialisedBytes: strokeBytesRef.current }
+      ? { baseline, serialisedBytes: strokeBytesRef.current, lodAbsentAtStart: strokeLodAbsentRef.current }
       : {};
     const refuse = (reason: DepthWriteRefusal): void => {
       strokeRefusedRef.current = true;
@@ -465,7 +456,10 @@ function usePaintTool({
     resetProcessed();
     strokeLevelRef.current = level;
     strokeRefusedRef.current = false;
-    strokeBytesRef.current = level > 0 ? JSON.stringify(mapData).length : null;
+    // Journal payload size, measured once per stroke (one stringify plus, on a
+    // large map, one deflate); every tick budgets against it (DATA-01).
+    strokeBytesRef.current = level > 0 ? depthBudgetBytesOf(mapData) : null;
+    strokeLodAbsentRef.current = mapData.lod === undefined;
     // A deep stroke never touches layer.cells, so it snapshots only its rung.
     strokeInitialStateRef.current = level > 0 ? null : [...activeLayer.cells];
     strokeInitialLevelCellsRef.current = level > 0 ? authoredCells(activeLayer, level) : null;
@@ -500,7 +494,7 @@ function usePaintTool({
       // that paints and erases the same cell ends on a new array with the old
       // content and must not record a no-op undo entry.
       const finalLevelCells = authoredCells(layer, level);
-      if (finalLevelCells !== initialLevelCells && !sameCells(finalLevelCells, initialLevelCells)) {
+      if (strokeChanged(finalLevelCells, initialLevelCells)) {
         onLevelCellsChange(level, (cells: Cell[]) => cells, false);
       }
     }

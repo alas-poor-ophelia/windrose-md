@@ -36,7 +36,7 @@ import {
   getBrushCells, bresenhamLine, floodFillCells, buildWallBarrier, FLOOD_FILL_LIMIT,
   homeLevelFields, tilesOnRung, tileRung, withTilePlaced, withTilesErasedAt, withFillRegionCleared
 } from '../../drawing/tilePlacementOps';
-import { guardDepthWrite, elementBytes } from '../../persistence/depthAuthoring';
+import { guardDepthWrite, elementBytes, depthBudgetBytesOf } from '../../persistence/depthAuthoring';
 import { authoredCells } from '../../persistence/layerAccessor';
 import { depthRefusalMessage } from '../../drawing/depthCellOps';
 import { scatterSpacing, makeScatterDrop } from '../../drawing/scatterBrush';
@@ -566,7 +566,7 @@ const TilePlacementLayer = ({
     depthNoticeShownRef.current = false;
     strokeLevelRef.current = level;
     gestureBudgetRef.current = level > 0 && mapData
-      ? { serialisedBytes: JSON.stringify(mapData).length, addedBytes: 0 }
+      ? { serialisedBytes: depthBudgetBytesOf(mapData), addedBytes: 0 }
       : null;
 
     const coords = cellAtLevel(e.clientX, e.clientY, level);

@@ -1,21 +1,36 @@
 /**
- * Capability flag for the global lattice ladder (zoom-native depth for hex maps).
+ * Lattice ladder predicates: the one place that decides whether a hex map is
+ * shown and edited as a detail ladder, and with which parameters.
  *
- * Two different things, both needed:
+ * Two inputs, both needed:
  *  - the CAPABILITY (`settings.lodLadder`): may this install use the ladder
  *    machinery at all. Developer preview, off by default.
- *  - the MAP MODE (`mapData.lod`, added in a later phase): is this particular
- *    map a ladder map. Absent means classic.
+ *  - the MAP MODE (`mapData.lod`): per-map ladder parameters (m, minCellPx,
+ *    maxLevel). A map carrying `lod` is a ladder map on every install; absent
+ *    means classic, unless the capability is on and the map qualifies.
  *
- * When the capability is off, every caller must behave exactly as shipped:
- * nothing here touches `DEFAULTS`, and the unflagged paths stay byte-identical.
- * Design: .claude/lod-rd/06-integration-design.md, sections 10 and 13.
+ * What lives here: the capability read, the ladder-view and depth-authoring
+ * gates (`isLadderView`, `canAuthorDepth`), the derived depth quarantine
+ * (`isDepthQuarantined`), the deepest-rung scan over cells and homed elements,
+ * the ladder parameters and zoom ceiling of a map, the settings-panel merge
+ * (`mergeLadderConfig`, `ladderSettingsPatch`), and the developer knobs on
+ * `window.__windroseLadder`.
+ *
+ * Developer knobs are read when a caller asks, not watched: changing
+ * `minCellPx` / `maxLevel` on the window object takes effect at the next
+ * MapCanvas render (pan or zoom once, or `windrose_reload`), and `tileClip`
+ * only once the static surface is re-baked.
+ *
+ * When the capability is off and a map has no `lod`, every caller must behave
+ * exactly as shipped: nothing here touches `DEFAULTS`.
+ * Design: .claude/lod-rd/06-integration-design.md, sections 10, 13 and 19.
  */
-import type { MapData, LadderConfig } from '#types/core/map.types';
+import type { MapData, MapLayer, LadderConfig } from '#types/core/map.types';
 import { getSettings } from './settingsAccessor';
 import { DEFAULTS } from './dmtConstants';
 import { chooseLevel, crossingZoom, rungMiddleZoom, LADDER_DEFAULTS, LADDER_M_ALLOWLIST, MAX_LADDER_LEVEL, MAX_LADDER_ZOOM, type LadderParams } from '../geometry/core/lattice';
-import { authoredLevels } from '../persistence/layerAccessor';
+import { authoredLevels, levelsShapeIsValid } from '../persistence/layerAccessor';
+import { homeLevelOf } from './homeLevel';
 import type { LadderOverrides } from '../geometry/core/createGeometryLadder';
 
 /** True when the lattice ladder capability is switched on in plugin settings. */
@@ -24,10 +39,13 @@ function isLodLadderEnabled(): boolean {
 }
 
 /**
- * Developer override for ladder parameters, read from `window.__windroseLadder`.
- * Phase 1 has no per-map schema yet; the measurement fixture needs `minCellPx`
- * 40 so two crossings fall inside today's zoom range (design section 13).
- * Only honoured while the capability is on. Never persisted.
+ * Developer-only override of the ladder parameters, read from
+ * `window.__windroseLadder` while the capability is on. Never persisted.
+ * `ladderParamsFor` applies it on top of the map's parameters: minCellPx and
+ * maxLevel always, m only on a map without `lod` (a stored m is never
+ * overridden). Today only unit tests set it (depthAuthoring.test.ts,
+ * lodFlags.test.ts); no E2E or MCP path does. Read at call time, so a change
+ * shows at the next MapCanvas render.
  */
 function getLadderOverrides(): LadderOverrides {
   if (!isLodLadderEnabled()) return {};
@@ -107,21 +125,45 @@ function hasSubHexChildren(mapData: MapData): boolean {
   return children !== undefined && children !== null && Object.keys(children).length > 0;
 }
 
-/** Deepest rung >= 1 holding authored cells on any layer; 0 when none. */
-function deepestAuthoredRung(mapData: MapData): number {
+/**
+ * Deepest rung >= 1 holding depth content across `layers`: authored rung
+ * cells, or an object, text label or tile homed on a rung (kgc.12; the home is
+ * read through `homeLevelOf`, so a malformed value counts as root). 0 when
+ * none. Export uses it over the exported layers only.
+ */
+function deepestAuthoredRungOfLayers(layers: readonly MapLayer[]): number {
   let deepest = 0;
-  for (const layer of mapData.layers ?? []) {
+  for (const layer of layers) {
     const levels = authoredLevels(layer);
     const last = levels.length > 0 ? levels[levels.length - 1] : 0;
     if (last > deepest) deepest = last;
-    // Elements homed on a rung (kgc.12) are laid out on the lattice like cells.
     for (const list of [layer.objects, layer.textLabels, layer.tiles]) {
-      for (const item of list ?? []) {
-        const home = (item as { homeLevel?: number }).homeLevel ?? 0;
+      for (const item of (list ?? []) as unknown[]) {
+        const home = homeLevelOf(item);
         if (home > deepest) deepest = home;
       }
     }
   }
+  return deepest;
+}
+
+/**
+ * `deepestAuthoredRung` per `mapData.layers` array. Wheel and pinch handlers
+ * ask through `isLadderView` / `getMaxZoom` on every tick, and the answer
+ * changes only when the layers do. Every layer edit (including
+ * `setLevelCells`) replaces the layers array, the same identity contract the
+ * static render key relies on, so a stale entry can never be read.
+ */
+const deepestRungMemo = new WeakMap<MapLayer[], number>();
+
+/** Deepest rung >= 1 holding depth content (rung cells or homed elements) on any layer; 0 when none. */
+function deepestAuthoredRung(mapData: MapData): number {
+  const layers = mapData.layers;
+  if (!Array.isArray(layers)) return 0;
+  const cached = deepestRungMemo.get(layers);
+  if (cached !== undefined) return cached;
+  const deepest = deepestAuthoredRungOfLayers(layers);
+  deepestRungMemo.set(layers, deepest);
   return deepest;
 }
 
@@ -140,6 +182,13 @@ function hasDepthContent(mapData: MapData): boolean {
  * its bytes untouched.
  */
 function isDepthQuarantined(mapData: MapData): { quarantined: boolean; reason: string | null } {
+  // A `levels` container this build cannot read (an array, or content under a
+  // key that is not a rung) is held untouched rather than half-rendered.
+  for (const layer of mapData.layers ?? []) {
+    if (!levelsShapeIsValid((layer as { levels?: unknown }).levels)) {
+      return { quarantined: true, reason: 'invalid-levels-key' };
+    }
+  }
   const deepest = deepestAuthoredRung(mapData);
   const lod = mapData.lod;
   if (lod === undefined || lod === null) {
@@ -294,8 +343,8 @@ function zoomForLevel(mapData: MapData | null | undefined, level: number): numbe
 }
 
 export {
-  zoomForLevel, isLodLadderEnabled, getLadderOverrides, ladderTileClipAt, isLadderView, isDepthQuarantined, canAuthorDepth,
-  ladderParamsFor, getMaxZoom, hasDepthContent, hasSubHexChildren, deepestAuthoredRung,
+  zoomForLevel, isLodLadderEnabled, ladderTileClipAt, isLadderView, isDepthQuarantined, canAuthorDepth,
+  ladderParamsFor, getMaxZoom, hasDepthContent, hasSubHexChildren, deepestAuthoredRung, deepestAuthoredRungOfLayers,
   ladderOpensAt, mergeLadderConfig, ladderSettingsPatch, MAX_LADDER_LEVEL, MAX_LADDER_ZOOM
 };
 export type { LadderTileClipMode, LadderPatch };

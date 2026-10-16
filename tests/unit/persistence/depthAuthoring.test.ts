@@ -6,13 +6,43 @@ vi.mock('../../../src/core/settingsAccessor', () => ({ getSettings }));
 
 const { createNewMap } = await import('../../../src/persistence/fileOperations');
 const { authoredCells, setLevelCells } = await import('../../../src/persistence/layerAccessor');
-const { MAX_JOURNAL_PAYLOAD } = await import('../../../src/persistence/saveJournal');
+const { MAX_JOURNAL_PAYLOAD, journalPayloadLength } = await import('../../../src/persistence/saveJournal');
 const {
-  canBeginDepthAuthoring, withLod, guardDepthWrite, writeDepthCells, MAX_CELLS_PER_DEPTH_OP, DEPTH_BUDGET_BYTES, BYTES_PER_CELL_ESTIMATE, elementBytes, depthEntryRefusal,
+  canBeginDepthAuthoring, withLod, guardDepthWrite, writeDepthCells, MAX_CELLS_PER_DEPTH_OP, DEPTH_BUDGET_BYTES, BYTES_PER_CELL_ESTIMATE, elementBytes, depthEntryRefusal, depthBudgetBytesOf,
 } = await import('../../../src/persistence/depthAuthoring');
 
 function hexMap(): MapData {
   return createNewMap('Depth', 'hex');
+}
+
+/**
+ * Deterministic text that deflate cannot shrink much (xorshift over `alphabet`),
+ * so the journal's encoded payload tracks its length. 'x'.repeat(n) would
+ * deflate to almost nothing and never approach the budget.
+ */
+function noise(length: number, alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'): string {
+  let seed = 0x9e3779b9;
+  const out: string[] = [];
+  for (let i = 0; i < length; i++) {
+    seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; // xorshift32
+    out.push(alphabet[(seed >>> 0) % alphabet.length]);
+  }
+  return out.join('');
+}
+
+/** A map padded with noise so its encoded journal payload sits just under `target`. */
+function paddedTo(map: MapData, target: number): MapData {
+  let length = target;
+  for (let i = 0; i < 6; i++) {
+    const measured = depthBudgetBytesOf({ ...map, name: noise(length) });
+    length = Math.max(0, length + (target - measured));
+  }
+  let padded: MapData = { ...map, name: noise(length) };
+  while (depthBudgetBytesOf(padded) > target) {
+    length -= 64;
+    padded = { ...map, name: noise(length) };
+  }
+  return padded;
 }
 
 describe('depthAuthoring', () => {
@@ -79,12 +109,13 @@ describe('depthAuthoring', () => {
 
   it('refuses a write that would cross the byte budget, and a shrinking write never does', () => {
     const m = hexMap();
-    const padded: MapData = { ...m, name: 'x'.repeat(DEPTH_BUDGET_BYTES - 500) };
+    const padded = paddedTo(m, DEPTH_BUDGET_BYTES - 500);
+    expect(depthBudgetBytesOf(padded)).toBeLessThanOrEqual(DEPTH_BUDGET_BYTES - 500);
     expect(guardDepthWrite(padded, m.layers[0].id, 1, Array.from({ length: 100 }, (_, i) => ({ q: i, r: 0, color: '#abcdef' })))).toBe('over-budget');
     const stamped = writeDepthCells(m, m.layers[0].id, 1, [{ q: 4, r: 0, color: '#123456' }, { q: 5, r: 0, color: '#123456' }]);
     expect(stamped.ok).toBe(true);
     if (stamped.ok) {
-      const fat: MapData = { ...stamped.mapData, name: 'x'.repeat(DEPTH_BUDGET_BYTES + 10) };
+      const fat: MapData = { ...stamped.mapData, name: noise(DEPTH_BUDGET_BYTES + 10) };
       expect(guardDepthWrite(fat, m.layers[0].id, 1, [{ q: 4, r: 0, color: '#123456' }])).toBeNull();
     }
   });
@@ -197,9 +228,10 @@ describe('depthAuthoring', () => {
       const id = m.layers[0].id;
       const stamped = writeDepthCells(m, id, 1, [{ q: 0, r: 0, color: '#abcdef' }]);
       if (!stamped.ok) throw new Error('expected the stamp to land');
-      const base = JSON.stringify(stamped.mapData).length;
-      const headroom = 200;
-      const fat: MapData = { ...stamped.mapData, name: 'x'.repeat(DEPTH_BUDGET_BYTES - base - headroom) };
+      const fat = paddedTo(stamped.mapData, DEPTH_BUDGET_BYTES - 200);
+      const headroom = DEPTH_BUDGET_BYTES - depthBudgetBytesOf(fat);
+      expect(headroom).toBeGreaterThanOrEqual(200);
+      expect(headroom).toBeLessThan(5000);
       const cells = authoredCells(fat.layers[0], 1);
       expect(guardDepthWrite(fat, id, 1, cells, { addedBytes: headroom - 50 })).toBeNull();
       expect(guardDepthWrite(fat, id, 1, cells, { addedBytes: headroom + 50 })).toBe('over-budget');
@@ -245,14 +277,79 @@ describe('depthAuthoring growth by key and size unit (Codex review)', () => {
     expect(guardDepthWrite(fat, id, 1, current.map(c => ({ ...c, color: '#000000' })))).toBeNull();
   });
 
-  it('measures the budget in UTF-16 code units, the unit the save journal caps (CJK label)', () => {
+  it('CJK payload measured encoded', () => {
+    const m = withLod(hexMap());
+    // Repetitive CJK: 600k chars, UTF-8 ~1.8 MB, but it deflates to almost
+    // nothing, so the journal stores it with room to spare: accepted.
+    const repetitive: MapData = { ...m, name: '地'.repeat(600_000) };
+    expect(new TextEncoder().encode(JSON.stringify(repetitive)).length).toBeGreaterThan(DEPTH_BUDGET_BYTES);
+    expect(depthBudgetBytesOf(repetitive)).toBeLessThan(DEPTH_BUDGET_BYTES);
+    expect(guardDepthWrite(repetitive, m.layers[0].id, 1, row(1, 0))).toBeNull();
+
+    // Varied CJK: .length 700k is under the budget, but the deflated base64 the
+    // journal would store is over it (the journal would refuse the payload), so
+    // the gate must measure what the journal stores, not .length.
+    let alphabet = '';
+    for (let c = 0x4e00; c < 0x4e00 + 8192; c++) alphabet += String.fromCharCode(c);
+    const varied: MapData = { ...m, name: noise(700_000, alphabet) };
+    const json = JSON.stringify(varied);
+    expect(json.length).toBeLessThan(DEPTH_BUDGET_BYTES);
+    expect(journalPayloadLength(json)).toBeGreaterThan(DEPTH_BUDGET_BYTES);
+    expect(depthBudgetBytesOf(varied)).toBe(journalPayloadLength(json));
+    expect(guardDepthWrite(varied, m.layers[0].id, 1, row(1, 0))).toBe('over-budget');
+  });
+
+  it('raw 2 MB map that compresses under the cap is accepted', () => {
+    const m = withLod(hexMap());
+    const id = m.layers[0].id;
+    // A realistic large map: 60k painted cells plus repetitive text, ~2.3 MB raw.
+    const big: MapData = {
+      ...m,
+      description: 'A long corridor of the old keep. '.repeat(10_000),
+      layers: [{ ...m.layers[0], cells: Array.from({ length: 60_000 }, (_, i) => ({ q: i % 300, r: Math.floor(i / 300), color: '#4a7c59' })) }],
+    };
+    const raw = JSON.stringify(big).length;
+    expect(raw).toBeGreaterThan(2_000_000);
+    expect(raw).toBeGreaterThan(MAX_JOURNAL_PAYLOAD);
+    expect(depthBudgetBytesOf(big)).toBeLessThan(DEPTH_BUDGET_BYTES);
+    expect(guardDepthWrite(big, id, 1, row(100, 0))).toBeNull();
+    const written = writeDepthCells(big, id, 1, row(100, 0));
+    expect(written.ok).toBe(true);
+  });
+});
+
+describe('a deep write that changes nothing never stamps lod (DATA-02)', () => {
+  beforeEach(() => { getSettings.mockReset(); getSettings.mockReturnValue({ lodLadder: true }); });
+
+  it('erase on an empty rung of a map without lod returns the same reference and no lod', () => {
     const m = hexMap();
-    // 600k CJK chars: .length 600k (under the budget), UTF-8 ~1.8 MB (over the 1.6 MB budget).
-    const cjk: MapData = { ...withLod(m), name: '地'.repeat(600_000) };
-    expect(JSON.stringify(cjk).length).toBeLessThan(DEPTH_BUDGET_BYTES);
-    expect(new TextEncoder().encode(JSON.stringify(cjk)).length).toBeGreaterThan(DEPTH_BUDGET_BYTES);
-    expect(JSON.stringify(cjk).length).toBeLessThanOrEqual(MAX_JOURNAL_PAYLOAD);
-    // The journal keeps this map (payload.length <= MAX_JOURNAL_PAYLOAD), so the guard must not refuse it.
-    expect(guardDepthWrite(cjk, m.layers[0].id, 1, row(1, 0))).toBeNull();
+    expect(m.lod).toBeUndefined();
+    const r = writeDepthCells(m, m.layers[0].id, 2, []);
+    expect(r.ok).toBe(true);
+    expect(r.mapData).toBe(m);
+    expect(r.mapData.lod).toBeUndefined();
+  });
+
+  it('paint then erase the same cell in one stroke leaves no lod', () => {
+    const m = hexMap();
+    const id = m.layers[0].id;
+    const context = { baseline: [], serialisedBytes: depthBudgetBytesOf(m), lodAbsentAtStart: m.lod === undefined };
+    const painted = writeDepthCells(m, id, 1, [{ q: 3, r: 1, color: '#abcdef' }], context);
+    if (!painted.ok) throw new Error('expected the paint tick to land');
+    expect(painted.mapData.lod).toBeDefined();
+    const erased = writeDepthCells(painted.mapData, id, 1, [], context);
+    expect(erased.ok).toBe(true);
+    expect(erased.mapData.lod).toBeUndefined();
+    expect(erased.mapData.layers[0].levels).toBeUndefined();
+  });
+
+  it('a ladder map keeps its lod when a stroke empties its rung', () => {
+    const m = withLod(hexMap());
+    const id = m.layers[0].id;
+    const context = { baseline: [], serialisedBytes: depthBudgetBytesOf(m), lodAbsentAtStart: false };
+    const painted = writeDepthCells(m, id, 1, [{ q: 3, r: 1, color: '#abcdef' }], context);
+    if (!painted.ok) throw new Error('expected the paint tick to land');
+    const erased = writeDepthCells(painted.mapData, id, 1, [], context);
+    expect(erased.mapData.lod).toEqual(m.lod);
   });
 });

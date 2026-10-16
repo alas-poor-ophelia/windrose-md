@@ -13,6 +13,7 @@ import {
   authoredLevels,
   setLevelCells,
   normaliseLevels,
+  levelsShapeIsValid,
   cloneLayer,
   promoteToStrata,
 } from '../../../src/persistence/layerAccessor';
@@ -131,15 +132,55 @@ describe('normaliseLevels', () => {
     expect(normaliseLevels(ladder)).toBe(ladder);
   });
 
-  it('removes empty rungs, key "0", non-integer keys, then an empty container, never content', () => {
+  it('removes empty or non-array rung values, then an empty container; keeps content under any key', () => {
     const l = layer({ levels: { 1: [], 2: [cell(1, 1)] } });
     rawKey(l, '0', [cell(9, 9)]);
     rawKey(l, '1.5', [cell(8, 8)]);
+    rawKey(l, '01', []);
+    (l.levels as unknown as Record<string, unknown>)['3'] = 'not cells';
     const n = normaliseLevels(l);
-    expect(n.levels).toEqual({ 2: [cell(1, 1)] });
+    expect(n.levels).toEqual({ 0: [cell(9, 9)], '1.5': [cell(8, 8)], 2: [cell(1, 1)] });
     expect(n.cells).toBe(l.cells);
     expect('levels' in normaliseLevels(layer({ levels: { 1: [] } }))).toBe(false);
     expect('levels' in normaliseLevels(layer({ levels: {} }))).toBe(false);
+    expect('levels' in normaliseLevels(layer({ levels: null as unknown as MapLayer['levels'] }))).toBe(false);
+  });
+
+  it("levels {'0':[c]} keeps the cell through migrate", () => {
+    const l = layer({ levels: {} });
+    rawKey(l, '0', [cell(9, 9)]);
+    const m = migrateMapData(roundTrip(mapWith(l)));
+    expect(m.layers[0].levels).toEqual({ 0: [cell(9, 9)] });
+    expect(levelsShapeIsValid(m.layers[0].levels)).toBe(false);
+  });
+
+  it('array-shaped levels untouched', () => {
+    const arrayLevels = [[cell(1, 1)], [cell(2, 2)]];
+    const l = layer({ levels: arrayLevels as unknown as MapLayer['levels'] });
+    expect(normaliseLevels(l)).toBe(l);
+    const m = migrateMapData(roundTrip(mapWith(l)));
+    expect(m.layers[0].levels).toEqual(arrayLevels);
+    expect(levelsShapeIsValid(m.layers[0].levels)).toBe(false);
+  });
+});
+
+describe('levelsShapeIsValid (C3)', () => {
+  it('is true when absent or every non-empty array sits under a rung key', () => {
+    expect(levelsShapeIsValid(undefined)).toBe(true);
+    expect(levelsShapeIsValid(null)).toBe(true);
+    expect(levelsShapeIsValid({})).toBe(true);
+    expect(levelsShapeIsValid({ 1: [cell(1, 1)], 12: [cell(2, 2)] })).toBe(true);
+    // Empty or non-array values under a bad key are not content (load drops them).
+    expect(levelsShapeIsValid({ 0: [], '01': 'x', 2: [cell(1, 1)] })).toBe(true);
+  });
+
+  it('is false for an array, a non-record, or content under a key that is not a rung', () => {
+    expect(levelsShapeIsValid([[cell(1, 1)]])).toBe(false);
+    expect(levelsShapeIsValid([])).toBe(false);
+    expect(levelsShapeIsValid(5)).toBe(false);
+    for (const key of ['0', '01', '1.5', '-1', 'x', '99999999999999999999']) {
+      expect(levelsShapeIsValid({ [key]: [cell(1, 1)] }), key).toBe(false);
+    }
   });
 });
 

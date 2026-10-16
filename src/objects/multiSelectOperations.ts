@@ -20,6 +20,7 @@ import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
 import { getActiveLayer } from '../persistence/layerAccessor';
 import { ladderObjectFootprint } from './ladderHitTest';
 import { getFontCss } from '../text/fontOptions';
+import { ladderLabelBounds } from '../text/textLabelOperations';
 
 
 // ===========================================
@@ -130,8 +131,7 @@ function getObjectWorldBounds(
     // INTENTIONAL CLASSIC BEHAVIOUR CHANGE (kept after the 2026-10-12
     // cross-model review, item 4): main used the one-hex box only, so a
     // multi-cell hex object was marquee-selectable by its anchor hex alone.
-    // Single-cell objects get exactly the old box. Listed in
-    // .claude/lod-rd/06-integration-design.md s20.
+    // Single-cell objects get exactly the old box.
     const drawnMinX = center.worldX - hexSize / 2;
     const drawnMinY = center.worldY - hexSize / 2;
     return {
@@ -184,7 +184,19 @@ function getTextLabelWorldBounds(
   const paddingY = 2;
   const boundingWidth = textWidth + paddingX * 2;
   const boundingHeight = textHeight + paddingY * 2;
-  
+  return labelBoxBounds(pos, boundingWidth, boundingHeight, rotation);
+}
+
+/**
+ * Axis-aligned world bounds of a label box of the given size centred on `pos`
+ * and rotated by `rotation` degrees.
+ */
+function labelBoxBounds(
+  pos: { x: number; y: number },
+  boundingWidth: number,
+  boundingHeight: number,
+  rotation: number
+): WorldBounds {
   // For rotated text, calculate the axis-aligned bounding box
   if (rotation !== 0) {
     const angleRad = (rotation * Math.PI) / 180;
@@ -253,7 +265,16 @@ function getItemsInWorldRect(
   const textLabels = activeLayer.textLabels ?? [];
   for (const label of textLabels) {
     if (rootOnly && (label.homeLevel ?? 0) !== 0) continue;
-    const labelBounds = getTextLabelWorldBounds(label, ctx);
+    let labelBounds: WorldBounds;
+    if (view !== undefined) {
+      // Ladder view: the label as drawn at this rung (band, visibleLevels,
+      // floor, held size), the same box the point pick uses.
+      const box = ladderLabelBounds(label, ctx, { ladder: view.ladder, zoom: view.zoom, activeLevel: view.level });
+      if (box === null) continue;
+      labelBounds = labelBoxBounds(label.position, box.width, box.height, label.rotation ?? 0);
+    } else {
+      labelBounds = getTextLabelWorldBounds(label, ctx);
+    }
     if (rectsOverlap(minX, minY, maxX, maxY, labelBounds)) {
       items.push({ type: 'text', id: label.id, data: label });
     }

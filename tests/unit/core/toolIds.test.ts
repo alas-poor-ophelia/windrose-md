@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 
-import { TOOL_IDS, isToolId } from '../../../src/core/toolIds';
+import { isToolId } from '../../../src/core/toolIds';
 
 describe('toolIds', () => {
   it('knows the paint tool as draw and refuses paint', () => {
@@ -14,8 +14,7 @@ describe('toolIds', () => {
     expect(isToolId('paint')).toBe(false);
   });
 
-  it('accepts every listed id and nothing else', () => {
-    for (const id of TOOL_IDS) expect(isToolId(id)).toBe(true);
+  it('refuses non-tool strings, inherited keys and non-strings', () => {
     expect(isToolId('')).toBe(false);
     expect(isToolId('toString')).toBe(false);
     expect(isToolId(42)).toBe(false);

@@ -36,7 +36,6 @@ import { OBJECT_FLOOR_PX, LABEL_FLOOR_PX, groupByDepth, groupVisibleAt, elementZ
 import { createLatticeClipCache, drawLadderLattice } from './latticeRenderer';
 import type { LatticeClipCache } from './latticeRenderer';
 import type { GeometryLadder } from '../core/createGeometryLadder';
-import { setActiveCanvas } from '../../hooks/canvas/surfaceBudget';
 import { fogDepsForRung } from '../../hooks/canvas/rungFog';
 import { recordFrame, recordRebuild, recordPhase } from '../../hooks/canvas/ladderTelemetry';
 import { getFontCss } from '../../text/fontOptions';
@@ -50,7 +49,7 @@ import { getActiveLayer, getRenderLayers, getExportLayers, getActiveBoardId, get
 import { getRenderer } from './layerCellsRenderer';
 import { blitStaticContent } from './staticLayerCache';
 import type { DrawStaticFn } from './staticLayerCache';
-import { drawStaticScene, makeRenderFrame, objectRenderDeps } from './staticPasses';
+import { drawStaticScene, makeRenderFrame, objectRenderDeps, LADDER_EPOCH } from './staticPasses';
 import type { StaticScene } from './staticPasses';
 
 /**
@@ -64,8 +63,16 @@ const latticeClipCaches = new WeakMap<HTMLCanvasElement, { ladder: GeometryLadde
 const ignorePhase: typeof recordPhase = () => undefined;
 /** Last active level painted per canvas, for the crossing flag in telemetry. */
 const lastLadderLevels = new WeakMap<HTMLCanvasElement, number>();
-/** Lattice epoch (see staticPasses.ts LADDER_EPOCH): existence never moves in Phase 1. */
-const LADDER_EPOCH = 0;
+
+/**
+ * The raw developer tile-clip knob (`__windroseLadder.tileClip`), or null. A
+ * static-key term: renderLadderTiles reads the knob at bake time, so without it
+ * a flipped knob kept serving the old surface until a plugin reload.
+ */
+function ladderTileClipKnob(): unknown {
+  if (typeof activeWindow === 'undefined') return null;
+  return (activeWindow as unknown as { __windroseLadder?: { tileClip?: unknown } }).__windroseLadder?.tileClip ?? null;
+}
 
 function clipCacheFor(canvas: HTMLCanvasElement, ladder: GeometryLadder): LatticeClipCache {
   const held = latticeClipCaches.get(canvas);
@@ -132,12 +139,10 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // An explicit `level` (export, previews) overrides the zoom's rung.
   const level = ladder !== null ? (levelOverride ?? ladder.activeLevel(zoom)) : 0;
   const crossing = ladderOn && lastLadderLevels.get(canvas) !== level;
-  if (ladderOn) {
-    lastLadderLevels.set(canvas, level);
-    // Only a real map canvas ever claims the surface budget's active slot;
-    // previews and export bypass the cache, so they never displace it.
-    setActiveCanvas(canvas);
-  }
+  // The surface budget's active slot follows user focus (MapCanvas claims it on
+  // focus, pointerdown and wheel), never paint order: a background pane that
+  // re-renders must not take protection from the pane the user is driving.
+  if (ladderOn) lastLadderLevels.set(canvas, level);
 
   traceZoom('paint', {
     zoom,
@@ -213,16 +218,21 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     // have no cheap version yet; plugin settings are mutated in place.
     getTileMetadataRenderVersion(),
     JSON.stringify(THEME), JSON.stringify(visibility),
-    // The levels-aware term (design 06 s18/s19 item 10) is `mapData.layers` above:
+    // The levels-aware term is `mapData.layers` above:
     // `setLevelCells`, the one writer of rungs >= 1, returns a new mapData whose
     // `layers` array is a new array holding the re-spread layer, so a deep write
     // always changes this identity and the baked surface re-bakes. Its no-op
     // returns the same mapData, which correctly keeps the surface.
     // The ladder by IDENTITY only. Deliberately NOT the level or an epoch: the key
     // is compared against the DRIFT SOURCE's key at a crossing, so a per-level term
-    // would miss on every crossing and force the synchronous bake D17 forbids.
+    // would miss on every crossing and force a synchronous bake in the crossing
+    // frame, which must only ever blit a cached surface.
     // `byLevel` already carries the level.
     ladder,
+    // Developer tile-clip knob, read by renderLadderTiles at bake time. The raw
+    // value is level-independent, so it keeps the key level-free; flipping the
+    // knob re-bakes instead of serving a stale surface until reload.
+    ladderTileClipKnob(),
   ];
 
   // A bake is the one part of a frame worth attributing separately, and it happens
@@ -266,7 +276,8 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     if (ladderOn) recordPhase('lattice', performance.now() - latticeStart);
   }
 
-  // Elements at depth (design 06 section 8), LIVE after the blit (or the direct
+  // Elements at depth (objects and labels on their home rung, shown per their
+  // element band), LIVE after the blit (or the direct
   // draw of a one-shot preview/export canvas) so they stay crisp under the
   // crossing scale-blit. Same layer and draw order as the classic bake: the
   // active layer's objects, then its text labels.
@@ -410,4 +421,4 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   if (ladderOn) recordFrame(performance.now() - frameStart, level, crossing);
 };
 
-export { renderCanvas };
+export { renderCanvas, ladderTileClipKnob };

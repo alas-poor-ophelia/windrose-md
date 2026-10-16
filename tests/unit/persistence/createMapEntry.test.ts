@@ -9,7 +9,7 @@ import type { App } from 'obsidian';
 import { TFile } from 'obsidian';
 
 import { buildMapEntry, createMapEntry, createNewMap, getEntryGeneration } from '../../../src/persistence/fileOperations';
-import { DEFAULTS, SCHEMA_VERSION } from '../../../src/core/dmtConstants';
+import { DEFAULTS } from '../../../src/core/dmtConstants';
 import { DEFAULT_BOARD_ID } from '../../../src/persistence/layerAccessor';
 import type { MapData, MapLayer } from '../../../types/core/map.types';
 
@@ -77,7 +77,7 @@ describe('buildMapEntry matches the old generated-dungeon literal', () => {
       settings: { useGlobalSettings: false, overrides: { distancePerCellGrid: 5, distanceUnitGrid: 'ft' } },
       uiPreferences: { rememberPanZoom: true, rememberSidebarState: true, rememberExpandedState: false },
       lastTextLabelSettings: null,
-      schemaVersion: SCHEMA_VERSION,
+      schemaVersion: 2,
       activeLayerId: layerId,
       layerPanelVisible: false,
       layers: [{

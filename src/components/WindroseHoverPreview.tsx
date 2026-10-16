@@ -13,11 +13,11 @@ import { renderCanvas } from '../geometry/renderers/mapRenderer';
 import { HexGeometry } from '../geometry/core/HexGeometry';
 import { getApp, getSettings, resolveTheme } from '../core/settingsAccessor';
 import { resolveHoverPreviewView } from '../core/deepLinkHoverTarget';
-import { isDepthQuarantined, isLadderView, ladderParamsFor } from '../core/lodFlags';
+import { deepestAuthoredRungOfLayers, isLadderView, ladderParamsFor } from '../core/lodFlags';
 import { createGeometryLadder } from '../geometry/core/createGeometryLadder';
 import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
 import { overrideRungFor } from '../geometry/renderers/elementBands';
-import { authoredLevels, getActiveLayer } from '../persistence/layerAccessor';
+import { getActiveLayer } from '../persistence/layerAccessor';
 
 const BASE_WIDTH = 240;
 const BASE_HEIGHT = 180;
@@ -111,12 +111,12 @@ function WindroseHoverPreview({ mapId, x, y, zoom: linkZoom, layerId, subHexPath
         // render bypasses the surface cache: a preview never takes a per-level
         // surface, a budget slot or the active-canvas claim (s3.5). No rung, no
         // ladder: classic previews stay byte-identical.
-        const focusedLevels = authoredLevels(getActiveLayer(focused));
-        const deepestAuthored = focusedLevels.length > 0 ? focusedLevels[focusedLevels.length - 1] : 0;
+        // Rung cells or elements homed on a rung, like the export (PX-03).
+        const deepestAuthored = deepestAuthoredRungOfLayers([getActiveLayer(focused)]);
         let previewLadder: GeometryLadder | null = null;
         let previewLevel = 0;
-        if (deepestAuthored > 0 && view.geometry instanceof HexGeometry && isLadderView(view.levelMap)
-            && !isDepthQuarantined(view.levelMap).quarantined) {
+        // isLadderView already includes the quarantine gate.
+        if (deepestAuthored > 0 && view.geometry instanceof HexGeometry && isLadderView(view.levelMap)) {
           const { m, minCellPx, maxLevel } = ladderParamsFor(view.levelMap);
           const ladder = createGeometryLadder(view.geometry, { m, minCellPx, maxLevel });
           previewLevel = overrideRungFor(ladder, deepestAuthored, view.zoom);

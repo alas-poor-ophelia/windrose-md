@@ -15,7 +15,7 @@ import type {
 } from '#types/index';
 import { isHexCell } from '#types/core/cell.types';
 import type { HexBounds } from '#types/core/map.types';
-import type { LadderPatch } from '../../core/lodFlags';
+import { hasDepthContent, type LadderPatch } from '../../core/lodFlags';
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { getLayerById } from '../../persistence/layerAccessor';
@@ -191,13 +191,15 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
       }
 
       // Ladder patch from the settings opt-in (ladderSettingsPatch): `set`
-      // arrives already merged over the stored lod; `remove` only ever comes for
-      // a map without depth content, so there are no layer levels to clean up;
-      // `keep` leaves the stored lod exactly as it was.
+      // arrives already merged over the stored lod; `keep` leaves the stored
+      // lod exactly as it was. `remove` was decided against the modal's
+      // snapshot, so it is re-checked against the LIVE map: rungs written
+      // since (another pane, an MCP write) turn it into `keep`, because
+      // stripping `lod` under depth content would quarantine the map (PX-07).
       if (prev.mapType === 'hex') {
         if (ladderPatch.kind === 'set') {
           newMapData.lod = ladderPatch.lod;
-        } else if (ladderPatch.kind === 'remove') {
+        } else if (ladderPatch.kind === 'remove' && !hasDepthContent(prev)) {
           delete newMapData.lod;
         }
       }

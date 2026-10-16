@@ -1,8 +1,8 @@
 /**
  * Undo sees ladder rungs (design 06 s5, s19 items 3 and 10): snapshots carry
- * `levels` by reference, restore writes the whole record back (or strips it),
- * and the dedupe comparator keeps stringify for classic snapshots while
- * comparing rungs by reference once `levels` is present.
+ * `levels` by reference, and restore writes the whole record back (or strips
+ * it, also for the EMPTY_LEVELS sentinel). Recording, dedupe and erase-to-empty
+ * are covered against the real hook in useLayerHistory.test.ts (MERGE-02).
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -12,10 +12,9 @@ import type { MapData, MapLayer } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
 import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 import {
+  EMPTY_LEVELS,
   snapshotLevelsOf,
   applySnapshotLevels,
-  restoreSnapshotLevels,
-  layerHistorySnapshotsEqual,
 } from '../../../../src/hooks/state/layerHistoryOps';
 import { setLevelCells, authoredCells } from '../../../../src/persistence/layerAccessor';
 import { viewStateForRung, stampedLodOf, lodStampForCommit, undoLodStamp, redoLodStamp } from '../../../../src/hooks/state/layerHistoryOps';
@@ -48,9 +47,9 @@ describe('snapshot carries levels', () => {
     const s = snap(withRung);
     expect(s.levels).toBe(withRung.levels);
 
-    const restored = restoreSnapshotLevels(mapWith(layer()), s);
-    expect(activeOf(restored).levels).toBe(withRung.levels);
-    expect(authoredCells(activeOf(restored), 2)).toEqual([cell(16, 0)]);
+    const restored = applySnapshotLevels(layer(), s);
+    expect(restored.levels).toBe(withRung.levels);
+    expect(authoredCells(restored, 2)).toEqual([cell(16, 0)]);
   });
 
   it('(2) a classic snapshot has no levels key and restoring it strips levels', () => {
@@ -58,14 +57,20 @@ describe('snapshot carries levels', () => {
     expect('levels' in s).toBe(false);
     expect(JSON.stringify(s)).not.toContain('levels');
 
-    const deep = setLevelCells(mapWith(layer()), 'L1', 2, [cell(16, 0)]);
-    const restored = restoreSnapshotLevels(deep, s);
-    expect('levels' in activeOf(restored)).toBe(false);
+    const deep = activeOf(setLevelCells(mapWith(layer()), 'L1', 2, [cell(16, 0)]));
+    expect('levels' in applySnapshotLevels(deep, s)).toBe(false);
   });
 
-  it('classic restore onto a classic layer returns the same map and layer', () => {
-    const m = mapWith(layer());
-    expect(restoreSnapshotLevels(m, snap(layer()))).toBe(m);
+  it('restoring the EMPTY_LEVELS sentinel strips the key and never writes the sentinel', () => {
+    const deep = activeOf(setLevelCells(mapWith(layer()), 'L1', 2, [cell(16, 0)]));
+    const stripped = applySnapshotLevels(deep, { levels: EMPTY_LEVELS });
+    expect('levels' in stripped).toBe(false);
+    const classic = layer();
+    expect(applySnapshotLevels(classic, { levels: EMPTY_LEVELS })).toBe(classic);
+    expect(Object.isFrozen(EMPTY_LEVELS)).toBe(true);
+  });
+
+  it('classic restore onto a classic layer returns the same layer', () => {
     const l = layer();
     expect(applySnapshotLevels(l, snap(l))).toBe(l);
   });
@@ -76,55 +81,10 @@ describe('snapshot carries levels', () => {
     const s = snap(activeOf(m), { level: 1 });
     expect(s.level).toBe(1);
 
-    const restored = activeOf(restoreSnapshotLevels(mapWith(layer()), s));
+    const restored = applySnapshotLevels(layer(), s);
     expect(authoredCells(restored, 1)).toEqual([cell(4, 0)]);
     expect(authoredCells(restored, 2)).toEqual([cell(16, 0)]);
     expect('level' in restored).toBe(false);
-  });
-});
-
-describe('layerHistorySnapshotsEqual', () => {
-  const base = setLevelCells(mapWith(layer()), 'L1', 2, [cell(16, 0), cell(17, 0)]);
-
-  it('(3) a deep paint (new rung array) is not deduped', () => {
-    const after = setLevelCells(base, 'L1', 2, [cell(16, 0), cell(17, 0), cell(18, 0)]);
-    expect(layerHistorySnapshotsEqual(snap(activeOf(base)), snap(activeOf(after)))).toBe(false);
-  });
-
-  it('a first deep paint on a classic layer is not deduped', () => {
-    const classic = mapWith(layer());
-    const after = setLevelCells(classic, 'L1', 1, [cell(4, 0)]);
-    expect(layerHistorySnapshotsEqual(snap(activeOf(classic)), snap(activeOf(after)))).toBe(false);
-  });
-
-  it('(4) erase-to-inherit (rung shrinks, or rung/container removed) is not deduped', () => {
-    const shrunk = setLevelCells(base, 'L1', 2, [cell(16, 0)]);
-    expect(layerHistorySnapshotsEqual(snap(activeOf(base)), snap(activeOf(shrunk)))).toBe(false);
-    const emptied = setLevelCells(base, 'L1', 2, []);
-    expect('levels' in activeOf(emptied)).toBe(false);
-    expect(layerHistorySnapshotsEqual(snap(activeOf(base)), snap(activeOf(emptied)))).toBe(false);
-  });
-
-  it('(5) a no-op (same references) is deduped, and level does not count', () => {
-    const noop = setLevelCells(base, 'L1', 2, authoredCells(activeOf(base), 2));
-    expect(noop).toBe(base);
-    expect(layerHistorySnapshotsEqual(snap(activeOf(base)), snap(activeOf(noop), { level: 2 }))).toBe(true);
-    // A shallow copy of the record with the same rung arrays is still equal.
-    const copy = { ...activeOf(base), levels: { ...activeOf(base).levels } };
-    expect(layerHistorySnapshotsEqual(snap(activeOf(base)), snap(copy))).toBe(true);
-  });
-
-  it('a non-level field change is still detected on the ladder path', () => {
-    const l = activeOf(base);
-    expect(layerHistorySnapshotsEqual(snap(l), snap(l, { name: 'renamed' }))).toBe(false);
-  });
-
-  it('(6) classic snapshots still dedupe by stringify', () => {
-    const a = snap(layer());
-    const b = snap(layer());
-    expect(a.cells).not.toBe(b.cells);
-    expect(layerHistorySnapshotsEqual(a, b)).toBe(true);
-    expect(layerHistorySnapshotsEqual(a, snap(layer({ cells: [cell(1, 0)] })))).toBe(false);
   });
 });
 
@@ -159,10 +119,18 @@ describe('lod stamp travels with the first deep write (kgc.15)', () => {
     expect(redoLodStamp(already, stampingEntry)).toBe(already);
   });
 
-  it('a classic snapshot carries no lodStamped key and still dedupes by stringify', () => {
-    const s = snap(layer());
-    expect('lodStamped' in s).toBe(false);
-    expect(layerHistorySnapshotsEqual(s, snap(layer()))).toBe(true);
+  it('a classic snapshot carries no lodStamped key', () => {
+    expect('lodStamped' in snap(layer())).toBe(false);
+  });
+
+  it('undo of the stamping entry keeps a lod edited after the stamp', () => {
+    const stampingEntry = snap(layer(), { lodStamped: LOD });
+    // A settings save after the stamp (not a history entry) changed minCellPx.
+    const edited: MapData = { ...mapWith(layer()), lod: { ...LOD, minCellPx: 96 } };
+    expect(undoLodStamp(edited, stampingEntry)).toBe(edited);
+    // Equal by value (a fresh object) still lifts.
+    const sameValue: MapData = { ...mapWith(layer()), lod: { ...LOD } };
+    expect('lod' in undoLodStamp(sameValue, stampingEntry)).toBe(false);
   });
 });
 

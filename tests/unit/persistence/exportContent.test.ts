@@ -115,6 +115,29 @@ describe("calculateExportBounds", () => {
     });
   });
 
+  it("classic hex freeform stamp bounds equal main's rule", () => {
+    // main d4b85b3e: half = cellSize * max(spanW, spanH) * scale / 2 around the
+    // world point. A hex cell box is about 2x wider, so the drop-cell rule
+    // framed classic hex exports with extra margin (DATA-06 / MERGE-04, D-9).
+    const stamp = { col: 3, row: 2, tilesetId: "ts", tileId: "s.png", freeform: true, worldX: 300, worldY: 200, spanW: 2, spanH: 1, scale: 1.5 };
+    const mapData = { ...gridMap({ layers: [layer({ tiles: [stamp] })] }), mapType: "hex", hexSize: 40 } as MapData;
+    const geometry = createGeometry(mapData);
+    const half = (40 * 2 * 1.5) / 2;
+    expect(calculateExportBounds(mapData, mapData.layers, geometry)).toEqual({
+      minX: 300 - half, minY: 200 - half, maxX: 300 + half, maxY: 200 + half,
+    });
+  });
+
+  it("freeform tile without worldX uses its drop cell (no NaN)", () => {
+    // Malformed on disk: the type requires worldX/worldY on a freeform tile.
+    const stamp = { col: 3, row: 2, tilesetId: "ts", tileId: "s.png", freeform: true } as unknown as NonNullable<MapLayer["tiles"]>[number];
+    const mapData = { ...gridMap({ layers: [layer({ tiles: [stamp] })] }), mapType: "hex", hexSize: 40 } as MapData;
+    const geometry = createGeometry(mapData);
+    const bounds = calculateExportBounds(mapData, mapData.layers, geometry);
+    expect(bounds).toEqual(geometry.getCellBounds({ q: 3, r: 2, color: "" }));
+    expect(Object.values(bounds ?? {}).every(Number.isFinite)).toBe(true);
+  });
+
   it("returns null for an empty map", () => {
     const mapData = gridMap();
     expect(calculateExportBounds(mapData, mapData.layers, createGeometry(mapData))).toBeNull();

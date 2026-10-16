@@ -7,12 +7,13 @@
  *
  * - Snapshots carry `levels` BY REFERENCE and only when the layer has it; a
  *   classic layer's snapshot has no `levels` key at all.
- * - Restoring writes the snapshot's WHOLE `levels` record back (or strips it
- *   when the snapshot has none). `snapshot.level` is UI/telemetry only and is
- *   never used to choose what to restore.
- * - Equality keeps the classic JSON.stringify rule unless either snapshot has
- *   `levels`; then rungs compare by array reference (setLevelCells returns the
- *   prior reference on a no-op, and every real edit makes a new array).
+ * - In the field diffs (useLayerHistory) a layer WITHOUT rungs reads as the
+ *   frozen `EMPTY_LEVELS` sentinel, never `undefined`: "no rungs" must be a
+ *   recordable value, or erasing the last rung to empty is skipped by the
+ *   diff and every earlier deep entry fails its guard (MERGE-01 / PX-01).
+ * - Restoring writes the WHOLE `levels` record back, or strips the key for
+ *   `undefined` / `EMPTY_LEVELS`. `snapshot.level` is UI/telemetry only and
+ *   is never used to choose what to restore.
  */
 
 import type { MapData, MapLayer, LadderConfig } from '#types/core/map.types';
@@ -26,6 +27,13 @@ import { chooseLevel, crossingZoom, rungMiddleZoom, type LadderParams } from '..
 
 type LevelsRecord = Record<number, Cell[]>;
 
+/**
+ * "This layer has no rungs" as a diffable value. Shared and frozen, so it is
+ * compared by reference and never written onto a layer (applySnapshotLevels
+ * strips the key for it).
+ */
+const EMPTY_LEVELS: LevelsRecord = Object.freeze({});
+
 /** Conditional-spread source: `{ levels }` when the layer has rungs, `{}` otherwise. */
 function snapshotLevelsOf(source: { levels?: LevelsRecord }): { levels?: LevelsRecord } {
   return source.levels !== undefined ? { levels: source.levels } : {};
@@ -33,57 +41,17 @@ function snapshotLevelsOf(source: { levels?: LevelsRecord }): { levels?: LevelsR
 
 /**
  * Put a snapshot's `levels` record onto a layer: the whole record by reference,
- * or no `levels` key when the snapshot has none. Returns the same layer when
- * nothing changes, so a classic undo stays reference-identical.
+ * or no `levels` key when the snapshot has none (`undefined` or the
+ * `EMPTY_LEVELS` sentinel). Returns the same layer when nothing changes, so a
+ * classic undo stays reference-identical.
  */
 function applySnapshotLevels(layer: MapLayer, snapshot: Pick<LayerHistorySnapshot, 'levels'>): MapLayer {
-  if (layer.levels === snapshot.levels && (snapshot.levels !== undefined || !('levels' in layer))) {
+  const levels = snapshot.levels === EMPTY_LEVELS ? undefined : snapshot.levels;
+  if (layer.levels === levels && (levels !== undefined || !('levels' in layer))) {
     return layer;
   }
   const { levels: _dropped, ...rest } = layer;
-  return snapshot.levels !== undefined ? { ...rest, levels: snapshot.levels } : rest;
-}
-
-/** Apply a snapshot's `levels` to the active layer of a map (same map when unchanged). */
-function restoreSnapshotLevels(mapData: MapData, snapshot: LayerHistorySnapshot): MapData {
-  const activeId = mapData.activeLayerId;
-  let changed = false;
-  const layers = mapData.layers.map((layer) => {
-    if (layer.id !== activeId) return layer;
-    const next = applySnapshotLevels(layer, snapshot);
-    if (next !== layer) changed = true;
-    return next;
-  });
-  return changed ? { ...mapData, layers } : mapData;
-}
-
-/** Same rung keys, and each rung is the same array reference. */
-function levelsEqualByReference(a: LevelsRecord | undefined, b: LevelsRecord | undefined): boolean {
-  if (a === b) return true;
-  if (a === undefined || b === undefined) return false;
-  const aEntries = Object.entries(a);
-  const bByKey = new Map<string, Cell[]>(Object.entries(b));
-  if (aEntries.length !== bByKey.size) return false;
-  for (const [key, cells] of aEntries) {
-    if (bByKey.get(key) !== cells) return false;
-  }
-  return true;
-}
-
-/**
- * History dedupe comparator. Classic snapshots (neither has `levels`) keep the
- * exact JSON.stringify rule. Otherwise: every non-level field compares by that
- * same stringify rule, and `levels` compares by rung keys + array references.
- * `level` is ignored on the ladder path (it names the edited rung, not content).
- */
-function layerHistorySnapshotsEqual(a: LayerHistorySnapshot, b: LayerHistorySnapshot): boolean {
-  if (a.levels === undefined && b.levels === undefined) {
-    return JSON.stringify(a) === JSON.stringify(b);
-  }
-  if (!levelsEqualByReference(a.levels, b.levels)) return false;
-  const { levels: _aLevels, level: _aLevel, ...aRest } = a;
-  const { levels: _bLevels, level: _bLevel, ...bRest } = b;
-  return JSON.stringify(aRest) === JSON.stringify(bRest);
+  return levels !== undefined ? { ...rest, levels } : rest;
 }
 
 /**
@@ -180,6 +148,13 @@ function lodStampForCommit(
   return { parked: null, stamp: parked !== null && parked.channel === channel ? { lodStamped: parked.lod } : {} };
 }
 
+/** Same ladder block by value (`distanceOverrides` compared structurally). */
+function sameLadderConfig(a: LadderConfig, b: LadderConfig): boolean {
+  if (a === b) return true;
+  return a.m === b.m && a.minCellPx === b.minCellPx && a.maxLevel === b.maxLevel
+    && JSON.stringify(a.distanceOverrides ?? null) === JSON.stringify(b.distanceOverrides ?? null);
+}
+
 /**
  * Undo LEAVING the entry that stamped `lod`: the map is classic again. Same map
  * otherwise. `mapData` is the map being restored TO; the stamp is lifted only
@@ -187,9 +162,13 @@ function lodStampForCommit(
  * land on an entry that does not own every deep write (a cancelled stroke's
  * cells stay on the map), and stripping `lod` there would leave
  * `levels-without-lod` and quarantine the map (Codex review, blocking).
+ * The stamp is also kept when the live `lod` no longer equals the stamped
+ * block: a settings save after the stamp (minCellPx, maxLevel, distance
+ * overrides) is not a history entry, and undo must not discard it (DATA-12).
  */
 function undoLodStamp(mapData: MapData, leaving: Pick<LayerHistorySnapshot, 'lodStamped'> | null | undefined): MapData {
   if (leaving?.lodStamped === undefined || mapData.lod === undefined) return mapData;
+  if (!sameLadderConfig(mapData.lod, leaving.lodStamped)) return mapData;
   if (hasDepthContent(mapData)) return mapData;
   const { lod: _dropped, ...rest } = mapData;
   return rest;
@@ -202,7 +181,7 @@ function redoLodStamp(mapData: MapData, entering: Pick<LayerHistorySnapshot, 'lo
 }
 
 export {
-  snapshotLevelsOf, applySnapshotLevels, restoreSnapshotLevels, layerHistorySnapshotsEqual, viewStateForRung,
-  viewStateAtRung, resolveEditLevel, resolveViewportZoom, stampedLodOf, lodStampForCommit, undoLodStamp, redoLodStamp
+  EMPTY_LEVELS, snapshotLevelsOf, applySnapshotLevels, viewStateForRung, viewStateAtRung,
+  resolveEditLevel, resolveViewportZoom, stampedLodOf, lodStampForCommit, undoLodStamp, redoLodStamp
 };
 export type { ParkedLodStamp };

@@ -23,15 +23,16 @@ import type {
 } from '#types/core/export.types';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { App } from 'obsidian';
-import { TFile } from 'obsidian';
+import { Platform, TFile } from 'obsidian';
 
-import { allAuthoredCells, authoredLevels, getActiveLayer, getExportLayers } from './layerAccessor';
+import { allAuthoredCells, getActiveLayer, getExportLayers } from './layerAccessor';
 import { ladderForAuthoredRungs } from './resizeOperations';
 import { HexGeometry } from '../geometry/core/HexGeometry';
 import { crossingZoom } from '../geometry/core/lattice';
 import type { LadderParams } from '../geometry/core/lattice';
-import { isDepthQuarantined, isLadderView } from '../core/lodFlags';
-import { overrideRungFor } from '../geometry/renderers/elementBands';
+import { deepestAuthoredRungOfLayers, isLadderView } from '../core/lodFlags';
+import { homeLevelOf } from '../core/homeLevel';
+import { elementVisibleAt, overrideRungFor } from '../geometry/renderers/elementBands';
 import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
 import { getFontCss } from '../text/fontOptions';
 import { cellsCoveredByAssignment } from '../assets/tileFootprint';
@@ -120,35 +121,39 @@ function cellAt(geometry: { type: string }, col: number, row: number): Cell {
  */
 function exportLadderFor(mapData: MapData, geometry: ExtendedGeometry): GeometryLadder | null {
   if (!(geometry instanceof HexGeometry)) return null;
-  if (!isLadderView(mapData) || isDepthQuarantined(mapData).quarantined) return null;
+  if (!isLadderView(mapData)) return null; // includes the quarantine gate
   return ladderForAuthoredRungs(mapData, geometry);
 }
 
 /**
  * World bounds of one placed tile on the geometry of its rung, or null when it
- * has no extent. A snapped tile is bounded by its cell footprint; a freeform
- * stamp by its drop cell's box re-centred on its world position, scaled by the
- * tile scale and its largest span.
+ * has no extent. A snapped tile is bounded by its cell footprint. A freeform
+ * stamp keeps main's rule: a square of half-side `cellSize * max(spanW, spanH)
+ * * scale / 2` around its world point (the rung's own cellSize on a deep tile),
+ * so a classic map frames exactly as it did before the ladder. A stamp with no
+ * world point (main produced NaN there) falls back to its drop cell.
  */
-function tileBounds(tile: TileAssignment, geometry: { type: string; getCellBounds(cell: Cell): BoundingBox }): BoundingBox | null {
+function tileBounds(tile: TileAssignment, geometry: { type: string; cellSize: number; getCellBounds(cell: Cell): BoundingBox }): BoundingBox | null {
   if (tile.freeform === true) {
-    const drop = geometry.getCellBounds(cellAt(geometry, tile.col, tile.row));
-    if (tile.worldX == null || tile.worldY == null) return drop;
-    const factor = (tile.scale ?? 1) * Math.max(1, tile.spanW ?? 1, tile.spanH ?? 1);
-    const halfW = ((drop.maxX - drop.minX) / 2) * factor;
-    const halfH = ((drop.maxY - drop.minY) / 2) * factor;
-    return { minX: tile.worldX - halfW, minY: tile.worldY - halfH, maxX: tile.worldX + halfW, maxY: tile.worldY + halfH };
+    if (tile.worldX == null || tile.worldY == null) return geometry.getCellBounds(cellAt(geometry, tile.col, tile.row));
+    const half = (geometry.cellSize * Math.max(1, tile.spanW ?? 1, tile.spanH ?? 1) * (tile.scale ?? 1)) / 2;
+    return { minX: tile.worldX - half, minY: tile.worldY - half, maxX: tile.worldX + half, maxY: tile.worldY + half };
   }
   const acc = new BoundsAccumulator();
   for (const c of cellsCoveredByAssignment(tile)) acc.addBox(geometry.getCellBounds(cellAt(geometry, c.col, c.row)));
   return acc.result();
 }
 
-/** Tiles, each on the geometry of the rung it is homed on; rung tiles only when a `ladder` is supplied. */
-function addTileBounds(acc: BoundsAccumulator, tiles: TileAssignment[], geometry: ExtendedGeometry, ladder: GeometryLadder | null): void {
+/**
+ * Tiles, each on the geometry of the rung it is homed on; rung tiles only when
+ * a `ladder` is supplied. With a render `level`, a tile homed on a finer rung
+ * is not drawn (tilesByHomeForRung), so it does not widen the frame.
+ */
+function addTileBounds(acc: BoundsAccumulator, tiles: TileAssignment[], geometry: ExtendedGeometry, ladder: GeometryLadder | null, level?: number): void {
   for (const tile of tiles) {
-    const home = tile.homeLevel ?? 0;
+    const home = homeLevelOf(tile);
     if (home > 0 && ladder === null) continue;
+    if (level !== undefined && home > level) continue;
     const bounds = tileBounds(tile, home > 0 && ladder !== null ? ladder.geometryForLevel(home) : geometry);
     if (bounds !== null) acc.addBox(bounds);
   }
@@ -192,13 +197,17 @@ function addTerrainStrokeBounds(acc: BoundsAccumulator, strokes: TerrainStroke[]
 /**
  * Calculate the world-coordinate bounding box of all content on a layer:
  * painted cells, objects, text labels, tiles, curves, wall paths and terrain strokes.
- * Rung (>= 1) cells, objects and tiles are measured with their rung's own
- * geometry and are only included when a `ladder` is supplied; classic maps have none.
+ * Rung (>= 1) cells, objects, labels and tiles are measured with their rung's
+ * own geometry and are only included when a `ladder` is supplied; classic maps
+ * have none. With a render `level` (deep export), objects and labels count only
+ * when the band rule shows them at that level (`elementVisibleAt`, including a
+ * per-element `visibleLevels`), and tiles only when homed at or above it.
  */
 function calculateContentBounds(
   layer: MapLayer,
   geometry: ExtendedGeometry,
-  ladder: GeometryLadder | null = null
+  ladder: GeometryLadder | null = null,
+  level?: number
 ): BoundingBox | null {
   const acc = new BoundsAccumulator();
 
@@ -207,22 +216,30 @@ function calculateContentBounds(
     if (level === 0) acc.addBox(geometry.getCellBounds(cell));
     else if (ladder !== null) acc.addBox(ladder.geometryForLevel(level).getCellBounds(cell));
   }
+  // Without a ladder only root elements are drawn; with a render level, only
+  // those the band rule shows there.
+  const drawn = (element: { homeLevel?: number }, kind: 'object' | 'label'): boolean => {
+    if (ladder === null) return homeLevelOf(element) === 0;
+    return level === undefined || elementVisibleAt(element, level, kind);
+  };
   for (const obj of layer.objects) {
-    const home = obj.homeLevel ?? 0;
-    if (home === 0) acc.addBox(geometry.getObjectBounds(obj));
-    else if (ladder !== null) acc.addBox(ladder.geometryForLevel(home).getObjectBounds(obj));
+    if (!drawn(obj, 'object')) continue;
+    const home = homeLevelOf(obj);
+    acc.addBox(home === 0 || ladder === null ? geometry.getObjectBounds(obj) : ladder.geometryForLevel(home).getObjectBounds(obj));
   }
 
-  // Text labels (need temporary canvas for measurement)
-  if (layer.textLabels.length > 0) {
+  // Text labels (need temporary canvas for measurement). World coordinates are
+  // shared by every rung; a label homed on a rung counts only with a ladder.
+  const labels = layer.textLabels.filter(label => drawn(label, 'label'));
+  if (labels.length > 0) {
     const tempCanvas = activeWindow.createEl('canvas');
     const tempCtx = tempCanvas.getContext('2d');
     if (tempCtx) {
-      for (const label of layer.textLabels) acc.addBox(getTextLabelBounds(label, tempCtx));
+      for (const label of labels) acc.addBox(getTextLabelBounds(label, tempCtx));
     }
   }
 
-  addTileBounds(acc, layer.tiles ?? [], geometry, ladder);
+  addTileBounds(acc, layer.tiles ?? [], geometry, ladder, level);
   addCurveBounds(acc, layer.curves ?? []);
   addWallPathBounds(acc, layer.wallPaths ?? [], geometry.cellSize);
   addTerrainStrokeBounds(acc, layer.terrainStrokes ?? []);
@@ -291,10 +308,11 @@ function calculateExportBounds(
   mapData: MapData,
   layers: MapLayer[],
   geometry: ExtendedGeometry,
-  ladder: GeometryLadder | null = null
+  ladder: GeometryLadder | null = null,
+  level?: number
 ): BoundingBox | null {
   let bounds: BoundingBox | null = null;
-  for (const layer of layers) bounds = unionBounds(bounds, calculateContentBounds(layer, geometry, ladder));
+  for (const layer of layers) bounds = unionBounds(bounds, calculateContentBounds(layer, geometry, ladder, level));
   return unionBounds(bounds, calculateMapLevelBounds(mapData, geometry));
 }
 
@@ -331,17 +349,6 @@ function exportViewStateForBounds(
   return { zoom, center: { x: cx, y: cy } };
 }
 
-/** Deepest rung >= 1 holding authored cells across `layers`; 0 when none. */
-function deepestAuthoredLevel(layers: readonly MapLayer[]): number {
-  let deepest = 0;
-  for (const layer of layers) {
-    const levels = authoredLevels(layer);
-    const last = levels.length > 0 ? levels[levels.length - 1] : 0;
-    if (last > deepest) deepest = last;
-  }
-  return deepest;
-}
-
 /** Render params plus the deep-export terms; all absent on a classic export. */
 type LadderRenderParams = RenderParams & { ladder?: GeometryLadder | null; level?: number; zoom?: number };
 
@@ -349,17 +356,34 @@ type LadderRenderParams = RenderParams & { ladder?: GeometryLadder | null; level
 const MAX_LADDER_EXPORT_SIDE = 8192;
 
 /**
+ * Pixel area of one ladder export canvas. WebKit (iPad, iPhone) refuses canvases
+ * past about 16.7M px: they come out blank or `toBlob` fails. The export holds
+ * two canvases of this size at once (renderMapToCanvas's temp plus the
+ * destination), so mobile gets half.
+ */
+const MAX_LADDER_EXPORT_AREA = 16_000_000;
+const MAX_LADDER_EXPORT_AREA_MOBILE = 8_000_000;
+
+function ladderExportAreaCap(): number {
+  return Platform.isMobile ? MAX_LADDER_EXPORT_AREA_MOBILE : MAX_LADDER_EXPORT_AREA;
+}
+
+/**
  * Export zoom for rung `level`: the rung's crossing zoom, so its cells are at
  * least `minCellPx` wide and crisp, never below 1 (the classic export scale),
- * and scaled back so neither canvas side exceeds MAX_LADDER_EXPORT_SIDE. When
- * the cap bites the rung still renders (the `level` option forces it); only its
- * crispness is lost. Level 0 is always exactly 1.
+ * and scaled back so neither canvas side exceeds MAX_LADDER_EXPORT_SIDE and the
+ * canvas area (after rounding each side up) stays within `maxArea`. When a cap
+ * bites, the export paints the rung that zoom activates; only crispness is
+ * lost. Level 0 is always exactly 1.
  */
-function exportZoomForLevel(level: number, params: LadderParams, worldWidth: number, worldHeight: number): number {
+function exportZoomForLevel(level: number, params: LadderParams, worldWidth: number, worldHeight: number, maxArea = ladderExportAreaCap()): number {
   if (level <= 0) return 1;
   const wanted = Math.max(1, crossingZoom(level, params));
-  const longest = Math.max(worldWidth, worldHeight, 1);
-  return Math.max(1, Math.min(wanted, MAX_LADDER_EXPORT_SIDE / longest));
+  const w = Math.max(worldWidth, 1);
+  const h = Math.max(worldHeight, 1);
+  // For z >= 1, ceil(w*z) * ceil(h*z) <= (w+1)(h+1) z^2, so the cap survives rounding.
+  const byArea = Math.sqrt(maxArea / ((w + 1) * (h + 1)));
+  return Math.max(1, Math.min(wanted, MAX_LADDER_EXPORT_SIDE / Math.max(w, h), byArea));
 }
 
 /**
@@ -426,38 +450,53 @@ async function exportMapAsImage(
     ? mapData
     : { ...mapData, activeLayerId: exportLayers[exportLayers.length - 1].id };
 
-  // Calculate content bounds across every selected layer plus map-level overlays
+  // Deep export (design 06 s19 item 8): paint the deepest rung holding depth
+  // content (rung cells or homed elements) on the exported layers. A
+  // quarantined or non-ladder map renders level 0 as usual. The frame is
+  // measured at the rung that will be painted, so elements the band rule hides
+  // there leave no blank margin.
   const ladder = exportLadderFor(mapData, geometry);
-  const bounds = calculateExportBounds(mapData, exportLayers, geometry, ladder);
+  const deepLevel = ladder !== null ? deepestAuthoredRungOfLayers(exportLayers) : 0;
+  const frameAt = (level: number): { bounds: BoundingBox; zoom: number } | null => {
+    const content = level > 0 && ladder !== null
+      ? calculateExportBounds(mapData, exportLayers, geometry, ladder, level)
+      : calculateExportBounds(mapData, exportLayers, geometry, null);
+    if (!content) return null;
+    const bounds: BoundingBox = {
+      minX: content.minX - buffer,
+      minY: content.minY - buffer,
+      maxX: content.maxX + buffer,
+      maxY: content.maxY + buffer
+    };
+    const zoom = deepLevel > 0 && ladder !== null
+      ? exportZoomForLevel(deepLevel, ladder.params, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY)
+      : 1;
+    return { bounds, zoom };
+  };
 
-  if (!bounds) {
+  let frame = frameAt(deepLevel);
+  if (!frame) {
     throw new Error('No content to export');
   }
-
-  // Add buffer
-  const exportBounds: BoundingBox = {
-    minX: bounds.minX - buffer,
-    minY: bounds.minY - buffer,
-    maxX: bounds.maxX + buffer,
-    maxY: bounds.maxY + buffer
-  };
-  
-  // Deep export (design 06 s19 item 8): paint the deepest authored rung of the
-  // exported layers. A quarantined or non-ladder map renders level 0 as usual.
-  const deepLevel = ladder !== null ? deepestAuthoredLevel(exportLayers) : 0;
-  const worldWidth = exportBounds.maxX - exportBounds.minX;
-  const worldHeight = exportBounds.maxY - exportBounds.minY;
-  const zoom = deepLevel > 0 && ladder !== null ? exportZoomForLevel(deepLevel, ladder.params, worldWidth, worldHeight) : 1;
-  // The side cap can pull the zoom below the deepest rung's crossing; then paint
-  // the rung that zoom activates, never a finer one whose cells are sub-pixel and
-  // whose enumeration over the whole map costs seconds (kgc.20).
-  const renderLevel = deepLevel > 0 && ladder !== null ? overrideRungFor(ladder, deepLevel, zoom) : 0;
+  // The caps can pull the zoom below the deepest rung's crossing; then paint the
+  // rung that zoom activates, never a finer one whose cells are sub-pixel and
+  // whose enumeration over the whole map costs seconds (kgc.20). Re-measure
+  // once at that rung, and never paint finer than the re-measured zoom allows.
+  let renderLevel = deepLevel > 0 && ladder !== null ? overrideRungFor(ladder, deepLevel, frame.zoom) : 0;
+  if (renderLevel !== deepLevel && ladder !== null) {
+    const coarser = frameAt(renderLevel);
+    if (coarser) {
+      frame = coarser;
+      if (renderLevel > 0) renderLevel = overrideRungFor(ladder, renderLevel, frame.zoom);
+    }
+  }
   const renderLadder = renderLevel > 0 ? ladder : null;
+  const { bounds: exportBounds, zoom } = frame;
 
   // Calculate canvas dimensions
-  const width = Math.ceil(worldWidth * zoom);
-  const height = Math.ceil(worldHeight * zoom);
-  
+  const width = Math.ceil((exportBounds.maxX - exportBounds.minX) * zoom);
+  const height = Math.ceil((exportBounds.maxY - exportBounds.minY) * zoom);
+
   // Create offscreen canvas
   const canvas = activeWindow.createEl('canvas');
   canvas.width = width;
@@ -530,4 +569,4 @@ async function saveMapImageToVault(
 // Exports
 // ===========================================
 
-export { calculateContentBounds, calculateExportBounds, deepestAuthoredLevel, exportLadderFor, exportZoomForLevel, exportViewStateForBounds, getExportTheme, saveMapImageToVault };
+export { calculateContentBounds, calculateExportBounds, exportLadderFor, exportZoomForLevel, exportViewStateForBounds, getExportTheme, saveMapImageToVault };

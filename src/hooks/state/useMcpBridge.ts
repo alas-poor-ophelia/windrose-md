@@ -28,7 +28,7 @@ import type { MapObject } from '#types/objects/object.types';
 import type { WindroseWallGapDebug, WindroseRawGap, WindroseMcpInstance, WindroseMcpOps, WindroseLevelWriteResult } from '#types/core/global.types';
 import type { HandleLevelCellsChange } from '#types/hooks/dataHandlers.types';
 import { getActiveLayer, getActiveBoardLayers, authoredCells, authoredLevels } from '../../persistence/layerAccessor';
-import { MAX_CELLS_PER_DEPTH_OP } from '../../persistence/depthAuthoring';
+import { MAX_CELLS_PER_DEPTH_OP, type DepthWriteRefusal } from '../../persistence/depthAuthoring';
 import { isLadderView, ladderParamsFor } from '../../core/lodFlags';
 import { HexGeometry } from '../../geometry/core/HexGeometry';
 import { createGeometryLadder, type GeometryLadder } from '../../geometry/core/createGeometryLadder';
@@ -88,12 +88,20 @@ interface UseMcpBridgeParams {
   handleViewStateChange: (viewState: { center: { x: number; y: number }; zoom: number }) => void;
   handleTileSelect: (tilesetId: string, tileId: string) => void;
   setSelectedTileForm: (form: TileForm) => void;
-  handleTilesChange: (tiles: TileAssignment[]) => void;
-  handleObjectsChange: (objects: MapObject[]) => void;
+  /** Returns the depth gate's refusal for a deep placement, null when the write landed (useDataHandlers). */
+  handleTilesChange: (tiles: TileAssignment[]) => DepthWriteRefusal | null;
+  /** Returns the depth gate's refusal for a deep placement, null when the write landed (useDataHandlers). */
+  handleObjectsChange: (objects: MapObject[]) => DepthWriteRefusal | null;
   selectPane: (pane: 'tiles' | 'objects') => void;
   setTileBrowserCollapsed: (collapsed: boolean) => void;
   setRailOpenId: (id: string | null) => void;
   getCachedImage: (vaultPath: string) => HTMLImageElement | null;
+  /**
+   * The mounted canvas's live rung (view controller zoom, current mid-gesture);
+   * null when no canvas has published one. Preferred over the committed
+   * viewState so the bridge reports the rung the tools latch (WIRE-01).
+   */
+  readLiveActiveLevel?: () => number | null;
 }
 
 let instanceCounter = 0;
@@ -178,6 +186,9 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
       return createGeometryLadder(geometry, { m, minCellPx, maxLevel });
     };
     const getActiveLevel = (): number => {
+      const live = S().readLiveActiveLevel?.() ?? null;
+      if (live !== null) return live;
+      // No canvas mounted: derive it from the committed zoom.
       const ladder = ladderOf();
       return ladder != null ? ladder.activeLevel(S().mapData.viewState?.zoom ?? 1) : 0;
     };
@@ -254,7 +265,7 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
       // fell through every coordinator branch in silence (the paint tool is
       // `draw`, there is no `paint`). Refuse it loudly instead.
       setTool: (toolId: string): { ok: true; tool: ToolId } | { ok: false; error: string } => {
-        if (!isToolId(toolId)) return { ok: false, error: 'unknown tool id: ' + toolId + ' (paint cells is "draw"; see TOOL_IDS)' };
+        if (!isToolId(toolId)) return { ok: false, error: 'unknown tool id: ' + toolId + ' (paint cells is "draw"; see the ToolId type)' };
         S().setCurrentTool(toolId);
         return { ok: true, tool: toolId };
       },
@@ -418,7 +429,10 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
         };
         // Same-rung, same-tier replace only: a root placement never removes a deep tile at the same index.
         const nextTiles = withTilePlaced(activeLayer.tiles ?? [], newTile, newTile.placement ?? 'fill');
-        S().handleTilesChange(nextTiles);
+        // A deep placement is gated (capability, quarantine, byte budget) inside
+        // the handler's updater against the live map; report its verdict.
+        const refusal = S().handleTilesChange(nextTiles);
+        if (refusal != null) return { ok: false, tileCount: activeLayer.tiles?.length ?? 0, error: refusal };
         return { ok: true, tileCount: nextTiles.length };
       },
       listObjectTypes: (): Array<{ id: string; label: string; category: string }> =>
@@ -464,7 +478,9 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
             objects = objects.map(o => (o.id === placedId ? { ...o, visibleLevels: levels.visibleLevels as number[] } : o));
           }
         }
-        S().handleObjectsChange(objects);
+        // Deep placements pass the depth gate inside the handler (see placeTile).
+        const refusal = S().handleObjectsChange(objects);
+        if (refusal != null) return { ok: false, error: refusal };
         return { ok: true, objectId: placedId };
       },
       openDrawer: (pane: 'tiles' | 'objects' | 'layers' | 'colors' | 'regions' | 'view' | null): { ok: boolean; note?: string } => {

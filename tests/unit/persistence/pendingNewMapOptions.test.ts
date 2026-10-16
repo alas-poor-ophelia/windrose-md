@@ -8,7 +8,7 @@ vi.mock('../../../src/core/settingsAccessor', async (importOriginal) => ({
   getSettings,
 }));
 
-const { loadMapDataWithGeneration, setPendingNewMapOptions, clearPendingNewMapOptions } =
+const { loadMapDataWithGeneration, setPendingNewMapOptions, clearPendingNewMapOptions, PENDING_NEW_MAP_CAP, PENDING_NEW_MAP_TTL_MS } =
   await import('../../../src/persistence/fileOperations');
 
 const app = { vault: { getAbstractFileByPath: () => null } } as unknown as App;
@@ -24,19 +24,29 @@ describe('pending new-map options', () => {
     expect(await lodM('a')).toBe(2); // not consumed until the map exists in the file
   });
 
-  it('expires entries after ten minutes', async () => {
+  it('expires entries after the TTL', async () => {
     setPendingNewMapOptions('a', { ladderM: 2 });
-    vi.advanceTimersByTime(10 * 60 * 1000 + 1);
+    vi.advanceTimersByTime(PENDING_NEW_MAP_TTL_MS + 1);
     expect(await lodM('a')).toBeUndefined();
   });
 
-  it('evicts the oldest entry beyond 32', async () => {
-    for (let i = 0; i < 33; i++) {
+  it('read refreshes the TTL', async () => {
+    setPendingNewMapOptions('a', { ladderM: 2 });
+    vi.advanceTimersByTime(PENDING_NEW_MAP_TTL_MS - 1000);
+    expect(await lodM('a')).toBe(2); // a re-mount reads it before the first save
+    vi.advanceTimersByTime(PENDING_NEW_MAP_TTL_MS - 1000);
+    expect(await lodM('a')).toBe(2); // well past the original TTL, still served
+    vi.advanceTimersByTime(PENDING_NEW_MAP_TTL_MS + 1);
+    expect(await lodM('a')).toBeUndefined(); // unread for a whole TTL: reaped
+  });
+
+  it('evicts the oldest entry beyond the cap', async () => {
+    for (let i = 0; i <= PENDING_NEW_MAP_CAP; i++) {
       setPendingNewMapOptions(`m${i}`, { ladderM: 15 });
       vi.advanceTimersByTime(1);
     }
     expect(await lodM('m0')).toBeUndefined();
     expect(await lodM('m1')).toBe(15);
-    expect(await lodM('m32')).toBe(15);
+    expect(await lodM(`m${PENDING_NEW_MAP_CAP}`)).toBe(15);
   });
 });

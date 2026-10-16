@@ -36,7 +36,7 @@ import { deflateSync, inflateSync, strFromU8, strToU8 } from 'fflate';
 import { Modal, Notice } from 'obsidian';
 
 import { canonicalizeTileIds, isMapTombstoned, readRawMapEntry } from './fileOperations';
-import { isNewerSchema, migrateMapData } from './schemaMigration';
+import { isNewerSchema, migrateMapData, stampSchemaVersions } from './schemaMigration';
 
 const JOURNAL_KEY_PREFIX = 'windrose-journal:';
 /** Metadata for a live slot (LiveMeta). Absent for a legacy v1 entry. */
@@ -203,6 +203,16 @@ function encodePayload(json: string): { enc: PayloadEncoding; data: string } {
   return { enc: 'deflate64', data: btoa(strFromU8(deflateSync(strToU8(json), { level: 1 }), true)) };
 }
 
+/**
+ * Stored length of a live payload for `json`: what writeLiveSlot compares with
+ * MAX_JOURNAL_PAYLOAD (plain JSON up to RAW_PAYLOAD_LIMIT, deflated base64
+ * above it). Costs one deflate for a large map, so callers measure once per
+ * operation, not per pointer tick (depthAuthoring's budget).
+ */
+function journalPayloadLength(json: string): number {
+  return encodePayload(json).data.length;
+}
+
 function decodePayload(enc: PayloadEncoding, data: string): string {
   return enc === 'deflate64' ? strFromU8(inflateSync(strToU8(atob(data), true))) : data;
 }
@@ -356,10 +366,10 @@ function journalPending(
   options?: { writerId?: string; version?: number }
 ): boolean {
   try {
-    // Match what saveMapData would write, so the on-disk comparison at load
-    // time is a plain string equality. Canonicalizes a copy; the live tree is
-    // never edited.
-    const json = JSON.stringify(canonicalizeTileIds(pendingData));
+    // Match what saveMapData would write (canonical tile ids, per-entry schema
+    // stamp), so the on-disk comparison at load time is a plain string
+    // equality. Both work on copies; the live tree is never edited.
+    const json = JSON.stringify(stampSchemaVersions(canonicalizeTileIds(pendingData)));
     return writeLiveSlot(app, mapId, options?.writerId ?? null, options?.version ?? null, json, Date.now());
   } catch (e) {
     console.debug('[Windrose] Save journal skipped:', e);
@@ -950,5 +960,5 @@ async function resolveJournalRound(
   return null;
 }
 
-export { journalPending, clearJournal, dropRestoredSlot, isJournalKept, readKeptEntries, moveJournalToConflict, readConflictJournal, readJournal, pruneJournal, setJournalWriterLive, compareJournalToDisk, resolveJournalOnLoad, resetJournalLoadState, MAX_JOURNAL_PAYLOAD, JOURNAL_MAX_AGE_MS, JOURNAL_INDEX_KEY, JOURNAL_KEY_PREFIX, JOURNAL_META_PREFIX, RAW_PAYLOAD_LIMIT, KEPT_KEY_PREFIX, KEPT_MAX_PER_MAP, CONFLICT_KEY_PREFIX };
+export { journalPending, journalPayloadLength, clearJournal, dropRestoredSlot, isJournalKept, readKeptEntries, moveJournalToConflict, readConflictJournal, readJournal, pruneJournal, setJournalWriterLive, compareJournalToDisk, resolveJournalOnLoad, resetJournalLoadState, MAX_JOURNAL_PAYLOAD, JOURNAL_MAX_AGE_MS, JOURNAL_INDEX_KEY, JOURNAL_KEY_PREFIX, JOURNAL_META_PREFIX, RAW_PAYLOAD_LIMIT, KEPT_KEY_PREFIX, KEPT_MAX_PER_MAP, CONFLICT_KEY_PREFIX };
 export type { LiveEntry, JournalSource, ConflictMoveResult };

@@ -216,10 +216,17 @@ const THEME: Theme = {
 // =============================================================================
 
 /**
- * Schema version for data migration (Z-Layer Architecture)
- * Increment when mapData structure changes in a breaking way
+ * Newest map schema this build reads and writes (the version-stepped runner in
+ * persistence/schemaMigration.ts brings every loaded map up to it). Increment
+ * only together with a registered `migrations[N]` step, and never with a step
+ * that rebuilds `layers`.
+ *
+ * v3 (detail ladder) is a per-map fence, not a reshaping: the writer stamps 3
+ * only on entries that carry `lod`, rung `levels` or `homeLevel` (so builds
+ * that predate the ladder refuse them instead of dropping rungs) and keeps
+ * every classic entry at 2, byte-identical (schemaMigration.stampSchemaVersions).
  */
-const SCHEMA_VERSION: number = 2;
+const SCHEMA_VERSION: number = 3;
 
 // =============================================================================
 // Defaults Configuration

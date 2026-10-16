@@ -20,12 +20,8 @@ import { HexGeometry } from '../geometry/core/HexGeometry';
 import { createGeometryLadder, type GeometryLadder } from '../geometry/core/createGeometryLadder';
 import { hasDepthContent, isDepthQuarantined, ladderParamsFor } from '../core/lodFlags';
 import { DEFAULTS } from '../core/dmtConstants';
+import { homeLevelOf } from '../core/homeLevel';
 import { authoredCells, authoredLevels, setLevelCells } from './layerAccessor';
-
-/** True when any layer holds authored cells on a rung >= 1. */
-function hasAuthoredRungs(mapData: MapData): boolean {
-  return (mapData.layers ?? []).some(layer => authoredLevels(layer).some(level => level >= 1));
-}
 
 /**
  * Ladder rooted at `root` (a hex geometry carrying the bounds to test against),
@@ -46,12 +42,6 @@ function ladderForAuthoredRungs(mapData: MapData, root: HexGeometry): GeometryLa
 
 type HomedList = 'objects' | 'textLabels' | 'tiles';
 const HOMED_LISTS: readonly HomedList[] = ['objects', 'textLabels', 'tiles'];
-
-/** The rung (>= 1) an element is homed on; 0 for a root element. */
-function homeOf(item: unknown): number {
-  const home = (item as { homeLevel?: number }).homeLevel ?? 0;
-  return Number.isInteger(home) && home > 0 ? home : 0;
-}
 
 /**
  * Does a homed element's rung cell still exist under the ladder's root bounds?
@@ -81,7 +71,7 @@ function homedElementExists(list: HomedList, item: unknown, home: number, ladder
 
 /** Is `item` an element homed on a rung >= 1 whose rung cell falls outside the ladder's root bounds? */
 function isHomedOrphan(list: HomedList, item: unknown, ladder: GeometryLadder): boolean {
-  const home = homeOf(item);
+  const home = homeLevelOf(item);
   return home > 0 && !homedElementExists(list, item, home, ladder);
 }
 
@@ -119,7 +109,7 @@ function countDepthContent(layer: MapLayer): number {
   }
   for (const list of HOMED_LISTS) {
     for (const item of (layer[list] ?? []) as unknown[]) {
-      if (homeOf(item) > 0) count++;
+      if (homeLevelOf(item) > 0) count++;
     }
   }
   return count;
@@ -186,6 +176,6 @@ function filterLevelsToBounds(mapData: MapData, ladder: GeometryLadder): MapData
 }
 
 export {
-  hasAuthoredRungs, ladderForAuthoredRungs, countLevelOrphans, countHomedOrphans, countLevelOrphansForBounds,
+  ladderForAuthoredRungs, countLevelOrphans, countLevelOrphansForBounds,
   depthResizeBlocker, filterLevelsToBounds
 };

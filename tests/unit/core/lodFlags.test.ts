@@ -4,8 +4,11 @@ import type { MapData } from '#types/core/map.types';
 const getSettings = vi.fn(() => ({} as Record<string, unknown>));
 vi.mock('../../../src/core/settingsAccessor', () => ({ getSettings }));
 
-const { isLodLadderEnabled, isLadderView, isDepthQuarantined, canAuthorDepth, ladderParamsFor, getMaxZoom, hasDepthContent, hasSubHexChildren, ladderTileClipAt } =
+const { isLodLadderEnabled, isLadderView, isDepthQuarantined, canAuthorDepth, ladderParamsFor, getMaxZoom, hasDepthContent, hasSubHexChildren, ladderTileClipAt, deepestAuthoredRung } =
   await import('../../../src/core/lodFlags');
+const { setLevelCells } = await import('../../../src/persistence/layerAccessor');
+const { calculateContentBounds, exportLadderFor } = await import('../../../src/persistence/exportOperations');
+const { HexGeometry } = await import('../../../src/geometry/core/HexGeometry');
 const { DEFAULTS } = await import('../../../src/core/dmtConstants');
 
 /** `activeWindow` is an Obsidian global; the override reader goes through it. */
@@ -301,5 +304,41 @@ describe('lodFlags: bounded ladder depth and zoom (cross-model review item 1)', 
     getSettings.mockReturnValue({ lodLadder: true });
     withLadderOverride({ maxLevel: 40 });
     expect(ladderParamsFor(hexMap()).maxLevel).toBe(3);
+  });
+});
+
+describe('lodFlags: wave 1 predicates (DATA-08, C3, MEM-06)', () => {
+  beforeEach(() => { getSettings.mockReset(); getSettings.mockReturnValue({}); });
+
+  it("homeLevel 1.5 or '2' counts as 0: not quarantined, export does not throw", () => {
+    for (const homeLevel of [1.5, '2', -1, Number.NaN] as unknown[]) {
+      const obj = { id: 'o', type: 'entrance', position: { x: 1, y: 1 }, size: { width: 1, height: 1 }, homeLevel };
+      const base = withLayers({ lod: { ...LOD, maxLevel: 1 } }, { 1: [cell(1, 1)] });
+      const map = { ...base, layers: [{ ...base.layers[0], objects: [obj] }] } as MapData;
+      expect(deepestAuthoredRung(map)).toBe(1);
+      expect(isDepthQuarantined(map)).toEqual({ quarantined: false, reason: null });
+      const root = new HexGeometry(80, 'flat', { maxCol: 10, maxRow: 10 });
+      const ladder = exportLadderFor(map, root);
+      expect(ladder).not.toBeNull();
+      // Bounded at the root, never through geometryForLevel(1.5), which throws.
+      expect(() => calculateContentBounds(map.layers[0], root, ladder, 1)).not.toThrow();
+    }
+  });
+
+  it('array-shaped levels quarantines', () => {
+    const base = withLayers({ lod: LOD });
+    const map = { ...base, layers: [{ ...base.layers[0], levels: [[cell(1, 1)]] }] } as unknown as MapData;
+    expect(isDepthQuarantined(map)).toEqual({ quarantined: true, reason: 'invalid-levels-key' });
+    expect(isLadderView(map)).toBe(false);
+  });
+
+  it('memo misses after setLevelCells', () => {
+    const map = withLayers({ lod: LOD });
+    expect(deepestAuthoredRung(map)).toBe(0);
+    expect(deepestAuthoredRung(map)).toBe(0); // memo hit, same answer
+    const next = setLevelCells(map, 'L1', 2, [cell(1, 1)]);
+    expect(next.layers).not.toBe(map.layers);
+    expect(deepestAuthoredRung(next)).toBe(2);
+    expect(deepestAuthoredRung(map)).toBe(0);
   });
 });

@@ -58,7 +58,9 @@ import { materialiseLevelLayer } from '../core/materialiseLevel';
 /**
  * Lattice epoch: bumped only when cell EXISTENCE changes. In Phase 1 existence is
  * a pure function of the root bounds, which live in the ladder itself, so a new
- * bounds means a new ladder identity and the epoch never has to move.
+ * bounds means a new ladder identity and the epoch never has to move. The one
+ * declaration: mapRenderer's lattice clip cache imports it, so a bump moves the
+ * materialise memo and the clip cache together.
  */
 const LADDER_EPOCH = 0;
 
@@ -134,10 +136,11 @@ function objectRenderDeps(mapData: MapData): Parameters<typeof renderObjects>[5]
 }
 
 /**
- * Tiles under the ladder (kgc.6 / kgc.22), for the active layer and both ghost
- * passes alike: each tile draws ONCE on its HOME rung's geometry (world-anchored
- * at the parent's rect) and a tile homed finer than the active rung is skipped.
- * At rungs >= 1 root tiles take the 'smart' clip by default (kgc.26): each is
+ * Tiles under the ladder, at every rung including 0, for the active layer and
+ * both ghost passes alike: each tile draws ONCE on its HOME rung's geometry
+ * (world-anchored at the parent's rect) and a tile homed finer than the active
+ * rung is skipped. At rungs >= 1 root tiles take the 'smart' clip by default
+ * (so root art never paints over a deeper rung's authored cells): each is
  * clipped to its own hexagon plus every neighbour WITHOUT deep content, so its
  * art never covers a neighbour's deep paint yet still runs across empty ones;
  * a tile with no deep neighbour draws unclipped. The developer knob can swap
@@ -518,7 +521,7 @@ function renderLayerComposite(frame: RenderFrame, scene: StaticScene, kit: Stati
     const hasStrokes = drawLayer.terrainStrokes != null && drawLayer.terrainStrokes.length > 0;
     if ((hasTiles || hasStrokes) && mapData.tilesets != null && mapData.tilesets.length > 0) {
       if (ladder !== null) {
-        // Tiles at depth, every rung including 0 (kgc.6 / kgc.22): see renderLadderTiles.
+        // Tiles at depth, every rung including 0, each on its home rung: see renderLadderTiles.
         renderLadderTiles(frame, scene, drawLayer, layerOpacity, hiddenTileLayers);
       } else {
         renderTiles(
@@ -669,9 +672,9 @@ function drawStaticScene(frame: RenderFrame, scene: StaticScene): void {
 }
 
 export {
+  LADDER_EPOCH,
   makeRenderFrame,
   objectRenderDeps,
-  renderLadderTiles,
   drawStaticScene,
   renderBackgroundAndGrid,
   renderGhostLayer,

@@ -22,6 +22,7 @@ import { useFeatureFlags } from './hooks/state/useFeatureFlags';
 import { useFogOfWar } from './hooks/interactions/useFogOfWar';
 import { useDataHandlers } from './hooks/state/useDataHandlers';
 import { useMcpBridge } from './hooks/state/useMcpBridge';
+import { installMediaClickGuard } from './utils/mediaClickGuard';
 import { createGeometry } from './geometry/core/createGeometry';
 import { MapHeader } from './components/controls/MapHeader';
 import { MapCanvas } from './components/mapcanvas/MapCanvas';
@@ -521,22 +522,23 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     if (role != null && role !== tileDepth) setTileDepth(role);
   }, [mapData, tileDepth, setTileDepth]);
 
-  // Obsidian's reading view delegates img,video clicks on .markdown-preview-sizer
-  // to its full-screen image viewer. Our embed lives inside the sizer, so stop
-  // media clicks here (bubble phase, after our own handlers) before they arrive.
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const stop = (e: Event): void => {
-      if (e.target instanceof HTMLImageElement || e.target instanceof HTMLVideoElement) e.stopPropagation();
-    };
-    el.addEventListener('click', stop);
-    el.addEventListener('contextmenu', stop);
-    return () => {
-      el.removeEventListener('click', stop);
-      el.removeEventListener('contextmenu', stop);
-    };
+  // Reading-view media guard (installMediaClickGuard). Attached through a
+  // callback ref on the container: an effect keyed on the ref object ran once
+  // while the loading placeholder was mounted and never attached (REACT-01).
+  const mediaGuardCleanupRef = useRef<(() => void) | null>(null);
+  const setContainerEl = useCallback((el: HTMLDivElement | null): void => {
+    containerRef.current = el;
+    mediaGuardCleanupRef.current?.();
+    mediaGuardCleanupRef.current = el !== null ? installMediaClickGuard(el) : null;
   }, [containerRef]);
+
+  // The canvas's live ladder rung getter (reads the view controller, not the
+  // committed viewState), published by MapCanvas for the MCP bridge (WIRE-01).
+  const liveActiveLevelRef = useRef<(() => number) | null>(null);
+  const publishActiveLevelGetter = useCallback((getter: (() => number) | null): void => {
+    liveActiveLevelRef.current = getter;
+  }, []);
+  const readLiveActiveLevel = useCallback((): number | null => liveActiveLevelRef.current?.() ?? null, []);
 
   // Custom event listeners (deep links, regions, object links, hex context
   // menu) + the direct sub-hex dive/surface callbacks the canvas layer calls.
@@ -590,7 +592,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleCellsChange, handleLevelCellsChange, wrappedHandleUndo, handleRedo, handleLayerSelect, forceSave,
     handleViewStateChange, availableTilesets, handleTileSelect, setSelectedTileForm,
     handleTilesChange, handleObjectsChange, selectPane, setTileBrowserCollapsed,
-    setRailOpenId, getCachedImage,
+    setRailOpenId, getCachedImage, readLiveActiveLevel,
   });
 
   // Deleted by this mount (mapDeleted) or by another mount this session
@@ -642,7 +644,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   return (
     <>
       <div
-        ref={containerRef}
+        ref={setContainerEl}
         className={`windrose-container interactive-child${fullPane ? '' : ' windrose-container-block'}${pictureFrameActive ? ' windrose-picture-frame' : ''}`}
         style={frameWidth != null ? { width: `${frameWidth}px`, maxWidth: '100%', marginInline: 'auto' } : undefined}
       >
@@ -773,6 +775,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               currentTool={currentTool}
               editLevelLock={editLevelLock}
               onEditLevelLockChange={setEditLevelLock}
+              onActiveLevelGetterChange={publishActiveLevelGetter}
               isAlignmentMode={isAlignmentMode}
               interactionLocked={pictureFrameActive}
               selectedObjectType={selectedObjectType ?? undefined}
