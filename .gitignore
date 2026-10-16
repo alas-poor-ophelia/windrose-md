@@ -90,6 +90,7 @@ docs/vendor/
 # LOD spike build + capture artifacts
 spikes/**/dist/
 spikes/**/out/
+spikes/**/out-*/
 
 # LOD R&D design handoffs (maintainer-only, stay local)
 .claude/lod-rd/
