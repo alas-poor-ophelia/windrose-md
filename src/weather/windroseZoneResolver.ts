@@ -10,7 +10,10 @@
  *
  * `resolve` answers synchronously for maps open in some view (their
  * published root snapshot). `resolveAsync` also answers for maps that are
- * not open, by reading the stored entry READ-ONLY through `loadMap`.
+ * not open, by reading the stored entry READ-ONLY through `loadMap`; the
+ * parsed zone fields are cached per map until the data file is modified
+ * (getDataFileStamp: any vault modify/delete/rename of the file). Never
+ * writes, never shows a Notice.
  */
 
 // Type-only imports
@@ -19,6 +22,7 @@ import type { WadjetZoneLocator } from '#types/integrations/wadjet.types';
 import type { WindroseZoneAnswers } from './wadjetBridge';
 import type { MapZoneSnapshot } from './weatherZones';
 
+import { getDataFileStamp } from '../persistence/storeCache';
 import { buildMapZoneSnapshot, getMountedMapZones, zoneAtHex, zoneOfRegion } from './weatherZones';
 
 /** Custom locator namespace for Windrose regions */
@@ -52,7 +56,15 @@ function answer(snapshot: MapZoneSnapshot, parsed: ParsedLocator): string | null
     : zoneOfRegion(snapshot, parsed.regionId);
 }
 
-function createWindroseZoneAnswers(loadMap: MapLoader): WindroseZoneAnswers {
+/**
+ * `getSourceStamp` names the version of the stored data: a closed map's
+ * parsed zones are reused while it is unchanged (default: the data file's
+ * modification stamp).
+ */
+function createWindroseZoneAnswers(loadMap: MapLoader, getSourceStamp: () => string = getDataFileStamp): WindroseZoneAnswers {
+  /** mapId → zone snapshot of the stored (closed) map, and the stamp it was read at */
+  const closedMaps = new Map<string, { stamp: string; snapshot: MapZoneSnapshot | null }>();
+
   const resolve = (locator: WadjetZoneLocator): string | null => {
     const parsed = parseLocator(locator);
     if (parsed == null) return null;
@@ -65,9 +77,18 @@ function createWindroseZoneAnswers(loadMap: MapLoader): WindroseZoneAnswers {
     if (parsed == null) return null;
     const mounted = getMountedMapZones(parsed.mapId);
     if (mounted != null) return answer(mounted, parsed);
+    // Stamp taken BEFORE the read: a modification landing during it makes
+    // the entry stale at once rather than hiding the change
+    const stamp = getSourceStamp();
+    const cached = closedMaps.get(parsed.mapId);
+    if (cached != null && cached.stamp === stamp) {
+      return cached.snapshot != null ? answer(cached.snapshot, parsed) : null;
+    }
     try {
       const map = await loadMap(parsed.mapId);
-      return map != null ? answer(buildMapZoneSnapshot(map), parsed) : null;
+      const snapshot = map != null ? buildMapZoneSnapshot(map) : null;
+      closedMaps.set(parsed.mapId, { stamp, snapshot });
+      return snapshot != null ? answer(snapshot, parsed) : null;
     } catch {
       return null;
     }

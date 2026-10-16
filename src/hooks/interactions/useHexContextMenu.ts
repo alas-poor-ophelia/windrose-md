@@ -248,12 +248,7 @@ function useHexContextMenu({
           });
         });
 
-        addWeatherZoneMenuItems(menu, app, region, weatherZoneId => {
-          const updated = (mapData.regions ?? []).map((r: Region) =>
-            r.id === region.id ? { ...r, weatherZoneId } : r
-          );
-          handleRegionsChange(updated);
-        });
+        addWeatherZoneMenuItems(menu, app, region, mapData.regions ?? [], handleRegionsChange);
 
         menu.addSeparator();
 

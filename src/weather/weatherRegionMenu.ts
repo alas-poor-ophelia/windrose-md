@@ -15,16 +15,35 @@ import { getWadjetApi, listWeatherZones } from './wadjetBridge';
 import { hasWeatherZone } from './weatherZones';
 
 /**
+ * `regions` with one region bound to `weatherZoneId`, or unbound when it
+ * is undefined: the key is deleted, never stored as undefined (an absent
+ * key is the persisted "no weather").
+ */
+function withRegionWeatherZone(regions: readonly Region[], regionId: string, weatherZoneId: string | undefined): Region[] {
+  return regions.map(region => {
+    if (region.id !== regionId) return region;
+    if (weatherZoneId !== undefined) return { ...region, weatherZoneId };
+    const unbound = { ...region };
+    delete unbound.weatherZoneId;
+    return unbound;
+  });
+}
+
+/**
  * Append one checkable entry per weather zone, plus a removal entry when
- * the region is bound. `onChange(undefined)` unbinds. A binding to a zone
- * the weather plugin no longer lists still gets its removal entry.
+ * the region is bound; each hands `onRegionsChange` the updated region
+ * list. A binding to a zone the weather plugin no longer lists still gets
+ * its removal entry.
  */
 function addWeatherZoneMenuItems(
   menu: Menu,
   app: App,
   region: Region,
-  onChange: (weatherZoneId: string | undefined) => void
+  regions: readonly Region[],
+  onRegionsChange: (regions: Region[]) => void
 ): void {
+  const onChange = (weatherZoneId: string | undefined): void =>
+    onRegionsChange(withRegionWeatherZone(regions, region.id, weatherZoneId));
   const api = getWadjetApi(app);
   if (api == null) return;
 
@@ -55,4 +74,4 @@ function addWeatherZoneMenuItems(
   }
 }
 
-export { addWeatherZoneMenuItems };
+export { addWeatherZoneMenuItems, withRegionWeatherZone };

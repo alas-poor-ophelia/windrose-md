@@ -31,7 +31,7 @@ WindroseSettingsTab.ts        # PluginSettingTab subclass: getSettingDefinitions
 
 ## Weather group
 
-`buildWeatherGroup` (Measurement & travel page) holds "Weather travel rules" (`weatherTravelInterpreter`, a DIRECT key). Its dropdown options are built when definitions are built, from the weather plugin's `listInterpreters("travel")` (built-in rules first; a saved id no longer registered stays listed). The group is visible only while the weather plugin is usable.
+`buildWeatherGroup` (Measurement & travel page) holds "Weather travel rules" (`weatherTravelInterpreter`, a DIRECT key). Its dropdown options are built when definitions are built, from the weather plugin's `listInterpreters("travel")` (built-in rules first; a saved id no longer registered stays listed). The group is visible only while the weather plugin is usable. Changing it needs no map-side wiring: `saveSettings()` fires `windrose-settings-changed`, and each open map's `WeatherProvider` re-reads the id and bumps its store version when it changed, so routes re-cost.
 
 ## Adding a setting
 

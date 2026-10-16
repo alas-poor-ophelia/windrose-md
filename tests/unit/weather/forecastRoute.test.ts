@@ -2,7 +2,7 @@
  * forecastRoute Unit Tests
  *
  * Route → walk steps over both geometries, the memoized weather lookup
- * (speed factor → time multiplier), joining a committed walk with the live
+ * (speed factor → time factor), joining a committed walk with the live
  * preview walk, departure ranking, and per-day stretches of the route line.
  */
 
@@ -85,36 +85,50 @@ function makeSource(speedFor: (zoneId: string, day: number) => { speed: number; 
 }
 
 describe("createRouteWeather", () => {
-  it("turns the speed factor into a time multiplier and tags the area", () => {
+  it("turns the speed factor into a time factor and tags the area", () => {
     const { source } = makeSource(zone => (zone === "ashfall" ? { speed: 0.5, label: "Gale" } : { speed: 1 }));
     const weather = createRouteWeather(source);
-    expect(weather.weatherMultiplier({ x: 7, y: 0 }, 3)).toEqual({ multiplier: 2, label: "Gale", areaId: "region:c" });
-    expect(weather.weatherMultiplier({ x: 1, y: 0 }, 3)).toEqual({ multiplier: 1, areaId: "region:h" });
+    expect(weather.weatherSlowdown({ x: 7, y: 0 }, 3)).toEqual({ timeFactor: 2, label: "Gale", areaId: "region:c" });
+    expect(weather.weatherSlowdown({ x: 1, y: 0 }, 3)).toEqual({ timeFactor: 1, areaId: "region:h" });
   });
 
   it("is fair outside every weather area and when there is no report", () => {
     const { source } = makeSource(zone => (zone === "ashfall" ? null : { speed: 0.5 }));
     const weather = createRouteWeather(source);
-    expect(weather.weatherMultiplier({ x: 1, y: 12 }, 0)).toEqual({ multiplier: 1 });
-    expect(weather.weatherMultiplier({ x: 8, y: 0 }, 0)).toEqual({ multiplier: 1 });
+    expect(weather.weatherSlowdown({ x: 1, y: 12 }, 0)).toEqual({ timeFactor: 1 });
+    expect(weather.weatherSlowdown({ x: 8, y: 0 }, 0)).toEqual({ timeFactor: 1 });
+  });
+
+  it("treats a fogged cell as unknown weather: fair, no label, no area (the itinerary must not reveal it)", () => {
+    const { source, report } = makeSource(() => ({ speed: 0.05, label: "Blizzard" }));
+    const weather = createRouteWeather({ ...source, isFogged: cell => cell.x === 7 });
+    expect(weather.weatherSlowdown({ x: 7, y: 0 }, 1)).toEqual({ timeFactor: 1 });
+    expect(report).not.toHaveBeenCalled();
+    // A walk through only fogged cells meets no weather at all
+    const steps = buildRouteSteps([{ x: 7, y: 0 }, { x: 7, y: 3 }], [8], [1], gridLine);
+    const fogged = createRouteWeather({ ...source, isFogged: () => true });
+    const walk = walkForecast(steps, { speedPerHour: 2, hoursPerDay: 8, departDay: 0, weatherSlowdown: fogged.weatherSlowdown });
+    expect(walk.days.flatMap(d => d.labels)).toEqual([]);
+    expect(walk.days.flatMap(d => d.areaIds)).toEqual([]);
+    expect(walk.totalHours).toBeCloseTo(walk.fairHours, 9);
   });
 
   it("asks the store once per area and day", () => {
     const { source, report } = makeSource(() => ({ speed: 0.8 }));
     const weather = createRouteWeather(source);
-    for (let x = 0; x < 5; x++) weather.weatherMultiplier({ x, y: 0 }, 1);
-    for (let x = 0; x < 5; x++) weather.weatherMultiplier({ x, y: 0 }, 1);
+    for (let x = 0; x < 5; x++) weather.weatherSlowdown({ x, y: 0 }, 1);
+    for (let x = 0; x < 5; x++) weather.weatherSlowdown({ x, y: 0 }, 1);
     expect(report).toHaveBeenCalledTimes(1);
   });
 
   it("finds the slowest area of a day", () => {
     const { source } = makeSource(zone => (zone === "ashfall" ? { speed: 0.25, label: "Storm" } : { speed: 0.9, label: "Rain" }));
     const weather = createRouteWeather(source);
-    weather.weatherMultiplier({ x: 1, y: 0 }, 2);
-    weather.weatherMultiplier({ x: 6, y: 0 }, 2);
+    weather.weatherSlowdown({ x: 1, y: 0 }, 2);
+    weather.weatherSlowdown({ x: 6, y: 0 }, 2);
     const worst = weather.worstArea(["region:h", "region:c"], 2);
     expect(worst?.areaId).toBe("region:c");
-    expect(worst?.multiplier).toBe(4);
+    expect(worst?.timeFactor).toBe(4);
     expect(weather.worstArea(["unknown"], 2)).toBeNull();
   });
 });
@@ -130,7 +144,7 @@ describe("continueWalk", () => {
     const tail = buildRouteSteps(points.slice(2), distances.slice(2), [1], gridLine, true);
     expect(head.length + tail.length).toBe(all.length);
 
-    const opts = { speedPerHour: 2, hoursPerDay: 8, weatherMultiplier: createRouteWeather(source).weatherMultiplier };
+    const opts = { speedPerHour: 2, hoursPerDay: 8, weatherSlowdown: createRouteWeather(source).weatherSlowdown };
     const whole = walkForecast(all, { ...opts, departDay: 0 });
     const first = walkForecast(head, { ...opts, departDay: 0 });
     const rest = walkForecast(tail, {
@@ -157,7 +171,7 @@ describe("continueWalk", () => {
 
   it("keeps the base when the tail is empty", () => {
     const steps = buildRouteSteps([{ x: 0, y: 0 }, { x: 3, y: 0 }], [6], [1], gridLine);
-    const opts = { speedPerHour: 2, hoursPerDay: 8, weatherMultiplier: () => ({ multiplier: 1 }), departDay: 4 };
+    const opts = { speedPerHour: 2, hoursPerDay: 8, weatherSlowdown: () => ({ timeFactor: 1 }), departDay: 4 };
     const base = walkForecast(steps, opts);
     const joined = continueWalk(base, walkForecast([], opts), steps.length);
     expect(joined.totalHours).toBeCloseTo(base.totalHours);
@@ -170,7 +184,7 @@ describe("rankDepartures", () => {
     // The coast is stormy on days 0-2 and fair afterwards
     const { source } = makeSource((zone, day) => (zone === "ashfall" && day < 3 ? { speed: 0.5, label: "Storm" } : { speed: 1 }));
     const steps = buildRouteSteps([{ x: 0, y: 0 }, { x: 9, y: 0 }], [30], [1], gridLine);
-    const options = rankDepartures(steps, { speedPerHour: 2, hoursPerDay: 8, weatherMultiplier: createRouteWeather(source).weatherMultiplier }, 0, 7);
+    const options = rankDepartures(steps, { speedPerHour: 2, hoursPerDay: 8, weatherSlowdown: createRouteWeather(source).weatherSlowdown }, 0, 7);
     expect(options).toHaveLength(7);
     expect(options.filter(o => o.best)).toHaveLength(1);
     const best = options.find(o => o.best);
@@ -227,7 +241,7 @@ describe("performance", () => {
     const run = () => {
       const weather = createRouteWeather(source);
       const steps = buildRouteSteps(points, distances, terrains, hexLine);
-      const opts = { speedPerHour: 3, hoursPerDay: 8, weatherMultiplier: weather.weatherMultiplier };
+      const opts = { speedPerHour: 3, hoursPerDay: 8, weatherSlowdown: weather.weatherSlowdown };
       walkForecast(steps, { ...opts, departDay: 0 });
       walkForecast(steps, { ...opts, speedPerHour: 6, departDay: 0 });
       return rankDepartures(steps, opts, 0, 7);

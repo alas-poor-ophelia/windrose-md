@@ -9,6 +9,8 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  isImpassable,
+  IMPASSABLE_MULTIPLIER,
   walkForecast,
   bestDeparture,
   speedPerHourFromMode,
@@ -30,16 +32,16 @@ function route(n: number, terrain = 1): WalkStep[] {
   return Array.from({ length: n }, (_, i) => ({ cell: { x: i, y: 0 }, distance: 1, terrainMultiplier: terrain }));
 }
 
-const fair: WalkOptions["weatherMultiplier"] = () => ({ multiplier: 1 });
+const fair: WalkOptions["weatherSlowdown"] = () => ({ timeFactor: 1 });
 
 /** Storm (×2 time) on day 3 over the second half of the route (x >= 27) */
-const stormDay3: WalkOptions["weatherMultiplier"] = (cell, day) =>
+const stormDay3: WalkOptions["weatherSlowdown"] = (cell, day) =>
   day === 3 && cell.x >= 27
-    ? { multiplier: 2, label: "Storm", areaId: "coast" }
-    : { multiplier: 1, label: "Clear", areaId: cell.x >= 27 ? "coast" : "highlands" };
+    ? { timeFactor: 2, label: "Storm", areaId: "coast" }
+    : { timeFactor: 1, label: "Clear", areaId: cell.x >= 27 ? "coast" : "highlands" };
 
 function opts(partial: Partial<WalkOptions> = {}): WalkOptions {
-  return { speedPerHour: SPEED, hoursPerDay: HOURS, departDay: 1, weatherMultiplier: fair, ...partial };
+  return { speedPerHour: SPEED, hoursPerDay: HOURS, departDay: 1, weatherSlowdown: fair, ...partial };
 }
 
 describe("walkForecast", () => {
@@ -63,7 +65,7 @@ describe("walkForecast", () => {
   });
 
   it("storm on day 3, second half only: leaving day 1 meets it for the last 6 units", () => {
-    const r = walkForecast(route(54), opts({ weatherMultiplier: stormDay3 }));
+    const r = walkForecast(route(54), opts({ weatherSlowdown: stormDay3 }));
     expect(r.ok).toBe(true);
     expect(r.days).toHaveLength(3);
     const last = r.days[2];
@@ -72,7 +74,7 @@ describe("walkForecast", () => {
     expect(last.hours).toBeCloseTo(4, 9);
     expect(last.hoursLost).toBeCloseTo(2, 9);
     expect(last.labels).toEqual(["Storm"]);
-    expect(last.worstMultiplier).toBe(2);
+    expect(last.worstTimeFactor).toBe(2);
     expect(r.days[0].labels).toEqual(["Clear"]);
     expect(r.days[1].areaIds).toEqual(["highlands", "coast"]);
     expect(r.totalHours).toBeCloseTo(20, 9);
@@ -80,7 +82,7 @@ describe("walkForecast", () => {
   });
 
   it("storm on day 3: leaving day 2 walks into it mid-day, leaving day 3 outruns it", () => {
-    const fromTwo = walkForecast(route(54), opts({ departDay: 2, weatherMultiplier: stormDay3 }));
+    const fromTwo = walkForecast(route(54), opts({ departDay: 2, weatherSlowdown: stormDay3 }));
     // Day 3: x 24..26 fair (1 h), then 7 h of storm at 1.5 units/h = 10.5 units
     expect(fromTwo.days[1].distance).toBeCloseTo(13.5, 9);
     expect(fromTwo.days[1].labels).toEqual(["Clear", "Storm"]);
@@ -88,7 +90,7 @@ describe("walkForecast", () => {
     expect(fromTwo.days[2].distance).toBeCloseTo(16.5, 9);
     expect(fromTwo.totalHours).toBeCloseTo(21.5, 9);
 
-    const fromThree = walkForecast(route(54), opts({ departDay: 3, weatherMultiplier: stormDay3 }));
+    const fromThree = walkForecast(route(54), opts({ departDay: 3, weatherSlowdown: stormDay3 }));
     expect(fromThree.totalHours).toBeCloseTo(18, 9);
     expect(fromThree.days[0].labels).toEqual(["Clear"]);
   });
@@ -97,7 +99,7 @@ describe("walkForecast", () => {
     const steps: WalkStep[] = [{ cell: { x: 0, y: 0 }, distance: 30, terrainMultiplier: 1 }];
     const r = walkForecast(steps, opts({
       departDay: 0,
-      weatherMultiplier: (_c, day) => (day === 0 ? { multiplier: 1, label: "Clear" } : { multiplier: 2, label: "Rain" }),
+      weatherSlowdown: (_c, day) => (day === 0 ? { timeFactor: 1, label: "Clear" } : { timeFactor: 2, label: "Rain" }),
     }));
     expect(r.days).toHaveLength(2);
     expect(r.days[0]).toMatchObject({ day: 0, startStep: 0, endStep: 0, labels: ["Clear"] });
@@ -119,7 +121,7 @@ describe("walkForecast", () => {
   it("waits out an impassable day and retries the next", () => {
     const r = walkForecast(route(54), opts({
       departDay: 0,
-      weatherMultiplier: (_c, day) => (day === 1 ? { multiplier: 25, label: "Blizzard" } : { multiplier: 1 }),
+      weatherSlowdown: (_c, day) => (day === 1 ? { timeFactor: 25, label: "Blizzard" } : { timeFactor: 1 }),
     }));
     expect(r.ok).toBe(true);
     expect(r.days.map(d => d.day)).toEqual([0, 1, 2, 3]);
@@ -137,7 +139,7 @@ describe("walkForecast", () => {
   });
 
   it("gives up after maxDays when the way never opens", () => {
-    const r = walkForecast(route(54), opts({ maxDays: 5, weatherMultiplier: () => ({ multiplier: 50, label: "Flood" }) }));
+    const r = walkForecast(route(54), opts({ maxDays: 5, weatherSlowdown: () => ({ timeFactor: 50, label: "Flood" }) }));
     expect(r.ok).toBe(false);
     expect(r.reason).toMatch(/5 days/);
     expect(r.days).toHaveLength(5);
@@ -186,7 +188,7 @@ describe("walkForecast", () => {
       { cell: { x: 1, y: 0 }, distance: NaN, terrainMultiplier: 1 },
       { cell: { x: 2, y: 0 }, distance: 3, terrainMultiplier: 0 },
     ];
-    const r = walkForecast(steps, opts({ weatherMultiplier: () => ({ multiplier: NaN }) }));
+    const r = walkForecast(steps, opts({ weatherSlowdown: () => ({ timeFactor: NaN }) }));
     expect(r.ok).toBe(true);
     expect(r.totalHours).toBeCloseTo(2, 9);
   });
@@ -204,7 +206,7 @@ describe("walkForecast", () => {
       const speedPerHour = 0.5 + rand() * 5;
       const hoursPerDay = 2 + rand() * 10;
       const plain = steps.reduce((s, st) => s + st.distance / (speedPerHour * st.terrainMultiplier), 0);
-      const r = walkForecast(steps, { speedPerHour, hoursPerDay, departDay: 0, weatherMultiplier: fair, maxDays: 1000 });
+      const r = walkForecast(steps, { speedPerHour, hoursPerDay, departDay: 0, weatherSlowdown: fair, maxDays: 1000 });
       expect(r.ok).toBe(true);
       expect(r.totalHours).toBeCloseTo(plain, 6);
       expect(r.fairHours).toBeCloseTo(plain, 6);
@@ -222,7 +224,7 @@ describe("walkForecast", () => {
 
 describe("bestDeparture", () => {
   it("walks consecutive departure days, sorted by departDay", () => {
-    const { departDay: _ignored, ...base } = opts({ weatherMultiplier: stormDay3 });
+    const { departDay: _ignored, ...base } = opts({ weatherSlowdown: stormDay3 });
     const rows = bestDeparture(route(54), base, 1, 3);
     expect(rows.map(r => r.departDay)).toEqual([1, 2, 3]);
     expect(rows.map(r => r.result.totalHours)).toEqual([20, 21.5, 18].map(h => expect.closeTo(h, 9)));
@@ -267,5 +269,15 @@ describe("speedPerHourFromMode", () => {
     const r = speedPerHourFromMode(onFoot, pack, "km", 8);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toMatch(/km/);
+  });
+});
+
+describe("isImpassable", () => {
+  it("compares the impassable threshold with a tolerance", () => {
+    expect(isImpassable(IMPASSABLE_MULTIPLIER)).toBe(true);
+    expect(isImpassable(IMPASSABLE_MULTIPLIER - 1e-9)).toBe(true);
+    // The weather rules' 0.05 speed factor, inverted
+    expect(isImpassable(1 / 0.05)).toBe(true);
+    expect(isImpassable(19.9)).toBe(false);
   });
 });

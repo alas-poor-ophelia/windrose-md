@@ -14,9 +14,13 @@
  *
  * With weather and a day length, the times come from the forecast walk and
  * the card adds the itinerary (one row per travel day: glyph, day, distance
- * made, weather, hours lost) and a "Leave on" departure window (the next
- * seven departure days with their total time, the fastest highlighted;
- * clicking one sets the departure day).
+ * made, weather, hours the weather adds) and a "Leave on" departure window
+ * (seven departure days from the view day with their total time, the
+ * fastest highlighted; clicking one sets the departure day). Weather time
+ * reads as added time everywhere ("+2.7 h"), in one colour.
+ *
+ * The card is opaque and theme-aware (scss/_measurement.scss): it floats
+ * over a busy map and must read in the light theme as well as the dark.
  */
 
 import type { VNode } from 'preact';
@@ -49,8 +53,8 @@ interface ItineraryDay {
   distance: string;
   /** Weather met that day, e.g. "Heavy rain, Gale"; null = fair */
   weather: string | null;
-  /** Hours lost to weather; null when none */
-  hoursLost: string | null;
+  /** Hours the weather adds that day, e.g. "2.7 h" (shown as "+2.7 h"); null when none */
+  hoursAdded: string | null;
 }
 
 /** One day of the departure window */
@@ -252,8 +256,13 @@ const MeasurementControls = ({
                     {entry.weather != null && (
                       <span className="windrose-measure-itinerary-weather">{entry.weather}</span>
                     )}
-                    {entry.hoursLost != null && (
-                      <span className="windrose-measure-itinerary-lost">{`−${entry.hoursLost}`}</span>
+                    {entry.hoursAdded != null && (
+                      <span
+                        className="windrose-measure-itinerary-added"
+                        ref={tooltipRef('Time the weather adds this day')}
+                      >
+                        {`+${entry.hoursAdded}`}
+                      </span>
                     )}
                   </div>
                 ))}

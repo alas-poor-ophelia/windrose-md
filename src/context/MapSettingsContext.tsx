@@ -158,7 +158,6 @@ interface MapSettingsHandlers {
   setWeather: (updates: Partial<SettingsWeather>) => void;
 
   // Color picker
-  // Color picker
   setActiveColorPicker: (picker: string | null) => void;
 
   // Background image (shared)

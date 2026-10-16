@@ -11,6 +11,7 @@ import { ColorPicker } from '../shared/ColorPicker';
 import { RegionPanel } from '../panels/RegionPanel';
 import { AlmanacPanel } from '../panels/AlmanacPanel';
 import { useWeatherStore } from '../../context/WeatherContext';
+import { useWeatherFog } from '../../weather/weatherFog';
 import type { PanelBags } from './panelBags';
 
 interface BlockEdgeRailProps {
@@ -26,9 +27,11 @@ interface BlockEdgeRailProps {
 const ALMANAC_DRAWER_WIDTH = 252;
 
 const BlockEdgeRail = ({ bags, openId, onOpenChange, regions, onSettingsClick }: BlockEdgeRailProps): VNode => {
-  // Offered while the weather plugin is usable and the shown level has weather
-  const weather = useWeatherStore();
-  const almanacOffered = weather.available && weather.areas.length > 0;
+  // Offered while the shown level has weather the players can see (an
+  // area under fog is never named, not even by an empty Almanac)
+  const { hasWeather } = useWeatherStore();
+  const { revealedAreas } = useWeatherFog();
+  const almanacOffered = hasWeather && revealedAreas.length > 0;
   const openInAlmanac = (regionId: string): void => {
     bags.almanac.onAreaChange(`region:${regionId}`);
     onOpenChange('almanac');

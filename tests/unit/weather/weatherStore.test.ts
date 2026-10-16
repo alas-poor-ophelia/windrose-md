@@ -15,6 +15,11 @@ import { windroseTravelInterpreter } from "../../../src/weather/travelInterprete
 import type { WadjetInterpreter, WeatherReport } from "#types/integrations/wadjet.types";
 import { buildReport, createFakeApi, createFakeApiV1, createFakeApp } from "./fakeWadjet";
 
+/** Move the fake calendar's current day (what api.now() answers) */
+function setToday(weather: ReturnType<typeof createFakeApi>, day: number) {
+  weather.api.now = () => ({ dayOrdinal: day, yearPhase: 0, yearLength: 365, source: "internal" });
+}
+
 /** Run scheduled work on demand */
 function manualScheduler() {
   const tasks: (() => void)[] = [];
@@ -166,11 +171,23 @@ describe("WeatherStoreCore", () => {
     it("clears everything and moves today on time-changed", () => {
       const { core, weather, getReport, listener } = setup("v1");
       core.report("coast", 2);
+      setToday(weather, 3);
       weather.emit("time-changed", { type: "time-changed", current: 3, adapterId: "internal" });
       expect(core.getSnapshot().today).toBe(3);
       expect(listener).toHaveBeenCalledTimes(1);
       core.report("coast", 2);
       expect(getReport).toHaveBeenCalledTimes(2);
+    });
+
+    it("re-reads the day from the API instead of trusting the payload", () => {
+      const { core, weather, getReport, listener } = setup("v1");
+      core.report("coast", 2);
+      // A non-active adapter announces its own day; the active calendar is unmoved
+      weather.emit("time-changed", { type: "time-changed", current: 40, adapterId: "other" });
+      expect(core.getSnapshot().today).toBe(2);
+      expect(listener).not.toHaveBeenCalled();
+      core.report("coast", 2);
+      expect(getReport).toHaveBeenCalledTimes(1);
     });
 
     it("ignores a 0.3.x clock tick inside the same day", () => {
@@ -264,6 +281,7 @@ describe("WeatherStoreCore", () => {
       const v0 = core.getSnapshot().version;
       core.setViewTime({ dayOffset: 3 });
       scheduler.flush();
+      setToday(weather, 5);
       weather.emit("time-changed", { type: "time-changed", current: 5, adapterId: "internal" });
       expect(core.getSnapshot().version).toBe(v0 + 2);
     });
@@ -393,16 +411,58 @@ describe("WeatherStoreCore", () => {
     });
   });
 
+  describe("travel rules setting", () => {
+    it("bumps the version when the selected interpreter changes, and only then", () => {
+      const fake = createFakeApp();
+      const weather = createFakeApiV1();
+      fake.install(weather.api);
+      let id = "windrose.travel";
+      const core = new WeatherStoreCore(fake.app, { schedule: manualScheduler().schedule, getTravelInterpreterId: () => id });
+      core.start();
+      core.report("coast", 2);
+      const listener = vi.fn();
+      core.subscribe(listener);
+      const v0 = core.getSnapshot().version;
+      core.noteSettingsChanged();
+      expect(listener).not.toHaveBeenCalled();
+      id = "acme.travel";
+      core.noteSettingsChanged();
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(core.getSnapshot().version).toBe(v0 + 1);
+      core.noteSettingsChanged();
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("ground", () => {
-    it("derives from the 14 days ending on the day, cached per (zone, day)", () => {
+    it("derives from the 45 days ending on the day, cached per (zone, day)", () => {
       const { core, weather } = setup("v1", { days: DRY_DAYS });
       const getRange = vi.fn(weather.api.getRange);
       weather.api.getRange = getRange;
-      const a = core.ground("coast", 20);
+      const a = core.ground("coast", 60);
       expect(a).toMatchObject({ label: "dry", travelMultiplier: 1 });
-      expect(getRange).toHaveBeenCalledWith("coast", 7, 20);
-      expect(core.ground("coast", 20)).toBe(a);
+      expect(getRange).toHaveBeenCalledWith("coast", 16, 60);
+      expect(core.ground("coast", 60)).toBe(a);
       expect(getRange).toHaveBeenCalledTimes(1);
+    });
+
+    it("reads only the new day when the window slides by one", () => {
+      const { core, weather } = setup("v1", { days: DRY_DAYS });
+      const getRange = vi.fn(weather.api.getRange);
+      weather.api.getRange = getRange;
+      core.ground("coast", 60);
+      core.ground("coast", 61);
+      expect(getRange).toHaveBeenCalledTimes(2);
+      expect(getRange).toHaveBeenLastCalledWith("coast", 61, 61);
+    });
+
+    it("keeps a month-old snowpack that a two-week window would have lost", () => {
+      // Heavy snow on days 1-10, then a long dry freeze
+      const days = (day: number) => day <= 10
+        ? { precipitation: { type: "snow" as const, amountMm: 20, intensity: 0.8 }, temperature: { high: -5, low: -12, mean: -8 } }
+        : { precipitation: { type: "none" as const, amountMm: 0, intensity: 0 }, temperature: { high: -5, low: -12, mean: -8 } };
+      const { core } = setup("v1", { days });
+      expect(core.ground("coast", 35)?.snowDepthCm).toBeGreaterThan(0);
     });
 
     it("sees snow fallen in the window and not before it", () => {
@@ -411,13 +471,14 @@ describe("WeatherStoreCore", () => {
         : { precipitation: { type: "none" as const, amountMm: 0, intensity: 0 }, temperature: { high: -5, low: -12, mean: -8 } };
       const { core } = setup("v1", { days: snowUntil(10) });
       expect(core.ground("coast", 12)?.label).toBe("deep snow");
-      // Day 30's window starts on day 17: none of the snow is in it
-      expect(core.ground("coast", 30)?.snowDepthCm).toBe(0);
+      // Day 60's window starts on day 16: none of the snow is in it
+      expect(core.ground("coast", 60)?.snowDepthCm).toBe(0);
     });
 
     it("is cleared with the report cache", () => {
       const { core, weather } = setup("v1", { days: DRY_DAYS });
       const before = core.ground("coast", 5);
+      setToday(weather, 3);
       weather.emit("time-changed", { type: "time-changed", current: 3, adapterId: "x" });
       expect(core.ground("coast", 5)).not.toBe(before);
       const again = core.ground("coast", 5);

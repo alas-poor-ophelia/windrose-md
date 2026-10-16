@@ -71,14 +71,27 @@ function getWeatherTint(visual: WeatherVisual): { color: string; opacity: number
   };
 }
 
-/** Mean temperature as a whole-degree badge ("-3°"), in the weather plugin's unit preference */
+/**
+ * A Celsius reading as whole degrees in the weather plugin's unit
+ * preference ("−3°", with a true minus sign as the plugin writes it);
+ * an en dash when there is no reading. The one temperature formatter for
+ * the map badge and the Almanac.
+ */
+function formatTemperature(celsius: number | null | undefined, units: 'metric' | 'imperial'): string {
+  if (celsius == null || !Number.isFinite(celsius)) return '–';
+  const value = units === 'imperial' ? celsius * 9 / 5 + 32 : celsius;
+  const rounded = Math.round(value);
+  return rounded < 0 ? `−${-rounded}°` : `${rounded === 0 ? 0 : rounded}°`;
+}
+
+/** Mean temperature as a whole-degree badge ("−3°"), in the weather plugin's unit preference */
 function formatBadgeTemperature(report: WadjetWeatherReport, units: 'metric' | 'imperial'): string {
-  const mean = units === 'imperial' ? report.temperature.mean * 9 / 5 + 32 : report.temperature.mean;
-  return `${Math.round(mean)}°`;
+  return formatTemperature(report.temperature.mean, units);
 }
 
 export {
   classifyWeatherVisual,
   getWeatherTint,
+  formatTemperature,
   formatBadgeTemperature,
 };

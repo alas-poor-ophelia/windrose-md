@@ -420,7 +420,7 @@ const RegionLayer = ({
       });
     }
 
-    addWeatherZoneMenuItems(menu, app, region, weatherZoneId => updateRegion(region.id, { weatherZoneId }));
+    addWeatherZoneMenuItems(menu, app, region, mapData?.regions ?? [], onRegionsChange);
 
     menu.addSeparator();
 
@@ -433,7 +433,7 @@ const RegionLayer = ({
 
     menu.showAtPosition({ x: contextMenu.screenX, y: contextMenu.screenY });
     dismissContextMenu();
-  }, [contextMenu, mapData?.regions, app, deleteRegion, dismissContextMenu, startEditingRegion, updateRegion]);
+  }, [contextMenu, mapData?.regions, app, deleteRegion, dismissContextMenu, startEditingRegion, updateRegion, onRegionsChange]);
 
   // Touch long-press needs no timer here: the event coordinator's long-press
   // synthesizes a contextmenu that reaches the same handlers as a right-click

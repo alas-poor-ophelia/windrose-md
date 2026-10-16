@@ -16,8 +16,10 @@
  * Multiplier conventions (they differ on purpose, so read carefully):
  * - terrainMultiplier is the travel pack's SPEED multiplier (TravelTerrain:
  *   > 1 faster, < 1 slower), exactly as computeRouteTravelTime applies it.
- * - weatherMultiplier is a TIME multiplier: >= 1 slows (2 = twice as long).
- * So the hours for a step are distance × weather ÷ (speedPerHour × terrain).
+ * - the weather's factor is a TIME factor (`weatherSlowdown`, `timeFactor`):
+ *   >= 1 slows (2 = twice as long). Named apart from the speed factors so
+ *   the two are never multiplied the wrong way round.
+ * So the hours for a step are distance × weather time factor ÷ (speedPerHour × terrain).
  */
 
 import type { TravelMode, TravelPack } from '#types/settings/travelPack.types';
@@ -27,8 +29,19 @@ import { computeTravelTime, type TravelTimeError } from './travelTimeOperations'
 /** Clock hour at which a travel day starts (the allowance runs from here) */
 const TRAVEL_DAY_START_HOUR = 8;
 
-/** A weather time multiplier at or above this means the cell is impassable that day */
+/** A weather time factor at or above this means the cell is impassable that day */
 const IMPASSABLE_MULTIPLIER = 20;
+
+/**
+ * Floating-point slack on the impassable threshold: a speed factor of 0.05
+ * inverts to a time factor that may land a hair under 20.
+ */
+const IMPASSABLE_TOLERANCE = 1e-6;
+
+/** True when a weather TIME factor stops travel for the day */
+function isImpassable(timeFactor: number): boolean {
+  return timeFactor >= IMPASSABLE_MULTIPLIER - IMPASSABLE_TOLERANCE;
+}
 
 /** Default safety cap on the number of days a walk may span */
 const DEFAULT_MAX_DAYS = 60;
@@ -45,8 +58,8 @@ export interface WalkStep {
 }
 
 export interface WeatherAtCell {
-  /** TIME multiplier: >= 1 slows; >= 20 is impassable for the day */
-  multiplier: number;
+  /** TIME factor: >= 1 slows; >= 20 is impassable for the day (see isImpassable) */
+  timeFactor: number;
   label?: string;
   areaId?: string | null;
 }
@@ -60,8 +73,8 @@ export interface WalkOptions {
   departDay: number;
   /** Clock hour of departure; default (and minimum) is the start of the travel day, 8 */
   departHour?: number;
-  /** Weather for a cell on a day; called once per (step, day) touched — caller memoizes */
-  weatherMultiplier(cell: { x: number; y: number }, day: number): WeatherAtCell;
+  /** Weather slowdown (a TIME factor) for a cell on a day; called once per (step, day) touched — caller memoizes */
+  weatherSlowdown(cell: { x: number; y: number }, day: number): WeatherAtCell;
   /** Safety cap on days spanned, default 60 */
   maxDays?: number;
 }
@@ -82,8 +95,8 @@ export interface WalkDay {
   labels: string[];
   /** Distinct weather area ids met this day */
   areaIds: string[];
-  /** Largest weather time multiplier met this day (1 when none) */
-  worstMultiplier: number;
+  /** Largest weather time factor met this day (1 when none) */
+  worstTimeFactor: number;
 }
 
 export interface WalkResult {
@@ -95,7 +108,7 @@ export interface WalkResult {
   totalTravelDays: number;
   /** Day ordinal and hours into that travel day (from its 8:00 start) at arrival */
   arrival: { day: number; hourOfTravelDay: number };
-  /** Hours the route takes in fair weather (weather multiplier 1, terrain applied) */
+  /** Hours the route takes in fair weather (weather time factor 1, terrain applied) */
   fairHours: number;
   /** Present when ok is false */
   reason?: string;
@@ -106,7 +119,7 @@ function positiveOr(value: number, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
-/** Fair-weather hours for the whole route (terrain applied, weather 1) */
+/** Fair-weather hours for the whole route (terrain applied, weather time factor 1) */
 function computeFairHours(steps: WalkStep[], speedPerHour: number): number {
   let hours = 0;
   for (const step of steps) {
@@ -142,7 +155,7 @@ function newDay(day: number, startStep: number): DayAccumulator {
     endStep: startStep,
     labels: [],
     areaIds: [],
-    worstMultiplier: 1,
+    worstTimeFactor: 1,
     fairHours: 0,
   };
 }
@@ -211,8 +224,8 @@ function walkForecast(steps: WalkStep[], opts: WalkOptions): WalkResult {
         };
       }
 
-      const weather = opts.weatherMultiplier(step.cell, current.day);
-      const multiplier = positiveOr(weather.multiplier, 1);
+      const weather = opts.weatherSlowdown(step.cell, current.day);
+      const weatherTimeFactor = positiveOr(weather.timeFactor, 1);
       current.endStep = i;
       if (weather.label != null && weather.label !== '' && !current.labels.includes(weather.label)) {
         current.labels.push(weather.label);
@@ -220,11 +233,11 @@ function walkForecast(steps: WalkStep[], opts: WalkOptions): WalkResult {
       if (weather.areaId != null && weather.areaId !== '' && !current.areaIds.includes(weather.areaId)) {
         current.areaIds.push(weather.areaId);
       }
-      if (multiplier > current.worstMultiplier) current.worstMultiplier = multiplier;
+      if (weatherTimeFactor > current.worstTimeFactor) current.worstTimeFactor = weatherTimeFactor;
 
       const hoursLeft = Math.max(0, hoursPerDay - used);
 
-      if (multiplier >= IMPASSABLE_MULTIPLIER) {
+      if (isImpassable(weatherTimeFactor)) {
         // Impassable today: the party waits out the rest of the day here
         // and tries again tomorrow.
         current.hours += hoursLeft;
@@ -232,7 +245,7 @@ function walkForecast(steps: WalkStep[], opts: WalkOptions): WalkResult {
         continue;
       }
 
-      const hoursPerUnit = fairHoursPerUnit * multiplier;
+      const hoursPerUnit = fairHoursPerUnit * weatherTimeFactor;
       const hoursNeeded = remaining * hoursPerUnit;
       if (hoursNeeded <= hoursLeft + EPSILON) {
         used = Math.min(hoursPerDay, used + hoursNeeded);
@@ -313,6 +326,7 @@ function speedPerHourFromMode(
 export {
   TRAVEL_DAY_START_HOUR,
   IMPASSABLE_MULTIPLIER,
+  isImpassable,
   walkForecast,
   bestDeparture,
   speedPerHourFromMode,

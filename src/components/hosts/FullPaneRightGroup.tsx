@@ -11,6 +11,7 @@ import { DockLayerList } from '../panels/DockLayerList';
 import { DockViewPanel } from '../panels/DockViewPanel';
 import { AlmanacPanel } from '../panels/AlmanacPanel';
 import { useWeatherStore } from '../../context/WeatherContext';
+import { useWeatherFog } from '../../weather/weatherFog';
 import { ObjectSidebar } from '../panels/ObjectSidebar';
 import { ColorPicker } from '../shared/ColorPicker';
 import { Icon } from '../shared/Icon';
@@ -42,9 +43,11 @@ const ALMANAC_RIBBON_ITEM = { id: 'almanac', icon: 'lucide-cloud-sun', title: 'A
 
 const FullPaneRightGroup = ({ bags, floating, dock, showTilePanel, drawerWidth, onDrawerWidthChange, drawerRibbon, onSettingsClick }: FullPaneRightGroupProps): VNode => {
   const { isFloating, toggleFloat } = floating;
-  // Offered while the weather plugin is usable and the shown level has weather
-  const weather = useWeatherStore();
-  const almanacOffered = weather.available && weather.areas.length > 0;
+  // Offered while the shown level has weather the players can see (an
+  // area under fog is never named, not even by an empty Almanac)
+  const { hasWeather } = useWeatherStore();
+  const { revealedAreas } = useWeatherFog();
+  const almanacOffered = hasWeather && revealedAreas.length > 0;
   const almanacCollapsed = dock.sectionCollapsed['almanac'] ?? true;
   return (
     <div className="windrose-right-group">

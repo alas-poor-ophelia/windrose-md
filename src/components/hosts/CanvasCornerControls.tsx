@@ -10,16 +10,20 @@ import { MapControls } from '../controls/MapControls';
 import { WindroseCompass } from '../shared/WindroseCompass';
 import { tooltipRef } from '../shared/obsidianTooltip';
 import { useWeatherStore } from '../../context/WeatherContext';
+import { useWeatherFog } from '../../weather/weatherFog';
 import { createGeometry } from '../../geometry/core/createGeometry';
 import { compassWind, pickCompassArea } from '../../weather/skyWeather';
 
 /**
- * Wind for the compass needle: the whole-map area's wind, else the area
- * under the view centre, else the first area; null without weather. Reads
- * the daily report, or the hourly one when the Almanac sets a view hour.
+ * Wind for the compass needle, from revealed areas only: the whole-map
+ * area's wind, else the area under the view centre (not when that cell is
+ * fogged), else the first revealed area; null without weather or when every
+ * area is hidden. Reads the daily report, or the hourly one when the
+ * Almanac sets a view hour.
  */
 function useCompassWind(mapData: MapData): CompassWind | null {
   const weather = useWeatherStore();
+  const fog = useWeatherFog();
   const centreX = mapData.viewState?.center.x;
   const centreY = mapData.viewState?.center.y;
   const { mapType, gridSize, hexSize, orientation, hexBounds } = mapData;
@@ -27,18 +31,18 @@ function useCompassWind(mapData: MapData): CompassWind | null {
     const day = weather.viewDay;
     if (!weather.available || day == null || weather.areas.length === 0) return null;
     let centreCell: { x: number; y: number } | null = null;
-    if (centreX != null && centreY != null && !weather.areas.some(area => area.kind === 'map')) {
+    if (centreX != null && centreY != null && !weather.areas.some(area => area.kind === 'map' && fog.areaRevealed(area))) {
       // createGeometry reads only these shape fields
       const geometry = createGeometry({ mapType, gridSize, hexSize, orientation, hexBounds } as MapData);
       // View centres are world px on hex maps, cell units on grid maps
       const scale = geometry.type === 'hex' ? 1 : geometry.cellSize;
       centreCell = geometry.worldToGrid(centreX * scale, centreY * scale);
     }
-    const area = pickCompassArea(weather.areas, weather.areaAt, centreCell);
+    const area = pickCompassArea(weather.areas, weather.areaAt, centreCell, fog);
     if (area == null) return null;
     const report = weather.report(area.zoneId, day, weather.viewTime.hour);
     return report != null ? compassWind(report, weather.classify(report)) : null;
-  }, [weather, centreX, centreY, mapType, gridSize, hexSize, orientation, hexBounds]);
+  }, [weather, fog, centreX, centreY, mapType, gridSize, hexSize, orientation, hexBounds]);
 }
 
 interface BlockControlsState {

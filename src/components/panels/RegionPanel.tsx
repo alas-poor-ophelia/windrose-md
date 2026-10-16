@@ -13,7 +13,7 @@ import { useMemo } from 'preact/hooks';
 import { Icon } from '../shared/Icon';
 import { tooltipRef } from '../shared/obsidianTooltip';
 import { useWeatherStore } from '../../context/WeatherContext';
-import { hasWeatherZone } from '../../weather/weatherZones';
+import { useWeatherFog } from '../../weather/weatherFog';
 
 const REGION_NAME_MAX_LENGTH = 20;
 const REGION_NAME_TRUNCATE_AT = 17;
@@ -62,20 +62,22 @@ const RegionPanel = ({
     return [...regions].sort((a, b) => a.order - b.order);
   }, [regions]);
 
-  // The view day's weather per weather-bound region, in the weather
-  // plugin's own wording; no entry when unbound or the plugin is unavailable
+  // The view day's weather per weather-bound region the players can see,
+  // in the weather plugin's own wording; no entry when unbound, mostly
+  // under fog, or the plugin is unavailable
   const weather = useWeatherStore();
+  const { revealedAreas } = useWeatherFog();
   const weatherLines = useMemo(() => {
     const lines = new Map<string, string>();
     const day = weather.viewDay;
-    if (!weather.available || day == null) return lines;
-    for (const region of regions) {
-      if (!hasWeatherZone(region)) continue;
-      const report = weather.report(region.weatherZoneId, day);
-      lines.set(region.id, report != null ? weather.describe(report) : 'Weather zone not found');
+    if (!weather.hasWeather || day == null) return lines;
+    for (const area of revealedAreas) {
+      if (area.regionId == null) continue;
+      const report = weather.report(area.zoneId, day);
+      lines.set(area.regionId, report != null ? weather.describe(report) : 'Weather zone not found');
     }
     return lines;
-  }, [weather, regions]);
+  }, [weather, revealedAreas]);
 
   if (regions.length === 0) return null;
 

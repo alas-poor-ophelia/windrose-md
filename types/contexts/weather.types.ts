@@ -55,6 +55,17 @@ export interface WeatherStore {
   viewDay: number | null;
   /** Bound regions (topmost first) then the map-level area */
   areas: WeatherArea[];
+  /**
+   * available && areas.length > 0: the one has-weather gate for toolbars,
+   * panels and layers. Fog is separate: ask useWeatherFog() which areas the
+   * players may see (src/weather/weatherFog.ts).
+   */
+  hasWeather: boolean;
+  /**
+   * The shown level's Sky animation setting (map setting `weatherAnimate`):
+   * its own value when set, else the nearest sub-hex ancestor's, else true.
+   */
+  animate: boolean;
   /** A plain function (safe to pass detached) */
   areaAt: (cell: { x: number; y: number }) => WeatherArea | null;
   /** Cached per (zone, day, hour); null when unavailable or unusable; never throws */
@@ -75,7 +86,8 @@ export interface WeatherStore {
   advance(days: number): Promise<boolean>;
   /**
    * Windrose's derived ground state (snow cover, mud) for a zone on a day,
-   * from the 14 days of daily reports ending on it. Cached per (zone, day),
+   * from the 45 days of daily reports ending on it (GROUND_HISTORY_DAYS in
+   * src/weather/weatherStore.ts). Cached per (zone, day),
    * cleared with the report cache; null when unavailable. Never throws.
    */
   ground(zoneId: string, day: number): GroundState | null;

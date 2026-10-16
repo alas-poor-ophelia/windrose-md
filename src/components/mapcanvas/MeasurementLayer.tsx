@@ -7,6 +7,8 @@
  * Escape = clear), finish-by-double-click (double-tap on touch), route
  * persistence, the save-as-route flow, and — when enabled travel packs
  * exist — live travel times and on-map per-segment terrain assignment.
+ * Travel times, weather, the forecast itinerary, departure window and day
+ * ribbon come from useRouteWeather.
  */
 
 import type { ToolId } from '#types/tools/tool.types';
@@ -14,15 +16,7 @@ import type { VNode } from 'preact';
 import type { MapTravelSettings, MeasurementRoute, SavedRoute } from '#types/core/map.types';
 import type { EffectiveDistanceSettings } from '#types/hooks/distanceMeasurement.types';
 import type { PluginSettings } from '#types/settings/settings.types';
-import type {
-  DepartureChip,
-  ItineraryDay,
-  TravelAllowanceOption,
-  TravelModeOption,
-  TravelTimeLine,
-} from '../overlays/MeasurementControls';
-import type { WalkResult } from '../../travel/forecastWalk';
-import type { DayStretch, RouteStep } from '../../weather/forecastRoute';
+import type { TravelAllowanceOption, TravelModeOption } from '../overlays/MeasurementControls';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useDistanceMeasurement } from '../../hooks/interactions/useDistanceMeasurement';
@@ -31,29 +25,12 @@ import { getSettings } from '../../core/settingsAccessor';
 import { createSavedRoute } from '../../drawing/routeOperations';
 import { getEnabledTravelPacks, getEffectiveTravelSettings } from '../../travel/travelPackOperations';
 import {
-  allowanceHoursPerDay,
   collectEnabledTerrains,
-  computeRouteTravelTime,
   findTerrainById,
-  formatTravelTime,
   resolveSelectedAllowance,
   resolveSelectedModes,
 } from '../../travel/travelTimeOperations';
-import type { WeatherTravelEffect } from '../../weather/weatherTravelRules';
-import { computeWeatherTimeRatio, formatWeatherNote } from '../../weather/weatherTravelRules';
-import { computeSegmentWeatherEffects } from '../../weather/weatherZones';
-import { travelEffectFromInterpretation } from '../../weather/travelInterpreter';
-import { useWeatherStore } from '../../context/WeatherContext';
-import { TRAVEL_DAY_START_HOUR, speedPerHourFromMode, walkForecast } from '../../travel/forecastWalk';
-import {
-  buildRouteSteps,
-  computeDayStretches,
-  continueWalk,
-  createRouteWeather,
-  formatHours,
-  formatTravelSpan,
-  rankDepartures,
-} from '../../weather/forecastRoute';
+import { useRouteWeather } from '../../hooks/interactions/useRouteWeather';
 import { MeasurementOverlay } from '../overlays/MeasurementOverlay';
 import { MeasurementDayRibbon } from '../overlays/MeasurementDayRibbon';
 import { MeasurementControls } from '../overlays/MeasurementControls';
@@ -84,17 +61,6 @@ interface TerrainPickerState {
   segmentIndex: number;
   x: number;
   y: number;
-}
-
-/** Shared "no weather on any segment" value — one identity, so memos keyed on it hold */
-const NO_SEGMENT_WEATHER: WeatherTravelEffect[] = [];
-
-/** Departure days offered in the departure window */
-const DEPARTURE_WINDOW_DAYS = 7;
-
-/** Distance for the itinerary: one decimal, trailing .0 dropped */
-function formatDistance(value: number): string {
-  return String(Math.round(value * 10) / 10);
 }
 
 const MeasurementLayer = ({
@@ -255,272 +221,33 @@ const MeasurementLayer = ({
     [enabledPacks, travelSettings]
   );
 
-  // Weather over each segment, from the map's weather store: cells in a
-  // bound region or under the map-level zone, costed by the selected
-  // "Weather travel rules" interpreter (Windrose's own by default). Kept
-  // apart from the terrain sampler: weather changes with the day and never
-  // writes segmentTerrains. Parked unless the measure tool is active.
-  // This fold costs the whole route with ONE day (the store's view day,
-  // today by default); once a travel day length is chosen the forecast walk
-  // below takes over.
-  const weather = useWeatherStore();
-  const weatherDay = weather.viewDay;
-  const weatherActive = currentTool === 'measure' && weather.available && weatherDay != null && weather.areas.length > 0;
-  const hoursPerDay = selectedAllowance != null ? allowanceHoursPerDay(selectedAllowance) : null;
-  const [departureChoice, setDepartureChoice] = useState<number | null>(null);
-  useEffect(() => {
-    if (waypoints.length === 0) setDepartureChoice(null);
-  }, [waypoints.length]);
-  const departDay = departureChoice ?? weatherDay;
-  const forecastActive = weatherActive && geometry != null && departDay != null &&
-    hoursPerDay != null && Number.isFinite(hoursPerDay) && hoursPerDay > 0;
-
-  // The single-day fold only runs when the forecast walk does not apply
-  const foldActive = weatherActive && !forecastActive;
-  const zoneAt = useMemo(
-    () => (x: number, y: number): string | null => weather.areaAt({ x, y })?.zoneId ?? null,
-    [weather]
-  );
-  const effectForZone = useMemo(() => {
-    const zoneEffects = new Map<string, WeatherTravelEffect | null>();
-    return (zoneId: string): WeatherTravelEffect | null => {
-      let effect = zoneEffects.get(zoneId);
-      if (effect === undefined) {
-        const report = weatherDay != null ? weather.report(zoneId, weatherDay) : null;
-        effect = report != null ? travelEffectFromInterpretation(weather.interpretTravel(report)) : null;
-        zoneEffects.set(zoneId, effect);
-      }
-      return effect;
-    };
-  }, [weather, weatherDay]);
-
-  // Committed segments and the live preview segment are costed apart: the
-  // preview moves with the pointer and must not re-walk the whole route.
-  // Without weather both stay on shared constants, so the travel lines
-  // below recompute exactly as often as they did before weather existed.
-  const committedWeather = useMemo((): WeatherTravelEffect[] => {
-    if (!foldActive || geometry == null || waypoints.length < 2) return NO_SEGMENT_WEATHER;
-    return computeSegmentWeatherEffects(
-      waypoints,
-      (x1, y1, x2, y2) => geometry.getCellsInLine(x1, y1, x2, y2),
-      zoneAt,
-      effectForZone
-    );
-  }, [foldActive, geometry, waypoints, zoneAt, effectForZone]);
-
-  const lastWaypoint = waypoints.length > 0 ? waypoints[waypoints.length - 1] : null;
-  const previewX = previewTarget?.x;
-  const previewY = previewTarget?.y;
-  const previewWeather = useMemo((): WeatherTravelEffect | null => {
-    if (!foldActive || geometry == null || lastWaypoint == null ||
-        previewX == null || previewY == null || previewDistance <= 0) return null;
-    const effects = computeSegmentWeatherEffects(
-      [lastWaypoint, { x: previewX, y: previewY }],
-      (x1, y1, x2, y2) => geometry.getCellsInLine(x1, y1, x2, y2),
-      zoneAt,
-      effectForZone
-    );
-    return effects[0] ?? null;
-  }, [foldActive, geometry, lastWaypoint, previewX, previewY, previewDistance, zoneAt, effectForZone]);
-
-  const segmentWeather = useMemo(
-    () => (previewWeather != null ? [...committedWeather, previewWeather] : committedWeather),
-    [committedWeather, previewWeather]
-  );
-
-  // ===========================================
-  // Forecast walk (route ribbon, departure window)
-  // ===========================================
-
-  // With weather and a travel day length, the route is walked cell by cell
-  // against the forecast from the departure day: each cell is costed with
-  // the weather of the day the party actually reaches it. This replaces the
-  // single-day fold above for the travel lines (the fold takes each
-  // segment's worst cell for the whole segment, so even a one-day route
-  // reads differently; the walk is the more honest of the two and is used
-  // for every route once it applies). Without a day length there is no
-  // travel day to walk, and the fold stays.
-  // One memoizing lookup per store version: every walk below shares it
-  const routeWeather = useMemo(
-    () => (forecastActive ? createRouteWeather(weather) : null),
-    [forecastActive, weather]
-  );
-
-  const mapUnit = distanceSettings.distanceUnit;
-  const distancePerCell = distanceSettings.distancePerCell;
-  const terrainMultiplierOf = useCallback(
-    (id: string | null | undefined): number => findTerrainById(enabledPacks, id ?? null)?.multiplier ?? 1,
-    [enabledPacks]
-  );
-
-  // Committed route as walk steps (map units); recomputed on route edits only
-  const committedSteps = useMemo((): RouteStep[] => {
-    if (!forecastActive || geometry == null || waypoints.length < 2) return [];
-    return buildRouteSteps(
-      waypoints,
-      segmentDistances.map(d => d * distancePerCell),
-      segmentTerrains.map(terrainMultiplierOf),
-      (x1, y1, x2, y2) => geometry.getCellsInLine(x1, y1, x2, y2)
-    );
-  }, [forecastActive, geometry, waypoints, segmentDistances, distancePerCell, segmentTerrains, terrainMultiplierOf]);
-
-  // Each selected mode's speed in map units per travel hour (or its unit guidance)
-  const modeSpeeds = useMemo(() => {
-    if (!forecastActive || hoursPerDay == null) return [];
-    return selectedModes.map(({ mode, pack }) => ({ mode, result: speedPerHourFromMode(mode, pack, mapUnit, hoursPerDay) }));
-  }, [forecastActive, hoursPerDay, selectedModes, mapUnit]);
-
-  const committedWalks = useMemo((): (WalkResult | null)[] => {
-    if (routeWeather == null || hoursPerDay == null || departDay == null) return [];
-    return modeSpeeds.map(({ result }) => result.ok
-      ? walkForecast(committedSteps, {
-        speedPerHour: result.speedPerHour,
-        hoursPerDay,
-        departDay,
-        weatherMultiplier: routeWeather.weatherMultiplier,
-      })
-      : null);
-  }, [routeWeather, hoursPerDay, departDay, modeSpeeds, committedSteps]);
-
-  // The live preview segment continues each committed walk from its arrival
-  // (exactly what walking the whole route would give) — the committed part
-  // is never re-walked on pointer moves
-  const previewTerrainId = segmentTerrains[segmentTerrains.length - 1] ?? firstSegmentTerrainId;
-  const walks = useMemo((): (WalkResult | null)[] => {
-    if (routeWeather == null || hoursPerDay == null || departDay == null || geometry == null) return committedWalks;
-    if (lastWaypoint == null || previewX == null || previewY == null || previewDistance <= 0) return committedWalks;
-    const previewSteps = buildRouteSteps(
-      [lastWaypoint, { x: previewX, y: previewY }],
-      [previewDistance * distancePerCell],
-      [terrainMultiplierOf(previewTerrainId)],
-      (x1, y1, x2, y2) => geometry.getCellsInLine(x1, y1, x2, y2),
-      committedSteps.length > 0
-    );
-    return committedWalks.map((base, i) => {
-      const speed = modeSpeeds[i]?.result;
-      if (base == null || speed == null || !speed.ok || !base.ok) return base;
-      const tail = walkForecast(previewSteps, {
-        speedPerHour: speed.speedPerHour,
-        hoursPerDay,
-        departDay: base.arrival.day,
-        departHour: TRAVEL_DAY_START_HOUR + base.arrival.hourOfTravelDay,
-        weatherMultiplier: routeWeather.weatherMultiplier,
-      });
-      return continueWalk(base, tail, committedSteps.length);
-    });
-  }, [routeWeather, hoursPerDay, departDay, geometry, lastWaypoint, previewX, previewY, previewDistance, distancePerCell,
-    terrainMultiplierOf, previewTerrainId, committedSteps.length, committedWalks, modeSpeeds]);
-
-  // The itinerary, departure window and map tint follow the first mode that can be walked
-  const primaryIndex = walks.findIndex(w => w != null);
-  const primaryWalk = primaryIndex >= 0 ? walks[primaryIndex] : null;
-  const primarySpeed = primaryIndex >= 0 ? modeSpeeds[primaryIndex]?.result : undefined;
-  const primaryModeName = primaryIndex >= 0 ? modeSpeeds[primaryIndex]?.mode.name ?? '' : '';
-
-  const itinerary = useMemo((): ItineraryDay[] => {
-    if (primaryWalk == null || routeWeather == null) return [];
-    return primaryWalk.days.map(day => {
-      const worst = routeWeather.worstArea(day.areaIds, day.day);
-      const lost = day.hoursLost > 0.05 ? formatHours(day.hoursLost) : null;
-      return {
-        day: day.day,
-        label: weather.formatDay(day.day),
-        glyphSvg: worst != null ? weather.glyphSvg(worst.report) : null,
-        distance: `${formatDistance(day.distance)} ${mapUnit}`,
-        weather: day.labels.length > 0 ? day.labels.join(', ') : null,
-        hoursLost: lost,
-      };
-    });
-  }, [primaryWalk, routeWeather, weather, mapUnit]);
-
-  // Departure window: the committed route only (stable while the pointer moves)
-  const departures = useMemo((): DepartureChip[] => {
-    if (routeWeather == null || hoursPerDay == null || primarySpeed == null || !primarySpeed.ok || committedSteps.length === 0) return [];
-    const fromDay = weather.today ?? weatherDay;
-    if (fromDay == null) return [];
-    return rankDepartures(committedSteps, {
-      speedPerHour: primarySpeed.speedPerHour,
-      hoursPerDay,
-      weatherMultiplier: routeWeather.weatherMultiplier,
-    }, fromDay, DEPARTURE_WINDOW_DAYS).map(option => ({
-      day: option.day,
-      label: weather.formatDay(option.day),
-      time: option.ok ? formatTravelSpan(option.totalHours, hoursPerDay) : 'Too long',
-      best: option.best,
-    }));
-  }, [routeWeather, hoursPerDay, primarySpeed, committedSteps, weather, weatherDay]);
-
-  // Route tint: one stretch per travel day, in world space
-  const dayStretches = useMemo((): DayStretch[] => {
-    if (primaryWalk == null || geometry == null || primaryWalk.days.length < 2) return [];
-    const route = [...waypoints];
-    const distances = segmentDistances.map(d => d * distancePerCell);
-    if (previewX != null && previewY != null && previewDistance > 0) {
-      route.push({ x: previewX, y: previewY });
-      distances.push(previewDistance * distancePerCell);
-    }
-    const world = route.map(p => {
-      const c = geometry.getCellCenter(p.x, p.y);
-      return { x: c.worldX, y: c.worldY };
-    });
-    return computeDayStretches(world, distances, primaryWalk.days.map(d => d.distance));
-  }, [primaryWalk, geometry, waypoints, segmentDistances, distancePerCell, previewX, previewY, previewDistance]);
-
-  const { travelLines, weatherNote } = useMemo((): { travelLines: TravelTimeLine[]; weatherNote: string | null } => {
-    if (selectedModes.length === 0 || waypoints.length === 0) return { travelLines: [], weatherNote: null };
-
-    if (forecastActive && walks.length === selectedModes.length) {
-      const lines = selectedModes.map(({ mode }, i): TravelTimeLine => {
-        const speed = modeSpeeds[i]?.result;
-        if (speed != null && !speed.ok) return { modeId: mode.id, name: mode.name, text: speed.reason, isError: true };
-        const walk = walks[i];
-        if (walk == null) return { modeId: mode.id, name: mode.name, text: '', isError: false };
-        if (!walk.ok) return { modeId: mode.id, name: mode.name, text: walk.reason ?? 'Too long to cost', isError: false };
-        const lost = walk.totalHours - walk.fairHours;
-        return {
-          modeId: mode.id,
-          name: mode.name,
-          text: formatTravelTime({ ok: true, amount: walk.totalHours, base: 'hours' }, selectedAllowance),
-          isError: false,
-          ...(lost > 0.05 ? { weatherDelta: `+${formatHours(lost)} for weather` } : {}),
-        };
-      });
-      let note: string | null = null;
-      if (primaryWalk != null) {
-        const labels: string[] = [];
-        for (const day of primaryWalk.days) for (const label of day.labels) if (!labels.includes(label)) labels.push(label);
-        if (labels.length > 0) {
-          const percent = primaryWalk.fairHours > 0 ? Math.round((primaryWalk.totalHours / primaryWalk.fairHours - 1) * 100) : 0;
-          note = percent > 0 ? `${labels.join(', ')} (+${percent}%)` : labels.join(', ');
-        }
-      }
-      return { travelLines: lines, weatherNote: note };
-    }
-
-    // Distances in map units, preview segment included live (TM-18); the
-    // preview's terrain-to-be is its predecessor's (TM-21), so its
-    // multiplier previews honestly too
-    const distances = segmentDistances.map(d => d * distanceSettings.distancePerCell);
-    const terrainIds: (string | null)[] = [...segmentTerrains];
-    if (previewDistance > 0) {
-      distances.push(previewDistance * distanceSettings.distancePerCell);
-      terrainIds.push(segmentTerrains[segmentTerrains.length - 1] ?? firstSegmentTerrainId);
-    }
-    const terrainMultipliers = terrainIds.map(id => findTerrainById(enabledPacks, id)?.multiplier ?? 1);
-    const weatherMultipliers = terrainMultipliers.map((_, i) => segmentWeather[i]?.multiplier ?? 1);
-    const multipliers = terrainMultipliers.map((m, i) => m * weatherMultipliers[i]);
-
-    const lines = selectedModes.map(({ mode, pack }) => {
-      const result = computeRouteTravelTime(distances, multipliers, distanceSettings.distanceUnit, mode, pack);
-      if (!result.ok) {
-        return { modeId: mode.id, name: mode.name, text: result.reason, isError: true };
-      }
-      return { modeId: mode.id, name: mode.name, text: formatTravelTime(result, selectedAllowance), isError: false };
-    });
-    const note = formatWeatherNote(segmentWeather, computeWeatherTimeRatio(distances, terrainMultipliers, weatherMultipliers));
-    return { travelLines: lines, weatherNote: note };
-  }, [selectedModes, selectedAllowance, waypoints.length, segmentDistances, previewDistance, segmentTerrains, distanceSettings, enabledPacks, firstSegmentTerrainId, segmentWeather,
-    forecastActive, walks, modeSpeeds, primaryWalk]);
+  // Travel times with the map's weather folded in: the forecast walk when a
+  // travel day length is set (itinerary, departure window, day ribbon), the
+  // single-day fold otherwise (see useRouteWeather)
+  const {
+    travelLines,
+    weatherNote,
+    itinerary,
+    itineraryModeName,
+    departures,
+    departureDay,
+    setDepartureDay,
+    dayStretches,
+  } = useRouteWeather({
+    active: currentTool === 'measure',
+    geometry,
+    waypoints,
+    segmentDistances,
+    segmentTerrains,
+    previewTarget,
+    previewDistance,
+    distanceUnit: distanceSettings.distanceUnit,
+    distancePerCell: distanceSettings.distancePerCell,
+    enabledPacks,
+    selectedModes,
+    selectedAllowance,
+    firstSegmentTerrainId,
+  });
 
   const modeOptions = useMemo((): TravelModeOption[] => {
     const selected = new Set(travelSettings?.modeIds ?? []);
@@ -614,10 +341,10 @@ const MeasurementLayer = ({
         travelLines={travelLines}
         weatherNote={weatherNote}
         itinerary={itinerary}
-        itineraryModeName={primaryModeName}
+        itineraryModeName={itineraryModeName}
         departures={departures}
-        departureDay={departDay}
-        onDepartureChange={setDepartureChoice}
+        departureDay={departureDay}
+        onDepartureChange={setDepartureDay}
         modeOptions={modeOptions}
         allowanceOptions={allowanceOptions}
         selectedAllowanceId={travelSettings?.allowanceId ?? null}

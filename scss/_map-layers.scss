@@ -562,6 +562,34 @@ button.windrose-region-item {
   text-align: left;
 }
 
+/* ==========================================================================
+   WEATHER OVERLAY (WeatherOverlay.tsx: tint, ground sheen, region badges)
+   ========================================================================== */
+.windrose-weather-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* Badge pill: a dark plate with a light rim, so it reads on a light map in
+   the light theme and on dark terrain in the dark theme alike */
+.windrose-weather-badge {
+  fill: oklch(22% 0.01 250deg / 0.86);
+  stroke: oklch(100% 0 0deg / 0.55);
+  stroke-width: 1px;
+}
+
+.windrose-weather-badge-text {
+  fill: #fff;
+  font-family: var(--font-interface, -apple-system, BlinkMacSystemFont, sans-serif);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 /* Marks a region bound to a weather zone (weather plugin present) */
 .windrose-region-weather-icon {
   display: flex;

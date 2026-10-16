@@ -11,6 +11,11 @@
  * changes with the world's day, not with map edits, and must not rebuild
  * the surface. Shapes are drawn in world coordinates inside one group that
  * tracks live pan/zoom, as PartyPinOverlay does.
+ *
+ * Region name plates are drawn on the map canvas UNDER this overlay; a mask
+ * keeps the weather off them so a snowy or foggy region's name stays
+ * readable. Static presentation (position, colours, fonts) lives in
+ * scss/_map-layers.scss.
  */
 
 import { useRef, useState } from 'preact/hooks';
@@ -19,7 +24,9 @@ import type { IGeometry, WorldCoords } from '#types/core/geometry.types';
 import type { MapData } from '#types/core/map.types';
 import type { ViewController } from '#types/hooks/viewController.types';
 import type { WeatherVisual, WeatherVisualKind } from '../../weather/weatherVisuals';
+import type { RegionLabelSpot } from '../../weather/skyCells';
 import { getWeatherTint } from '../../weather/weatherVisuals';
+import { regionLabelPlateSize } from '../../weather/skyCells';
 import { getRegionLabelHalfHeight } from '../../geometry/renderers/regionRenderer';
 import {
   computeCounterScale,
@@ -59,6 +66,8 @@ interface WeatherGeometry extends IGeometry {
 
 interface WeatherOverlayProps {
   areas: WeatherAreaVisual[];
+  /** Region name plates to keep clear of the weather (world-space anchors) */
+  labels?: RegionLabelSpot[];
   /** Draw the static precipitation/fog textures (the animated Sky is off) */
   textured: boolean;
   geometry: IGeometry | null;
@@ -70,6 +79,9 @@ interface WeatherOverlayProps {
 
 /** Kinds drawn with a texture over the tint */
 const TEXTURED_KINDS: WeatherVisualKind[] = ['drizzle', 'rain', 'sleet', 'snow', 'fog'];
+
+/** Mask extent in world px: far beyond any reachable view */
+const MASK_EXTENT = 1e7;
 
 /** Screen-px gap between the region's name label and the badge under it */
 const BADGE_GAP = 4;
@@ -88,18 +100,20 @@ function renderGroundPatterns(snowId: string | null, mudId: string | null, u: nu
   if (snowId != null) {
     out.push(
       <pattern key={snowId} id={snowId} width={u * 0.6} height={u * 0.6} patternUnits="userSpaceOnUse">
-        <rect width={u * 0.6} height={u * 0.6} fill="#f4f8ff" fillOpacity={0.3} />
-        <circle cx={u * 0.12} cy={u * 0.18} r={u * 0.02} fill="#ffffff" fillOpacity={0.8} />
-        <path d={`M${u * 0.3} ${u * 0.47}q${u * 0.12} ${-u * 0.05} ${u * 0.24} 0`} stroke="#ffffff" strokeOpacity={0.55} strokeWidth={u * 0.014} fill="none" />
+        {/* A light veil, not a white-out: the painted terrain must still read through it */}
+        <rect width={u * 0.6} height={u * 0.6} fill="#eef4fc" fillOpacity={0.16} />
+        <circle cx={u * 0.12} cy={u * 0.18} r={u * 0.02} fill="#ffffff" fillOpacity={0.7} />
+        <path d={`M${u * 0.3} ${u * 0.47}q${u * 0.12} ${-u * 0.05} ${u * 0.24} 0`} stroke="#ffffff" strokeOpacity={0.45} strokeWidth={u * 0.014} fill="none" />
       </pattern>
     );
   }
   if (mudId != null) {
     out.push(
-      <pattern key={mudId} id={mudId} width={u * 0.42} height={u * 0.42} patternUnits="userSpaceOnUse">
-        <circle cx={u * 0.08} cy={u * 0.1} r={u * 0.03} fill="#5b4126" fillOpacity={0.7} />
-        <circle cx={u * 0.29} cy={u * 0.22} r={u * 0.022} fill="#6e5032" fillOpacity={0.6} />
-        <circle cx={u * 0.17} cy={u * 0.35} r={u * 0.026} fill="#4f3820" fillOpacity={0.65} />
+      // Sparse and light: a whole-map area lays this over every cell
+      <pattern key={mudId} id={mudId} width={u * 0.8} height={u * 0.8} patternUnits="userSpaceOnUse">
+        <circle cx={u * 0.14} cy={u * 0.18} r={u * 0.022} fill="#5b4126" fillOpacity={0.45} />
+        <circle cx={u * 0.55} cy={u * 0.42} r={u * 0.018} fill="#6e5032" fillOpacity={0.4} />
+        <circle cx={u * 0.3} cy={u * 0.66} r={u * 0.02} fill="#4f3820" fillOpacity={0.42} />
       </pattern>
     );
   }
@@ -209,6 +223,7 @@ function renderGlyph(kind: WeatherVisualKind): VNode {
 
 const WeatherOverlay = ({
   areas,
+  labels = [],
   textured,
   geometry,
   mapData,
@@ -222,7 +237,7 @@ const WeatherOverlay = ({
   // Pattern ids are document-global; several maps can be open at once, each
   // with its own hex size
   const [instanceId] = useState(() => ++overlayInstanceCount);
-  const patternId = (kind: WeatherVisualKind | 'ground-snow' | 'ground-mud'): string => `windrose-weather-${instanceId}-${kind}`;
+  const patternId = (kind: WeatherVisualKind | 'ground-snow' | 'ground-mud' | 'labels'): string => `windrose-weather-${instanceId}-${kind}`;
 
   // Mid-gesture pan/zoom ticks rewrite the group transform imperatively
   useLiveOverlayTransform({ groupRef: worldGroupRef, canvasRef, geometry: geo, northDirection, viewController });
@@ -247,44 +262,58 @@ const WeatherOverlay = ({
   const hasSnow = areas.some(a => (a.ground?.snow ?? 0) > 0);
   const hasMud = areas.some(a => (a.ground?.mud ?? 0) > 0);
   const unit = geo.hexSize ?? geo.cellSize;
+  const zoom = viewState.zoom > 0 ? viewState.zoom : 1;
 
   return (
     <svg
       className="windrose-weather-overlay"
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        pointerEvents: 'none',
-        zIndex: Z_INDEX.CANVAS_OVERLAY
-      }}
+      style={{ zIndex: Z_INDEX.CANVAS_OVERLAY }}
     >
       <defs>
         {texturedKinds.map(kind => renderPattern(kind, patternId(kind), unit))}
         {renderGroundPatterns(hasSnow ? patternId('ground-snow') : null, hasMud ? patternId('ground-mud') : null, unit)}
       </defs>
       <g ref={worldGroupRef} transform={worldTransform}>
-        {areas.map(area => {
-          const tint = getWeatherTint(area.visual);
-          const snow = area.ground?.snow ?? 0;
-          const mud = area.ground?.mud ?? 0;
-          return (
-            <g key={area.id} className={`windrose-weather-area is-${area.visual.kind}`}>
-              {snow > 0 && (
-                <path className="windrose-weather-ground is-snow" d={area.path} fill={`url(#${patternId('ground-snow')})`} fillOpacity={snow} />
-              )}
-              {mud > 0 && (
-                <path className="windrose-weather-ground is-mud" d={area.path} fill={`url(#${patternId('ground-mud')})`} fillOpacity={mud} />
-              )}
-              <path d={area.path} fill={tint.color} fillOpacity={tint.opacity * area.tintScale} />
-              {texturedKinds.includes(area.visual.kind) && (
-                <path d={area.path} fill={`url(#${patternId(area.visual.kind)})`} fillOpacity={area.tintScale} />
-              )}
-            </g>
-          );
-        })}
+        {/* Name plates cut out of the weather; plate size is canvas px, so /zoom in world px */}
+        {labels.length > 0 && (
+          <mask
+            id={patternId('labels')}
+            maskUnits="userSpaceOnUse"
+            x={-MASK_EXTENT}
+            y={-MASK_EXTENT}
+            width={2 * MASK_EXTENT}
+            height={2 * MASK_EXTENT}
+          >
+            <rect x={-MASK_EXTENT} y={-MASK_EXTENT} width={2 * MASK_EXTENT} height={2 * MASK_EXTENT} fill="#ffffff" />
+            {labels.map(label => {
+              const plate = regionLabelPlateSize(label.text, zoom);
+              const w = plate.width / zoom;
+              const h = plate.height / zoom;
+              return <rect key={label.regionId} x={label.worldX - w / 2} y={label.worldY - h / 2} width={w} height={h} fill="#000000" />;
+            })}
+          </mask>
+        )}
+        <g mask={labels.length > 0 ? `url(#${patternId('labels')})` : undefined}>
+          {areas.map(area => {
+            const tint = getWeatherTint(area.visual);
+            const snow = area.ground?.snow ?? 0;
+            const mud = area.ground?.mud ?? 0;
+            return (
+              <g key={area.id} className={`windrose-weather-area is-${area.visual.kind}`}>
+                {snow > 0 && (
+                  <path className="windrose-weather-ground is-snow" d={area.path} fill={`url(#${patternId('ground-snow')})`} fillOpacity={snow} />
+                )}
+                {mud > 0 && (
+                  <path className="windrose-weather-ground is-mud" d={area.path} fill={`url(#${patternId('ground-mud')})`} fillOpacity={mud} />
+                )}
+                <path d={area.path} fill={tint.color} fillOpacity={tint.opacity * area.tintScale} />
+                {texturedKinds.includes(area.visual.kind) && (
+                  <path d={area.path} fill={`url(#${patternId(area.visual.kind)})`} fillOpacity={area.tintScale} />
+                )}
+              </g>
+            );
+          })}
+        </g>
 
         {/* Badges — counter-scaled so they hold a constant on-screen size */}
         {areas.map(region => {
@@ -307,20 +336,16 @@ const WeatherOverlay = ({
                   width={width}
                   height={BADGE_HEIGHT}
                   rx={BADGE_HEIGHT / 2}
-                  fill="rgba(20, 24, 30, 0.78)"
                 />
                 <g transform={`translate(${-width / 2 + 12} ${BADGE_HEIGHT / 2})`}>
                   {renderGlyph(region.visual.kind)}
                 </g>
                 <text
+                  className="windrose-weather-badge-text"
                   x={-width / 2 + BADGE_GLYPH_WIDTH}
                   y={BADGE_HEIGHT / 2}
                   textAnchor="start"
                   dominantBaseline="central"
-                  fill="#ffffff"
-                  fontSize={12}
-                  fontFamily="var(--font-interface, -apple-system, BlinkMacSystemFont, sans-serif)"
-                  fontWeight="600"
                 >
                   {region.badgeText}
                 </text>

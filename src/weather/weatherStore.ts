@@ -9,10 +9,13 @@
  * adds the map's weather areas.
  *
  * Invalidation: profiles-changed clears the named zones (apiVersion 1
- * payload) or everything; time-changed and adapters-changed clear
+ * payload) or everything; time-changed re-reads the day from the API and
+ * clears everything only when the day moved; adapters-changed clears
  * everything; unload drops the API at once (unavailable); wadjet:ready
  * rebinds to the new API object. A 0.3.x plugin says nothing when it is
- * disabled, so reads also notice a vanished API and go unavailable.
+ * disabled, so reads also notice a vanished API and go unavailable. A
+ * change of the "Weather travel rules" setting bumps the version (nothing
+ * cached depends on it) so open maps re-cost their routes.
  */
 
 // Type-only imports
@@ -69,8 +72,14 @@ interface WeatherStoreCoreOptions {
 
 const MAX_RANGE_SPAN_DAYS = 3660;
 const DAILY = 'd';
-/** Days of daily history (the target day included) ground state is derived from */
-const GROUND_HISTORY_DAYS = 14;
+/**
+ * Days of daily history (the target day included) ground state is derived
+ * from. 45 days keeps a season's snowpack (a cold month of accumulation and
+ * the thaw after it) without walking the whole year. Cheap: the history is
+ * read through the per-day report cache, so consecutive days (a week strip,
+ * a forecast walk) fetch only the days not seen yet, in one range call.
+ */
+const GROUND_HISTORY_DAYS = 45;
 
 const GROUND_PRECIP_TYPES: ReadonlySet<string> = new Set<GroundPrecipType>(['none', 'drizzle', 'rain', 'sleet', 'snow']);
 
@@ -108,11 +117,14 @@ class WeatherStoreCore {
   private notifyPending = false;
   private livenessCheckPending = false;
   private stopSubscription: (() => void) | null = null;
+  /** The travel interpreter id the last published version was costed with */
+  private travelInterpreterId: string;
 
   constructor(app: App, options: WeatherStoreCoreOptions = {}) {
     this.app = app;
     this.getTravelInterpreterId = options.getTravelInterpreterId ?? (() => WINDROSE_TRAVEL_INTERPRETER_ID);
     this.schedule = options.schedule ?? (task => queueMicrotask(task));
+    this.travelInterpreterId = this.getTravelInterpreterId();
     this.snapshot = {
       available: false, apiVersion: 0, zones: [], units: 'metric', today: null,
       viewTime: { dayOffset: 0, hour: null }, canAdvance: false, version: 0,
@@ -161,13 +173,18 @@ class WeatherStoreCore {
         return;
       case 'time': {
         if (this.api == null) return;
-        const previous = this.snapshot.today;
-        const today = change.day !== undefined ? change.day : getWeatherDay(this.api);
-        // 0.3.x fires on clock ticks too; reports are per day, so a tick
-        // inside the same day changes nothing
-        if (this.snapshot.apiVersion < 1 && today === previous) return;
+        // Always re-read the day: a payload's current day may come from a
+        // calendar adapter that is not the active one. 0.3.x fires on clock
+        // ticks too; reports are per day, so a change inside the same day
+        // changes nothing (no cache clear, no republish).
+        const today = getWeatherDay(this.api);
+        const canAdvance = canAdvanceWeather(this.api);
+        if (today === this.snapshot.today) {
+          if (canAdvance !== this.snapshot.canAdvance) this.update({ canAdvance });
+          return;
+        }
         this.clearCaches();
-        this.update({ today, canAdvance: canAdvanceWeather(this.api) });
+        this.update({ today, canAdvance });
         return;
       }
       case 'profiles':
@@ -276,6 +293,18 @@ class WeatherStoreCore {
     return null;
   }
 
+  /**
+   * Plugin settings changed: when the "Weather travel rules" interpreter is
+   * a different one, bump the version so open maps re-cost. Nothing cached
+   * depends on the interpreter, so no cache is cleared.
+   */
+  noteSettingsChanged(): void {
+    const id = this.getTravelInterpreterId();
+    if (id === this.travelInterpreterId) return;
+    this.travelInterpreterId = id;
+    this.publish();
+  }
+
   // ===========================================
   // View time
   // ===========================================
@@ -358,7 +387,7 @@ class WeatherStoreCore {
     let zone = this.grounds.get(zoneId);
     const cached = zone?.get(day);
     if (cached !== undefined) return cached;
-    const history = this.range(zoneId, day - (GROUND_HISTORY_DAYS - 1), day);
+    const history = this.dailyHistory(zoneId, day - (GROUND_HISTORY_DAYS - 1), day);
     const state = history.length > 0 ? deriveGroundState(history.map(groundDayFromReport)) : null;
     if (zone == null) {
       zone = new Map();
@@ -366,6 +395,44 @@ class WeatherStoreCore {
     }
     zone.set(day, state);
     return state;
+  }
+
+  /**
+   * Daily reports from..to read through the per-day cache: only the span of
+   * days not cached yet is fetched (one range call), so sliding the window
+   * by a day reads one new day.
+   */
+  private dailyHistory(zoneId: string, from: number, to: number): WadjetWeatherReport[] {
+    const known = this.reports.get(zoneId);
+    let firstMissing: number | null = null;
+    let lastMissing: number | null = null;
+    for (let day = from; day <= to; day++) {
+      if (known?.get(`${day}|${DAILY}`) === undefined) {
+        firstMissing ??= day;
+        lastMissing = day;
+      }
+    }
+    if (firstMissing != null && lastMissing != null) {
+      const fetched = this.range(zoneId, firstMissing, lastMissing);
+      // The span's range entry is not worth keeping: its days are now cached
+      this.ranges.get(zoneId)?.delete(`${firstMissing}:${lastMissing}`);
+      // Days the plugin skipped are known to have no report
+      const seeded = this.reports.get(zoneId);
+      if (seeded != null) {
+        const got = new Set(fetched.map(report => report.dayOrdinal));
+        for (let day = firstMissing; day <= lastMissing; day++) {
+          const key = `${day}|${DAILY}`;
+          if (!got.has(day) && seeded.get(key) === undefined) seeded.set(key, null);
+        }
+      }
+    }
+    const daily = this.reports.get(zoneId);
+    const reports: WadjetWeatherReport[] = [];
+    for (let day = from; day <= to; day++) {
+      const report = daily?.get(`${day}|${DAILY}`);
+      if (report != null) reports.push(report);
+    }
+    return reports;
   }
 
   classify(report: WadjetWeatherReport): WadjetClassification {
@@ -410,8 +477,9 @@ class WeatherStoreCore {
    * Travel effect of a report under the selected interpreter. Windrose's
    * own id runs locally (same result, no round trip); any other id goes
    * through api.interpret and falls back to Windrose's rules when the API
-   * is old, the id is unknown, the interpreter throws, or its result has no
-   * usable factor.
+   * is old, the id is unknown or the interpreter throws. A third-party
+   * result without a usable factor counts as no effect (factor 1): the
+   * selected rules answered, so Windrose's own rules do not overrule them.
    *
    * Every interpreter receives the options `{ ground }`: the report's zone's
    * ground state on its day (Windrose's convention; see travelInterpreter.ts).

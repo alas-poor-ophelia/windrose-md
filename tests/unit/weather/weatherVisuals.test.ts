@@ -11,6 +11,7 @@ import { describe, it, expect } from "vitest";
 import {
   classifyWeatherVisual,
   formatBadgeTemperature,
+  formatTemperature,
   getWeatherTint,
 } from "../../../src/weather/weatherVisuals";
 import type { WadjetWeatherReport } from "#types/integrations/wadjet.types";
@@ -96,6 +97,21 @@ describe("weatherVisuals", () => {
 
     it("rounds a mean just below zero to 0°", () => {
       expect(formatBadgeTemperature(buildReport({ temperature: { high: 1, low: -2, mean: -0.4 } }), "metric")).toBe("0°");
+    });
+
+    it("writes below-zero readings with a true minus sign, like the Almanac", () => {
+      const report = buildReport({ temperature: { high: 0, low: -6, mean: -3.2 } });
+      expect(formatBadgeTemperature(report, "metric")).toBe("−3°");
+      expect(formatBadgeTemperature(report, "metric")).toBe(formatTemperature(-3.2, "metric"));
+    });
+  });
+
+  describe("formatTemperature", () => {
+    it("converts, rounds and dashes a missing reading", () => {
+      expect(formatTemperature(-20, "imperial")).toBe("−4°");
+      expect(formatTemperature(21.6, "metric")).toBe("22°");
+      expect(formatTemperature(undefined, "metric")).toBe("–");
+      expect(formatTemperature(Number.NaN, "imperial")).toBe("–");
     });
   });
 });

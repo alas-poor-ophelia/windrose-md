@@ -10,9 +10,14 @@
  *
  * Pure: no Preact, no Obsidian. The store is passed in as a plain object.
  *
- * Multiplier conventions: the store's interpretTravel() answers a SPEED
- * factor (> 1 faster, 0.05 = impassable); the walk wants a TIME multiplier,
- * so the lookup hands it 1 / speed. Terrain stays a SPEED factor.
+ * Factor conventions: the store's interpretTravel() answers a SPEED factor
+ * (> 1 faster, 0.05 = impassable); the walk wants a TIME factor (its
+ * `weatherSlowdown`), so the lookup hands it 1 / speed. Terrain stays a
+ * SPEED factor.
+ *
+ * Fog: a fogged cell is unknown weather. It costs as fair (time factor 1),
+ * carries no label and no area, so neither the itinerary nor its glyphs can
+ * reveal weather the players have not uncovered.
  */
 
 import type { Point } from '#types/core/geometry.types';
@@ -71,6 +76,8 @@ export interface RouteWeatherSource {
   areaAt(cell: { x: number; y: number }): WeatherArea | null;
   report(zoneId: string, day: number): WadjetReport | null;
   interpretTravel(report: WadjetReport): WeatherTravelResult;
+  /** Fogged cells are unknown weather (fair, unlabeled); absent = nothing is fogged */
+  isFogged?(cell: { x: number; y: number }): boolean;
 }
 
 /** One weather area's travel effect on one day */
@@ -78,22 +85,22 @@ export interface AreaDayWeather {
   areaId: string;
   zoneId: string;
   report: WadjetReport;
-  /** TIME multiplier (1 / speed) */
-  multiplier: number;
+  /** TIME factor (1 / speed) */
+  timeFactor: number;
   label?: string;
 }
 
 export interface RouteWeather {
-  /** For walkForecast: cells outside every weather area are fair (1) */
-  weatherMultiplier: (cell: { x: number; y: number }, day: number) => WeatherAtCell;
+  /** For walkForecast: cells outside every weather area, and fogged cells, are fair (1) */
+  weatherSlowdown: (cell: { x: number; y: number }, day: number) => WeatherAtCell;
   /** Of the given areas, the one slowest to cross on `day` (null when none has a report) */
   worstArea: (areaIds: string[], day: number) => AreaDayWeather | null;
 }
 
-const FAIR: WeatherAtCell = { multiplier: 1 };
+const FAIR: WeatherAtCell = { timeFactor: 1 };
 
-/** A speed factor as a walk TIME multiplier; unusable factors count as fair */
-function timeMultiplierFromSpeed(speed: number): number {
+/** A speed factor as a walk TIME factor; unusable factors count as fair */
+function weatherTimeFactorFromSpeed(speed: number): number {
   return Number.isFinite(speed) && speed > 0 ? 1 / speed : 1;
 }
 
@@ -119,7 +126,7 @@ function createRouteWeather(source: RouteWeatherSource): RouteWeather {
         areaId: area.id,
         zoneId: area.zoneId,
         report,
-        multiplier: timeMultiplierFromSpeed(travel.speedMultiplier),
+        timeFactor: weatherTimeFactorFromSpeed(travel.speedMultiplier),
         ...(travel.label != null && travel.label !== '' ? { label: travel.label } : {}),
       };
     }
@@ -128,18 +135,18 @@ function createRouteWeather(source: RouteWeatherSource): RouteWeather {
   };
 
   return {
-    weatherMultiplier: (cell, day) => {
+    weatherSlowdown: (cell, day) => {
       const key = `${cell.x},${cell.y}|${day}`;
       const cached = cellCache.get(key);
       if (cached !== undefined) return cached;
-      const area = source.areaAt(cell);
+      const area = source.isFogged?.(cell) === true ? null : source.areaAt(cell);
       let result = FAIR;
       if (area != null) {
         areasById.set(area.id, area);
         const weather = areaWeather(area, day);
         if (weather != null) {
           result = {
-            multiplier: weather.multiplier,
+            timeFactor: weather.timeFactor,
             areaId: area.id,
             ...(weather.label != null ? { label: weather.label } : {}),
           };
@@ -154,7 +161,7 @@ function createRouteWeather(source: RouteWeatherSource): RouteWeather {
         const area = areasById.get(id);
         if (area == null) continue;
         const weather = areaWeather(area, day);
-        if (weather != null && (worst == null || weather.multiplier > worst.multiplier)) worst = weather;
+        if (weather != null && (worst == null || weather.timeFactor > worst.timeFactor)) worst = weather;
       }
       return worst;
     },
@@ -179,7 +186,7 @@ function mergeDays(a: WalkDay, b: WalkDay, stepOffset: number): WalkDay {
     endStep: b.endStep + stepOffset,
     labels,
     areaIds,
-    worstMultiplier: Math.max(a.worstMultiplier, b.worstMultiplier),
+    worstTimeFactor: Math.max(a.worstTimeFactor, b.worstTimeFactor),
   };
 }
 
@@ -330,5 +337,4 @@ export {
   rankDepartures,
   computeDayStretches,
   formatHours,
-  timeMultiplierFromSpeed,
 };

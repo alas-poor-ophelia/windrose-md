@@ -13,10 +13,19 @@
  * prefers-reduced-motion it draws one still frame and redraws only when
  * the view, the weather or the shapes change.
  *
- * Clip caching: world-space outlines are rebuilt only when the areas, the
- * fog, the geometry or which areas animate change; their screen projection
- * (a few boundary vertices per area) only when the live viewport, the
- * canvas size or north changes. A frame is step + draw, nothing else.
+ * Clip caching: world-space outlines come from useWeatherShapes (traced
+ * once per area/fog/geometry change and shared with WeatherLayer); the Sky
+ * keeps the areas that animate. Their screen projection (a few boundary
+ * vertices per area) is redone only when the live viewport, the canvas size
+ * or north changes. A frame is step + draw, nothing else.
+ *
+ * Hour rule (skyWeather.ts): with a view hour the Sky reads the hourly
+ * report and its precipitation window; with no hour it shows the day.
+ * Region name plates (drawn on the map canvas below) are cleared out of
+ * every frame so names stay readable under rain, snow and fog.
+ *
+ * Animation follows the store's resolved `animate` (the map's "Animate
+ * weather" setting, inherited by sub-hex levels).
  *
  * Never part of the static cache: a private overlay canvas from
  * useOverlayCanvas, whose backing store is 1:1 with the main canvas (no
@@ -28,17 +37,18 @@ import type { VNode } from 'preact';
 import type { StoredViewState } from '#types/core/map.types';
 import type { SkyArea, SkyFrame, SkyWeather } from '../../weather/sky/skyTypes';
 import type { SkyShape } from '../../weather/skyClip';
+import type { RegionLabelSpot } from '../../weather/skyCells';
 
 import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
 import { useWeatherStore } from '../../context/WeatherContext';
-import { getActiveLayer } from '../../persistence/layerAccessor';
 import { useOverlayCanvas } from '../../hooks/canvas/useOverlayCanvas';
+import { useWeatherShapes } from '../../hooks/canvas/useWeatherShapes';
 import { createViewportTransform } from './viewportTransform';
 import { SkyEngine } from '../../weather/sky/SkyEngine';
-import { buildSkyShapes, cellWinding, projectSkyShape } from '../../weather/skyClip';
-import { collectFoggedKeys, skyCellSource } from '../../weather/skyCells';
-import { SKY_DEFAULT_HOUR, isQuietSky, toSkyWeather } from '../../weather/skyWeather';
+import { projectSkyShape } from '../../weather/skyClip';
+import { regionLabelPlateSize, regionLabelSpots } from '../../weather/skyCells';
+import { isQuietSky, toSkyWeather } from '../../weather/skyWeather';
 
 /** Props for WeatherSkyLayer */
 export interface WeatherSkyLayerProps {
@@ -60,28 +70,33 @@ interface SkyDebugStats {
 
 const DEFAULT_VIEW: StoredViewState = { zoom: 1, center: { x: 0, y: 0 } };
 
+const NO_SHAPES: { shapes: SkyShape[]; winding: 1 | -1 } = { shapes: [], winding: 1 };
+
+/** Same members, regardless of order */
+function sameMembers(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
+  if (a.size !== b.size) return false;
+  for (const id of a) if (!b.has(id)) return false;
+  return true;
+}
+
 const WeatherSkyLayer = ({ visible }: WeatherSkyLayerProps): VNode | null => {
   const { mapData, geometry, canvasRef, viewController } = useMapState();
   const weather = useWeatherStore();
 
-  const animate = visible && mapData?.weatherAnimate !== false;
-  const mapType = geometry?.type ?? 'grid';
-  const orientation = mapData?.orientation ?? 'flat';
-  const hexBounds = mapData?.hexBounds;
+  const animate = visible && weather.animate;
   const north = mapData?.northDirection ?? 0;
-  const activeLayer = mapData != null ? getActiveLayer(mapData) : null;
-  const fogOfWar = activeLayer?.fogOfWar;
-  const paintedCells = activeLayer?.cells;
+  const regions = mapData?.regions;
 
-  // Each area's Sky weather for the view day and hour; quiet areas left out
+  // Each area's Sky weather for the view day (and hour, when one is set);
+  // quiet areas left out
   const skyByArea = useMemo((): Map<string, SkyWeather> => {
     const result = new Map<string, SkyWeather>();
     const day = weather.viewDay;
     if (!animate || !weather.available || day == null) return result;
-    const hour = weather.viewTime.hour ?? SKY_DEFAULT_HOUR;
+    const hour = weather.viewTime.hour;
     for (const area of weather.areas) {
-      let report = weather.report(area.zoneId, day, hour);
-      let hourly = true;
+      let report = hour != null ? weather.report(area.zoneId, day, hour) : null;
+      let hourly = report != null;
       if (report == null) {
         report = weather.report(area.zoneId, day);
         hourly = false;
@@ -93,37 +108,32 @@ const WeatherSkyLayer = ({ visible }: WeatherSkyLayerProps): VNode | null => {
     return result;
   }, [animate, weather]);
 
-  // Which areas animate, as a memo key: a store version bump that leaves
-  // the set alone must not retrace outlines
-  const animatedKey = [...skyByArea.keys()].join('|');
+  // Which areas animate, memoized by content: a store version bump that
+  // leaves the set alone keeps the same Set, so the clips stay put
+  const animatedRef = useRef<ReadonlySet<string>>(new Set());
+  const nextAnimated = new Set(skyByArea.keys());
+  if (!sameMembers(nextAnimated, animatedRef.current)) animatedRef.current = nextAnimated;
+  const animated = animatedRef.current;
 
-  const fogged = useMemo(
-    () => collectFoggedKeys(fogOfWar, mapType, orientation),
-    [fogOfWar, mapType, orientation]
-  );
-
-  // World-space outlines: areas, fog, geometry and the animated set only
+  // World-space outlines, shared with WeatherLayer; the Sky keeps the animated ones
+  const allShapes = useWeatherShapes(animate);
   const shapeData = useMemo((): { shapes: SkyShape[]; winding: 1 | -1 } => {
-    if (geometry == null || animatedKey === '') return { shapes: [], winding: 1 };
-    const animated = new Set(animatedKey.split('|'));
-    const source = skyCellSource(geometry, hexBounds, paintedCells);
-    return {
-      shapes: buildSkyShapes({
-        areas: weather.areas,
-        fogged,
-        cellVertices: source.cellVertices,
-        mapCells: source.mapCells,
-        include: area => animated.has(area.id),
-      }),
-      winding: cellWinding(source.cellVertices),
-    };
-  }, [geometry, hexBounds, paintedCells, weather.areas, fogged, animatedKey]);
+    if (allShapes == null || animated.size === 0) return NO_SHAPES;
+    return { shapes: allShapes.shapes.filter(shape => animated.has(shape.id)), winding: allShapes.winding };
+  }, [allShapes, animated]);
+
+  // Region name plates the Sky leaves clear
+  const fogged = allShapes?.fogged ?? null;
+  const labels = useMemo(
+    (): RegionLabelSpot[] => (geometry?.type === 'hex' && shapeData.shapes.length > 0 ? regionLabelSpots(regions, geometry, fogged) : []),
+    [geometry, regions, fogged, shapeData]
+  );
 
   const active = animate && shapeData.shapes.length > 0;
 
   // Latest inputs for the loop, which is not restarted by input changes
-  const inputsRef = useRef({ shapeData, skyByArea, north, geometry, mapData });
-  inputsRef.current = { shapeData, skyByArea, north, geometry, mapData };
+  const inputsRef = useRef({ shapeData, skyByArea, north, geometry, mapData, labels });
+  inputsRef.current = { shapeData, skyByArea, north, geometry, mapData, labels };
   const dirtyRef = useRef(true);
   const kickRef = useRef<() => void>(() => undefined);
 
@@ -139,7 +149,7 @@ const WeatherSkyLayer = ({ visible }: WeatherSkyLayerProps): VNode | null => {
   useEffect(() => {
     dirtyRef.current = true;
     kickRef.current();
-  }, [shapeData, skyByArea, north, geometry]);
+  }, [shapeData, skyByArea, north, geometry, labels]);
 
   const engineRef = useRef<SkyEngine | null>(null);
 
@@ -162,6 +172,8 @@ const WeatherSkyLayer = ({ visible }: WeatherSkyLayerProps): VNode | null => {
     engine.setReducedMotion(reduced);
 
     const frame: SkyFrame = { width: 0, height: 0, areas: [], mapRotationDeg: 0, pixelRatio: 1 };
+    // Name plates to clear after each draw: centre (backing px) and size
+    let plates: Array<{ x: number; y: number; w: number; h: number }> = [];
     const stats: SkyDebugStats = { frames: 0, lastMs: 0, avgMs: 0, particles: 0, drawCalls: 0, areas: 0 };
 
     const project = (overlay: HTMLCanvasElement): void => {
@@ -173,6 +185,7 @@ const WeatherSkyLayer = ({ visible }: WeatherSkyLayerProps): VNode | null => {
       const cssWidth = main.getBoundingClientRect().width;
       frame.pixelRatio = cssWidth > 0 ? overlay.width / cssWidth : 1;
       const areas: SkyArea[] = [];
+      plates = [];
       if (geo != null) {
         const view = viewController?.getLive() ?? inputs.mapData?.viewState ?? DEFAULT_VIEW;
         const transform = createViewportTransform({
@@ -196,6 +209,12 @@ const WeatherSkyLayer = ({ visible }: WeatherSkyLayerProps): VNode | null => {
           }
           areas.push({ id: shape.id, weather: sky, clip, bounds: screen.bounds });
         }
+        // The plates are drawn in canvas px, and this canvas is 1:1 with the main one
+        for (const label of inputs.labels) {
+          const centre = transform.worldToBuffer(label.worldX, label.worldY);
+          const plate = regionLabelPlateSize(label.text, view.zoom);
+          plates.push({ x: centre.x, y: centre.y, w: plate.width, h: plate.height });
+        }
       }
       frame.areas = areas;
       dirtyRef.current = false;
@@ -215,6 +234,7 @@ const WeatherSkyLayer = ({ visible }: WeatherSkyLayerProps): VNode | null => {
       const t0 = performance.now();
       engine.step(dt, frame);
       engine.draw(ctx, frame);
+      if (plates.length > 0) clearPlates(ctx);
       const cost = performance.now() - t0;
       stats.frames++;
       stats.lastMs = cost;
@@ -222,6 +242,19 @@ const WeatherSkyLayer = ({ visible }: WeatherSkyLayerProps): VNode | null => {
       stats.particles = engine.stats.particles;
       stats.drawCalls = engine.stats.drawCalls;
       stats.areas = engine.stats.areas;
+    };
+
+    // Region names sit on the map canvas under this one: keep them clear.
+    // The canvas is rotated by north about its centre, the plates with it.
+    const clearPlates = (ctx: CanvasRenderingContext2D): void => {
+      const angle = (frame.mapRotationDeg * Math.PI) / 180;
+      ctx.save();
+      for (const plate of plates) {
+        ctx.setTransform(1, 0, 0, 1, plate.x, plate.y);
+        if (angle !== 0) ctx.rotate(angle);
+        ctx.clearRect(-plate.w / 2, -plate.h / 2, plate.w, plate.h);
+      }
+      ctx.restore();
     };
 
     const running = (): boolean => !reduced && docVisible && onScreen;

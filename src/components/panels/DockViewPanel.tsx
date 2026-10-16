@@ -3,6 +3,7 @@ import type { MapType } from '#types/core/map.types';
 import type { FogToolId } from '#types/hooks/fog.types';
 import type { LayerVisibility } from '#types/contexts/context.types';
 import type { FogOfWarState } from '../toolbars/VisibilityToolbar';
+import { offeredLayers } from '../toolbars/VisibilityToolbar';
 
 import { useCallback } from 'preact/hooks';
 import { Modal } from 'obsidian';
@@ -17,7 +18,7 @@ interface LayerDef {
   icon: string;
   label: string;
   hexOnly?: boolean;
-  /** Offered only while the weather plugin is usable and the map has weather */
+  /** Offered only while the map has weather (store.hasWeather) */
   requiresWeather?: boolean;
 }
 
@@ -72,13 +73,8 @@ const DockViewPanel = ({
 }: DockViewPanelProps): VNode => {
   const app = useApp();
   const featureFlags = useFeatureFlags();
-  // Map has weather = a bound region or a map-level (or inherited) zone
-  const weather = useWeatherStore();
-  const weatherAvailable = weather.available && weather.areas.length > 0;
-  const visibleLayers = LAYERS.filter(l =>
-    (l.hexOnly !== true || mapType === 'hex') &&
-    (l.requiresWeather !== true || weatherAvailable)
-  );
+  const { hasWeather } = useWeatherStore();
+  const visibleLayers = offeredLayers(LAYERS, mapType, hasWeather);
 
   const handleClearAll = useCallback(() => {
     const modal = new Modal(app);

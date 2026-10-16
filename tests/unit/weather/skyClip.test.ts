@@ -5,7 +5,7 @@
  * per-area shapes (topmost region claims a cell, fog removes cells, skipped
  * areas still claim, the whole-map area takes the rest or becomes "the
  * canvas but these cells"), the screen projection and its nonzero rule,
- * and the map-side inputs (fog keys, cell corners, map cell lists).
+ * and the map-side inputs (cell corners, map cell lists, region name plates).
  */
 
 import { describe, it, expect } from "vitest";
@@ -19,9 +19,8 @@ import {
   traceCellLoops,
 } from "../../../src/weather/skyClip";
 import type { Loop } from "../../../src/weather/skyClip";
-import { collectFoggedKeys, skyCellSource } from "../../../src/weather/skyCells";
+import { regionLabelPlateSize, regionLabelSpots, skyCellSource } from "../../../src/weather/skyCells";
 import { HexGeometry } from "../../../src/geometry/core/HexGeometry";
-import { offsetToAxial } from "../../../src/geometry/core/offsetCoordinates";
 import type { WeatherArea } from "#types/contexts/weather.types";
 import type { Cell } from "#types/core/cell.types";
 
@@ -167,13 +166,32 @@ describe("skyShapeToSvgPath", () => {
 });
 
 describe("skyCells", () => {
-  it("collects fogged cells only when fog is enabled, converting hex offsets to axial", () => {
-    const fog = { enabled: true, foggedCells: [{ col: 3, row: 2 }], texture: null };
-    expect(collectFoggedKeys({ ...fog, enabled: false }, "hex", "flat")).toBeNull();
-    expect(collectFoggedKeys(null, "grid", "flat")).toBeNull();
-    expect([...collectFoggedKeys(fog, "grid", "flat")!]).toEqual(["3,2"]);
-    const { q, r } = offsetToAxial(3, 2, "flat");
-    expect([...collectFoggedKeys(fog, "hex", "flat")!]).toEqual([`${q},${r}`]);
+  it("lists the region name plates the renderer draws: visible, named, at least half revealed", () => {
+    const hex = new HexGeometry(16, "flat", { maxCol: 8, maxRow: 8 });
+    const region = (id: string, extra: Record<string, unknown> = {}) => ({
+      id, name: id.toUpperCase(), hexes: [{ x: 0, y: 0 }, { x: 1, y: 0 }], color: "#000", opacity: 1,
+      borderColor: "#000", borderWidth: 1, visible: true, ...extra,
+    });
+    const regions = [
+      region("a", { labelPosition: { x: 40, y: 50 } }),
+      region("hidden", { visible: false }),
+      region("blank", { name: "" }),
+      region("fogged", { hexes: [{ x: 5, y: 5 }, { x: 6, y: 5 }] }),
+    ];
+    const fogged = new Set(["5,5", "6,5"]);
+    const spots = regionLabelSpots(regions as never, hex, fogged);
+    expect(spots).toEqual([{ regionId: "a", worldX: 40, worldY: 50, text: "A" }]);
+    // Half revealed still shows (the renderer's >= 50% rule)
+    expect(regionLabelSpots([region("half", { hexes: [{ x: 5, y: 5 }, { x: 2, y: 2 }] })] as never, hex, fogged)).toHaveLength(1);
+  });
+
+  it("sizes a name plate like the region renderer: font plus padding, wider for longer names", () => {
+    const small = regionLabelPlateSize("Moor", 1);
+    const long = regionLabelPlateSize("Greywold Highlands", 1);
+    expect(small.height).toBe(14 + 6);
+    expect(long.width).toBeGreaterThan(small.width);
+    // Never below the readable minimum font (12 px) when zoomed far out
+    expect(regionLabelPlateSize("Moor", 0.1).height).toBe(12 + 6);
   });
 
   it("lists a rectangular hex map's every cell, else the painted cells", () => {

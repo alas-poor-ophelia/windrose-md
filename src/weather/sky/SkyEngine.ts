@@ -18,7 +18,10 @@
  *    sway and wraps at the visible edge; it fades in and out over its life.
  *  - Fog banks and cloud shadows are a handful of pre-rendered soft sprites
  *    drifting downwind; their strength eases toward the weather's level so
- *    hourly changes fade instead of popping.
+ *    hourly changes fade instead of popping. Cloud shadows are gathered on
+ *    a private shadow layer first and composited at a capped strength, so
+ *    where several drift over each other they never pool into one dark
+ *    patch (CLOUD_SHADOW_MAX).
  *  - Nothing is allocated per particle per frame. Rain-like streaks are one
  *    path + one stroke per depth bucket per area.
  */
@@ -59,6 +62,11 @@ const BOLT_MAX_POINTS = 40;
 const FLASH_MS = 650;
 /** Time constant for fog / cloud strength easing. */
 const EASE_MS = 1500;
+/**
+ * The darkest cloud shadow anywhere, however many shadows overlap. A lone
+ * shadow keeps its own strength (up to this); overlaps saturate here.
+ */
+const CLOUD_SHADOW_MAX = 0.42;
 
 const TAU = Math.PI * 2;
 
@@ -179,6 +187,8 @@ interface AreaState {
 
 const WIND_SCRATCH: Vec = { x: 0, y: 0 };
 
+type SpriteContext = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+
 export class SkyEngine {
   readonly stats: SkyStats = { particles: 0, areas: 0, drawCalls: 0 };
 
@@ -191,6 +201,9 @@ export class SkyEngine {
   private stamp = 0;
   private sprites: SkySprites | null = null;
   private spritesTried = false;
+  /** Cloud shadow layer, frame-sized; null when no canvas can be created */
+  private shadowLayer: SkySpriteCanvas | null = null;
+  private shadowTried = false;
   private pr = 1;
 
   constructor(opts: SkyEngineOptions = {}) {
@@ -209,6 +222,8 @@ export class SkyEngine {
 
   /** Drop all per-area state. */
   clear(): void {
+    this.shadowLayer = null;
+    this.shadowTried = false;
     this.states.clear();
     this.list.length = 0;
     this.stats.particles = 0;
@@ -693,8 +708,9 @@ export class SkyEngine {
     }
     if (st.fogLvl > 0.02) this.drawFog(ctx, st, ox, oy, sprites);
     if (precipOn(w) && (w.precipType === 'snow' || w.precipType === 'sleet')) {
-      // Falling snow whitens the air; more so in a blizzard.
-      ctx.globalAlpha = clamp(w.intensity, 0, 1) * (0.07 + 0.13 * clamp(st.windKph / 70, 0, 1));
+      // Falling snow whitens the air; more so in a blizzard. Kept faint:
+      // the map is usually light already, and region names must still read.
+      ctx.globalAlpha = clamp(w.intensity, 0, 1) * (0.04 + 0.08 * clamp(st.windKph / 70, 0, 1));
       ctx.fillStyle = 'rgb(236,242,248)';
       ctx.fillRect(vx, vy, vw, vh);
       this.stats.drawCalls++;
@@ -716,6 +732,26 @@ export class SkyEngine {
     ctx.globalAlpha = 1;
   }
 
+  /** The frame-sized cloud shadow layer, cleared; null when none can be made */
+  private shadowContext(width: number, height: number): SpriteContext | null {
+    if (!this.shadowTried) {
+      this.shadowTried = true;
+      this.shadowLayer = this.createCanvas(Math.max(1, width), Math.max(1, height));
+    }
+    const layer = this.shadowLayer;
+    if (layer == null) return null;
+    if (layer.width !== width || layer.height !== height) {
+      layer.width = Math.max(1, width);
+      layer.height = Math.max(1, height);
+    }
+    const lctx = layer.getContext('2d');
+    if (lctx == null) return null;
+    lctx.setTransform(1, 0, 0, 1, 0, 0);
+    lctx.globalAlpha = 1;
+    lctx.clearRect(0, 0, layer.width, layer.height);
+    return lctx;
+  }
+
   private drawClouds(ctx: CanvasRenderingContext2D, st: AreaState, ox: number, oy: number, sprites: SkySprites | null): void {
     const cover = st.cloudLvl;
     const shown = cover * CLOUD_BLOBS;
@@ -723,27 +759,43 @@ export class SkyEngine {
     // Under falling precipitation the light is flat: soften the shadows.
     const wet = precipOn(st.weather) ? 0.5 : 1;
     const c = Math.cos(ang), s = Math.sin(ang);
+    // Shadows gather on the layer at full strength (overlaps saturate at
+    // opaque there) and the layer is laid down at CLOUD_SHADOW_MAX, so a
+    // lone shadow keeps its strength and a pile-up cannot get darker.
+    const layer = sprites ? this.shadowContext(ctx.canvas.width, ctx.canvas.height) : null;
+    const target: SpriteContext = layer ?? ctx;
+    const gain = layer != null ? 1 / CLOUD_SHADOW_MAX : 1;
+    let drawn = 0;
     for (let i = 0; i < CLOUD_BLOBS; i++) {
       const vis = clamp(shown - i, 0, 1);
       if (vis <= 0) break;
       const r = this.cloudRadius(st, i);
       // Shadows read best in broken cloud; under overcast the dim wash takes over.
-      ctx.globalAlpha = vis * (0.26 + 0.3 * cover) * (1 - 0.65 * clamp((cover - 0.7) / 0.3, 0, 1)) * wet;
+      const alpha = vis * (0.26 + 0.3 * cover) * (1 - 0.65 * clamp((cover - 0.7) / 0.3, 0, 1)) * wet;
+      target.globalAlpha = Math.min(1, alpha * gain);
       const x = ox + st.cloud.x[i], y = oy + st.cloud.y[i];
       if (sprites) {
         // Stretched along the wind: clouds are streets, not discs.
         const sx = 1.45, sy = 0.95;
-        ctx.setTransform(c * sx, s * sx, -s * sy, c * sy, x, y);
-        ctx.drawImage(sprites.cloud[i % SPRITE_VARIANTS], -r, -r, 2 * r, 2 * r);
+        target.setTransform(c * sx, s * sx, -s * sy, c * sy, x, y);
+        target.drawImage(sprites.cloud[i % SPRITE_VARIANTS], -r, -r, 2 * r, 2 * r);
       } else {
-        ctx.fillStyle = 'rgb(14,20,32)';
-        ctx.beginPath();
-        ctx.arc(x, y, r * 0.6, 0, TAU);
-        ctx.fill();
+        // No layer without sprites: keep each shadow light so overlaps stay bearable
+        target.globalAlpha = Math.min(CLOUD_SHADOW_MAX, alpha) * 0.6;
+        target.fillStyle = 'rgb(14,20,32)';
+        target.beginPath();
+        target.arc(x, y, r * 0.6, 0, TAU);
+        target.fill();
       }
+      drawn++;
       this.stats.drawCalls++;
     }
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    target.setTransform(1, 0, 0, 1, 0, 0);
+    if (layer != null && drawn > 0 && this.shadowLayer != null) {
+      ctx.globalAlpha = CLOUD_SHADOW_MAX;
+      ctx.drawImage(this.shadowLayer, 0, 0);
+      this.stats.drawCalls++;
+    }
   }
 
   private drawFog(ctx: CanvasRenderingContext2D, st: AreaState, ox: number, oy: number, sprites: SkySprites | null): void {

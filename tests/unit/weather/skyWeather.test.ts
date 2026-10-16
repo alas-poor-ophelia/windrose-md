@@ -1,9 +1,10 @@
 /**
  * skyWeather Unit Tests
  *
- * Report -> Sky weather mapping (hourly precipitation window, fog from the
- * condition tag or visibility class), the quiet-sky skip, the compass wind
- * (downwind bearing, wording) and which area the compass follows.
+ * Report -> Sky weather mapping (hourly precipitation window; a daily
+ * report animates the day's precipitation; fog from the condition tag or
+ * visibility class), the quiet-sky skip, the compass wind (downwind
+ * bearing, wording) and which area the compass follows (revealed only).
  */
 
 import { describe, it, expect } from "vitest";
@@ -45,6 +46,13 @@ describe("toSkyWeather", () => {
     expect(toSkyWeather(off, classification(), true).precipActive).toBe(false);
     expect(toSkyWeather(off, classification(), false).precipActive).toBe(true);
     expect(toSkyWeather(report(), classification(), true).precipActive).toBe(true);
+  });
+
+  it("shows the day's precipitation from a daily report: active whenever the day has any", () => {
+    const dry = report({ precipitation: { type: "none", amountMm: 0, intensity: 0 } });
+    expect(toSkyWeather(dry, classification(), false).precipActive).toBe(false);
+    const snow = report({ precipitation: { type: "snow", amountMm: 4, intensity: 0.4, active: false } });
+    expect(toSkyWeather(snow, classification(), false).precipActive).toBe(true);
   });
 
   it("reads fog from the condition tag or a poor visibility class", () => {
@@ -102,5 +110,27 @@ describe("pickCompassArea", () => {
     expect(pickCompassArea([a, b], () => null, { x: 9, y: 9 })).toBe(a);
     expect(pickCompassArea([a, b], () => b, null)).toBe(a);
     expect(pickCompassArea([], () => null, null)).toBeNull();
+  });
+
+  describe("with fog", () => {
+    const a = region("a");
+    const b = region("b");
+    const fogOf = (hidden: WeatherArea[], foggedCell?: { x: number; y: number }) => ({
+      isFogged: (cell: { x: number; y: number }) => foggedCell != null && cell.x === foggedCell.x && cell.y === foggedCell.y,
+      areaRevealed: (area: WeatherArea) => !hidden.includes(area),
+    });
+
+    it("skips a hidden whole-map area", () => {
+      expect(pickCompassArea([a, map], () => a, { x: 0, y: 0 }, fogOf([map]))).toBe(a);
+    });
+    it("never reads the area of a fogged centre cell", () => {
+      expect(pickCompassArea([a, b], () => b, { x: 3, y: 3 }, fogOf([], { x: 3, y: 3 }))).toBe(a);
+    });
+    it("never follows a hidden area under the centre", () => {
+      expect(pickCompassArea([a, b], () => b, { x: 0, y: 0 }, fogOf([b]))).toBe(a);
+    });
+    it("shows no needle when nothing is revealed", () => {
+      expect(pickCompassArea([a, b, map], () => b, { x: 0, y: 0 }, fogOf([a, b, map]))).toBeNull();
+    });
   });
 });

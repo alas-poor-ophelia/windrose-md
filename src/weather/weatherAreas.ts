@@ -71,6 +71,20 @@ function resolveWeatherAreas(root: MapData | null | undefined, path: SubHexPath 
 }
 
 /**
+ * The Sky animation setting of the level at `path`, inherited like the
+ * zone: the level's own `weatherAnimate` when set, else the nearest
+ * ancestor's (walking up the sub-hex path to the root), else true.
+ */
+function resolveWeatherAnimate(root: MapData | null | undefined, path: SubHexPath = []): boolean {
+  for (let depth = path.length; depth >= 0; depth--) {
+    const level = getMapAtSubHexPath(root, path.slice(0, depth));
+    const value = level?.weatherAnimate;
+    if (typeof value === 'boolean') return value;
+  }
+  return true;
+}
+
+/**
  * A cell lookup over areas: the topmost region containing the cell, else
  * the map-level area, else null.
  */
@@ -104,4 +118,4 @@ function sameWeatherAreas(a: WeatherArea[], b: WeatherArea[]): boolean {
   });
 }
 
-export { inheritedZoneId, resolveWeatherAreas, buildAreaLookup, sameWeatherAreas };
+export { inheritedZoneId, resolveWeatherAreas, resolveWeatherAnimate, buildAreaLookup, sameWeatherAreas };

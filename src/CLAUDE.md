@@ -69,7 +69,7 @@ windrose/                        # Development root (OUTSIDE vault)
 
 The codebase follows a composition pattern:
 
-- **Context Providers**: `AppContext`, `MapContext`, `MapSelectionContext`, `ObjectLinkingContext`, `EventHandlerContext`; `MapSettingsContext` exists only inside the per-map settings modal (see `context/CLAUDE.md`)
+- **Context Providers**: `AppContext`, `MapContext`, `MapSelectionContext`, `ObjectLinkingContext`, `EventHandlerContext`, `WeatherContext` (per-map weather store + fog view, inert outside a provider); `MapSettingsContext` exists only inside the per-map settings modal (see `context/CLAUDE.md`)
 - **Custom Hooks**: Encapsulate complex logic (`useCanvasRenderer`, `useDrawingTools`, `useEventCoordinator`, etc.)
 - **Layer Components**: Separate rendering concerns (`DrawingLayer`, `ObjectLayer`, `FogOfWarLayer`, etc.)
 
@@ -120,21 +120,31 @@ src/
 ├── objects/               # Map object domain (objectOperations, partyPin*, shapeOverlay*, selection)
 ├── drawing/               # Pure map-editing math: cells, edges, walls, wall gaps, routes, tiles, scatter, terrain strokes
 ├── text/                  # Text label domain
-├── travel/                # Travel packs (units, terrains, modes, allowances) and segment terrain sampler
+├── travel/                # Travel packs (units, terrains, modes, allowances), segment terrain sampler, forecastWalk.ts (day-by-day walk of a route through forecast weather)
 ├── weather/               # Optional U+13080 Weather plugin (id `wadjet`) integration — public API only
 │   ├── wadjetBridge.ts    # The ONE contact point: API lookup, 0.3.x vs apiVersion-1 feature detection, safe reads,
 │   │                      #   event subscription (payloads, unload), connectZoneResolver / connectInterpreter
-│   ├── weatherStore.ts    # WeatherStoreCore: per-map store core (report cache, view time, invalidation, rebind)
-│   ├── weatherAreas.ts    # Weather areas of the shown level (bound regions + map-level zone, sub-hex inheritance)
+│   ├── weatherStore.ts    # WeatherStoreCore: per-map store core (report cache, view time, invalidation, rebind,
+│   │                      #   45-day ground history, travel-rules setting bump)
+│   ├── weatherAreas.ts    # Weather areas of the shown level (bound regions + map-level zone, sub-hex inheritance),
+│   │                      #   resolveWeatherAnimate (Sky setting inherited like the zone)
+│   ├── weatherFog.ts      # THE fog rule for weather UI: buildWeatherFogView / useWeatherFog (isFogged, areaRevealed,
+│   │                      #   revealedAreas; regions revealed at >= 50% unfogged). Weather never reveals fogged cells/areas
 │   ├── weatherZones.ts    # Region/cell → zone lookups, route segment fold, mounted-map zone snapshots
-│   ├── windroseZoneResolver.ts # Answers `hex` and `windrose.region` locators (open maps sync, closed maps read-only async)
+│   ├── windroseZoneResolver.ts # Answers `hex` and `windrose.region` locators (open maps sync; closed maps read-only async,
+│   │                      #   parsed zones cached per map until the data file is modified)
 │   ├── travelInterpreter.ts # `windrose.travel` interpreter; documents Windrose's travel result shape { speedMultiplier, label? }
 │   ├── weatherTravelRules.ts # Rule table: report → speed multiplier + reasons
 │   ├── weatherClassify.ts # Local classify/describe fallbacks for 0.3.x plugins
-│   ├── weatherVisuals.ts  # Report → region tint / badge
-│   ├── weatherRegionMenu.ts # Region context-menu zone binding
+│   ├── weatherVisuals.ts  # Report → region tint / badge; formatTemperature (the one °C/°F formatter)
+│   ├── weatherRegionMenu.ts # Region context-menu zone binding (unbind deletes the key)
+│   ├── svgGlyph.ts        # Allowlist parser for the plugin's glyph SVG (never innerHTML; ids prefixed per instance)
+│   ├── forecastRoute.ts   # A route's day-by-day weather costing (measure tool, departure window)
+│   ├── skyWeather.ts      # Report → Sky parameters (precipitation, cloud, wind)
+│   ├── skyClip.ts         # Weather area outlines (cells minus fog) as world-space shapes / SVG paths
+│   ├── skyCells.ts        # Map-side shape inputs: cell corners, the whole-map cell list
 │   ├── groundState.ts     # Snow cover / mud derivation (Windrose's, not the plugin's)
-│   └── sky/               # Animated Sky layer engine
+│   └── sky/               # Animated Sky layer engine (SkyEngine, skyMath, skySprites, skyTypes)
 ├── assets/                # Icons, tileset operations, and the tile import/prediction pipeline (import*, *Predictor, tile*)
 ├── content-packs/         # Content pack browser/download/install/registry, DD pack import
 ├── persistence/           # Data I/O & vault interaction (fileOperations, saveCoordinator, schemaMigration, exportOperations, layerAccessor, fogOperations, subHexPath)
@@ -182,14 +192,14 @@ Non-source files live outside `src/`: `CHANGELOG.md` (read by the release workfl
 | Feature | Files |
 |---------|-------|
 | Beacon (party pin) | `objects/partyPinOperations.ts`, `objects/partyRangeQuery.ts`, `objects/partyRelatedNotes.ts`, `persistence/partyNoteOperations.ts`, `components/mapcanvas/PartyPinLayer.tsx` + `PartyPinInstance.tsx`, `components/overlays/PartyPin*.tsx`, `hooks/interactions/usePartyPin*.ts` |
-| Weather (U+13080 Weather plugin) | `weather/`, `context/WeatherContext.tsx` (WeatherProvider + `useWeatherStore()`, one per mounted map, mounted in `DungeonMapTracker.tsx`), `components/mapcanvas/WeatherLayer.tsx`, `components/settings/WeatherTab.tsx`, `types/integrations/wadjet.types.ts` (verbatim mirror of the plugin's `types/wadjet.d.ts` + a 0.3.x tolerance layer), `types/contexts/weather.types.ts` |
+| Weather (U+13080 Weather plugin) | `weather/`, `context/WeatherContext.tsx` (WeatherProvider + `useWeatherStore()`, one per mounted map, mounted in `DungeonMapTracker.tsx`; also provides the fog view read by `useWeatherFog()` from `weather/weatherFog.ts`), `components/mapcanvas/WeatherLayer.tsx` (tint, ground sheen, badges) + `WeatherSkyLayer.tsx` (animated Sky), `components/overlays/WeatherOverlay.tsx`, `components/overlays/MeasurementDayRibbon.tsx` + `hooks/interactions/useRouteWeather.ts` + `travel/forecastWalk.ts` (measure tool), `components/panels/AlmanacPanel.tsx` (block rail flyout + full-pane dock section), `components/settings/WeatherTab.tsx`, `scss/_almanac.scss`, `types/integrations/wadjet.types.ts` (verbatim mirror of the plugin's `types/wadjet.d.ts` + a 0.3.x tolerance layer), `types/contexts/weather.types.ts`. Gate on `store.hasWeather` (never re-derive it); Sky animation is `store.animate`; ground state is `store.ground(zone, day)`; anything that names or shows an area asks `useWeatherFog()` first |
 | Travel and routes | `travel/` (packs, time, segment terrain sampler), `drawing/routeOperations.ts`, `components/mapcanvas/RouteLayer.tsx` + `MeasurementLayer.tsx`, `hooks/interactions/useTerrainSampling.ts`, `components/modals/SaveRouteModal.ts`, `settings/modals/TravelPackEditModal.ts` |
 | Openings (wall gaps) | `drawing/wallGapOperations.ts`, `drawing/wallEditGeometry.ts`, `components/mapcanvas/WallLayer.tsx`, `hooks/walls/` (`useWallTools.ts` state + handlers, `useWallOverlay.ts` overlay canvas, `useWallToolSurface.ts` drawer-footer controls) (walls/paths: `drawing/wallPath*.ts`, `geometry/renderers/wallPathRenderer.ts`) |
 | Full-pane view | `views/WindroseMapView.ts` |
 | DMT app wiring | `hooks/app/` (map chrome state, dock layout, drawer ribbon, tile drawer/flyouts/tool coupling, tileset art handlers, board and map-list actions, layer links, adjacent sub-maps): composition hooks that keep `DungeonMapTracker.tsx` a thin root; panels render through `components/hosts/` |
 | Sub-hex maps | `hooks/interactions/useSubHexNavigation.ts`, `persistence/subHexPath.ts` (hexKey-path read/write helpers), `core/subHexBackdropStore.ts`, `core/paintedViewStore.ts`, `geometry/core/subHexBackdrop.ts`, `geometry/renderers/subHexBackdropRenderer.ts`, `components/controls/SubHexBreadcrumb.tsx` |
 | Export | `persistence/exportOperations.ts`, `components/modals/ExportImageModal.ts` |
-| Dock panels | `components/panels/Dock*.tsx`, `DrawerDock.tsx`, `EdgeRail.tsx`, `hooks/state/useFloatingPanels.ts`; rendered via `components/hosts/` (add a panel prop in `panelBags.ts` + `buildPanelBags.ts`, never per layout) |
+| Dock panels | `components/panels/Dock*.tsx`, `DrawerDock.tsx`, `EdgeRail.tsx`, `AlmanacPanel.tsx` (block rail flyout / full-pane dock section, offered while the map has weather and some area is out of the fog), `hooks/state/useFloatingPanels.ts`; rendered via `components/hosts/` (add a panel prop in `panelBags.ts` + `buildPanelBags.ts`, never per layout) |
 | Tile import wizard | `assets/import*.ts` (+ predictors, `tile*.ts`), `settings/modals/AddTilesModal.ts`, `components/panels/TileAssetBrowser.tsx` (+ `TileCell.tsx`, `TileBrowserFooter.tsx`, `hooks/tiles/useTileFilterPipeline.ts`), `TileOrganizePane.tsx` |
 | Terrain strokes | `drawing/terrainStrokeOperations.ts`, `geometry/strokes/`, `components/mapcanvas/TerrainBrushLayer.tsx` |
 | Pan/zoom performance | `hooks/canvas/useViewController.ts`, `useLiveOverlay*.ts` |

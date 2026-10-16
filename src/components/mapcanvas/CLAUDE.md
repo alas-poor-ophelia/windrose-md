@@ -24,9 +24,11 @@ MapCanvas.tsx               # Providers (MapSelection, ObjectLinking, EventHandl
 ├── NotePinLayer.tsx          # Note link pins
 ├── PartyPinLayer.tsx         # Beacon: resolves shared settings once, one PartyPinInstance per pin
 ├── PartyPinInstance.tsx      # One Beacon: range query, ring overlay, controls card when selected
-├── MeasurementLayer.tsx      # Measure tool, terrain picker, auto segment terrain (useTerrainSampling)
+├── MeasurementLayer.tsx      # Measure tool, terrain picker, auto segment terrain (useTerrainSampling); travel times,
+│                             #   weather, itinerary, departure window and day stretches from hooks/interactions/useRouteWeather;
+│                             #   renders overlays/MeasurementDayRibbon (per-day route band) under MeasurementOverlay
 ├── RouteLayer.tsx            # Saved measurement routes (SVG, always visible)
-├── WeatherLayer.tsx          # Weather tint, ground sheen and region badges per weather area (SVG, WeatherOverlay)
+├── WeatherLayer.tsx          # Weather tint, ground sheen and region badges per weather area (SVG, overlays/WeatherOverlay)
 ├── WeatherSkyLayer.tsx       # Animated weather Sky (overlay canvas, own rAF loop; engine in weather/sky, clips in weather/skyClip.ts)
 ├── AreaSelectLayer.tsx       # Multi-select rectangle
 ├── HexCoordinateLayer.tsx    # Hex coordinates (hex only)
@@ -58,7 +60,16 @@ Layers do NOT read `MapSettingsContext`: that provider exists only inside the pe
 
 - Committed content is drawn by `useCanvasRenderer` onto the main canvas; do not draw map content to it from layers.
 - Layers that need live feedback own a private overlay `<canvas>` through `useOverlayCanvas` (hooks/canvas): Freehand, TerrainBrush, Wall, Outline, Region, WeatherSky. WeatherSky is the only layer with a continuous animation loop: it pauses when hidden, offscreen (IntersectionObserver) or in a hidden document, draws one still frame under reduced motion, and re-projects its clips only on view/fog/area changes. Do not hand-roll the create/size/remove lifecycle. `MapCanvas` also owns the fog blur canvas.
-- Pan/zoom goes through `useViewController` (live state off the Preact path; commit at gesture end), driven by `usePanZoomCoordinator`. Anything positioned in screen space must follow live ticks: `useLiveOverlayRedraw` for overlay canvases, `useLiveOverlayTransform` for SVG groups (RouteLayer, MeasurementOverlay, PartyPinOverlay). See "Live Pan/Zoom" in `hooks/CLAUDE.md`.
+- Pan/zoom goes through `useViewController` (live state off the Preact path; commit at gesture end), driven by `usePanZoomCoordinator`. Anything positioned in screen space must follow live ticks: `useLiveOverlayRedraw` for overlay canvases, `useLiveOverlayTransform` for SVG groups (RouteLayer, MeasurementOverlay, MeasurementDayRibbon, PartyPinOverlay, WeatherOverlay). See "Live Pan/Zoom" in `hooks/CLAUDE.md`.
+
+### Weather layers
+
+- `WeatherLayer` (static SVG: tint, ground sheen, badges, textures when the Sky is off) and `WeatherSkyLayer` (animated canvas) share ONE set of area outlines from `hooks/canvas/useWeatherShapes` (cached per geometry instance; painted cells keyed by count + bounding box, and only when the whole-map area follows them). The Sky filters to the areas it animates; never trace outlines in a layer.
+- Gates come from the store: `store.hasWeather`, `store.animate` (the map's "Animate weather", inherited by sub-hex levels), `store.ground(zone, day)`. Do not read `mapData.weatherAnimate` directly.
+- Hour rule: with no view hour the Sky shows the DAY (daily report; precipitation animates whenever the day has any). Only a chosen hour reads the hourly report and its `precipitation.active` window.
+- Fog: shapes drop fogged cells; badges need the anchor unfogged and >= 50% revealed; the compass and the measure tool ask `useWeatherFog()` (fogged cells are unknown weather). Nothing weather-related may reveal a fogged cell.
+- Region name plates are drawn on the main canvas UNDER both weather surfaces: `WeatherOverlay` masks them out of the tint/sheen, `WeatherSkyLayer` clears them out of every frame (`regionLabelSpots`/`regionLabelPlateSize` in `weather/skyCells.ts` mirror the region renderer's label rule and plate size).
+- Export does not include weather: `exportOperations` re-renders the map into a fresh canvas with `renderCanvas`, which never sees the Sky canvas or the SVG overlay. Picture-frame mode is a live view, so weather shows there under the same visibility toggle as on the canvas.
 
 ## Context Dependencies
 

@@ -6,20 +6,23 @@
  * and the whole-map area) and renders the static overlay: a tint, a ground
  * sheen when the store derives ground state, region badges, and the static
  * precipitation textures when the map's Sky animation is off (the animated
- * WeatherSkyLayer draws precipitation otherwise). Reads the per-map weather
- * store (WeatherContext); does no work when the weather plugin is
- * unavailable or the map has no weather area.
+ * WeatherSkyLayer draws precipitation otherwise). Region name plates are
+ * kept clear of the overlay so they stay readable on snowy ground.
+ *
+ * Area outlines come from useWeatherShapes (traced once, shared with the
+ * Sky). Reads the per-map weather store (WeatherContext); does no work when
+ * the weather plugin is unavailable or the map has no weather area.
  */
 
 import type { VNode } from 'preact';
-import type { WeatherStore } from '#types/contexts/weather.types';
+import type { GroundState } from '../../weather/groundState';
 
 import { useMemo } from 'preact/hooks';
 import { computeCentroid } from '../../geometry/renderers/regionRenderer';
-import { getActiveLayer } from '../../persistence/layerAccessor';
 import { classifyWeatherVisual, formatBadgeTemperature } from '../../weather/weatherVisuals';
-import { buildSkyShapes, cellWinding, skyShapeToSvgPath } from '../../weather/skyClip';
-import { collectFoggedKeys, skyCellSource } from '../../weather/skyCells';
+import { skyShapeToSvgPath } from '../../weather/skyClip';
+import { regionLabelSpots } from '../../weather/skyCells';
+import { useWeatherShapes } from '../../hooks/canvas/useWeatherShapes';
 import { WeatherOverlay } from '../overlays/WeatherOverlay';
 import type { WeatherAreaVisual, WeatherGroundVisual } from '../overlays/WeatherOverlay';
 import { useMapState } from '../../context/MapContext';
@@ -41,72 +44,55 @@ const MAP_TINT_SCALE = 0.45;
  * the terrain stays readable.
  */
 const SKY_TINT_SCALE = 0.45;
+/**
+ * Snow is a white wash over a light map: its tint is held to this share on
+ * top of the scales above, so painted terrain still reads through it.
+ */
+const SNOW_TINT_SCALE = 0.55;
 /** Snow sheen shows from this depth and is full at SNOW_FULL_CM */
 const SNOW_MIN_CM = 1;
 const SNOW_FULL_CM = 30;
+/** Snow sheen strength range (light cover .. full cover) */
+const SNOW_SHEEN_MIN = 0.35;
+const SNOW_SHEEN_MAX = 0.75;
 /** Mud stipple shows from this wetness */
 const MUD_MIN = 0.3;
-
-type GroundReader = (zoneId: string, day: number) => { snowDepthCm: number; mud: number } | null;
-
-/**
- * The store's ground reader when it has one. Feature-detected: the ground
- * derivation may be absent from the store this layer runs against.
- */
-function groundReader(store: WeatherStore): GroundReader | null {
-  const ground = (store as { ground?: unknown }).ground;
-  return typeof ground === 'function' ? (ground as GroundReader) : null;
-}
+/** Mud stipple strength range (damp .. waterlogged) */
+const MUD_SHEEN_MIN = 0.3;
+const MUD_SHEEN_MAX = 0.7;
 
 /** Sheen strengths for a ground state, or null when the ground is unremarkable */
-function groundVisual(ground: { snowDepthCm: number; mud: number } | null): WeatherGroundVisual | null {
+function groundVisual(ground: Pick<GroundState, 'snowDepthCm' | 'mud'> | null): WeatherGroundVisual | null {
   if (ground == null) return null;
   const snow = ground.snowDepthCm >= SNOW_MIN_CM
-    ? 0.4 + 0.6 * Math.min(1, ground.snowDepthCm / SNOW_FULL_CM)
+    ? SNOW_SHEEN_MIN + (SNOW_SHEEN_MAX - SNOW_SHEEN_MIN) * Math.min(1, ground.snowDepthCm / SNOW_FULL_CM)
     : 0;
-  const mud = snow === 0 && ground.mud >= MUD_MIN ? 0.4 + 0.6 * Math.min(1, (ground.mud - MUD_MIN) / (1 - MUD_MIN)) : 0;
+  const mud = snow === 0 && ground.mud >= MUD_MIN
+    ? MUD_SHEEN_MIN + (MUD_SHEEN_MAX - MUD_SHEEN_MIN) * Math.min(1, (ground.mud - MUD_MIN) / (1 - MUD_MIN))
+    : 0;
   return snow > 0 || mud > 0 ? { snow, mud } : null;
 }
 
 const WeatherLayer = ({ visible }: WeatherLayerProps): VNode | null => {
   const { mapData, geometry, canvasRef, viewController } = useMapState();
   const weather = useWeatherStore();
+  const skyAnimates = weather.animate;
 
   const regions = mapData?.regions;
-  const activeLayer = mapData != null ? getActiveLayer(mapData) : null;
-  const fogOfWar = activeLayer?.fogOfWar;
-  const paintedCells = activeLayer?.cells;
-  const orientation = mapData?.orientation ?? 'flat';
-  const hexBounds = mapData?.hexBounds;
-  const mapType = geometry?.type ?? 'grid';
-  const skyAnimates = mapData?.weatherAnimate !== false;
-
-  const fogged = useMemo(
-    () => collectFoggedKeys(fogOfWar, mapType, orientation),
-    [fogOfWar, mapType, orientation]
-  );
-
-  // World-space outlines: only the areas, the fog and the geometry move them
-  const shapeData = useMemo(() => {
-    if (!visible || geometry == null || weather.areas.length === 0) return null;
-    const source = skyCellSource(geometry, hexBounds, paintedCells);
-    return {
-      shapes: buildSkyShapes({ areas: weather.areas, fogged, cellVertices: source.cellVertices, mapCells: source.mapCells }),
-      winding: cellWinding(source.cellVertices),
-    };
-  }, [visible, geometry, hexBounds, paintedCells, weather.areas, fogged]);
+  const shapeData = useWeatherShapes(visible);
+  const fogged = shapeData?.fogged ?? null;
 
   const areaVisuals = useMemo((): WeatherAreaVisual[] => {
     const day = weather.viewDay;
     if (shapeData == null || !weather.available || day == null || geometry == null) return [];
-    const readGround = groundReader(weather);
     const regionById = new Map((regions ?? []).map(region => [region.id, region]));
+    const areaById = new Map(weather.areas.map(area => [area.id, area]));
 
     const visuals: WeatherAreaVisual[] = [];
     for (const shape of shapeData.shapes) {
       const report = weather.report(shape.zoneId, day);
       if (report == null) continue;
-      const area = weather.areas.find(a => a.id === shape.id);
+      const area = areaById.get(shape.id);
 
       let badgeAnchor: WeatherAreaVisual['badgeAnchor'] = null;
       const region = area?.regionId != null ? regionById.get(area.regionId) : undefined;
@@ -124,12 +110,15 @@ const WeatherLayer = ({ visible }: WeatherLayerProps): VNode | null => {
         if (!anchorFogged && revealed / region.hexes.length >= BADGE_MIN_REVEALED) badgeAnchor = anchor;
       }
 
+      const visual = classifyWeatherVisual(report);
+      const ground = groundVisual(weather.ground(shape.zoneId, day));
+      const snowy = visual.kind === 'snow' || (ground?.snow ?? 0) > 0;
       visuals.push({
         id: shape.id,
         path: skyShapeToSvgPath(shape, shapeData.winding),
-        visual: classifyWeatherVisual(report),
-        tintScale: (shape.kind === 'map' ? MAP_TINT_SCALE : 1) * (skyAnimates ? SKY_TINT_SCALE : 1),
-        ground: groundVisual(readGround?.(shape.zoneId, day) ?? null),
+        visual,
+        tintScale: (shape.kind === 'map' ? MAP_TINT_SCALE : 1) * (skyAnimates ? SKY_TINT_SCALE : 1) * (snowy ? SNOW_TINT_SCALE : 1),
+        ground,
         badgeAnchor,
         badgeText: formatBadgeTemperature(report, weather.units),
       });
@@ -137,11 +126,18 @@ const WeatherLayer = ({ visible }: WeatherLayerProps): VNode | null => {
     return visuals;
   }, [shapeData, weather, regions, geometry, fogged, skyAnimates]);
 
+  // Region name plates the overlay leaves clear (drawn on the canvas below it)
+  const labelSpots = useMemo(
+    () => (areaVisuals.length > 0 && geometry?.type === 'hex' ? regionLabelSpots(regions, geometry, fogged) : []),
+    [areaVisuals.length, geometry, regions, fogged]
+  );
+
   if (areaVisuals.length === 0) return null;
 
   return (
     <WeatherOverlay
       areas={areaVisuals}
+      labels={labelSpots}
       textured={!skyAnimates}
       geometry={geometry}
       mapData={mapData}

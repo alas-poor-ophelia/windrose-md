@@ -6,22 +6,22 @@
  * draw" test, and the compass wind needle (which area, which way, what
  * it says).
  *
- * Hour rule: the Sky asks for the hourly report at the view hour so the
- * precipitation window (`precipitation.active`) opens and closes as the
- * Almanac moves the hour. With no view hour (daily view) it asks for hour
- * SKY_DEFAULT_HOUR, midday, instead of reading any clock: the map shows a
- * day, and midday is that day's representative hour. A plugin without
- * hourly reports answers the daily report, and precipitation then counts
- * as active all day.
+ * Hour rule: with a view hour (the Almanac's hour slider) the Sky asks for
+ * the hourly report at that hour, so the precipitation window
+ * (`precipitation.active`) opens and closes as the hour moves. With no view
+ * hour the map shows the DAY: the Sky reads the daily report and animates
+ * the day's precipitation whenever the day has any (`precipitation.type`
+ * is not `none`); no representative hour is picked. A plugin without
+ * hourly reports answers the daily report, read the same way.
+ *
+ * Fog: the compass needle only ever reads a revealed area and never the
+ * area of a fogged centre cell, so the wind cannot give hidden weather away.
  */
 
 // Type-only imports
 import type { WeatherArea } from '#types/contexts/weather.types';
 import type { WadjetClassification, WadjetWeatherReport } from '#types/integrations/wadjet.types';
 import type { SkyWeather } from './sky/skyTypes';
-
-/** Hour used for the precipitation window when the view has no hour */
-const SKY_DEFAULT_HOUR = 12;
 
 /** Precipitation lighter than this is not animated (matches the tint's threshold) */
 const SKY_PRECIP_MIN_INTENSITY = 0.05;
@@ -40,9 +40,9 @@ function finiteOr(value: number | undefined, fallback: number): number {
 
 /**
  * The Sky's input for one report. `hourly` says whether the report was
- * asked for at an hour (its `precipitation.active` window applies; absent
- * means active). Fog comes from the `fog` condition tag or a poor
- * visibility class.
+ * asked for at an hour: then its `precipitation.active` window applies
+ * (absent means active). A daily report animates whatever precipitation the
+ * day has. Fog comes from the `fog` condition tag or a poor visibility class.
  */
 function toSkyWeather(report: WadjetWeatherReport, classification: WadjetClassification, hourly: boolean): SkyWeather {
   const precip = report.precipitation;
@@ -51,7 +51,7 @@ function toSkyWeather(report: WadjetWeatherReport, classification: WadjetClassif
   return {
     precipType: type,
     intensity: clamp01(precip.intensity),
-    precipActive: hourly ? precip.active ?? true : true,
+    precipActive: hourly ? precip.active ?? true : type !== 'none',
     windSpeedKph: Math.max(0, finiteOr(report.wind.speedKph, 0)),
     windFromDeg: finiteOr(report.wind.directionDeg, 0),
     cloudCover: clamp01(report.cloudCover),
@@ -89,20 +89,32 @@ function compassWind(report: WadjetWeatherReport, classification: WadjetClassifi
   return { towardDeg: toward, beaufort, label };
 }
 
+/** What the compass may see of the fog (WeatherFogView's slice) */
+interface CompassFog {
+  isFogged(cell: { x: number; y: number }): boolean;
+  areaRevealed(area: WeatherArea): boolean;
+}
+
 /**
- * The area whose wind the compass shows: the whole-map area when there is
- * one, else the area under the view centre, else the first area.
+ * The area whose wind the compass shows, among REVEALED areas only: the
+ * whole-map area when there is one, else the area under the view centre
+ * (unless that cell is fogged), else the first revealed area; null when no
+ * area is revealed (no needle). Without `fog` every area counts as revealed.
  */
 function pickCompassArea(
   areas: readonly WeatherArea[],
   areaAt: (cell: { x: number; y: number }) => WeatherArea | null,
-  centreCell: { x: number; y: number } | null
+  centreCell: { x: number; y: number } | null,
+  fog?: CompassFog | null
 ): WeatherArea | null {
-  const mapArea = areas.find(area => area.kind === 'map');
+  const revealed = fog != null ? areas.filter(area => fog.areaRevealed(area)) : areas;
+  const mapArea = revealed.find(area => area.kind === 'map');
   if (mapArea != null) return mapArea;
-  const atCentre = centreCell != null ? areaAt(centreCell) : null;
-  return atCentre ?? areas[0] ?? null;
+  const centreHidden = centreCell != null && fog != null && fog.isFogged(centreCell);
+  const atCentre = centreCell != null && !centreHidden ? areaAt(centreCell) : null;
+  const revealedAtCentre = atCentre != null ? revealed.find(area => area.id === atCentre.id) : undefined;
+  return revealedAtCentre ?? revealed[0] ?? null;
 }
 
-export { SKY_DEFAULT_HOUR, compassWind, isQuietSky, pickCompassArea, toSkyWeather };
+export { compassWind, isQuietSky, pickCompassArea, toSkyWeather };
 export type { CompassWind };

@@ -8,8 +8,10 @@
  * panel drives the whole map, not only itself. "Advance a day" moves the
  * world's calendar through the weather plugin (only when it allows it).
  *
- * Reads everything from the per-map weather store (useWeatherStore); hosts
- * offer it only while the store is available and the map has weather areas.
+ * Reads everything from the per-map weather store (useWeatherStore) and
+ * lists only the areas the players can see (useWeatherFog: a region mostly
+ * under fog, or a whole map entirely under it, is never named); hosts offer
+ * it only while store.hasWeather and some area is revealed.
  * Glyph SVG from the weather plugin is rendered through svgGlyph.ts (parsed
  * as image/svg+xml, rejected when active, never innerHTML).
  */
@@ -19,13 +21,15 @@ import type { WeatherArea, WeatherStore } from '#types/contexts/weather.types';
 import type { WadjetReport } from '#types/integrations/wadjet.types';
 import type { GroundState } from '../../weather/groundState';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Notice } from 'obsidian';
 import { Icon } from '../shared/Icon';
 import { CornerBrackets } from '../shared/CornerBrackets';
 import { tooltipRef } from '../shared/obsidianTooltip';
 import { useWeatherStore } from '../../context/WeatherContext';
 import { mountGlyphSvg } from '../../weather/svgGlyph';
+import { useWeatherFog } from '../../weather/weatherFog';
+import { formatTemperature } from '../../weather/weatherVisuals';
 
 /** Day scrubber reach, in days from today */
 const SCRUB_MIN_DAY = -3;
@@ -48,14 +52,6 @@ interface AlmanacPanelProps {
 // ===========================================
 
 type Units = WeatherStore['units'];
-
-function formatTemp(celsius: number | undefined, units: Units): string {
-  if (celsius == null || !Number.isFinite(celsius)) return '–';
-  const value = units === 'imperial' ? celsius * 9 / 5 + 32 : celsius;
-  const rounded = Math.round(value);
-  // A true minus sign, matching the weather plugin's own wording
-  return rounded < 0 ? `−${-rounded}°` : `${rounded}°`;
-}
 
 function formatAmount(mm: number, units: Units): string {
   if (!Number.isFinite(mm) || mm <= 0) return '';
@@ -126,7 +122,9 @@ const WeatherGlyph = ({ store, report, size }: { store: WeatherStore; report: Wa
   const svg = store.glyphSvg(report);
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
+  // Layout effect: the glyph (or the fallback) is settled before the first
+  // paint, so a glyph never flashes the lucide stand-in
+  useLayoutEffect(() => {
     const host = hostRef.current;
     if (host == null) return;
     const ok = mountGlyphSvg(host, svg);
@@ -156,7 +154,9 @@ function defaultArea(areas: WeatherArea[]): WeatherArea | null {
 
 const AlmanacPanel = ({ areaId, onAreaChange, active = true }: AlmanacPanelProps): VNode => {
   const store = useWeatherStore();
-  const { areas, units, today, viewTime } = store;
+  const { units, today, viewTime } = store;
+  // Only the areas the players can see are listed or picked by default
+  const areas = useWeatherFog().revealedAreas;
 
   // Area: controlled by the host when it passes onAreaChange, else local
   const [localAreaId, setLocalAreaId] = useState<string | null>(null);
@@ -192,6 +192,9 @@ const AlmanacPanel = ({ areaId, onAreaChange, active = true }: AlmanacPanelProps
 
   // ---- Time-lapse ----
   const [playing, setPlaying] = useState(false);
+  // Mirrors `playing` for togglePlay, which must not act inside a state updater
+  const playingRef = useRef(false);
+  playingRef.current = playing;
   const storeRef = useRef(store);
   storeRef.current = store;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -222,15 +225,15 @@ const AlmanacPanel = ({ areaId, onAreaChange, active = true }: AlmanacPanelProps
   }, [playing]);
 
   const togglePlay = useCallback(() => {
-    setPlaying(prev => {
-      if (!prev) {
-        const current = storeRef.current.viewTime;
-        // At the very end, start again from today's dawn
-        if (current.dayOffset >= SCRUB_MAX_DAY && current.hour === 23) storeRef.current.setViewTime({ dayOffset: 0, hour: 0 });
-        else if (current.hour == null) storeRef.current.setViewTime({ hour: 0 });
-      }
-      return !prev;
-    });
+    const starting = !playingRef.current;
+    if (starting) {
+      const current = storeRef.current.viewTime;
+      // At the very end, start again from today's dawn
+      if (current.dayOffset >= SCRUB_MAX_DAY && current.hour === 23) storeRef.current.setViewTime({ dayOffset: 0, hour: 0 });
+      else if (current.hour == null) storeRef.current.setViewTime({ hour: 0 });
+    }
+    playingRef.current = starting;
+    setPlaying(starting);
   }, []);
 
   const resetToday = useCallback(() => {
@@ -260,6 +263,15 @@ const AlmanacPanel = ({ areaId, onAreaChange, active = true }: AlmanacPanelProps
   }, [store, viewTime.hour]);
 
   // ---- Empty states ----
+  if (store.hasWeather && area == null) {
+    // Weather exists but every area is under fog: say nothing about it
+    return (
+      <div className="windrose-almanac windrose-almanac-empty">
+        <Icon icon="lucide-cloud-off" size={16} />
+        <span>No visible weather areas.</span>
+      </div>
+    );
+  }
   if (!store.available || area == null) {
     return (
       <div className="windrose-almanac windrose-almanac-empty">
@@ -313,10 +325,10 @@ const AlmanacPanel = ({ areaId, onAreaChange, active = true }: AlmanacPanelProps
           <div className="windrose-almanac-hero-body">
             <WeatherGlyph store={store} report={shown} size={56} />
             <div className="windrose-almanac-temps">
-              <span className="windrose-almanac-temp-now">{formatTemp(hourly != null ? current : temps?.mean, units)}</span>
+              <span className="windrose-almanac-temp-now">{formatTemperature(hourly != null ? current : temps?.mean, units)}</span>
               <span className="windrose-almanac-temp-range">
-                <span className="is-high">High {formatTemp(temps?.high, units)}</span>
-                <span className="is-low">Low {formatTemp(temps?.low, units)}</span>
+                <span className="is-high">High {formatTemperature(temps?.high, units)}</span>
+                <span className="is-low">Low {formatTemperature(temps?.low, units)}</span>
               </span>
             </div>
           </div>
@@ -331,7 +343,7 @@ const AlmanacPanel = ({ areaId, onAreaChange, active = true }: AlmanacPanelProps
         <dl className="windrose-almanac-facts">
           <div>
             <dt><Icon icon="lucide-thermometer" size={12} />Feels like</dt>
-            <dd>{formatTemp(classification.feelsLike.current ?? classification.feelsLike.mean, units)}</dd>
+            <dd>{formatTemperature(classification.feelsLike.current ?? classification.feelsLike.mean, units)}</dd>
           </div>
           <div>
             <dt><Icon icon="lucide-wind" size={12} />Wind</dt>
@@ -371,8 +383,8 @@ const AlmanacPanel = ({ areaId, onAreaChange, active = true }: AlmanacPanelProps
               >
                 <span className="windrose-almanac-week-label">{relativeDay(dayOffset)}</span>
                 <WeatherGlyph store={store} report={report} size={22} />
-                <span className="windrose-almanac-week-high">{formatTemp(report.temperature.high, units)}</span>
-                <span className="windrose-almanac-week-low">{formatTemp(report.temperature.low, units)}</span>
+                <span className="windrose-almanac-week-high">{formatTemperature(report.temperature.high, units)}</span>
+                <span className="windrose-almanac-week-low">{formatTemperature(report.temperature.low, units)}</span>
                 <span className="windrose-almanac-week-precip" aria-hidden="true">
                   <span style={{ height: `${Math.round(Math.min(1, report.precipitation.amountMm / maxAmount) * 100)}%` }} />
                 </span>

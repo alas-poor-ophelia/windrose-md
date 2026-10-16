@@ -25,13 +25,29 @@ export interface FogOfWarState {
 }
 
 /** Layer definition for visibility toggles */
-interface LayerDef {
+interface LayerDef extends LayerOffer {
   id: keyof LayerVisibility;
   icon: string;
   tooltip: string;
+}
+
+/** What a layer toggle needs to say about where it applies */
+interface LayerOffer {
   hexOnly?: boolean;
-  /** Offered only while the weather plugin is usable and the map has weather */
+  /** Offered only while the map has weather (store.hasWeather) */
   requiresWeather?: boolean;
+}
+
+/**
+ * The layer toggles that apply: hex-only toggles on hex maps, the weather
+ * toggle while the map has weather. Shared by this toolbar and the dock's
+ * View panel.
+ */
+function offeredLayers<T extends LayerOffer>(layers: readonly T[], mapType: MapType, hasWeather: boolean): T[] {
+  return layers.filter(layer =>
+    (layer.hexOnly !== true || mapType === 'hex') &&
+    (layer.requiresWeather !== true || hasWeather)
+  );
 }
 
 /** Props for VisibilityToolbar component */
@@ -62,9 +78,7 @@ const VisibilityToolbar = ({
   onToggleViewLock
 }: VisibilityToolbarProps): VNode => {
   const featureFlags = useFeatureFlags();
-  // Map has weather = a bound region or a map-level (or inherited) zone
-  const weather = useWeatherStore();
-  const weatherAvailable = weather.available && weather.areas.length > 0;
+  const { hasWeather } = useWeatherStore();
   const layers: LayerDef[] = [
     {
       id: 'grid',
@@ -112,10 +126,7 @@ const VisibilityToolbar = ({
     }
   ];
 
-  const visibleLayers = layers.filter(layer =>
-    (layer.hexOnly !== true || mapType === 'hex') &&
-    (layer.requiresWeather !== true || weatherAvailable)
-  );
+  const visibleLayers = offeredLayers(layers, mapType, hasWeather);
 
   return (
     <div className={`windrose-visibility-toolbar ${isOpen ? 'windrose-visibility-toolbar-open' : ''}`}>
@@ -195,4 +206,4 @@ const VisibilityToolbar = ({
   );
 };
 
-export { VisibilityToolbar };
+export { VisibilityToolbar, offeredLayers };

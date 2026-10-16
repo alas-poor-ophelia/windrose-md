@@ -9,7 +9,10 @@
 
 import { afterEach, describe, it, expect, vi } from "vitest";
 
-import { buildAreaLookup, inheritedZoneId, resolveWeatherAreas, sameWeatherAreas } from "../../../src/weather/weatherAreas";
+import { buildAreaLookup, inheritedZoneId, resolveWeatherAnimate, resolveWeatherAreas, sameWeatherAreas } from "../../../src/weather/weatherAreas";
+import { withRegionWeatherZone } from "../../../src/weather/weatherRegionMenu";
+import { getDataFileStamp, noteStoreFileModified, noteStoreFilePathGone } from "../../../src/persistence/storeCache";
+import { TFile } from "obsidian";
 import { createWindroseZoneAnswers, mapLoaderFromRawEntries } from "../../../src/weather/windroseZoneResolver";
 import { buildMapZoneSnapshot, publishMapZones } from "../../../src/weather/weatherZones";
 import type { MapData, Region } from "#types/core/map.types";
@@ -136,6 +139,36 @@ describe("sameWeatherAreas", () => {
   });
 });
 
+describe("resolveWeatherAnimate", () => {
+  it("defaults to true and uses the level's own value when set", () => {
+    expect(resolveWeatherAnimate(map())).toBe(true);
+    expect(resolveWeatherAnimate(map({ weatherAnimate: false }))).toBe(false);
+    expect(resolveWeatherAnimate(null)).toBe(true);
+  });
+
+  it("inherits the nearest ancestor's value down the sub-hex path", () => {
+    const grandchild = map();
+    const child = withSub(map(), "1,1", grandchild);
+    const root = withSub(map({ weatherAnimate: false }), "0,0", child);
+    expect(resolveWeatherAnimate(root, ["0,0"])).toBe(false);
+    expect(resolveWeatherAnimate(root, ["0,0", "1,1"])).toBe(false);
+    const ownOn = withSub(map({ weatherAnimate: false }), "0,0", map({ weatherAnimate: true }));
+    expect(resolveWeatherAnimate(ownOn, ["0,0"])).toBe(true);
+  });
+});
+
+describe("withRegionWeatherZone", () => {
+  it("binds one region and deletes the key on unbind (never stores undefined)", () => {
+    const regions = [region("a", [], { weatherZoneId: "z" }), region("b", [])];
+    const bound = withRegionWeatherZone(regions, "b", "y");
+    expect(bound[1].weatherZoneId).toBe("y");
+    expect(bound[0]).toBe(regions[0]);
+    const unbound = withRegionWeatherZone(regions, "a", undefined);
+    expect("weatherZoneId" in unbound[0]).toBe(false);
+    expect(regions[0].weatherZoneId).toBe("z");
+  });
+});
+
 describe("windroseZoneResolver", () => {
   const retractions: (() => void)[] = [];
   afterEach(() => { while (retractions.length > 0) retractions.pop()?.(); });
@@ -169,6 +202,45 @@ describe("windroseZoneResolver", () => {
     readRaw.mockClear();
     await expect(answers.resolveAsync({ kind: "hex", mapId: "open-map", q: 0, r: 0 })).resolves.toBe("plains");
     expect(readRaw).not.toHaveBeenCalled();
+  });
+
+  it("reuses a closed map's parsed zones until the source stamp changes", async () => {
+    const readRaw = vi.fn(() => Promise.resolve(JSON.stringify(stored)));
+    let stamp = "a";
+    const answers = createWindroseZoneAnswers(mapLoaderFromRawEntries(readRaw), () => stamp);
+    await expect(answers.resolveAsync({ kind: "hex", mapId: "closed-map", q: 2, r: -1 })).resolves.toBe("upland");
+    await expect(answers.resolveAsync(regionLocator("closed-map", "hills"))).resolves.toBe("upland");
+    expect(readRaw).toHaveBeenCalledTimes(1);
+    stamp = "b";
+    readRaw.mockImplementation(() => Promise.resolve(JSON.stringify(map({ weatherZoneId: "tundra" }))));
+    await expect(answers.resolveAsync({ kind: "hex", mapId: "closed-map", q: 2, r: -1 })).resolves.toBe("tundra");
+    expect(readRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it("caches a missing map too, and never caches a failed read", async () => {
+    const load = vi.fn(() => Promise.reject(new Error("io")));
+    const answers = createWindroseZoneAnswers(load, () => "same");
+    await answers.resolveAsync({ kind: "hex", mapId: "x", q: 0, r: 0 });
+    await answers.resolveAsync({ kind: "hex", mapId: "x", q: 0, r: 0 });
+    expect(load).toHaveBeenCalledTimes(2);
+    const none = vi.fn(() => Promise.resolve(null));
+    const missing = createWindroseZoneAnswers(none, () => "same");
+    await missing.resolveAsync({ kind: "hex", mapId: "x", q: 0, r: 0 });
+    await missing.resolveAsync({ kind: "hex", mapId: "x", q: 0, r: 0 });
+    expect(none).toHaveBeenCalledTimes(1);
+  });
+
+  it("the data-file stamp moves on a modify, delete or rename of the data file only", () => {
+    const dataFile = Object.assign(new TFile(), { path: "windrose-md-data.json", stat: { mtime: 1, size: 1, ctime: 1 } });
+    const other = Object.assign(new TFile(), { path: "notes/x.md", stat: { mtime: 1, size: 1, ctime: 1 } });
+    const s0 = getDataFileStamp();
+    noteStoreFileModified(other);
+    expect(getDataFileStamp()).toBe(s0);
+    noteStoreFileModified(dataFile);
+    const s1 = getDataFileStamp();
+    expect(s1).not.toBe(s0);
+    noteStoreFilePathGone("windrose-md-data.json");
+    expect(getDataFileStamp()).not.toBe(s1);
   });
 
   it("answers null when the stored entry is unreadable", async () => {
