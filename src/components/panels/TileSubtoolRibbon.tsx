@@ -10,7 +10,7 @@
 
 import type { VNode } from 'preact';
 import type { TileForm } from '#types/tiles/tile.types';
-import type { TileSubtoolId } from '../../assets/tileForm';
+import type { TileSubtoolId } from '#types/tiles/tile.types';
 
 import { SUBTOOL_META, THRESHOLD_ENTRY, formDef, ribbonSubtoolsForForm, subtoolGate } from '../../assets/tileForm';
 import { Icon } from '../shared/Icon';

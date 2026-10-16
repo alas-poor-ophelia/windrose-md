@@ -4,7 +4,6 @@
 
 import type { TilesetDef, TileEntry, TileLayerRole, TileMetadataStore } from '#types/tiles/tile.types';
 import type { VNode } from 'preact';
-import type { Dispatch, StateUpdater } from 'preact/hooks';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
@@ -12,7 +11,7 @@ import { usePreactVirtualizer } from '../../hooks/state/useVirtualizer';
 import { Icon } from '../shared/Icon';
 import { depthMeta } from './DepthBar';
 import {
-  saveTileMetadataDebounced,
+  updateTileMetadata,
   bulkAddTag,
   bulkToggleStar,
   bulkSetDepthAffinity,
@@ -30,13 +29,12 @@ import { MAX_TILE_SPAN } from '../../assets/tileRenderResolution';
 import { observeWidth, predictSpanFromMeta, TileThumbnail } from './tileBrowserCommon';
 import { tooltipRef } from '../shared/obsidianTooltip';
 
-export interface TileOrganizePaneProps {
+interface TileOrganizePaneProps {
   tilesets: TilesetDef[];
   /** The browsable pool (wall end-caps already excluded). */
   allTiles: TileEntry[];
   tileToTilesetId: Map<string, string>;
   tileMetadata: TileMetadataStore;
-  setTileMetadata: Dispatch<StateUpdater<TileMetadataStore>>;
   /** Canonical merged-category lookup (`${pack}|${raw}` → label) for Move… suggestions. */
   mergedCategoryLookup: Map<string, string>;
   getThumbUrl: (path: string) => string | null;
@@ -51,7 +49,6 @@ const TileOrganizePane = ({
   allTiles,
   tileToTilesetId,
   tileMetadata,
-  setTileMetadata,
   mergedCategoryLookup,
   getThumbUrl,
   requestThumbs,
@@ -116,9 +113,7 @@ const TileOrganizePane = ({
   const handleBulkTag = (): void => {
     if (orgTagInput.trim() === '' || orgSelection.size === 0) return;
     const paths = Array.from(orgSelection);
-    const updated = bulkAddTag(tileMetadata, paths, orgTagInput.trim());
-    setTileMetadata(updated);
-    saveTileMetadataDebounced(app, updated);
+    updateTileMetadata(app, store => bulkAddTag(store, paths, orgTagInput.trim()));
     setOrgTagInput('');
     setOrgShowTag(false);
   };
@@ -126,18 +121,13 @@ const TileOrganizePane = ({
   const handleBulkStar = (): void => {
     if (orgSelection.size === 0) return;
     const paths = Array.from(orgSelection);
-    const anyUnstarred = paths.some(p => !isStarred(tileMetadata, p));
-    const updated = bulkToggleStar(tileMetadata, paths, anyUnstarred);
-    setTileMetadata(updated);
-    saveTileMetadataDebounced(app, updated);
+    updateTileMetadata(app, store => bulkToggleStar(store, paths, paths.some(p => !isStarred(store, p))));
   };
 
   const handleBulkTier = (tier: TileLayerRole): void => {
     if (orgSelection.size === 0) return;
     const entries = Array.from(orgSelection).map(vaultPath => ({ vaultPath, depth: tier }));
-    const updated = bulkSetDepthAffinity(tileMetadata, entries);
-    setTileMetadata(updated);
-    saveTileMetadataDebounced(app, updated);
+    updateTileMetadata(app, store => bulkSetDepthAffinity(store, entries));
     setOrgShowTier(false);
   };
 
@@ -146,11 +136,9 @@ const TileOrganizePane = ({
   const handleBulkRenderMode = (mode: 'cell' | 'region' | undefined): void => {
     if (orgSelection.size === 0) return;
     const paths = Array.from(orgSelection);
-    const updated = mode == null
-      ? bulkClearRenderMode(tileMetadata, paths)
-      : bulkSetRenderMode(tileMetadata, paths.map(vaultPath => ({ vaultPath, mode })));
-    setTileMetadata(updated);
-    saveTileMetadataDebounced(app, updated);
+    updateTileMetadata(app, store => mode == null
+      ? bulkClearRenderMode(store, paths)
+      : bulkSetRenderMode(store, paths.map(vaultPath => ({ vaultPath, mode }))));
   };
 
   const handleBulkSpanApply = (): void => {
@@ -158,16 +146,12 @@ const TileOrganizePane = ({
     const w = Math.min(Math.max(parseInt(orgSpanW, 10) || 1, 1), MAX_TILE_SPAN);
     const h = Math.min(Math.max(parseInt(orgSpanH, 10) || 1, 1), MAX_TILE_SPAN);
     const entries = Array.from(orgSelection).map(vaultPath => ({ vaultPath, spanW: w, spanH: h }));
-    const updated = bulkSetDefaultSpan(tileMetadata, entries);
-    setTileMetadata(updated);
-    saveTileMetadataDebounced(app, updated);
+    updateTileMetadata(app, store => bulkSetDefaultSpan(store, entries));
   };
 
   const handleBulkSpanAuto = (): void => {
     if (orgSelection.size === 0) return;
-    const updated = bulkClearDefaultSpan(tileMetadata, Array.from(orgSelection));
-    setTileMetadata(updated);
-    saveTileMetadataDebounced(app, updated);
+    updateTileMetadata(app, store => bulkClearDefaultSpan(store, Array.from(orgSelection)));
     setOrgSpanW('');
     setOrgSpanH('');
   };
@@ -176,9 +160,7 @@ const TileOrganizePane = ({
   // undefined clears it, restoring the folder-derived category (lossless).
   const handleBulkMove = (category: string | undefined): void => {
     if (orgSelection.size === 0) return;
-    const updated = bulkSetCategoryOverride(tileMetadata, Array.from(orgSelection), category);
-    setTileMetadata(updated);
-    saveTileMetadataDebounced(app, updated);
+    updateTileMetadata(app, store => bulkSetCategoryOverride(store, Array.from(orgSelection), category));
     setOrgMoveInput('');
     setOrgShowMove(false);
   };

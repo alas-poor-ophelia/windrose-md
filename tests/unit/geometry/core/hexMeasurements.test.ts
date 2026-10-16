@@ -20,6 +20,7 @@ import {
   calculateHexSizeFromColumns,
   calculateGridFromMeasurement,
   calculateGridFromColumns,
+  calculateGridFromHexSize,
   validateMeasurementSize,
   validateFineTune,
   getFineTuneRange,
@@ -500,6 +501,18 @@ describe("hexMeasurements", () => {
 
     it("returns the parent zoom unchanged for a degenerate child hex size", () => {
       expect(subHexContinuityZoom(2.5, 30, 0, 7)).toBe(2.5);
+    });
+  });
+
+  describe("calculateGridFromHexSize", () => {
+    it.each(["flat", "pointy"] as const)("matches the measurement path at the same hex size (%s)", (orientation) => {
+      const fromMeasurement = calculateGridFromMeasurement(1000, 700, 60, MEASUREMENT_EDGE, orientation);
+      expect(calculateGridFromHexSize(1000, 700, fromMeasurement.hexSize, orientation)).toEqual(fromMeasurement);
+    });
+
+    it("uses calculateColumns/calculateRows for the bounds", () => {
+      const grid = calculateGridFromHexSize(1000, 700, 30, "flat");
+      expect(grid).toEqual({ columns: calculateColumns(1000, 30, "flat"), rows: calculateRows(700, 30, "flat"), hexSize: 30 });
     });
   });
 });

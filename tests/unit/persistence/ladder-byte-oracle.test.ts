@@ -29,7 +29,9 @@ interface Harness {
   read: () => string;
 }
 
-function makeApp(initialContent: string | null = null): Harness {
+// An existing empty store: saveMapData refuses to create a missing data file
+// (missing-store guard), so the harness starts from one, as a new-map flow does.
+function makeApp(initialContent: string | null = JSON.stringify({ maps: {} })): Harness {
   const store = new Map<string, string>();
   const files = new Map<string, TFile>();
   const contents = new Map<string, string>();

@@ -19,12 +19,13 @@ import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useShapeOverlayTools } from '../../hooks/interactions/useShapeOverlayTools';
 import { snapShapeOverlayToGrid } from '../../objects/shapeOverlayOperations';
 import { getNextRotation } from '../../drawing/rotationOperations';
-import { buildShapeOverlayActions } from '../../hooks/interactions/useSelectionActions';
+import { buildShapeOverlayActions } from '../toolbars/selectionActionBuilders';
 import { SelectionActionsOverlay } from '../toolbars/SelectionActionsOverlay';
 import { ShapePreviewOverlay } from './ShapePreviewOverlay';
 import { Icon } from '../shared/Icon';
 import { Z_INDEX } from '../../core/dmtConstants';
 import { tooltipRef } from '../shared/obsidianTooltip';
+import { shouldHandleMapKey } from '../../utils/keyboardTargets';
 
 
 export interface ShapeOverlayLayerProps {
@@ -74,22 +75,27 @@ const ShapeOverlayLayer = ({
   });
 
   // Always expose handleShapeSelection so the select tool can hit shapes
-  useLayerHandlers('shapeOverlay', isShapeTool
-    ? { handlePointerDown, handlePointerMove, handleShapeSelection, handleShapeDragging, stopShapeDragging }
-    : { handleShapeSelection, handleShapeDragging, stopShapeDragging });
+  useLayerHandlers('shapeOverlay', {
+    handleShapeSelection, handleShapeDragging, stopShapeDragging,
+    handlePointerDown: isShapeTool ? handlePointerDown : undefined,
+    handlePointerMove: isShapeTool ? handlePointerMove : undefined
+  });
 
   // ESC to cancel placement
   useEffect(() => {
     if (!isShapeTool) return undefined;
     const handler = (e: KeyboardEvent): void => {
+      // Escape in the note editor (or another map) is not ours to swallow.
+      if (!shouldHandleMapKey(e, canvasRef.current)) return;
       if (e.key === 'Escape') {
         e.preventDefault();
         cancelPlacement();
       }
     };
-    activeDocument.addEventListener('keydown', handler);
-    return () => activeDocument.removeEventListener('keydown', handler);
-  }, [isShapeTool, cancelPlacement]);
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('keydown', handler);
+    return () => doc.removeEventListener('keydown', handler);
+  }, [isShapeTool, cancelPlacement, canvasRef]);
 
   const distanceSettings = useMemo(() => {
     if (!mapData) return null;

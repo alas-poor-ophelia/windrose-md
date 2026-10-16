@@ -14,11 +14,13 @@ interface UseKeyboardShortcutsOptions {
   onTogglePictureFrame?: () => void;
   /** Recenter the view on the current layer's content. */
   onRecenterView?: () => void;
+  /** This map block's root element: listeners bind to ITS window (popout-safe). */
+  containerRef?: { current: HTMLElement | null };
 }
 
 function useKeyboardShortcuts({
   isFocused, mapData, handleUndo, handleRedo, handleLayerSelect,
-  pictureFrameLocked = false, onTogglePictureFrame, onRecenterView
+  pictureFrameLocked = false, onTogglePictureFrame, onRecenterView, containerRef
 }: UseKeyboardShortcutsOptions): void {
   useEffect((): (() => void) | undefined => {
     if (!isFocused || !mapData) return undefined;
@@ -72,9 +74,10 @@ function useKeyboardShortcuts({
       }
     };
 
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [isFocused, mapData, handleUndo, handleRedo, handleLayerSelect, pictureFrameLocked, onTogglePictureFrame, onRecenterView]);
+    const win = containerRef?.current?.ownerDocument.defaultView ?? window;
+    win.addEventListener('keydown', handler);
+    return () => win.removeEventListener('keydown', handler);
+  }, [isFocused, mapData, handleUndo, handleRedo, handleLayerSelect, pictureFrameLocked, onTogglePictureFrame, onRecenterView, containerRef]);
 }
 
 export { useKeyboardShortcuts };

@@ -1,8 +1,8 @@
 import type { MapData } from '#types/core/map.types';
 import type { App } from 'obsidian';
 
-import { useEffect, useState } from 'preact/hooks';
-import { preloadImage, pinImage, getCachedImage } from '../../assets/imageOperations';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { preloadImage, pinImage, unpinImage, getCachedImage } from '../../assets/imageOperations';
 import { resolveTileEntry } from '../../assets/tilesetOperations';
 import { collectWallPathImagePaths } from '../../geometry/renderers/wallPathRenderer';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
@@ -75,62 +75,89 @@ function useImagePreloading(
   const [fowImageReady, setFowImageReady] = useState(false);
   const [tileImagesReady, setTileImagesReady] = useState(false);
 
+  // Background and fog images are pinned for as long as this map uses them and
+  // unpinned in cleanup (path change or unmount) so they can be evicted (MEM-04).
   useEffect(() => {
     const bgPath = mapData?.backgroundImage?.path;
     if (bgPath != null && bgPath !== '') {
+      let cancelled = false;
       setBackgroundImageReady(false);
+      pinImage(bgPath);
       void preloadImage(app, bgPath).then((img) => {
-        if (img) {
-          pinImage(bgPath);
-          setBackgroundImageReady(true);
-        }
+        if (img && !cancelled) setBackgroundImageReady(true);
       });
-    } else {
-      setBackgroundImageReady(false);
+      return () => {
+        cancelled = true;
+        unpinImage(bgPath);
+      };
     }
+    setBackgroundImageReady(false);
+    return undefined;
   }, [app, mapData?.backgroundImage?.path]);
 
-  useEffect(() => {
-    if (!mapData) return;
+  // Narrow effect inputs (honest deps): the effects below key on these fields,
+  // not on the whole mapData object, which changes on every edit.
+  const hasMapData = mapData != null;
+  const mapSettings = mapData?.settings;
+  const mapType = mapData?.mapType;
+  const objectSetId = mapData?.objectSetId;
+  const tilesets = mapData?.tilesets;
+  const layers = mapData?.layers;
+  // Latest-ref: collectPlacedImagePaths needs the whole map, but only a
+  // tilesets/layers change should re-run the tile preload.
+  const mapDataRef = useRef(mapData);
+  mapDataRef.current = mapData;
 
-    const effectiveSettings = getEffectiveSettings(mapData.settings);
+  useEffect(() => {
+    if (!hasMapData) return;
+
+    const effectiveSettings = getEffectiveSettings(mapSettings);
     const fowImagePath = effectiveSettings.fogOfWarImage;
 
     if (fowImagePath != null && fowImagePath !== '') {
+      let cancelled = false;
       setFowImageReady(false);
+      pinImage(fowImagePath);
       void preloadImage(app, fowImagePath).then((img) => {
-        if (img) {
-          pinImage(fowImagePath);
-          setFowImageReady(true);
-        }
+        if (img && !cancelled) setFowImageReady(true);
       });
-    } else {
-      setFowImageReady(false);
+      return () => {
+        cancelled = true;
+        unpinImage(fowImagePath);
+      };
     }
-  }, [app, mapData?.settings]);
+    setFowImageReady(false);
+    return undefined;
+  }, [app, hasMapData, mapSettings]);
 
   useEffect(() => {
-    if (!mapData) return;
+    if (!hasMapData) return;
 
-    const objectTypes = getResolvedObjectTypes(mapData.mapType, mapData.objectSetId);
-    const imageObjects = objectTypes.filter(hasImagePath);
-
-    for (const objType of imageObjects) {
-      if (objType.imagePath != null && objType.imagePath !== '') {
-        void preloadImage(app, objType.imagePath);
-      }
+    const objectTypes = getResolvedObjectTypes(mapType, objectSetId);
+    const iconPaths: string[] = [];
+    for (const objType of objectTypes.filter(hasImagePath)) {
+      if (objType.imagePath != null && objType.imagePath !== '') iconPaths.push(objType.imagePath);
     }
-  }, [app, mapData?.mapType, mapData?.objectSetId, settingsVersion]);
+
+    // Pinned while this map uses them (MEM-11): another mount's tileset-rebuild
+    // sweep only knows ITS OWN object set and would otherwise evict these.
+    for (const path of iconPaths) {
+      pinImage(path);
+      void preloadImage(app, path);
+    }
+    return () => { for (const path of iconPaths) unpinImage(path); };
+  }, [app, hasMapData, mapType, objectSetId, settingsVersion]);
 
   useEffect(() => {
-    if (mapData?.tilesets == null || mapData.tilesets.length === 0) {
+    const currentMap = mapDataRef.current;
+    if (currentMap == null || tilesets == null || tilesets.length === 0) {
       setTileImagesReady(false);
       return;
     }
 
     // Only preload tiles actually placed on the map, not the entire catalog.
     // The tile browser loads thumbnails on-demand via CSS background-image.
-    const placedPaths = collectPlacedImagePaths(mapData);
+    const placedPaths = collectPlacedImagePaths(currentMap);
 
     if (placedPaths.size === 0) {
       setTileImagesReady(true);
@@ -156,9 +183,9 @@ function useImagePreloading(
       promises.push(preloadImage(app, path));
     }
     void Promise.all(promises).then(() => setTileImagesReady(true));
-  }, [app, mapData?.tilesets, mapData?.layers]);
+  }, [app, tilesets, layers]);
 
   return { backgroundImageReady, fowImageReady, tileImagesReady };
 }
 
-export { useImagePreloading, collectPlacedImagePaths, prewarmMapAssets };
+export { useImagePreloading, prewarmMapAssets };

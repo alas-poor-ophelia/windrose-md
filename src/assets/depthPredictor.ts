@@ -230,4 +230,4 @@ function predictDepthTiers(
 }
 
 export { extractTokens, predictDepthTier, predictDepthTiers, HEAD_NOUN_KEYWORDS, DD_PATH_TO_DEPTH, DD_TAG_TO_DEPTH };
-export type { DepthPrediction };
+

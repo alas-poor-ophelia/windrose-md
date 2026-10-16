@@ -9,12 +9,13 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
 import type { HexColor } from '#types/core/common.types';
 import type { EffectiveDistanceSettings } from '#types/hooks/distanceMeasurement.types';
-import type { ShapeStart, DragStartContext } from '#types/hooks/drawingTools.types';
+import type { ShapeStart } from '#types/hooks/drawingTools.types';
 
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { useDrawingTools } from '../../hooks/drawing/useDrawingTools';
 import { useMapState } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
+import { drawingCursorFor } from '../../hooks/canvas/canvasCursor';
 import { createViewportTransform, getCanvasDisplayMetrics } from './viewportTransform';
 import { ShapePreviewOverlay } from './ShapePreviewOverlay';
 import { SegmentPickerOverlay } from './SegmentPickerOverlay';
@@ -40,23 +41,6 @@ interface PreviewSettings {
   touchEnabled: boolean;
 }
 
-/** Drawing state change callback data */
-interface DrawingStateChangeData {
-  isDrawing: boolean;
-  rectangleStart: ShapeStart | null;
-  circleStart: ShapeStart | null;
-  edgeLineStart: ShapeStart | null;
-  shapeHoverPosition: ShapeStart | null;
-  touchConfirmPending: boolean;
-  handlers: {
-    handleDrawingPointerDown: (e: PointerEvent | MouseEvent | TouchEvent, gridX: number, gridY: number, isTouchEvent?: boolean) => boolean;
-    handleDrawingPointerMove: (e: PointerEvent | MouseEvent | TouchEvent, dragStart?: DragStartContext | null) => boolean;
-    stopDrawing: () => void;
-    cancelDrawing: () => void;
-    cancelShapePreview: () => void;
-  };
-}
-
 /** Props for DrawingLayer component */
 export interface DrawingLayerProps {
   /** Current active tool */
@@ -65,8 +49,6 @@ export interface DrawingLayerProps {
   selectedColor: HexColor | null;
   /** Selected opacity (0-1) */
   selectedOpacity?: number;
-  /** Callback when drawing state changes */
-  onDrawingStateChange?: (state: DrawingStateChangeData) => void;
   /** Global plugin settings */
   globalSettings?: Record<string, unknown>;
   /** Per-map distance setting overrides */
@@ -77,7 +59,6 @@ const DrawingLayer = ({
   currentTool,
   selectedColor,
   selectedOpacity = 1,
-  onDrawingStateChange,
   globalSettings,
   mapDistanceOverrides
 }: DrawingLayerProps): VNode => {
@@ -85,7 +66,8 @@ const DrawingLayer = ({
     canvasRef,
     containerRef,
     mapData,
-    geometry
+    geometry,
+    cursorStore
   } = useMapState();
   const { ladder } = useMapState();
 
@@ -159,40 +141,28 @@ const DrawingLayer = ({
   }, [rectangleStart, circleStart, edgeLineStart, touchConfirmPending, cancelShapePreview, segmentPickerOpen, closeSegmentPicker]);
 
   useEffect(() => {
-    activeDocument.addEventListener('keydown', handleKeyDown);
-    return () => activeDocument.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+    // Listen on the document that owns this map's canvas (popout-safe).
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('keydown', handleKeyDown);
+    return () => doc.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown, canvasRef]);
 
   useLayerHandlers('drawing', {
     handleDrawingPointerDown, handleDrawingPointerMove,
     stopDrawing: handleStopDrawing, cancelDrawing,
     isDrawing, rectangleStart, circleStart, edgeLineStart,
-    updateShapeHover, updateEdgeLineHover, shapeHoverPosition,
-    touchConfirmPending, cancelShapePreview,
+    updateShapeHover, updateEdgeLineHover, cancelShapePreview,
     previewEnabled: previewSettings.kbmEnabled,
     updateSegmentHover, clearSegmentHover
   });
 
+  // Shape-active / drawing cursor on this map's canvas (REACT-04). Erasing
+  // has no transient cursor: the erase tool's crosshair stays.
+  const drawingCursor = drawingCursorFor(currentTool, isDrawing, rectangleStart != null, circleStart != null);
   useEffect(() => {
-    if (onDrawingStateChange) {
-      onDrawingStateChange({
-        isDrawing,
-        rectangleStart,
-        circleStart,
-        edgeLineStart,
-        shapeHoverPosition,
-        touchConfirmPending,
-        handlers: {
-          handleDrawingPointerDown,
-          handleDrawingPointerMove,
-          stopDrawing: handleStopDrawing,
-          cancelDrawing,
-          cancelShapePreview
-        }
-      });
-    }
-  }, [isDrawing, rectangleStart, circleStart, edgeLineStart, shapeHoverPosition,
-    touchConfirmPending, onDrawingStateChange, handleStopDrawing, cancelShapePreview]);
+    cursorStore?.setDrawing(drawingCursor);
+  }, [cursorStore, drawingCursor]);
+  useEffect(() => () => cursorStore?.setDrawing(null), [cursorStore]);
 
   const renderStartMarker = (): VNode | null => {
     if (!canvasRef.current || !containerRef?.current || !geometry) return null;

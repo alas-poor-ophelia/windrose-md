@@ -52,6 +52,17 @@ export interface MapDataLoadFailure {
   dataPath: string;
   /** Diagnostic message (not user-facing copy). */
   message: string;
+  /**
+   * 'unreadable' (default): the data file could not be read or parsed; a
+   * backup restore may help. 'schema': the map needs a newer or fixed plugin
+   * version (MapSchemaError); the file is fine and NO restore is offered.
+   */
+  kind?: 'unreadable' | 'schema' | 'missing';
+  /**
+   * kind 'missing' only: vault path of a same-named store (or one of its
+   * backups) found outside the configured folder, or null when none.
+   */
+  foundAt?: string | null;
 }
 
 // ===========================================
@@ -67,6 +78,13 @@ export interface UseMapDataResult {
 
   /** Non-null when the data file could not be read — editing must be disabled */
   loadFailure: MapDataLoadFailure | null;
+
+  /**
+   * True when the map was deleted this session (by this or another mount):
+   * the load found it tombstoned, or a save came back 'deleted'. The UI must
+   * show its "Map deleted" state instead of an editable canvas.
+   */
+  mapDeleted: boolean;
 
   /** Re-read the data file from disk, clearing any previous load failure */
   reload: () => void;

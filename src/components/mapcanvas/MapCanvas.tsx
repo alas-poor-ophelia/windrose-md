@@ -11,27 +11,27 @@ import type {
   TextLabelSettings,
   ToolId,
   ObjectTypeId,
-  Point,
   LayerId,
   LayerVisibility
 } from '#types/index';
 import type { ResolvedTheme } from '#types/settings/settings.types';
-import type { ExtendedGeometry, MapStateContextValue, MapOperationsContextValue } from '#types/contexts/context.types';
+import type { ExtendedGeometry, MapStateContextValue } from '#types/contexts/context.types';
 import type { AdjacentEmptySlotRenderData, AdjacentSubHexRenderData } from '#types/hooks/canvasRenderer.types';
 import type { MapDistanceOverrides } from '#types/hooks/distanceMeasurement.types';
 import type { TileAssignment } from '#types/tiles/tile.types';
 import type { WallPath } from '#types/core/wallpath.types';
 import type { TerrainStroke } from '#types/core/terrainstroke.types';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { useCanvasRenderer, renderCanvas } from '../../hooks/canvas/useCanvasRenderer';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useCanvasRenderer } from '../../hooks/canvas/useCanvasRenderer';
 import { useCanvasInteraction } from '../../hooks/canvas/useCanvasInteraction';
 import { useViewController } from '../../hooks/canvas/useViewController';
+import { createCanvasCursorStore, toolCursorClass } from '../../hooks/canvas/canvasCursor';
 import type { ViewController } from '#types/hooks/viewController.types';
 import type { HandleLevelCellsChange } from '#types/hooks/dataHandlers.types';
 import { GridGeometry } from '../../geometry/core/GridGeometry';
 import { DEFAULTS } from '../../core/dmtConstants';
-import { getObjectAtPosition, addObject, removeObject, removeObjectAtPosition, removeObjectsInRectangle, updateObject, isAreaFree, canResizeObject } from '../../objects/objectOperations';
+import { getObjectAtPosition, addObject, removeObject, removeObjectsInRectangle, updateObject, isAreaFree } from '../../objects/objectOperations';
 import { addTextLabel, getTextLabelAtPosition, removeTextLabel, updateTextLabel } from '../../text/textLabelOperations';
 import { HexGeometry } from '../../geometry/core/HexGeometry';
 import { createGeometry } from '../../geometry/core/createGeometry';
@@ -63,6 +63,7 @@ import { ShapeOverlayLayer } from './ShapeOverlayLayer';
 import { TilePlacementLayer } from './TilePlacementLayer';
 import { TerrainBrushLayer } from './TerrainBrushLayer';
 import { WallLayer } from './WallLayer';
+import { focusMapOnPointerDown, shouldHandleMapKey } from '../../utils/keyboardTargets';
 import { RerollDungeonButton } from './RerollDungeonButton';
 import { getSetting } from '../../core/settingsAccessor';
 import { usePanZoomCoordinator } from '../../hooks/canvas/usePanZoomCoordinator';
@@ -75,18 +76,6 @@ import { useEventCoordinator } from '../../hooks/canvas/useEventCoordinator';
 interface CanvasDimensions {
   width: number;
   height: number;
-}
-
-interface DrawingLayerState {
-  isDrawing: boolean;
-  rectangleStart: Point | null;
-  circleStart: Point | null;
-}
-
-interface PanZoomLayerState {
-  isPanning: boolean;
-  isTouchPanning: boolean;
-  spaceKeyPressed: boolean;
 }
 
 interface CoordinatorsProps {
@@ -114,6 +103,8 @@ interface MapCanvasContentProps {
   onTilesChange?: (tiles: TileAssignment[]) => void;
   /** Arms a layer (real layer-select: swaps the per-layer history stack). */
   onLayerSelect?: (layerId: LayerId) => void;
+  /** Drops held transient-history baselines (gesture boundary; see useLayerHistory.clearTransient). */
+  clearTransient?: () => void;
   onWallPathsChange?: (wallPaths: WallPath[], suppressHistory?: boolean) => void;
   onTerrainStrokesChange?: (strokes: TerrainStroke[], suppressHistory?: boolean) => void;
   tileImagesReady?: boolean;
@@ -129,9 +120,6 @@ interface MapCanvasContentProps {
   selectedObjectType: ObjectTypeId | undefined;
   selectedColor: string;
   isColorPickerOpen: boolean;
-  customColors: string[];
-  onAddCustomColor: (color: string) => void;
-  onDeleteCustomColor: (color: string) => void;
   isFocused: boolean;
   isAnimating: boolean;
   theme: ResolvedTheme;
@@ -196,7 +184,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, adjacentEmptySlots, onViewStateChange, onTextLabelSettingsChange, currentTool, editLevelLock, onEditLevelLockChange, selectedObjectType, selectedColor, isColorPickerOpen, customColors: _customColors, onAddCustomColor: _onAddCustomColor, onDeleteCustomColor: _onDeleteCustomColor, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex, children }: MapCanvasContentProps): VNode => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, clearTransient, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, adjacentEmptySlots, onViewStateChange, onTextLabelSettingsChange, currentTool, editLevelLock, onEditLevelLockChange, selectedObjectType, selectedColor, isColorPickerOpen, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex, children }: MapCanvasContentProps): VNode => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -231,25 +219,42 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
   const showCoordinatesRef = useRef<boolean>(showCoordinates);
   showCoordinatesRef.current = showCoordinates;
 
-  // Refs to hold layer state for cursor coordination
-  const drawingLayerStateRef = useRef<DrawingLayerState>({ isDrawing: false, rectangleStart: null, circleStart: null });
-  const panZoomLayerStateRef = useRef<PanZoomLayerState>({ isPanning: false, isTouchPanning: false, spaceKeyPressed: false });
-
-  // Callbacks for layers to expose their state
-  const handleDrawingStateChange = useCallback((drawingState: DrawingLayerState) => {
-    drawingLayerStateRef.current = drawingState;
-  }, []);
-
-  const handlePanZoomStateChange = useCallback((panZoomState: PanZoomLayerState) => {
-    panZoomLayerStateRef.current = panZoomState;
-  }, []);
+  // Cursor classes for THIS map's canvas (REACT-04). The tool class is
+  // render-time; the transient interaction class (space-grab, panning,
+  // shape-active, drawing) is written by the store straight to the element,
+  // fed by the pan/zoom coordinator and DrawingLayer. The canvas takes no
+  // className prop so Preact never clobbers the transient class.
+  const [cursorStore] = useState(createCanvasCursorStore);
+  const toolCursor = toolCursorClass(currentTool, isDraggingSelection, selectedObjectType != null);
+  useLayoutEffect(() => {
+    cursorStore.attach(canvasRef.current);
+    return () => cursorStore.attach(null);
+  }, [cursorStore]);
+  useLayoutEffect(() => {
+    cursorStore.setBase(toolCursor);
+  }, [cursorStore, toolCursor]);
 
   // Create geometry instance based on map type
   // Return null during loading to prevent errors
+  // Keyed on the five fields createGeometry reads; the rest of mapData comes
+  // from a latest-ref so unrelated edits don't rebuild the geometry.
+  const geometryMapDataRef = useRef(mapData);
+  geometryMapDataRef.current = mapData;
+  const hasGeometryMapData = mapData != null;
+  const geoMapType = mapData?.mapType;
+  const geoGridSize = mapData?.gridSize;
+  const geoHexSize = mapData?.hexSize;
+  const geoOrientation = mapData?.orientation;
+  const geoHexBounds = mapData?.hexBounds;
   const geometry = useMemo((): ExtendedGeometry | null => {
-    if (!mapData) return null;
-    return createGeometry(mapData);
-  }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
+    const latest = geometryMapDataRef.current;
+    if (!hasGeometryMapData || latest == null) return null;
+    return createGeometry({
+      ...latest,
+      mapType: geoMapType ?? latest.mapType, gridSize: geoGridSize, hexSize: geoHexSize,
+      orientation: geoOrientation, hexBounds: geoHexBounds
+    });
+  }, [hasGeometryMapData, geoMapType, geoGridSize, geoHexSize, geoOrientation, geoHexBounds]);
 
   // Lattice ladder for this map, or null on every classic path. Built ONCE per
   // geometry: the static surface cache keys on the ladder's identity, so a ladder
@@ -353,21 +358,27 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
     if (!container) return;
 
     // Wait one more frame to ensure CSS transition is fully complete
-    window.requestAnimationFrame(() => {
+    const rafId = window.requestAnimationFrame(() => {
       const rect = container.getBoundingClientRect();
       setCanvasDimensions({
         width: Math.max(rect.width, DEFAULTS.canvasSize.width),
         height: Math.max(rect.height, DEFAULTS.canvasSize.height)
       });
     });
+    return () => window.cancelAnimationFrame(rafId);
   }, [isAnimating]);
 
   // Render canvas whenever relevant state changes
-  useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, draggingWallId, subHexPath: subHexPath ?? null, ladder }, viewController);
+  const { scheduleRender } = useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, draggingWallId, subHexPath: subHexPath ?? null, ladder }, viewController);
 
-  // Trigger redraw when canvas dimensions change (from expand/collapse)
-  useEffect(() => {
-    if (!canvasRef.current || !mapData || !geometry) return;
+  // Canvas sizing on dimension change (expand/collapse). This effect only
+  // resizes; every repaint goes through the coordinated renderer's
+  // scheduleRender so the frame carries multi-select, live view and dragged-wall
+  // state (REACT-05). Visibility/coordinate/adjacency changes are already
+  // inputs of useCanvasRenderer and are not repeated here. Layout effect: the
+  // queued frame lands before the browser paints the cleared canvas.
+  useLayoutEffect(() => {
+    if (!canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const fogCanvas = fogCanvasRef.current;
@@ -375,7 +386,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
     // During animation, preserve canvas content
     if (isAnimating) {
       // Save current canvas content
-      const tempCanvas = activeWindow.createEl('canvas');
+      const tempCanvas = (canvas.ownerDocument.defaultView ?? activeWindow).createEl('canvas');
       tempCanvas.width = canvas.width;
       tempCanvas.height = canvas.height;
       const tempCtx = tempCanvas.getContext('2d');
@@ -399,15 +410,26 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
         ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
       }
     } else {
-      // After animation, do a proper redraw with correct dimensions. Paint at the
-      // LIVE view: this effect also re-fires whenever a parent re-render hands
-      // down fresh prop identities (layerVisibility, adjacent ghosts), which can
-      // happen mid-gesture (tile image arrival, a save-status tick), and a paint
-      // at the committed viewState then flashes one whole frame at the pre-
-      // gesture zoom. Outside a gesture the live view IS the committed one.
-      renderCanvas(canvas, fogCanvas, mapData, geometry, selectedItem ?? undefined, { isResizeMode, theme, showCoordinates, layerVisibility, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, subHexPath: subHexPath ?? null, ladder, liveViewState: viewController.getLive() });
+      // After animation, do a proper redraw with correct dimensions
+      scheduleRender();
     }
-  }, [canvasDimensions.width, canvasDimensions.height, isAnimating, showCoordinates, layerVisibility, adjacentSubHexes, adjacentEmptySlots]);
+  }, [canvasDimensions.width, canvasDimensions.height, isAnimating, scheduleRender]);
+
+  // Keyboard focus: a press on the map moves focus to the (tabIndex -1) map
+  // wrapper, so the next Delete/R/Escape targets the map. Without it, focus
+  // stays on the note editor in Live Preview (the canvas handlers
+  // preventDefault mousedown/touchstart) and the typing guard drops the key.
+  // Capture phase: runs before any layer's own pointer handling. Presses on
+  // inputs, buttons and other self-focusing controls keep their own focus.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return undefined;
+    const handlePointerDown = (e: PointerEvent): void => {
+      focusMapOnPointerDown(e.target, container);
+    };
+    container.addEventListener('pointerdown', handlePointerDown, true);
+    return () => container.removeEventListener('pointerdown', handlePointerDown, true);
+  }, []);
 
   // 'C' key handler for coordinate overlay (hex maps only)
   useEffect(() => {
@@ -423,9 +445,8 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
     }
 
     const handleKeyDown = (e: KeyboardEvent): void => {
-      const target = e.target as HTMLElement;
       if (e.key.toLowerCase() === 'c' && !e.shiftKey && !e.ctrlKey && !e.metaKey &&
-          target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          shouldHandleMapKey(e, canvasRef.current)) {
         if (e.repeat && keyMode === 'toggle') return;
 
         e.preventDefault();
@@ -446,49 +467,15 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
+    // Listen on the window that owns this map's canvas (popout-safe).
+    const win = canvasRef.current?.ownerDocument.defaultView ?? window;
+    win.addEventListener('keydown', handleKeyDown);
+    win.addEventListener('keyup', handleKeyUp);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
+      win.removeEventListener('keydown', handleKeyDown);
+      win.removeEventListener('keyup', handleKeyUp);
     };
   }, [isFocused, mapData?.mapType, setShowCoordinates]);
-
-  // Determine cursor class based on current tool and interaction state
-  const getCursorClass = (): string => {
-    // Get state
-    const effectiveDrawingState = drawingLayerStateRef.current;
-    const effectivePanZoomState = panZoomLayerStateRef.current;
-
-    // Space key override - show grab cursor
-    if (effectivePanZoomState.spaceKeyPressed && !effectivePanZoomState.isPanning) return 'windrose-canvas-space-grab';
-
-    if (effectivePanZoomState.isPanning || effectivePanZoomState.isTouchPanning) return 'windrose-canvas-panning';
-    if (isDraggingSelection) return 'windrose-canvas-selecting';
-    if (currentTool === 'select') return 'windrose-canvas-select';
-    if (currentTool === 'measure') return 'windrose-canvas-measure';
-    if (currentTool === 'diagonalFill') return 'windrose-canvas-diagonal-fill';
-    if (currentTool === 'addNote') return 'windrose-canvas-add-object';
-    if (currentTool === 'addObject') {
-      return selectedObjectType != null ? 'windrose-canvas-add-object' : 'windrose-canvas';
-    }
-    if (currentTool === 'addText') {
-      return 'windrose-canvas-add-text';
-    }
-    if (currentTool === 'rectangle') {
-      return effectiveDrawingState.rectangleStart ? 'windrose-canvas-rectangle-active' : 'windrose-canvas-rectangle';
-    }
-    if (currentTool === 'circle') {
-      return effectiveDrawingState.circleStart ? 'windrose-canvas-circle-active' : 'windrose-canvas-circle';
-    }
-    if (currentTool === 'clearArea') {
-      return effectiveDrawingState.rectangleStart ? 'windrose-canvas-cleararea-active' : 'windrose-canvas-cleararea';
-    }
-    if (effectiveDrawingState.isDrawing) {
-      return currentTool === 'draw' ? 'windrose-canvas-drawing' : 'windrose-canvas-erasing';
-    }
-    return currentTool === 'erase' ? 'windrose-canvas-erase' : 'windrose-canvas';
-  };
 
   // Build context values for providers
   const mapStateValue = useMemo(() => ({
@@ -519,18 +506,17 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
     instanceId: instanceId ?? null,
     requestEnterSubHex,
     requestExitSubHex,
-    // State change callbacks for layers
-    onDrawingStateChange: handleDrawingStateChange,
-    onPanZoomStateChange: handlePanZoomStateChange
+    cursorStore
   } as MapStateContextValue), [mapData, mapId, notePath, geometry, currentTool, selectedColor,
     selectedObjectType, screenToGrid, screenToWorld, getClientCoords, viewController,
-    ladder, getActiveLevel, editLevelLock, onEditLevelLockChange, getEditLevel, screenToLevelCell, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex,
-    handleDrawingStateChange, handlePanZoomStateChange]);
+    ladder, getActiveLevel, editLevelLock, onEditLevelLockChange, getEditLevel, screenToLevelCell,
+    distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex,
+    cursorStore]);
 
   // Hit-tests honour the held label size and band visibility on ladder maps (live zoom, read at call time).
   const getTextLabelAtPositionInView = useCallback(
     (labels: TextLabel[], worldX: number, worldY: number, ctx: CanvasRenderingContext2D | null): TextLabel | null =>
-      getTextLabelAtPosition(labels as Parameters<typeof getTextLabelAtPosition>[0], worldX, worldY, ctx, ladder ? { ladder, zoom: viewController.getLive().zoom, activeLevel: getActiveLevel() } : undefined) as TextLabel | null,
+      getTextLabelAtPosition(labels, worldX, worldY, ctx, ladder ? { ladder, zoom: viewController.getLive().zoom, activeLevel: getActiveLevel() } : undefined),
     [ladder, viewController, getActiveLevel]
   );
 
@@ -541,8 +527,6 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
     updateObject,
     removeObject,
     isAreaFree,
-    canResizeObject,
-    removeObjectAtPosition,
     removeObjectsInRectangle,
 
     // Text operations
@@ -560,10 +544,11 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
     onEdgesChange,
     onTilesChange,
     onLayerSelect,
+    clearTransient,
     onWallPathsChange,
     onTerrainStrokesChange,
     onMapDataUpdate
-  } as MapOperationsContextValue), [onCellsChange, onLevelCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange, onMapDataUpdate, getTextLabelAtPositionInView]);
+  }), [onCellsChange, onLevelCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, clearTransient, onWallPathsChange, onTerrainStrokesChange, onMapDataUpdate, getTextLabelAtPositionInView]);
 
   return (
     <EventHandlerProvider>
@@ -589,7 +574,6 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCell
                 ref={canvasRef}
                 width={canvasDimensions.width}
                 height={canvasDimensions.height}
-                className={getCursorClass()}
                 style={{ touchAction: 'none', display: 'block' }}
               />
 

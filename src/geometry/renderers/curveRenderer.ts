@@ -307,7 +307,30 @@ function multiPolygonBounds(multiPoly: [number, number][][][]): AABB {
 let preprocessCacheRef: Curve[] | null = null;
 let preprocessCacheResult: PreprocessResult | null = null;
 
+/**
+ * Union results keyed by sorted cluster curve ids. Bounded LRU (MEM-03): Map
+ * insertion order is the recency order, hits are re-inserted at the end and the
+ * oldest entries are dropped past UNION_CACHE_MAX. An LRU (not a per-pass
+ * sweep) keeps alternating curve arrays (ghost layers, several open maps) from
+ * evicting each other's unions every frame.
+ */
+const UNION_CACHE_MAX = 64;
 const unionCache = new Map<string, { refs: Curve[]; path: Path2D; bounds: AABB }>();
+
+function touchUnionCache(key: string, entry: { refs: Curve[]; path: Path2D; bounds: AABB }): void {
+  unionCache.delete(key);
+  unionCache.set(key, entry);
+  while (unionCache.size > UNION_CACHE_MAX) {
+    const oldest = unionCache.keys().next().value;
+    if (oldest === undefined) break;
+    unionCache.delete(oldest);
+  }
+}
+
+/** Current number of cached union results (test/diagnostic hook). */
+function getUnionCacheSize(): number {
+  return unionCache.size;
+}
 
 function preprocessCurves(curves: Curve[]): PreprocessResult {
   // Level 1: array reference check
@@ -375,6 +398,7 @@ function preprocessCurves(curves: Curve[]): PreprocessResult {
           }
         }
         if (valid) {
+          touchUnionCache(sortedIds, cached);
           unionGroups.push({
             path: cached.path,
             bounds: cached.bounds,
@@ -400,7 +424,7 @@ function preprocessCurves(curves: Curve[]): PreprocessResult {
       const path = multiPolygonToPath2D(result);
       const bounds = multiPolygonBounds(result);
 
-      unionCache.set(sortedIds, { refs: clusterCurves.slice(), path, bounds });
+      touchUnionCache(sortedIds, { refs: clusterCurves.slice(), path, bounds });
 
       unionGroups.push({
         path,
@@ -581,4 +605,4 @@ function renderCurves(
   }
 }
 
-export { renderCurves, buildPath2D };
+export { renderCurves, preprocessCurves, getUnionCacheSize, UNION_CACHE_MAX };

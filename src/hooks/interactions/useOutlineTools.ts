@@ -11,6 +11,8 @@ import type { MapData, Outline } from '#types/core/map.types';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { updateById, removeById } from '../../objects/entityList';
+import { mintId } from '../../core/ids';
 
 interface OutlineToolsOptions {
   currentTool: ToolId;
@@ -55,7 +57,7 @@ const DEFAULT_SETTINGS: OutlineSettings = {
 };
 
 function generateOutlineId(): string {
-  return `outline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return mintId('outline', { randomLength: 6 });
 }
 
 function distanceToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
@@ -101,9 +103,7 @@ function useOutlineTools(options: OutlineToolsOptions): UseOutlineToolsResult {
       const next = { ...prev, ...updates };
       // Apply changes to selected outline immediately
       if (selectedOutlineId != null && selectedOutlineId !== '' && mapData?.outlines != null) {
-        const outlines = mapData.outlines.map(o =>
-          o.id === selectedOutlineId ? { ...o, ...updates } : o
-        );
+        const outlines = updateById<Outline>(mapData.outlines, selectedOutlineId, updates);
         onOutlinesChange(outlines);
       }
       return next;
@@ -255,16 +255,14 @@ function useOutlineTools(options: OutlineToolsOptions): UseOutlineToolsResult {
 
   const deleteOutline = useCallback((outlineId: string) => {
     if (!mapData) return;
-    const outlines = (mapData.outlines ?? []).filter(o => o.id !== outlineId);
+    const outlines = removeById<Outline>(mapData.outlines, outlineId);
     onOutlinesChange(outlines);
     if (selectedOutlineId === outlineId) setSelectedOutlineId(null);
   }, [mapData, onOutlinesChange, selectedOutlineId]);
 
   const updateOutline = useCallback((outlineId: string, updates: Partial<Outline>) => {
     if (!mapData) return;
-    const outlines = (mapData.outlines ?? []).map(o =>
-      o.id === outlineId ? { ...o, ...updates } : o
-    );
+    const outlines = updateById<Outline>(mapData.outlines, outlineId, updates);
     onOutlinesChange(outlines);
   }, [mapData, onOutlinesChange]);
 

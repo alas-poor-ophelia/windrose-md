@@ -12,9 +12,9 @@ import { Modal } from 'obsidian';
 import type { App } from 'obsidian';
 
 
-export type CloneMode = 'all' | 'mapOnly';
+type CloneMode = 'all' | 'mapOnly';
 
-export interface CloneLayerModalProps {
+interface CloneLayerModalProps {
   layerName: string;
   onClone: (mode: CloneMode) => void;
   onCancel: () => void;
@@ -33,7 +33,7 @@ function openNativeCloneLayerModal(options: {
     const modal = new (class extends Modal {
       private submitted = false;
 
-      onOpen(): void {
+      override onOpen(): void {
         const { contentEl, titleEl } = this;
         titleEl.setText(`Clone Layer: ${layerName}`);
 
@@ -64,7 +64,7 @@ function openNativeCloneLayerModal(options: {
         });
       }
 
-      onClose(): void {
+      override onClose(): void {
         if (!this.submitted && onCancel) {
           onCancel();
         }

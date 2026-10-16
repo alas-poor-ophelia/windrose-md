@@ -9,13 +9,16 @@
 // Type-only imports
 import type { BoundingBox } from '#types/core/geometry.types';
 import type { MapData, MapLayer, StoredViewState } from '#types/core/map.types';
-import type { TextLabel } from '#types/objects/note.types';
 import type { Cell } from '#types/core/cell.types';
+import type { Curve } from '#types/core/curve.types';
+import type { WallPath } from '#types/core/wallpath.types';
+import type { TerrainStroke } from '#types/core/terrainstroke.types';
 import type { TileAssignment } from '#types/tiles/tile.types';
+import type { TextLabel } from '#types/objects/note.types';
+import type { ResolvedTheme } from '#types/settings/settings.types';
 import type {
   RenderParams,
   ExportResult,
-  ExportTheme,
   ExportImageOptions
 } from '#types/core/export.types';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
@@ -33,7 +36,7 @@ import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
 import { getFontCss } from '../text/fontOptions';
 import { cellsCoveredByAssignment } from '../assets/tileFootprint';
 import { renderCanvas } from '../hooks/canvas/useCanvasRenderer';
-import { getSettings } from '../core/settingsAccessor';
+import { resolveTheme } from '../core/settingsAccessor';
 
 // ===========================================
 // Text Label Bounds
@@ -74,6 +77,41 @@ function getTextLabelBounds(label: TextLabel, ctx: CanvasRenderingContext2D): Bo
 // Content Bounds Calculation
 // ===========================================
 
+/** Mutable bounds accumulator: grows to cover every box or padded point fed to it. */
+class BoundsAccumulator {
+  minX = Infinity;
+  minY = Infinity;
+  maxX = -Infinity;
+  maxY = -Infinity;
+  hasContent = false;
+
+  addBox(b: BoundingBox): void {
+    this.hasContent = true;
+    this.minX = Math.min(this.minX, b.minX);
+    this.minY = Math.min(this.minY, b.minY);
+    this.maxX = Math.max(this.maxX, b.maxX);
+    this.maxY = Math.max(this.maxY, b.maxY);
+  }
+
+  addPoint(x: number, y: number, pad = 0): void {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    this.addBox({ minX: x - pad, minY: y - pad, maxX: x + pad, maxY: y + pad });
+  }
+
+  result(): BoundingBox | null {
+    return this.hasContent
+      ? { minX: this.minX, minY: this.minY, maxX: this.maxX, maxY: this.maxY }
+      : null;
+  }
+}
+
+/** Storage cell for a col/row (grid) or q/r (hex) position. */
+function cellAt(geometry: { type: string }, col: number, row: number): Cell {
+  return geometry.type === 'hex'
+    ? { q: col, r: row, color: '' }
+    : { x: col, y: row, color: '' };
+}
+
 /**
  * The ladder an export measures and paints rungs with, or null for a level-0
  * export. Same condition as the render's deep path: a ladder view that is not
@@ -86,33 +124,74 @@ function exportLadderFor(mapData: MapData, geometry: ExtendedGeometry): Geometry
   return ladderForAuthoredRungs(mapData, geometry);
 }
 
-/** A tile's cell (col, row) as a Cell on `geometry`'s lattice. */
-function tileCell(col: number, row: number, geometry: { type: string }): Cell {
-  return geometry.type === 'hex' ? { q: col, r: row, color: '' } : { x: col, y: row, color: '' };
-}
-
-/** World bounds of one placed tile on the geometry of its rung, or null when it has no extent. */
+/**
+ * World bounds of one placed tile on the geometry of its rung, or null when it
+ * has no extent. A snapped tile is bounded by its cell footprint; a freeform
+ * stamp by its drop cell's box re-centred on its world position, scaled by the
+ * tile scale and its largest span.
+ */
 function tileBounds(tile: TileAssignment, geometry: { type: string; getCellBounds(cell: Cell): BoundingBox }): BoundingBox | null {
   if (tile.freeform === true) {
-    const drop = geometry.getCellBounds(tileCell(tile.col, tile.row, geometry));
+    const drop = geometry.getCellBounds(cellAt(geometry, tile.col, tile.row));
     if (tile.worldX == null || tile.worldY == null) return drop;
-    const scale = tile.scale ?? 1;
-    const halfW = ((drop.maxX - drop.minX) / 2) * scale;
-    const halfH = ((drop.maxY - drop.minY) / 2) * scale;
+    const factor = (tile.scale ?? 1) * Math.max(1, tile.spanW ?? 1, tile.spanH ?? 1);
+    const halfW = ((drop.maxX - drop.minX) / 2) * factor;
+    const halfH = ((drop.maxY - drop.minY) / 2) * factor;
     return { minX: tile.worldX - halfW, minY: tile.worldY - halfH, maxX: tile.worldX + halfW, maxY: tile.worldY + halfH };
   }
-  let out: BoundingBox | null = null;
-  for (const c of cellsCoveredByAssignment(tile)) {
-    const b = geometry.getCellBounds(tileCell(c.col, c.row, geometry));
-    out = out === null
-      ? b
-      : { minX: Math.min(out.minX, b.minX), minY: Math.min(out.minY, b.minY), maxX: Math.max(out.maxX, b.maxX), maxY: Math.max(out.maxY, b.maxY) };
+  const acc = new BoundsAccumulator();
+  for (const c of cellsCoveredByAssignment(tile)) acc.addBox(geometry.getCellBounds(cellAt(geometry, c.col, c.row)));
+  return acc.result();
+}
+
+/** Tiles, each on the geometry of the rung it is homed on; rung tiles only when a `ladder` is supplied. */
+function addTileBounds(acc: BoundsAccumulator, tiles: TileAssignment[], geometry: ExtendedGeometry, ladder: GeometryLadder | null): void {
+  for (const tile of tiles) {
+    const home = tile.homeLevel ?? 0;
+    if (home > 0 && ladder === null) continue;
+    const bounds = tileBounds(tile, home > 0 && ladder !== null ? ladder.geometryForLevel(home) : geometry);
+    if (bounds !== null) acc.addBox(bounds);
   }
-  return out;
+}
+
+/** Curves: the control polygon contains a cubic bezier, so its bbox (plus half the stroke) bounds the curve. */
+function addCurveBounds(acc: BoundsAccumulator, curves: Curve[]): void {
+  for (const curve of curves) {
+    const pad = (curve.strokeWidth || 0) / 2;
+    acc.addPoint(curve.start[0], curve.start[1], pad);
+    for (const seg of curve.segments) {
+      acc.addPoint(seg[0], seg[1], pad);
+      acc.addPoint(seg[2], seg[3], pad);
+      acc.addPoint(seg[4], seg[5], pad);
+    }
+  }
 }
 
 /**
- * Calculate the world-coordinate bounding box of all content on a layer.
+ * Wall/path strips: vertices padded by an estimate of the strip half-width.
+ * The true width depends on the strip image height, which is not available
+ * here; half a cell times widthScale covers typical packs.
+ */
+function addWallPathBounds(acc: BoundsAccumulator, wallPaths: WallPath[], cellSize: number): void {
+  for (const wp of wallPaths) {
+    const pad = (cellSize * (wp.widthScale > 0 ? wp.widthScale : 1)) / 2;
+    for (const v of wp.vertices) acc.addPoint(v.x, v.y, pad);
+  }
+}
+
+/** Terrain brush strokes: flat [x, y, ...] points padded by the brush radius. */
+function addTerrainStrokeBounds(acc: BoundsAccumulator, strokes: TerrainStroke[]): void {
+  for (const stroke of strokes) {
+    const pad = stroke.radius || 0;
+    for (let i = 0; i + 1 < stroke.points.length; i += 2) {
+      acc.addPoint(stroke.points[i], stroke.points[i + 1], pad);
+    }
+  }
+}
+
+/**
+ * Calculate the world-coordinate bounding box of all content on a layer:
+ * painted cells, objects, text labels, tiles, curves, wall paths and terrain strokes.
  * Rung (>= 1) cells, objects and tiles are measured with their rung's own
  * geometry and are only included when a `ladder` is supplied; classic maps have none.
  */
@@ -121,76 +200,110 @@ function calculateContentBounds(
   geometry: ExtendedGeometry,
   ladder: GeometryLadder | null = null
 ): BoundingBox | null {
-  let minX = Infinity, minY = Infinity;
-  let maxX = -Infinity, maxY = -Infinity;
-  
-  let hasContent = false;
-  
-  // 1. Painted cells (level 0, then every authored rung)
+  const acc = new BoundsAccumulator();
+
+  // Painted cells: level 0, then every authored rung on its own geometry
   for (const { level, cell } of allAuthoredCells(layer)) {
-    if (level > 0 && ladder === null) continue;
-    hasContent = true;
-    const bounds = level === 0 || ladder === null
-      ? geometry.getCellBounds(cell)
-      : ladder.geometryForLevel(level).getCellBounds(cell);
-    minX = Math.min(minX, bounds.minX);
-    minY = Math.min(minY, bounds.minY);
-    maxX = Math.max(maxX, bounds.maxX);
-    maxY = Math.max(maxY, bounds.maxY);
+    if (level === 0) acc.addBox(geometry.getCellBounds(cell));
+    else if (ladder !== null) acc.addBox(ladder.geometryForLevel(level).getCellBounds(cell));
+  }
+  for (const obj of layer.objects) {
+    const home = obj.homeLevel ?? 0;
+    if (home === 0) acc.addBox(geometry.getObjectBounds(obj));
+    else if (ladder !== null) acc.addBox(ladder.geometryForLevel(home).getObjectBounds(obj));
   }
 
-  // 2. Objects
-  if (layer.objects.length > 0) {
-    for (const obj of layer.objects) {
-      const home = obj.homeLevel ?? 0;
-      if (home > 0 && ladder === null) continue;
-      hasContent = true;
-      const bounds = home > 0 && ladder !== null
-        ? ladder.geometryForLevel(home).getObjectBounds(obj)
-        : geometry.getObjectBounds(obj);
-      minX = Math.min(minX, bounds.minX);
-      minY = Math.min(minY, bounds.minY);
-      maxX = Math.max(maxX, bounds.maxX);
-      maxY = Math.max(maxY, bounds.maxY);
-    }
-  }
-
-  // 3. Tiles: a snapped tile is bounded by its cell footprint, a freeform stamp
-  // by its drop cell's box re-centred on its world position (scaled), both on
-  // the geometry of the rung it is homed on.
-  for (const tile of layer.tiles ?? []) {
-    const home = tile.homeLevel ?? 0;
-    if (home > 0 && ladder === null) continue;
-    const g = home > 0 && ladder !== null ? ladder.geometryForLevel(home) : geometry;
-    const bounds = tileBounds(tile, g);
-    if (bounds === null) continue;
-    hasContent = true;
-    minX = Math.min(minX, bounds.minX);
-    minY = Math.min(minY, bounds.minY);
-    maxX = Math.max(maxX, bounds.maxX);
-    maxY = Math.max(maxY, bounds.maxY);
-  }
-
-  // 4. Text labels (need temporary canvas for measurement)
+  // Text labels (need temporary canvas for measurement)
   if (layer.textLabels.length > 0) {
     const tempCanvas = activeWindow.createEl('canvas');
     const tempCtx = tempCanvas.getContext('2d');
-    
     if (tempCtx) {
-      for (const label of layer.textLabels) {
-        hasContent = true;
-        const bounds = getTextLabelBounds(label, tempCtx);
-        minX = Math.min(minX, bounds.minX);
-        minY = Math.min(minY, bounds.minY);
-        maxX = Math.max(maxX, bounds.maxX);
-        maxY = Math.max(maxY, bounds.maxY);
-      }
+      for (const label of layer.textLabels) acc.addBox(getTextLabelBounds(label, tempCtx));
     }
   }
-  
-  if (!hasContent) return null;
-  
-  return { minX, minY, maxX, maxY };
+
+  addTileBounds(acc, layer.tiles ?? [], geometry, ladder);
+  addCurveBounds(acc, layer.curves ?? []);
+  addWallPathBounds(acc, layer.wallPaths ?? [], geometry.cellSize);
+  addTerrainStrokeBounds(acc, layer.terrainStrokes ?? []);
+
+  return acc.result();
+}
+
+/**
+ * Bounds of map-level (not per-layer) content that has world extent:
+ * visible shape overlays, visible regions (hex members) and visible outlines.
+ */
+function calculateMapLevelBounds(mapData: MapData, geometry: ExtendedGeometry): BoundingBox | null {
+  const acc = new BoundsAccumulator();
+
+  for (const shape of mapData.shapeOverlays ?? []) {
+    if (shape.visible === false) continue;
+    const { x, y } = shape.worldPosition;
+    if (shape.shape === 'circle') {
+      acc.addPoint(x, y, shape.size);
+      continue;
+    }
+    const hw = shape.halfWidth ?? shape.size;
+    const hh = shape.halfHeight ?? shape.size;
+    const rot = (((shape.rotation ?? 0) % 180) + 180) % 180;
+    if (rot === 0) {
+      acc.addBox({ minX: x - hw, minY: y - hh, maxX: x + hw, maxY: y + hh });
+    } else if (rot === 90) {
+      acc.addBox({ minX: x - hh, minY: y - hw, maxX: x + hh, maxY: y + hw });
+    } else {
+      acc.addPoint(x, y, Math.hypot(hw, hh));
+    }
+  }
+
+  for (const region of mapData.regions ?? []) {
+    if (region.visible === false) continue;
+    for (const hex of region.hexes) acc.addBox(geometry.getCellBounds(cellAt(geometry, hex.x, hex.y)));
+  }
+
+  for (const outline of mapData.outlines ?? []) {
+    if (outline.visible === false) continue;
+    const pad = (outline.lineWidth || 0) / 2;
+    for (const v of outline.vertices) acc.addPoint(v.x, v.y, pad);
+  }
+
+  return acc.result();
+}
+
+/** Union of two optional bounds. */
+function unionBounds(a: BoundingBox | null, b: BoundingBox | null): BoundingBox | null {
+  if (!a) return b;
+  if (!b) return a;
+  return {
+    minX: Math.min(a.minX, b.minX),
+    minY: Math.min(a.minY, b.minY),
+    maxX: Math.max(a.maxX, b.maxX),
+    maxY: Math.max(a.maxY, b.maxY)
+  };
+}
+
+/**
+ * World bounds of everything an export of `layers` will draw: per-layer
+ * content for each selected layer (rungs included when a `ladder` is given)
+ * plus map-level overlays.
+ */
+function calculateExportBounds(
+  mapData: MapData,
+  layers: MapLayer[],
+  geometry: ExtendedGeometry,
+  ladder: GeometryLadder | null = null
+): BoundingBox | null {
+  let bounds: BoundingBox | null = null;
+  for (const layer of layers) bounds = unionBounds(bounds, calculateContentBounds(layer, geometry, ladder));
+  return unionBounds(bounds, calculateMapLevelBounds(mapData, geometry));
+}
+
+/**
+ * Theme used for image export: the map's effective theme (global settings
+ * with the map's per-map overrides applied), identical to the on-screen one.
+ */
+function getExportTheme(mapData: MapData): ResolvedTheme {
+  return resolveTheme(mapData.settings);
 }
 
 // ===========================================
@@ -263,30 +376,7 @@ function renderMapToCanvas(
   tempCanvas.width = width;
   tempCanvas.height = height;
 
-  const effectiveSettings = getSettings();
-
-  const theme: ExportTheme = {
-    grid: {
-      lines: effectiveSettings.gridLineColor,
-      lineWidth: effectiveSettings.gridLineWidth,
-      background: effectiveSettings.backgroundColor
-    },
-    cells: {
-      fill: '#c4a57b',
-      border: effectiveSettings.borderColor,
-      borderWidth: 2
-    },
-    compass: {
-      color: '#c4a57b',
-      size: 100
-    },
-    decorativeBorder: {
-      color: '#8b7355',
-      width: 20,
-      pattern: 'fancy'
-    },
-    coordinateKey: effectiveSettings.coordinateKeyColor
-  };
+  const theme = getExportTheme(mapData);
 
   renderCanvas(
     tempCanvas,
@@ -336,19 +426,9 @@ async function exportMapAsImage(
     ? mapData
     : { ...mapData, activeLayerId: exportLayers[exportLayers.length - 1].id };
 
-  // Calculate content bounds across every selected layer
-  let bounds: BoundingBox | null = null;
+  // Calculate content bounds across every selected layer plus map-level overlays
   const ladder = exportLadderFor(mapData, geometry);
-  for (const layer of exportLayers) {
-    const layerBounds = calculateContentBounds(layer, geometry, ladder);
-    if (!layerBounds) continue;
-    bounds = bounds === null ? layerBounds : {
-      minX: Math.min(bounds.minX, layerBounds.minX),
-      minY: Math.min(bounds.minY, layerBounds.minY),
-      maxX: Math.max(bounds.maxX, layerBounds.maxX),
-      maxY: Math.max(bounds.maxY, layerBounds.maxY)
-    };
-  }
+  const bounds = calculateExportBounds(mapData, exportLayers, geometry, ladder);
 
   if (!bounds) {
     throw new Error('No content to export');
@@ -450,4 +530,4 @@ async function saveMapImageToVault(
 // Exports
 // ===========================================
 
-export { calculateContentBounds, deepestAuthoredLevel, exportLadderFor, exportZoomForLevel, exportViewStateForBounds, renderMapToCanvas, exportMapAsImage, saveMapImageToVault };
+export { calculateContentBounds, calculateExportBounds, deepestAuthoredLevel, exportLadderFor, exportZoomForLevel, exportViewStateForBounds, getExportTheme, saveMapImageToVault };

@@ -6,23 +6,22 @@
  */
 
 // Type-only imports
-import type { Point } from '#types/core/geometry.types';
+import { mintId } from '../core/ids';
 import type { HexColor } from '#types/core/common.types';
 import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
 import { LABEL_FLOOR_PX, depthModeOf, elementScale, elementZoom, labelVisible } from '../geometry/renderers/elementBands';
+import type { TextLabel, TextLabelId } from '#types/objects/note.types';
+import { updateById, removeById } from '../objects/entityList';
 
 // ===========================================
 // Type Definitions
 // ===========================================
 
-/** Unique text label identifier */
-export type TextLabelId = string;
-
 /** Font face options */
-export type FontFace = 'sans' | 'serif' | 'mono' | 'script' | 'fantasy';
+type FontFace = 'sans' | 'serif' | 'mono' | 'script' | 'fantasy';
 
 /** Text label styling options */
-export interface TextLabelOptions {
+interface TextLabelOptions {
   fontSize?: number;
   fontFace?: FontFace;
   color?: HexColor;
@@ -35,29 +34,15 @@ export interface TextLabelOptions {
  * Camera state for hit-testing labels under the lattice ladder. A null ladder
  * (classic maps) means the unscaled, always-visible behaviour.
  */
-export interface TextLabelHitView {
+interface TextLabelHitView {
   ladder: GeometryLadder | null;
   /** Live camera zoom (screen px per world px). */
   zoom: number;
   activeLevel: number;
 }
 
-/** Text label data structure */
-export interface TextLabel {
-  id: TextLabelId;
-  content: string;
-  position: Point;
-  rotation: number;
-  fontSize: number;
-  fontFace: FontFace;
-  color: HexColor;
-  opacity?: number;
-  homeLevel?: number;
-  depthMode?: 'pop' | 'persist';
-}
-
 /** Partial text label for updates */
-export type TextLabelUpdate = Partial<Omit<TextLabel, 'id'>>;
+type TextLabelUpdate = Partial<Omit<TextLabel, 'id'>>;
 
 // ===========================================
 // Constants
@@ -74,7 +59,7 @@ const MAX_CONTENT_LENGTH = 200;
  * Generate a unique ID for a text label
  */
 function generateTextLabelId(): TextLabelId {
-  return 'text-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+  return mintId('text');
 }
 
 // ===========================================
@@ -126,11 +111,7 @@ function updateTextLabel(
   id: TextLabelId,
   updates: TextLabelUpdate
 ): TextLabel[] {
-  if (!labels || !Array.isArray(labels)) return [];
-  
-  return labels.map(label => 
-    label.id === id ? { ...label, ...updates } : label
-  );
+  return updateById<TextLabel>(labels, id, updates);
 }
 
 /**
@@ -140,8 +121,7 @@ function removeTextLabel(
   labels: TextLabel[] | null | undefined,
   id: TextLabelId
 ): TextLabel[] {
-  if (!labels || !Array.isArray(labels)) return [];
-  return labels.filter(label => label.id !== id);
+  return removeById<TextLabel>(labels, id);
 }
 
 // ===========================================
@@ -200,7 +180,7 @@ function getTextLabelAtPosition(
   }
   
   // Font family mapping
-  const fontMap: Record<FontFace, string> = {
+  const fontMap: Partial<Record<string, string>> = {
     'sans': 'system-ui, -apple-system, sans-serif',
     'serif': 'Georgia, Times, serif',
     'mono': '"Courier New", monospace',
@@ -226,7 +206,7 @@ function getTextLabelAtPosition(
     // Set font to measure text accurately
     const fontSize = (label.fontSize || 16) * scale;
     const fontFace = label.fontFace || 'sans';
-    const fontFamily = fontMap[fontFace] || 'sans-serif';
+    const fontFamily = fontMap[fontFace] ?? 'sans-serif';
     
     context.font = `${fontSize}px ${fontFamily}`;
     
@@ -248,7 +228,7 @@ function getTextLabelAtPosition(
       x, y,
       label.position.x, label.position.y,
       boundingWidth, boundingHeight,
-      label.rotation || 0
+      label.rotation ?? 0
     )) {
       return label;
     }
@@ -257,31 +237,9 @@ function getTextLabelAtPosition(
   return null;
 }
 
-/**
- * Remove all text labels within a rectangular area (for clear area tool)
- */
-function removeTextLabelsInRectangle(
-  labels: TextLabel[] | null | undefined,
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number
-): TextLabel[] {
-  if (!labels || !Array.isArray(labels)) return [];
-  
-  const minX = Math.min(x1, x2);
-  const maxX = Math.max(x1, x2);
-  const minY = Math.min(y1, y2);
-  const maxY = Math.max(y1, y2);
-  
-  return labels.filter(label => {
-    return !(label.position.x >= minX && label.position.x <= maxX && 
-             label.position.y >= minY && label.position.y <= maxY);
-  });
-}
-
 // ===========================================
 // Exports
 // ===========================================
 
-export { generateTextLabelId, addTextLabel, updateTextLabel, removeTextLabel, getTextLabelAtPosition, removeTextLabelsInRectangle };
+export { addTextLabel, updateTextLabel, removeTextLabel, getTextLabelAtPosition };
+export type { TextLabel };

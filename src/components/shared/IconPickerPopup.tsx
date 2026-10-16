@@ -20,7 +20,7 @@ import { Icon } from './Icon';
 import { tooltipRef } from './obsidianTooltip';
 
 /** Props for IconPickerPopup */
-export interface IconPickerPopupProps {
+interface IconPickerPopupProps {
   /** Whether the picker is open */
   isOpen: boolean;
   /** Currently selected icon (`ra-*` class or literal symbol), or null */
@@ -78,7 +78,7 @@ const IconPickerPopup = ({
       position: 'fixed',
       left: `${rect.left}px`,
       ...(position === 'above'
-        ? { bottom: `${window.innerHeight - rect.top + gap}px` }
+        ? { bottom: `${(anchorRef.current.ownerDocument.defaultView ?? window).innerHeight - rect.top + gap}px` }
         : { top: `${rect.bottom + gap}px` }
       )
     };

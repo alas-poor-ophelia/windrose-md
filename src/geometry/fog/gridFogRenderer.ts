@@ -6,6 +6,9 @@
  */
 
 import type { FoggedCell } from '#types/core/map.types';
+import { getFoggedCellSet } from './foggedCellIndex';
+
+import { FOG_PASS_OPACITY_BASE, FOG_PASS_OPACITY_RAMP, FOG_FILTER_BLUR_START, FOG_FILTER_MIN_BLUR_PX } from '../renderers/renderConstants';
 
 interface GridFogRenderContext {
   ctx: CanvasRenderingContext2D;
@@ -83,11 +86,11 @@ function renderBlurPasses(
   for (let i = 0; i < numPasses; i++) {
     const t = i / (numPasses - 1);
     const radius = maxRadius - (blurRadius * t);
-    const opacity = 0.50 + (0.30 * t);
+    const opacity = FOG_PASS_OPACITY_BASE + (FOG_PASS_OPACITY_RAMP * t);
 
     if (useFilterFallback) {
-      const passBlur = filterBlurAmount * (1.5 - t);
-      targetCtx.filter = passBlur > 0.5 ? `blur(${passBlur}px)` : 'none';
+      const passBlur = filterBlurAmount * (FOG_FILTER_BLUR_START - t);
+      targetCtx.filter = passBlur > FOG_FILTER_MIN_BLUR_PX ? `blur(${passBlur}px)` : 'none';
     }
 
     targetCtx.beginPath();
@@ -179,7 +182,8 @@ function renderGridFog(
   visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number },
   zoom: number
 ): void {
-  const foggedSet = new Set(fogCells.map(c => `${c.col},${c.row}`));
+  // Cached per foggedCells identity (MEM-02); was rebuilt every frame.
+  const foggedSet = getFoggedCellSet(fogCells);
 
   // Identify visible and edge cells
   const { visibleFogCells, edgeCells } = identifyEdgeCells(

@@ -356,6 +356,10 @@ describe("layerAccessor", () => {
       expect(shiftedTop.order).toBe(2);
     });
 
+    // Ids are regenerated in the copy (DATA-17); content must match.
+    const stripIds = (items: Array<{ id?: string }>): unknown[] =>
+      items.map(({ id: _id, ...rest }) => rest);
+
     it("mode 'all' copies cells, curves, edges, objects, textLabels, fogOfWar, tiles", () => {
       const layer1 = createLayer("layer-1", "Full", 0);
       layer1.cells = [{ x: 1, y: 2, color: "#aaa" }] as any;
@@ -373,10 +377,10 @@ describe("layerAccessor", () => {
 
       const clone = updated.layers.find((l) => l.id !== "layer-1")!;
       expect(clone.cells).toEqual(layer1.cells);
-      expect(clone.curves).toEqual(layer1.curves);
+      expect(stripIds(clone.curves)).toEqual(stripIds(layer1.curves));
       expect(clone.edges).toEqual(layer1.edges);
-      expect(clone.objects).toEqual(layer1.objects);
-      expect(clone.textLabels).toEqual(layer1.textLabels);
+      expect(stripIds(clone.objects)).toEqual(stripIds(layer1.objects));
+      expect(stripIds(clone.textLabels)).toEqual(stripIds(layer1.textLabels));
       expect(clone.fogOfWar).toEqual(layer1.fogOfWar);
       expect(clone.tiles).toEqual(layer1.tiles);
     });
@@ -398,7 +402,7 @@ describe("layerAccessor", () => {
 
       const clone = updated.layers.find((l) => l.id !== "layer-1")!;
       expect(clone.cells).toEqual(layer1.cells);
-      expect(clone.curves).toEqual(layer1.curves);
+      expect(stripIds(clone.curves)).toEqual(stripIds(layer1.curves));
       expect(clone.edges).toEqual(layer1.edges);
       expect(clone.tiles).toEqual(layer1.tiles);
       expect(clone.objects).toEqual([]);

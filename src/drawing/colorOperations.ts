@@ -15,7 +15,7 @@ import { getColorPaletteSettings, BUILT_IN_COLORS } from '../core/settingsAccess
 // ===========================================
 
 /** Color definition in the palette */
-export interface ColorDefinition {
+interface ColorDefinition {
   id: string;
   color: string;
   label: string;
@@ -30,12 +30,6 @@ export interface ColorDefinition {
 
 /** Default cell color (tan/brown) */
 const DEFAULT_COLOR = '#c4a57b';
-
-/** 
- * Static fallback palette for backward compatibility.
- * Components should prefer getColorPalette() for dynamic colors.
- */
-const COLOR_PALETTE: ColorDefinition[] = BUILT_IN_COLORS;
 
 // ===========================================
 // Functions
@@ -116,13 +110,4 @@ function colorsMatch(a: string | null | undefined, b: string | null | undefined)
 // Exports
 // ===========================================
 
-export {
-  DEFAULT_COLOR,
-  COLOR_PALETTE,
-  getColorPalette,
-  getCellColor,
-  getColorByHex,
-  isDefaultColor,
-  normalizeHexColor,
-  colorsMatch,
-};
+export { DEFAULT_COLOR, getColorPalette, getCellColor, getColorByHex, isDefaultColor, colorsMatch };

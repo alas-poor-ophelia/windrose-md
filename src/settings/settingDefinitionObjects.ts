@@ -16,6 +16,7 @@ import { PromptModal } from './modals/PromptModal';
 import { ContentPackBrowserModal } from '../content-packs/ContentPackBrowserModal';
 import { infoItem, dedupeRowNames, saveAndRebuild } from './settingDefinitionLists';
 import type { SettingsTabThis } from './tabs/settingsTabContext';
+import { mintId } from '../core/ids';
 
 // settingDefinitionObjects.ts
 // Declarative Settings API (Obsidian 1.13+) Object Types section: object
@@ -427,7 +428,7 @@ function objectRow(tab: SettingsTabThis, obj: ResolvedObject, isHiddenSection: b
 
             tab.plugin.settings[targetObjectsKey] ??= [];
 
-            const newId = 'custom-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+            const newId = mintId('custom');
 
             // Copy the object's custom category to the target type if absent
             const targetCategory = obj.category;

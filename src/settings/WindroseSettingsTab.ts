@@ -18,7 +18,7 @@ interface WindrosePlugin extends Plugin {
 // 8-file render-mixin Object.assign structure) was demolished when
 // minAppVersion moved to 1.13.0 — see docs/proposals/settings-api-migration.md.
 class WindroseMDSettingsTab extends PluginSettingTab {
-  plugin: WindrosePlugin;
+  override plugin: WindrosePlugin;
   settingsChanged: boolean;
   selectedMapType: 'grid' | 'hex';
   cachedHasOldData: boolean;
@@ -39,15 +39,15 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     });
   }
 
-  getSettingDefinitions(): SettingDefinitionItem[] {
+  override getSettingDefinitions(): SettingDefinitionItem[] {
     return buildSettingDefinitions(this);
   }
 
-  getControlValue(key: string): unknown {
+  override getControlValue(key: string): unknown {
     return getSettingControlValue(this, key);
   }
 
-  async setControlValue(key: string, value: unknown): Promise<void> {
+  override async setControlValue(key: string, value: unknown): Promise<void> {
     await setSettingControlValue(this, key, value);
   }
 
@@ -92,7 +92,7 @@ class WindroseMDSettingsTab extends PluginSettingTab {
     }
   }
 
-  hide(): void {
+  override hide(): void {
     if (this.settingsChanged) {
       window.dispatchEvent(new CustomEvent('windrose-settings-changed', {
         detail: { timestamp: Date.now() }

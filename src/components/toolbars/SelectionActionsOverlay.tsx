@@ -1,8 +1,8 @@
 /**
  * SelectionActionsOverlay.tsx
  *
- * Unified selection toolbar replacing ObjectSelectionToolbar, TextSelectionToolbar,
- * and MultiSelectToolbar. Renders a bronze-themed card anchored to the selected item(s)
+ * Unified selection toolbar (replaced the old object, text and multi-select toolbars)
+ * Renders a bronze-themed card anchored to the selected item(s)
  * with labeled actions in a 2-column grid.
  */
 
@@ -11,17 +11,20 @@ import type { VNode } from 'preact';
 import type { IGeometry } from '#types/core/geometry.types';
 import type { SelectedItem } from '#types/contexts/context.types';
 import type { MapObject } from '#types/objects/object.types';
-import type { SelectionAction } from '../../hooks/interactions/useSelectionActions.ts';
+import type { SelectionAction } from './selectionActionBuilders';
 import type { CustomColor } from '#types/core/common.types';
 import type { MenuItem } from 'obsidian';
 
 import { useEffect, useState } from 'preact/hooks';
-import { useToolbarPosition } from '../../hooks/interactions/useToolbarPosition';
+import { computeToolbarPosition } from './toolbarPosition';
 import { openNoteInNewTab } from '../../persistence/noteOperations';
 import { ColorPicker } from '../shared/ColorPicker';
 import { CornerBrackets } from '../shared/CornerBrackets';
 import { getActiveLayer } from '../../persistence/layerAccessor';
+import { getObjectAtPosition } from '../../objects/objectOperations';
 import { getSelectionBounds } from '../../objects/selectionBounds';
+import { pickLadderObject } from '../../objects/ladderHitTest';
+import { classicHitRung } from '../../objects/hexSlotPositioner';
 import { Menu } from 'obsidian';
 import { SelectionCardFiligree } from './SelectionCardFiligree';
 import { Icon } from '../shared/Icon';
@@ -123,7 +126,7 @@ const SelectionActionsOverlay = ({
 }: SelectionActionsOverlayProps): VNode | null => {
   // Per-mount instance id: this overlay always renders inside the MapCanvas
   // provider tree, and must only claim context-menu events from its own mount.
-  const { instanceId, viewController, ladder } = useMapState();
+  const { instanceId, viewController, screenToGrid, screenToWorld, ladder, getActiveLevel } = useMapState();
 
   // Hide (via CSS, in the JSX below) mid pan/zoom gesture; reanchor on
   // commit. The card's bounds are computed from committed viewState and
@@ -147,6 +150,26 @@ const SelectionActionsOverlay = ({
       // Foreign mount's event: don't act on it — and don't claim it either.
       if (isForeignInstanceEvent(detail, instanceId)) return;
       if (detail.handled === true) return;
+      // Claimant rule (mirrored in ObjectLayer): a right-click that lands on
+      // an object NOT in this selection belongs to ObjectLayer, which selects
+      // that object and shows its menu. Everything else while this overlay is
+      // mounted (on the selection, or on empty map) is ours. Disjoint
+      // predicates, so listener registration order cannot pick the winner.
+      const objects = getActiveLayer(mapData).objects ?? [];
+      let hit: MapObject | null = null;
+      if (ladder !== null) {
+        const world = screenToWorld(detail.clientX, detail.clientY);
+        if (world != null) {
+          const zoom = viewController?.getLive().zoom ?? mapData.viewState?.zoom ?? 1;
+          hit = pickLadderObject(objects, world.worldX, world.worldY, {
+            ladder, level: getActiveLevel(), zoom, orientation: mapData.orientation ?? 'flat'
+          });
+        }
+      } else {
+        const coords = screenToGrid(detail.clientX, detail.clientY);
+        if (coords != null) hit = getObjectAtPosition(objects, coords.x, coords.y, classicHitRung(mapData));
+      }
+      if (hit != null && !selectedItems.some(s => s.id === hit.id)) return;
       detail.handled = true;
       const { screenX, screenY } = detail;
 
@@ -171,9 +194,10 @@ const SelectionActionsOverlay = ({
       menu.showAtPosition({ x: screenX, y: screenY });
     };
 
-    activeDocument.addEventListener('windrose:selection-context-menu', handler);
-    return () => activeDocument.removeEventListener('windrose:selection-context-menu', handler);
-  }, [actions, instanceId]);
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('windrose:selection-context-menu', handler);
+    return () => doc.removeEventListener('windrose:selection-context-menu', handler);
+  }, [actions, instanceId, screenToGrid, screenToWorld, ladder, getActiveLevel, viewController, mapData, selectedItems, canvasRef]);
 
   const hasRequiredRefs = selectedItems.length > 0 && canvasRef.current != null && containerRef.current != null;
 
@@ -243,7 +267,7 @@ const SelectionActionsOverlay = ({
   const linkedNoteHeight = linkedNote != null && linkedNote !== '' ? 32 : 0;
   const linkedNoteGap = linkedNote != null && linkedNote !== '' ? 4 : 0;
 
-  const toolbarPos = useToolbarPosition({
+  const toolbarPos = computeToolbarPosition({
     bounds,
     containerRef,
     toolbarWidth: cardWidth,

@@ -14,6 +14,17 @@ interface EdgeCell extends FoggedCell {
 
 import type { HexGeometryLike } from './fogRenderer';
 import type { IGeometry } from '#types/core/geometry.types';
+import { getFoggedCellSet } from './foggedCellIndex';
+
+import { FOG_PASS_OPACITY_BASE, FOG_PASS_OPACITY_RAMP, FOG_FILTER_BLUR_START, FOG_FILTER_MIN_BLUR_PX } from '../renderers/renderConstants';
+
+/** Screen-space rectangle (pre-rotation) a fog cell centre must fall inside to be drawn. */
+interface ScreenCullRect {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
 
 interface HexFogRenderContext {
   ctx: CanvasRenderingContext2D;
@@ -21,6 +32,77 @@ interface HexFogRenderContext {
   offsetX: number;
   offsetY: number;
   zoom: number;
+  /** Viewport cull rect; absent = draw every cell (legacy callers, tests). */
+  cull?: ScreenCullRect;
+}
+
+/**
+ * Interior outlines are batched into ONE stroked path. A single stroke paints
+ * a shared edge once, where the old per-cell strokes painted it twice at 0.15
+ * (composited ~0.28). 0.28 keeps the interior lattice looking the same.
+ */
+const INTERIOR_OUTLINE_STYLE = 'rgba(255, 255, 255, 0.28)';
+
+// ===========================================
+// Topology cache (MEM-02)
+// ===========================================
+//
+// Which fog cells are edges (some neighbour unfogged) and which have a fogged
+// neighbour depends only on the foggedCells array, the orientation and the
+// hex size, never on the viewport. Fog updates are immutable (a changed fog
+// state is a new array), so the classification is computed once per array
+// identity in a WeakMap, the same convention as foggedCellIndex, and the
+// per-frame work drops to a cull + path trace over the visible cells.
+
+interface HexFogCellInfo {
+  col: number;
+  row: number;
+  q: number;
+  r: number;
+  /** World-space centre, for the viewport cull. */
+  wx: number;
+  wy: number;
+  /** At least one neighbour is NOT fogged (gets the blur passes). */
+  edge: boolean;
+  /** At least one neighbour IS fogged (gets an interior outline). */
+  interior: boolean;
+}
+
+interface HexFogTopology {
+  orientation: 'flat' | 'pointy';
+  hexSize: number;
+  cells: HexFogCellInfo[];
+}
+
+const topologyCache = new WeakMap<readonly FoggedCell[], HexFogTopology>();
+
+function getHexFogTopology(
+  fogCells: FoggedCell[],
+  hexGeometry: HexGeometryLike,
+  orientation: 'flat' | 'pointy',
+  offsetToAxial: (col: number, row: number, orientation: 'flat' | 'pointy') => { q: number; r: number },
+  axialToOffset: (q: number, r: number, orientation: 'flat' | 'pointy') => { col: number; row: number }
+): HexFogTopology {
+  const cached = topologyCache.get(fogCells);
+  if (cached && cached.orientation === orientation && cached.hexSize === hexGeometry.hexSize) return cached;
+
+  const foggedSet = getFoggedCellSet(fogCells);
+  const cells: HexFogCellInfo[] = [];
+  for (const { col, row } of fogCells) {
+    const { q, r } = offsetToAxial(col, row, orientation);
+    let edge = false;
+    let interior = false;
+    for (const n of hexGeometry.getNeighbors(q, r)) {
+      const { col: nCol, row: nRow } = axialToOffset(n.x, n.y, orientation);
+      if (foggedSet.has(`${nCol},${nRow}`)) interior = true; else edge = true;
+      if (edge && interior) break;
+    }
+    const { worldX, worldY } = hexGeometry.hexToWorld(q, r);
+    cells.push({ col, row, q, r, wx: worldX, wy: worldY, edge, interior });
+  }
+  const topology: HexFogTopology = { orientation, hexSize: hexGeometry.hexSize, cells };
+  topologyCache.set(fogCells, topology);
+  return topology;
 }
 
 interface HexFogRenderOptions {
@@ -140,11 +222,11 @@ function renderHexBlurPasses(
   for (let i = 0; i < numPasses; i++) {
     const t = i / (numPasses - 1);
     const scale = 1.0 + (maxExpansion * (1.0 - t));
-    const opacity = 0.50 + (0.30 * t);
+    const opacity = FOG_PASS_OPACITY_BASE + (FOG_PASS_OPACITY_RAMP * t);
 
     if (useFilterFallback) {
-      const passBlur = filterBlurAmount * (1.5 - t);
-      targetCtx.filter = passBlur > 0.5 ? `blur(${passBlur}px)` : 'none';
+      const passBlur = filterBlurAmount * (FOG_FILTER_BLUR_START - t);
+      targetCtx.filter = passBlur > FOG_FILTER_MIN_BLUR_PX ? `blur(${passBlur}px)` : 'none';
     }
 
     targetCtx.beginPath();
@@ -194,38 +276,36 @@ function renderInteriorHexOutlines(
   offsetToAxial: (col: number, row: number, orientation: 'flat' | 'pointy') => { q: number; r: number },
   axialToOffset: (q: number, r: number, orientation: 'flat' | 'pointy') => { col: number; row: number }
 ): void {
-  const { ctx, offsetX, offsetY, zoom } = context;
-
   if (visibleFogCells.length <= 1) return;
 
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-  ctx.lineWidth = Math.max(1, 1 * zoom);
-
+  const outlined: Array<{ q: number; r: number }> = [];
   for (const { col, row } of visibleFogCells) {
     const { q, r } = offsetToAxial(col, row, orientation);
-
-    const neighbors = hexGeometry.getNeighbors(q, r);
-    const hasFoggedNeighbor = neighbors.some(n => {
+    const hasFoggedNeighbor = hexGeometry.getNeighbors(q, r).some(n => {
       const { col: nCol, row: nRow } = axialToOffset(n.x, n.y, orientation);
       return foggedSet.has(`${nCol},${nRow}`);
     });
-
-    if (hasFoggedNeighbor) {
-      const vertices = hexGeometry.getHexVertices(q, r);
-
-      ctx.beginPath();
-      const first = geometry.worldToScreen(vertices[0].worldX, vertices[0].worldY, offsetX, offsetY, zoom);
-      ctx.moveTo(first.screenX, first.screenY);
-
-      for (let i = 1; i < vertices.length; i++) {
-        const vertex = geometry.worldToScreen(vertices[i].worldX, vertices[i].worldY, offsetX, offsetY, zoom);
-        ctx.lineTo(vertex.screenX, vertex.screenY);
-      }
-
-      ctx.closePath();
-      ctx.stroke();
-    }
+    if (hasFoggedNeighbor) outlined.push({ q, r });
   }
+  strokeHexOutlines(outlined, context, hexGeometry, geometry);
+}
+
+/** One path, one stroke for every outlined hex (was one stroke per cell). */
+function strokeHexOutlines(
+  cells: ReadonlyArray<{ q: number; r: number }>,
+  context: HexFogRenderContext,
+  hexGeometry: HexGeometryLike,
+  geometry: IGeometry
+): void {
+  if (cells.length === 0) return;
+  const { ctx, offsetX, offsetY, zoom } = context;
+  ctx.strokeStyle = INTERIOR_OUTLINE_STYLE;
+  ctx.lineWidth = Math.max(1, 1 * zoom);
+  ctx.beginPath();
+  for (const { q, r } of cells) {
+    traceHexPath(ctx, q, r, 1.0, hexGeometry, geometry, { offsetX, offsetY, zoom });
+  }
+  ctx.stroke();
 }
 
 /**
@@ -243,39 +323,43 @@ function renderHexFog(
   offsetToAxial: (col: number, row: number, orientation: 'flat' | 'pointy') => { q: number; r: number },
   axialToOffset: (q: number, r: number, orientation: 'flat' | 'pointy') => { col: number; row: number }
 ): void {
-  const foggedSet = new Set(fogCells.map(c => `${c.col},${c.row}`));
+  const topology = getHexFogTopology(fogCells, hexGeometry, orientation, offsetToAxial, axialToOffset);
+  const { minCol, maxCol, minRow, maxRow } = visibleBounds;
+  const { cull, offsetX, offsetY, zoom } = context;
 
-  // Identify visible and edge cells
-  const { visibleFogCells, edgeCells } = identifyHexEdgeCells(
-    fogCells,
-    foggedSet,
-    visibleBounds,
-    hexGeometry,
-    orientation,
-    offsetToAxial,
-    axialToOffset
-  );
+  // Per-frame: cull the cached classification to the viewport.
+  const visible: HexFogCellInfo[] = [];
+  const edges: EdgeCell[] = [];
+  const interiors: HexFogCellInfo[] = [];
+  for (const cell of topology.cells) {
+    if (cell.col < minCol || cell.col > maxCol || cell.row < minRow || cell.row > maxRow) continue;
+    if (cull) {
+      const { screenX, screenY } = geometry.worldToScreen(cell.wx, cell.wy, offsetX, offsetY, zoom);
+      if (screenX < cull.minX || screenX > cull.maxX || screenY < cull.minY || screenY > cull.maxY) continue;
+    }
+    visible.push(cell);
+    if (cell.edge) edges.push(cell);
+    if (cell.interior) interiors.push(cell);
+  }
+  if (visible.length === 0) return;
 
   // Render blur passes for edge cells
   if (options.fowBlurEnabled && options.blurRadius > 0) {
-    renderHexBlurPasses(edgeCells, context, options, hexGeometry, geometry);
+    renderHexBlurPasses(edges, context, options, hexGeometry, geometry);
     context.ctx.globalAlpha = options.useGlobalAlpha ? options.fowOpacity : 1;
   }
 
-  // Render solid fog cells
-  renderHexFogCells(visibleFogCells, context, hexGeometry, geometry, orientation, offsetToAxial);
+  // Render solid fog cells (one path)
+  const { ctx } = context;
+  ctx.beginPath();
+  for (const { q, r } of visible) {
+    traceHexPath(ctx, q, r, 1.0, hexGeometry, geometry, { offsetX, offsetY, zoom });
+  }
+  ctx.fill();
 
-  // Render interior hex outlines
-  renderInteriorHexOutlines(
-    visibleFogCells,
-    foggedSet,
-    context,
-    hexGeometry,
-    geometry,
-    orientation,
-    offsetToAxial,
-    axialToOffset
-  );
+  // Interior hex outlines (one path, one stroke)
+  if (visible.length > 1) strokeHexOutlines(interiors, context, hexGeometry, geometry);
 }
 
-export { identifyHexEdgeCells, traceHexPath, renderHexBlurPasses, renderHexFogCells, renderInteriorHexOutlines, renderHexFog };
+export { identifyHexEdgeCells, traceHexPath, renderHexBlurPasses, renderHexFogCells, renderInteriorHexOutlines, renderHexFog, getHexFogTopology };
+export type { ScreenCullRect };

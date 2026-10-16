@@ -22,7 +22,7 @@ This is a standard Obsidian Community Plugin using Preact (not React):
 // Standard Windrose pattern
 import { useState, useCallback } from 'preact/hooks';
 import { useMapState } from '../context/MapContext';
-import type { Cell } from '#types';
+import type { Cell } from '#types/core/cell.types';
 
 function MyComponent() {
   const { geometry } = useMapState();
@@ -49,14 +49,12 @@ windrose/                        # Development root (OUTSIDE vault)
 ├── package.json
 ├── tsconfig.json
 ├── types/                       # TypeScript type definitions
-│   ├── core/
-│   ├── hooks/
-│   ├── objects/
-│   └── index.ts                 # Barrel export
+│   ├── core/  contexts/  hooks/  objects/  settings/  tiles/  tools/  content-packs/
+│   └── index.ts                 # Barrel export (prefer direct '#types/core/...' imports)
 ├── tests/
-│   ├── unit/                    # Vitest unit tests (~1200 tests)
-│   └── e2e/                     # Playwright E2E tests
-└── src/                         # Plugin source — real tracked directory (~264 files)
+│   ├── unit/                    # Vitest unit tests (~2,450 tests, ~4-5 s)
+│   └── e2e/                     # obsidian-testing-framework + Vitest, drives real Obsidian
+└── src/                         # Plugin source — real tracked directory (~315 files)
 ```
 
 #### Why this structure:
@@ -71,7 +69,7 @@ windrose/                        # Development root (OUTSIDE vault)
 
 The codebase follows a composition pattern:
 
-- **Context Providers**: `MapContext`, `MapSettingsContext`, `MapSelectionContext`, `EventHandlerContext`, `AppContext`
+- **Context Providers**: `AppContext`, `MapContext`, `MapSelectionContext`, `ObjectLinkingContext`, `EventHandlerContext`; `MapSettingsContext` exists only inside the per-map settings modal (see `context/CLAUDE.md`)
 - **Custom Hooks**: Encapsulate complex logic (`useCanvasRenderer`, `useDrawingTools`, `useEventCoordinator`, etc.)
 - **Layer Components**: Separate rendering concerns (`DrawingLayer`, `ObjectLayer`, `FogOfWarLayer`, etc.)
 
@@ -82,6 +80,13 @@ The codebase follows a composition pattern:
 - `HexGeometry.ts` — Hexagonal grid implementation
 - Components use geometry abstraction, never assume grid vs hex
 - See `geometry/CLAUDE.md` for IGeometry methods, coordinate systems, and iOS canvas patterns
+
+### Glossary
+
+- **Beacon (UI) = PartyPin (code)**: the party marker. Persisted key is `partyPins`; user label is generated as `Beacon N`. Related files are named `partyPin*` / `party*`.
+- **Sub-hex**: a hex cell drilled into as its own map (`subHexMaps`, `useSubHexNavigation`).
+- **Full-pane**: the map opened as an Obsidian view (`views/WindroseMapView.ts`) rather than a code-block embed.
+- `DungeonMapTracker` is the root map component (historical name); `dmtConstants.ts` holds shared constants.
 
 ### State Management
 
@@ -102,34 +107,38 @@ The codebase follows a composition pattern:
 ```
 src/
 ├── main.ts               # Plugin entry point
+├── DungeonMapTracker.tsx  # Root map component (one per mounted map)
 ├── core/                  # App infrastructure
-│   ├── dmtConstants.ts    # Constants, theme, defaults
+│   ├── dmtConstants.ts    # Constants, theme, defaults, schema version, segment tables
 │   ├── settingsAccessor.ts # Plugin settings read/write
 │   ├── lodFlags.ts        # Lattice ladder capability flag (developer setting, default off)
+│   ├── featureFlags.ts    # Feature gating (absent = enabled)
+│   ├── windroseEvents.ts  # Typed registry of windrose:* custom DOM events
+│   ├── paintedViewStore.ts # Per-canvas record of the viewState last actually painted
+│   ├── subHexBackdropStore.ts # Parent-map snapshot store for sub-hex dives
 │   ├── deepLinkRegistration.ts # Deep link system (4-layer)
 │   └── interactjs.ts      # interact.js wrapper
-├── objects/               # Map object domain
-│   ├── objectTypes.ts
-│   ├── objectOperations.ts
-│   └── ...
-├── drawing/               # Cell painting & interaction math
+├── objects/               # Map object domain (objectOperations, partyPin*, shapeOverlay*, selection)
+├── drawing/               # Pure map-editing math: cells, edges, walls, wall gaps, routes, tiles, scatter, terrain strokes
 ├── text/                  # Text label domain
-├── travel/                # Travel packs (units, terrains, modes, allowances)
-├── assets/                # Icons & tileset operations
-├── persistence/           # Data I/O & vault interaction
-│   ├── fileOperations.ts
-│   ├── layerAccessor.ts
-│   └── ...
+├── travel/                # Travel packs (units, terrains, modes, allowances) and segment terrain sampler
+├── assets/                # Icons, tileset operations, and the tile import/prediction pipeline (import*, *Predictor, tile*)
+├── content-packs/         # Content pack browser/download/install/registry, DD pack import
+├── persistence/           # Data I/O & vault interaction (fileOperations, saveCoordinator, schemaMigration, exportOperations, layerAccessor, fogOperations, subHexPath)
+├── utils/                 # Dev/diagnostic probes (perfTelemetry, zoomTraceProbe, inputEventProbe, canvasCapabilityReport) plus small shared guards: keyboardTargets.ts (typing-surface check for map key handlers), assertNever.ts (exhaustive-switch guard: `default: return assertNever(x)`)
+├── views/                 # WindroseMapView.ts (full-pane Obsidian view)
 ├── geometry/
-│   ├── core/              # Geometry abstractions (Base/Grid/Hex)
+│   ├── core/              # Geometry abstractions (Base/Grid/Hex), createGeometry, contentFitView, subHexBackdrop
 │   ├── renderers/         # Canvas draw functions
 │   ├── fog/               # Fog-of-war rendering pipeline
+│   ├── strokes/           # Terrain stroke geometry
 │   └── curves/            # Bezier math & boolean ops
 ├── hooks/
 │   ├── canvas/            # Canvas infrastructure
 │   ├── drawing/           # Drawing tools
 │   ├── objects/           # Object interactions
 │   ├── state/             # State management & data
+│   ├── app/               # Root-component composition hooks (DungeonMapTracker only)
 │   └── interactions/      # Feature-specific tool interactions
 ├── components/
 │   ├── controls/          # Map chrome & navigation
@@ -138,10 +147,11 @@ src/
 │   ├── panels/            # Sidebar/docked panels
 │   ├── toolbars/          # Action toolbars
 │   ├── shared/            # Reusable primitives (Icon, InternalLink)
+│   ├── hosts/             # DMT layout hosts: one prop bag per panel (panelBags/buildPanelBags), TileBrowserHost (block|fullpane|floating), edge rail, drawers, dock column, floating panels, canvas layers
 │   ├── mapcanvas/         # Canvas layer components
 │   └── settings/          # Settings UI components
 ├── context/               # Preact Contexts
-├── settings/              # Obsidian settings tab (declarative 1.13+ Settings API)
+├── settings/              # Obsidian settings tab (declarative 1.13+ Settings API); see settings/CLAUDE.md
 │   ├── WindroseSettingsTab.ts       # Tab class: definitions + control value plumbing
 │   ├── settingDefinitions.ts        # Stock sections, dungeon pickers, shortcuts, banner
 │   ├── settingDefinitionLists.ts    # List sections: colors, travel packs, tile sets
@@ -149,8 +159,29 @@ src/
 │   ├── helpers/           # Settings utilities
 │   ├── modals/            # Settings modals
 │   └── tabs/settingsTabContext.ts   # Structural tab type for definition builders
-└── generation/            # Random map generation
+└── generation/            # Random map generation (dungeonGenerator.ts, objectPlacer.ts, dungeonStyleColors.ts; all TypeScript, golden-hash test in tests/unit/generation)
 ```
+
+Non-source files live outside `src/`: `CHANGELOG.md` (read by the release workflow) at the repo root, and the sample map-block template and object set under `examples/`.
+
+## Feature Map (post-2.0 features to files)
+
+| Feature | Files |
+|---------|-------|
+| Beacon (party pin) | `objects/partyPinOperations.ts`, `objects/partyRangeQuery.ts`, `objects/partyRelatedNotes.ts`, `persistence/partyNoteOperations.ts`, `components/mapcanvas/PartyPinLayer.tsx` + `PartyPinInstance.tsx`, `components/overlays/PartyPin*.tsx`, `hooks/interactions/usePartyPin*.ts` |
+| Travel and routes | `travel/` (packs, time, segment terrain sampler), `drawing/routeOperations.ts`, `components/mapcanvas/RouteLayer.tsx` + `MeasurementLayer.tsx`, `hooks/interactions/useTerrainSampling.ts`, `components/modals/SaveRouteModal.ts`, `settings/modals/TravelPackEditModal.ts` |
+| Openings (wall gaps) | `drawing/wallGapOperations.ts`, `drawing/wallEditGeometry.ts`, `components/mapcanvas/WallLayer.tsx`, `hooks/walls/` (`useWallTools.ts` state + handlers, `useWallOverlay.ts` overlay canvas, `useWallToolSurface.ts` drawer-footer controls) (walls/paths: `drawing/wallPath*.ts`, `geometry/renderers/wallPathRenderer.ts`) |
+| Full-pane view | `views/WindroseMapView.ts` |
+| DMT app wiring | `hooks/app/` (map chrome state, dock layout, drawer ribbon, tile drawer/flyouts/tool coupling, tileset art handlers, board and map-list actions, layer links, adjacent sub-maps): composition hooks that keep `DungeonMapTracker.tsx` a thin root; panels render through `components/hosts/` |
+| Sub-hex maps | `hooks/interactions/useSubHexNavigation.ts`, `persistence/subHexPath.ts` (hexKey-path read/write helpers), `core/subHexBackdropStore.ts`, `core/paintedViewStore.ts`, `geometry/core/subHexBackdrop.ts`, `geometry/renderers/subHexBackdropRenderer.ts`, `components/controls/SubHexBreadcrumb.tsx` |
+| Export | `persistence/exportOperations.ts`, `components/modals/ExportImageModal.ts` |
+| Dock panels | `components/panels/Dock*.tsx`, `DrawerDock.tsx`, `EdgeRail.tsx`, `hooks/state/useFloatingPanels.ts`; rendered via `components/hosts/` (add a panel prop in `panelBags.ts` + `buildPanelBags.ts`, never per layout) |
+| Tile import wizard | `assets/import*.ts` (+ predictors, `tile*.ts`), `settings/modals/AddTilesModal.ts`, `components/panels/TileAssetBrowser.tsx` (+ `TileCell.tsx`, `TileBrowserFooter.tsx`, `hooks/tiles/useTileFilterPipeline.ts`), `TileOrganizePane.tsx` |
+| Terrain strokes | `drawing/terrainStrokeOperations.ts`, `geometry/strokes/`, `components/mapcanvas/TerrainBrushLayer.tsx` |
+| Pan/zoom performance | `hooks/canvas/useViewController.ts`, `useLiveOverlay*.ts` |
+| Content packs | `content-packs/` |
+| Save durability | `persistence/saveCoordinator.ts`, `saveJournal.ts`, `fileOperations.ts`, `hooks/state/useDebouncedSave.ts` |
+| Lattice detail ladder (LOD, dormant unless `core/lodFlags.ts` is on and the map opts in) | Geometry: `geometry/core/createGeometryLadder.ts`, `lattice.ts`, `materialiseLevel.ts`; render: `geometry/renderers/latticeRenderer.ts`, `elementBands.ts`, `tileClipRegion.ts`, `hooks/canvas/levelSurfaces.ts`, `surfaceBudget.ts`, `rungFog.ts`, `ladderTelemetry.ts`; authoring: `persistence/depthAuthoring.ts` (the single deep-write gate), `drawing/depthCellOps.ts`, `drawing/tilePlacementOps.ts` (rung-scoped tiles), `objects/ladderHitTest.ts`, `groupDragOps.ts`, `hooks/state/layerHistoryOps.ts`; UI: `components/mapcanvas/LadderLevelOverlay.tsx`, `components/settings/hexmap/LadderSection.tsx`. Objects, tiles and labels carry `homeLevel` (absent = 0); classic maps never see it |
 
 ## Key Principles
 
@@ -176,14 +207,14 @@ Always consider:
 ## Common Tasks
 
 ### Adding a New Utility Function
-1. Create in the appropriate domain directory (`core/`, `objects/`, `drawing/`, `text/`, `assets/`, `persistence/`)
+1. Create in the appropriate domain directory (`core/`, `objects/`, `drawing/`, `text/`, `travel/`, `assets/`, `content-packs/`, `persistence/`)
 2. Add types to corresponding `types/*.types.ts`
 3. Export via `export { myFunction }`
 4. Import via `import { myFunction } from '../path/to/file'`
 5. If the function needs Obsidian's App, take `app: App` as the first parameter
 
 ### Adding a New Hook
-1. Create `use*.ts` file in the appropriate `hooks/` subdirectory
+1. Create `use*.ts` file in the appropriate `hooks/` subdirectory (taxonomy in `hooks/CLAUDE.md`)
 2. Use `useState`, `useCallback`, `useMemo`, `useEffect` from `preact/hooks`
 3. Return stable references for functions
 4. Document parameters and return type
@@ -199,17 +230,19 @@ Always consider:
 
 ### Unit Tests
 ```bash
-npm run test:unit    # ~1200 tests, ~300ms
+npm run test:unit    # ~2,450 tests, ~4-5 s (Vitest, no Obsidian)
 ```
 
 ### E2E Tests
 ```bash
-npm run test:e2e     # Full Obsidian integration via Playwright
+npm run build:dev && npm run test:e2e   # real Obsidian via obsidian-testing-framework + Vitest; 20-30+ min full suite
 ```
+Never start an E2E run without the user's explicit go-ahead (see root `CLAUDE.md`).
 
 ### Type Check + Lint
 ```bash
-npm run check        # tsc --noEmit + eslint
+npm run check          # tsc --noEmit + eslint
+npm run lint:scanner   # store-scan replica lint; 0 problems required before release
 ```
 
 **Always verify both grid AND hex maps** — geometry abstraction bugs often only appear on one type.

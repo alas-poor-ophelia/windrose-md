@@ -36,13 +36,11 @@ interface UseEdgeDragToolOptions {
 
 interface UseEdgeDragToolResult {
   edgeIsDrawing: boolean;
-  processedEdges: Set<string>;
   toggleEdge: (worldX: number, worldY: number, shouldPaint: boolean) => void;
   processEdgeDuringDrag: (e: PointerEvent | MouseEvent | TouchEvent) => void;
   startEdgeDrawing: (e: PointerEvent | MouseEvent | TouchEvent) => void;
   stopEdgeDrawing: () => void;
   cancelEdgeDrawing: () => void;
-  setProcessedEdges: (v: Set<string>) => void;
 }
 
 function useEdgeDragTool({
@@ -51,7 +49,9 @@ function useEdgeDragTool({
 }: UseEdgeDragToolOptions): UseEdgeDragToolResult {
 
   const [edgeIsDrawing, setEdgeIsDrawing] = useState<boolean>(false);
-  const [processedEdges, setProcessedEdges] = useState<Set<string>>(new Set());
+  // Per-stroke dedupe set, mutated in place (no re-render per edge; .has()
+  // never reads a stale render's copy).
+  const processedEdgesRef = useRef<Set<string>>(new Set());
   const strokeInitialEdgesRef = useRef<Edge[] | null>(null);
 
   const toggleEdge = (worldX: number, worldY: number, shouldPaint: boolean): void => {
@@ -87,9 +87,9 @@ function useEdgeDragTool({
 
     const edgeKey = `${edgeInfo.x},${edgeInfo.y},${edgeInfo.side}`;
 
-    if (processedEdges.has(edgeKey)) return;
+    if (processedEdgesRef.current.has(edgeKey)) return;
 
-    setProcessedEdges((prev: Set<string>) => new Set([...prev, edgeKey]));
+    processedEdgesRef.current.add(edgeKey);
 
     const shouldPaint = currentTool === 'edgeDraw';
     toggleEdge(worldCoords.worldX, worldCoords.worldY, shouldPaint);
@@ -101,7 +101,7 @@ function useEdgeDragTool({
     const activeLayer = getActiveLayer(mapData);
 
     setEdgeIsDrawing(true);
-    setProcessedEdges(new Set());
+    processedEdgesRef.current.clear();
     strokeInitialEdgesRef.current = [...(activeLayer.edges ?? [])];
     processEdgeDuringDrag(e);
   };
@@ -110,7 +110,7 @@ function useEdgeDragTool({
     if (!edgeIsDrawing) return;
 
     setEdgeIsDrawing(false);
-    setProcessedEdges(new Set());
+    processedEdgesRef.current.clear();
 
     if (strokeInitialEdgesRef.current !== null && mapData != null) {
       const activeLayer = getActiveLayer(mapData);
@@ -124,16 +124,15 @@ function useEdgeDragTool({
   const cancelEdgeDrawing = (): void => {
     if (edgeIsDrawing) {
       setEdgeIsDrawing(false);
-      setProcessedEdges(new Set());
+      processedEdgesRef.current.clear();
       strokeInitialEdgesRef.current = null;
     }
   };
 
   return {
-    edgeIsDrawing, processedEdges,
+    edgeIsDrawing,
     toggleEdge, processEdgeDuringDrag,
-    startEdgeDrawing, stopEdgeDrawing, cancelEdgeDrawing,
-    setProcessedEdges
+    startEdgeDrawing, stopEdgeDrawing, cancelEdgeDrawing
   };
 }
 

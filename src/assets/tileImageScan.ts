@@ -104,7 +104,7 @@ async function loadBitmap(app: App, vaultPath: string): Promise<ImageBitmap | nu
 }
 
 /** Scan a single tile image into detection signals, or null if it can't be read. */
-export async function scanTileImageSignals(
+async function scanTileImageSignals(
   app: App,
   vaultPath: string,
 ): Promise<TileImageSignals | null> {
@@ -181,4 +181,25 @@ export async function runDetectionScan(
   }
   await Promise.all(workers);
   return results;
+}
+
+// Paths claimed by an in-flight or finished detection scan this session.
+// Every mounted tile browser runs the scan effect; claiming dedupes the work
+// across mounts so the same library is decoded once, not once per embed.
+const claimedScanPaths = new Set<string>();
+
+/** Claim the not-yet-claimed paths for a detection scan; returns only those. */
+export function claimDetectionScanPaths(paths: string[]): string[] {
+  const claimed: string[] = [];
+  for (const p of paths) {
+    if (claimedScanPaths.has(p)) continue;
+    claimedScanPaths.add(p);
+    claimed.push(p);
+  }
+  return claimed;
+}
+
+/** Release claims (an aborted scan) so a later mount can scan them. */
+export function releaseDetectionScanPaths(paths: string[]): void {
+  for (const p of paths) claimedScanPaths.delete(p);
 }

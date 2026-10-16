@@ -126,18 +126,23 @@ Fogged cells use **offset coordinates** regardless of geometry type.
 
 ## Migrations
 
-**Schema version**: `SCHEMA_VERSION = 2` (in `dmtConstants.ts`)
+**Schema version**: `SCHEMA_VERSION = 2` (in `dmtConstants.ts`). Every writer imports it; never hard-code a version.
 
-### Migration Trigger
+### Version-stepped runner (`src/persistence/schemaMigration.ts`)
 
-`needsMigration(mapData)` returns true if:
-- `schemaVersion` is missing
-- `schemaVersion < SCHEMA_VERSION`
-- `layers` array is missing
+`runSchemaMigrations(mapData)` brings a stored map up to `SCHEMA_VERSION` one step at a time, using the `migrations` registry keyed by TARGET version (`migrations[n]` upgrades n-1 to n):
+
+- The starting version is judged by SHAPE first: no `layers` array => v1. A map WITH a `layers` array is v2+ even when `schemaVersion` is missing or lower; it is only **stamped**, never rebuilt.
+- `schemaVersion > SCHEMA_VERSION` (written by a newer plugin): loaded as-is with a console warning, no step runs, the stamp is not downgraded.
+- A missing step throws; the loader turns that into `MapDataUnreadableError` (editing blocked) instead of saving a half-migrated tree.
+
+**Bumping `SCHEMA_VERSION` does nothing useful on its own.** You MUST register `migrations[NEW_VERSION]` (a function that takes a valid previous-version map and returns the upgraded one, preserving all existing data). A unit test (`tests/unit/persistence/schemaMigration.test.ts`) fails if any step from 2..SCHEMA_VERSION is unregistered.
+
+`needsMigration(mapData)` only reports whether any schema work (rebuild, step or stamp) applies; it is not a "run the v1 rebuild" switch.
 
 ### v1 → v2 Migration (Layer Schema)
 
-Old format stored cells/edges/objects/textLabels at the map root level. Migration moves them into a single default layer:
+`migrations[2]` = `migrateToLayerSchema`. It runs ONLY when the map has no `layers` array (an existing layers array is stamped, not rebuilt). Old format stored cells/edges/objects/textLabels at the map root level. Migration moves them into a single default layer:
 
 1. Deep clone original data (backup)
 2. Generate layer ID: `layer-{Date.now()}-{random}`
@@ -150,7 +155,7 @@ Old format stored cells/edges/objects/textLabels at the map root level. Migratio
 
 ### Additional Load-Time Fixes
 
-Applied in `loadMapData()` after migration, these patch missing fields from older saves:
+Applied by `migrateOneMap()` (schemaMigration.ts) to the root AND every nested `subHexMaps` entry at any depth. Per-layer defaults, crash filters, wall-gap sanitation and the legacy tile (q/r -> col/row, layer -> placement) and curve (holes -> innerRings) upgrades live in `sanitizeLayer()`, shared by every level. These patch missing fields from older saves:
 
 ```typescript
 // Array initialization
@@ -179,7 +184,7 @@ if (mapData.hexBounds?.maxQ !== undefined) {
 // Sub-hex maps: recursively migrate nested mapData
 ```
 
-**When adding new fields to MapData**: add a default-initialization check in `loadMapData()` so old saves don't crash.
+**When adding new fields to MapData**: add a default-initialization check in `migrateOneMap()` (or `sanitizeLayer()` for layer fields) so old saves don't crash. Additive optional fields need defaults, not a schema bump.
 
 ## Autosave Pattern
 
@@ -266,7 +271,8 @@ Key functions from `layerAccessor.ts`:
 | Mistake | Consequence | Fix |
 |---------|------------|-----|
 | Adding MapData fields without load-time defaults | Old saves crash on load | Add `if (!mapData.newField)` check in `loadMapData()` |
-| Forgetting to increment `SCHEMA_VERSION` | Migration won't trigger | Increment and implement migration path |
+| Bumping `SCHEMA_VERSION` without registering `migrations[N]` | Every map refuses to load (runner throws, test fails) | Register the step in `schemaMigration.ts` in the same change |
+| Bumping `SCHEMA_VERSION` for an additive optional field | Needless step; older plugins open newer maps with a warning | Add a load-time default instead |
 | Saving without version tracking | Concurrent changes lost | Use `saveVersionRef` pattern |
 | Using grid coords for fog-of-war | Wrong cells fogged on hex maps | Use offset coordinates (col/row) |
 | Mutating `mapData` directly | Skips autosave, breaks undo | Use `updateMapData(updater)` |

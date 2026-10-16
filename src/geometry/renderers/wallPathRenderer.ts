@@ -554,19 +554,5 @@ function collectWallPathImagePaths(
   return Array.from(paths);
 }
 
-export {
-  renderWallPaths,
-  flattenWallPath,
-  resolveWallStrip,
-  collectWallPathImagePaths,
-  computeGapSpans,
-  solidWallPolylines,
-  seatedLeafSize,
-  quadPoint,
-  arcSubdivisions,
-  wrapAngle,
-  miterClipPoly,
-  MITER_MIN_TURN,
-  MITER_LIMIT,
-};
-export type { WallPathRenderOptions, FlattenedPath, ResolvedWallStrip, WallViewState };
+export { renderWallPaths, flattenWallPath, collectWallPathImagePaths, computeGapSpans, solidWallPolylines, seatedLeafSize, quadPoint, arcSubdivisions, wrapAngle, miterClipPoly, MITER_MIN_TURN, MITER_LIMIT };
+export type { FlattenedPath };

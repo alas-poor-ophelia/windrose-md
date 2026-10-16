@@ -7,6 +7,7 @@
  */
 
 import type { MapType } from '#types/core/map.types';
+import type { LayerVisibility } from '#types/contexts/context.types';
 import type { VNode } from 'preact';
 import { Icon } from '../shared/Icon';
 import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
@@ -22,17 +23,6 @@ export interface FogOfWarState {
   activeTool: FogTool;
 }
 
-/** Layer visibility state */
-export interface LayerVisibility {
-  grid: boolean;
-  objects: boolean;
-  textLabels: boolean;
-  hexCoordinates?: boolean;
-  regions?: boolean;
-  outlines?: boolean;
-  savedRoutes?: boolean;
-}
-
 /** Layer definition for visibility toggles */
 interface LayerDef {
   id: keyof LayerVisibility;
@@ -42,7 +32,7 @@ interface LayerDef {
 }
 
 /** Props for VisibilityToolbar component */
-export interface VisibilityToolbarProps {
+interface VisibilityToolbarProps {
   isOpen: boolean;
   layerVisibility: LayerVisibility;
   onToggleLayer: (layerId: keyof LayerVisibility) => void;

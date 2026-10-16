@@ -1,7 +1,7 @@
-diff --git a/node_modules/obsidian-testing-framework/lib/index.js b/node_modules/obsidian-testing-framework/lib/index.js
+diff --git a/lib/index.js b/lib/index.js
 index 5c02743..d1c34e9 100644
---- a/node_modules/obsidian-testing-framework/lib/index.js
-+++ b/node_modules/obsidian-testing-framework/lib/index.js
+--- a/lib/index.js
++++ b/lib/index.js
 @@ -7,7 +7,8 @@ import { randomBytes } from "crypto";
  export function getExe() {
      checkToy();
@@ -123,10 +123,10 @@ index 5c02743..d1c34e9 100644
              try {
                  await waitForIndexingComplete(page);
              }
-diff --git a/node_modules/obsidian-testing-framework/lib/util.js b/node_modules/obsidian-testing-framework/lib/util.js
+diff --git a/lib/util.js b/lib/util.js
 index 298045f..2e01e6d 100644
---- a/node_modules/obsidian-testing-framework/lib/util.js
-+++ b/node_modules/obsidian-testing-framework/lib/util.js
+--- a/lib/util.js
++++ b/lib/util.js
 @@ -111,12 +111,18 @@ export function waitForIndexingComplete(page) {
      return page.evaluateHandle("window.app").then((appHandle) => {
          return appHandle.evaluate((app) => {

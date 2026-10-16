@@ -75,62 +75,6 @@
   }
 }
 
-.windrose-multi-select-toolbar {
-  align-items: center;
-}
-
-.windrose-toolbar-button {
-  width: 44px;
-  height: 44px;
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border-hover);
-  border-radius: 6px;
-  color: var(--text-normal);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: var(--windrose-transition);
-  user-select: none;
-  box-shadow: 0 2px 8px oklch(0% 0 0deg / 0.2);
-
-  &:hover {
-    background: var(--background-primary-alt, var(--background-secondary));
-    border-color: var(--text-accent);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px oklch(0% 0 0deg / 0.3);
-  }
-
-  &:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 6px oklch(0% 0 0deg / 0.2);
-  }
-
-  svg {
-    width: 20px;
-    height: 20px;
-  }
-}
-
-.windrose-toolbar-color-button {
-  border: 2px solid oklch(100% 0 0deg / 0.3);
-
-  svg {
-    filter: drop-shadow(0 0 2px oklch(0% 0 0deg / 0.8));
-    color: oklch(0% 0 0deg);
-  }
-
-  &:hover {
-    border-color: oklch(100% 0 0deg / 0.5);
-  }
-}
-
-.windrose-toolbar-delete-button:hover {
-  background: var(--background-modifier-error);
-  border-color: var(--text-error);
-  color: var(--text-on-accent);
-}
-
 // Hover link (double-class specificity)
 .windrose-object-hover-link.windrose-object-hover-link {
   pointer-events: auto;
@@ -186,11 +130,4 @@
       background: oklch(100% 0 0deg / 0.3);
     }
   }
-}
-
-// Active toolbar button (double-class specificity)
-.windrose-toolbar-button-active.windrose-toolbar-button-active,
-.windrose-toolbar-button-active.windrose-toolbar-button-active:hover {
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
 }

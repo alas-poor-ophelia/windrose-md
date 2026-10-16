@@ -9,43 +9,34 @@
 import type { MapObject } from '#types/objects/object.types';
 
 import { useCallback } from 'preact/hooks';
-import { getNextRotation } from '../../drawing/rotationOperations';
-import { canPlaceObjectAt, generateObjectId } from '../../objects/objectOperations';
-import { assignSlot } from '../../objects/hexSlotPositioner';
+import { findDuplicateTarget, generateObjectId, rotateObjectInList } from '../../objects/objectOperations';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { useMapState } from '../../context/MapContext';
 import { useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+/**
+ * Rotation/deletion/duplication accept an explicit target object id so the
+ * right-click menu can act on the clicked object; omitted (or a toolbar
+ * click's Event) they act on the current selection.
+ */
 const useObjectModifications = (): {
   handleObjectWheel: (e: WheelEvent) => boolean;
   handleNoteSubmit: (content: string, editingObjectId: string) => void;
   handleObjectColorSelect: (color: string) => void;
   handleObjectColorReset: (setShowObjectColorPicker: (show: boolean) => void) => void;
-  handleObjectRotation: () => void;
-  handleObjectDeletion: () => void;
-  handleObjectDuplicate: () => void;
+  handleObjectRotation: (target?: string | Event) => void;
+  handleObjectDeletion: (target?: string | Event) => void;
+  handleObjectDuplicate: (target?: string | Event) => void;
 } => {
   const { mapData, screenToGrid } = useMapState();
   const { updateObject, removeObject, onObjectsChange } = useMapOperations();
   const { selectedItem, setSelectedItem } = useMapSelection();
+
+  const resolveTargetId = useCallback((target?: string | Event): string | null => {
+    if (typeof target === 'string' && target !== '') return target;
+    return selectedItem?.type === 'object' ? selectedItem.id : null;
+  }, [selectedItem]);
 
   const handleObjectWheel = useCallback((e: WheelEvent): boolean => {
     if (selectedItem?.type !== 'object' || !mapData) {
@@ -111,86 +102,39 @@ const useObjectModifications = (): {
     setShowObjectColorPicker(false);
   }, [handleObjectColorSelect]);
 
-  const handleObjectRotation = useCallback((): void => {
-    if (!selectedItem || selectedItem.type !== 'object' || !mapData) {
+  const handleObjectRotation = useCallback((target?: string | Event): void => {
+    const targetId = resolveTargetId(target);
+    if (targetId == null || !mapData) {
       return;
     }
 
-    const currentObject = getActiveLayer(mapData).objects?.find((obj: MapObject) => obj.id === selectedItem.id);
-    const currentRotation = currentObject?.rotation ?? 0;
-    const nextRotation = getNextRotation(currentRotation);
-
-    const updatedObjects = updateObject(
-      getActiveLayer(mapData).objects,
-      selectedItem.id,
-      { rotation: nextRotation }
-    );
+    const updatedObjects = rotateObjectInList(getActiveLayer(mapData).objects, targetId);
     onObjectsChange(updatedObjects);
-  }, [selectedItem, mapData, updateObject, onObjectsChange]);
+  }, [resolveTargetId, mapData, onObjectsChange]);
 
-  const handleObjectDeletion = useCallback((): void => {
-    if (!selectedItem || selectedItem.type !== 'object' || !mapData) {
+  const handleObjectDeletion = useCallback((target?: string | Event): void => {
+    const targetId = resolveTargetId(target);
+    if (targetId == null || !mapData) {
       return;
     }
 
-    const updatedObjects = removeObject(getActiveLayer(mapData).objects, selectedItem.id);
+    const updatedObjects = removeObject(getActiveLayer(mapData).objects, targetId);
     onObjectsChange(updatedObjects);
     setSelectedItem(null);
-  }, [selectedItem, mapData, removeObject, onObjectsChange, setSelectedItem]);
+  }, [resolveTargetId, mapData, removeObject, onObjectsChange, setSelectedItem]);
 
-  const handleObjectDuplicate = useCallback((): void => {
-    if (!selectedItem || selectedItem.type !== 'object' || !mapData) {
+  const handleObjectDuplicate = useCallback((target?: string | Event): void => {
+    const targetId = resolveTargetId(target);
+    if (targetId == null || !mapData) {
       return;
     }
 
-    const sourceObject = getActiveLayer(mapData).objects.find((obj: MapObject) => obj.id === selectedItem.id);
+    const layerObjects = getActiveLayer(mapData).objects;
+    const sourceObject = layerObjects.find((obj: MapObject) => obj.id === targetId);
     if (!sourceObject) return;
 
-    const { mapType } = mapData;
-    const { x: sourceX, y: sourceY } = sourceObject.position;
-    // The copy keeps the source's rung (spread below), so it must look for
-    // room among that rung's cells, not the root's.
-    const home = sourceObject.homeLevel ?? 0;
-
-    // Hex-axial 6 directions vs Cartesian 4 directions
-    const directions = mapType === 'hex'
-      ? [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]]
-      : [[1, 0], [0, 1], [-1, 0], [0, -1]];
-    let targetX = sourceX;
-    let targetY = sourceY;
-    let found = false;
-
-    // Check immediate neighbors first
-    for (const [dx, dy] of directions) {
-      if (canPlaceObjectAt(getActiveLayer(mapData).objects, sourceX + dx, sourceY + dy, mapType, home)) {
-        targetX = sourceX + dx;
-        targetY = sourceY + dy;
-        found = true;
-        break;
-      }
-    }
-
-    // Expanding ring search if immediate neighbors are full
-    if (!found) {
-      for (let ring = 2; ring <= 10 && !found; ring++) {
-        for (let dx = -ring; dx <= ring && !found; dx++) {
-          for (let dy = -ring; dy <= ring && !found; dy++) {
-            if (Math.abs(dx) === ring || Math.abs(dy) === ring) {
-              const checkX = sourceX + dx;
-              const checkY = sourceY + dy;
-
-              if (canPlaceObjectAt(getActiveLayer(mapData).objects, checkX, checkY, mapType, home)) {
-                targetX = checkX;
-                targetY = checkY;
-                found = true;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    if (!found) {
+    const dest = findDuplicateTarget(layerObjects, sourceObject, mapData.mapType);
+    if (!dest) {
       console.warn('No empty space found for duplicate');
       return;
     }
@@ -198,25 +142,18 @@ const useObjectModifications = (): {
     const newObject: MapObject = {
       ...sourceObject,
       id: generateObjectId(),
-      position: { x: targetX, y: targetY }
+      position: { x: dest.x, y: dest.y }
     };
+    if (dest.slot !== undefined) newObject.slot = dest.slot;
 
-    if (mapType === 'hex') {
-      const occupiedSlots = getActiveLayer(mapData).objects
-        .filter((obj: MapObject) => obj.position.x === targetX && obj.position.y === targetY && (obj.homeLevel ?? 0) === home)
-        .map((obj: MapObject) => obj.slot)
-        .filter((s: number | undefined): s is number => s !== undefined);
-      newObject.slot = assignSlot(occupiedSlots);
-    }
-
-    const updatedObjects = [...getActiveLayer(mapData).objects, newObject];
+    const updatedObjects = [...layerObjects, newObject];
     onObjectsChange(updatedObjects);
 
     setSelectedItem({
       type: 'object',
       id: newObject.id
     });
-  }, [selectedItem, mapData, onObjectsChange, setSelectedItem]);
+  }, [resolveTargetId, mapData, onObjectsChange, setSelectedItem]);
 
   return {
     handleObjectWheel,

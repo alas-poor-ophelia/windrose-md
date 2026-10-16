@@ -1,6 +1,6 @@
 import type { LinkingSource } from '../../context/ObjectLinkingContext.tsx';
 
-import { useEffect } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
 import type { VNode } from 'preact';
 import { getObjectType } from '../../objects/objectTypeResolver';
 import { Icon } from '../shared/Icon';
@@ -19,6 +19,7 @@ interface LinkingModeBannerProps {
 const LinkingModeBanner = ({ linkingFrom, onCancel }: LinkingModeBannerProps): VNode => {
   const objectDef = getObjectType(linkingFrom.objectType);
   const objectLabel = objectDef?.label || linkingFrom.objectType;
+  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
@@ -27,12 +28,14 @@ const LinkingModeBanner = ({ linkingFrom, onCancel }: LinkingModeBannerProps): V
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    // Listen on the window that owns this banner (popout-safe).
+    const win = rootRef.current?.ownerDocument.defaultView ?? window;
+    win.addEventListener('keydown', handleKeyDown);
+    return () => win.removeEventListener('keydown', handleKeyDown);
   }, [onCancel]);
 
   return (
-    <div className="windrose-linking-banner">
+    <div ref={rootRef} className="windrose-linking-banner">
       <div className="windrose-linking-banner-content">
         <Icon icon="lucide-link-2" />
         <span>Linking from <strong>{objectLabel}</strong> - click target object</span>

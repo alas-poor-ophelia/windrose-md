@@ -71,4 +71,4 @@ function projectPointToPolyline(
 }
 
 export { closestPointOnSegment, projectPointToPolyline };
-export type { SegmentProjection, PolylineProjection };
+export type { PolylineProjection };

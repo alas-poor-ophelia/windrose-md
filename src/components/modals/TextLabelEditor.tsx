@@ -69,7 +69,7 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
       pendingCustomColorRef = { current: null as string | null };
       clickOutsideHandler: ((e: MouseEvent) => void) | null = null;
 
-      onOpen(): void {
+      override onOpen(): void {
         const { contentEl, titleEl } = this;
         titleEl.setText(isEditing ? 'Edit Text Label' : 'Add Text Label');
         contentEl.addClass('windrose-text-editor-native');
@@ -193,7 +193,7 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
 
       renderColorPicker(): void {
         if (this.clickOutsideHandler) {
-          activeDocument.removeEventListener('mousedown', this.clickOutsideHandler);
+          this.modalEl.ownerDocument.removeEventListener('mousedown', this.clickOutsideHandler);
           this.clickOutsideHandler = null;
         }
 
@@ -206,7 +206,7 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
             this.isPickerOpen = false;
             this.renderColorPicker();
           };
-          activeDocument.addEventListener('mousedown', this.clickOutsideHandler);
+          this.modalEl.ownerDocument.addEventListener('mousedown', this.clickOutsideHandler);
 
           preactRender(
             h(ColorPicker, {
@@ -285,9 +285,9 @@ function openNativeTextLabelEditor(app: App, options: OpenNativeTextLabelEditorO
         }
       }
 
-      onClose(): void {
+      override onClose(): void {
         if (this.clickOutsideHandler) {
-          activeDocument.removeEventListener('mousedown', this.clickOutsideHandler);
+          this.modalEl.ownerDocument.removeEventListener('mousedown', this.clickOutsideHandler);
           this.clickOutsideHandler = null;
         }
         if (this.colorPickerContainerEl != null) {

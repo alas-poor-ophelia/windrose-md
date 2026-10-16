@@ -31,9 +31,4 @@ async function fetchRegistry(forceRefresh = false): Promise<ContentPackRegistry>
   }
 }
 
-function clearRegistryCache(): void {
-  cachedRegistry = null;
-  cacheTimestamp = 0;
-}
-
-export { fetchRegistry, clearRegistryCache };
+export { fetchRegistry };

@@ -9,6 +9,13 @@ import type { ShapeOverlay } from '#types/core/map.types';
 
 import { getShapeHalfExtents } from '../../objects/shapeOverlayOperations';
 
+/** Player light radius: disc fill alpha, dashed ring alpha, ring width and dash (on, off). */
+const LIGHT_FILL_ALPHA = 0.15;
+const LIGHT_RING_ALPHA = 0.4;
+const LIGHT_RING_WIDTH_PX = 1.5;
+const LIGHT_RING_DASH = [4, 4];
+
+
 interface ViewState {
   x: number;
   y: number;
@@ -75,52 +82,6 @@ function renderShapeOverlays(
   }
 }
 
-function renderShapePreview(
-  ctx: CanvasRenderingContext2D,
-  center: { x: number; y: number },
-  size: number,
-  shape: 'square' | 'circle',
-  color: string,
-  opacity: number,
-  viewState: ViewState
-): void {
-  const { sx, sy } = worldToScreen(center.x, center.y, viewState);
-  const screenSize = size * viewState.zoom;
-
-  ctx.save();
-  ctx.globalAlpha = opacity * 0.5;
-  ctx.fillStyle = color;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.setLineDash([6, 4]);
-
-  if (shape === 'circle') {
-    ctx.beginPath();
-    ctx.arc(sx, sy, screenSize, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = Math.min(opacity, 1);
-    ctx.stroke();
-  } else {
-    ctx.fillRect(sx - screenSize, sy - screenSize, screenSize * 2, screenSize * 2);
-    ctx.globalAlpha = Math.min(opacity, 1);
-    ctx.strokeRect(sx - screenSize, sy - screenSize, screenSize * 2, screenSize * 2);
-  }
-
-  // Center crosshair
-  ctx.setLineDash([]);
-  ctx.globalAlpha = 0.8;
-  ctx.lineWidth = 1;
-  const crossSize = 6;
-  ctx.beginPath();
-  ctx.moveTo(sx - crossSize, sy);
-  ctx.lineTo(sx + crossSize, sy);
-  ctx.moveTo(sx, sy - crossSize);
-  ctx.lineTo(sx, sy + crossSize);
-  ctx.stroke();
-
-  ctx.restore();
-}
-
 function renderPlayerLights(
   ctx: CanvasRenderingContext2D,
   objects: Array<{ position: { x: number; y: number }; freeform?: boolean; worldPosition?: { x: number; y: number }; isPlayer?: boolean; lightRadius?: number; lightColor?: string; lightEnabled?: boolean }>,
@@ -149,19 +110,19 @@ function renderPlayerLights(
     const screenRadius = radiusInWorld * viewState.zoom;
 
     ctx.save();
-    ctx.globalAlpha = 0.15;
+    ctx.globalAlpha = LIGHT_FILL_ALPHA;
     ctx.fillStyle = obj.lightColor ?? 'rgba(255, 255, 100, 1)';
     ctx.beginPath();
     ctx.arc(sx, sy, screenRadius, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.globalAlpha = 0.4;
+    ctx.globalAlpha = LIGHT_RING_ALPHA;
     ctx.strokeStyle = obj.lightColor ?? 'rgba(255, 255, 100, 1)';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = LIGHT_RING_WIDTH_PX;
+    ctx.setLineDash(LIGHT_RING_DASH);
     ctx.stroke();
     ctx.restore();
   }
 }
 
-export { renderShapeOverlays, renderShapePreview, renderPlayerLights };
+export { renderShapeOverlays, renderPlayerLights };

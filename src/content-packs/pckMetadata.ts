@@ -140,4 +140,4 @@ async function parseWallSidecars(source: PckSource, archive: PckArchive): Promis
 }
 
 export { parsePackMetadata, parseDungeondraftTags, findPackJson, findTagsFile, parseWallSidecars };
-export type { DungeondraftPackMeta, DungeondraftTags, MetadataResult, WallSidecarInfo };
+export type { DungeondraftPackMeta };

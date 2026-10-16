@@ -54,17 +54,26 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
     }
   }, [isActive, offsetX, offsetY, panelPosition.x]);
   
+  // Hidden anchor rendered in this map's own DOM tree (the panel itself is
+  // portaled away): scopes the canvas-drag listeners to this mount, so with
+  // two maps open, dragging the other map never moves this background.
+  const anchorRef = useRef<HTMLSpanElement>(null);
+
   // Use refs to avoid stale closures in event handlers
   const isDraggingRef = useRef(false);
   const dragStartOffsetRef = useRef({ x: 0, y: 0 });
   const dragStartClientRef = useRef({ x: 0, y: 0 });
+  const applyRef = useRef<() => void>(() => undefined);
+  const cancelRef = useRef<() => void>(() => undefined);
   
   // Canvas drag event handlers - use useCallback to stabilize
   const handleCanvasPointerDown = useCallback((e: PointerEvent | TouchEvent) => {
-    // Only handle events on the canvas
-    const canvas = activeDocument.querySelector('[class^="windrose-canvas"]');
+    // Only handle events on this map's canvas
+    const anchor = anchorRef.current;
+    const scope = anchor?.closest('.windrose-container') ?? anchor?.parentElement ?? null;
     const target = e.target as HTMLElement | null;
-    if (canvas == null || !target?.closest('[class^="windrose-canvas"]')) {
+    const canvas = target?.closest('[class^="windrose-canvas"]') ?? null;
+    if (scope == null || canvas == null || !scope.contains(canvas)) {
       return;
     }    // Only handle single-finger/mouse events (let two-finger pan through)
     const touches = (e as TouchEvent).touches;
@@ -103,29 +112,28 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
   useEffect(() => {    if (!isActive) {      return undefined;
     }
 
-    const canvas = activeDocument.querySelector('[class^="windrose-canvas"]');
-    if (!canvas) return undefined;
+    // Attach to document instead of canvas to avoid CodeMirror interception.
+    // The anchor's ownerDocument is the window that owns this map (popout-safe).
+    const doc = anchorRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('pointerdown', handleCanvasPointerDown);
+    doc.addEventListener('pointermove', handleCanvasPointerMove);
+    doc.addEventListener('pointerup', handleCanvasPointerUp);
+    doc.addEventListener('pointercancel', handleCanvasPointerUp);
 
-    // Attach to document instead of canvas to avoid CodeMirror interception
-    activeDocument.addEventListener('pointerdown', handleCanvasPointerDown);
-    activeDocument.addEventListener('pointermove', handleCanvasPointerMove);
-    activeDocument.addEventListener('pointerup', handleCanvasPointerUp);
-    activeDocument.addEventListener('pointercancel', handleCanvasPointerUp);
-    
     // Also handle touch events for better mobile support
-    activeDocument.addEventListener('touchstart', handleCanvasPointerDown);
-    activeDocument.addEventListener('touchmove', handleCanvasPointerMove);
-    activeDocument.addEventListener('touchend', handleCanvasPointerUp);
-    activeDocument.addEventListener('touchcancel', handleCanvasPointerUp);
-    
-    return () => {      activeDocument.removeEventListener('pointerdown', handleCanvasPointerDown);
-      activeDocument.removeEventListener('pointermove', handleCanvasPointerMove);
-      activeDocument.removeEventListener('pointerup', handleCanvasPointerUp);
-      activeDocument.removeEventListener('pointercancel', handleCanvasPointerUp);
-      activeDocument.removeEventListener('touchstart', handleCanvasPointerDown);
-      activeDocument.removeEventListener('touchmove', handleCanvasPointerMove);
-      activeDocument.removeEventListener('touchend', handleCanvasPointerUp);
-      activeDocument.removeEventListener('touchcancel', handleCanvasPointerUp);
+    doc.addEventListener('touchstart', handleCanvasPointerDown);
+    doc.addEventListener('touchmove', handleCanvasPointerMove);
+    doc.addEventListener('touchend', handleCanvasPointerUp);
+    doc.addEventListener('touchcancel', handleCanvasPointerUp);
+
+    return () => {      doc.removeEventListener('pointerdown', handleCanvasPointerDown);
+      doc.removeEventListener('pointermove', handleCanvasPointerMove);
+      doc.removeEventListener('pointerup', handleCanvasPointerUp);
+      doc.removeEventListener('pointercancel', handleCanvasPointerUp);
+      doc.removeEventListener('touchstart', handleCanvasPointerDown);
+      doc.removeEventListener('touchmove', handleCanvasPointerMove);
+      doc.removeEventListener('touchend', handleCanvasPointerUp);
+      doc.removeEventListener('touchcancel', handleCanvasPointerUp);
     };
   }, [isActive, handleCanvasPointerDown, handleCanvasPointerMove, handleCanvasPointerUp]);
   
@@ -160,11 +168,11 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
           handled = true;
           break;
         case 'Enter':
-          handleApply();
+          applyRef.current();
           handled = true;
           break;
         case 'Escape':
-          handleCancel();
+          cancelRef.current();
           handled = true;
           break;
       }
@@ -175,8 +183,9 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
       }
     };
     
-    activeDocument.addEventListener('keydown', handleKeyDown);
-    return () => activeDocument.removeEventListener('keydown', handleKeyDown);
+    const doc = anchorRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('keydown', handleKeyDown);
+    return () => doc.removeEventListener('keydown', handleKeyDown);
   }, [isActive, offsetX, offsetY, onOffsetChange]);
   
   // Panel dragging (mouse + touch)
@@ -214,16 +223,17 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
       setIsDragging(false);
     };
 
-    activeDocument.addEventListener('mousemove', handleMove);
-    activeDocument.addEventListener('mouseup', handleEnd);
-    activeDocument.addEventListener('touchmove', handleMove, { passive: false });
-    activeDocument.addEventListener('touchend', handleEnd);
+    const doc = anchorRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('mousemove', handleMove);
+    doc.addEventListener('mouseup', handleEnd);
+    doc.addEventListener('touchmove', handleMove, { passive: false });
+    doc.addEventListener('touchend', handleEnd);
 
     return () => {
-      activeDocument.removeEventListener('mousemove', handleMove);
-      activeDocument.removeEventListener('mouseup', handleEnd);
-      activeDocument.removeEventListener('touchmove', handleMove);
-      activeDocument.removeEventListener('touchend', handleEnd);
+      doc.removeEventListener('mousemove', handleMove);
+      doc.removeEventListener('mouseup', handleEnd);
+      doc.removeEventListener('touchmove', handleMove);
+      doc.removeEventListener('touchend', handleEnd);
     };
   }, [isDragging, dragStart]);
   
@@ -239,6 +249,10 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
     // Revert to initial offset
     onCancel(initialOffset.x, initialOffset.y);
   }, [initialOffset, onCancel]);
+
+  // Latest-ref for the keyboard effect above (declared before these handlers).
+  applyRef.current = handleApply;
+  cancelRef.current = handleCancel;
   
   const handleOffsetXChange = useCallback((e: Event) => {
     const value = parseInt((e.target as HTMLInputElement).value, 10) || 0;
@@ -257,9 +271,12 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
     }
   }, [onGridSizeChange]);
   
-  if (!isActive || panelPosition.x === null) return null;
+  const anchor = <span ref={anchorRef} hidden />;
+  if (!isActive || panelPosition.x === null) return anchor;
   
   return (
+    <>
+    {anchor}
     <ModalPortal>
       <div
         class="alignment-mode-panel"
@@ -440,6 +457,7 @@ function ImageAlignmentMode({ isActive, offsetX, offsetY, onOffsetChange, onAppl
         </div>
       </div>
     </ModalPortal>
+    </>
   );
 }
 

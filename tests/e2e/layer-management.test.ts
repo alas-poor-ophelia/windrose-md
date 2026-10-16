@@ -112,7 +112,8 @@ test("Deleting a layer decreases layer count", async ({ page }) => {
   const errors = setupErrorTracking(page);
   const mapId = MAP_IDS.grid;
 
-  page.on('dialog', (dialog: any) => dialog.accept());
+  // The harness patch already accepts every dialog at the context level; a second accept throws.
+  page.on('dialog', (dialog: any) => { void dialog.accept().catch(() => { /* already handled by the harness */ }); });
 
   await navigateToMap(page, TEST_MAPS.grid);
   await waitForContainer(page);

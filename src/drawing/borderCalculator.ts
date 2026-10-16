@@ -3,7 +3,7 @@
  */
 
 import type { Cell } from '#types/core/cell.types';
-import { isGridCell } from '#types/core/cell.types';
+import { isGridCell, pointKey } from '../geometry/core/cellAccessor';
 
 /** Border side identifier */
 type BorderSide = 'top' | 'right' | 'bottom' | 'left';
@@ -60,7 +60,7 @@ function buildCellLookup(cells: Cell[]): CellLookup {
   const lookup = new Set<string>();
   for (const cell of cells) {
     if (isGridCell(cell)) {
-      lookup.add(`${cell.x},${cell.y}`);
+      lookup.add(pointKey(cell.x, cell.y));
     }
   }
   return lookup;
@@ -70,7 +70,7 @@ function buildCellLookup(cells: Cell[]): CellLookup {
  * Check if cell exists in lookup map
  */
 function cellExistsInLookup(lookup: CellLookup, x: number, y: number): boolean {
-  return lookup.has(`${x},${y}`);
+  return lookup.has(pointKey(x, y));
 }
 
 /**

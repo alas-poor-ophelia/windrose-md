@@ -15,7 +15,7 @@ import type { VNode } from 'preact';
 import type { HexColor } from '#types/core/common.types';
 import type { CustomColor } from '#types/core/common.types';
 
-import { useCallback, useEffect } from 'preact/hooks';
+import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useTextLabelInteraction } from '../../hooks/interactions/useTextLabelInteraction';
 import { useMapState } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
@@ -23,7 +23,7 @@ import { useApp } from '../../context/AppContext';
 import { openNativeTextLabelEditor } from '../modals/TextLabelEditor';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { SelectionActionsOverlay } from '../toolbars/SelectionActionsOverlay';
-import { buildTextActions } from '../../hooks/interactions/useSelectionActions';
+import { buildTextActions } from '../toolbars/selectionActionBuilders';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { copyDeepLinkToClipboard } from '../../persistence/deepLinkHandler';
 import { depthModeOf } from '../../geometry/renderers/elementBands';
@@ -82,7 +82,13 @@ const TextLayer = ({
     handleTextDeletion
   } = useTextLabelInteraction(currentTool, onAddCustomColor, customColors?.map(c => c.color) ?? []);
 
+  // Latest-ref: the editor opens when the show flag / edited id change,
+  // reading the current map, colors and handlers at that moment.
+  const textModalInputsRef = useRef({ app, mapData, customColors, onAddCustomColor, onDeleteCustomColor, handleTextSubmit, handleTextCancel });
+  textModalInputsRef.current = { app, mapData, customColors, onAddCustomColor, onDeleteCustomColor, handleTextSubmit, handleTextCancel };
+
   useEffect(() => {
+    const { app, mapData, customColors, onAddCustomColor, onDeleteCustomColor, handleTextSubmit, handleTextCancel } = textModalInputsRef.current;
     if (!showTextModal || !mapData) return;
 
     let currentLabel = null;
@@ -133,7 +139,7 @@ const TextLayer = ({
   useLayerHandlers('text', {
     handleTextPlacement, handleTextSelection,
     handleTextDragging, stopTextDragging,
-    handleCanvasDoubleClick, handleEditClick, handleTextKeyDown
+    handleCanvasDoubleClick, handleTextKeyDown
   });
 
   if (showCoordinates || !layerVisibility.textLabels) {

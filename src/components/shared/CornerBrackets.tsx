@@ -81,4 +81,4 @@ function CornerBrackets({ classPrefix, variant = 'compact', filterId = 'bracket'
 }
 
 export { CornerBrackets };
-export type { BracketPosition };
+

@@ -9,6 +9,8 @@ export interface RegistryPack {
   description: string;
   size: number;
   downloadUrl: string;
+  /** Optional lowercase hex SHA-256 of the download; verified when present. */
+  sha256?: string;
 }
 
 export interface ContentPackRegistry {

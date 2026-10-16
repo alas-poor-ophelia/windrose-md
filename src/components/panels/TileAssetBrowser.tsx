@@ -4,9 +4,14 @@
  * Full drawer content for the tile browser panel.
  * Structure: header → depth band → filter → tag chips →
  * body (jump rail + tile grid) → loaded-brush footer.
+ *
+ * Split (STRUCT-A-14): the filter pipeline lives in hooks/tiles/useTileFilterPipeline,
+ * per-tile cells in TileCell.tsx, the footer + wall-tool row in TileBrowserFooter.tsx.
+ * Tile metadata is read ONLY through the shared store (useTileMetadata) and written
+ * only through updateTileMetadata — never a private copy (the 2026-07-30 wipe).
  */
 
-import type { TilesetDef, TileEntry, TileForm, TilesetOverrides, TileLayerRole, TileMetadataStore, TilesetOrigin } from '#types/tiles/tile.types';
+import type { TilesetDef, TileEntry, TileForm, TilesetOverrides, TileLayerRole } from '#types/tiles/tile.types';
 import type { ToolId } from '#types/tools/tool.types';
 import type { WallToolSurface } from '#types/core/wallpath.types';
 import type { FlyoutTile } from './DrawerDock';
@@ -18,112 +23,33 @@ import { useApp } from '../../context/AppContext';
 import { useThumbnailPipeline } from '../../hooks/state/useThumbnailPipeline';
 import { usePreactVirtualizer } from '../../hooks/state/useVirtualizer';
 import { Icon } from '../shared/Icon';
+import { nextRotation, rotationStepsFor, snapRotationToGrid, isOnRotationGrid, tileGeometryKind } from '../../assets/tileRotation';
 import { DrawerPaneHead, DrawerSearch } from './drawerChrome';
 import { DepthBar, depthMeta } from './DepthBar';
 import {
-  loadTileMetadata,
-  saveTileMetadataDebounced,
-  setTileMetadataForRender,
+  ensureTileMetadataLoaded,
+  updateTileMetadata,
   bulkSetDepthAffinity,
   bulkSetDetectionSignals,
   isStarred,
-  collectUniqueTags,
-  collectDepthAwareTags,
-  getAllTags,
 } from '../../persistence/tileMetadata';
 import { predictDepthTier } from '../../assets/depthPredictor';
 import { deriveTileForm, formDef } from '../../assets/tileForm';
-import type { TileSubtoolId } from '../../assets/tileForm';
-import { clusterCategories, NOISE, humanizePackName, detectTileGeometry } from '../../assets/categoryMerge';
+import type { TileSubtoolId } from '#types/tiles/tile.types';
 import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
-import type { FolderInput } from '../../assets/categoryMerge';
-import { runDetectionScan } from '../../assets/tileImageScan';
+import { runDetectionScan, claimDetectionScanPaths, releaseDetectionScanPaths } from '../../assets/tileImageScan';
+import { useTileMetadata } from '../../hooks/state/useTileMetadata';
 import { resolveTileEntry } from '../../assets/tilesetOperations';
 import { drawTileToCanvas, loadVaultImage, observeWidth, TileThumbnail, PREVIEW_SIZE } from './tileBrowserCommon';
+import { TileCell, TileListRow, MosaicCard } from './TileCell';
+import { LoadedBrushFooter } from './TileBrowserFooter';
+import { useTileFilterPipeline } from '../../hooks/tiles/useTileFilterPipeline';
 import { TileOrganizePane } from './TileOrganizePane';
 import { TileFilterScreen } from './TileFilterScreen';
 import type { FilterFacet } from './TileFilterScreen';
 import { TilesetConfigPanel } from './TilesetConfigPanel';
 import { tooltipRef } from '../shared/obsidianTooltip';
-
-// ===========================================
-// Per-tile scale control (slider + editable readout)
-// ===========================================
-
-const TILE_SCALE_MIN = 0.25;
-const TILE_SCALE_MAX = 3;
-const TILE_SCALE_STEP = 0.25;
-
-/** Direct entry allows finer precision (0.05) than the slider detents. */
-function clampTileScale(v: number): number {
-  return Math.min(TILE_SCALE_MAX, Math.max(TILE_SCALE_MIN, Math.round(v * 20) / 20));
-}
-
-/** Scale slider with a live readout: the mouse wheel steps the value over the
- *  slider, and clicking the readout swaps it for a direct numeric input
- *  (Enter/blur commits, Esc cancels). Drop-in for a bare range+cap pair.
- *  In compact (block) mode the range bar is too cramped to be useful, so it is
- *  dropped and only the click-to-edit readout remains. */
-function TileScaleSlider({ value, onChange, compact = false }: {
-  value: number;
-  onChange: (v: number) => void;
-  compact?: boolean;
-}): VNode {
-  const [editing, setEditing] = useState(false);
-  const handleWheel = useCallback((e: WheelEvent) => {
-    e.preventDefault();
-    const dir = e.deltaY < 0 ? 1 : -1;
-    onChange(clampTileScale(value + dir * TILE_SCALE_STEP));
-  }, [value, onChange]);
-  const commit = (raw: string): void => {
-    const v = parseFloat(raw);
-    if (Number.isFinite(v)) onChange(clampTileScale(v));
-    setEditing(false);
-  };
-  return (
-    <>
-      {!compact && (
-        <input
-          className="windrose-tb-range"
-          type="range"
-          min={TILE_SCALE_MIN}
-          max={TILE_SCALE_MAX}
-          step={TILE_SCALE_STEP}
-          value={value}
-          onInput={(e: Event) => onChange(parseFloat((e.target as HTMLInputElement).value))}
-          onWheel={handleWheel}
-          style={{ flex: 1, minWidth: 0 }}
-        />
-      )}
-      {editing ? (
-        <input
-          className="windrose-tb-scale-input"
-          type="number"
-          min={TILE_SCALE_MIN}
-          max={TILE_SCALE_MAX}
-          step={0.05}
-          defaultValue={String(value)}
-          ref={(el: HTMLInputElement | null) => { el?.focus(); el?.select(); }}
-          onKeyDown={(e: KeyboardEvent) => {
-            const el = e.target as HTMLInputElement;
-            if (e.key === 'Enter') commit(el.value);
-            else if (e.key === 'Escape') { el.dataset.cancel = '1'; setEditing(false); }
-          }}
-          onBlur={(e: Event) => {
-            const el = e.target as HTMLInputElement;
-            if (el.dataset.cancel !== '1') commit(el.value);
-          }}
-        />
-      ) : (
-        <button
-          className="windrose-tb-cap windrose-tb-cap-edit"
-          ref={tooltipRef('Edit scale')}
-          onClick={() => setEditing(true)}
-        >{value}×</button>
-      )}
-    </>
-  );
-}
+import { assertNever } from '../../utils/assertNever';
 
 // ===========================================
 // Horizontal scroller (wheel→sideways + drag)
@@ -186,47 +112,6 @@ function HScroll({ className, children }: { className?: string; children: Compon
 }
 
 // ===========================================
-// Loaded-brush chip thumbnail
-// ===========================================
-
-const LoadedChipThumb = memo(({ url }: { url: string | null }): VNode => {
-  return url != null && url !== ''
-    ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-    : <div style={{ width: '100%', height: '100%' }} />;
-});
-
-// ===========================================
-// Category card with 2×2 mosaic preview
-// ===========================================
-
-function MosaicCard({ category, tiles, count, getThumbUrl, onClick }: {
-  category: string;
-  tiles: TileEntry[];
-  count: number;
-  getThumbUrl: (path: string) => string | null;
-  onClick: () => void;
-}): VNode {
-  const preview = tiles.slice(0, 4);
-  return (
-    <button className="windrose-tb-card" onClick={onClick}>
-      <div className="windrose-tb-mosaic">
-        {[0, 1, 2, 3].map(i => (
-          <div key={i} className="windrose-tb-mosaic-cell">
-            {preview[i] != null && <TileThumbnail url={getThumbUrl(preview[i].vaultPath)} />}
-          </div>
-        ))}
-      </div>
-      <div className="windrose-tb-card-meta">
-        <span className="windrose-tb-card-name">{category}</span>
-        <span className="windrose-tb-card-count">
-          {count}<Icon icon="lucide-chevron-right" size={11} />
-        </span>
-      </div>
-    </button>
-  );
-}
-
-// ===========================================
 // Main component
 // ===========================================
 
@@ -242,8 +127,6 @@ interface TileAssetBrowserProps {
   flipH: boolean;
   onRotationChange: (rotation: number) => void;
   onFlipChange: (flipH: boolean) => void;
-  tileLayer: 'base' | 'overlay';
-  onTileLayerChange: (layer: 'base' | 'overlay') => void;
   tileDepth: TileLayerRole;
   onTileDepthChange: (depth: TileLayerRole) => void;
   hidden?: Set<TileLayerRole>;
@@ -316,7 +199,7 @@ interface TileAssetBrowserProps {
   ribbon?: VNode;
 }
 
-export type TileViewMode = 'grid' | 'list';
+type TileViewMode = 'grid' | 'list';
 
 // `string & {}` keeps the literal autocomplete hints while still allowing any
 // dynamic tileset id (set via setRailSel(cat)) without collapsing to bare string.
@@ -333,8 +216,6 @@ function displayCategory(category: string): string {
   if (parts.length <= 2) return category;
   return parts.slice(-2).join('/');
 }
-
-const ROTATION_STEPS = [0, 60, 120, 180, 240, 300];
 
 // memo: the map root re-renders on EVERY pointermove (viewState lives in its
 // state). Without memo, this entire tree — hundreds of tile nodes when any
@@ -353,7 +234,6 @@ const TileAssetBrowser = memo(({
   flipH,
   onRotationChange,
   onFlipChange,
-  tileLayer,
   tileDepth,
   onTileDepthChange,
   hidden,
@@ -423,13 +303,19 @@ const TileAssetBrowser = memo(({
   const [viewModeLocal, setViewModeLocal] = useState<TileViewMode>('grid');
   const viewMode = viewModeProp ?? viewModeLocal;
   const setViewMode = onViewModeChange ?? setViewModeLocal;
-  const [tileMetadata, setTileMetadata] = useState<TileMetadataStore>({});
+  const tileMetadata = useTileMetadata(app);
   const { getThumbUrl, requestThumbs } = useThumbnailPipeline();
   const gridWrapRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
-  // Reset rail, tags, and drill-down when depth changes
+  // Reset rail, tags, and drill-down when depth changes. Skips the first run
+  // (and any re-run where depth is unchanged, e.g. a new setRailSel identity):
+  // the rail selection is host-owned precisely so it survives the remount
+  // caused by the Objects/Tiles pane swap, and a mount-time reset would wipe it.
+  const prevDepthRef = useRef(tileDepth);
   useEffect(() => {
+    if (prevDepthRef.current === tileDepth) return;
+    prevDepthRef.current = tileDepth;
     setRailSel('all');
     setActiveTags(new Set());
     setPackFilter(new Set());
@@ -452,19 +338,37 @@ const TileAssetBrowser = memo(({
     }
   };
 
+  // Rotation steps follow the map geometry AND the placement mode: snapped
+  // grid 90, snapped hex 60, freeform (stamp/scatter) 15 on both.
+  const rotationFreeform = activeSubtool === 'stamp' || activeSubtool === 'scatter';
+  const rotationSteps = rotationStepsFor(tileGeometryKind(mapType), rotationFreeform);
+
+  // The brush's rotation must suit the armed mode: leaving freeform at 15 for
+  // snapped painting on a grid would stamp a square tile askew in its cell.
+  // Placed tiles are never touched — only the brush value is fitted.
+  useEffect(() => {
+    if (!isOnRotationGrid(rotation, rotationSteps)) {
+      onRotationChange(snapRotationToGrid(rotation, rotationSteps));
+    }
+  }, [rotation, rotationSteps, onRotationChange]);
+
   const handleRotateCW = (): void => {
-    const currentIdx = ROTATION_STEPS.indexOf(rotation);
-    const nextIdx = (currentIdx + 1) % ROTATION_STEPS.length;
-    onRotationChange(ROTATION_STEPS[nextIdx]);
+    onRotationChange(nextRotation(rotation, rotationSteps, 1));
   };
 
   const handleRotateCCW = (): void => {
-    const currentIdx = ROTATION_STEPS.indexOf(rotation);
-    const nextIdx = (currentIdx - 1 + ROTATION_STEPS.length) % ROTATION_STEPS.length;
-    onRotationChange(ROTATION_STEPS[nextIdx]);
+    onRotationChange(nextRotation(rotation, rotationSteps, -1));
   };
 
-  // Manage hover preview portal on document.body
+  // Latest values read by the hover-preview effect, which deliberately re-runs
+  // only when the hovered tile or its transform changes.
+  // (tileToTilesetIdRef is assigned below, after the filter pipeline.)
+  const previewInputsRef = useRef({ app, getCachedImage });
+  previewInputsRef.current = { app, getCachedImage };
+  const tileToTilesetIdRef = useRef<{ get(key: string): string | undefined }>(new Map<string, string>());
+
+  // Manage hover preview portal on the body of the document that owns this
+  // browser (popout-safe).
   useEffect(() => {
     if (!hoveredTile) {
       if (portalRef.current) {
@@ -474,17 +378,15 @@ const TileAssetBrowser = memo(({
     }
 
     if (!portalRef.current) {
-      const div = activeWindow.createDiv();
+      const doc = browserRef.current?.ownerDocument ?? activeDocument;
+      const div = doc.body.createDiv();
       div.className = 'windrose-tile-preview-portal';
-      const canvas = activeWindow.createEl('canvas');
+      const canvas = div.createEl('canvas');
       canvas.width = PREVIEW_SIZE;
       canvas.height = PREVIEW_SIZE;
       canvas.classList.add('windrose-tile-preview-canvas');
-      const label = activeWindow.createDiv();
+      const label = div.createDiv();
       label.className = 'windrose-tile-preview-label';
-      div.appendChild(canvas);
-      div.appendChild(label);
-      activeDocument.body.appendChild(div);
       portalRef.current = div;
       previewRef.current = canvas;
       previewLabelRef.current = label;
@@ -506,7 +408,8 @@ const TileAssetBrowser = memo(({
 
     label.textContent = hoveredTile.filename + (rotation ? ` (${rotation}°)` : '') + (flipH ? ' [flipped]' : '');
 
-    const isHoveredSelected = selectedTilesetId === tileToTilesetId.get(hoveredTile.vaultPath) && selectedTileId === hoveredTile.id;
+    const { app: previewApp, getCachedImage: previewGetCachedImage } = previewInputsRef.current;
+    const isHoveredSelected = selectedTilesetId === tileToTilesetIdRef.current.get(hoveredTile.vaultPath) && selectedTileId === hoveredTile.id;
     if (isHoveredSelected && (rotation || flipH)) {
       const transformVal = `rotate(${rotation}deg)${flipH ? ' scaleX(-1)' : ''}`;
       canvas.style.setProperty('transform', transformVal);
@@ -514,7 +417,7 @@ const TileAssetBrowser = memo(({
       canvas.style.removeProperty('transform');
     }
 
-    return loadVaultImage(app, hoveredTile.vaultPath, getCachedImage, (img) => {
+    return loadVaultImage(previewApp, hoveredTile.vaultPath, previewGetCachedImage, (img) => {
       drawTileToCanvas(canvas, img, PREVIEW_SIZE, hoveredTile.vaultPath);
     });
   }, [hoveredTile, rotation, flipH, selectedTilesetId, selectedTileId]);
@@ -523,7 +426,7 @@ const TileAssetBrowser = memo(({
   useEffect(() => {
     return () => {
       if (portalRef.current) {
-        activeDocument.body.removeChild(portalRef.current);
+        portalRef.current.remove();
         portalRef.current = null;
         previewLabelRef.current = null;
       }
@@ -571,25 +474,8 @@ const TileAssetBrowser = memo(({
   };
 
   // ---- Tile metadata ----
-
-  useEffect(() => {
-    // Load at mount AND whenever the settings-changed event fires: pack imports,
-    // the classification-rescan command, and the folder-add detection pass all
-    // rewrite the store outside this component and dispatch the event when done.
-    // A mount-once load left the browser rendering a frozen copy until a full
-    // app reload (stale strata/walls-pane/portal classification).
-    const reload = (): void => { void loadTileMetadata(app).then(setTileMetadata); };
-    reload();
-    window.addEventListener('windrose-settings-changed', reload);
-    return () => window.removeEventListener('windrose-settings-changed', reload);
-  }, []);
-
-  // Keep the renderer's global metadata accessor in sync with browser edits
-  // (detection scans, render-mode toggles) so placed tiles resolve their mode
-  // from the latest classification.
-  useEffect(() => {
-    setTileMetadataForRender(tileMetadata);
-  }, [tileMetadata]);
+  // One shared store (persistence/tileMetadata.ts) across every mount and the
+  // renderer; writes go through updateTileMetadata, never a local copy.
 
   // Report starred tiles to parent for spine flyout
   const prevStarredRef = useRef<string>('');
@@ -612,94 +498,75 @@ const TileAssetBrowser = memo(({
 
   // Thumbnail requests are driven by virtualizer visibility — see effect after virtualizer setup
 
-  // Auto-predict depth affinity for tiles that don't have one yet (deferred to idle)
+  // Auto-predict depth affinity for tiles that don't have one yet (deferred to
+  // idle). Runs against the LOADED shared store and fills only missing rows
+  // inside the mutator, so it can never save a stale or empty copy over the
+  // library (the 2026-07-30 wipe).
   const predictionRanRef = useRef(false);
   useEffect(() => {
     if (predictionRanRef.current) return;
     if (tilesets.length === 0) return;
 
+    let cancelled = false;
     const run = (): void => {
-      if (predictionRanRef.current) return;
-      const allTiles = tilesets.flatMap(ts => ts.tiles);
-      if (allTiles.length === 0) return;
-      const missing: Array<{ vaultPath: string; depth: TileLayerRole }> = [];
-      for (const tile of allTiles) {
-        const entry = tileMetadata[tile.vaultPath];
-        if (entry?.depthAffinity != null) continue;
-        const { tier, confidence } = predictDepthTier(tile, entry);
-        if (confidence >= 0.4) {
-          missing.push({ vaultPath: tile.vaultPath, depth: tier });
-        }
-      }
-      if (missing.length > 0) {
+      void ensureTileMetadataLoaded(app).then(() => {
+        if (cancelled || predictionRanRef.current) return;
+        const allTiles = tilesets.flatMap(ts => ts.tiles);
+        if (allTiles.length === 0) return;
         predictionRanRef.current = true;
-        // Merge into a FRESH load, never the captured state: an import or
-        // rescan may have rewritten the store since this component mounted,
-        // and saving the stale copy replaces the whole file with it (the
-        // 2026-07-30 wipe: a mount over a corrupt load saved 2046 predicted
-        // rows over the entire library). Re-filter against the fresh store so
-        // fill-missing stays true.
-        void loadTileMetadata(app).then(fresh => {
-          const stillMissing = missing.filter(m => fresh[m.vaultPath]?.depthAffinity == null);
-          if (stillMissing.length === 0) return;
-          const updated = bulkSetDepthAffinity(fresh, stillMissing);
-          setTileMetadata(updated);
-          saveTileMetadataDebounced(app, updated);
+        updateTileMetadata(app, store => {
+          const missing: Array<{ vaultPath: string; depth: TileLayerRole }> = [];
+          for (const tile of allTiles) {
+            const entry = store[tile.vaultPath];
+            if (entry?.depthAffinity != null) continue;
+            const { tier, confidence } = predictDepthTier(tile, entry);
+            if (confidence >= 0.4) missing.push({ vaultPath: tile.vaultPath, depth: tier });
+          }
+          return missing.length > 0 ? bulkSetDepthAffinity(store, missing) : store;
         });
-      } else if (allTiles.some(t => tileMetadata[t.vaultPath]?.depthAffinity != null)) {
-        predictionRanRef.current = true;
-      }
+      });
     };
 
     const id = typeof requestIdleCallback === 'function'
       ? requestIdleCallback(run)
       : window.setTimeout(run, 200);
     return () => {
+      cancelled = true;
       if (typeof cancelIdleCallback === 'function') { cancelIdleCallback(id); } else { window.clearTimeout(id); }
     };
-  }, [tilesets, tileMetadata, app]);
+  }, [tilesets, app]);
 
   // Eager detection scan: caches per-tile alpha coverage + opaque bounds + natural
   // dims (decoupled from thumbnails, which are lazy + LRU-evicted). Signals only —
   // render-mode/footprint predictions are applied at import time, never bulk-persisted
-  // for an existing library (see comment inside).
-  const detectionScanRanRef = useRef(false);
+  // for an existing library (2026-06-09: 304 tiles silently flipped to 'region',
+  // breaking placed terrain; per-tile metadata outranks the per-tileset setting).
+  // Keyed on tilesets only (STRUCT-A-12): a metadata change mid-scan no longer
+  // aborts it. Paths are claimed module-wide so several mounts scan each tile once.
   useEffect(() => {
-    if (detectionScanRanRef.current) return;
     if (tilesets.length === 0) return;
 
     const controller = new AbortController();
+    let claimed: string[] = [];
     const run = async (): Promise<void> => {
-      if (detectionScanRanRef.current) return;
-      detectionScanRanRef.current = true;
-
-      const allTiles = tilesets.flatMap(ts => ts.tiles);
-      const needsScan = allTiles
+      const store = await ensureTileMetadataLoaded(app);
+      if (controller.signal.aborted) return;
+      const needsScan = tilesets
+        .flatMap(ts => ts.tiles)
         .filter(t => {
-          const e = tileMetadata[t.vaultPath];
+          const e = store[t.vaultPath];
           // Re-scan entries missing either signal — older scans cached
           // alphaCoverage/opaque bounds but not the natural dims footprint needs.
           return e?.alphaCoverage == null || e?.srcW == null;
         })
         .map(t => t.vaultPath);
-      const scanned = needsScan.length > 0
-        ? await runDetectionScan(app, needsScan, { concurrency: 4, signal: controller.signal })
-        : [];
+      claimed = claimDetectionScanPaths(needsScan);
+      if (claimed.length === 0) return;
+      const scanned = await runDetectionScan(app, claimed, { concurrency: 4, signal: controller.signal });
       if (controller.signal.aborted) return;
-
-      setTileMetadata(prev => {
-        // Signals only. Render-mode and footprint PREDICTIONS must not be
-        // persisted here: per-tile metadata outranks the per-tileset setting in
-        // resolveTileRender, so bulk-writing predictions for an existing library
-        // retroactively changes how already-placed tiles render on every device
-        // the metadata file syncs to (2026-06-09: 304 tiles silently flipped to
-        // 'region', breaking placed terrain). Predictions are applied at import
-        // time (DungeondraftImportModal), where no placements exist yet.
-        if (scanned.length === 0) return prev;
-        const updated = bulkSetDetectionSignals(prev, scanned);
-        saveTileMetadataDebounced(app, updated);
-        return updated;
-      });
+      claimed = [];
+      if (scanned.length === 0) return;
+      updateTileMetadata(app, prev => bulkSetDetectionSignals(prev, scanned));
     };
 
     const id = typeof requestIdleCallback === 'function'
@@ -707,220 +574,48 @@ const TileAssetBrowser = memo(({
       : window.setTimeout(() => void run(), 400);
     return () => {
       controller.abort();
+      releaseDetectionScanPaths(claimed);
+      claimed = [];
       if (typeof cancelIdleCallback === 'function') { cancelIdleCallback(id); } else { window.clearTimeout(id); }
     };
-  }, [tilesets, tileMetadata, app]);
-
-  // Merge all tileset tiles into a single pool. Wall/path strips are browsable
-  // (selecting one arms the wall tool); their `_end` caps stay hidden — caps
-  // are referenced indirectly via the strip's wallEndCapPath metadata.
-  const allTiles = useMemo(() => {
-    const tiles: TileEntry[] = [];
-    for (const ts of tilesets) {
-      for (const t of ts.tiles) {
-        const e = tileMetadata[t.vaultPath];
-        if (e?.isWallEndCap === true) continue;
-        tiles.push(t);
-      }
-    }
-    return tiles;
-  }, [tilesets, tileMetadata]);
-
-  // Map vaultPath → tilesetId for click handlers
-  const tileToTilesetId = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const ts of tilesets) {
-      for (const t of ts.tiles) map.set(t.vaultPath, ts.id);
-    }
-    return map;
-  }, [tilesets]);
+  }, [tilesets, app]);
 
   const exitOrganize = useCallback((): void => {
     setOrganize(false);
   }, []);
 
-  // Collect available tags for the filter chips, then drop folder/pack noise.
-  // A tag is junk if it contains a grid/packaging NOISE word (hex/set/pack/… —
-  // semantic tags never do, only folder & pack names) or matches a pack/dev-id
-  // pattern (e.g. "FCWallsDev1": no spaces, mixes letters + digits). Clean tags
-  // like "walls"/"wooden" survive. Search still matches every tag (getAllTags).
-  const availableTags = useMemo(() => {
-    if (allTiles.length === 0) return [];
-    const raw = mapType === 'grid'
-      ? collectDepthAwareTags(allTiles, tileMetadata, tileDepth)
-      : collectUniqueTags(allTiles, tileMetadata);
-    return raw.filter(tag => {
-      if (!/\s/.test(tag) && /[a-z]/i.test(tag) && /\d/.test(tag)) return false;
-      for (const piece of tag.toLowerCase().split(/[/_\-\s&,()]+/)) {
-        const tok = piece.replace(/[^a-z]/g, '');
-        if (tok !== '' && NOISE.has(tok)) return false;
-      }
-      return true;
-    });
-  }, [allTiles, tileMetadata, tileDepth, mapType]);
-
-  const filteredTiles = useMemo(() => {
-    if (allTiles.length === 0) return [];
-    let tiles = allTiles;
-
-    // Text search (includes import + user tags via metadata)
-    if (searchFilter != null && searchFilter !== '') {
-      const lower = searchFilter.toLowerCase();
-      tiles = tiles.filter((t: TileEntry) => {
-        if (t.filename.toLowerCase().includes(lower)) return true;
-        if (t.category != null && t.category !== '' && t.category.toLowerCase().includes(lower)) return true;
-        const tags = getAllTags(t, tileMetadata);
-        return tags.some(tag => tag.toLowerCase().includes(lower));
-      });
-    }
-
-    // Tag filter (AND logic, includes import + user tags)
-    if (activeTags.size > 0) {
-      tiles = tiles.filter((t: TileEntry) => {
-        const tags = getAllTags(t, tileMetadata);
-        const lowerTags = tags.map(tag => tag.toLowerCase());
-        return Array.from(activeTags).every(tag => lowerTags.includes(tag.toLowerCase()));
-      });
-    }
-
-    // Pack filter (OR within packs, AND with the other facets)
-    if (packFilter.size > 0) {
-      tiles = tiles.filter((t: TileEntry) => packFilter.has(tileToTilesetId.get(t.vaultPath) ?? 'unknown'));
-    }
-
-    // Role filter: on grid maps the depth selector scopes the rail to the active
-    // role. A classified tile shows under its role; an unclassified tile (no
-    // depthAffinity yet) is treated as 'ground' — the base role per
-    // DEFAULT_TILE_LAYERS — so the non-ground roles stay clean and untagged
-    // tiles land on Terrain rather than bleeding across every role.
-    // Read-only use of depthAffinity (no persistence → no RCA risk).
-    if (mapType === 'grid') {
-      tiles = tiles.filter((t: TileEntry) => {
-        const meta = tileMetadata[t.vaultPath];
-        // Wall strips never receive a depthAffinity (strips are excluded from
-        // depth prediction by design), but per the design IA a wall is a
-        // line-form tile in the Structure role — route them there instead of
-        // letting the unclassified fallback shelve them under Terrain.
-        const affinity = meta?.depthAffinity
-          ?? (meta?.ddSourceType?.toLowerCase() === 'walls' ? 'structure' : 'ground');
-        return affinity === tileDepth;
-      });
-    }
-
-    // Silent geometry scope: hide a tile only when its own folder/tags EXPLICITLY
-    // declare the other geometry (a "Hex Forest" terrain on a grid map). Tiles with
-    // no geometry signal are agnostic and show everywhere. Read-only derivation — no
-    // metadata write, so it never touches placed-tile rendering. Backs the Filter
-    // panel's "auto · {mapType} map" note row.
-    tiles = tiles.filter((t: TileEntry) => {
-      const geom = detectTileGeometry(t.category ?? '', getAllTags(t, tileMetadata));
-      return geom == null || geom === mapType;
-    });
-
-    // Feature gate: wall/path strips arm the wall tool on select, so hide them
-    // entirely when the walls feature is disabled (placed walls still render).
-    if (!featureFlags.walls) {
-      tiles = tiles.filter((t: TileEntry) => {
-        const src = tileMetadata[t.vaultPath]?.ddSourceType?.toLowerCase();
-        return src !== 'walls' && src !== 'paths';
-      });
-    }
-
-    return tiles;
-  }, [allTiles, searchFilter, activeTags, packFilter, tileToTilesetId, tileMetadata, tileDepth, mapType, featureFlags.walls]);
-
-  // Packs present in the current role, for the Pack filter facet — with a
-  // humanized short label and a per-pack count, scoped to the active depth on
-  // grid maps (mirrors filteredTiles' role filter) so chips match the spec's
-  // `packsHere`. Count ignores search/tag/pack filters so it stays stable.
-  const availablePacks = useMemo((): Array<{ id: string; name: string; short: string; count: number; origin: TilesetOrigin }> => {
-    const counts = new Map<string, number>();
-    for (const tile of allTiles) {
-      if (mapType === 'grid') {
-        const affinity = tileMetadata[tile.vaultPath]?.depthAffinity ?? 'ground';
-        if (affinity !== tileDepth) continue;
-      }
-      const id = tileToTilesetId.get(tile.vaultPath);
-      if (id == null) continue;
-      counts.set(id, (counts.get(id) ?? 0) + 1);
-    }
-    return tilesets
-      .filter(ts => counts.has(ts.id))
-      .map(ts => ({
-        id: ts.id,
-        name: ts.name,
-        short: humanizePackName(ts.name),
-        count: counts.get(ts.id) ?? 0,
-        origin: ts.origin ?? 'native',
-      }));
-  }, [allTiles, tileToTilesetId, tilesets, tileMetadata, tileDepth, mapType]);
-
-  // Cross-pack category merge (Phase 2): collapse messy import-time folders into
-  // one canonical category, with cross-pack duplicates merged. Built over ALL tiles
-  // so the category set stays stable regardless of search/tag filtering. Keyed by
-  // `${pack}|${rawCategory}` so the same folder name in different packs resolves
-  // independently. Replaces the old pack-name-prefix disambiguation.
-  const mergedCategories = useMemo(() => {
-    const seen = new Set<string>();
-    const folders: FolderInput[] = [];
-    for (const tile of allTiles) {
-      // Organize's Move… reassigns the category home read-time; the raw
-      // folder-derived category is never rewritten (lossless).
-      const raw = tileMetadata[tile.vaultPath]?.categoryOverride ?? tile.category ?? 'Uncategorized';
-      const pack = tileToTilesetId.get(tile.vaultPath) ?? 'unknown';
-      const key = `${pack}|${raw}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        folders.push({ raw, pack });
-      }
-    }
-    const lookup = new Map<string, string>();
-    // Per-canonical-label provenance for the merge banner (only where a merge happened).
-    const meta = new Map<string, { folders: number; packs: number }>();
-    for (const c of clusterCategories(folders)) {
-      for (const m of c.members) lookup.set(`${m.pack}|${m.raw}`, c.label);
-      if (c.merged) {
-        const packs = new Set(c.members.map(m => m.pack));
-        meta.set(c.label, { folders: c.members.length, packs: packs.size });
-      }
-    }
-    return { lookup, meta };
-  }, [allTiles, tileToTilesetId, tileMetadata]);
-
-  const groupedTiles = useMemo(() => {
-    const groups = new Map<string, TileEntry[]>();
-    for (const tile of filteredTiles) {
-      const raw = tileMetadata[tile.vaultPath]?.categoryOverride ?? tile.category ?? 'Uncategorized';
-      const pack = tileToTilesetId.get(tile.vaultPath) ?? 'unknown';
-      const cat = mergedCategories.lookup.get(`${pack}|${raw}`) ?? raw;
-      const bucket = groups.get(cat);
-      if (bucket === undefined) {
-        groups.set(cat, [tile]);
-      } else {
-        bucket.push(tile);
-      }
-    }
-    return groups;
-  }, [filteredTiles, mergedCategories, tileToTilesetId, tileMetadata]);
-
-  // Merge banner (Option B): provenance for the currently-open single category.
-  const openCategoryMerge = useMemo(() => {
-    if (railSel === 'all' || railSel === 'recent' || railSel === 'starred') return null;
-    return mergedCategories.meta.get(railSel) ?? null;
-  }, [railSel, mergedCategories]);
-
-  // Resolve which groups to show based on rail selection
-  const shownGroups = useMemo((): Array<[string, TileEntry[]]> => {
-    const entries = Array.from(groupedTiles.entries());
-    if (railSel === 'all' || railSel === 'recent' || railSel === 'starred') return entries;
-    return entries.filter(([cat]) => cat === railSel);
-  }, [groupedTiles, railSel]);
+  // Search / filter / sort / group pipeline (pure derivation over the shared
+  // metadata snapshot; see hooks/tiles/useTileFilterPipeline.ts).
+  const {
+    allTiles,
+    tileToTilesetId,
+    availableTags,
+    filteredTiles,
+    availablePacks,
+    mergedCategories,
+    groupedTiles,
+    openCategoryMerge,
+    shownGroups,
+  } = useTileFilterPipeline({
+    tilesets,
+    tileMetadata,
+    searchFilter,
+    activeTags,
+    packFilter,
+    tileDepth,
+    mapType,
+    railSel,
+    wallsEnabled: featureFlags.walls,
+  });
+  tileToTilesetIdRef.current = tileToTilesetId;
 
   // Resolve the selected tile entry for the loaded-brush footer
   const selectedTile = useMemo((): TileEntry | null => {
     if (selectedTileId == null || selectedTilesetId == null) return null;
     const ts = tilesets.find(t => t.id === selectedTilesetId);
-    return ts?.tiles.find(t => t.id === selectedTileId) ?? null;
+    // resolveTileEntry also accepts legacy basename ids (recents / MCP selects);
+    // the grid highlights below compare against this resolved entry's id.
+    return resolveTileEntry(ts, selectedTileId) ?? null;
   }, [selectedTileId, selectedTilesetId, tilesets]);
 
   // The selected tile's derived render-form: reported upward for the drawer
@@ -1020,8 +715,10 @@ const TileAssetBrowser = memo(({
           return 24;
         case 'empty':
           return 40;
-        default:
+        case 'tileRow':
           return listMode ? LIST_ROW_H : fullCellWidth;
+        default:
+          return assertNever(row);
       }
     },
     gap: gridGap,
@@ -1126,7 +823,7 @@ const TileAssetBrowser = memo(({
   // ---- Main render ----
 
   const isGrid = mapType === 'grid';
-  const depthLabel = isGrid ? depthMeta(tileDepth).label.toLowerCase() : tileLayer;
+  const depthLabel = isGrid ? depthMeta(tileDepth).label.toLowerCase() : 'tiles';
 
   // Unified facet model — the quick chips AND the dedicated Filter screen share one filter state.
   const activeFilterCount = activeTags.size + packFilter.size;
@@ -1139,140 +836,6 @@ const TileAssetBrowser = memo(({
   ];
   const clearAllFilters = (): void => { setActiveTags(new Set()); setPackFilter(new Set()); };
 
-  // Wall-tool footer controls (relocated from the old floating bar). Rendered in
-  // the loaded-brush footer whenever the wall tool publishes a control surface.
-  const renderWallBar = (surface: WallToolSurface): VNode => {
-    // A selected gap wins over the opening-mode placement hint: portal mode's
-    // click-to-edit selects doors, and the footer must edit the door it selects.
-    if (surface.assetForm === 'opening' && !(surface.mode === 'edit' && surface.edit?.gap != null)) {
-      return <span className="windrose-tb-cap">Click a wall to place a door · Click a placed door to edit it · Alt-click for a bare opening</span>;
-    }
-    if (!surface.hasAsset && surface.assetForm !== 'opening') {
-      return <span className="windrose-tb-cap">Pick a wall or path strip</span>;
-    }
-    if (surface.mode === 'edit' && surface.edit?.gap != null) {
-      // A gap handle is selected → the footer edits the door, not the wall.
-      const g = surface.edit.gap;
-      return (
-        <>
-          <span className="windrose-tb-cap" style={{ minWidth: 34 }}>{g.bound ? 'Door' : 'Opening'}</span>
-          <span className="label">Width</span>
-          <input
-            className="windrose-tb-range"
-            type="range"
-            min="0.25"
-            max="6"
-            step="0.25"
-            value={g.widthCells}
-            onInput={(e: Event) => g.setWidth(parseFloat((e.target as HTMLInputElement).value))}
-            style={{ flex: 1, minWidth: 40 }}
-          />
-          <span className="windrose-tb-cap" style={{ minWidth: 40, textAlign: 'right' }}>{g.widthCells} cell</span>
-          <button
-            className={`windrose-tb-iconbtn ${g.flip ? 'active' : ''}`}
-            ref={tooltipRef('Flip door (mirror across the wall)')}
-            disabled={!g.bound}
-            onClick={g.toggleFlip}
-          >
-            <Icon icon="lucide-flip-horizontal" size={14} />
-          </button>
-          <button
-            className="windrose-tb-iconbtn"
-            ref={tooltipRef('Remove door art (leave a bare opening)')}
-            disabled={!g.bound}
-            onClick={g.unbind}
-          >
-            <Icon icon="lucide-unlink" size={14} />
-          </button>
-          <button className="windrose-tb-iconbtn" ref={tooltipRef('Delete opening (Delete)')} onClick={g.deleteGap}>
-            <Icon icon="lucide-trash-2" size={14} />
-          </button>
-          <button className="windrose-tb-iconbtn" ref={tooltipRef('Done editing opening (Escape)')} onClick={g.deselectGap}>
-            <Icon icon="lucide-x" size={14} />
-          </button>
-        </>
-      );
-    }
-    if (surface.mode === 'edit' && surface.edit != null) {
-      const edit = surface.edit;
-      return (
-        <>
-          <span className="windrose-tb-cap" style={{ minWidth: 34 }}>{edit.vertexCount} pts</span>
-          <span className="label">Width</span>
-          <input
-            className="windrose-tb-range"
-            type="range"
-            min="0.25"
-            max="3"
-            step="0.25"
-            value={edit.widthScale}
-            onInput={(e: Event) => edit.setWidth(parseFloat((e.target as HTMLInputElement).value))}
-            style={{ flex: 1, minWidth: 40 }}
-          />
-          <span className="windrose-tb-cap" style={{ minWidth: 24, textAlign: 'right' }}>{edit.widthScale}×</span>
-          <button
-            className={`windrose-tb-iconbtn ${edit.flip ? 'active' : ''}`}
-            ref={tooltipRef('Flip texture direction')}
-            onClick={edit.toggleFlip}
-          >
-            <Icon icon="lucide-flip-vertical" size={14} />
-          </button>
-          <button className="windrose-tb-iconbtn" ref={tooltipRef('Delete wall (Delete)')} onClick={edit.deleteWall}>
-            <Icon icon="lucide-trash-2" size={14} />
-          </button>
-          <button className="windrose-tb-iconbtn" ref={tooltipRef('Deselect (Escape)')} onClick={edit.deselect}>
-            <Icon icon="lucide-x" size={14} />
-          </button>
-        </>
-      );
-    }
-    // Draw mode (also covers idle-with-asset: the action buttons disable until drawing).
-    return (
-      <>
-        <span className="windrose-tb-cap" style={{ minWidth: 34 }}>{surface.vertexCount} pts</span>
-        <button
-          className={`windrose-tb-iconbtn ${surface.snapEnabled ? 'active' : ''}`}
-          ref={tooltipRef(surface.snapEnabled ? 'Grid snap: ON' : 'Grid snap: OFF')}
-          onClick={surface.toggleSnap}
-        >
-          <Icon icon="lucide-magnet" size={14} />
-        </button>
-        <button
-          className={`windrose-tb-iconbtn ${surface.angleSnapEnabled ? 'active' : ''}`}
-          ref={tooltipRef(surface.angleSnapEnabled ? '45° angle snap: ON (or hold Alt)' : '45° angle snap: OFF (or hold Alt)')}
-          onClick={surface.toggleAngleSnap}
-        >
-          <Icon icon="lucide-triangle-right" size={14} />
-        </button>
-        <span className="sep" />
-        <button
-          className="windrose-tb-iconbtn"
-          ref={tooltipRef('Undo last point (Backspace)')}
-          disabled={!surface.isDrawing}
-          onClick={surface.undoLastPoint}
-        >
-          <Icon icon="lucide-undo-2" size={14} />
-        </button>
-        <button
-          className="windrose-tb-iconbtn"
-          ref={tooltipRef('Cancel (Escape)')}
-          disabled={!surface.isDrawing}
-          onClick={surface.cancelDrawing}
-        >
-          <Icon icon="lucide-x" size={14} />
-        </button>
-        <button
-          className="windrose-tb-iconbtn active"
-          ref={tooltipRef('Finish wall (Enter or double-click)')}
-          disabled={!surface.canFinish}
-          onClick={surface.finishWall}
-        >
-          <Icon icon="lucide-check" size={14} />
-        </button>
-      </>
-    );
-  };
-
   return (
     <div ref={browserRef} className="windrose-tile-browser">
       {organize ? (
@@ -1281,7 +844,6 @@ const TileAssetBrowser = memo(({
           allTiles={allTiles}
           tileToTilesetId={tileToTilesetId}
           tileMetadata={tileMetadata}
-          setTileMetadata={setTileMetadata}
           mergedCategoryLookup={mergedCategories.lookup}
           getThumbUrl={getThumbUrl}
           requestThumbs={requestThumbs}
@@ -1349,7 +911,6 @@ const TileAssetBrowser = memo(({
           onArtOffsetChange={onTilesetArtOffsetChange}
           onArtScaleChange={onTilesetArtScaleChange}
           isGrid={isGrid}
-          setTileMetadata={setTileMetadata}
         />
       )}
 
@@ -1516,21 +1077,16 @@ const TileAssetBrowser = memo(({
                   <div className="windrose-tb-list">
                     {(groupedTiles.get(openCat) ?? []).map((tile: TileEntry) => {
                       const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
-                      const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
                       return (
-                        <button
+                        <TileListRow
                           key={tile.vaultPath}
-                          className={`windrose-tb-listrow ${isSelected ? 'sel' : ''}`}
-                          onClick={() => handleTileClick(tsId, tile.id)}
-                          onMouseEnter={() => setHoveredTile(tile)}
-                          onMouseLeave={() => setHoveredTile(null)}
-                          ref={tooltipRef(tile.filename)}
-                        >
-                          <span className="lthumb">
-                            <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
-                          </span>
-                          <span className="lname">{tile.filename}</span>
-                        </button>
+                          tile={tile}
+                          tilesetId={tsId}
+                          selected={selectedTilesetId === tsId && selectedTile?.id === tile.id}
+                          thumbUrl={getThumbUrl(tile.vaultPath)}
+                          onTileClick={handleTileClick}
+                          onHover={setHoveredTile}
+                        />
                       );
                     })}
                   </div>
@@ -1538,19 +1094,16 @@ const TileAssetBrowser = memo(({
                   <div className="windrose-tb-leaf-grid">
                     {(groupedTiles.get(openCat) ?? []).map((tile: TileEntry) => {
                       const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
-                      const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
                       return (
-                        <div
+                        <TileCell
                           key={tile.vaultPath}
-                          className={`windrose-tile-thumb ${isSelected ? 'sel' : ''}`}
-                          onClick={() => handleTileClick(tsId, tile.id)}
-                          onMouseEnter={() => setHoveredTile(tile)}
-                          onMouseLeave={() => setHoveredTile(null)}
-                          ref={tooltipRef(tile.filename)}
-                        >
-                          <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
-                          <span className="tname">{tile.filename}</span>
-                        </div>
+                          tile={tile}
+                          tilesetId={tsId}
+                          selected={selectedTilesetId === tsId && selectedTile?.id === tile.id}
+                          thumbUrl={getThumbUrl(tile.vaultPath)}
+                          onTileClick={handleTileClick}
+                          onHover={setHoveredTile}
+                        />
                       );
                     })}
                   </div>
@@ -1571,21 +1124,16 @@ const TileAssetBrowser = memo(({
                     </div>,
                     ...tiles.map((tile: TileEntry) => {
                       const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
-                      const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
                       return (
-                        <button
+                        <TileListRow
                           key={tile.vaultPath}
-                          className={`windrose-tb-listrow ${isSelected ? 'sel' : ''}`}
-                          onClick={() => handleTileClick(tsId, tile.id)}
-                          onMouseEnter={() => setHoveredTile(tile)}
-                          onMouseLeave={() => setHoveredTile(null)}
-                          ref={tooltipRef(tile.filename)}
-                        >
-                          <span className="lthumb">
-                            <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
-                          </span>
-                          <span className="lname">{tile.filename}</span>
-                        </button>
+                          tile={tile}
+                          tilesetId={tsId}
+                          selected={selectedTilesetId === tsId && selectedTile?.id === tile.id}
+                          thumbUrl={getThumbUrl(tile.vaultPath)}
+                          onTileClick={handleTileClick}
+                          onHover={setHoveredTile}
+                        />
                       );
                     }),
                   ])}
@@ -1659,21 +1207,16 @@ const TileAssetBrowser = memo(({
                       <div className="windrose-tb-list">
                         {row.tiles.map((tile: TileEntry) => {
                           const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
-                          const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
                           return (
-                            <button
+                            <TileListRow
                               key={tile.vaultPath}
-                              className={`windrose-tb-listrow ${isSelected ? 'sel' : ''}`}
-                              onClick={() => handleTileClick(tsId, tile.id)}
-                              onMouseEnter={() => setHoveredTile(tile)}
-                              onMouseLeave={() => setHoveredTile(null)}
-                              ref={tooltipRef(tile.filename)}
-                            >
-                              <span className="lthumb">
-                                <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
-                              </span>
-                              <span className="lname">{tile.filename}</span>
-                            </button>
+                              tile={tile}
+                              tilesetId={tsId}
+                              selected={selectedTilesetId === tsId && selectedTile?.id === tile.id}
+                              thumbUrl={getThumbUrl(tile.vaultPath)}
+                              onTileClick={handleTileClick}
+                              onHover={setHoveredTile}
+                            />
                           );
                         })}
                       </div>
@@ -1682,19 +1225,16 @@ const TileAssetBrowser = memo(({
                       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${fullColCount}, 1fr)`, gap: gridGap }}>
                         {row.tiles.map((tile: TileEntry) => {
                           const tsId = tileToTilesetId.get(tile.vaultPath) ?? '';
-                          const isSelected = selectedTilesetId === tsId && selectedTileId === tile.id;
                           return (
-                            <div
+                            <TileCell
                               key={tile.vaultPath}
-                              className={`windrose-tile-thumb ${isSelected ? 'sel' : ''}`}
-                              onClick={() => handleTileClick(tsId, tile.id)}
-                              onMouseEnter={() => setHoveredTile(tile)}
-                              onMouseLeave={() => setHoveredTile(null)}
-                              ref={tooltipRef(tile.filename)}
-                            >
-                              <TileThumbnail url={getThumbUrl(tile.vaultPath)} />
-                              <span className="tname">{tile.filename}</span>
-                            </div>
+                              tile={tile}
+                              tilesetId={tsId}
+                              selected={selectedTilesetId === tsId && selectedTile?.id === tile.id}
+                              thumbUrl={getThumbUrl(tile.vaultPath)}
+                              onTileClick={handleTileClick}
+                              onHover={setHoveredTile}
+                            />
                           );
                         })}
                       </div>
@@ -1711,166 +1251,34 @@ const TileAssetBrowser = memo(({
       </div>
 
       {/* Loaded-brush footer */}
-      {selectedTile != null && (compact ? (
-        <div className="windrose-tb-footer">
-          <div className="windrose-tb-brushbar windrose-tb-brushbar-compact">
-            <div className="chip-tile compact">
-              <LoadedChipThumb url={getThumbUrl(selectedTile.vaultPath)} />
-            </div>
-            <button className="windrose-tb-iconbtn" ref={tooltipRef('Rotate')} onClick={handleRotateCW}>
-              <Icon icon="lucide-rotate-cw" size={12} />
-            </button>
-            <button
-              className={`windrose-tb-iconbtn ${activeSubtool === 'stamp' ? 'active' : ''}`}
-              onClick={toggleStampSubtool}
-              ref={tooltipRef(activeSubtool === 'stamp' ? 'Stamp: ON' : 'Stamp: OFF')}
-            >
-              <Icon icon="lucide-stamp" size={12} />
-            </button>
-            <span className="sep" />
-            {activeSubtool === 'brush' && onBrushSizeChange != null ? (
-              <>
-                <span className="label">Size</span>
-                <input
-                  className="windrose-tb-range"
-                  type="range"
-                  min="0.5"
-                  max="8"
-                  step="0.5"
-                  value={brushSize ?? 1}
-                  onInput={(e: Event) => onBrushSizeChange(parseFloat((e.target as HTMLInputElement).value))}
-                  style={{ flex: 1, minWidth: 0 }}
-                />
-              </>
-            ) : (
-              <>
-                <span className="label">Scale</span>
-                <TileScaleSlider value={tileScale} onChange={onTileScaleChange} compact />
-              </>
-            )}
-            <button
-              className="windrose-tb-iconbtn ghost"
-              ref={tooltipRef('Clear brush')}
-              onClick={onTileDeselect}
-              style={{ width: 22, height: 22 }}
-            >
-              <Icon icon="lucide-x" size={12} />
-            </button>
-          </div>
-          {/* Wall tool row: joins (not replaces) the transform row so every
-              control lives in the footer. */}
-          {wallSurface != null && (
-            <div className="windrose-tb-brushbar windrose-tb-brushbar-compact">
-              {renderWallBar(wallSurface)}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="windrose-tb-footer">
-          <div className="windrose-tb-loaded">
-            <div className="chip-tile">
-              <LoadedChipThumb url={getThumbUrl(selectedTile.vaultPath)} />
-            </div>
-            <div className="meta">
-              <div className="n">{selectedTile.filename}</div>
-              <div className="s">
-                {selectedTile.category ?? 'Uncategorized'} · loaded on {isGrid ? depthMeta(tileDepth).label : tileLayer}
-              </div>
-            </div>
-            <button
-              className="windrose-tb-iconbtn ghost"
-              ref={tooltipRef('Clear brush')}
-              onClick={onTileDeselect}
-            >
-              <Icon icon="lucide-x" size={14} />
-            </button>
-          </div>
-          {/* Brushbar: context-sensitive per armed subtool. Brush swaps the
-              transform controls for size/softness; the ribbon owns subtool
-              selection in full mode, so no stamp mirror here. */}
-          <div className="windrose-tb-brushbar">
-            {activeSubtool === 'brush' && onBrushSizeChange != null ? (
-              <>
-                <span className="label">Size</span>
-                <input
-                  className="windrose-tb-range"
-                  type="range"
-                  min="0.5"
-                  max="8"
-                  step="0.5"
-                  value={brushSize ?? 1}
-                  onInput={(e: Event) => onBrushSizeChange(parseFloat((e.target as HTMLInputElement).value))}
-                  style={{ flex: 1, minWidth: 40 }}
-                />
-                <span className="windrose-tb-cap" style={{ minWidth: 30, textAlign: 'right' }}>{brushSize ?? 1}c</span>
-                <span className="sep" />
-                <span className="label">Soft</span>
-                <input
-                  className="windrose-tb-range"
-                  type="range"
-                  min="0"
-                  max="1.5"
-                  step="0.05"
-                  value={brushSoftness ?? 0.5}
-                  onInput={(e: Event) => onBrushSoftnessChange?.(parseFloat((e.target as HTMLInputElement).value))}
-                  style={{ flex: 1, minWidth: 40 }}
-                />
-                <span className="windrose-tb-cap" style={{ minWidth: 26, textAlign: 'right' }}>
-                  {Math.round((brushSoftness ?? 0.5) * 100)}
-                </span>
-              </>
-            ) : (
-              <>
-                <button className="windrose-tb-iconbtn" ref={tooltipRef('Rotate counter-clockwise')} onClick={handleRotateCCW}>
-                  <Icon icon="lucide-rotate-ccw" size={14} />
-                </button>
-                <span className="windrose-tb-cap" style={{ minWidth: 28, textAlign: 'center' }}>{rotation}°</span>
-                <button className="windrose-tb-iconbtn" ref={tooltipRef('Rotate clockwise')} onClick={handleRotateCW}>
-                  <Icon icon="lucide-rotate-cw" size={14} />
-                </button>
-                <button
-                  className={`windrose-tb-iconbtn ${flipH ? 'active' : ''}`}
-                  onClick={() => onFlipChange(!flipH)}
-                  ref={tooltipRef('Flip horizontal')}
-                >
-                  <Icon icon="lucide-flip-horizontal" size={14} />
-                </button>
-                <span className="sep" />
-                {selectedForm === 'region' && onPaintEdgeBlendChange != null && (
-                  <button
-                    className={`windrose-tb-iconbtn ${paintEdgeBlend === true ? 'active' : ''}`}
-                    onClick={() => onPaintEdgeBlendChange(paintEdgeBlend !== true)}
-                    ref={tooltipRef(paintEdgeBlend === true ? 'Edge blend: ON — new cells paint with soft edges' : 'Edge blend: OFF — new cells paint with hard edges')}
-                  >
-                    <Icon icon="lucide-droplet" size={14} />
-                  </button>
-                )}
-                <button
-                  className="windrose-tb-iconbtn"
-                  onClick={() => {
-                    const modes: Array<'auto' | 'fill' | 'contain'> = ['auto', 'fill', 'contain'];
-                    const idx = modes.indexOf(tileFitMode);
-                    onTileFitModeChange(modes[(idx + 1) % modes.length]);
-                  }}
-                  ref={tooltipRef(`Fit: ${tileFitMode}`)}
-                >
-                  <Icon icon={tileFitMode === 'contain' ? 'lucide-minimize-2' : tileFitMode === 'fill' ? 'lucide-maximize-2' : 'lucide-scan'} size={14} />
-                </button>
-                <span className="sep" />
-                <span className="label">Scale</span>
-                <TileScaleSlider value={tileScale} onChange={onTileScaleChange} />
-              </>
-            )}
-          </div>
-          {/* Wall tool row: joins (not replaces) the transform brushbar so
-              every control lives in the footer. */}
-          {wallSurface != null && (
-            <div className="windrose-tb-brushbar">
-              {renderWallBar(wallSurface)}
-            </div>
-          )}
-        </div>
-      ))}
+      {selectedTile != null && (
+        <LoadedBrushFooter
+          compact={compact}
+          selectedTile={selectedTile}
+          thumbUrl={getThumbUrl(selectedTile.vaultPath)}
+          loadedOnLabel={isGrid ? depthMeta(tileDepth).label : undefined}
+          selectedForm={selectedForm}
+          rotation={rotation}
+          onRotateCW={handleRotateCW}
+          onRotateCCW={handleRotateCCW}
+          flipH={flipH}
+          onFlipChange={onFlipChange}
+          activeSubtool={activeSubtool}
+          onToggleStamp={toggleStampSubtool}
+          tileFitMode={tileFitMode}
+          onTileFitModeChange={onTileFitModeChange}
+          tileScale={tileScale}
+          onTileScaleChange={onTileScaleChange}
+          brushSize={brushSize}
+          onBrushSizeChange={onBrushSizeChange}
+          brushSoftness={brushSoftness}
+          onBrushSoftnessChange={onBrushSoftnessChange}
+          paintEdgeBlend={paintEdgeBlend}
+          onPaintEdgeBlendChange={onPaintEdgeBlendChange}
+          wallSurface={wallSurface}
+          onTileDeselect={onTileDeselect}
+        />
+      )}
 
       </>)}
     </div>

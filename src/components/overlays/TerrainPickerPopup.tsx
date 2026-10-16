@@ -51,10 +51,12 @@ const TerrainPickerPopup = ({
       }
     };
     // Deferred so the opening click does not immediately dismiss
-    const id = window.setTimeout(() => activeDocument.addEventListener('pointerdown', handler, true), 0);
+    // The popup's ownerDocument is the window that owns this map (popout-safe).
+    const doc = rootRef.current?.ownerDocument ?? activeDocument;
+    const id = window.setTimeout(() => doc.addEventListener('pointerdown', handler, true), 0);
     return () => {
       window.clearTimeout(id);
-      activeDocument.removeEventListener('pointerdown', handler, true);
+      doc.removeEventListener('pointerdown', handler, true);
     };
   }, [onClose]);
 
@@ -101,4 +103,4 @@ const TerrainPickerPopup = ({
 };
 
 export { TerrainPickerPopup };
-export type { TerrainPickerOption };
+

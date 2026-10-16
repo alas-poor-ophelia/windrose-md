@@ -22,6 +22,7 @@ import type { StoredViewState } from '#types/core/map.types';
 import type { ViewController } from '#types/hooks/viewController.types';
 
 import { useEffect, useState } from 'preact/hooks';
+import { calculateViewportOffset } from '../../geometry/core/viewportMath';
 
 /** Geometry surface needed for the world→screen transform */
 interface OverlayGeometry extends IGeometry {
@@ -81,12 +82,9 @@ function computeWorldTransform(
 ): string {
   const { zoom, center } = viewState;
   const { canvasWidth, canvasHeight, displayScale, canvasOffsetX, canvasOffsetY } = metrics;
-  const panOffsetX = geometry.type === 'grid'
-    ? canvasWidth / 2 - center.x * geometry.getScaledCellSize(zoom)
-    : canvasWidth / 2 - center.x * zoom;
-  const panOffsetY = geometry.type === 'grid'
-    ? canvasHeight / 2 - center.y * geometry.getScaledCellSize(zoom)
-    : canvasHeight / 2 - center.y * zoom;
+  const { offsetX: panOffsetX, offsetY: panOffsetY } = calculateViewportOffset(
+    geometry, center, { width: canvasWidth, height: canvasHeight }, zoom
+  );
 
   return `translate(${canvasOffsetX} ${canvasOffsetY}) ` +
     `scale(${displayScale}) ` +
@@ -202,4 +200,3 @@ export {
   useLiveOverlayTransform,
   useLiveViewTick
 };
-export type { OverlayMetrics };

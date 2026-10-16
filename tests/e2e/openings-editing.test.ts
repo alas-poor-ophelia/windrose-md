@@ -11,6 +11,7 @@ import {
   readWallGapsLive,
   resetDataFile,
   TEST_MAPS,
+  pressMapKey,
 } from "./helpers";
 
 // Reset the clean fixture before each test so each fresh Obsidian instance loads
@@ -40,14 +41,17 @@ beforeEach(() => resetDataFile());
 // from a windrose_canvas_dump rather than nudging pixels blindly.
 // ===========================================
 
-/** mousedown+mouseup at a fraction of the canvas (optionally Alt). */
+/** pointerdown+mousedown, pointerup+mouseup (real browser order) at a fraction
+ *  of the canvas (optionally Alt). The pointerdown drives the map focus hand-off. */
 async function canvasClick(page: any, fx: number, fy: number, altKey = false): Promise<void> {
   await page.evaluate(({ fx, fy, altKey }: { fx: number; fy: number; altKey: boolean }) => {
     const canvas = document.querySelector(".windrose-canvas-wrapper canvas") as HTMLCanvasElement | null;
     if (canvas == null) throw new Error("canvas not found");
     const rect = canvas.getBoundingClientRect();
     const opts = { clientX: rect.left + rect.width * fx, clientY: rect.top + rect.height * fy, bubbles: true, button: 0, altKey };
+    canvas.dispatchEvent(new PointerEvent("pointerdown", { ...opts, pointerId: 1, pointerType: "mouse", isPrimary: true }));
     canvas.dispatchEvent(new MouseEvent("mousedown", opts));
+    canvas.dispatchEvent(new PointerEvent("pointerup", { ...opts, pointerId: 1, pointerType: "mouse", isPrimary: true }));
     canvas.dispatchEvent(new MouseEvent("mouseup", opts));
   }, { fx, fy, altKey });
   await page.waitForTimeout(200);
@@ -60,9 +64,13 @@ async function canvasDrag(page: any, fromX: number, fromY: number, toX: number, 
     if (canvas == null) throw new Error("canvas not found");
     const rect = canvas.getBoundingClientRect();
     const at = (fx: number, fy: number) => ({ clientX: rect.left + rect.width * fx, clientY: rect.top + rect.height * fy, bubbles: true, button: 0 });
+    canvas.dispatchEvent(new PointerEvent("pointerdown", { ...at(fromX, fromY), pointerId: 1, pointerType: "mouse", isPrimary: true }));
     canvas.dispatchEvent(new MouseEvent("mousedown", at(fromX, fromY)));
+    canvas.dispatchEvent(new PointerEvent("pointermove", { ...at((fromX + toX) / 2, (fromY + toY) / 2), pointerId: 1, pointerType: "mouse", isPrimary: true }));
     canvas.dispatchEvent(new MouseEvent("mousemove", at((fromX + toX) / 2, (fromY + toY) / 2)));
+    canvas.dispatchEvent(new PointerEvent("pointermove", { ...at(toX, toY), pointerId: 1, pointerType: "mouse", isPrimary: true }));
     canvas.dispatchEvent(new MouseEvent("mousemove", at(toX, toY)));
+    canvas.dispatchEvent(new PointerEvent("pointerup", { ...at(toX, toY), pointerId: 1, pointerType: "mouse", isPrimary: true }));
     canvas.dispatchEvent(new MouseEvent("mouseup", at(toX, toY)));
   }, { fromX, fromY, toX, toY });
   await page.waitForTimeout(250);
@@ -85,9 +93,13 @@ async function canvasDragOffsetY(page: any, fromX: number, fromY: number, toX: n
     if (canvas == null) throw new Error("canvas not found");
     const rect = canvas.getBoundingClientRect();
     const at = (fx: number, fy: number) => ({ clientX: rect.left + rect.width * fx, clientY: rect.top + rect.height * fy + yPx, bubbles: true, button: 0 });
+    canvas.dispatchEvent(new PointerEvent("pointerdown", { ...at(fromX, fromY), pointerId: 1, pointerType: "mouse", isPrimary: true }));
     canvas.dispatchEvent(new MouseEvent("mousedown", at(fromX, fromY)));
+    canvas.dispatchEvent(new PointerEvent("pointermove", { ...at((fromX + toX) / 2, (fromY + toY) / 2), pointerId: 1, pointerType: "mouse", isPrimary: true }));
     canvas.dispatchEvent(new MouseEvent("mousemove", at((fromX + toX) / 2, (fromY + toY) / 2)));
+    canvas.dispatchEvent(new PointerEvent("pointermove", { ...at(toX, toY), pointerId: 1, pointerType: "mouse", isPrimary: true }));
     canvas.dispatchEvent(new MouseEvent("mousemove", at(toX, toY)));
+    canvas.dispatchEvent(new PointerEvent("pointerup", { ...at(toX, toY), pointerId: 1, pointerType: "mouse", isPrimary: true }));
     canvas.dispatchEvent(new MouseEvent("mouseup", at(toX, toY)));
   }, { fromX, fromY, toX, toY, yPx });
   await page.waitForTimeout(250);
@@ -108,7 +120,7 @@ async function drawWallWithDoor(page: any): Promise<void> {
   await footer.waitFor({ state: "visible", timeout: 5000 });
   await canvasClick(page, 0.3, 0.5);
   await canvasClick(page, 0.7, 0.5);
-  await page.keyboard.press("Enter");
+  await pressMapKey(page, "Enter");
   await page.waitForTimeout(400);
   await armPortal(page);
   await canvasClick(page, 0.5, 0.5); // seat the door

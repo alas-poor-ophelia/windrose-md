@@ -77,22 +77,6 @@ export interface HexContextMenuDetail extends InstanceScopedDetail {
 }
 
 /**
- * Seamless zoom-out surfacing payload: the child view at the moment the
- * surface fired, so the exit can restore a visually-continuous parent view
- * (sub-map footprint → parent hex footprint) instead of the stale dive-time
- * view. Escape-key / breadcrumb exits dispatch no detail and keep the
- * classic restore.
- */
-export interface SubHexExitDetail {
-  /** Child zoom the surfacing tick was heading to. */
-  childZoom: number;
-  /** Child world point under the zoom anchor (cursor / pinch center). */
-  childAnchor: { x: number; y: number };
-  /** Anchor's screen offset from the canvas center, in canvas pixels. */
-  anchorOffset: { dx: number; dy: number };
-}
-
-/**
  * Right-click on a selection. `handled` is a mutable claim flag: the first
  * handler to act sets it true so later handlers skip (not a cancelable event).
  */
@@ -136,7 +120,7 @@ export interface RemoveObjectLinkDetail extends InstanceScopedDetail {
  * Settings-changed signal. Some dispatch sites omit detail entirely (bare
  * Event), so `timestamp` is optional — no listener currently reads it.
  */
-export interface SettingsChangedDetail {
+interface SettingsChangedDetail {
   timestamp?: number;
 }
 
@@ -149,7 +133,7 @@ export interface SettingsChangedDetail {
  * via MapContext, navigateToSibling in DungeonMapTracker) and can no longer
  * leak between co-mounted maps.
  */
-export interface WindroseEventMap {
+interface WindroseEventMap {
   'windrose:hex-context-menu': CustomEvent<HexContextMenuDetail>;
   'windrose:selection-context-menu': CustomEvent<SelectionContextMenuDetail>;
   'windrose:edit-region': CustomEvent<RegionIdDetail>;

@@ -21,15 +21,13 @@
  */
 
 import type { HexOrientation, GridCalculation } from '#types/settings/settings.types';
+import type { MeasurementMethod } from '#types/core/map.types';
 
 import { DEFAULTS } from '../../core/dmtConstants';
 
 // ===========================================
 // Type Definitions
 // ===========================================
-
-/** Measurement method */
-export type MeasurementMethod = 'edge' | 'corner';
 
 /** Validation result */
 export interface ValidationResult {
@@ -171,13 +169,22 @@ function calculateGridFromMeasurement(
   method: MeasurementMethod,
   orientation: HexOrientation = 'flat'
 ): GridCalculation {
-  const hexSize = measurementToHexSize(size, method, orientation);
-  const columns = calculateColumns(imageWidth, hexSize, orientation);
-  const rows = calculateRows(imageHeight, hexSize, orientation);
-  
+  return calculateGridFromHexSize(imageWidth, imageHeight, measurementToHexSize(size, method, orientation), orientation);
+}
+
+/**
+ * Calculate the grid that covers an image at a given hex size (radius).
+ * Shared by measurement mode and fine-tune so both size the bounds the same way.
+ */
+function calculateGridFromHexSize(
+  imageWidth: number,
+  imageHeight: number,
+  hexSize: number,
+  orientation: HexOrientation = 'flat'
+): GridCalculation {
   return {
-    columns,
-    rows,
+    columns: calculateColumns(imageWidth, hexSize, orientation),
+    rows: calculateRows(imageHeight, hexSize, orientation),
     hexSize
   };
 }
@@ -365,7 +372,7 @@ export {
   MEASUREMENT_EDGE, MEASUREMENT_CORNER, MIN_MEASUREMENT_SIZE, MAX_MEASUREMENT_SIZE, MAX_FINE_TUNE_OFFSET,
   measurementToHexSize, hexSizeToMeasurement,
   calculateColumns, calculateRows, calculateHexSizeFromColumns,
-  calculateGridFromMeasurement, calculateGridFromColumns,
+  calculateGridFromMeasurement, calculateGridFromColumns, calculateGridFromHexSize,
   validateMeasurementSize, validateFineTune, getFineTuneRange,
   calculateFitZoom, subHexAnchorToChildCenter,
   subHexChildPointToParentOffset, subHexContinuityZoom

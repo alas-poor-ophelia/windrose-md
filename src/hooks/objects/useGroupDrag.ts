@@ -42,6 +42,7 @@ const useGroupDrag = (): UseGroupDragResult => {
     screenToGrid,
     screenToWorld,
     getClientCoords,
+    canvasRef,
     ladder,
     screenToLevelCell,
     getActiveLevel,
@@ -56,7 +57,8 @@ const useGroupDrag = (): UseGroupDragResult => {
 
   const {
     onObjectsChange,
-    onTextLabelsChange
+    onTextLabelsChange,
+    clearTransient
   } = useMapOperations();
 
   const {
@@ -85,13 +87,15 @@ const useGroupDrag = (): UseGroupDragResult => {
       if (e.key === 'Alt') altKeyRef.current = false;
       if (e.key === 'Shift') shiftKeyRef.current = false;
     };
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
+    // Popout-safe: the window that owns this map's canvas, captured once.
+    const win = canvasRef.current?.ownerDocument.defaultView ?? window;
+    win.addEventListener('keydown', onKeyDown);
+    win.addEventListener('keyup', onKeyUp);
     return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
+      win.removeEventListener('keydown', onKeyDown);
+      win.removeEventListener('keyup', onKeyUp);
     };
-  }, []);
+  }, [canvasRef]);
 
   const getClickedSelectedItem = useCallback((
     x: number,
@@ -435,7 +439,11 @@ const useGroupDrag = (): UseGroupDragResult => {
     if (!isDraggingSelection || dragStart?.isGroupDrag !== true) {
       return false;
     }
-    if (geometry == null || mapData == null) return false;
+    if (geometry == null || mapData == null) {
+      // No commit: drop any live-move pin so the next unrelated commit cannot absorb it.
+      clearTransient?.();
+      return false;
+    }
 
     // Restore original freeform state for any objects that were inverted during drag
     {
@@ -483,12 +491,15 @@ const useGroupDrag = (): UseGroupDragResult => {
       onTextLabelsChange(activeLayer.textLabels, false);
 
       groupDragInitialStateRef.current = null;
+    } else {
+      // No commit: drop any live-move pin so the next unrelated commit cannot absorb it.
+      clearTransient?.();
     }
 
     groupDragOffsetsRef.current = new Map();
 
     return true;
-  }, [isDraggingSelection, dragStart, mapData, geometry, cellGeometryFor, setIsDraggingSelection, setDragStart, onObjectsChange, onTextLabelsChange, groupDragInitialStateRef, groupDragOffsetsRef]);
+  }, [isDraggingSelection, dragStart, mapData, geometry, cellGeometryFor, setIsDraggingSelection, setDragStart, onObjectsChange, onTextLabelsChange, groupDragInitialStateRef, groupDragOffsetsRef, clearTransient]);
 
   return {
     isGroupDragging,

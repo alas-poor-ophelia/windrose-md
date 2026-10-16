@@ -1,4 +1,7 @@
-// DungeonMapTracker.tsx - Main component with undo/redo, objects, text labels, and color support
+// DungeonMapTracker.tsx - Root component of one mounted Windrose map (grid, hex, or world; code-block embed or full-pane view).
+// Owns: map data load/save (useMapData, useDataHandlers), per-layer diff undo/redo incl. fog (useLayerHistory), sub-hex drill-down
+// (useSubHexNavigation), tool/color state, panel and dock layout (usePanelState, useUILayout, useFloatingPanels),
+// fog, alignment mode, keyboard shortcuts, the MCP bridge, and composes MapCanvas with its layers, toolbars, docks and modals.
 
 import type { VNode } from 'preact';
 import type {
@@ -6,10 +9,9 @@ import type {
   MapType,
 } from '#types/index';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
-import type { ResolvedTheme, OnboardingState } from '#types/settings/settings.types';
-import type { WallToolSurface } from '#types/core/wallpath.types';
-import type { TilesetOverrides } from '#types/tiles/tile.types';
-import type { CustomColor } from '#types/core/common.types';
+import type { ResolvedTheme } from '#types/settings/settings.types';
+import type { MapDataUpdater } from '#types/hooks/mapData.types';
+import type { RecordMapChangeOptions } from '#types/hooks/layerHistory.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useMapData } from './hooks/state/useMapData';
@@ -23,66 +25,57 @@ import { useMcpBridge } from './hooks/state/useMcpBridge';
 import { createGeometry } from './geometry/core/createGeometry';
 import { MapHeader } from './components/controls/MapHeader';
 import { MapCanvas } from './components/mapcanvas/MapCanvas';
-import { MapControls } from './components/controls/MapControls';
-import { ToolPalette, isToolIdEnabled } from './components/toolbars/ToolPalette';
-import { ObjectSidebar } from './components/panels/ObjectSidebar';
-import { VisibilityToolbar } from './components/toolbars/VisibilityToolbar';
-import { FogOfWarToolbar } from './components/toolbars/FogOfWarToolbar';
-import { WindroseCompass } from './components/shared/WindroseCompass';
 
 import { MapSettingsModal } from './components/settings/MapSettingsModal';
-import { getTheme, getEffectiveSettings, getSettings, getTilesetFolders } from './core/settingsAccessor';
+import { resolveTheme, getEffectiveSettings } from './core/settingsAccessor';
 import { isFeatureEnabled } from './core/featureFlags';
-import { getColorByHex, isDefaultColor, DEFAULT_COLOR } from './drawing/colorOperations';
 import { ImageAlignmentMode } from './components/overlays/ImageAlignmentMode';
 import { OnboardingSurvey } from './components/overlays/OnboardingSurvey';
 import { WhatsNewNotice } from './components/overlays/WhatsNewNotice';
 import { DataFileRecoveryPanel } from './components/overlays/DataFileRecoveryPanel';
 import { StaleMapConflictPanel } from './components/overlays/StaleMapConflictPanel';
 import { useAlignmentMode } from './hooks/interactions/useAlignmentMode';
-import { ModalPortal } from './components/modals/ModalPortal';
-import { allAuthoredCells, getActiveLayer, getLayerById, getActiveBoardLayers, getBoardsOrdered, updateBoard, addBoard, setActiveBoard, removeBoard, setLayerMode, addLayer, updateActiveLayer } from './persistence/layerAccessor';
-import { copyDeepLinkToClipboard } from './persistence/deepLinkHandler';
+import { getActiveLayer, getActiveBoardLayers } from './persistence/layerAccessor';
 import type { TileLayerRole } from '#types/tiles/tile.types';
-import { resolveTileEntry } from './assets/tilesetOperations';
-import { FloatingPanel } from './components/panels/FloatingPanel';
-import { DockPanel } from './components/panels/DockPanel';
-import { DockRibbon } from './components/panels/DockRibbon';
-import { DockLayerList } from './components/panels/DockLayerList';
-import { DockViewPanel } from './components/panels/DockViewPanel';
-import { ColorPicker } from './components/shared/ColorPicker';
-import { RegionPanel } from './components/panels/RegionPanel';
-import { EdgeRail } from './components/panels/EdgeRail';
-import { TileSubtoolRibbon } from './components/panels/TileSubtoolRibbon';
-import { LayerEditModal } from './components/modals/LayerEditModal';
-import { openNativeCloneLayerModal, CloneLayerModal } from './components/modals/CloneLayerModal';
 import { useSubHexNavigation } from './hooks/interactions/useSubHexNavigation';
 import { useCustomEventHandlers } from './hooks/interactions/useCustomEventHandlers';
 import { useKeyboardShortcuts } from './hooks/interactions/useKeyboardShortcuts';
 import { usePlayerFogClear } from './hooks/interactions/usePlayerFogClear';
 import { useUILayout } from './hooks/state/useUILayout';
 import { useFloatingPanels } from './hooks/state/useFloatingPanels';
-import type { PanelId, PanelState } from './hooks/state/useFloatingPanels';
 import { usePanelState } from './hooks/state/usePanelState';
 import { useViewControls } from './hooks/state/useViewControls';
 import { useTileBrush } from './hooks/state/useTileBrush';
 import { useThemeMode } from './hooks/state/useThemeMode';
-import { SubHexBreadcrumb } from './components/controls/SubHexBreadcrumb';
-import { TileAssetBrowser } from './components/panels/TileAssetBrowser';
-import type { RailSelection } from './components/panels/TileAssetBrowser';
-import { DrawerDock } from './components/panels/DrawerDock';
-import type { FlyoutTile } from './components/panels/DrawerDock';
 import { useApp } from './context/AppContext';
+import type { PanelId, PanelState } from './hooks/state/useFloatingPanels';
+import { useDockLayout } from './hooks/app/useDockLayout';
+import { useTileDrawerState } from './hooks/app/useTileDrawerState';
+import { useTileToolCoupling } from './hooks/app/useTileToolCoupling';
+import { useFogAwareToolState, useReleaseFogOnSurfaceClose } from './hooks/app/useFogToolCoupling';
+import { useDrawerRibbon } from './hooks/app/useDrawerRibbon';
+import { useMapListActions } from './hooks/app/useMapListActions';
+import { useBoardHandlers } from './hooks/app/useBoardHandlers';
+import { useAdjacentSubMaps } from './hooks/app/useAdjacentSubMaps';
+import { useTilesetArtHandlers } from './hooks/app/useTilesetArtHandlers';
+import { useTileFlyouts } from './hooks/app/useTileFlyouts';
+import { useOnboardingState, useSubHexRowReveal, useCanvasFrameSize } from './hooks/app/useMapChromeState';
+import { BlockEdgeRail } from './components/hosts/BlockEdgeRail';
+import { BlockTileDrawer } from './components/hosts/BlockTileDrawer';
+import { FloatingPanelsHost } from './components/hosts/FloatingPanelsHost';
+import { FullPaneRightGroup } from './components/hosts/FullPaneRightGroup';
+import { buildPanelBags } from './components/hosts/buildPanelBags';
+import { MapCanvasLayers } from './components/hosts/MapCanvasLayers';
+import { SubHexRow } from './components/hosts/SubHexRow';
+import { FooterHelp } from './components/hosts/FooterHelp';
+import { StageToolbars } from './components/hosts/StageToolbars';
+import { LayerModalsHost } from './components/hosts/LayerModalsHost';
+import { CanvasCornerControls } from './components/hosts/CanvasCornerControls';
+import { useSubHexLink, useCloneLayerRequest } from './hooks/app/useLayerLinkActions';
 import { Icon } from './components/shared/Icon';
 import { CornerBrackets } from './components/shared/CornerBrackets';
 import { tooltipRef } from './components/shared/obsidianTooltip';
-import { listMaps, deleteMapData, setPendingNewMapOptions } from './persistence/fileOperations';
-import type { MapListEntry } from './persistence/fileOperations';
-import { ConfirmModal } from './settings/modals/ConfirmModal';
-import { loadTileMetadata, setTileMetadataForRender, getTileMetadataForRender } from './persistence/tileMetadata';
-import { NewMapModal } from './components/modals/NewMapModal';
-import { InsertDungeonModal } from './settings/modals/InsertDungeonModal';
-import type { DungeonInsertOptions } from './settings/modals/InsertDungeonModal';
+import { ensureTileMetadataLoaded } from './persistence/tileMetadata';
 
 // ============================================================================
 // LOCAL TYPE DEFINITIONS
@@ -112,14 +105,6 @@ interface DungeonMapTrackerProps {
 }
 
 /**
- * Delay before the sub-hex breadcrumb row tweens open after a dive: the
- * seamless zoom should settle before the layout moves. The row expanding
- * synchronously with the map swap reflowed the canvas mid-transition — the
- * most visible part of the dive "blink" (windrose-1mc).
- */
-const SUBHEX_ROW_REVEAL_DELAY_MS = 450;
-
-/**
  * Per-mount instance counter (same pattern as useDebouncedSave's save
  * registry). Each mounted map block stamps its id into map-scoped custom
  * events so co-mounted blocks — including a second embed of the SAME map,
@@ -131,10 +116,10 @@ let mapInstanceCounter = 0;
 // MAIN COMPONENT
 // ============================================================================
 
-const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', initialSubHexPath, initialLevel, mcpKey, fullPane = false,onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange, onMapDeleted }: DungeonMapTrackerProps): VNode => {
+const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', initialSubHexPath, initialLevel, mcpKey, fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange, onMapDeleted }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
-  useThemeMode();
-  const { mapData: rootMapData, isLoading, loadFailure, reload: reloadMapData, saveStatus, updateMapData: rootUpdateMapData, forceSave, markDeleted, staleConflict, acknowledgeStaleConflict, settingsVersion, getCachedImage } = useMapData(mapId, mapName, mapType);
+  const isLightTheme = useThemeMode();
+  const { mapData: rootMapData, isLoading, loadFailure, mapDeleted: dataMapDeleted, reload: reloadMapData, saveStatus, updateMapData: rootUpdateMapData, forceSave, markDeleted, staleConflict, acknowledgeStaleConflict, settingsVersion, getCachedImage } = useMapData(mapId, mapName, mapType);
   const [mapDeleted, setMapDeleted] = useState(false);
 
   // Per-mount instance id for event scoping (see mapInstanceCounter above).
@@ -169,18 +154,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // scale from the parent chain; the root map uses its own stored settings.
   const distanceOverrides = activeDistanceOverrides ?? mapData?.settings?.distanceSettings;
 
-  // Sub-hex breadcrumb row reveal: opens on a delay after the dive settles
-  // (height tween + content fade in CSS, .windrose-subhex-row), closes
-  // immediately on exit so the collapse tween plays while the map swaps.
-  const [subHexRowOpen, setSubHexRowOpen] = useState(false);
-  useEffect(() => {
-    if (!isInSubHex) {
-      setSubHexRowOpen(false);
-      return undefined;
-    }
-    const t = window.setTimeout(() => setSubHexRowOpen(true), SUBHEX_ROW_REVEAL_DELAY_MS);
-    return () => window.clearTimeout(t);
-  }, [isInSubHex, subHexPath]);
+  // Sub-hex breadcrumb row reveal: opens on a delay after the dive settles.
+  const subHexRowOpen = useSubHexRowReveal(isInSubHex, subHexPath);
 
   // Picture frame mode (locked embed view) is a property of the ROOT map — it
   // must survive sub-hex dives and reloads. Block mode only.
@@ -188,203 +163,44 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
 
   // Populate the renderer's tile-metadata accessor on mount so terrain tiles
   // resolve to seamless region fills out-of-the-box, even if the tile browser
-  // panel is never opened. Also refresh on import (windrose-settings-changed)
-  // so a pack imported while a map is open picks up the new classifications.
+  // panel is never opened. The store is shared and loads once per session;
+  // importers write through it, so no settings-changed re-read is needed.
   useEffect(() => {
-    const refresh = (): void => { void loadTileMetadata(app).then(setTileMetadataForRender); };
-    refresh();
-    window.addEventListener('windrose-settings-changed', refresh);
-    return () => window.removeEventListener('windrose-settings-changed', refresh);
+    void ensureTileMetadataLoaded(app);
   }, [app]);
 
   // notePath is passed from the code block processor (ctx.sourcePath)
 
   // Tool and color state (extracted to useToolState hook)
+  // setCurrentTool is wrapped so any normal tool pick leaves fog mode first.
+  const { toolState, releaseFogRef } = useFogAwareToolState(useToolState({ mapData, updateMapData }));
   const {
     currentTool, setCurrentTool,
-    selectedObjectType, setSelectedObjectType,
+    selectedObjectType,
     selectedColor, setSelectedColor,
     selectedOpacity,
     isColorPickerOpen, setIsColorPickerOpen,
-    freeformPlacementMode, setFreeformPlacementMode,
+    freeformPlacementMode,
     editLevelLock, setEditLevelLock,
     handleOpacityChange
-  } = useToolState({ mapData, updateMapData });
+  } = toolState;
 
   // Global feature gating (identity-stable; only flips when a flag changes).
   const featureFlags = useFeatureFlags();
 
-  // First-run onboarding: 'pending' shows the survey overlay, 'whatsnew' the
-  // upgrader notice. Completion saves settings → the settings-changed event
-  // re-reads state here and dismisses every mounted instance.
-  const [onboarding, setOnboarding] = useState<OnboardingState>(
-    () => getSettings().onboardingState ?? 'done'
-  );
-  useEffect(() => {
-    const handler = (): void => { setOnboarding(getSettings().onboardingState ?? 'done'); };
-    window.addEventListener('windrose-settings-changed', handler);
-    return () => window.removeEventListener('windrose-settings-changed', handler);
-  }, []);
+  // First-run onboarding: 'pending' shows the survey, 'whatsnew' the upgrader notice.
+  const onboarding = useOnboardingState();
 
-  // Tile drawer pane: Tiles vs Objects (Objects sidebar folded into the drawer).
-  // Open on Objects when this vault has no tile packs configured — the Tiles
-  // pane's empty state is a dead end for anyone who has not imported anything.
-  // Read the FOLDER SETTINGS, not mapData.tilesets: settings are available
-  // synchronously at mount, whereas tilesets are attached later by the async
-  // tileset builder, so keying off the map data opened every tiled vault on
-  // Objects (the builder had not run yet).
-  const [tilePane, setTilePane] = useState<'tiles' | 'objects'>(
-    () => (isFeatureEnabled('tiles') && getTilesetFolders().some(f => f.trim() !== '')
-      ? 'tiles'
-      : 'objects')
-  );
-  // Selecting a pane couples to the active tool: Objects → addObject, Tiles → tilePaint.
-  // Forcing tilePaint on the Tiles tab avoids ping-pong with the coupling effect below.
-  const selectPane = useCallback((p: 'tiles' | 'objects'): void => {
-    setTilePane(p);
-    setCurrentTool(p === 'objects' ? 'addObject' : 'tilePaint');
-  }, [setCurrentTool]);
-  // Coupling: picking the Object tool elsewhere (e.g. an object grid) flips the drawer to Objects.
-  useEffect(() => {
-    if (currentTool === 'addObject') setTilePane('objects');
-  }, [currentTool]);
-  // Feature gating: disabling tiles forces the drawer onto the Objects pane.
-  useEffect(() => {
-    if (!featureFlags.tiles) setTilePane('objects');
-  }, [featureFlags.tiles]);
-  // Feature gating: if the active tool's feature gets disabled, fall back to
-  // select so a hidden tool can't stay armed (depends on stable flags record;
-  // setCurrentTool('select') settles in one pass).
-  useEffect(() => {
-    if (!isToolIdEnabled(currentTool, featureFlags)) setCurrentTool('select');
-  }, [currentTool, featureFlags, setCurrentTool]);
-  // Category-rail / view selection, owned here so the Recent/Starred view-filters
-  // can live on the drawer ribbon while the rail (categories) lives in the browser.
-  const [tileRailSel, setTileRailSel] = useState<RailSelection>('all');
-  // Grid/list tile view, owned here so it survives the Objects-pane swap (which
-  // unmounts the browser) and persists per map via mapData.
-  const tileViewMode = mapData?.tileViewMode ?? 'grid';
-  const setTileViewMode = useCallback((mode: 'grid' | 'list'): void => {
-    updateMapData((prev: MapData) => ({ ...prev, tileViewMode: mode }));
-  }, [updateMapData]);
-  // Objects pane grid/list view — its own per-map field, independent of tiles.
-  const objectViewMode = mapData?.objectViewMode ?? 'grid';
-  const setObjectViewMode = useCallback((mode: 'grid' | 'list'): void => {
-    updateMapData((prev: MapData) => ({ ...prev, objectViewMode: mode }));
-  }, [updateMapData]);
-  // Id of the wall being edit-dragged: threaded to the renderer so the static
-  // raster drops it (the WallLayer overlay draws it live during the drag).
-  const [draggingWallId, setDraggingWallId] = useState<string | null>(null);
-  // Wall-tool control surface published by WallLayer and consumed by the tile
-  // drawer footer, which renders the tool's draw/edit controls.
-  const [wallSurface, setWallSurface] = useState<WallToolSurface | null>(null);
-  // Bare-threshold placement mode (§5.3 primary trigger): the built-in Threshold
-  // ribbon entry arms NO asset, so WallLayer cuts empty 1-cell gaps. It is a
-  // sub-mode of portal arming (the entry only surfaces on an opening-form tile,
-  // so the wall tool is already active). Toggled by the ribbon; disarmed on tool
-  // switch, on Escape (via WallLayer), and when the opening asset is un-armed.
-  const [bareThresholdArmed, setBareThresholdArmed] = useState(false);
-  const handleThreshold = useCallback((): void => {
-    setBareThresholdArmed(prev => !prev);
-    setCurrentTool('wall');
-  }, [setCurrentTool]);
-  // Vertical left ribbon: Tiles/Objects tabs + (on Tiles with a tile selected) placement subtools.
-  const renderDrawerRibbon = (): VNode => (
-    <div className="windrose-fd-subrib">
-      {featureFlags.tiles && <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'tiles' ? 'on' : ''}`} ref={tooltipRef('Tiles')} onClick={() => selectPane('tiles')}><Icon icon="lucide-layout-dashboard" size={16} /></button>}
-      <button className={`windrose-fd-ribtab interactive-child ${tilePane === 'objects' ? 'on' : ''}`} ref={tooltipRef('Objects')} onClick={() => selectPane('objects')}><Icon icon="lucide-sofa" size={16} /></button>
-      {tilePane === 'tiles' && (
-        <>
-          <div className="windrose-fd-subrib-div" />
-          <button className={`windrose-fd-ribtab interactive-child ${tileRailSel === 'recent' ? 'on' : ''}`} ref={tooltipRef('Recent')} onClick={() => setTileRailSel(tileRailSel === 'recent' ? 'all' : 'recent')}><Icon icon="lucide-clock" size={16} /></button>
-          <button className={`windrose-fd-ribtab interactive-child ${tileRailSel === 'starred' ? 'on' : ''}`} ref={tooltipRef('Starred')} onClick={() => setTileRailSel(tileRailSel === 'starred' ? 'all' : 'starred')}><Icon icon="lucide-star" size={16} /></button>
-        </>
-      )}
-      {tilePane === 'tiles' && selectedTileForm != null && (
-        <>
-          <div className="windrose-fd-subrib-div" />
-          <div className="windrose-fd-subrib-cap">Mode</div>
-          <TileSubtoolRibbon form={selectedTileForm} activeSubtool={tileSubtool} onSubtoolChange={setTileSubtool} onThreshold={handleThreshold} thresholdActive={bareThresholdArmed} />
-        </>
-      )}
-    </div>
-  );
-  // `hideHeader` in block mode (the compact head above both panes serves); the
-  // full-pane pane renders its own DrawerPaneHead to match the tile pane, and
-  // takes the vertical ribbon so it seats below the header like the tile ribbon.
-  const renderObjectsPane = (hideHeader: boolean, ribbon?: VNode): VNode => (
-    <ObjectSidebar
-      selectedObjectType={selectedObjectType}
-      onObjectTypeSelect={setSelectedObjectType}
-      onToolChange={setCurrentTool}
-      isCollapsed={false}
-      onCollapseChange={() => {}}
-      mapType={mapData?.mapType ?? 'grid'}
-      objectSetId={mapData?.objectSetId}
-      onObjectSetChange={handleObjectSetChange}
-      isFreeformMode={freeformPlacementMode}
-      onFreeformToggle={() => setFreeformPlacementMode(prev => !prev)}
-      hideHeader={hideHeader}
-      viewMode={objectViewMode}
-      onViewModeChange={setObjectViewMode}
-      onCollapse={collapseTileBrowser}
-      ribbon={ribbon}
-    />
-  );
-  // Block-mode shared drawer header: a segmented Tiles|Objects control (the
-  // block spec's pane switch, replacing the .fd-subrib), the grid/list view
-  // toggle (tiles only) and a collapse button — sits above both panes.
-  // Block mode hides the tile browser's internal header, so the tileset-config
-  // toggle is hoisted here into the compact drawer head (windrose-48j).
-  const [blockTilesetConfigOpen, setBlockTilesetConfigOpen] = useState(false);
-
-  const renderCompactDrawerHead = (): VNode => {
-    // The grid/list toggle serves whichever pane is active.
-    const paneViewMode = tilePane === 'tiles' ? tileViewMode : objectViewMode;
-    const setPaneViewMode = tilePane === 'tiles' ? setTileViewMode : setObjectViewMode;
-    return (
-      <div className="windrose-cd-head">
-        <div className="windrose-cd-paneseg interactive-child" role="group" aria-label="Tiles or Objects">
-          {featureFlags.tiles && (
-            <button
-              className={`windrose-cd-segbtn ${tilePane === 'tiles' ? 'active' : ''}`}
-              onClick={() => selectPane('tiles')}
-            >Tiles</button>
-          )}
-          <button
-            className={`windrose-cd-segbtn ${tilePane === 'objects' ? 'active' : ''}`}
-            onClick={() => selectPane('objects')}
-          >Objects</button>
-        </div>
-        <div className="windrose-cd-vtog interactive-child" role="group" aria-label="View mode">
-          <button
-            className={`windrose-tb-iconbtn ${paneViewMode === 'grid' ? 'active' : 'ghost'}`}
-            ref={tooltipRef('Grid view')}
-            aria-pressed={paneViewMode === 'grid'}
-            onClick={() => setPaneViewMode('grid')}
-          ><Icon icon="lucide-layout-grid" size={14} /></button>
-          <button
-            className={`windrose-tb-iconbtn ${paneViewMode === 'list' ? 'active' : 'ghost'}`}
-            ref={tooltipRef('List view')}
-            aria-pressed={paneViewMode === 'list'}
-            onClick={() => setPaneViewMode('list')}
-          ><Icon icon="lucide-list" size={14} /></button>
-        </div>
-        {tilePane === 'tiles' && availableTilesets.length > 0 && (
-          <button
-            className={`windrose-tb-iconbtn interactive-child ${blockTilesetConfigOpen ? 'active' : 'ghost'}`}
-            ref={tooltipRef('Tileset settings')}
-            onClick={() => setBlockTilesetConfigOpen(v => !v)}
-          ><Icon icon="lucide-sliders-horizontal" size={14} /></button>
-        )}
-        <button
-          className="windrose-tb-iconbtn ghost interactive-child windrose-cd-collapse"
-          ref={tooltipRef('Collapse to edge')}
-          onClick={collapseTileBrowser}
-        ><Icon icon="lucide-panel-left-open" size={15} /></button>
-      </div>
-    );
-  };
+  // Tile drawer UI state: pane (coupled to the tool), rail selection, view
+  // modes, wall surface/drag id, bare-threshold mode, block tileset-config toggle.
+  const drawerState = useTileDrawerState({ mapData, updateMapData, currentTool, setCurrentTool, featureFlags });
+  const {
+    tilePane, selectPane, tileRailSel, setTileRailSel,
+    tileViewMode, setTileViewMode, objectViewMode, setObjectViewMode,
+    draggingWallId, setDraggingWallId, setWallSurface,
+    bareThresholdArmed, setBareThresholdArmed, handleThreshold,
+    blockTilesetConfigOpen, setBlockTilesetConfigOpen,
+  } = drawerState;
 
   // Panel/modal state (plugin installer, settings modal, layer edit)
   const {
@@ -411,203 +227,51 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // (MapControls Layers/Regions buttons) drive this too, so it's lifted here.
   const [railOpenId, setRailOpenId] = useState<string | null>(null);
 
-  const { isFloating, getZIndex, getInitialPosition, toggleFloat, bringToFront, updatePosition } = useFloatingPanels({ fullPane, savedState: savedPanelState, onStateChange: onPanelStateChange });
+  const floating = useFloatingPanels({ fullPane, savedState: savedPanelState, onStateChange: onPanelStateChange });
+  const { isFloating, toggleFloat } = floating;
 
-  // Full-pane right dock: collapse the whole stacked panel column to an icon
-  // ribbon (persisted in the view's workspace state). Unlike the block-mode
-  // rail, the ribbon replaces the panels — it never shows alongside them.
-  const [dockCollapsed, setDockCollapsedState] = useState<boolean>(savedDockCollapsed ?? false);
-  const setDockCollapsed = useCallback((collapsed: boolean) => {
-    setDockCollapsedState(collapsed);
-    onDockCollapsedChange?.(collapsed);
-  }, [onDockCollapsedChange]);
-  // Per-section collapse (controlled, so a ribbon click can expand a section).
-  // View starts collapsed, matching its former defaultCollapsed.
-  const [dockSectionCollapsed, setDockSectionCollapsed] = useState<Record<string, boolean>>({ layers: false, colorPicker: false, view: true });
-  const toggleDockSection = useCallback((id: string) => {
-    setDockSectionCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
-  }, []);
-  const handleDockRibbonExpand = useCallback((id: string) => {
-    setDockCollapsed(false);
-    setDockSectionCollapsed(prev => ({ ...prev, [id]: false }));
-  }, [setDockCollapsed]);
+  // Full-pane right dock: column collapse (persisted via the view) + per-section collapse.
+  const dock = useDockLayout(savedDockCollapsed, onDockCollapsedChange);
 
-  const [mapListEntries, setMapListEntries] = useState<MapListEntry[]>([]);
-  useEffect(() => {
-    if (!fullPane) return;
-    void listMaps(app).then(entries => {
-      if (mapId && !entries.some(e => e.id === mapId)) {
-        entries.push({ id: mapId, name: mapName || '', type: mapType || 'grid' });
-      }
-      setMapListEntries(entries);
-    });
-  }, [fullPane, app]);
-
-  const handleMapSelect = useCallback((entry: MapListEntry) => {
-    onMapChange?.(entry.id, entry.name, entry.type);
-  }, [onMapChange]);
-
-  const handleNewMap = useCallback(() => {
-    new NewMapModal(app, (newId, newName, newType, ladderM) => {
-      // The map is built lazily on its first load, by whichever host opens it
-      // (full-pane view or an embed block), so the preset is parked here, at
-      // the dialog, rather than in any one host's map-change handler.
-      if (ladderM !== undefined && newType === 'hex') setPendingNewMapOptions(newId, { ladderM });
-      onMapChange?.(newId, newName, newType, ladderM);
-    }).open();
-  }, [app, onMapChange]);
-
-  // Generates a brand-new map (not the currently open one) and navigates to
-  // it — mirrors the "insert-random-dungeon" command's generate+save step,
-  // minus the editor/code-block half that has no equivalent in full-pane view.
-  const handleGenerateDungeon = useCallback(() => {
-    const plugin = app.plugins.plugins['windrose-md'] as unknown as
-      {
-        loadDungeonGenerator(): Promise<{ generateDungeon(...args: unknown[]): unknown }>;
-        loadObjectPlacer(): Promise<{ stockDungeon(...args: unknown[]): unknown }>;
-        createRandomDungeonMap(
-          mapName: string,
-          cells: Record<string, unknown>[],
-          objects: unknown[],
-          edges: unknown[],
-          options: DungeonInsertOptions
-        ): Promise<string>;
-      } | undefined;
-    if (plugin == null) return;
-    new InsertDungeonModal(app, plugin, async (newMapName, cells, objects, edges, options) => {
-      const newId = await plugin.createRandomDungeonMap(newMapName, cells, objects, edges, options);
-      onMapChange?.(newId, newMapName, 'grid');
-    }).open();
-  }, [app, onMapChange]);
-
-  // Read at delete time via ref so handleDeleteMap doesn't churn identity on
-  // every map edit just to name the confirm prompt.
-  const rootMapNameRef = useRef<string | undefined>(undefined);
-  rootMapNameRef.current = rootMapData?.name;
-
-  const handleDeleteMap = useCallback(async (): Promise<void> => {
-    if (mapId == null || mapId === '') return;
-    const dataName = rootMapNameRef.current ?? '';
-    const displayName = mapName !== '' ? mapName : dataName !== '' ? dataName : mapId;
-    const lines = [
-      `Delete "${displayName}"? This permanently removes the map's data and cannot be undone.`,
-    ];
-    if (!fullPane) {
-      lines.push('The windrose-map code block in your note will remain — remove it manually.');
-    }
-    const confirmed = await new ConfirmModal(app, {
-      message: lines.join('\n'),
-      confirmText: 'Delete map',
-      cancelText: 'Cancel',
-      isDestructive: true,
-    }).openAndGetValue();
-    if (!confirmed) return;
-
-    // Resurrection guard: disable all saves for this instance BEFORE deleting, so
-    // no trailing autosave can rewrite (and thus recreate) the map.
-    markDeleted();
-    await deleteMapData(app, mapId);
-
-    if (fullPane) {
-      onMapDeleted?.();
-    } else {
-      setMapDeleted(true);
-    }
-  }, [app, mapId, mapName, fullPane, markDeleted, onMapDeleted]);
+  // Map list + select/new/generate/delete (full-pane header; delete also from settings).
+  const {
+    mapListEntries, setMapListEntries,
+    handleMapSelect, handleNewMap, handleGenerateDungeon, handleDeleteMap,
+  } = useMapListActions({
+    app, fullPane, mapId, mapName, mapType, rootMapName: rootMapData?.name,
+    markDeleted, onMapChange, onMapDeleted, setMapDeleted,
+  });
 
   const floatingPickerPendingRef = useRef<string | null>(null);
 
-  // Adjacent sub-map visibility: persisted in global plugin settings
-  const [showAdjacentSubMaps, setShowAdjacentSubMapsState] = useState(() =>
-    getSettings().showAdjacentSubMaps ?? false
-  );
-  const setShowAdjacentSubMaps = useCallback((v: boolean) => {
-    try {
-      const plugin = app.plugins.plugins['windrose-md'] as unknown as
-        { settings: { showAdjacentSubMaps?: boolean }; saveSettings(): Promise<void> } | undefined;
-      if (plugin != null) {
-        plugin.settings.showAdjacentSubMaps = v;
-        void plugin.saveSettings();
-        window.dispatchEvent(new Event('windrose-settings-changed'));
-      }
-    } catch { /* settings plugin unavailable */ }
-    setShowAdjacentSubMapsState(v);
-  }, [app]);
-  useEffect(() => {
-    const handler = (): void => { setShowAdjacentSubMapsState(getSettings().showAdjacentSubMaps ?? false); };
-    window.addEventListener('windrose-settings-changed', handler);
-    return () => window.removeEventListener('windrose-settings-changed', handler);
-  }, []);
 
   // Tile browser state (hex maps only)
+  const tileBrush = useTileBrush();
   const {
     tileBrowserCollapsed, setTileBrowserCollapsed,
     tileBrowserWidth, setTileBrowserWidth,
     selectedTilesetId,
     selectedTileId,
-    tileRotation, setTileRotation,
-    tileFlipH, setTileFlipH,
-    tileLayer, setTileLayer,
-    tileFitMode, setTileFitMode,
     selectedTileForm, setSelectedTileForm,
     tileSubtool, setTileSubtool,
-    tileScale, setTileScale,
-    brushSize, setBrushSize,
-    brushSoftness, setBrushSoftness,
-    paintEdgeBlend, setPaintEdgeBlend,
     tileDepth, setTileDepth,
-    hiddenLayers, toggleHiddenLayer,
+    hiddenLayers,
     recentTiles,
-    handleTileSelect, handleTileDeselect,
-  } = useTileBrush();
+    handleTileSelect,
+  } = tileBrush;
 
-  // Coupling: the 'line' subtool and the wall tool travel together. Arming
-  // line (a wall/path strip got selected) switches to the wall tool; leaving
-  // line while the wall tool is still active returns to tile placement.
-  // Transition-driven via refs so a manual tool pick is never fought.
-  const currentToolRef = useRef(currentTool);
-  currentToolRef.current = currentTool;
-  const prevSubtoolRef = useRef<typeof tileSubtool>(null);
-  const prevOpeningArmedRef = useRef(false);
-  // A DD portal is an opening asset — it travels with the wall tool just like a
-  // strip's 'line' subtool. Detected via metadata (union-free): the 'opening'
-  // subtool literal isn't a TileSubtoolId until P3 lands (see GOTCHAS). This
-  // also covers the Alt-click bare-threshold path (portal armed, no 'opening'
-  // subtool). The built-in Threshold ribbon entry (arms NO asset) still needs
-  // the subtool-based trigger — deferred to P3/P5 integration.
-  const openingArmed = useMemo((): boolean => {
-    const tilesets = rootMapData?.tilesets ?? mapData?.tilesets ?? [];
-    const ts = tilesets.find(t => t.id === selectedTilesetId);
-    const entry = ts != null && selectedTileId != null ? resolveTileEntry(ts, selectedTileId) : null;
-    return entry?.vaultPath != null && getTileMetadataForRender()[entry.vaultPath]?.ddSourceType === 'portals';
-  }, [rootMapData?.tilesets, mapData?.tilesets, selectedTilesetId, selectedTileId]);
-  useEffect(() => {
-    const prev = prevSubtoolRef.current;
-    prevSubtoolRef.current = tileSubtool;
-    const prevOpening = prevOpeningArmedRef.current;
-    prevOpeningArmedRef.current = openingArmed;
-    // The wall tool is armed whenever a wall/path strip (subtool 'line') OR an
-    // opening asset (portal / bare threshold) is armed. Toggle the tool only on
-    // ENTERING or LEAVING that combined "wall-relevant" state — never on a
-    // transition BETWEEN two wall-relevant states (e.g. picking a portal right
-    // after a wall strip: 'line' → 'opening'), which must keep the wall tool.
-    const nowWallRelevant = tileSubtool === 'line' || openingArmed;
-    const wasWallRelevant = prev === 'line' || prevOpening;
-    if (nowWallRelevant && !wasWallRelevant) {
-      setCurrentTool('wall');
-    } else if (!nowWallRelevant && wasWallRelevant && currentToolRef.current === 'wall') {
-      setCurrentTool('tilePaint');
-    }
-  }, [tileSubtool, openingArmed, setCurrentTool]);
+  // Vertical left ribbon (full-pane drawer), memoized for TileAssetBrowser's memo().
+  const drawerRibbon = useDrawerRibbon({
+    tilesEnabled: featureFlags.tiles, tilePane, selectPane, tileRailSel, setTileRailSel,
+    selectedTileForm, tileSubtool, setTileSubtool, handleThreshold, bareThresholdArmed,
+  });
 
-  // Disarm the bare-threshold mode when it no longer applies: the tool leaves the
-  // wall tool, or the opening asset it rode in on is un-armed (portal deselected /
-  // a strip picked). Keeps a stale bare mode from hijacking the wall tool.
-  useEffect(() => {
-    if (bareThresholdArmed && (currentTool !== 'wall' || !openingArmed)) {
-      setBareThresholdArmed(false);
-    }
-  }, [bareThresholdArmed, currentTool, openingArmed]);
+  // Coupling: a wall/path strip or opening asset arms the wall tool; leaving returns to tilePaint.
+  useTileToolCoupling({
+    rootTilesets: rootMapData?.tilesets, activeTilesets: mapData?.tilesets,
+    selectedTilesetId, selectedTileId, tileSubtool, currentTool, setCurrentTool,
+    bareThresholdArmed, setBareThresholdArmed,
+  });
 
   // Use rootMapData for tileset check — tilesets are built from global settings and stored on root,
   // but sub-maps should also have access to tiles
@@ -645,88 +309,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const expandTileBrowser = useCallback(() => setTileBrowserCollapsed(false), [setTileBrowserCollapsed]);
 
   // Flyout data for spine (recent + starred tiles)
-  const [starredFlyoutTiles, setStarredFlyoutTiles] = useState<FlyoutTile[]>([]);
+  const flyouts = useTileFlyouts({ availableTilesets, recentTiles, handleTileSelect, setCurrentTool });
 
-  const flyoutRecent = useMemo((): FlyoutTile[] => {
-    if (availableTilesets.length === 0) return [];
-    return recentTiles
-      .map(r => {
-        const ts = availableTilesets.find(t => t.id === r.tilesetId);
-        const tile = resolveTileEntry(ts, r.tileId);
-        if (!tile || !ts) return null;
-        return { tilesetId: ts.id, tileId: tile.id, filename: tile.filename, vaultPath: tile.vaultPath };
-      })
-      .filter((t): t is FlyoutTile => t != null)
-      .slice(0, 10);
-  }, [recentTiles, availableTilesets]);
-
-  const handleFlyoutSelect = useCallback((tilesetId: string, tileId: string) => {
-    handleTileSelect(tilesetId, tileId);
-    setCurrentTool('tilePaint');
-  }, [handleTileSelect, setCurrentTool]);
-
-  // Persist a tileset's render overrides AND apply them to the live merged
-  // tileset so changes (fitMode, stamp thresholds, terrain render mode) take
-  // effect immediately without waiting for a tileset rebuild/reload.
-  const handleTilesetOverrideChange = useCallback((tilesetId: string, overrides: TilesetOverrides) => {
-    updateMapData((prev: MapData) => ({
-      ...prev,
-      tilesetOverrides: { ...prev.tilesetOverrides, [tilesetId]: overrides },
-      tilesets: (prev.tilesets ?? []).map(ts => ts.id === tilesetId ? { ...ts, ...overrides } : ts),
-    }));
-  }, [updateMapData]);
-
-  // Art nudge is GLOBAL per tileset (plugin settings), not a per-map override:
-  // apply to the live merged tileset immediately, persist debounced — the
-  // eventual saveSettings() fires windrose-settings-changed and a full tileset
-  // rebuild, which a dragged slider must not storm per tick.
-  const artOffsetSaveTimer = useRef<number | null>(null);
-  const handleTilesetArtOffsetChange = useCallback((tilesetId: string, value: number | undefined) => {
-    updateMapData((prev: MapData) => ({
-      ...prev,
-      tilesets: (prev.tilesets ?? []).map(ts => ts.id === tilesetId ? { ...ts, artOffsetY: value } : ts),
-    }));
-    if (artOffsetSaveTimer.current != null) window.clearTimeout(artOffsetSaveTimer.current);
-    artOffsetSaveTimer.current = window.setTimeout(() => {
-      artOffsetSaveTimer.current = null;
-      try {
-        const plugin = app.plugins.plugins['windrose-md'] as unknown as
-          { settings: { tilesetArtOffsets?: Record<string, number> }; saveSettings(): Promise<void> } | undefined;
-        if (plugin != null) {
-          const offsets = { ...(plugin.settings.tilesetArtOffsets ?? {}) };
-          if (value == null || value === 0) delete offsets[tilesetId];
-          else offsets[tilesetId] = value;
-          plugin.settings.tilesetArtOffsets = offsets;
-          void plugin.saveSettings();
-        }
-      } catch { /* settings plugin unavailable */ }
-    }, 600);
-  }, [updateMapData, app]);
-
-  // Art scale mirrors the art nudge exactly: GLOBAL per tileset, applied to
-  // the live merged tileset immediately, persisted debounced.
-  const artScaleSaveTimer = useRef<number | null>(null);
-  const handleTilesetArtScaleChange = useCallback((tilesetId: string, value: number | undefined) => {
-    updateMapData((prev: MapData) => ({
-      ...prev,
-      tilesets: (prev.tilesets ?? []).map(ts => ts.id === tilesetId ? { ...ts, artScale: value } : ts),
-    }));
-    if (artScaleSaveTimer.current != null) window.clearTimeout(artScaleSaveTimer.current);
-    artScaleSaveTimer.current = window.setTimeout(() => {
-      artScaleSaveTimer.current = null;
-      try {
-        const plugin = app.plugins.plugins['windrose-md'] as unknown as
-          { settings: { tilesetArtScales?: Record<string, number> }; saveSettings(): Promise<void> } | undefined;
-        if (plugin != null) {
-          const scales = { ...(plugin.settings.tilesetArtScales ?? {}) };
-          if (value == null || value === 1) delete scales[tilesetId];
-          else scales[tilesetId] = value;
-          plugin.settings.tilesetArtScales = scales;
-          void plugin.saveSettings();
-        }
-      } catch { /* settings plugin unavailable */ }
-    }, 600);
-  }, [updateMapData, app]);
+  // Tileset render overrides (per map) + global art nudge/scale (debounced); flushes on unmount.
+  const artHandlers = useTilesetArtHandlers(app, updateMapData);
 
   // Image alignment mode (extracted to useAlignmentMode hook)
   const {
@@ -737,30 +323,44 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   } = useAlignmentMode({ mapData, updateMapData, setShowSettingsModal });
 
   // Create geometry instance for coordinate conversions
+  // Keyed on the five fields createGeometry reads; the rest of mapData comes
+  // from a latest-ref so unrelated edits don't rebuild the geometry.
+  const geometryMapDataRef = useRef(mapData);
+  geometryMapDataRef.current = mapData;
+  const hasGeometryMapData = mapData != null;
+  const geoMapType = mapData?.mapType;
+  const geoGridSize = mapData?.gridSize;
+  const geoHexSize = mapData?.hexSize;
+  const geoOrientation = mapData?.orientation;
+  const geoHexBounds = mapData?.hexBounds;
   const geometry = useMemo((): ExtendedGeometry | null => {
-    if (!mapData) return null;
-    return createGeometry(mapData);
-  }, [mapData?.mapType, mapData?.gridSize, mapData?.hexSize, mapData?.orientation, mapData?.hexBounds]);
+    const latest = geometryMapDataRef.current;
+    if (!hasGeometryMapData || latest == null) return null;
+    return createGeometry({
+      ...latest,
+      mapType: geoMapType ?? latest.mapType, gridSize: geoGridSize, hexSize: geoHexSize,
+      orientation: geoOrientation, hexBounds: geoHexBounds
+    });
+  }, [hasGeometryMapData, geoMapType, geoGridSize, geoHexSize, geoOrientation, geoHexBounds]);
 
-  // Copy a clickable deep link to the CURRENT sub-hex view. Encodes the drill
-  // path so the link reopens at this sub-hex, then centres on the current view.
-  // Needs a host note to open, so it is block-mode only (full-pane notePath='').
-  const handleCopySubHexLink = useCallback(() => {
-    if (notePath === '' || mapId === '' || subHexPath == null || subHexPath === '' || !mapData) return;
-    const center = mapData.viewState?.center ?? { x: 0, y: 0 };
-    const zoom = mapData.viewState?.zoom ?? 1;
-    const layerId = mapData.activeLayerId ?? getActiveLayer(mapData)?.id ?? 'layer_001';
-    let x = center.x;
-    let y = center.y;
-    if (geometry?.type === 'hex') {
-      const hc = geometry.worldToHex(center.x, center.y);
-      x = hc.q;
-      y = hc.r;
-    }
-    copyDeepLinkToClipboard(mapData.name ?? 'Sub-hex view', notePath, mapId, x, y, zoom, layerId, subHexPath);
-  }, [notePath, mapId, subHexPath, mapData, geometry]);
+  // Copy a deep link to the current sub-hex view (block mode only).
+  const handleCopySubHexLink = useSubHexLink({ notePath, mapId, subHexPath, mapData, geometry });
+
+  // Fog operations enter undo history (DATA-06): wrap the writer so every fog
+  // update records its exact prev -> next diff. useLayerHistory is called
+  // further down, so its recorder is read through a ref. Brush strokes
+  // (one update per cell) coalesce into a single entry.
+  const recordMapChangeRef = useRef<((prev: MapData, next: MapData, options?: RecordMapChangeOptions) => void) | null>(null);
+  const fogUpdateMapData = useCallback<MapDataUpdater>((updaterOrData, options) => {
+    updateMapData((prev: MapData) => {
+      const next = typeof updaterOrData === 'function' ? updaterOrData(prev) : updaterOrData;
+      recordMapChangeRef.current?.(prev, next, { coalesceKey: 'fog' });
+      return next;
+    }, options);
+  }, [updateMapData]);
 
   // Fog of War state and handlers (extracted to useFogOfWar hook)
+  const fog = useFogOfWar({ mapData, geometry, updateMapData: fogUpdateMapData });
   const {
     showFogTools,
     fogActiveTool,
@@ -771,54 +371,29 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleFogFillAll,
     handleFogClearAll,
     handleFogChange
-  } = useFogOfWar({ mapData, geometry, updateMapData });
+  } = fog;
+  releaseFogRef.current = fog.releaseFog;
+  // Closing the last surface that shows the fog tools leaves fog mode.
+  useReleaseFogOnSurfaceClose({
+    fullPane, showVisibilityToolbar, showFogTools, railOpenId,
+    viewDockOpen: !dock.collapsed && !(dock.sectionCollapsed['view'] ?? true),
+    viewFloating: isFloating('view'),
+  }, fog.releaseFog);
 
-  // Get current theme with effective settings (global + map overrides)
-  // This will be called on every render, fetching fresh settings each time
+  // Effective settings (global + map overrides), fetched fresh each render.
   const effectiveSettings = mapData ? getEffectiveSettings(mapData.settings) : null;
-  const theme: ResolvedTheme = effectiveSettings ? {
-    grid: {
-      lines: effectiveSettings.gridLineColor,
-      lineWidth: effectiveSettings.gridLineWidth,
-      background: effectiveSettings.backgroundColor
-    },
-    cells: {
-      fill: getTheme().cells.fill,
-      border: effectiveSettings.borderColor,
-      borderWidth: getTheme().cells.borderWidth
-    },
-    compass: getTheme().compass,
-    decorativeBorder: getTheme().decorativeBorder,
-    coordinateKey: effectiveSettings.coordinateKeyColor
-  } as ResolvedTheme : getTheme();
+  // Theme is memoized so MapCanvas / the renderer see a stable object between
+  // renders. Deps: the map's overrides, global settings (settingsVersion bumps
+  // on windrose-settings-changed) and light/dark mode (grid line and background
+  // defaults swap on the body theme class).
+  const mapSettings = mapData?.settings;
+  const theme: ResolvedTheme = useMemo(
+    () => resolveTheme(mapSettings),
+    [mapSettings, settingsVersion, isLightTheme]
+  );
 
-  // Determine canvas height based on device type and settings
-  // Detect touch devices using media query match
-  const isTouchDevice = useMemo(() => {
-    return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-  }, []);
-
-  const canvasHeight = fullPane ? null : (pictureFrameActive
-    ? (isTouchDevice
-        ? (effectiveSettings?.pictureFrameHeightMobile ?? 300)
-        : (effectiveSettings?.pictureFrameHeight ?? 400))
-    : (effectiveSettings
-        ? (isTouchDevice
-            ? (effectiveSettings.canvasHeightMobile ?? 400)
-            : (effectiveSettings.canvasHeight ?? 600))
-        : (isTouchDevice ? 400 : 600)));
-
-  // Width only applies in picture frame mode; unset means the frame spans
-  // the note's content column (the default embed behavior). This sizes the
-  // CONTAINER, not the canvas wrapper — the visible frame (border, inset ring,
-  // corner brackets) lives on .windrose-container, which _layout.scss pins to
-  // width:100%. Sizing the inner wrapper instead only shrinks the canvas and
-  // leaves the frame spanning the full note column.
-  const frameWidth = !fullPane && pictureFrameActive
-    ? (isTouchDevice
-        ? (effectiveSettings?.pictureFrameWidthMobile ?? null)
-        : (effectiveSettings?.pictureFrameWidth ?? null))
-    : null;
+  // Canvas height (device type + settings) and picture-frame width.
+  const { canvasHeight, frameWidth } = useCanvasFrameSize(fullPane, pictureFrameActive, effectiveSettings);
 
 
 
@@ -829,14 +404,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   };
 
   // Layer and history management (extracted to useLayerHistory hook)
+  const layerHistory = useLayerHistory({ mapData, updateMapData, isLoading, navigationVersion, levelKey: subHexPath });
   const {
     // Layer management
     handleLayerSelect,
-    handleLayerAdd,
-    handleLayerDelete,
-    handleLayerReorder,
-    handleToggleShowLayerBelow,
-    handleSetLayerBelowOpacity,
     handleUpdateLayerDisplay,
     handleLayerClone,
     // History state
@@ -847,73 +418,31 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleRedo,
     // For data change handlers
     addToHistory,
-    isApplyingHistory
-  } = useLayerHistory({ mapData, updateMapData, isLoading, navigationVersion });
+    isApplyingHistory,
+    recordMapChange,
+  } = layerHistory;
+  recordMapChangeRef.current = recordMapChange;
 
-  // Board (floor) + strata-mode handlers (Phase 7). Structural board ops update map
-  // data directly; layer-content undo is unaffected (history is per-layerId).
-  const handleToggleStrataMode = useCallback((): void => {
-    updateMapData((prev: MapData) => setLayerMode(prev, prev.layerMode === 'strata' ? 'simple' : 'strata'));
-  }, [updateMapData]);
-  const handleBoardAdd = useCallback((): void => {
-    updateMapData((prev: MapData) => addBoard(prev));
-  }, [updateMapData]);
-  const handleBoardSelect = useCallback((boardId: string): void => {
-    updateMapData((prev: MapData) => setActiveBoard(prev, boardId));
-  }, [updateMapData]);
-  const handleBoardDelete = useCallback((boardId: string): void => {
-    updateMapData((prev: MapData) => removeBoard(prev, boardId));
-  }, [updateMapData]);
-  const handleAddLayerToStratum = useCallback((role: TileLayerRole): void => {
-    updateMapData((prev: MapData) => updateActiveLayer(addLayer(prev), { tileRole: role }));
-  }, [updateMapData]);
-  const handleToggleLayerVisible = useCallback((layerId: string): void => {
-    updateMapData((prev: MapData) => ({
-      ...prev,
-      layers: prev.layers.map(l => l.id === layerId ? { ...l, visible: l.visible === false } : l),
-    }));
-  }, [updateMapData]);
-  const handleToggleShowBoardBelow = useCallback((boardId: string): void => {
-    updateMapData((prev: MapData) => {
-      const board = getBoardsOrdered(prev).find(b => b.id === boardId);
-      if (!board) return prev;
-      return updateBoard(prev, boardId, { showBoardBelow: board.showBoardBelow !== true });
-    });
-  }, [updateMapData]);
-  const handleSetBoardBelowOpacity = useCallback((boardId: string, opacity: number): void => {
-    const clampedOpacity = Math.max(0.1, Math.min(0.5, opacity));
-    updateMapData((prev: MapData) => updateBoard(prev, boardId, { boardBelowOpacity: clampedOpacity }));
-  }, [updateMapData]);
+  // Board (floor) + strata-mode handlers for the layers panel (Phase 7).
+  const boardHandlers = useBoardHandlers(updateMapData);
 
   // Wrap undo to let in-progress operations (e.g. region creation) cancel first
-  const wrappedHandleUndo = useCallback(() => {
+  // Returns whether anything changed (a tool consuming the undo counts), so the
+  // MCP bridge can report undo exactly.
+  const wrappedHandleUndo = useCallback((): boolean => {
     const event = new CustomEvent('windrose:before-undo', { cancelable: true, detail: { instanceId } });
-    activeDocument.dispatchEvent(event);
-    if (!event.defaultPrevented) {
-      handleUndo();
-    }
-  }, [handleUndo, instanceId]);
+    // Dispatch on the document that owns this map (popout-safe); RegionLayer
+    // listens on its canvas's ownerDocument.
+    (containerRef.current?.ownerDocument ?? activeDocument).dispatchEvent(event);
+    if (event.defaultPrevented) return true; // a tool consumed the undo
+    return handleUndo();
+  }, [handleUndo, instanceId, containerRef]);
 
-  // Clone layer modal state (Preact fallback only)
-  const [cloningLayerId, setCloningLayerId] = useState<string | null>(null);
-
-  const handleCloneLayerRequest = useCallback((layerId: string): void => {
-    if (!mapData) return;
-    const layer = getLayerById(mapData, layerId);
-    if (!layer) return;
-
-    const layerName = layer.name || String(layer.order + 1);
-    const opened = openNativeCloneLayerModal({
-      app,
-      layerName,
-      onClone: (mode) => handleLayerClone(layerId, mode),
-    });
-    if (!opened) {
-      setCloningLayerId(layerId);
-    }
-  }, [mapData, handleLayerClone, app]);
+  // Clone layer: native modal first, Preact fallback state otherwise.
+  const { cloningLayerId, setCloningLayerId, handleCloneLayerRequest } = useCloneLayerRequest(app, mapData, handleLayerClone);
 
   // Data change handlers (extracted to useDataHandlers hook)
+  const dataHandlers = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
   const {
     handleNameChange,
     handleCellsChange,
@@ -926,19 +455,10 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleWallPathsChange,
     handleTerrainStrokesChange,
     handleAddCustomColor,
-    handleDeleteCustomColor,
-    handleUpdateColorOpacity,
     handleViewStateChange,
-    handleObjectSetChange,
     handleTextLabelSettingsChange,
-    handleRegionsChange,
-    handleOutlinesChange,
-    handleShapeOverlaysChange,
-    handlePartyPinsChange,
-    handleMeasurementRouteChange,
-    handleSavedRoutesChange,
-    handleTravelSettingsChange
-  } = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
+    handleRegionsChange
+  } = dataHandlers;
 
   // Picture frame handlers write through rootUpdateMapData, not the
   // active-map funnel (see pictureFrameActive above).
@@ -967,7 +487,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         entry.id === mapId ? { ...entry, name: newName } : entry
       ));
     }
-  }, [handleNameChange, onNameChange, fullPane, mapId]);
+  }, [handleNameChange, onNameChange, fullPane, mapId, setMapListEntries]);
 
   const handleFloatingPickerClose = useCallback(() => {
     if (floatingPickerPendingRef.current != null && floatingPickerPendingRef.current !== '') {
@@ -1007,103 +527,17 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     mapData, mapId, instanceId, isFocused, geometry, updateMapData,
     handleLayerSelect, enterSubHex, exitSubHex, drillToSubHexPath, isInSubHex,
     handleRegionsChange,
-    subHexPath
+    subHexPath, containerRef
   });
 
   // Player fog clearing on drop (reads latest state via functional updater, supports undo)
-  usePlayerFogClear({ geometry, updateMapData, addToHistory, isApplyingHistory, instanceId });
+  usePlayerFogClear({ geometry, updateMapData, addToHistory, isApplyingHistory, instanceId, containerRef });
 
-  // Adjacent sub-map click-to-navigate
-  useEffect((): (() => void) | undefined => {
-    if (!showAdjacentSubMaps || !isInSubHex || (adjacentSubHexes.length === 0 && adjacentEmptySlots.length === 0) || geometry?.type !== 'hex' || !renderMapData) return undefined;
-    const maxRing = renderMapData.hexBounds?.maxRing ?? 7;
-    const tileStep = 2 * maxRing + 1;
-
-    const handleAdjacentClick = (e: MouseEvent): void => {
-      const canvas = (e.target as HTMLElement).closest('canvas');
-      if (canvas == null) return;
-      // Document-level listener: only react to clicks on THIS block's canvas,
-      // or a click on any co-mounted map could hit-test against our adjacency
-      // geometry and navigate this map sympathetically.
-      if (containerRef.current == null || !containerRef.current.contains(canvas)) return;
-
-      const rect = canvas.getBoundingClientRect();
-      let canvasX = (e.clientX - rect.left) * (canvas.width / rect.width);
-      let canvasY = (e.clientY - rect.top) * (canvas.height / rect.height);
-
-      // The renderer draws ghost previews, labels, and "+" markers inside a
-      // northDirection rotation about the canvas center — invert it here so
-      // hit-tests align with what's actually on screen on rotated maps.
-      const northDeg = (renderMapData.northDirection ?? 0) % 360;
-      if (northDeg !== 0) {
-        const theta = (-northDeg * Math.PI) / 180;
-        const cx = canvas.width / 2;
-        const cy = canvas.height / 2;
-        const dx = canvasX - cx;
-        const dy = canvasY - cy;
-        canvasX = cx + dx * Math.cos(theta) - dy * Math.sin(theta);
-        canvasY = cy + dx * Math.sin(theta) + dy * Math.cos(theta);
-      }
-
-      const viewState = renderMapData.viewState;
-      if (viewState == null) return;
-      const oX = canvas.width / 2 - viewState.center.x * viewState.zoom;
-      const oY = canvas.height / 2 - viewState.center.y * viewState.zoom;
-
-      // Convert click to world coords
-      const clickWorldX = (canvasX - oX) / viewState.zoom;
-      const clickWorldY = (canvasY - oY) / viewState.zoom;
-
-      // Check each adjacent sub-hex: is the click within its grid bounds?
-      for (const adj of adjacentSubHexes) {
-        const scaledQ = adj.dq * tileStep;
-        const scaledR = adj.dr * tileStep;
-        if (geometry.hexToWorld == null) continue;
-        const offset = geometry.hexToWorld(scaledQ, scaledR);
-
-        // Click relative to adjacent grid center
-        const relX = clickWorldX - offset.worldX;
-        const relY = clickWorldY - offset.worldY;
-
-        // Check if within maxRing hex radius (approximate with world-space distance)
-        const hexSize = geometry.hexSize ?? 1;
-        const gridRadius = hexSize * Math.sqrt(3) * maxRing;
-        if (relX * relX + relY * relY < gridRadius * gridRadius) {
-          // Parse the hex key to get absolute q, r. Direct call — this was a
-          // document event every co-mounted map obeyed (sympathetic zoom).
-          const [aq, ar] = adj.hexKey.split(',').map(Number);
-          navigateToSibling(aq, ar);
-          e.stopPropagation();
-          e.preventDefault();
-          return;
-        }
-      }
-
-      // "+" affordances for empty adjacent slots: hit-test the marker circle
-      // drawn where the sibling's label would sit (useCanvasRenderer keeps
-      // position + radius in sync with this math). A hit creates the sibling
-      // (or enters an existing-but-empty one) and navigates to it.
-      for (const slot of adjacentEmptySlots) {
-        if (geometry.hexToWorld == null) continue;
-        const markerWorld = geometry.hexToWorld(slot.dq * (maxRing + 2), slot.dr * (maxRing + 2));
-        const relX = clickWorldX - markerWorld.worldX;
-        const relY = clickWorldY - markerWorld.worldY;
-        // Drawn radius (screen px, matches the renderer) with a touch-friendly
-        // hit slop, converted to world units at the current zoom.
-        const hitRadiusWorld = (Math.max(12, 14 * viewState.zoom) * 1.6) / viewState.zoom;
-        if (relX * relX + relY * relY < hitRadiusWorld * hitRadiusWorld) {
-          const [aq, ar] = slot.hexKey.split(',').map(Number);
-          navigateToSibling(aq, ar, { createIfMissing: true });
-          e.stopPropagation();
-          e.preventDefault();
-          return;
-        }
-      }
-    };
-
-    activeDocument.addEventListener('click', handleAdjacentClick, true);
-    return () => activeDocument.removeEventListener('click', handleAdjacentClick, true);
-  }, [showAdjacentSubMaps, isInSubHex, adjacentSubHexes, adjacentEmptySlots, geometry, renderMapData, navigateToSibling, containerRef]);
+  // Adjacent sub-map previews: global toggle + click-to-navigate on siblings and "+" slots.
+  const { showAdjacentSubMaps, setShowAdjacentSubMaps } = useAdjacentSubMaps({
+    app, isInSubHex, adjacentSubHexes, adjacentEmptySlots, navigateToSibling,
+    geometry, renderMapData, containerRef,
+  });
 
   // Canvas pixel size for view-fitting calculations (recenter-view).
   // querySelector depends on DOM order: the MAIN map canvas must stay the
@@ -1124,7 +558,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     handleUndo: wrappedHandleUndo, handleRedo, handleLayerSelect,
     pictureFrameLocked: pictureFrameActive,
     onTogglePictureFrame: !fullPane ? handleTogglePictureFrame : undefined,
-    onRecenterView: handleRecenterView
+    onRecenterView: handleRecenterView,
+    containerRef
   });
 
   // MCP bridge: each map instance registers its own state + operations.
@@ -1141,15 +576,21 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     setRailOpenId, getCachedImage,
   });
 
-  if (mapDeleted) {
-    return <div className="windrose-loading">Map deleted. You can remove this windrose-map code block.</div>;
+  // Deleted by this mount (mapDeleted) or by another mount this session
+  // (dataMapDeleted: tombstoned at load, or a save came back 'deleted').
+  if (mapDeleted || dataMapDeleted) {
+    return (
+      <div className="windrose-loading">
+        {fullPane ? 'Map deleted.' : 'Map deleted. You can remove this windrose-map code block.'}
+      </div>
+    );
   }
 
   // Unreadable data file: render a blocking panel INSTEAD of the canvas. No
   // canvas means no edits, which means nothing can overwrite the file while it
   // is in an unknown state. The panel also offers the backup restore.
   if (loadFailure) {
-    return <DataFileRecoveryPanel dataPath={loadFailure.dataPath} onRestored={reloadMapData} />;
+    return <DataFileRecoveryPanel dataPath={loadFailure.dataPath} kind={loadFailure.kind} foundAt={loadFailure.foundAt} onRestored={reloadMapData} />;
   }
 
   // A save carrying real edits was refused because another mount of this map
@@ -1170,12 +611,15 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     return <div className="windrose-loading">Loading map...</div>;
   }
 
-  // Get color display name
-  const getColorDisplayName = (): string => {
-    if (isDefaultColor(selectedColor)) return 'Default';
-    const colorDef = getColorByHex(selectedColor);
-    return colorDef ? colorDef.label : selectedColor;
-  };
+  // One prop set per panel (STRUCT-A-02): every layout spreads the same bag.
+  const bags = buildPanelBags({
+    mapData, tool: toolState, layerHistory, data: dataHandlers, fog, tileBrush,
+    uiLayout: { layerVisibility, handleToggleLayerVisibility, isFocused },
+    boards: boardHandlers, drawer: drawerState, flyouts, art: artHandlers, featureFlags,
+    availableTilesets, getCachedImage, onEditLayer: setEditingLayerId, onLayerClone: handleCloneLayerRequest,
+    onZoomIn: handleZoomIn, onZoomOut: handleZoomOut, onUndo: wrappedHandleUndo,
+    onTileDepthChange: handleTileDepthChange, collapseTileBrowser, expandTileBrowser,
+  });
 
   // Main render
   return (
@@ -1209,112 +653,42 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
         {/* One-time upgrader notice pointing at the Features settings section. */}
         {onboarding === 'whatsnew' && !pictureFrameActive && <WhatsNewNotice />}
 
-        <div className={`windrose-subhex-row${subHexRowOpen && isInSubHex && !pictureFrameActive ? ' is-open' : ''}`}>
-          <div className="windrose-subhex-row-inner">
-          {isInSubHex && !pictureFrameActive && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <SubHexBreadcrumb
-              breadcrumbs={breadcrumbs}
-              onNavigate={navigateToLevel}
-            />
-            {(adjacentSubHexes.length > 0 || adjacentEmptySlots.length > 0) && (
-              <button
-                onClick={() => setShowAdjacentSubMaps(!showAdjacentSubMaps)}
-                ref={tooltipRef(showAdjacentSubMaps ? 'Hide adjacent sub-maps' : 'Show adjacent sub-maps')}
-                style={{
-                  padding: '2px 8px',
-                  fontSize: '11px',
-                  background: showAdjacentSubMaps ? 'var(--interactive-accent)' : 'var(--background-secondary)',
-                  color: showAdjacentSubMaps ? 'var(--text-on-accent)' : 'var(--text-muted)',
-                  border: '1px solid var(--background-modifier-border)',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                <Icon icon="lucide-layers" />
-              </button>
-            )}
-            {notePath !== '' && (
-              <button
-                onClick={handleCopySubHexLink}
-                ref={tooltipRef('Copy link to this sub-hex view')}
-                style={{
-                  padding: '2px 8px',
-                  fontSize: '11px',
-                  background: 'var(--background-secondary)',
-                  color: 'var(--text-muted)',
-                  border: '1px solid var(--background-modifier-border)',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                <Icon icon="lucide-link" />
-              </button>
-            )}
-          </div>
-          )}
-          </div>
-        </div>
+        <SubHexRow
+          open={subHexRowOpen && isInSubHex && !pictureFrameActive}
+          show={isInSubHex && !pictureFrameActive}
+          breadcrumbs={breadcrumbs}
+          onNavigate={navigateToLevel}
+          hasAdjacent={adjacentSubHexes.length > 0 || adjacentEmptySlots.length > 0}
+          showAdjacent={showAdjacentSubMaps}
+          onToggleAdjacent={() => setShowAdjacentSubMaps(!showAdjacentSubMaps)}
+          onCopyLink={notePath !== '' ? handleCopySubHexLink : null}
+        />
 
         <div className="windrose-stage">
-        {!pictureFrameActive && <div className="windrose-toolbar-anchor">
-          {!isFloating('toolPalette') && (
-            <ToolPalette
-              currentTool={currentTool}
-              onToolChange={setCurrentTool}
-              onUndo={wrappedHandleUndo}
-              onRedo={handleRedo}
-              canUndo={canUndo}
-              canRedo={canRedo}
-              mapType={mapData.mapType}
-              isFocused={isFocused}
-              vertical={fullPane}
-              dockButton={fullPane ? (
-                <button
-                  className="windrose-tool-btn windrose-tool-palette-dock-btn interactive-child"
-                  onClick={(e) => {
-                    const rect = (e.currentTarget as HTMLElement).closest('.windrose-tool-palette')!.getBoundingClientRect();
-                    toggleFloat('toolPalette', { x: rect.left, y: rect.top });
-                  }}
-                  ref={tooltipRef('Pop out tools')}
-                >
-                  <Icon icon="lucide-maximize-2" />
-                </button>
-              ) : undefined}
-            />
-          )}
-
-          {!fullPane && (
-            <VisibilityToolbar
-              isOpen={showVisibilityToolbar}
-              layerVisibility={layerVisibility}
-              onToggleLayer={handleToggleLayerVisibility}
-              mapType={mapData.mapType}
-              showFogTools={showFogTools}
-              onFogToolsToggle={handleFogToolsToggle}
-              onTogglePictureFrame={handleTogglePictureFrame}
-              viewLocked={rootMapData?.lockedViewState != null}
-              onToggleViewLock={handleToggleViewLock}
-            />
-          )}
-        </div>}
-
-        {!fullPane && !pictureFrameActive && featureFlags.fogOfWar && (
-          <FogOfWarToolbar
-            isOpen={showFogTools && showVisibilityToolbar}
-            fogOfWarState={currentFogState}
-            onFogToolSelect={handleFogToolSelect}
-            onFogVisibilityToggle={handleFogVisibilityToggle}
-            onFogFillAll={handleFogFillAll}
-            onFogClearAll={handleFogClearAll}
+        {!pictureFrameActive && (
+          <StageToolbars
+            fullPane={fullPane}
+            toolPalette={bags.toolPalette}
+            paletteDocked={!isFloating('toolPalette')}
+            onPopOutPalette={(pos) => toggleFloat('toolPalette', pos)}
+            visibility={fullPane ? null : {
+              isOpen: showVisibilityToolbar, layerVisibility, onToggleLayer: handleToggleLayerVisibility,
+              mapType: mapData.mapType, showFogTools, onFogToolsToggle: handleFogToolsToggle,
+              onTogglePictureFrame: handleTogglePictureFrame,
+              viewLocked: rootMapData?.lockedViewState != null, onToggleViewLock: handleToggleViewLock,
+            }}
+            fogToolbar={fullPane || !featureFlags.fogOfWar ? null : {
+              isOpen: showFogTools && showVisibilityToolbar, fogOfWarState: currentFogState,
+              onFogToolSelect: handleFogToolSelect, onFogVisibilityToggle: handleFogVisibilityToggle,
+              onFogFillAll: handleFogFillAll, onFogClearAll: handleFogClearAll,
+            }}
           />
         )}
 
         <div
           className={`windrose-canvas-wrapper${fullPane ? ' windrose-full-pane-canvas' : ''}`}
           style={canvasHeight != null ? { height: `${canvasHeight}px` } : undefined}
+          tabIndex={-1}
           onMouseEnter={() => setIsFocused(true)}
           onMouseLeave={() => setIsFocused(false)}
         >
@@ -1333,96 +707,14 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           {/* Block-mode left icon rail — Layers / Colors / View (+ Regions on hex).
               42px rail, flyouts overlay the canvas. Replaces windrose-left-panels. */}
           {!fullPane && !pictureFrameActive && (
-            <EdgeRail
+            <BlockEdgeRail
+              bags={bags}
               openId={railOpenId}
               onOpenChange={setRailOpenId}
-              panels={[
-                {
-                  id: 'layers',
-                  icon: 'lucide-layers',
-                  title: 'Layers',
-                  content: (
-                    <DockLayerList
-                      mapData={mapData}
-                      onLayerSelect={handleLayerSelect}
-                      onLayerAdd={handleLayerAdd}
-                      onLayerDelete={handleLayerDelete}
-                      onLayerReorder={handleLayerReorder}
-                      onToggleShowLayerBelow={handleToggleShowLayerBelow}
-                      onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
-                      onEditLayer={setEditingLayerId}
-                      onLayerClone={handleCloneLayerRequest}
-                      onToggleStrataMode={handleToggleStrataMode}
-                      onBoardAdd={handleBoardAdd}
-                      onBoardSelect={handleBoardSelect}
-                      onBoardDelete={handleBoardDelete}
-                      onAddLayerToStratum={handleAddLayerToStratum}
-                      onToggleLayerVisible={handleToggleLayerVisible}
-                      onToggleShowBoardBelow={handleToggleShowBoardBelow}
-                      onSetBoardBelowOpacity={handleSetBoardBelowOpacity}
-                    />
-                  )
-                },
-                {
-                  id: 'colors',
-                  icon: 'lucide-palette',
-                  title: 'Colors',
-                  content: (
-                    <ColorPicker
-                      isOpen
-                      floatingMode
-                      selectedColor={selectedColor}
-                      onColorSelect={setSelectedColor}
-                      onClose={() => {}}
-                      onReset={() => setSelectedColor(DEFAULT_COLOR)}
-                      customColors={mapData.customColors ?? []}
-                      paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides ?? {}}
-                      onAddCustomColor={handleAddCustomColor}
-                      onDeleteCustomColor={handleDeleteCustomColor}
-                      onUpdateColorOpacity={handleUpdateColorOpacity}
-                      opacity={selectedOpacity}
-                      onOpacityChange={handleOpacityChange}
-                    />
-                  )
-                },
-                {
-                  id: 'view',
-                  icon: 'lucide-eye',
-                  title: 'View',
-                  content: (
-                    <DockViewPanel
-                      currentZoom={mapData.viewState?.zoom ?? 1}
-                      onZoomIn={handleZoomIn}
-                      onZoomOut={handleZoomOut}
-                      layerVisibility={layerVisibility}
-                      onToggleLayer={handleToggleLayerVisibility}
-                      mapType={mapData.mapType}
-                      fogOfWarState={currentFogState}
-                      onFogToolSelect={handleFogToolSelect}
-                      onFogVisibilityToggle={handleFogVisibilityToggle}
-                      onFogFillAll={handleFogFillAll}
-                      onFogClearAll={handleFogClearAll}
-                    />
-                  )
-                },
-                ...(mapData.mapType === 'hex' && featureFlags.regions ? [{
-                  id: 'regions',
-                  icon: 'lucide-map',
-                  title: 'Regions',
-                  content: (
-                    <RegionPanel
-                      regions={mapData.regions ?? []}
-                      onRegionsChange={handleRegionsChange}
-                      sidebarCollapsed={false}
-                      isOpen
-                      instanceId={instanceId}
-                    />
-                  )
-                }] : [])
-              ]}
-              actions={[
-                { id: 'settings', icon: 'lucide-settings', title: 'Map settings', onClick: handleSettingsClick }
-              ]}
+              regions={mapData.mapType === 'hex' && featureFlags.regions
+                ? { regions: mapData.regions ?? [], onRegionsChange: handleRegionsChange, instanceId }
+                : null}
+              onSettingsClick={handleSettingsClick}
             />
           )}
 
@@ -1454,6 +746,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onEdgesChange={handleEdgesChange}
               onTilesChange={handleTilesChange}
               onLayerSelect={handleLayerSelect}
+              clearTransient={layerHistory.clearTransient}
               onWallPathsChange={handleWallPathsChange}
               onTerrainStrokesChange={handleTerrainStrokesChange}
               tileImagesReady={tileImagesReady}
@@ -1468,9 +761,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               selectedObjectType={selectedObjectType ?? undefined}
               selectedColor={selectedColor}
               isColorPickerOpen={isColorPickerOpen}
-              customColors={(mapData.customColors ?? []).map((c: CustomColor) => c.color)}
-              onAddCustomColor={handleAddCustomColor}
-              onDeleteCustomColor={handleDeleteCustomColor}
               isFocused={isFocused}
               isAnimating={isAnimating}
               theme={theme}
@@ -1485,658 +775,87 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               requestEnterSubHex={requestEnterSubHex}
               requestExitSubHex={requestExitSubHex}
             >
-              {/* DrawingLayer - handles all drawing tools */}
-              <MapCanvas.DrawingLayer
+              <MapCanvasLayers
                 currentTool={currentTool}
                 selectedColor={selectedColor}
                 selectedOpacity={selectedOpacity}
-                mapDistanceOverrides={distanceOverrides}
-              />
-
-              {/* FreehandLayer - handles freehand curve drawing */}
-              <MapCanvas.FreehandLayer
-                currentTool={currentTool}
-                selectedColor={selectedColor}
-                selectedOpacity={selectedOpacity}
-              />
-
-              {/* ObjectLayer - handles object placement and interactions */}
-              <MapCanvas.ObjectLayer
-                currentTool={currentTool}
+                onColorChange={setSelectedColor}
                 selectedObjectType={selectedObjectType}
-                onObjectsChange={handleObjectsChange}
-                customColors={mapData.customColors ?? []}
-                onAddCustomColor={handleAddCustomColor}
-                onDeleteCustomColor={handleDeleteCustomColor}
                 freeformPlacementMode={freeformPlacementMode}
-              />
-
-              {/* AreaSelectLayer - handles area selection tool for multi-select */}
-              <MapCanvas.AreaSelectLayer
-                currentTool={currentTool}
-              />
-
-              {/* TextLayer - handles text label interactions */}
-              <MapCanvas.TextLayer
-                currentTool={currentTool}
                 customColors={mapData.customColors ?? []}
-                onAddCustomColor={handleAddCustomColor}
-                onDeleteCustomColor={handleDeleteCustomColor}
-              />
-
-              {/* NotePinLayer - handles note pin placement */}
-              <MapCanvas.NotePinLayer
-                currentTool={currentTool}
-                selectedObjectType={selectedObjectType}
-              />
-
-              {/* FogOfWarLayer - handles fog painting/erasing interactions */}
-              {fogActiveTool && (
-                <MapCanvas.FogOfWarLayer
-                  activeTool={fogActiveTool}
-                  onFogChange={handleFogChange}
-                  onInitializeFog={(updatedMapData) => updateMapData(updatedMapData)}
-                />
-              )}
-
-              {/* TilePlacementLayer - hex tile placement */}
-              <MapCanvas.TilePlacementLayer
-                currentTool={currentTool}
-                selectedTilesetId={selectedTilesetId}
-                selectedTileId={selectedTileId}
-                tileRotation={tileRotation}
-                tileFlipH={tileFlipH}
-                tileLayer={tileLayer}
-                tileFitMode={tileFitMode}
-                activeSubtool={tileSubtool}
-                tileScale={tileScale}
-                brushSize={brushSize}
-                paintEdgeBlend={paintEdgeBlend}
-                tileDepth={tileDepth}
-                onTilesChange={handleTilesChange}
-              />
-
-              {/* TerrainBrushLayer - world-space soft terrain brush ('brush' subtool) */}
-              <MapCanvas.TerrainBrushLayer
-                currentTool={currentTool}
-                activeSubtool={tileSubtool}
-                selectedTilesetId={selectedTilesetId}
-                selectedTileId={selectedTileId}
-                brushSize={brushSize}
-                brushSoftness={brushSoftness}
-                tileDepth={tileDepth}
-                onTerrainStrokesChange={handleTerrainStrokesChange}
-              />
-
-              {/* WallLayer - wall/path strip drawing along polylines */}
-              <MapCanvas.WallLayer
-                currentTool={currentTool}
-                selectedTilesetId={selectedTilesetId}
-                selectedTileId={selectedTileId}
-                onWallPathsChange={handleWallPathsChange}
-                onDragStateChange={setDraggingWallId}
-                onSurfaceChange={setWallSurface}
+                distanceOverrides={distanceOverrides}
+                globalSettings={effectiveSettings ?? undefined}
+                data={dataHandlers}
+                fogActiveTool={fogActiveTool}
+                onFogChange={handleFogChange}
+                updateMapData={updateMapData}
+                tileBrush={tileBrush}
+                onWallDragStateChange={setDraggingWallId}
+                onWallSurfaceChange={setWallSurface}
                 bareThresholdArmed={bareThresholdArmed}
                 onDisarmOpening={() => setBareThresholdArmed(false)}
-                tileScale={tileScale}
+                showSavedRoutes={layerVisibility.savedRoutes}
+                showRerollButton={featureFlags.dungeonGenerator}
               />
-
-              {/* RegionLayer - hex region creation and editing */}
-              <MapCanvas.RegionLayer
-                currentTool={currentTool}
-                selectedColor={selectedColor}
-                selectedOpacity={selectedOpacity}
-                onRegionsChange={handleRegionsChange}
-              />
-
-              {/* OutlineLayer - polygon outline drawing and editing */}
-              <MapCanvas.OutlineLayer
-                currentTool={currentTool}
-                selectedColor={selectedColor}
-                onColorChange={setSelectedColor}
-                onOutlinesChange={handleOutlinesChange}
-              />
-
-              {/* ShapeOverlayLayer - square/circle shape overlay placement */}
-              <MapCanvas.ShapeOverlayLayer
-                currentTool={currentTool}
-                selectedColor={selectedColor}
-                selectedOpacity={selectedOpacity}
-                freeformPlacementMode={freeformPlacementMode}
-                onShapeOverlaysChange={handleShapeOverlaysChange}
-              />
-
-              {/* HexCoordinateLayer - displays coordinate labels when 'C' key is held */}
-              <MapCanvas.HexCoordinateLayer />
-
-              {/* PartyPinLayer - party pin marker and range ring */}
-              <MapCanvas.PartyPinLayer currentTool={currentTool} onPartyPinsChange={handlePartyPinsChange} />
-
-              {/* RouteLayer - saved measurement routes (gated by the visibility toolbar) */}
-              {layerVisibility.savedRoutes && (
-                <MapCanvas.RouteLayer
-                  currentTool={currentTool}
-                  onSavedRoutesChange={handleSavedRoutesChange}
-                />
-              )}
-
-              {/* MeasurementLayer - distance measurement tool overlay */}
-              <MapCanvas.MeasurementLayer
-                currentTool={currentTool}
-                globalSettings={effectiveSettings ?? undefined}
-                mapDistanceOverrides={distanceOverrides}
-                onMeasurementRouteChange={handleMeasurementRouteChange}
-                onSavedRoutesChange={handleSavedRoutesChange}
-                onTravelSettingsChange={handleTravelSettingsChange}
-              />
-
-              {/* DiagonalFillOverlay - diagonal fill tool preview */}
-              <MapCanvas.DiagonalFillOverlay
-                currentTool={currentTool}
-              />
-
-              {/* Re-roll button for generated dungeons */}
-              {featureFlags.dungeonGenerator && <MapCanvas.RerollDungeonButton />}
             </MapCanvas>
 
-            {!fullPane && !pictureFrameActive && (
-              <MapControls
-                onZoomIn={handleZoomIn}
-                onZoomOut={handleZoomOut}
-                onCompassClick={handleCompassClick}
-                onRecenterView={handleRecenterView}
-                onSettingsClick={handleSettingsClick}
-                northDirection={mapData.northDirection ?? 0}
-                currentZoom={mapData.viewState?.zoom ?? 1}
-                isExpanded={isExpanded}
-                onToggleExpand={handleToggleExpand}
-                hideExpand={fullPane}
-                minimalControls
-                mapType={mapData.mapType}
-                showLayerPanel={railOpenId === 'layers'}
-                onToggleLayerPanel={() => setRailOpenId(prev => prev === 'layers' ? null : 'layers')}
-                showRegionPanel={railOpenId === 'regions'}
-                onToggleRegionPanel={mapData.mapType === 'hex' && featureFlags.regions ? () => setRailOpenId(prev => prev === 'regions' ? null : 'regions') : undefined}
-                showVisibilityToolbar={showVisibilityToolbar}
-                onToggleVisibilityToolbar={() => {
-                  const closing = showVisibilityToolbar;
-                  setShowVisibilityToolbar(!showVisibilityToolbar);
-                  if (closing && showFogTools) handleFogToolsToggle();
-                }}
-                alwaysShowControls={effectiveSettings?.alwaysShowControls ?? false}
-              />
-            )}
-            {fullPane && (
-              <div
-                className="windrose-compass-standalone"
-                onClick={handleCompassClick}
-                ref={tooltipRef(`North: ${mapData.northDirection ?? 0}° — Click to rotate`)}
-              >
-                <WindroseCompass rotation={mapData.northDirection ?? 0} className="windrose-compass-svg" />
-              </div>
-            )}
+            <CanvasCornerControls
+              mapData={mapData}
+              onCompassClick={handleCompassClick}
+              showStandaloneCompass={fullPane}
+              block={fullPane || pictureFrameActive ? null : {
+                onZoomIn: handleZoomIn, onZoomOut: handleZoomOut, onRecenterView: handleRecenterView,
+                onSettingsClick: handleSettingsClick, isExpanded, onToggleExpand: handleToggleExpand,
+                railOpenId, setRailOpenId, regionsEnabled: mapData.mapType === 'hex' && featureFlags.regions,
+                showVisibilityToolbar, setShowVisibilityToolbar, showFogTools, onFogToolsToggle: handleFogToolsToggle,
+                alwaysShowControls: effectiveSettings?.alwaysShowControls ?? false,
+              }}
+            />
           </div>
 
           {/* Tile Asset Browser (right sidebar, block mode) */}
           {showTilePanel && !fullPane && !pictureFrameActive && (
-            <DrawerDock
-              open={!tileBrowserCollapsed}
-              onCollapse={collapseTileBrowser}
-              onExpand={expandTileBrowser}
-              drawerWidth={240}
-              ribbonWidth={46}
-              fold
-              compact
-              depth={tileDepth}
-              onDepthChange={handleTileDepthChange}
-              hidden={hiddenLayers}
-              onToggleHide={toggleHiddenLayer}
-              flyoutRecent={flyoutRecent}
-              flyoutStarred={starredFlyoutTiles}
-              onFlyoutSelect={handleFlyoutSelect}
-              pane={tilePane}
-              onPane={selectPane}
-              tilesEnabled={featureFlags.tiles}
-            >
-              <div className="windrose-cd">
-              {renderCompactDrawerHead()}
-              <div className="windrose-cd-main">
-              {tilePane === 'objects' ? (
-              renderObjectsPane(true)
-              ) : (
-              <TileAssetBrowser
-                tilesets={availableTilesets}
-                selectedTilesetId={selectedTilesetId}
-                selectedTileId={selectedTileId}
-                onTileSelect={handleTileSelect}
-                onTileDeselect={handleTileDeselect}
-                onToolChange={setCurrentTool}
-                onCollapse={collapseTileBrowser}
-                rotation={tileRotation}
-                flipH={tileFlipH}
-                onRotationChange={setTileRotation}
-                onFlipChange={setTileFlipH}
-                tileLayer={tileLayer}
-                onTileLayerChange={setTileLayer}
-                tileDepth={tileDepth}
-                onTileDepthChange={handleTileDepthChange}
-                hidden={hiddenLayers}
-                onToggleHide={toggleHiddenLayer}
-                mapType={mapData?.mapType}
-                tileFitMode={tileFitMode}
-                onTileFitModeChange={setTileFitMode}
-                activeSubtool={tileSubtool}
-                onSubtoolChange={setTileSubtool}
-                wallSurface={wallSurface}
-                tileScale={tileScale}
-                onTileScaleChange={setTileScale}
-                brushSize={brushSize}
-                onBrushSizeChange={setBrushSize}
-                brushSoftness={brushSoftness}
-                onBrushSoftnessChange={setBrushSoftness}
-                paintEdgeBlend={paintEdgeBlend}
-                onPaintEdgeBlendChange={setPaintEdgeBlend}
-                getCachedImage={getCachedImage}
-                tilesetOverrides={mapData?.tilesetOverrides}
-                onTilesetOverrideChange={handleTilesetOverrideChange}
-                onTilesetArtOffsetChange={handleTilesetArtOffsetChange}
-                onTilesetArtScaleChange={handleTilesetArtScaleChange}
-                tilesetConfigOpen={blockTilesetConfigOpen}
-                onTilesetConfigOpenChange={setBlockTilesetConfigOpen}
-                compact
-                hideHeader
-                active={!tileBrowserCollapsed}
-                recentTiles={recentTiles}
-                onStarredChange={setStarredFlyoutTiles}
-                onSelectedFormChange={setSelectedTileForm}
-                railSel={tileRailSel}
-                onRailSelChange={setTileRailSel}
-                viewMode={tileViewMode}
-                onViewModeChange={setTileViewMode}
-              />
-              )}
-              </div>
-              </div>
-            </DrawerDock>
+            <BlockTileDrawer
+              drawer={bags.drawer}
+              tileBrowser={bags.tileBrowser}
+              objectsPane={bags.objectsPane}
+              tileViewMode={tileViewMode}
+              onTileViewModeChange={setTileViewMode}
+              objectViewMode={objectViewMode}
+              onObjectViewModeChange={setObjectViewMode}
+              hasTilesets={availableTilesets.length > 0}
+              tilesetConfigOpen={blockTilesetConfigOpen}
+              onTilesetConfigOpenChange={setBlockTilesetConfigOpen}
+            />
           )}
 
           {/* Floating panels (portalled, render anywhere) */}
-          {isFloating('toolPalette') && (
-            <FloatingPanel
-              title="Tools"
-              isFloating
-              headerless
-              onDock={() => toggleFloat('toolPalette')}
-              onFocus={() => bringToFront('toolPalette')}
-              zIndex={getZIndex('toolPalette')}
-              initialPosition={getInitialPosition('toolPalette')}
-              onPositionChange={(pos) => updatePosition('toolPalette', pos)}
-            >
-              <ToolPalette
-                currentTool={currentTool}
-                onToolChange={setCurrentTool}
-                onUndo={wrappedHandleUndo}
-                onRedo={handleRedo}
-                canUndo={canUndo}
-                canRedo={canRedo}
-                mapType={mapData.mapType}
-                isFocused={isFocused}
-                dockButton={
-                  <button
-                    className="windrose-tool-btn windrose-tool-palette-dock-btn interactive-child"
-                    onClick={() => toggleFloat('toolPalette')}
-                    ref={tooltipRef('Dock tools')}
-                  >
-                    <Icon icon="lucide-pin" />
-                  </button>
-                }
-              />
-            </FloatingPanel>
-          )}
-          {isFloating('layers') && (
-            <FloatingPanel
-              title="Layers"
-              isFloating
-              onDock={() => toggleFloat('layers')}
-              onFocus={() => bringToFront('layers')}
-              zIndex={getZIndex('layers')}
-              initialPosition={getInitialPosition('layers')}
-              resizable
-              minSize={{ width: 200, height: 150 }}
-              onPositionChange={(pos) => updatePosition('layers', pos)}
-            >
-              <DockLayerList
-                mapData={mapData}
-                onLayerSelect={handleLayerSelect}
-                onLayerAdd={handleLayerAdd}
-                onLayerDelete={handleLayerDelete}
-                onLayerReorder={handleLayerReorder}
-                onToggleShowLayerBelow={handleToggleShowLayerBelow}
-                onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
-                onEditLayer={setEditingLayerId}
-                onLayerClone={handleCloneLayerRequest}
-                onToggleStrataMode={handleToggleStrataMode}
-                onBoardAdd={handleBoardAdd}
-                onBoardSelect={handleBoardSelect}
-                onBoardDelete={handleBoardDelete}
-                onAddLayerToStratum={handleAddLayerToStratum}
-                onToggleLayerVisible={handleToggleLayerVisible}
-                onToggleShowBoardBelow={handleToggleShowBoardBelow}
-                onSetBoardBelowOpacity={handleSetBoardBelowOpacity}
-              />
-            </FloatingPanel>
-          )}
-          {isFloating('colorPicker') && (
-            <FloatingPanel
-              title="Colors"
-              isFloating
-              onDock={handleFloatingPickerClose}
-              onFocus={() => bringToFront('colorPicker')}
-              zIndex={getZIndex('colorPicker')}
-              initialPosition={getInitialPosition('colorPicker')}
-              resizable
-              minSize={{ width: 200, height: 150 }}
-              onPositionChange={(pos) => updatePosition('colorPicker', pos)}
-            >
-              <ColorPicker
-                isOpen
-                floatingMode
-                selectedColor={selectedColor}
-                onColorSelect={setSelectedColor}
-                onClose={handleFloatingPickerClose}
-                onReset={() => setSelectedColor(DEFAULT_COLOR)}
-                customColors={mapData.customColors ?? []}
-                paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides ?? {}}
-                onAddCustomColor={handleAddCustomColor}
-                onDeleteCustomColor={handleDeleteCustomColor}
-                onUpdateColorOpacity={handleUpdateColorOpacity}
-                pendingCustomColorRef={floatingPickerPendingRef}
-                opacity={selectedOpacity}
-                onOpacityChange={handleOpacityChange}
-              />
-            </FloatingPanel>
-          )}
-          {isFloating('view') && (
-            <FloatingPanel
-              title="View"
-              isFloating
-              onDock={() => toggleFloat('view')}
-              onFocus={() => bringToFront('view')}
-              zIndex={getZIndex('view')}
-              initialPosition={getInitialPosition('view')}
-              onPositionChange={(pos) => updatePosition('view', pos)}
-            >
-              <DockViewPanel
-                currentZoom={mapData.viewState?.zoom ?? 1}
-                onZoomIn={handleZoomIn}
-                onZoomOut={handleZoomOut}
-                layerVisibility={layerVisibility}
-                onToggleLayer={handleToggleLayerVisibility}
-                mapType={mapData.mapType}
-                fogOfWarState={currentFogState}
-                onFogToolSelect={handleFogToolSelect}
-                onFogVisibilityToggle={handleFogVisibilityToggle}
-                onFogFillAll={handleFogFillAll}
-                onFogClearAll={handleFogClearAll}
-              />
-            </FloatingPanel>
-          )}
-          {isFloating('tiles') && showTilePanel && featureFlags.tiles && (
-            <FloatingPanel
-              title="Tiles"
-              isFloating
-              onDock={() => toggleFloat('tiles')}
-              onFocus={() => bringToFront('tiles')}
-              zIndex={getZIndex('tiles')}
-              initialPosition={getInitialPosition('tiles')}
-              resizable
-              minSize={{ width: 200, height: 200 }}
-              onPositionChange={(pos) => updatePosition('tiles', pos)}
-            >
-              <TileAssetBrowser
-                tilesets={availableTilesets}
-                selectedTilesetId={selectedTilesetId}
-                selectedTileId={selectedTileId}
-                onTileSelect={handleTileSelect}
-                onTileDeselect={handleTileDeselect}
-                onToolChange={setCurrentTool}
-                rotation={tileRotation}
-                flipH={tileFlipH}
-                onRotationChange={setTileRotation}
-                onFlipChange={setTileFlipH}
-                tileLayer={tileLayer}
-                onTileLayerChange={setTileLayer}
-                tileDepth={tileDepth}
-                onTileDepthChange={handleTileDepthChange}
-                hidden={hiddenLayers}
-                onToggleHide={toggleHiddenLayer}
-                mapType={mapData?.mapType}
-                tileFitMode={tileFitMode}
-                onTileFitModeChange={setTileFitMode}
-                activeSubtool={tileSubtool}
-                onSubtoolChange={setTileSubtool}
-                wallSurface={wallSurface}
-                tileScale={tileScale}
-                onTileScaleChange={setTileScale}
-                brushSize={brushSize}
-                onBrushSizeChange={setBrushSize}
-                brushSoftness={brushSoftness}
-                onBrushSoftnessChange={setBrushSoftness}
-                paintEdgeBlend={paintEdgeBlend}
-                onPaintEdgeBlendChange={setPaintEdgeBlend}
-                getCachedImage={getCachedImage}
-                tilesetOverrides={mapData?.tilesetOverrides}
-                onTilesetOverrideChange={handleTilesetOverrideChange}
-                onTilesetArtOffsetChange={handleTilesetArtOffsetChange}
-                onTilesetArtScaleChange={handleTilesetArtScaleChange}
-                recentTiles={recentTiles}
-                onSelectedFormChange={setSelectedTileForm}
-              />
-            </FloatingPanel>
-          )}
+          <FloatingPanelsHost
+            bags={bags}
+            floating={floating}
+            onColorPickerClose={handleFloatingPickerClose}
+            pendingCustomColorRef={floatingPickerPendingRef}
+            showTiles={showTilePanel && featureFlags.tiles}
+          />
 
           {/* Right group: Tile Drawer + Dock Panel Column (full-pane mode only) */}
           {fullPane && (
-            <div className="windrose-right-group">
-              {showTilePanel && !isFloating('tiles') && (
-                <DrawerDock
-                  open={!tileBrowserCollapsed}
-                  onCollapse={collapseTileBrowser}
-                  onExpand={expandTileBrowser}
-                  drawerWidth={tileBrowserWidth}
-                  onWidthChange={setTileBrowserWidth}
-                  minWidth={180}
-                  maxWidth={392}
-                  ribbonWidth={54}
-                  fold
-                  compact={false}
-                  depth={tileDepth}
-                  onDepthChange={handleTileDepthChange}
-                  hidden={hiddenLayers}
-                  onToggleHide={toggleHiddenLayer}
-                  flyoutRecent={flyoutRecent}
-                  flyoutStarred={starredFlyoutTiles}
-                  onFlyoutSelect={handleFlyoutSelect}
-                  pane={tilePane}
-                  onPane={selectPane}
-                  tilesEnabled={featureFlags.tiles}
-                >
-                  {tilePane === 'objects' ? (
-                  renderObjectsPane(false, renderDrawerRibbon())
-                  ) : (
-                  <TileAssetBrowser
-                    tilesets={availableTilesets}
-                    selectedTilesetId={selectedTilesetId}
-                    selectedTileId={selectedTileId}
-                    onTileSelect={handleTileSelect}
-                    onTileDeselect={handleTileDeselect}
-                    onToolChange={setCurrentTool}
-                    onCollapse={collapseTileBrowser}
-                    rotation={tileRotation}
-                    flipH={tileFlipH}
-                    onRotationChange={setTileRotation}
-                    onFlipChange={setTileFlipH}
-                    tileLayer={tileLayer}
-                    onTileLayerChange={setTileLayer}
-                    tileDepth={tileDepth}
-                    onTileDepthChange={handleTileDepthChange}
-                    hidden={hiddenLayers}
-                    onToggleHide={toggleHiddenLayer}
-                    mapType={mapData?.mapType}
-                    tileFitMode={tileFitMode}
-                    onTileFitModeChange={setTileFitMode}
-                    activeSubtool={tileSubtool}
-                    onSubtoolChange={setTileSubtool}
-                    wallSurface={wallSurface}
-                    tileScale={tileScale}
-                    onTileScaleChange={setTileScale}
-                    brushSize={brushSize}
-                    onBrushSizeChange={setBrushSize}
-                    brushSoftness={brushSoftness}
-                    onBrushSoftnessChange={setBrushSoftness}
-                    paintEdgeBlend={paintEdgeBlend}
-                    onPaintEdgeBlendChange={setPaintEdgeBlend}
-                    getCachedImage={getCachedImage}
-                    tilesetOverrides={mapData?.tilesetOverrides}
-                    onTilesetOverrideChange={handleTilesetOverrideChange}
-                onTilesetArtOffsetChange={handleTilesetArtOffsetChange}
-                onTilesetArtScaleChange={handleTilesetArtScaleChange}
-                    showRail
-                    active={!tileBrowserCollapsed}
-                    recentTiles={recentTiles}
-                    onStarredChange={setStarredFlyoutTiles}
-                    onSelectedFormChange={setSelectedTileForm}
-                    railSel={tileRailSel}
-                    onRailSelChange={setTileRailSel}
-                    viewMode={tileViewMode}
-                    onViewModeChange={setTileViewMode}
-                    ribbon={renderDrawerRibbon()}
-                  />
-                  )}
-                </DrawerDock>
-              )}
-              <div className={`windrose-dock-right${dockCollapsed ? ' is-collapsed' : ''}`}>
-                {dockCollapsed ? (
-                  <DockRibbon
-                    items={[
-                      { id: 'layers', icon: 'lucide-layers', title: 'Layers' },
-                      { id: 'colorPicker', icon: 'lucide-palette', title: 'Colors' },
-                      { id: 'view', icon: 'lucide-eye', title: 'View' },
-                    ].filter(it => !isFloating(it.id as PanelId))
-                      // Settings is an action, not a panel — opens the modal directly
-                      .concat([{ id: 'settings', icon: 'lucide-settings', title: 'Map settings' }])}
-                    onExpand={(id) => id === 'settings' ? handleSettingsClick() : handleDockRibbonExpand(id)}
-                  />
-                ) : (
-                <>
-                {!isFloating('layers') && (
-                  <DockPanel
-                    title="Layers"
-                    collapsed={dockSectionCollapsed['layers'] ?? false}
-                    onToggleCollapse={() => toggleDockSection('layers')}
-                    onCollapseDock={() => setDockCollapsed(true)}
-                    onUndock={(pos) => toggleFloat('layers', pos)}
-                  >
-                    <DockLayerList
-                      mapData={mapData}
-                      onLayerSelect={handleLayerSelect}
-                      onLayerAdd={handleLayerAdd}
-                      onLayerDelete={handleLayerDelete}
-                      onLayerReorder={handleLayerReorder}
-                      onToggleShowLayerBelow={handleToggleShowLayerBelow}
-                      onSetLayerBelowOpacity={handleSetLayerBelowOpacity}
-                      onEditLayer={setEditingLayerId}
-                      onLayerClone={handleCloneLayerRequest}
-                      onToggleStrataMode={handleToggleStrataMode}
-                      onBoardAdd={handleBoardAdd}
-                      onBoardSelect={handleBoardSelect}
-                      onBoardDelete={handleBoardDelete}
-                      onAddLayerToStratum={handleAddLayerToStratum}
-                      onToggleLayerVisible={handleToggleLayerVisible}
-                      onToggleShowBoardBelow={handleToggleShowBoardBelow}
-                      onSetBoardBelowOpacity={handleSetBoardBelowOpacity}
-                    />
-                  </DockPanel>
-                )}
-                {!isFloating('colorPicker') && (
-                  <DockPanel
-                    title="Colors"
-                    collapsed={dockSectionCollapsed['colorPicker'] ?? false}
-                    onToggleCollapse={() => toggleDockSection('colorPicker')}
-                    onUndock={(pos) => toggleFloat('colorPicker', pos)}
-                  >
-                    <ColorPicker
-                      isOpen
-                      floatingMode
-                      selectedColor={selectedColor}
-                      onColorSelect={setSelectedColor}
-                      onClose={() => {}}
-                      onReset={() => setSelectedColor(DEFAULT_COLOR)}
-                      customColors={mapData.customColors ?? []}
-                      paletteColorOpacityOverrides={mapData.paletteColorOpacityOverrides ?? {}}
-                      onAddCustomColor={handleAddCustomColor}
-                      onDeleteCustomColor={handleDeleteCustomColor}
-                      onUpdateColorOpacity={handleUpdateColorOpacity}
-                      opacity={selectedOpacity}
-                      onOpacityChange={handleOpacityChange}
-                    />
-                  </DockPanel>
-                )}
-                {!isFloating('view') && (
-                  <DockPanel
-                    title="View"
-                    collapsed={dockSectionCollapsed['view'] ?? true}
-                    onToggleCollapse={() => toggleDockSection('view')}
-                    onUndock={(pos) => toggleFloat('view', pos)}
-                  >
-                    <DockViewPanel
-                      currentZoom={mapData.viewState?.zoom ?? 1}
-                      onZoomIn={handleZoomIn}
-                      onZoomOut={handleZoomOut}
-                      layerVisibility={layerVisibility}
-                      onToggleLayer={handleToggleLayerVisibility}
-                      mapType={mapData.mapType}
-                      fogOfWarState={currentFogState}
-                      onFogToolSelect={handleFogToolSelect}
-                      onFogVisibilityToggle={handleFogVisibilityToggle}
-                      onFogFillAll={handleFogFillAll}
-                      onFogClearAll={handleFogClearAll}
-                    />
-                  </DockPanel>
-                )}
-                {/* Map settings — moved out of the View panel (windrose-5cx);
-                    a standalone action row at the bottom of the dock column. */}
-                <button
-                  className="windrose-dock-settings-btn interactive-child"
-                  onClick={handleSettingsClick}
-                  ref={tooltipRef('Map settings')}
-                >
-                  <Icon icon="lucide-settings" size={14} />
-                  <span>Map settings</span>
-                </button>
-                </>
-                )}
-              </div>
-            </div>
+            <FullPaneRightGroup
+              bags={bags}
+              floating={floating}
+              dock={dock}
+              showTilePanel={showTilePanel}
+              drawerWidth={tileBrowserWidth}
+              onDrawerWidthChange={setTileBrowserWidth}
+              drawerRibbon={drawerRibbon}
+              onSettingsClick={handleSettingsClick}
+            />
           )}
         </div>
         </div>
 
         {showFooter && !pictureFrameActive && (
-          <div className="windrose-footer">
-            Map ID: {mapId} | Color: {getColorDisplayName()} | {
-              currentTool === 'select' ? 'Click to select text/objects | Drag to move | Press R to rotate | Press Delete to remove' :
-                currentTool === 'draw' ? 'Click/drag to draw' :
-                  currentTool === 'erase' ? 'Click/drag to erase (text first, then objects, tiles, walls, then cells)' :
-                    currentTool === 'rectangle' ? 'Click two corners to fill rectangle' :
-                      currentTool === 'circle' ? 'Click edge point, then center to fill circle' :
-                        currentTool === 'clearArea' ? 'Click two corners to clear area' :
-                          currentTool === 'addObject' ? (selectedObjectType != null && selectedObjectType !== '' ? 'Click to place object' : 'Select an object from the sidebar') :
-                            currentTool === 'addNote' ? 'Click to place note pin' :
-                            currentTool === 'addText' ? 'Click to add text label' :
-                              'Select a tool'
-            } | Undo/redo available | Middle-click, two-finger drag, or trackpad scroll to pan | Wheel or pinch to zoom | Click compass to rotate | {allAuthoredCells(getActiveLayer(mapData)).length} cells filled | {getActiveLayer(mapData).objects.length} objects placed | {getActiveLayer(mapData).textLabels.length} text labels
-          </div>
+          <FooterHelp mapId={mapId} mapData={mapData} selectedColor={selectedColor} currentTool={currentTool} selectedObjectType={selectedObjectType} />
         )}
 
         {/* Map Settings Modal */}
@@ -2181,40 +900,16 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           />
         )}
 
-        
-        {editingLayer && (
-          <ModalPortal>
-            <LayerEditModal
-              layer={editingLayer}
-              defaultName={String(editingLayer.order + 1)}
-              onSave={(name, icon) => {
-                if (editingLayerId != null) {
-                  handleUpdateLayerDisplay(editingLayerId, name, icon);
-                }
-                setEditingLayerId(null);
-              }}
-              onCancel={() => setEditingLayerId(null)}
-            />
-          </ModalPortal>
-        )}
-
-        {cloningLayerId != null && cloningLayerId !== '' && (() => {
-          const layer = getLayerById(mapData, cloningLayerId);
-          if (layer == null) return null;
-          const layerName = layer.name ?? String(layer.order + 1);
-          return (
-            <ModalPortal>
-              <CloneLayerModal
-                layerName={layerName}
-                onClone={(mode) => {
-                  handleLayerClone(cloningLayerId, mode);
-                  setCloningLayerId(null);
-                }}
-                onCancel={() => setCloningLayerId(null)}
-              />
-            </ModalPortal>
-          );
-        })()}
+        <LayerModalsHost
+          mapData={mapData}
+          editingLayer={editingLayer}
+          editingLayerId={editingLayerId}
+          setEditingLayerId={setEditingLayerId}
+          onUpdateLayerDisplay={handleUpdateLayerDisplay}
+          cloningLayerId={cloningLayerId}
+          setCloningLayerId={setCloningLayerId}
+          onLayerClone={handleLayerClone}
+        />
 
         {/* First-run onboarding survey — overlays the whole block; covers
             both code-block and full-pane paths (same component). */}

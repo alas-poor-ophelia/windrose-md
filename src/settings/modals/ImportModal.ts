@@ -34,7 +34,7 @@ class ImportModal extends Modal {
     this.importData = null;
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-import-modal');
@@ -219,7 +219,7 @@ class ImportModal extends Modal {
     };
   }
 
-  onClose(): void {
+  override onClose(): void {
     this.contentEl.empty();
   }
 }

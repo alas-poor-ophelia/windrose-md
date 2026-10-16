@@ -33,12 +33,6 @@ export interface ExternalBorder {
   neighborSegment: SegmentName;
 }
 
-/** Combined border calculation result */
-export interface SegmentBorders {
-  internal: InternalBorder[];
-  external: ExternalBorder[];
-}
-
 // ============================================================================
 // INTERNAL BORDER CALCULATION
 // ============================================================================
@@ -119,23 +113,9 @@ function getExternalBorders(
 // COMBINED BORDER CALCULATION
 // ============================================================================
 
-/**
- * Get all borders (internal + external) for a segment cell
- */
-function getSegmentBorders(
-  cell: SegmentGridCell,
-  cellMap: CellMap,
-  geometry: IGeometry
-): SegmentBorders {
-  return {
-    internal: getInternalBorders(cell),
-    external: getExternalBorders(cell, cellMap, geometry)
-  };
-}
-
 // ============================================================================
 // EXPORTS
 // ============================================================================
 
 export { // Main API
-  getSegmentBorders, getInternalBorders, getExternalBorders };
+  getInternalBorders, getExternalBorders };

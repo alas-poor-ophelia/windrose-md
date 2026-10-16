@@ -22,7 +22,8 @@ import { calculateEdgeAlignment, removeObjectFromHex } from '../../objects/objec
 import { getClickedObjectInCell, getObjectsInCell, assignSlot, classicHitRung } from '../../objects/hexSlotPositioner';
 import { pickLadderObject } from '../../objects/ladderHitTest';
 import { rungFogPredicate } from '../canvas/rungFog';
-import { getActiveLayer, isCellFogged } from '../../persistence/layerAccessor';
+import { getActiveLayer } from '../../persistence/layerAccessor';
+import { isCellFoggedIndexed } from '../../geometry/fog/foggedCellIndex';
 
 
 
@@ -55,11 +56,11 @@ function useObjectDragSelect(
   handleObjectDragging: (e: PointerEvent | MouseEvent | TouchEvent) => boolean;
   stopObjectDragging: () => boolean;
 } {
-  const { mapData, geometry, screenToWorld, getClientCoords, instanceId, ladder, getActiveLevel, screenToLevelCell, viewController } = useMapState();
+  const { mapData, geometry, screenToWorld, getClientCoords, instanceId, canvasRef, ladder, getActiveLevel, screenToLevelCell, viewController } = useMapState();
 
   const edgeSnapModeRef = useRef(edgeSnapMode);
   edgeSnapModeRef.current = edgeSnapMode;
-  const { getObjectAtPosition, updateObject, onObjectsChange } = useMapOperations();
+  const { getObjectAtPosition, updateObject, onObjectsChange, clearTransient } = useMapOperations();
   const { selectedItem, setSelectedItem, isDraggingSelection, setIsDraggingSelection, dragStart, setDragStart, isResizeMode, setIsResizeMode } = useMapSelection();
 
   const longPressTimerRef = useRef<number | null>(null);
@@ -141,7 +142,7 @@ function useObjectDragSelect(
       // exactly as the renderer hides it (rungFog).
       if (activeLayer.fogOfWar?.enabled === true) {
         const home = object.homeLevel ?? 0;
-        const fogged = ladder !== null && home > 0 ? rungFogPredicate(ladder, home, isCellFogged) : isCellFogged;
+        const fogged = ladder !== null && home > 0 ? rungFogPredicate(ladder, home, isCellFoggedIndexed) : isCellFoggedIndexed;
         const objOffset = geometry.toOffsetCoords(object.position.x, object.position.y);
         if (fogged(activeLayer, objOffset.col, objOffset.row)) {
           object = null;
@@ -489,7 +490,8 @@ function useObjectDragSelect(
               || initialObj.worldPosition?.x !== currentObj.worldPosition?.x
               || initialObj.worldPosition?.y !== currentObj.worldPosition?.y;
             if (moved) {
-              activeDocument.dispatchEvent(new CustomEvent('windrose:player-fog-clear', {
+              // Popout-safe: dispatch on the document that owns this canvas.
+              (canvasRef.current?.ownerDocument ?? activeDocument).dispatchEvent(new CustomEvent('windrose:player-fog-clear', {
                 detail: { objectId: fogObjectId, instanceId: instanceId ?? undefined }
               }));
             }
@@ -497,6 +499,9 @@ function useObjectDragSelect(
         }
 
         dragInitialStateRef.current = null;
+      } else {
+        // No commit: drop any live-move pin so the next unrelated commit cannot absorb it.
+        clearTransient?.();
       }
 
       // Refresh selectedItem.data so toolbar reflects current freeform state
@@ -510,7 +515,7 @@ function useObjectDragSelect(
       return true;
     }
     return false;
-  }, [isDraggingSelection, selectedItem, dragStart, setIsDraggingSelection, setDragStart, onObjectsChange, mapData, geometry, updateObject, setSelectedItem, instanceId]);
+  }, [isDraggingSelection, selectedItem, dragStart, setIsDraggingSelection, setDragStart, onObjectsChange, mapData, geometry, updateObject, setSelectedItem, instanceId, canvasRef, clearTransient]);
 
   return { handleObjectSelection, handleObjectDragging, stopObjectDragging };
 }

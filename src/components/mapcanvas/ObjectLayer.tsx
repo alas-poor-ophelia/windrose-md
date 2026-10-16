@@ -7,71 +7,43 @@
  * - Object resizing
  * - Object color and notes
  * - Hover tooltips
+ *
+ * Focused pieces live in hooks/objects: useObjectInteractions (pointer
+ * tools), useMultiSelectionActions (rotate/duplicate/delete all),
+ * useObjectLinking (object-to-object links), useObjectContextMenu (native
+ * right-click menu), useDragMeasurement (measure-movement readout).
  */
 
 import type { TargetedMouseEvent, VNode } from 'preact';
-import { Notice } from 'obsidian';
 import type { ToolId } from '#types/tools/tool.types';
 import type { ObjectTypeId, MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { HexColor } from '#types/core/common.types';
-import type { SelectedItem } from '#types/contexts/context.types';
 import type { CustomColor } from '#types/core/common.types';
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { useMapState, useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
-import { useLinkingMode } from '../../context/ObjectLinkingContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useObjectInteractions } from '../../hooks/objects/useObjectInteractions';
-import type { MenuItem } from 'obsidian';
-import { Menu } from 'obsidian';
 import { useObjectModals } from '../../hooks/objects/useObjectModals';
+import { useMultiSelectionActions } from '../../hooks/objects/useMultiSelectionActions';
+import { useObjectLinking } from '../../hooks/objects/useObjectLinking';
+import { useObjectContextMenu } from '../../hooks/objects/useObjectContextMenu';
+import type { ObjectMenuHandlers } from '../../hooks/objects/useObjectContextMenu';
+import { useDragMeasurement } from '../../hooks/objects/useDragMeasurement';
 import { SelectionActionsOverlay } from '../toolbars/SelectionActionsOverlay';
-import { buildObjectActions, buildMultiActions } from '../../hooks/interactions/useSelectionActions';
+import { buildObjectActions, buildMultiActions } from '../toolbars/selectionActionBuilders';
 import { calculateObjectScreenPosition } from '../../objects/screenPositionUtils';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { convertObjectToFreeform, snapObjectToGrid } from '../../objects/objectOperations';
 import { toggledDepthMode } from '../../geometry/renderers/elementBands';
-import { pickLadderObject } from '../../objects/ladderHitTest';
-import { classicHitRung, homeLevelOf } from '../../objects/hexSlotPositioner';
 import { isLadderView } from '../../core/lodFlags';
 import { copyDeepLinkToClipboard } from '../../persistence/deepLinkHandler';
 import { LinkingModeBanner } from '../overlays/LinkingModeBanner';
 import { CardinalIndicators } from './CardinalIndicators';
 import { MeasurementOverlay } from '../overlays/MeasurementOverlay';
-import { formatDistance, getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
-import { getSettings } from '../../core/settingsAccessor';
-import { rotateByIncrement } from '../../drawing/rotationOperations';
-import { Z_INDEX } from '../../core/dmtConstants';
-import type { SelectionContextMenuDetail } from '../../core/windroseEvents';
-import { isForeignInstanceEvent } from '../../core/windroseEvents';
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { ObjectHoverTooltip } from './ObjectHoverTooltip';
 
 /** Props for ObjectLayer component */
 export interface ObjectLayerProps {
@@ -100,22 +72,16 @@ const ObjectLayer = ({
   onDeleteCustomColor,
   freeformPlacementMode = false
 }: ObjectLayerProps): VNode | null => {
-  const { canvasRef, containerRef, mapData, mapId, notePath, geometry, screenToGrid, screenToWorld, distanceOverrides, subHexPath, instanceId, ladder, getActiveLevel, viewController } = useMapState();
-  const { getObjectAtPosition, updateObject, onObjectsChange: contextOnObjectsChange, onTextLabelsChange } = useMapOperations();
+  const { canvasRef, containerRef, mapData, mapId, notePath, geometry, distanceOverrides, subHexPath, ladder, getActiveLevel } = useMapState();
+  const { updateObject, onObjectsChange: contextOnObjectsChange } = useMapOperations();
   const {
     selectedItem, setSelectedItem,
-    selectedItems, hasMultiSelection, selectionCount, selectMultiple, clearSelection,
+    selectedItems, hasMultiSelection, selectionCount,
     isDraggingSelection,
     isResizeMode, setIsResizeMode,
-    hoveredObject,
-    mousePosition,
     showCoordinates,
-    layerVisibility,
-    updateSelectedItemsData
+    layerVisibility
   } = useMapSelection();
-
-  const { isLinkingMode, linkingFrom, startLinking, cancelLinking } = useLinkingMode();
-
 
   const applyObjectUpdates = useCallback((updates: Record<string, unknown>) => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
@@ -152,182 +118,23 @@ const ObjectLayer = ({
     applyObjectUpdates({ lightColor: color });
   }, [applyObjectUpdates]);
 
+  const handleScaleChange = useCallback((newScale: number) => {
+    applyObjectUpdates({ scale: newScale });
+  }, [applyObjectUpdates]);
+
   const [showLightColorPicker, setShowLightColorPicker] = useState(false);
   const lightColorBtnRef = useRef<HTMLButtonElement>(null);
+  const [showObjectColorPicker, setShowObjectColorPicker] = useState(false);
 
-  const [measureMovement, setMeasureMovement] = useState(false);
-  const measureOriginRef = useRef<{ x: number; y: number } | null>(null);
-
-  useEffect(() => {
-    setMeasureMovement(false);
-    measureOriginRef.current = null;
-  }, [selectedItem?.id]);
-
-  if (isDraggingSelection && measureMovement && selectedItem?.type === 'object' && selectedItem.data && !measureOriginRef.current) {
-    measureOriginRef.current = { x: selectedItem.data.position.x, y: selectedItem.data.position.y };
-  }
-  if (!isDraggingSelection) {
-    measureOriginRef.current = null;
-  }
+  const {
+    measureMovement, toggleMeasureMovement, measureOrigin, measureTarget, formattedMeasureDistance
+  } = useDragMeasurement({ selectedItem, isDraggingSelection, mapData, geometry, distanceOverrides });
 
   // Keep a ref in sync with the freeformPlacementMode prop for the interactions hook
   const freeformPlacementModeRef = useRef(freeformPlacementMode);
   freeformPlacementModeRef.current = freeformPlacementMode;
 
-  // Helper for bidirectional link updates (handles same-layer vs cross-layer)
-  const applyLinkUpdate = useCallback((
-    updates: Array<{ layerId: string; objectId: string; transform: (obj: MapObject) => MapObject }>,
-    crossLayerEvent: { name: string; detail: Record<string, unknown> }
-  ): void => {
-    if (!mapData) return;
-
-    const allOnActiveLayer = updates.every(u => u.layerId === mapData.activeLayerId);
-
-    if (allOnActiveLayer) {
-      const activeLayer = getActiveLayer(mapData);
-      const updatedObjects = activeLayer.objects?.map((obj: MapObject) => {
-        const update = updates.find(u => u.objectId === obj.id);
-        return update ? update.transform(obj) : obj;
-      });
-      if (updatedObjects != null) {
-        onObjectsChange(updatedObjects);
-      }
-    } else {
-      // Cross-layer link updates round-trip through a window event handled by
-      // this mount's useCustomEventHandlers — stamp the sender so co-mounted
-      // maps don't apply it too.
-      window.dispatchEvent(new CustomEvent(crossLayerEvent.name, {
-        detail: { ...crossLayerEvent.detail, instanceId: instanceId ?? undefined }
-      }));
-    }
-  }, [mapData, onObjectsChange, instanceId]);
-
-  const [showObjectColorPicker, setShowObjectColorPicker] = useState(false);
-
-  const handleScaleChange = useCallback((newScale: number) => {
-    if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
-
-    const updatedObjects = updateObject(getActiveLayer(mapData).objects, selectedItem.id, { scale: newScale });
-    contextOnObjectsChange(updatedObjects);
-
-    const updatedObject = updatedObjects.find((obj: MapObject) => obj.id === selectedItem.id);
-    if (updatedObject) {
-      setSelectedItem({ ...selectedItem, data: updatedObject });
-    }
-  }, [selectedItem, mapData, updateObject, contextOnObjectsChange, setSelectedItem]);
-
-  const handleRotateAll = useCallback(() => {
-    if (!hasMultiSelection || !mapData) return;
-
-    const activeLayer = getActiveLayer(mapData);
-    const updatedObjects = [...(activeLayer.objects ?? [])];
-    const updatedTextLabels = [...(activeLayer.textLabels ?? [])];
-
-    for (const item of selectedItems) {
-      if (item.type === 'object') {
-        const idx = updatedObjects.findIndex((o: MapObject) => o.id === item.id);
-        if (idx !== -1) {
-          const obj = updatedObjects[idx];
-          const currentRotation = obj.rotation ?? 0;
-          const nextRotation = rotateByIncrement(currentRotation);
-          updatedObjects[idx] = { ...obj, rotation: nextRotation };
-        }
-      } else if (item.type === 'text') {
-        const idx = updatedTextLabels.findIndex((l: { id: string }) => l.id === item.id);
-        if (idx !== -1) {
-          const label = updatedTextLabels[idx];
-          const currentRotation = label.rotation ?? 0;
-          const nextRotation = rotateByIncrement(currentRotation);
-          updatedTextLabels[idx] = { ...label, rotation: nextRotation };
-        }
-      }
-    }
-
-    onObjectsChange(updatedObjects, true);
-    onTextLabelsChange(updatedTextLabels, false);
-
-    const updates = selectedItems.map((item: SelectedItem) => {
-      if (item.type === 'object') {
-        const obj = updatedObjects.find((o: MapObject) => o.id === item.id);
-        return obj ? { id: item.id, rotation: obj.rotation } : null;
-      } else {
-        const label = updatedTextLabels.find((l: { id: string; rotation?: number }) => l.id === item.id);
-        return label ? { id: item.id, rotation: label.rotation } : null;
-      }
-    }).filter((x): x is { id: string; rotation: number | undefined } => x !== null);
-
-    updateSelectedItemsData(updates);
-  }, [hasMultiSelection, mapData, selectedItems, onObjectsChange, onTextLabelsChange, updateSelectedItemsData]);
-
-  const handleDuplicateAll = useCallback(() => {
-    if (!hasMultiSelection || !mapData) return;
-
-    const activeLayer = getActiveLayer(mapData);
-    const updatedObjects = [...(activeLayer.objects ?? [])];
-    const updatedTextLabels = [...(activeLayer.textLabels ?? [])];
-    const newSelectedItems: SelectedItem[] = [];
-
-    const offsetX = 1;
-    const offsetY = 0;
-
-    for (const item of selectedItems) {
-      if (item.type === 'object') {
-        const sourceObj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
-        if (!sourceObj) continue;
-
-        const newId = `obj-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-        const newObj = {
-          ...sourceObj,
-          id: newId,
-          position: {
-            x: sourceObj.position.x + offsetX,
-            y: sourceObj.position.y + offsetY
-          }
-        };
-        updatedObjects.push(newObj);
-        newSelectedItems.push({ type: 'object', id: newId, data: newObj });
-      } else if (item.type === 'text') {
-        const sourceLabel = activeLayer.textLabels?.find((l: { id: string }) => l.id === item.id);
-        if (!sourceLabel) continue;
-
-        const newId = `text-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-        const offsetWorld = (mapData.gridSize ?? 32) * 1;
-        const newLabel = {
-          ...sourceLabel,
-          id: newId,
-          position: {
-            x: sourceLabel.position.x + offsetWorld,
-            y: sourceLabel.position.y
-          }
-        };
-        updatedTextLabels.push(newLabel);
-        newSelectedItems.push({ type: 'text', id: newId, data: newLabel });
-      }
-    }
-
-    onObjectsChange(updatedObjects, true);
-    onTextLabelsChange(updatedTextLabels, false);
-
-    if (newSelectedItems.length > 0) {
-      selectMultiple(newSelectedItems);
-    }
-  }, [hasMultiSelection, mapData, selectedItems, onObjectsChange, onTextLabelsChange, selectMultiple]);
-
-  const handleDeleteAll = useCallback(() => {
-    if (!hasMultiSelection || !mapData) return;
-
-    const activeLayer = getActiveLayer(mapData);
-    const selectedObjectIds = new Set(selectedItems.filter((i: SelectedItem) => i.type === 'object').map((i: SelectedItem) => i.id));
-    const selectedTextIds = new Set(selectedItems.filter((i: SelectedItem) => i.type === 'text').map((i: SelectedItem) => i.id));
-
-    const updatedObjects = (activeLayer.objects ?? []).filter((obj: MapObject) => !selectedObjectIds.has(obj.id));
-    const updatedTextLabels = (activeLayer.textLabels ?? []).filter((label: { id: string }) => !selectedTextIds.has(label.id));
-
-    onObjectsChange(updatedObjects, true);
-    onTextLabelsChange(updatedTextLabels, false);
-
-    clearSelection();
-  }, [hasMultiSelection, mapData, selectedItems, onObjectsChange, onTextLabelsChange, clearSelection]);
+  const { handleRotateAll, handleDuplicateAll, handleDeleteAll } = useMultiSelectionActions(onObjectsChange);
 
   const handleCopyLink = useCallback(() => {
     if (!selectedItem || !mapData || mapId == null || mapId === '' || notePath == null || notePath === '') return;
@@ -362,7 +169,6 @@ const ObjectLayer = ({
 
   const {
     isResizing,
-    resizeCorner,
     objectColorBtnRef,
     pendingObjectCustomColorRef,
     edgeSnapMode,
@@ -390,94 +196,10 @@ const ObjectLayer = ({
     handleEditNoteLink,
   } = useObjectModals({ onObjectsChange, handleNoteSubmit: (content: string, objectId: string | null) => { if (objectId != null && objectId !== '') handleNoteSubmit(content, objectId); } });
 
-  // Wrap handleObjectSelection to intercept clicks when in linking mode
-  const wrappedHandleObjectSelection = useCallback((
-    clientX: number,
-    clientY: number,
-    gridX: number,
-    gridY: number,
-    isTouchActive?: boolean
-  ): boolean => {
-    if (isLinkingMode && linkingFrom && mapData) {
-      // In linking mode - try to find target object. Under the ladder the
-      // target is whatever is DRAWN under the pointer (home rung, held size,
-      // depth-mode visibility); the level-0 cell is only right on classic maps.
-      const activeLayer = getActiveLayer(mapData);
-      let targetObject: MapObject | undefined;
-      if (ladder !== null) {
-        const world = screenToWorld(clientX, clientY);
-        const zoom = viewController?.getLive().zoom ?? mapData.viewState?.zoom ?? 1;
-        targetObject = world
-          ? pickLadderObject(activeLayer.objects ?? [], world.worldX, world.worldY, {
-            ladder, level: getActiveLevel(), zoom, orientation: mapData.orientation ?? 'flat'
-          }) ?? undefined
-          : undefined;
-      } else {
-        // A `lod` map off the ladder view draws rung 0 only: deep objects are not link targets.
-        const rung = classicHitRung(mapData);
-        targetObject = activeLayer.objects?.find((obj: MapObject) => {
-          return obj.position.x === gridX && obj.position.y === gridY && (rung === undefined || homeLevelOf(obj) === rung);
-        });
-      }
-
-      if (targetObject) {
-        // Prevent self-linking
-        if (targetObject.id === linkingFrom.objectId && mapData.activeLayerId === linkingFrom.layerId) {
-          new Notice('Cannot link an object to itself');
-          return true;
-        }
-
-        // Complete the bidirectional link
-        const sourceToTargetLink = {
-          layerId: mapData.activeLayerId,
-          objectId: targetObject.id,
-          position: targetObject.position,
-          objectType: targetObject.type
-        };
-
-        const targetToSourceLink = {
-          layerId: linkingFrom.layerId,
-          objectId: linkingFrom.objectId,
-          position: linkingFrom.position,
-          objectType: linkingFrom.objectType
-        };
-
-        applyLinkUpdate(
-          [
-            { layerId: linkingFrom.layerId, objectId: linkingFrom.objectId, transform: (obj) => ({ ...obj, linkedObject: sourceToTargetLink }) },
-            { layerId: mapData.activeLayerId, objectId: targetObject.id, transform: (obj) => ({ ...obj, linkedObject: targetToSourceLink }) }
-          ],
-          {
-            name: 'windrose-create-object-link',
-            detail: {
-              sourceLayerId: linkingFrom.layerId,
-              sourceObjectId: linkingFrom.objectId,
-              sourceLink: sourceToTargetLink,
-              targetLayerId: mapData.activeLayerId,
-              targetObjectId: targetObject.id,
-              targetLink: targetToSourceLink
-            }
-          }
-        );
-
-        // Clear linking mode
-        cancelLinking();
-        new Notice('Objects linked');
-
-        // Select the target object with updated data
-        setSelectedItem({
-          type: 'object',
-          id: targetObject.id,
-          data: { ...targetObject, linkedObject: targetToSourceLink }
-        });
-
-        return true;
-      }
-    }
-
-    // Not in linking mode or no target found - use normal selection
-    return handleObjectSelection(clientX, clientY, gridX, gridY, isTouchActive);
-  }, [isLinkingMode, linkingFrom, mapData, handleObjectSelection, applyLinkUpdate, cancelLinking, setSelectedItem, ladder, screenToWorld, getActiveLevel, viewController]);
+  const {
+    isLinkingMode, linkingFrom, cancelLinking,
+    wrappedHandleObjectSelection, handleLinkObject, handleFollowLink, handleRemoveLink
+  } = useObjectLinking({ onObjectsChange, handleObjectSelection, selectedItem, setSelectedItem });
 
   useLayerHandlers('object', {
     handleObjectPlacement,
@@ -485,8 +207,7 @@ const ObjectLayer = ({
     handleObjectDragging, handleObjectResizing,
     stopObjectDragging, stopObjectResizing,
     handleHoverUpdate, handleObjectWheel, handleObjectKeyDown,
-    isResizing, resizeCorner,
-    edgeSnapMode, setEdgeSnapMode
+    isResizing, edgeSnapMode, setEdgeSnapMode
   });
 
   const handleResizeButtonClick = (e: TargetedMouseEvent<HTMLElement>): void => {
@@ -526,14 +247,6 @@ const ObjectLayer = ({
     }
   };
 
-  // Ladder depth mode (kgc.13): pop at the next rung, or hold the on-screen size.
-  const handleDepthModeToggle = (): void => {
-    if (selectedItem?.type !== 'object' || !mapData) return;
-    const obj = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === selectedItem.id);
-    if (!obj) return;
-    applyObjectUpdates({ depthMode: toggledDepthMode(obj) });
-  };
-
   const handleObjectColorButtonClick = (e: TargetedMouseEvent<HTMLElement>): void => {
     if (selectedItem?.type === 'object') {
       e.preventDefault();
@@ -549,104 +262,6 @@ const ObjectLayer = ({
   const handleObjectColorResetWrapper = (): void => {
     handleObjectColorReset(setShowObjectColorPicker);
   };
-
-  const handleLinkObject = useCallback(() => {
-    if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
-
-    const activeLayer = getActiveLayer(mapData);
-    const obj = activeLayer.objects?.find((o: MapObject) => o.id === selectedItem.id);
-    if (!obj) return;
-
-    startLinking({
-      layerId: mapData.activeLayerId,
-      objectId: obj.id,
-      position: obj.position,
-      objectType: obj.type
-    });
-  }, [selectedItem, mapData, startLinking]);
-
-  const handleMeasureToggle = useCallback(() => {
-    setMeasureMovement(prev => !prev);
-  }, []);
-
-  const handleFollowLink = useCallback(() => {
-    if (!selectedItem || selectedItem.type !== 'object' || !mapData || mapId == null || mapId === '' || notePath == null || notePath === '') return;
-
-    const obj = selectedItem.data;
-    if (obj?.linkedObject == null) return;
-
-    const { layerId, objectId } = obj.linkedObject;
-
-    const targetLayer = mapData.layers.find(l => l.id === layerId);
-    if (!targetLayer) {
-      new Notice('Linked layer no longer exists');
-      return;
-    }
-
-    const targetObject = targetLayer.objects?.find((o: MapObject) => o.id === objectId);
-    if (!targetObject) {
-      new Notice('Linked object no longer exists');
-      return;
-    }
-
-    // Navigate to the target (DungeonMapTracker handles layer switching + panning)
-    window.dispatchEvent(new CustomEvent('windrose-navigate-to', {
-      detail: {
-        notePath,
-        mapId,
-        x: targetObject.position.x,
-        y: targetObject.position.y,
-        zoom: 1.175,
-        layerId,
-        timestamp: Date.now()
-      }
-    }));
-
-    // Select the target object immediately (we already have its data)
-    setSelectedItem({
-      type: 'object',
-      id: targetObject.id,
-      data: targetObject
-    });
-  }, [selectedItem, mapData, mapId, notePath, setSelectedItem]);
-
-  const handleRemoveLink = useCallback(() => {
-    if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;
-
-    const obj = selectedItem.data;
-    if (!obj?.linkedObject) return;
-
-    const { layerId: targetLayerId, objectId: targetObjectId } = obj.linkedObject;
-    const sourceLayerId = mapData.activeLayerId;
-    const sourceObjectId = selectedItem.id;
-
-    const removeLinkedObject = (o: MapObject): MapObject => {
-      const { linkedObject, ...rest } = o;
-      void linkedObject; // dropped from the copy
-      return rest;
-    };
-
-    applyLinkUpdate(
-      [
-        { layerId: sourceLayerId, objectId: sourceObjectId, transform: removeLinkedObject },
-        { layerId: targetLayerId, objectId: targetObjectId, transform: removeLinkedObject }
-      ],
-      {
-        name: 'windrose-remove-object-link',
-        detail: { sourceLayerId, sourceObjectId, targetLayerId, targetObjectId }
-      }
-    );
-
-    const { linkedObject, ...restData } = obj;
-    void linkedObject; // dropped from the copy
-    setSelectedItem({
-      type: 'object',
-      id: selectedItem.id,
-      data: restData
-    });
-
-    new Notice('Link removed');
-  }, [selectedItem, mapData, applyLinkUpdate, setSelectedItem]);
 
   useEffect(() => {
     if (!showObjectColorPicker) return undefined;
@@ -667,80 +282,54 @@ const ObjectLayer = ({
       }
     };
 
-    activeDocument.addEventListener('mousedown', handleClickOutside);
-    activeDocument.addEventListener('touchstart', handleClickOutside, { passive: true });
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('mousedown', handleClickOutside);
+    doc.addEventListener('touchstart', handleClickOutside, { passive: true });
 
     return () => {
-      activeDocument.removeEventListener('mousedown', handleClickOutside);
-      activeDocument.removeEventListener('touchstart', handleClickOutside);
+      doc.removeEventListener('mousedown', handleClickOutside);
+      doc.removeEventListener('touchstart', handleClickOutside);
     };
-  }, [showObjectColorPicker, handleObjectColorSelect, onAddCustomColor, pendingObjectCustomColorRef]);
+  }, [showObjectColorPicker, handleObjectColorSelect, onAddCustomColor, pendingObjectCustomColorRef, canvasRef]);
 
-  // Context menu: hit-test for object, select it, show native menu
-  useEffect(() => {
-    if (!mapData || !geometry) return undefined;
+  // Ladder depth mode (kgc.13): pop at the next rung, or hold the on-screen size.
+  const handleDepthModeToggle = (): void => {
+    if (selectedItem?.type !== 'object' || !mapData) return;
+    const obj = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === selectedItem.id);
+    if (!obj) return;
+    applyObjectUpdates({ depthMode: toggledDepthMode(obj) });
+  };
 
-    const handler = (e: CustomEvent<SelectionContextMenuDetail>): void => {
-      const detail = e.detail;
-      // Foreign mount's event: don't act on it — and don't claim it either.
-      if (isForeignInstanceEvent(detail, instanceId)) return;
-      if (detail.handled === true) return;
+  // Single-object action handlers: shared by the selection toolbar and the
+  // right-click menu (which reads them at click time).
+  const objectActionHandlers: ObjectMenuHandlers = {
+    onRotate: handleObjectRotation,
+    onDuplicate: handleObjectDuplicate,
+    onFreeformToggle: handleFreeformToggle,
+    onLabel: handleNoteButtonClick as (e?: Event) => void,
+    onLinkNote: () => { if (selectedItem != null) handleEditNoteLink(selectedItem.id); },
+    onLinkObject: handleLinkObject,
+    onFollowLink: handleFollowLink,
+    onRemoveLink: handleRemoveLink,
+    onCopyLink: handleCopyLink,
+    onColorClick: handleObjectColorButtonClick as (e?: Event) => void,
+    onResize: handleResizeButtonClick as (e?: Event) => void,
+    onDelete: handleObjectDeletion,
+    onPlayerToggle: handlePlayerToggle,
+    onMeasureToggle: toggleMeasureMovement,
+    onDepthModeToggle: handleDepthModeToggle
+  };
 
-      const activeLayer = getActiveLayer(mapData);
-      let obj: MapObject | null = null;
-      if (ladder !== null) {
-        const world = screenToWorld(detail.clientX, detail.clientY);
-        if (!world) return;
-        const zoom = viewController?.getLive().zoom ?? mapData.viewState?.zoom ?? 1;
-        obj = pickLadderObject(activeLayer.objects ?? [], world.worldX, world.worldY, {
-          ladder, level: getActiveLevel(), zoom, orientation: mapData.orientation ?? 'flat'
-        });
-      } else {
-        const coords = screenToGrid(detail.clientX, detail.clientY);
-        if (!coords) return;
-        obj = getObjectAtPosition(activeLayer.objects ?? [], coords.x, coords.y, classicHitRung(mapData));
-      }
-      if (!obj) return;
-
-      detail.handled = true;
-
-      const item = { type: 'object' as const, id: obj.id, data: obj };
-
-      const actions = buildObjectActions(item, {
-        onRotate: handleObjectRotation,
-        onDuplicate: handleObjectDuplicate,
-        onFreeformToggle: handleFreeformToggle,
-        onLabel: handleNoteButtonClick as (e?: Event) => void,
-        onLinkNote: () => handleEditNoteLink(obj.id),
-        onLinkObject: handleLinkObject,
-        onFollowLink: handleFollowLink,
-        onRemoveLink: handleRemoveLink,
-        onCopyLink: handleCopyLink,
-        onColorClick: handleObjectColorButtonClick as (e?: Event) => void,
-        onResize: handleResizeButtonClick as (e?: Event) => void,
-        onDelete: handleObjectDeletion,
-        onMeasureToggle: handleMeasureToggle,
-        onDepthModeToggle: handleDepthModeToggle
-      }, mapData, { isResizeMode, isMeasuring: measureMovement, isLadder: isLadderView(mapData) });
-
-      const menu = new Menu();
-      let lastGroup: string | null = null;
-      for (const action of actions.filter(a => a.visible && a.disabled !== true)) {
-        if (lastGroup != null && lastGroup !== '' && action.group !== lastGroup) menu.addSeparator();
-        lastGroup = action.group;
-        menu.addItem((mi: MenuItem) => {
-          mi.setTitle(action.label);
-          mi.setIcon(action.icon);
-          if (action.id === 'delete') mi.setWarning(true);
-          mi.onClick(() => action.invoke());
-        });
-      }
-      menu.showAtPosition({ x: detail.screenX, y: detail.screenY });
-    };
-
-    activeDocument.addEventListener('windrose:selection-context-menu', handler);
-    return () => activeDocument.removeEventListener('windrose:selection-context-menu', handler);
-  }, [mapData, geometry, screenToGrid, screenToWorld, isResizeMode, instanceId, ladder, getActiveLevel, viewController]);
+  useObjectContextMenu({
+    handlers: objectActionHandlers,
+    idActions: {
+      rotate: handleObjectRotation,
+      duplicate: handleObjectDuplicate,
+      delete: handleObjectDeletion,
+      editNoteLink: handleEditNoteLink
+    },
+    measureMovement
+  });
 
   if (showCoordinates || !layerVisibility.objects) {
     return null;
@@ -787,23 +376,6 @@ const ObjectLayer = ({
     ? getCardinalIndicatorPositions(selectedObject)
     : null;
 
-  const measureTarget = (() => {
-    if (!measureMovement || !isDraggingSelection || !measureOriginRef.current || selectedItem?.id == null || selectedItem.id === '' || !mapData) return null;
-    const obj = getActiveLayer(mapData).objects?.find((o: MapObject) => o.id === selectedItem.id);
-    return obj ? obj.position : null;
-  })();
-
-  const formattedMeasureDistance = (() => {
-    if (!measureOriginRef.current || !measureTarget || !geometry) return null;
-    const origin = measureOriginRef.current;
-    if (origin.x === measureTarget.x && origin.y === measureTarget.y) return null;
-    const globalSettings = getSettings() ?? {};
-    const overrides = distanceOverrides ?? null;
-    const settings = getEffectiveDistanceSettings(mapData?.mapType ?? 'grid', globalSettings, overrides);
-    const dist = geometry.getCellDistance(origin.x, origin.y, measureTarget.x, measureTarget.y, { diagonalRule: settings.gridDiagonalRule });
-    return formatDistance(dist, settings.distancePerCell, settings.distanceUnit, settings.displayFormat);
-  })();
-
   return (
     <>
       {/* Linking Mode Banner */}
@@ -821,9 +393,9 @@ const ObjectLayer = ({
         isFreeform={selectedObject?.freeform === true}
       />
 
-      {measureOriginRef.current && measureTarget && formattedMeasureDistance != null && formattedMeasureDistance !== '' && (
+      {measureOrigin && measureTarget && formattedMeasureDistance != null && formattedMeasureDistance !== '' && (
         <MeasurementOverlay
-          waypoints={[measureOriginRef.current]}
+          waypoints={[measureOrigin]}
           previewTarget={measureTarget}
           formattedTotal={formattedMeasureDistance}
           formattedSegments={[]}
@@ -856,24 +428,10 @@ const ObjectLayer = ({
           selectedItems={[selectedItem]}
           actions={[...buildObjectActions(
             selectedItem,
-            {
-            onRotate: handleObjectRotation,
-            onDuplicate: handleObjectDuplicate,
-            onFreeformToggle: handleFreeformToggle,
-            onLabel: handleNoteButtonClick as (e?: Event) => void,
-            onLinkNote: () => handleEditNoteLink(selectedItem?.id),
-            onLinkObject: handleLinkObject,
-            onFollowLink: handleFollowLink,
-            onRemoveLink: handleRemoveLink,
-            onCopyLink: handleCopyLink,
-            onColorClick: handleObjectColorButtonClick as (e?: Event) => void,
-            onResize: handleResizeButtonClick as (e?: Event) => void,
-            onDelete: handleObjectDeletion,
-            onPlayerToggle: handlePlayerToggle,
-            onMeasureToggle: handleMeasureToggle,
-            onDepthModeToggle: handleDepthModeToggle
-          }, mapData, { isResizeMode, isPlayer: selectedItem.data?.isPlayer === true, isMeasuring: measureMovement, isLadder: isLadderView(mapData) })]}
-
+            objectActionHandlers,
+            mapData,
+            { isResizeMode, isPlayer: selectedItem.data?.isPlayer === true, isMeasuring: measureMovement, isLadder: isLadderView(mapData) }
+          )]}
           mapData={mapData}
           canvasRef={canvasRef}
           containerRef={containerRef}
@@ -906,24 +464,7 @@ const ObjectLayer = ({
         />
       )}
 
-
-      {hoveredObject && mousePosition && hoveredObject.type !== 'note_pin' && (
-        <div
-          className="windrose-object-tooltip"
-          style={{
-            position: 'absolute',
-            left: mousePosition.x + 20,
-            top: mousePosition.y + 25,
-            pointerEvents: 'none',
-            zIndex: Z_INDEX.INTERACTIVE_LAYER
-          }}
-        >
-          {hoveredObject.customTooltip != null && hoveredObject.customTooltip !== ''
-            ? `${hoveredObject.label} - ${hoveredObject.customTooltip}`
-            : hoveredObject.label
-          }
-        </div>
-      )}
+      <ObjectHoverTooltip />
     </>
   );
 };

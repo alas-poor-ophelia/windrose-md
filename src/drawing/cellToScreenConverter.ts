@@ -6,6 +6,7 @@
  */
 
 import type { Point, IGeometry } from '#types/core/geometry.types';
+import { worldToCanvasPx } from '../geometry/core/viewportMath';
 
 
 
@@ -77,35 +78,12 @@ function cellToScreen(
     }
   }
 
-  let offsetX: number, offsetY: number;
-  if (geometry.type === 'grid') {
-    const scaledCellSize = geometry.getScaledCellSize(zoom);
-    offsetX = canvasWidth / 2 - center.x * scaledCellSize;
-    offsetY = canvasHeight / 2 - center.y * scaledCellSize;
-  } else {
-    offsetX = canvasWidth / 2 - center.x * zoom;
-    offsetY = canvasHeight / 2 - center.y * zoom;
-  }
-
-  let screenX = offsetX + worldX * zoom;
-  let screenY = offsetY + worldY * zoom;
-
-  if (northDirection !== 0) {
-    const centerX = canvasWidth / 2;
-    const centerY = canvasHeight / 2;
-
-    screenX -= centerX;
-    screenY -= centerY;
-
-    const angleRad = (northDirection * Math.PI) / 180;
-    const rotatedX = screenX * Math.cos(angleRad) - screenY * Math.sin(angleRad);
-    const rotatedY = screenX * Math.sin(angleRad) + screenY * Math.cos(angleRad);
-
-    screenX = rotatedX + centerX;
-    screenY = rotatedY + centerY;
-  }
-
-  return { x: screenX, y: screenY };
+  return worldToCanvasPx(
+    geometry, worldX, worldY,
+    { width: canvasWidth, height: canvasHeight },
+    { zoom, center },
+    northDirection
+  );
 }
 
 export { cellToScreen };

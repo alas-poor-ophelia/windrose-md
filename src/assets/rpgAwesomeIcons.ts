@@ -568,11 +568,4 @@ function searchIcons(query: string): IconWithClass[] {
     .map(([iconClass, data]) => ({ iconClass, ...data }));
 }
 
-/**
- * Get all icon class names
- */
-function getAllIconClasses(): string[] {
-  return Object.keys(RA_ICONS);
-}
-
-export { RA_CATEGORIES, RA_ICONS, getIconChar, getIconInfo, getIconsByCategory, searchIcons, getAllIconClasses };
+export { RA_CATEGORIES, RA_ICONS, getIconChar, getIconInfo, getIconsByCategory, searchIcons };

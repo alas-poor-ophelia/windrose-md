@@ -12,10 +12,11 @@ import type { Region, StoredViewState } from '#types/core/map.types';
 
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { useApp } from '../../context/AppContext';
-import { useMapState } from '../../context/MapContext';
+import { useMapState, useMapOperations } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useLiveOverlayRedraw } from '../../hooks/canvas/useLiveOverlayRedraw';
-import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
+import { useOverlayCanvas } from '../../hooks/canvas/useOverlayCanvas';
+import { applyNorthRotation, calculateViewportOffset } from '../../geometry/core/viewportMath';
 import { useRegionTools } from '../../hooks/interactions/useRegionTools';
 import type { MenuItem } from 'obsidian';
 import { Menu } from 'obsidian';
@@ -38,7 +39,7 @@ export interface RegionLayerProps {
   currentTool: ToolId;
   selectedColor: string;
   selectedOpacity: number;
-  onRegionsChange: (regions: Region[]) => void;
+  onRegionsChange: (regions: Region[], suppressHistory?: boolean) => void;
 }
 
 const RegionLayer = ({
@@ -49,6 +50,7 @@ const RegionLayer = ({
 }: RegionLayerProps): VNode | null => {
   const app = useApp();
   const { canvasRef, mapData, geometry, screenToWorld, screenToGrid, instanceId, viewController } = useMapState();
+  const { clearTransient } = useMapOperations();
 
   const isRegionTool = currentTool === 'regionPaint' || currentTool === 'regionBoundary';
 
@@ -59,7 +61,6 @@ const RegionLayer = ({
     editingRegion,
     handlePointerDown,
     handlePointerMove,
-    handlePointerUp,
     handleDoubleClick,
     handleContextMenu,
     confirmRegion,
@@ -78,13 +79,16 @@ const RegionLayer = ({
     geometry,
     screenToWorld,
     screenToGrid,
-    onRegionsChange
+    onRegionsChange,
+    clearTransient
   });
 
   // Context menu handler is always present; tool handlers resolve to undefined when inactive
   useLayerHandlers('region', {
     handleContextMenu,
-    ...(isRegionTool ? { handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick } : {})
+    handlePointerDown: isRegionTool ? handlePointerDown : undefined,
+    handlePointerMove: isRegionTool ? handlePointerMove : undefined,
+    handleDoubleClick: isRegionTool ? handleDoubleClick : undefined
   });
 
   // Listen for edit-region events from sidebar panel
@@ -96,9 +100,10 @@ const RegionLayer = ({
         startEditingRegion(regionId);
       }
     };
-    activeDocument.addEventListener('windrose:edit-region', handler);
-    return () => activeDocument.removeEventListener('windrose:edit-region', handler);
-  }, [startEditingRegion, instanceId]);
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('windrose:edit-region', handler);
+    return () => doc.removeEventListener('windrose:edit-region', handler);
+  }, [startEditingRegion, instanceId, canvasRef]);
 
   // Name input state
   const [showNameInput, setShowNameInput] = useState(false);
@@ -118,9 +123,10 @@ const RegionLayer = ({
         setRegionName('');
       }
     };
-    activeDocument.addEventListener('windrose:before-undo', handler);
-    return () => activeDocument.removeEventListener('windrose:before-undo', handler);
-  }, [pendingHexes.length, editingRegionId, showNameInput, cancelRegion, instanceId]);
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('windrose:before-undo', handler);
+    return () => doc.removeEventListener('windrose:before-undo', handler);
+  }, [pendingHexes.length, editingRegionId, showNameInput, cancelRegion, instanceId, canvasRef]);
 
   const handleCreateClick = useCallback(() => {
     setShowNameInput(true);
@@ -159,9 +165,10 @@ const RegionLayer = ({
   // hue/saturation square — hundreds per second on a high-poll mouse. Routing
   // each one straight to updateRegion() replaced the entire mapData object
   // (broadcast to every layer) AND pushed a full active-layer snapshot onto
-  // the undo stack per move, and addToHistory compares snapshots with a pair
-  // of JSON.stringify calls. One drag therefore cost hundreds of whole-map
-  // serialisations and buried the user's real undo history under itself.
+  // the undo stack per move (addToHistory's dedupe, now the reference-based
+  // isSameHistoryState, cannot collapse a changing colour). One drag therefore
+  // cost hundreds of whole-map rebroadcasts and buried the user's real undo
+  // history under itself.
   //
   // The drag now repaints the overlay from a preview colour held in a REF,
   // coalesced to one repaint per animation frame (the useLiveOverlayRedraw
@@ -231,32 +238,11 @@ const RegionLayer = ({
   }, [editingRegionId, cancelPreviewFrame]);
 
   // ── Overlay canvas (same as FreehandLayer pattern) ─────────────────
-  const overlayRef = useRef<HTMLCanvasElement | null>(null);
-
-  useEffect(() => {
-    const mainCanvas = canvasRef.current;
-    if (!mainCanvas || !mainCanvas.parentElement || !isRegionTool) {
-      if (overlayRef.current && overlayRef.current.parentElement) {
-        overlayRef.current.parentElement.removeChild(overlayRef.current);
-        overlayRef.current = null;
-      }
-      return undefined;
-    }
-
-    if (!overlayRef.current) {
-      const overlay = activeWindow.createEl('canvas');
-      overlay.classList.add('windrose-overlay-layer');
-      mainCanvas.parentElement.appendChild(overlay);
-      overlayRef.current = overlay;
-    }
-
-    return () => {
-      if (overlayRef.current && overlayRef.current.parentElement) {
-        overlayRef.current.parentElement.removeChild(overlayRef.current);
-        overlayRef.current = null;
-      }
-    };
-  }, [canvasRef, isRegionTool]);
+  // Present while the tool is active; resizing clears it, so repaint.
+  const { sized: sizedOverlay } = useOverlayCanvas(canvasRef, {
+    active: isRegionTool,
+    onResize: () => { repaintOverlayRef.current(); },
+  });
 
   // Render pending/editing hexes on the overlay. The view basis is a
   // PARAMETER: during a pan/zoom gesture the ViewController's live state
@@ -264,15 +250,18 @@ const RegionLayer = ({
   // commit), so the live subscription below re-runs this with getLive()
   // and the overlay tracks the gesture instead of freezing until release.
   const drawRegionOverlay = useCallback((viewState: StoredViewState) => {
-    const overlay = overlayRef.current;
-    const mainCanvas = canvasRef.current;
-    if (!overlay || !mainCanvas || !geometry || geometry.type !== 'hex' || !mapData) return;
-
-    overlay.width = mainCanvas.width;
-    overlay.height = mainCanvas.height;
+    if (!geometry || geometry.type !== 'hex' || !mapData) return;
+    // Only resizes when the size changed: assigning width/height resets the
+    // context and can reallocate the backing store on every live frame (MEM-18).
+    const overlay = sizedOverlay();
+    if (!overlay) return;
 
     const ctx = overlay.getContext('2d');
     if (!ctx) return;
+    // The size assignment no longer resets context state, so do it explicitly.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.setLineDash([]);
     ctx.clearRect(0, 0, overlay.width, overlay.height);
 
     const hexesToHighlight = editingRegion ? editingRegion.hexes : pendingHexes;
@@ -287,9 +276,7 @@ const RegionLayer = ({
 
     if (northDirection !== 0) {
       ctx.save();
-      ctx.translate(overlay.width / 2, overlay.height / 2);
-      ctx.rotate((northDirection * Math.PI) / 180);
-      ctx.translate(-overlay.width / 2, -overlay.height / 2);
+      applyNorthRotation(ctx, overlay.width, overlay.height, northDirection);
     }
 
     const { offsetX, offsetY } = calculateViewportOffset(
@@ -341,7 +328,7 @@ const RegionLayer = ({
     }
 
     if (northDirection !== 0) ctx.restore();
-  }, [pendingHexes, boundaryVertices, canvasRef, geometry, mapData, selectedColor, editingRegion]);
+  }, [pendingHexes, boundaryVertices, sizedOverlay, geometry, mapData, selectedColor, editingRegion]);
 
   const repaintOverlay = useCallback(() => {
     const vs = viewController?.getLive() ?? mapData?.viewState;
@@ -445,71 +432,10 @@ const RegionLayer = ({
     dismissContextMenu();
   }, [contextMenu, mapData?.regions, app, deleteRegion, dismissContextMenu, startEditingRegion, updateRegion]);
 
-  // ── Long-press touch support for context menu (500ms) ──────────────
-  const longPressTimerRef = useRef<number | null>(null);
-  const longPressPosRef = useRef<{ x: number; y: number } | null>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return undefined;
-
-    const handleTouchStart = (e: TouchEvent): void => {
-      if (e.touches.length !== 1) return;
-      const touch = e.touches[0];
-      longPressPosRef.current = { x: touch.clientX, y: touch.clientY };
-
-      longPressTimerRef.current = window.setTimeout(() => {
-        if (!longPressPosRef.current) return;
-        const synth = new MouseEvent('contextmenu', {
-          clientX: longPressPosRef.current.x,
-          clientY: longPressPosRef.current.y,
-          bubbles: true
-        });
-        const hex = screenToGrid != null ? screenToGrid(longPressPosRef.current.x, longPressPosRef.current.y) : null;
-        if (hex && mapData?.regions) {
-          const key = `${hex.x},${hex.y}`;
-          const region = mapData.regions.find(r => r.hexes.some(h => `${h.x},${h.y}` === key));
-          if (region) {
-            handleContextMenu(synth);
-          }
-        }
-        longPressPosRef.current = null;
-      }, 500);
-    };
-
-    const handleTouchMove = (e: TouchEvent): void => {
-      if (longPressPosRef.current && e.touches.length === 1) {
-        const touch = e.touches[0];
-        const dx = touch.clientX - longPressPosRef.current.x;
-        const dy = touch.clientY - longPressPosRef.current.y;
-        if (dx * dx + dy * dy > 100) {
-          if (longPressTimerRef.current != null) window.clearTimeout(longPressTimerRef.current);
-          longPressPosRef.current = null;
-        }
-      }
-    };
-
-    const handleTouchEnd = (): void => {
-      if (longPressTimerRef.current != null) {
-        window.clearTimeout(longPressTimerRef.current);
-        longPressTimerRef.current = null;
-      }
-      longPressPosRef.current = null;
-    };
-
-    canvas.addEventListener('touchstart', handleTouchStart, { passive: true });
-    canvas.addEventListener('touchmove', handleTouchMove, { passive: true });
-    canvas.addEventListener('touchend', handleTouchEnd);
-    canvas.addEventListener('touchcancel', handleTouchEnd);
-
-    return () => {
-      canvas.removeEventListener('touchstart', handleTouchStart);
-      canvas.removeEventListener('touchmove', handleTouchMove);
-      canvas.removeEventListener('touchend', handleTouchEnd);
-      canvas.removeEventListener('touchcancel', handleTouchEnd);
-      if (longPressTimerRef.current != null) window.clearTimeout(longPressTimerRef.current);
-    };
-  }, [canvasRef, screenToGrid, mapData?.regions, handleContextMenu]);
+  // Touch long-press needs no timer here: the event coordinator's long-press
+  // synthesizes a contextmenu that reaches the same handlers as a right-click
+  // (the hex menu carries the region items; non-hex maps fall back to the
+  // 'region' handleContextMenu registered above).
 
   // ── JSX ────────────────────────────────────────────────────────────
   return (

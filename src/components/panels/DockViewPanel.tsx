@@ -1,7 +1,8 @@
 import type { VNode } from 'preact';
 import type { MapType } from '#types/core/map.types';
 import type { FogToolId } from '#types/hooks/fog.types';
-import type { LayerVisibility, FogOfWarState } from '../toolbars/VisibilityToolbar';
+import type { LayerVisibility } from '#types/contexts/context.types';
+import type { FogOfWarState } from '../toolbars/VisibilityToolbar';
 
 import { useCallback } from 'preact/hooks';
 import { Modal } from 'obsidian';

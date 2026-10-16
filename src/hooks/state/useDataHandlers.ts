@@ -127,10 +127,10 @@ function useDataHandlers({
         const newMapData = stampLodForDeepElements(updateActiveLayer(currentMapData, { [field]: newValue }), newValue);
         const lodStamp = lodStampForHistory(currentMapData, newMapData, suppressHistory, field);
 
-        if (!suppressHistory) {
-          const activeLayer = getActiveLayer(currentMapData);
-          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue, ...lodStamp }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []));
-        }
+        // A suppressed (live drag) write records nothing but pins the pre-drag
+        // value, so the commit at drop undoes the whole drag in one step.
+        const activeLayer = getActiveLayer(currentMapData);
+        addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { [field]: newValue, ...lodStamp }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []), { transient: suppressHistory });
 
         return newMapData;
       });
@@ -170,10 +170,10 @@ function useDataHandlers({
         // A batched stroke stamps on a suppressed tick and records on an
         // identity commit, so the stamp is parked under this rung's channel.
         const lodStamp = lodStampForHistory(currentMapData, result.mapData, suppressHistory, `level:${level}`);
-        if (!suppressHistory) {
-          const written = getActiveLayer(result.mapData);
-          addToHistory(buildLayerHistorySnapshot(written, result.mapData.name ?? '', { ...snapshotLevelsOf(written), level, ...lodStamp }, result.mapData.regions ?? [], result.mapData.outlines ?? [], result.mapData.shapeOverlays ?? [], written.fogOfWar, result.mapData.partyPins ?? [], result.mapData.savedRoutes ?? []));
-        }
+        // A suppressed stroke tick pins the pre-stroke rungs; the commit at
+        // pointerup records the whole deep stroke as one undo step.
+        const written = getActiveLayer(result.mapData);
+        addToHistory(buildLayerHistorySnapshot(written, result.mapData.name ?? '', { ...snapshotLevelsOf(written), level, ...lodStamp }, result.mapData.regions ?? [], result.mapData.outlines ?? [], result.mapData.shapeOverlays ?? [], written.fogOfWar, result.mapData.partyPins ?? [], result.mapData.savedRoutes ?? []), { transient: suppressHistory });
 
         return result.mapData;
       });
@@ -225,9 +225,8 @@ function useDataHandlers({
         const activeLayer = getActiveLayer(currentMapData);
         let nextMapData = stampLodForDeepElements(updateActiveLayer(currentMapData, { tiles: newValue }), newValue);
         const lodStamp = lodStampForHistory(currentMapData, nextMapData, suppressHistory, 'tiles');
-        if (!suppressHistory) {
-          addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { tiles: newValue, ...lodStamp }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []));
-        }
+        // Suppressed (live drag) writes pin the pre-drag value; see the cells handler.
+        addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', { tiles: newValue, ...lodStamp }, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []), { transient: suppressHistory });
 
         // 0→first-tile transition (anywhere on the map) promotes Simple → Strata, once.
         const mapHadTiles = currentMapData.layers.some(l => (l.tiles?.length ?? 0) > 0);
@@ -348,40 +347,37 @@ function useDataHandlers({
     }, { cosmetic: true });
   }, [updateMapData]);
 
-  // Handle sidebar collapse state change - NOT tracked in history (cosmetic,
-  // same rationale as handleViewStateChange)
-  const handleSidebarCollapseChange = useCallback((collapsed: boolean): void => {
-    updateMapData((currentMapData) => {
-      if (currentMapData == null) return currentMapData;
-      return { ...currentMapData, sidebarCollapsed: collapsed };
-    }, { cosmetic: true });
-  }, [updateMapData]);
-
   // Handle object set change - NOT tracked in history
+  // Cosmetic (DATA-18): a preference, so a stale refusal stays silent
+  // instead of arming the conflict panel. Still saved normally.
   const handleObjectSetChange = useCallback((setId: string | null): void => {
     updateMapData((currentMapData) => {
       if (currentMapData == null) return currentMapData;
       return { ...currentMapData, objectSetId: setId };
-    });
+    }, { cosmetic: true });
   }, [updateMapData]);
 
   // Handle text label settings change - NOT tracked in history
+  // Cosmetic (DATA-18): a preference, so a stale refusal stays silent
+  // instead of arming the conflict panel. Still saved normally.
   const handleTextLabelSettingsChange = useCallback((settings: TextLabelSettings): void => {
     updateMapData((currentMapData) => {
       if (currentMapData == null) return currentMapData;
       return { ...currentMapData, lastTextLabelSettings: settings };
-    });
+    }, { cosmetic: true });
   }, [updateMapData]);
 
   // Handle regions change (hex maps only) - tracked in history for undo/redo
-  const handleRegionsChange = useCallback((regions: Region[]): void => {
+  // suppressHistory: a live region-label drag move; it pins the pre-drag value
+  // and the drop commit records the whole drag as one step.
+  const handleRegionsChange = useCallback((regions: Region[], suppressHistory = false): void => {
     if (isApplyingHistory()) return;
 
     updateMapData((currentMapData) => {
       if (currentMapData == null) return currentMapData;
 
       const activeLayer = getActiveLayer(currentMapData);
-      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, regions, currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []));
+      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, regions, currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, currentMapData.partyPins ?? [], currentMapData.savedRoutes ?? []), { transient: suppressHistory });
 
       return { ...currentMapData, regions };
     });
@@ -423,31 +419,35 @@ function useDataHandlers({
     updateMapData((currentMapData) => {
       if (currentMapData == null) return currentMapData;
 
-      if (!suppressHistory) {
-        const activeLayer = getActiveLayer(currentMapData);
-        addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, partyPins, currentMapData.savedRoutes ?? []));
-      }
+      // A suppressed (live drag) write pins the pre-drag pins instead of
+      // recording; the drop commit then records the whole move as one step.
+      const activeLayer = getActiveLayer(currentMapData);
+      addToHistory(buildLayerHistorySnapshot(activeLayer, currentMapData.name ?? '', {}, currentMapData.regions ?? [], currentMapData.outlines ?? [], currentMapData.shapeOverlays ?? [], activeLayer.fogOfWar, partyPins, currentMapData.savedRoutes ?? []), { transient: suppressHistory });
 
       return { ...currentMapData, partyPins };
     });
   }, [updateMapData, addToHistory, isApplyingHistory, buildLayerHistorySnapshot]);
 
   // Handle the in-progress measurement route change - NOT tracked in history.
+  // Cosmetic (DATA-18): a preference, so a stale refusal stays silent
+  // instead of arming the conflict panel. Still saved normally.
   // This is measure-tool working state that persists with the map so a
   // measurement survives closing and reopening the view.
   const handleMeasurementRouteChange = useCallback((measurementRoute: MeasurementRoute): void => {
     updateMapData((currentMapData) => {
       if (currentMapData == null) return currentMapData;
       return { ...currentMapData, measurementRoute };
-    });
+    }, { cosmetic: true });
   }, [updateMapData]);
 
   // Handle per-map travel display selection - NOT tracked in history
+  // Cosmetic (DATA-18): a preference, so a stale refusal stays silent
+  // instead of arming the conflict panel. Still saved normally.
   const handleTravelSettingsChange = useCallback((travelSettings: MapTravelSettings): void => {
     updateMapData((currentMapData) => {
       if (currentMapData == null) return currentMapData;
       return { ...currentMapData, travelSettings };
-    });
+    }, { cosmetic: true });
   }, [updateMapData]);
 
   // Handle saved routes change - tracked in history so save-as-route,
@@ -486,7 +486,6 @@ function useDataHandlers({
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
     handleViewStateChange,
-    handleSidebarCollapseChange,
     handleObjectSetChange,
     handleTextLabelSettingsChange,
     handleRegionsChange,
@@ -518,7 +517,6 @@ function useDataHandlers({
     handleDeleteCustomColor,
     handleUpdateColorOpacity,
     handleViewStateChange,
-    handleSidebarCollapseChange,
     handleObjectSetChange,
     handleTextLabelSettingsChange,
     handleRegionsChange,

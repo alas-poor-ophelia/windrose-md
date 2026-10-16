@@ -17,15 +17,17 @@ import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
 import type { TerrainStroke } from '#types/core/terrainstroke.types';
 import type { TileLayerRole } from '#types/tiles/tile.types';
-import type { TileSubtoolId } from '../../assets/tileForm';
+import type { TileSubtoolId } from '#types/tiles/tile.types';
 
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useApp } from '../../context/AppContext';
-import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
+import { calculateViewportOffset } from '../../geometry/core/viewportMath';
 import { getActiveLayer } from '../../persistence/layerAccessor';
-import { getTileMetadataForRender } from '../../persistence/tileMetadata';
+import { resolveTileEntry } from '../../assets/tilesetOperations';
+import { useTileMetadata } from '../../hooks/state/useTileMetadata';
+import { useOverlayCanvas } from '../../hooks/canvas/useOverlayCanvas';
 import { getCachedImage, preloadImage } from '../../assets/imageOperations';
 import { resolveTileRender } from '../../assets/tileRenderResolution';
 import { computeRegionPatternTransform } from '../../geometry/renderers/tileRenderer';
@@ -62,6 +64,8 @@ const TerrainBrushLayer = ({
 }: TerrainBrushLayerProps): VNode | null => {
   const app = useApp();
   const { mapData, geometry, screenToWorld, getClientCoords, canvasRef } = useMapState();
+  // Subscribed, so a classification change re-renders the layer (STRUCT-A-20).
+  const tileMetadata = useTileMetadata(app);
 
   const hasTileSelected = selectedTilesetId != null && selectedTilesetId !== '' && selectedTileId != null && selectedTileId !== '';
   const isBrushActive = currentTool === 'tilePaint' && activeSubtool === 'brush' && hasTileSelected;
@@ -74,7 +78,6 @@ const TerrainBrushLayer = ({
   const paintingRef = useRef(false);
   const erasingRef = useRef(false);
   const eraseInitialRef = useRef<TerrainStroke[] | null>(null);
-  const overlayRef = useRef<HTMLCanvasElement | null>(null);
 
   const getStrokes = useCallback((): TerrainStroke[] => {
     if (mapData == null) return [];
@@ -84,33 +87,18 @@ const TerrainBrushLayer = ({
   const selectedEntry = (() => {
     if (mapData?.tilesets == null || !hasTileSelected) return null;
     const ts = mapData.tilesets.find(t => t.id === selectedTilesetId);
-    return ts?.tiles.find(t => t.id === selectedTileId) ?? null;
+    // resolveTileEntry also accepts legacy basename ids (recents / MCP selects).
+    return resolveTileEntry(ts, selectedTileId ?? undefined) ?? null;
   })();
 
-  // ---- Overlay (same pattern as WallLayer) ----
-  const createOverlay = useCallback((): HTMLCanvasElement | null => {
-    if (overlayRef.current != null) return overlayRef.current;
-    const mainCanvas = canvasRef.current;
-    if (!mainCanvas || !mainCanvas.parentElement) return null;
-    const overlay = activeWindow.createEl('canvas');
-    overlay.width = mainCanvas.width;
-    overlay.height = mainCanvas.height;
-    overlay.classList.add('windrose-overlay-layer');
-    mainCanvas.parentElement.appendChild(overlay);
-    overlayRef.current = overlay;
-    return overlay;
-  }, [canvasRef]);
-
-  const removeOverlay = useCallback(() => {
-    if (overlayRef.current?.parentElement != null) {
-      overlayRef.current.parentElement.removeChild(overlayRef.current);
-    }
-    overlayRef.current = null;
-  }, []);
+  // ---- Overlay (shared lifecycle; resizing clears it, so repaint the stroke) ----
+  const { overlayRef, ensure: createOverlay, remove: removeOverlay, sized: sizedOverlay } = useOverlayCanvas(canvasRef, {
+    onResize: () => { if (paintingRef.current) drawPreview(); },
+  });
 
   // ---- Live preview: hard-edged pattern sweep of the in-flight stroke ----
   const drawPreview = useCallback(() => {
-    const overlay = overlayRef.current;
+    const overlay = sizedOverlay();
     if (overlay == null || mapData == null || geometry == null) return;
     const ctx = overlay.getContext('2d');
     if (ctx == null) return;
@@ -129,7 +117,7 @@ const TerrainBrushLayer = ({
     const img = selectedEntry != null ? getCachedImage(selectedEntry.vaultPath) : null;
     if (img?.naturalWidth != null && img.naturalWidth > 0) {
       const origin = geometry.worldToScreen(0, 0, offsetX, offsetY, zoom);
-      const meta = getTileMetadataForRender()[selectedEntry?.vaultPath ?? ''];
+      const meta = tileMetadata[selectedEntry?.vaultPath ?? ''];
       const tileset = mapData.tilesets?.find(t => t.id === selectedTilesetId);
       const resolved = resolveTileRender(undefined, meta, tileset);
       const { scale, translateX, translateY } = computeRegionPatternTransform(
@@ -166,7 +154,7 @@ const TerrainBrushLayer = ({
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
-  }, [mapData, geometry, radiusWorld, selectedEntry, selectedTilesetId, cellSize]);
+  }, [mapData, geometry, radiusWorld, selectedEntry, selectedTilesetId, cellSize, sizedOverlay, tileMetadata]);
 
   // ---- Erase gesture ----
   const eraseAt = useCallback((worldX: number, worldY: number) => {
@@ -254,7 +242,7 @@ const TerrainBrushLayer = ({
       feather: brushSoftness,
     });
     onTerrainStrokesChange([...getStrokes(), stroke], false);
-  }, [mapData, selectedTilesetId, selectedTileId, radiusWorld, tileDepth, brushSoftness, getStrokes, onTerrainStrokesChange]);
+  }, [mapData, selectedTilesetId, selectedTileId, radiusWorld, tileDepth, brushSoftness, getStrokes, onTerrainStrokesChange, overlayRef]);
 
   // Drop transient state when the brush disarms.
   useEffect(() => {
@@ -266,13 +254,14 @@ const TerrainBrushLayer = ({
       removeOverlay();
     }
   }, [isBrushActive, removeOverlay]);
-  useEffect(() => () => removeOverlay(), [removeOverlay]);
 
   // Register under 'terrainBrush' — the coordinator dispatches tilePaint
   // events to both tile layers; the subtool gate decides which one acts.
-  useLayerHandlers('terrainBrush', isBrushActive
-    ? { handlePointerDown, handlePointerMove, handlePointerUp }
-    : {});
+  useLayerHandlers(
+    'terrainBrush',
+    { handlePointerDown, handlePointerMove, handlePointerUp },
+    { enabled: isBrushActive }
+  );
 
   return null;
 };

@@ -13,8 +13,10 @@ import type { MapData, Region } from '#types/core/map.types';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { updateById, removeById } from '../../objects/entityList';
+import { mintId } from '../../core/ids';
 import { getRegionLabelWorldPosition, computeCentroid } from '../../geometry/renderers/regionRenderer';
-import { offsetToAxial } from '../../geometry/core/offsetCoordinates';
+import { hexKey, pointInPolygon, forEachHexInBounds } from '../../geometry/hex/hexRegionMath';
 
 interface RegionToolsOptions {
   currentTool: ToolId;
@@ -24,7 +26,10 @@ interface RegionToolsOptions {
   geometry: ExtendedGeometry | null;
   screenToWorld: (clientX: number, clientY: number) => { worldX: number; worldY: number } | null;
   screenToGrid: (clientX: number, clientY: number) => Point | null;
-  onRegionsChange: (regions: Region[]) => void;
+  /** suppressHistory: a live label-drag move (pins the pre-drag value; the drop commits one step). */
+  onRegionsChange: (regions: Region[], suppressHistory?: boolean) => void;
+  /** Drops held transient-history pins (useLayerHistory.clearTransient). */
+  clearTransient?: () => void;
 }
 
 interface ContextMenuState {
@@ -56,28 +61,10 @@ interface UseRegionToolsResult {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function hexKey(q: number, r: number): string {
-  return `${q},${r}`;
-}
-
 function generateRegionId(): string {
-  return `region-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return mintId('region', { randomLength: 6 });
 }
 
-/**
- * Point-in-polygon test (ray casting) for world-space coordinates.
- */
-function pointInPolygon(px: number, py: number, polygon: Array<{ x: number; y: number }>): boolean {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].x, yi = polygon[i].y;
-    const xj = polygon[j].x, yj = polygon[j].y;
-    if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) {
-      inside = !inside;
-    }
-  }
-  return inside;
-}
 
 // ── Hook ─────────────────────────────────────────────────────────────
 
@@ -89,7 +76,8 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     geometry,
     screenToWorld,
     screenToGrid,
-    onRegionsChange
+    onRegionsChange,
+    clearTransient
   } = options;
 
   const isActive = currentTool === 'regionPaint' || currentTool === 'regionBoundary';
@@ -109,6 +97,11 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
   const [draggingLabelRegionId, setDraggingLabelRegionId] = useState<string | null>(null);
   const labelDragStartRef = useRef<{ worldX: number; worldY: number } | null>(null);
   const labelDragCleanupRef = useRef<(() => void) | null>(null);
+  // Document that owns the element the label drag started on (popout-safe
+  // target for the document-level move/up listeners below).
+  const labelDragDocRef = useRef<Document | null>(null);
+  // Regions after the last live label-drag move; committed once at drop.
+  const labelDragRegionsRef = useRef<Region[] | null>(null);
   const handlePointerMoveRef = useRef<((e: PointerEvent) => void) | null>(null);
   const handlePointerUpRef = useRef<((e: PointerEvent) => void) | null>(null);
 
@@ -172,6 +165,7 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     if (world) {
       const hitRegion = checkLabelHit(world.worldX, world.worldY);
       if (hitRegion) {
+        labelDragDocRef.current = e.target instanceof Node ? e.target.ownerDocument : null;
         setDraggingLabelRegionId(hitRegion.id);
         labelDragStartRef.current = { worldX: world.worldX, worldY: world.worldY };
         e.preventDefault();
@@ -243,6 +237,7 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     // Check for label drag first
     const hitRegion = checkLabelHit(world.worldX, world.worldY);
     if (hitRegion) {
+      labelDragDocRef.current = e.target instanceof Node ? e.target.ownerDocument : null;
       setDraggingLabelRegionId(hitRegion.id);
       labelDragStartRef.current = { worldX: world.worldX, worldY: world.worldY };
       e.preventDefault();
@@ -261,49 +256,12 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
 
     // Find all hexes whose centers fall inside the polygon
     const selected: Point[] = [];
-
-    if (bounds.maxRing !== undefined) {
-      // Radial bounds
-      for (let ring = 0; ring <= bounds.maxRing; ring++) {
-        if (ring === 0) {
-          const center = hexGeom.hexToWorld(0, 0);
-          if (pointInPolygon(center.worldX, center.worldY, boundaryVertices)) {
-            selected.push({ x: 0, y: 0 });
-          }
-        } else {
-          let q = ring, r = 0;
-          const dirs = [
-            { dq: -1, dr: 1 }, { dq: -1, dr: 0 }, { dq: 0, dr: -1 },
-            { dq: 1, dr: -1 }, { dq: 1, dr: 0 }, { dq: 0, dr: 1 }
-          ];
-          for (const dir of dirs) {
-            for (let step = 0; step < ring; step++) {
-              if (hexGeom.isWithinBounds(q, r)) {
-                const center = hexGeom.hexToWorld(q, r);
-                if (pointInPolygon(center.worldX, center.worldY, boundaryVertices)) {
-                  selected.push({ x: q, y: r });
-                }
-              }
-              q += dir.dq;
-              r += dir.dr;
-            }
-          }
-        }
+    forEachHexInBounds(hexGeom, bounds, mapData.orientation ?? 'flat', (q, r) => {
+      const center = hexGeom.hexToWorld(q, r);
+      if (pointInPolygon(center.worldX, center.worldY, boundaryVertices)) {
+        selected.push({ x: q, y: r });
       }
-    } else {
-      // Rectangular bounds - iterate offset coords and convert
-      for (let col = 0; col <= bounds.maxCol; col++) {
-        for (let row = 0; row <= bounds.maxRow; row++) {
-          const { q, r } = offsetToAxial(col, row, mapData.orientation ?? 'flat');
-          if (hexGeom.isWithinBounds(q, r)) {
-            const center = hexGeom.hexToWorld(q, r);
-            if (pointInPolygon(center.worldX, center.worldY, boundaryVertices)) {
-              selected.push({ x: q, y: r });
-            }
-          }
-        }
-      }
-    }
+    });
 
     setPendingHexes(selected);
     setBoundaryVertices([]);
@@ -366,22 +324,27 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     }
 
     // Update region with new label position (running delta)
-    const regions = (mapData.regions ?? []).map(r =>
-      r.id === draggingLabelRegionId ? { ...r, labelPosition: newPos } : r
-    );
-    onRegionsChange(regions);
+    // Live move: suppressed, so the whole drag is one undo step committed at drop.
+    const regions = updateById<Region>(mapData.regions, draggingLabelRegionId, { labelPosition: newPos });
+    labelDragRegionsRef.current = regions;
+    onRegionsChange(regions, true);
   }, [draggingLabelRegionId, getWorldCoords, mapData, geometry, onRegionsChange]);
 
   const handlePointerUp = useCallback((_e: PointerEvent): void => {
     if (draggingLabelRegionId != null && draggingLabelRegionId !== '') {
       setDraggingLabelRegionId(null);
       labelDragStartRef.current = null;
+      // Commit the drag as one history step (a click without a move commits nothing).
+      const dragged = labelDragRegionsRef.current;
+      labelDragRegionsRef.current = null;
+      if (dragged != null) onRegionsChange(dragged, false);
+      else clearTransient?.(); // no commit: drop any stray pin
       if (labelDragCleanupRef.current) {
         labelDragCleanupRef.current();
         labelDragCleanupRef.current = null;
       }
     }
-  }, [draggingLabelRegionId]);
+  }, [draggingLabelRegionId, onRegionsChange, clearTransient]);
 
   // Keep refs in sync for document-level listeners
   handlePointerMoveRef.current = handlePointerMove;
@@ -394,17 +357,22 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
     const onMove = (e: PointerEvent): void => { handlePointerMoveRef.current?.(e); };
     const onUp = (e: PointerEvent): void => { handlePointerUpRef.current?.(e); };
 
-    activeDocument.addEventListener('pointermove', onMove);
-    activeDocument.addEventListener('pointerup', onUp);
+    const doc = labelDragDocRef.current ?? activeDocument;
+    doc.addEventListener('pointermove', onMove);
+    doc.addEventListener('pointerup', onUp);
+    // A cancelled pointer ends the drag through the same path as a release.
+    doc.addEventListener('pointercancel', onUp);
 
     labelDragCleanupRef.current = () => {
-      activeDocument.removeEventListener('pointermove', onMove);
-      activeDocument.removeEventListener('pointerup', onUp);
+      doc.removeEventListener('pointermove', onMove);
+      doc.removeEventListener('pointerup', onUp);
+      doc.removeEventListener('pointercancel', onUp);
     };
 
     return () => {
-      activeDocument.removeEventListener('pointermove', onMove);
-      activeDocument.removeEventListener('pointerup', onUp);
+      doc.removeEventListener('pointermove', onMove);
+      doc.removeEventListener('pointerup', onUp);
+      doc.removeEventListener('pointercancel', onUp);
     };
   }, [draggingLabelRegionId]);
 
@@ -450,16 +418,14 @@ function useRegionTools(options: RegionToolsOptions): UseRegionToolsResult {
 
   const deleteRegion = useCallback((regionId: string) => {
     if (!mapData) return;
-    const regions = (mapData.regions ?? []).filter(r => r.id !== regionId);
+    const regions = removeById<Region>(mapData.regions, regionId);
     onRegionsChange(regions);
     if (editingRegionId === regionId) setEditingRegionId(null);
   }, [mapData, onRegionsChange, editingRegionId]);
 
   const updateRegion = useCallback((regionId: string, updates: Partial<Region>) => {
     if (!mapData) return;
-    const regions = (mapData.regions ?? []).map(r =>
-      r.id === regionId ? { ...r, ...updates } : r
-    );
+    const regions = updateById<Region>(mapData.regions, regionId, updates);
     onRegionsChange(regions);
   }, [mapData, onRegionsChange]);
 

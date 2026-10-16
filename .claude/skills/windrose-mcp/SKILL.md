@@ -30,7 +30,7 @@ The MCP has dedicated tools for every historically-thrashed task. Reaching for `
 | Place an image tile | `windrose_place_tile` | Imperative API — do NOT synthesize canvas clicks |
 | List/place map objects | `windrose_list_objects` (`types:true` for catalog), `windrose_place_object` | Synthetic pointer events NEVER reach Preact handlers — 0/7 historical success rate; always use the tool |
 | Open Tiles/Objects/Layers UI | `windrose_open_drawer` | Side effect: switches active tool. Edge-rail panes are block-mode only |
-| Tool/color/layer/undo/save | `windrose_set_tool`, `windrose_set_color`, `windrose_select_layer`, `windrose_undo/redo`, `windrose_force_save` | undo/redo return honest results now |
+| Tool/color/layer/undo/save | `windrose_set_tool`, `windrose_set_color`, `windrose_select_layer`, `windrose_undo/redo`, `windrose_force_save` | undo/redo: `ok` = the map changed (an entry that no longer applies is dropped, the next one tried); "Nothing to undo" means nothing changed. Needs DMT's undo wrapper to pass the result through (else it falls back to the pre-step canUndo) |
 | Reload after `npm run deploy` | `windrose_reload` | Flushes saves first (never raw disable/enable — a raw teardown once truncated the data file), rerenders blocks, polls ready. Pass `notePath` to reopen in one call |
 | Read any vault file | `windrose_vault_read` | `search` param for context-around-match |
 | Console errors | `windrose_get_errors` | |
@@ -111,3 +111,8 @@ This is the exception: cell paint / tile placement / object placement all have r
 4. **Verify mutations on low-content maps** (check `cellCount`/`objectCount` via get_state first); revert experiments with `windrose_undo`.
 5. There are **two data files** in some vaults (root `windrose-md-data.json` + the real one under `Garden/...`). Never guess: `windrose_get_state`'s `dataFilePath` is the truth.
 6. **DOM events can land on the wrong map instance** (earned 2026-07-26): keyed tools (`get_state`/`select_tile`/`set_tool`) resolve the target instance correctly, but a synthetic canvas click selected by a "visible container" heuristic (`width>50 && offsetParent!=null`) can hit a *different* foregrounded `.windrose-container` (e.g. the persistent full-pane view) in the same tab group. `windrose_ensure_visible` reveals *a* visible leaf, not necessarily *your* leaf. Before dispatching DOM events, force the target active: `app.workspace.setActiveLeaf(targetLeaf, {focus:true})` + `revealLeaf`, then query the canvas *inside that leaf's container*.
+
+## Known limits
+
+- **Several map blocks in one note**: each block registers once per mount in `window.__windrose.mcpInstances`. The first-mounted block owns the plain note-path key, which is what every MCP tool resolves by; later blocks appear as `<notePath>#mcp-N` (each entry also carries `instanceId`). The MCP tools only address the plain-key block; to drive a later block, use eval with `Object.values(window.__windrose.mcpInstances)` and pick by `instanceId`/`mapId`. If the first block unmounts, the next one is promoted to the plain key.
+- Registry entries expose snapshot fields as live getters over the latest render, so `JSON.stringify(inst)` and property reads see current values; `timestamp` is the last render time, not registration time.

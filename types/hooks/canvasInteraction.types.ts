@@ -6,12 +6,27 @@
  * and coordinate transformation for the canvas.
  */
 
-import type { Dispatch, StateUpdater } from 'preact/hooks';
 import type { Point, WorldCoords } from '../core/geometry.types';
 import type { StoredViewState } from '../core/map.types';
 
 // Re-export WorldCoords for backwards compatibility
 export type { WorldCoords };
+
+/**
+ * Seamless zoom-out surfacing payload: the child view at the moment the
+ * surface fired, so the exit can restore a visually-continuous parent view
+ * (sub-map footprint → parent hex footprint) instead of the stale dive-time
+ * view. Escape-key / breadcrumb exits dispatch no detail and keep the
+ * classic restore.
+ */
+export interface SubHexExitDetail {
+  /** Child zoom the surfacing tick was heading to. */
+  childZoom: number;
+  /** Child world point under the zoom anchor (cursor / pinch center). */
+  childAnchor: { x: number; y: number };
+  /** Anchor's screen offset from the canvas center, in canvas pixels. */
+  anchorOffset: { dx: number; dy: number };
+}
 
 // ===========================================
 // Pan State Types
@@ -99,23 +114,10 @@ export interface PanHandlers {
    */
   markPanAnchorStale: () => void;
   startTouchPan: (center: TouchCenter) => void;
+  /** Two-finger start: startTouchPan + pinch baseline seed in one call. */
+  startPinch: (center: TouchCenter, distance: number) => void;
   updateTouchPan: (touches: TouchList) => void;
   stopTouchPan: () => void;
-}
-
-// ===========================================
-// State Setters
-// ===========================================
-
-/** Direct state setters for external control */
-export interface CanvasInteractionSetters {
-  setIsPanning: Dispatch<StateUpdater<boolean>>;
-  setIsTouchPanning: Dispatch<StateUpdater<boolean>>;
-  setPanStart: Dispatch<StateUpdater<PanStart | null>>;
-  setTouchPanStart: Dispatch<StateUpdater<TouchCenter | null>>;
-  /** Seeds the pinch baseline into ref and state together — plain values only. */
-  setInitialPinchDistance: (distance: number | null) => void;
-  setSpaceKeyPressed: Dispatch<StateUpdater<boolean>>;
 }
 
 // ===========================================
@@ -143,8 +145,7 @@ export interface UseCanvasInteractionResult extends
   CanvasInteractionStateValues,
   CoordinateHelpers,
   ZoomHandlers,
-  PanHandlers,
-  CanvasInteractionSetters {
+  PanHandlers {
   lastTouchTimeRef: LastTouchTimeRef;
   isTouchPanningRef: { current: boolean };
   touchPanStartRef: { current: TouchCenter | null };

@@ -36,7 +36,7 @@ function snapshotLevelsOf(source: { levels?: LevelsRecord }): { levels?: LevelsR
  * or no `levels` key when the snapshot has none. Returns the same layer when
  * nothing changes, so a classic undo stays reference-identical.
  */
-function applySnapshotLevels(layer: MapLayer, snapshot: LayerHistorySnapshot): MapLayer {
+function applySnapshotLevels(layer: MapLayer, snapshot: Pick<LayerHistorySnapshot, 'levels'>): MapLayer {
   if (layer.levels === snapshot.levels && (snapshot.levels !== undefined || !('levels' in layer))) {
     return layer;
   }
@@ -188,7 +188,7 @@ function lodStampForCommit(
  * cells stay on the map), and stripping `lod` there would leave
  * `levels-without-lod` and quarantine the map (Codex review, blocking).
  */
-function undoLodStamp(mapData: MapData, leaving: LayerHistorySnapshot | null | undefined): MapData {
+function undoLodStamp(mapData: MapData, leaving: Pick<LayerHistorySnapshot, 'lodStamped'> | null | undefined): MapData {
   if (leaving?.lodStamped === undefined || mapData.lod === undefined) return mapData;
   if (hasDepthContent(mapData)) return mapData;
   const { lod: _dropped, ...rest } = mapData;
@@ -196,7 +196,7 @@ function undoLodStamp(mapData: MapData, leaving: LayerHistorySnapshot | null | u
 }
 
 /** Redo ONTO the entry that stamped `lod`: the block comes back. Same map otherwise. */
-function redoLodStamp(mapData: MapData, entering: LayerHistorySnapshot): MapData {
+function redoLodStamp(mapData: MapData, entering: Pick<LayerHistorySnapshot, 'lodStamped'>): MapData {
   if (entering.lodStamped === undefined || mapData.lod !== undefined) return mapData;
   return { ...mapData, lod: entering.lodStamped };
 }

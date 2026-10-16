@@ -327,4 +327,3 @@ function tileTouchesKeys(t: TileAssignment, keys: ReadonlySet<string>): boolean 
 
 export { getBrushCells, bresenhamLine, floodFillCells, buildWallBarrier, segmentsIntersect, FLOOD_FILL_LIMIT };
 export { tileRung, homeLevelFields, tilesOnRung, withTilePlaced, withTilesErasedAt, withFillRegionCleared };
-export type { FloodFillOptions, FloodFillResult, WallBarrier, WallPolyline };

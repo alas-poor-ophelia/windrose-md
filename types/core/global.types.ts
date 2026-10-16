@@ -115,6 +115,8 @@ interface WindroseMcpInstance {
   isExpanded: boolean;
   dataFilePath: string;
   notePath: string;
+  /** Per-mount id; stable key when several blocks share one notePath */
+  instanceId?: string;
   timestamp: number;
   /** Number of cells in the active layer */
   cellCount: number;

@@ -135,8 +135,8 @@ export type { Edge };
 // Text Labels & Note Pins (canonical types in objects/note.types.ts)
 // ===========================================
 
-import type { TextLabel, NotePin } from '../objects/note.types';
-export type { TextLabel, NotePin };
+import type { TextLabel } from '../objects/note.types';
+export type { TextLabel };
 
 // ===========================================
 // Outlines (hex map polygon outlines)
@@ -178,7 +178,7 @@ export interface DungeonStyleColors {
   water: string;
 }
 
-export interface DungeonConfigOverrides {
+interface DungeonConfigOverrides {
   objectDensity?: number;
   monsterWeight?: number;
   emptyWeight?: number;
@@ -192,7 +192,7 @@ export interface DungeonConfigOverrides {
   waterOpacity?: number;
 }
 
-export interface DungeonStockingMetadata {
+interface DungeonStockingMetadata {
   rooms?: unknown[];
   corridorResult?: unknown;
   doorPositions?: Array<{ x: number; y: number }>;
@@ -202,7 +202,7 @@ export interface DungeonStockingMetadata {
   waterRoomIds?: string[];
 }
 
-export interface GenerationSettings {
+interface GenerationSettings {
   preset?: string;
   seed?: number;
   configOverrides?: DungeonConfigOverrides;
@@ -215,7 +215,7 @@ export interface GenerationSettings {
 
 // Full MapObject type is in object.types.ts
 // We use a minimal interface here to avoid circular imports
-export interface MapObjectRef {
+interface MapObjectRef {
   id: string;
   typeId: string;
   type?: string;
@@ -399,7 +399,6 @@ export interface MapData {
   // UI state persistence (optional - defaults exist)
   uiPreferences?: UIPreferences;
   showAdjacentSubMaps?: boolean;
-  sidebarCollapsed?: boolean;
   expandedState?: boolean;
 
   // Custom colors for this map
@@ -410,9 +409,6 @@ export interface MapData {
 
   // Last selected object opacity
   lastSelectedOpacity?: number;
-
-  // Note pins (global, not per-layer)
-  notePins?: NotePin[];
 
   // Shape overlays (global, both grid and hex maps)
   shapeOverlays?: ShapeOverlay[];

@@ -75,10 +75,11 @@ function FlyoutPanel({ tiles, onSelect, onClose, label }: {
         onClose();
       }
     };
-    const id = window.setTimeout(() => activeDocument.addEventListener('mousedown', handler), 0);
+    const doc = panelRef.current?.ownerDocument ?? activeDocument;
+    const id = window.setTimeout(() => doc.addEventListener('mousedown', handler), 0);
     return () => {
       window.clearTimeout(id);
-      activeDocument.removeEventListener('mousedown', handler);
+      doc.removeEventListener('mousedown', handler);
     };
   }, [onClose]);
 
@@ -248,7 +249,7 @@ function DrawerDock({
 }: DrawerDockProps): VNode {
   const [resizing, setResizing] = useState(false);
   const [spineFlyout, setSpineFlyout] = useState<'recent' | 'starred' | null>(null);
-  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const dragRef = useRef<{ startX: number; startWidth: number; doc: Document } | null>(null);
   const dockWidth = open ? drawerWidth : ribbonWidth;
 
   // Close flyout when drawer opens
@@ -269,7 +270,9 @@ function DrawerDock({
   const handleResizeStart = useCallback((e: MouseEvent) => {
     if (!onWidthChange) return;
     e.preventDefault();
-    dragRef.current = { startX: e.clientX, startWidth: drawerWidth };
+    // The resize handle's ownerDocument is the window that owns this map (popout-safe).
+    const doc = e.target instanceof Node ? (e.target.ownerDocument ?? activeDocument) : activeDocument;
+    dragRef.current = { startX: e.clientX, startWidth: drawerWidth, doc };
     setResizing(true);
   }, [drawerWidth, onWidthChange]);
 
@@ -290,11 +293,12 @@ function DrawerDock({
       setResizing(false);
     };
 
-    activeDocument.addEventListener('mousemove', handleMove);
-    activeDocument.addEventListener('mouseup', handleUp);
+    const doc = dragRef.current?.doc ?? activeDocument;
+    doc.addEventListener('mousemove', handleMove);
+    doc.addEventListener('mouseup', handleUp);
     return () => {
-      activeDocument.removeEventListener('mousemove', handleMove);
-      activeDocument.removeEventListener('mouseup', handleUp);
+      doc.removeEventListener('mousemove', handleMove);
+      doc.removeEventListener('mouseup', handleUp);
     };
   }, [resizing, onWidthChange, minWidth, maxWidth]);
 
@@ -389,4 +393,4 @@ function DrawerDock({
 }
 
 export { DrawerDock };
-export type { DrawerDockProps, FlyoutTile };
+export type { FlyoutTile };

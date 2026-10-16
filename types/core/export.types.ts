@@ -7,7 +7,6 @@
 
 import type { BoundingBox } from './geometry.types';
 import type { LayerId, MapData } from './map.types';
-import type { HexColor } from './common.types';
 import type { ExtendedGeometry, LayerVisibility } from '../contexts/context.types';
 
 // ===========================================
@@ -31,45 +30,6 @@ export interface ExportResult {
   success: boolean;
   path?: string;
   error?: string;
-}
-
-// ===========================================
-// Export Theme
-// ===========================================
-
-/** Theme configuration for export rendering */
-export interface ExportTheme {
-  grid: {
-    lines: HexColor;
-    lineWidth: number;
-    background: HexColor;
-  };
-  cells: {
-    fill: HexColor;
-    border: HexColor;
-    borderWidth: number;
-  };
-  compass: {
-    color: HexColor;
-    size: number;
-  };
-  decorativeBorder: {
-    color: HexColor;
-    width: number;
-    pattern: string;
-  };
-  coordinateKey: HexColor;
-}
-
-// ===========================================
-// Visibility Options
-// ===========================================
-
-/** Layer visibility options for export rendering */
-export interface ExportVisibilityOptions {
-  objects: boolean;
-  textLabels: boolean;
-  hexCoordinates: boolean;
 }
 
 // ===========================================

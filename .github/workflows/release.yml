@@ -86,7 +86,7 @@ jobs:
             $0 == "## Version " ver { flag = 1; next }
             /^## Version / { if (flag) exit }
             flag { print }
-          ' "src/Windrose Changelogs.md" > release-notes.md
+          ' "CHANGELOG.md" > release-notes.md
           if [ ! -s release-notes.md ]; then
             echo "No changelog entry found for ${{ steps.meta.outputs.version }}." > release-notes.md
           fi

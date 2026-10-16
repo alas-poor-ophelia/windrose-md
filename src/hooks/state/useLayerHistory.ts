@@ -1,36 +1,199 @@
 /**
  * useLayerHistory.ts
  *
- * Manages layer switching with per-layer undo/redo history.
- * This hook centralizes all history-related logic including:
- * - Per-layer history caching (each layer has independent undo/redo stacks)
- * - Layer select/add/delete handlers that preserve history state
- * - Undo/redo operations
- * - History tracking for data change handlers
+ * Layer switching plus per-layer undo/redo (DATA-06 redesign).
  *
- * The hook internally uses useHistory and manages the layer-specific caching,
- * providing a clean API for the parent component.
+ * History entries are field diffs, not full snapshots: each entry records the
+ * layer it was made on and the before/after values of ONLY the layer fields
+ * and map-wide fields (name, regions, outlines, shapes, Beacons, routes) that
+ * the edit changed. Undo/redo:
+ * - write back only the entry's own fields, through a functional updater on
+ *   the live map (never a render-time or dive-time copy);
+ * - skip any field whose live value no longer matches what the entry left
+ *   behind, so undo never clobbers an edit made since (e.g. a Beacon placed on
+ *   another layer, or a fog reveal).
+ *
+ * Stacks are kept per layer (undo acts on the active layer's edits) and per
+ * level: history never crosses levels. The root level's stacks are set aside
+ * while a sub-hex is open and come back on return; a sub-hex level's stacks
+ * are cleared when it is left (levelKey or navigationVersion change).
+ *
+ * An undo/redo step whose entry no longer applies to the live map (every
+ * field changed since by a write outside history) is dropped and the next
+ * entry is tried, inside the same functional update, so a keypress never
+ * spends an entry on a silent no-op (parallax wave-7 finding 2). handleUndo
+ * and handleRedo report whether the map changed.
+ *
+ * Live drags write with suppressHistory and commit once at drop. Each live
+ * write calls addToHistory(snapshot, { transient: true }), which records
+ * nothing but pins the fields it changes at their pre-drag values; the drop
+ * commit diffs against those pins, not against the last render (which already
+ * shows the dragged position), so the whole drag is one undoable step.
+ *
+ * Fog operations enter history through recordMapChange (prev -> next diff);
+ * fog brush strokes coalesce into one entry, never across a layer switch.
+ *
+ * Ladder rungs (design 06 s5): a layer's `levels` record is one diffed layer
+ * field, restored whole (or stripped when the entry had none). An entry also
+ * carries the rung it edited (`level`, camera only) and the `lod` block its
+ * first deep write stamped (`lodStamped`): undo lifts the stamp unless depth
+ * content remains, redo puts it back, and both bring the camera to the rung.
  */
 
 // Type-only imports
-import type { MapData, MapLayer, LayerId, Region, Outline, ShapeOverlay, FogOfWar, PartyPin, SavedRoute } from '#types/core/map.types';
+import type { MapData, MapLayer, LayerId } from '#types/core/map.types';
 import type {
+  AddToHistoryOptions,
   LayerHistorySnapshot,
-  LayerHistoryCache,
+  LayerHistoryEntry,
+  LayerHistoryStacks,
+  LayerHistoryLayerKey,
+  LayerHistoryMapKey,
+  LayerHistoryLayerValues,
+  LayerHistoryMapValues,
+  RecordMapChangeOptions,
   UseLayerHistoryOptions,
   LayerActions,
   HistoryActions,
   UseLayerHistoryResult,
 } from '#types/hooks/layerHistory.types';
+import type { FieldDiff } from '#types/hooks/history.types';
 
-import { useCallback, useEffect, useRef } from 'preact/hooks';
-import { useHistory } from './useHistory';
-import { getActiveLayer, getLayerById, updateActiveLayer, updateLayer, addLayer, cloneLayer, removeLayer, reorderLayers, setActiveLayer } from '../../persistence/layerAccessor';
-import { snapshotLevelsOf, restoreSnapshotLevels, layerHistorySnapshotsEqual, viewStateForRung, undoLodStamp, redoLodStamp } from './layerHistoryOps';
+import { useCallback, useRef, useState } from 'preact/hooks';
+import {
+  createHistoryStack,
+  diffHistoryFields,
+  dropHistoryStep,
+  guardedPatch,
+  mergeFieldDiffs,
+  peekTopHistoryEntry,
+  pushHistoryEntry,
+  replaceTopHistoryEntry,
+  stepHistoryRedo,
+  stepHistoryUndo,
+} from './useHistory';
+import { getLayerById, updateLayer, addLayer, cloneLayer, removeLayer, reorderLayers, setActiveLayer } from '../../persistence/layerAccessor';
+import { applySnapshotLevels, viewStateForRung, undoLodStamp, redoLodStamp } from './layerHistoryOps';
 
+
+const LAYER_KEYS: readonly LayerHistoryLayerKey[] = [
+  'cells', 'curves', 'objects', 'textLabels', 'edges', 'tiles', 'wallPaths', 'terrainStrokes', 'fogOfWar', 'levels'
+];
+const MAP_KEYS: readonly LayerHistoryMapKey[] = [
+  'name', 'regions', 'outlines', 'shapeOverlays', 'partyPins', 'savedRoutes'
+];
+
+/** Entries with the same coalesce key pushed within this window merge. */
+const COALESCE_WINDOW_MS = 1000;
+
+function emptyDiff<T>(): FieldDiff<T> {
+  return { before: {}, after: {} };
+}
+
+function readLayerValues(layer: MapLayer): LayerHistoryLayerValues {
+  return {
+    cells: layer.cells,
+    curves: layer.curves,
+    objects: layer.objects,
+    textLabels: layer.textLabels,
+    edges: layer.edges,
+    tiles: layer.tiles,
+    wallPaths: layer.wallPaths,
+    terrainStrokes: layer.terrainStrokes,
+    fogOfWar: layer.fogOfWar,
+    levels: layer.levels
+  };
+}
+
+function readMapValues(map: MapData): LayerHistoryMapValues {
+  return {
+    name: map.name ?? '',
+    regions: map.regions,
+    outlines: map.outlines,
+    shapeOverlays: map.shapeOverlays,
+    partyPins: map.partyPins,
+    savedRoutes: map.savedRoutes
+  };
+}
+
+function pickLayerValues(s: LayerHistorySnapshot): Partial<LayerHistoryLayerValues> {
+  return {
+    cells: s.cells, curves: s.curves, objects: s.objects, textLabels: s.textLabels, edges: s.edges,
+    tiles: s.tiles, wallPaths: s.wallPaths, terrainStrokes: s.terrainStrokes, fogOfWar: s.fogOfWar,
+    levels: s.levels
+  };
+}
+
+function pickMapValues(s: LayerHistorySnapshot): Partial<LayerHistoryMapValues> {
+  return {
+    name: s.name, regions: s.regions, outlines: s.outlines, shapeOverlays: s.shapeOverlays,
+    partyPins: s.partyPins, savedRoutes: s.savedRoutes
+  };
+}
 
 /**
- * Hook for managing layer switching with per-layer history
+ * Write one entry's fields onto the live map. `undo` moves after -> before,
+ * `redo` before -> after; a field is written only while its live value still
+ * equals the value the entry expects (see guardedPatch). Pure.
+ */
+export function applyLayerHistoryEntry(prev: MapData, entry: LayerHistoryEntry, direction: 'undo' | 'redo'): MapData {
+  const isUndo = direction === 'undo';
+  let next = prev;
+
+  const mapPatch = guardedPatch(
+    readMapValues(prev),
+    isUndo ? entry.map.after : entry.map.before,
+    isUndo ? entry.map.before : entry.map.after
+  );
+  if (mapPatch != null) next = { ...next, ...mapPatch };
+
+  const layer = getLayerById(prev, entry.layerId);
+  if (layer != null) {
+    const layerPatch = guardedPatch(
+      readLayerValues(layer),
+      isUndo ? entry.layer.after : entry.layer.before,
+      isUndo ? entry.layer.before : entry.layer.after
+    );
+    if (layerPatch != null) {
+      const { levels, ...fields } = layerPatch;
+      next = updateLayer(next, entry.layerId, fields);
+      // Rungs go back whole, or the key is stripped (never `levels: undefined`).
+      if ('levels' in layerPatch) {
+        next = { ...next, layers: next.layers.map((l) => l.id === entry.layerId ? applySnapshotLevels(l, { levels }) : l) };
+      }
+    }
+  }
+  if (next === prev) return prev;
+  // Leaving the entry that stamped `lod` makes the map classic again (kept
+  // while depth content remains); entering it puts the block back.
+  return isUndo ? undoLodStamp(next, entry) : redoLodStamp(next, entry);
+}
+
+/** Last known values for the open level: the last rendered map plus edits recorded since. */
+interface PinnedValues {
+  map: Partial<LayerHistoryMapValues>;
+  layers: Record<LayerId, Partial<LayerHistoryLayerValues>>;
+}
+
+/** Pin each changed field's `before` unless a pin for it is already held. */
+function pinBefore<T extends object>(pins: Partial<T>, diff: FieldDiff<T> | null): Partial<T> {
+  if (diff == null) return pins;
+  const next: Partial<T> = { ...pins };
+  for (const key of Object.keys(diff.before) as (keyof T)[]) {
+    if (!(key in next)) next[key] = diff.before[key];
+  }
+  return next;
+}
+
+interface KnownValues {
+  source: MapData | null;
+  activeLayerId: LayerId | null;
+  map: Partial<LayerHistoryMapValues>;
+  layers: Record<LayerId, Partial<LayerHistoryLayerValues>>;
+}
+
+/**
+ * Hook for managing layer switching with per-layer diff history
  *
  * @param options - Configuration options
  * @returns Layer and history state/actions
@@ -39,369 +202,241 @@ function useLayerHistory({
   mapData,
   updateMapData,
   isLoading,
-  navigationVersion = 0
+  navigationVersion = 0,
+  levelKey = null
 }: UseLayerHistoryOptions): UseLayerHistoryResult {
-  // =========================================================================
-  // Core History Hook
-  // =========================================================================
-
-  const initialSnapshot: LayerHistorySnapshot = {
-    cells: [],
-    curves: [],
-    name: "",
-    tiles: [],
-    wallPaths: [],
-    terrainStrokes: [],
-    objects: [],
-    textLabels: [],
-    edges: [],
-    regions: [],
-    outlines: []
-  };
-
-  const {
-    currentState,
-    addToHistory: addToHistoryInternal,
-    undo: undoInternal,
-    redo: redoInternal,
-    canUndo,
-    canRedo,
-    resetHistory,
-    getHistoryState,
-    restoreHistoryState
-  } = useHistory<LayerHistorySnapshot>(initialSnapshot, layerHistorySnapshotsEqual);
-
-  // =========================================================================
-  // Refs for History Management
-  // =========================================================================
+  // Undo stacks per layer. Refs, because pushes happen inside other state
+  // updaters; the version counter re-renders consumers of canUndo/canRedo.
+  const stacksRef = useRef<LayerHistoryStacks>({});
+  const [, setVersion] = useState(0);
+  const bump = useCallback((): void => setVersion((v: number) => v + 1), []);
 
   // Track if we're applying history (to avoid adding to history during undo/redo)
   const isApplyingHistoryRef = useRef<boolean>(false);
 
-  // Track if history has been initialized for the current session
-  const historyInitialized = useRef<boolean>(false);
-
-  // Cache history state per layer (keyed by layer ID)
-  const layerHistoryCache = useRef<LayerHistoryCache>({});
-
-  // =========================================================================
-  // History Initialization Effect
-  // =========================================================================
-
-  // Initialize history when map data loads (only once)
-  useEffect(() => {
-    if (mapData && !isLoading && !historyInitialized.current) {
-      const activeLayer = getActiveLayer(mapData);
-      resetHistory({
-        cells: activeLayer.cells,
-        curves: activeLayer.curves,
-        name: mapData.name ?? '',
-        objects: activeLayer.objects,
-        textLabels: activeLayer.textLabels,
-        edges: activeLayer.edges,
-        tiles: activeLayer.tiles,
-        wallPaths: activeLayer.wallPaths,
-        terrainStrokes: activeLayer.terrainStrokes,
-        regions: mapData.regions ?? [],
-        outlines: mapData.outlines ?? [],
-        shapeOverlays: mapData.shapeOverlays ?? [],
-        fogOfWar: activeLayer.fogOfWar,
-        partyPins: mapData.partyPins ?? [],
-        savedRoutes: mapData.savedRoutes ?? [],
-        ...snapshotLevelsOf(activeLayer)
-      });
-      historyInitialized.current = true;
+  // History is per level and per load. Clear it while loading and whenever
+  // the open level changes. levelKey (the sub-hex path) changes in the same
+  // render as the level's map data, so a fallback to an ancestor level (trim)
+  // clears history before any undo can run; navigationVersion is kept as a
+  // second trigger for re-entering the same path.
+  // The root level's stacks survive a dive and come back on exit (parallax
+  // wave-7 finding 7); entries guard against the live values on apply, so a
+  // root field changed meanwhile is never clobbered.
+  const levelRef = useRef<{ nav: number; key: string | null }>({ nav: navigationVersion, key: levelKey });
+  const rootStacksRef = useRef<LayerHistoryStacks | null>(null);
+  // Layer of the last recorded entry; coalescing requires it to be unchanged
+  // (no merge across an A -> B -> A round trip, parallax wave-7 finding 8).
+  const lastRecordLayerRef = useRef<LayerId | null>(null);
+  // Pre-drag baselines pinned by transient (live-drag) writes, consumed by the
+  // next committed snapshot. See the file header.
+  const pinnedRef = useRef<PinnedValues>({ map: {}, layers: {} });
+  if (isLoading) {
+    levelRef.current = { nav: navigationVersion, key: levelKey };
+    stacksRef.current = {};
+    rootStacksRef.current = null;
+    lastRecordLayerRef.current = null;
+    pinnedRef.current = { map: {}, layers: {} };
+  } else if (levelRef.current.key === levelKey && levelRef.current.nav !== navigationVersion && mapData?.lod !== undefined) {
+    // A map that IS a ladder (it carries `lod`) has no sub-hex navigation: a
+    // navigationVersion bump is a camera move and keeps history (design 06 s5).
+    // The test is the map's own `lod`, NOT the capability flag: a flag-on
+    // install still navigates legacy sub-hex maps (review finding, phase 3b).
+    levelRef.current = { nav: navigationVersion, key: levelKey };
+  } else if (levelRef.current.nav !== navigationVersion || levelRef.current.key !== levelKey) {
+    pinnedRef.current = { map: {}, layers: {} };
+    const leaving = levelRef.current.key;
+    if (leaving !== levelKey) {
+      if (leaving === null) rootStacksRef.current = stacksRef.current;
+      stacksRef.current = levelKey === null ? (rootStacksRef.current ?? {}) : {};
+      if (levelKey === null) rootStacksRef.current = null;
+    } else if (levelKey !== null) {
+      // The same sub-hex path re-entered: it may be a recreated level.
+      stacksRef.current = {};
     }
-  }, [mapData, isLoading, resetHistory]);
+    levelRef.current = { nav: navigationVersion, key: levelKey };
+    lastRecordLayerRef.current = null;
+  }
+  if (mapData != null && lastRecordLayerRef.current !== mapData.activeLayerId) {
+    lastRecordLayerRef.current = null;
+  }
 
-  // A map that IS a ladder (it carries `lod`) has no sub-hex navigation: a
-  // level change is a camera move, so the reset below must never fire on one
-  // (design 06 s5). The test is the map's own `lod`, NOT the capability flag:
-  // a flag-on install still navigates legacy sub-hex maps, and their history
-  // must keep resetting per level (review finding, phase 3b). Read through a
-  // ref so the effect stays keyed on navigationVersion alone.
-  const isLadderMapRef = useRef<boolean>(false);
-  isLadderMapRef.current = mapData?.lod !== undefined;
-
-  // Reset history when sub-hex navigation changes level
-  useEffect(() => {
-    if (navigationVersion > 0 && !isLadderMapRef.current) {
-      layerHistoryCache.current = {};
-      historyInitialized.current = false;
-    }
-  }, [navigationVersion]);
+  // Sync known values from the rendered map. Pushes diff against these, so
+  // edits that bypass history (and land in a render) are never folded into
+  // the next entry's "before".
+  const knownRef = useRef<KnownValues>({ source: null, activeLayerId: null, map: {}, layers: {} });
+  if (mapData != null && mapData !== knownRef.current.source) {
+    const layers: Record<LayerId, Partial<LayerHistoryLayerValues>> = {};
+    for (const layer of mapData.layers) layers[layer.id] = readLayerValues(layer);
+    knownRef.current = { source: mapData, activeLayerId: mapData.activeLayerId, map: readMapValues(mapData), layers };
+  }
 
   // =========================================================================
-  // Layer State Helpers
+  // Recording
   // =========================================================================
 
-  /**
-   * Build a history state snapshot from layer data
-   */
-  const buildHistoryState = useCallback(
-    (layer: MapLayer, name: string, regions: Region[] = [], outlines: Outline[] = [], shapeOverlays: ShapeOverlay[] = [], fogOfWar: FogOfWar | null = null, partyPins: PartyPin[] = [], savedRoutes: SavedRoute[] = []): LayerHistorySnapshot => ({
-      cells: layer.cells,
-      curves: layer.curves,
-      name: name,
-      objects: layer.objects,
-      textLabels: layer.textLabels,
-      edges: layer.edges,
-      tiles: layer.tiles,
-      wallPaths: layer.wallPaths,
-      terrainStrokes: layer.terrainStrokes,
-      shapeOverlays: shapeOverlays,
-      fogOfWar: fogOfWar ?? layer.fogOfWar,
-      regions: regions,
-      outlines: outlines,
-      partyPins: partyPins,
-      savedRoutes: savedRoutes,
-      ...snapshotLevelsOf(layer)
-    }),
-    []
-  );
+  const recordEntry = useCallback(
+    (
+      layerId: LayerId,
+      layerDiff: FieldDiff<LayerHistoryLayerValues> | null,
+      mapDiff: FieldDiff<LayerHistoryMapValues> | null,
+      coalesceKey?: string,
+      meta?: Pick<LayerHistorySnapshot, 'level' | 'lodStamped'>
+    ): void => {
+      if (layerDiff == null && mapDiff == null) return;
+      const now = Date.now();
+      const stack = stacksRef.current[layerId] ?? createHistoryStack<LayerHistoryEntry>();
+      const entry: LayerHistoryEntry = {
+        layerId,
+        layer: layerDiff ?? emptyDiff<LayerHistoryLayerValues>(),
+        map: mapDiff ?? emptyDiff<LayerHistoryMapValues>(),
+        coalesceKey,
+        time: now,
+        ...(meta?.level !== undefined ? { level: meta.level } : {}),
+        ...(meta?.lodStamped !== undefined ? { lodStamped: meta.lodStamped } : {})
+      };
 
-  /**
-   * Save current layer's history to cache
-   */
-  const saveCurrentLayerHistory = useCallback((): void => {
-    if (!mapData) return;
-    const currentLayerId = mapData.activeLayerId;
-    layerHistoryCache.current[currentLayerId] = getHistoryState();
-  }, [mapData, getHistoryState]);
-
-  /**
-   * Restore or initialize history for a layer
-   */
-  const restoreOrInitLayerHistory = useCallback(
-    (newMapData: MapData, layerId: LayerId): void => {
-      const cachedHistory = layerHistoryCache.current[layerId];
-      if (cachedHistory != null) {
-        restoreHistoryState(cachedHistory);
+      const top = coalesceKey != null && lastRecordLayerRef.current === layerId ? peekTopHistoryEntry(stack) : null;
+      lastRecordLayerRef.current = layerId;
+      if (top != null && top.coalesceKey === coalesceKey && now - top.time <= COALESCE_WINDOW_MS) {
+        stacksRef.current[layerId] = replaceTopHistoryEntry(stack, {
+          ...entry,
+          layer: mergeFieldDiffs(top.layer, entry.layer),
+          map: mergeFieldDiffs(top.map, entry.map)
+        });
       } else {
-        // No cached history for this layer - initialize fresh
-        const layer = getActiveLayer(newMapData);
-        historyInitialized.current = false;
-        resetHistory(buildHistoryState(layer, newMapData.name ?? '', newMapData.regions ?? [], newMapData.outlines ?? [], newMapData.shapeOverlays ?? [], layer.fogOfWar, newMapData.partyPins ?? [], newMapData.savedRoutes ?? []));
-        historyInitialized.current = true;
-      }
-    },
-    [restoreHistoryState, resetHistory, buildHistoryState]
-  );
-
-  // =========================================================================
-  // Layer Management Handlers
-  // =========================================================================
-
-  const handleLayerSelect = useCallback(
-    (layerId: LayerId): void => {
-      if (!mapData || mapData.activeLayerId === layerId) return;
-
-      // Save current layer's history before switching
-      saveCurrentLayerHistory();
-
-      const newMapData = setActiveLayer(mapData, layerId);
-      updateMapData(newMapData);
-
-      // Restore new layer's history or initialize if none cached
-      restoreOrInitLayerHistory(newMapData, layerId);
-    },
-    [mapData, updateMapData, saveCurrentLayerHistory, restoreOrInitLayerHistory]
-  );
-
-  // Add a new layer
-  const handleLayerAdd = useCallback((): void => {
-    if (!mapData) return;
-
-    // Save current layer's history before switching
-    saveCurrentLayerHistory();
-
-    const newMapData = addLayer(mapData);
-    updateMapData(newMapData);
-
-    // New layer always starts with fresh history
-    const newActiveLayer = getActiveLayer(newMapData);
-    historyInitialized.current = false;
-    resetHistory(buildHistoryState(newActiveLayer, newMapData.name ?? '', newMapData.regions ?? [], newMapData.outlines ?? [], newMapData.shapeOverlays ?? [], newActiveLayer.fogOfWar, newMapData.partyPins ?? [], newMapData.savedRoutes ?? []));
-    historyInitialized.current = true;
-  }, [mapData, updateMapData, saveCurrentLayerHistory, resetHistory, buildHistoryState]);
-
-  const handleLayerClone = useCallback(
-    (layerId: LayerId, mode: 'all' | 'mapOnly'): void => {
-      if (!mapData) return;
-
-      saveCurrentLayerHistory();
-
-      const newMapData = cloneLayer(mapData, layerId, mode);
-      if (newMapData === mapData) return;
-
-      updateMapData(newMapData);
-
-      const clonedLayer = getActiveLayer(newMapData);
-      historyInitialized.current = false;
-      resetHistory(buildHistoryState(clonedLayer, newMapData.name ?? '', newMapData.regions ?? [], newMapData.outlines ?? [], newMapData.shapeOverlays ?? [], clonedLayer.fogOfWar, newMapData.partyPins ?? [], newMapData.savedRoutes ?? []));
-      historyInitialized.current = true;
-    },
-    [mapData, updateMapData, saveCurrentLayerHistory, resetHistory, buildHistoryState]
-  );
-
-  const handleLayerDelete = useCallback(
-    (layerId: LayerId): void => {
-      if (!mapData) return;
-
-      // removeLayer handles preventing deletion of last layer
-      const newMapData = removeLayer(mapData, layerId);
-
-      // Only update if something changed
-      if (newMapData !== mapData) {
-        // Clear cached history for deleted layer
-        delete layerHistoryCache.current[layerId];
-
-        updateMapData(newMapData);
-
-        // If active layer changed, restore or init history for new active layer
-        if (newMapData.activeLayerId !== mapData.activeLayerId) {
-          restoreOrInitLayerHistory(newMapData, newMapData.activeLayerId);
-        }
-      }
-    },
-    [mapData, updateMapData, restoreOrInitLayerHistory]
-  );
-
-  // Reorder layers (no history interaction needed)
-  const handleLayerReorder = useCallback(
-    (layerId: LayerId, newIndex: number): void => {
-      if (!mapData) return;
-
-      const newMapData = reorderLayers(mapData, layerId, newIndex);
-      updateMapData(newMapData);
-    },
-    [mapData, updateMapData]
-  );
-
-  // Toggle show layer below for a specific layer
-  const handleToggleShowLayerBelow = useCallback(
-    (layerId: LayerId): void => {
-      if (!mapData) return;
-
-      const layer = getLayerById(mapData, layerId);
-      if (!layer) return;
-
-      const newMapData = updateLayer(mapData, layerId, {
-        showLayerBelow: layer.showLayerBelow !== true
-      });
-      updateMapData(newMapData);
-    },
-    [mapData, updateMapData]
-  );
-
-  // Set layer below opacity for a specific layer
-  const handleSetLayerBelowOpacity = useCallback(
-    (layerId: LayerId, opacity: number): void => {
-      if (!mapData) return;
-
-      // Clamp opacity to valid range
-      const clampedOpacity = Math.max(0.1, Math.min(0.5, opacity));
-
-      const newMapData = updateLayer(mapData, layerId, {
-        layerBelowOpacity: clampedOpacity
-      });
-      updateMapData(newMapData);
-    },
-    [mapData, updateMapData]
-  );
-
-  const handleUpdateLayerDisplay = useCallback(
-    (layerId: LayerId, newName: string, icon: string | null): void => {
-      if (!mapData) return;
-
-      const updates: Partial<MapLayer> = { name: newName };
-      if (icon !== null) {
-        updates.icon = icon;
-      } else {
-        // If icon is null, we need to remove it - use undefined
-        updates.icon = undefined;
+        stacksRef.current[layerId] = pushHistoryEntry(stack, entry);
       }
 
-      const newMapData = updateLayer(mapData, layerId, updates);
-      updateMapData(newMapData);
+      const known = knownRef.current;
+      if (layerDiff != null) known.layers[layerId] = { ...known.layers[layerId], ...layerDiff.after };
+      if (mapDiff != null) known.map = { ...known.map, ...mapDiff.after };
+      bump();
     },
-    [mapData, updateMapData]
+    [bump]
+  );
+
+  /**
+   * Add a post-edit snapshot to history (data change handlers). Diffed
+   * against the last known values of the active layer and the map; only
+   * changed fields are recorded.
+   */
+  const addToHistory = useCallback(
+    (state: LayerHistorySnapshot, options?: AddToHistoryOptions): void => {
+      if (isApplyingHistoryRef.current) return;
+      const known = knownRef.current;
+      const layerId = known.activeLayerId;
+      if (layerId == null) return;
+      const knownLayer = known.layers[layerId] as Partial<LayerHistoryLayerValues> | undefined;
+      const pinned = pinnedRef.current;
+      const pinnedLayer = pinned.layers[layerId] ?? {};
+
+      if (options?.transient === true) {
+        // Live drag write: pin the pre-drag values of the fields it changes.
+        // `known` still holds them on the first move (no render in between);
+        // later moves find the pin already held and leave it.
+        const liveLayerDiff = knownLayer != null
+          ? diffHistoryFields(LAYER_KEYS, knownLayer, pickLayerValues(state), true)
+          : null;
+        const liveMapDiff = diffHistoryFields(MAP_KEYS, known.map, pickMapValues(state), true);
+        pinnedRef.current = {
+          map: pinBefore(pinned.map, liveMapDiff),
+          layers: { ...pinned.layers, [layerId]: pinBefore(pinnedLayer, liveLayerDiff) }
+        };
+        return;
+      }
+
+      // Committed snapshot: diff against the pre-drag pins where held (the last
+      // render already shows the dragged value), then release them.
+      const baseLayer = knownLayer != null ? { ...knownLayer, ...pinnedLayer } : null;
+      const baseMap = { ...known.map, ...pinned.map };
+      pinnedRef.current = { map: {}, layers: { ...pinned.layers, [layerId]: {} } };
+      // A layer not yet rendered has no known baseline: record only map-wide fields.
+      const layerDiff = baseLayer != null
+        ? diffHistoryFields(LAYER_KEYS, baseLayer, pickLayerValues(state), true)
+        : null;
+      const mapDiff = diffHistoryFields(MAP_KEYS, baseMap, pickMapValues(state), true);
+      recordEntry(layerId, layerDiff, mapDiff, undefined, { level: state.level, lodStamped: state.lodStamped });
+    },
+    [recordEntry]
+  );
+
+  /**
+   * Record an exact prev -> next transition (fog operations): diffs the
+   * active layer of `prev` and the map-wide fields.
+   */
+  const recordMapChange = useCallback(
+    (prev: MapData, next: MapData, options?: RecordMapChangeOptions): void => {
+      if (isApplyingHistoryRef.current || prev === next) return;
+      const layerId = prev.activeLayerId;
+      const prevLayer = getLayerById(prev, layerId);
+      const nextLayer = getLayerById(next, layerId);
+      const layerDiff = prevLayer != null && nextLayer != null
+        ? diffHistoryFields(LAYER_KEYS, readLayerValues(prevLayer), readLayerValues(nextLayer), false)
+        : null;
+      const mapDiff = diffHistoryFields(MAP_KEYS, readMapValues(prev), readMapValues(next), false);
+      recordEntry(layerId, layerDiff, mapDiff, options?.coalesceKey);
+      knownRef.current.activeLayerId = next.activeLayerId;
+    },
+    [recordEntry]
   );
 
   // =========================================================================
   // Undo/Redo Handlers
   // =========================================================================
 
-  const handleUndo = useCallback((): void => {
-    // The change being undone lives on the rung of the entry we are LEAVING
-    // (the current top), not of the snapshot we restore.
-    const leavingLevel = currentState?.level;
-    const previousState = undoInternal();
-    if (previousState && mapData) {
+  /**
+   * One undo/redo keypress. The stack moves only once an entry actually
+   * changes the live map; an entry that no longer applies (every field
+   * changed since by a write outside history) is dropped and the next one is
+   * tried. All of it runs against the live map inside the functional update,
+   * computed from the stack as it was at the call, so the result is the same
+   * however often the updater runs. Returns whether the map changed (known at
+   * return because updaters run at dispatch; false if it was deferred).
+   */
+  const applyStep = useCallback(
+    (direction: 'undo' | 'redo'): boolean => {
+      // Pins from an uncommitted drag would mis-baseline the next entry.
+      pinnedRef.current = { map: {}, layers: {} };
+      const layerId = knownRef.current.activeLayerId;
+      if (layerId == null) return false;
+      const startStack = stacksRef.current[layerId] as LayerHistoryStacks[LayerId] | undefined;
+      if (startStack == null) return false;
+      if (direction === 'undo' ? startStack.index === 0 : startStack.index >= startStack.entries.length) return false;
+
+      let applied = false;
       isApplyingHistoryRef.current = true;
-      // Apply layer-specific data to active layer, name/regions/outlines at root
-      const newMapData = updateActiveLayer(
-        { ...mapData, name: previousState.name, regions: previousState.regions ?? mapData.regions, outlines: previousState.outlines ?? mapData.outlines, shapeOverlays: previousState.shapeOverlays ?? mapData.shapeOverlays, partyPins: previousState.partyPins ?? mapData.partyPins, savedRoutes: previousState.savedRoutes ?? mapData.savedRoutes },
-        {
-          cells: previousState.cells,
-          curves: previousState.curves,
-          objects: previousState.objects,
-          textLabels: previousState.textLabels,
-          edges: previousState.edges,
-          tiles: previousState.tiles,
-          wallPaths: previousState.wallPaths,
-          terrainStrokes: previousState.terrainStrokes,
-          fogOfWar: previousState.fogOfWar !== undefined ? previousState.fogOfWar : undefined
+      updateMapData((prev: MapData) => {
+        let stack = startStack;
+        let next = prev;
+        for (;;) {
+          const step = direction === 'undo' ? stepHistoryUndo(stack) : stepHistoryRedo(stack);
+          if (step == null) break;
+          const candidate = applyLayerHistoryEntry(prev, step.entry, direction);
+          if (candidate !== prev) {
+            stack = step.stack;
+            // Cross-rung undo/redo: bring the camera to the rung the change lives on.
+            const view = viewStateForRung(candidate, step.entry.level);
+            next = view !== null ? { ...candidate, viewState: view } : candidate;
+            break;
+          }
+          stack = dropHistoryStep(stack, direction);
         }
-      );
-      // Whole `levels` record back (or stripped); `level` never selects the rung.
-      // Leaving the entry that stamped `lod` makes the map classic again.
-      const restored = undoLodStamp(restoreSnapshotLevels(newMapData, previousState), currentState);
-      // Cross-rung undo: bring the camera to the rung the change lives on.
-      const view = viewStateForRung(restored, leavingLevel);
-      updateMapData(view !== null ? { ...restored, viewState: view } : restored);
-      // Use setTimeout to ensure state update completes before re-enabling history
+        stacksRef.current[layerId] = stack;
+        applied = next !== prev;
+        return next;
+      });
+      if (stacksRef.current[layerId] !== startStack) bump();
+      // Re-enable recording once the update has been dispatched.
       window.setTimeout(() => {
         isApplyingHistoryRef.current = false;
       }, 0);
-    }
-  }, [undoInternal, currentState, mapData, updateMapData]);
+      return applied;
+    },
+    [updateMapData, bump]
+  );
 
-  const handleRedo = useCallback((): void => {
-    const nextState = redoInternal();
-    if (nextState && mapData) {
-      isApplyingHistoryRef.current = true;
-      // Apply layer-specific data to active layer, name/regions/outlines at root
-      const newMapData = updateActiveLayer(
-        { ...mapData, name: nextState.name, regions: nextState.regions ?? mapData.regions, outlines: nextState.outlines ?? mapData.outlines, shapeOverlays: nextState.shapeOverlays ?? mapData.shapeOverlays, partyPins: nextState.partyPins ?? mapData.partyPins, savedRoutes: nextState.savedRoutes ?? mapData.savedRoutes },
-        {
-          cells: nextState.cells,
-          curves: nextState.curves,
-          objects: nextState.objects,
-          textLabels: nextState.textLabels,
-          edges: nextState.edges,
-          tiles: nextState.tiles,
-          wallPaths: nextState.wallPaths,
-          terrainStrokes: nextState.terrainStrokes,
-          fogOfWar: nextState.fogOfWar !== undefined ? nextState.fogOfWar : undefined
-        }
-      );
-      // Whole `levels` record back (or stripped); `level` never selects the rung.
-      // Entering the entry that stamped `lod` puts the block back.
-      const restored = redoLodStamp(restoreSnapshotLevels(newMapData, nextState), nextState);
-      // Cross-rung redo: the re-applied change lives on the entry's own rung.
-      const view = viewStateForRung(restored, nextState.level);
-      updateMapData(view !== null ? { ...restored, viewState: view } : restored);
-      // Use setTimeout to ensure state update completes before re-enabling history
-      window.setTimeout(() => {
-        isApplyingHistoryRef.current = false;
-      }, 0);
-    }
-  }, [redoInternal, mapData, updateMapData]);
-
-  // =========================================================================
-  // History API for Data Handlers
-  // =========================================================================
+  const handleUndo = useCallback((): boolean => applyStep('undo'), [applyStep]);
+  const handleRedo = useCallback((): boolean => applyStep('redo'), [applyStep]);
 
   /**
    * Check if we're currently applying history (undo/redo in progress)
@@ -412,21 +447,97 @@ function useLayerHistory({
   }, []);
 
   /**
-   * Add a state to history (wrapper that checks isApplyingHistory)
-   * This is what data change handlers should call
+   * Drop the transient pins (parallax-livefix 2). A drag that ends without its
+   * commit (pointercancel, a release the drag hook never sees) would otherwise
+   * leave its pre-drag baseline held, and the next commit of ANY field would
+   * diff against it and record the abandoned move as part of that entry. The
+   * abandoned live values then count as the baseline, like any other write
+   * outside history.
    */
-  const addToHistory = useCallback(
-    (state: LayerHistorySnapshot): void => {
-      if (!isApplyingHistoryRef.current) {
-        addToHistoryInternal(state);
-      }
+  const clearTransient = useCallback((): void => {
+    pinnedRef.current = { map: {}, layers: {} };
+  }, []);
+
+  // =========================================================================
+  // Layer Management Handlers (functional updates on the live map)
+  // =========================================================================
+
+  // Stacks are keyed by layer id, so switching/adding/cloning needs no history work.
+  const handleLayerSelect = useCallback(
+    (layerId: LayerId): void => {
+      updateMapData((prev: MapData) => prev.activeLayerId === layerId ? prev : setActiveLayer(prev, layerId));
     },
-    [addToHistoryInternal]
+    [updateMapData]
+  );
+
+  const handleLayerAdd = useCallback((): void => {
+    updateMapData((prev: MapData) => addLayer(prev));
+  }, [updateMapData]);
+
+  const handleLayerClone = useCallback(
+    (layerId: LayerId, mode: 'all' | 'mapOnly'): void => {
+      updateMapData((prev: MapData) => cloneLayer(prev, layerId, mode));
+    },
+    [updateMapData]
+  );
+
+  const handleLayerDelete = useCallback(
+    (layerId: LayerId): void => {
+      updateMapData((prev: MapData) => {
+        // removeLayer handles preventing deletion of last layer
+        const next = removeLayer(prev, layerId);
+        if (next !== prev) delete stacksRef.current[layerId];
+        return next;
+      });
+    },
+    [updateMapData]
+  );
+
+  const handleLayerReorder = useCallback(
+    (layerId: LayerId, newIndex: number): void => {
+      updateMapData((prev: MapData) => reorderLayers(prev, layerId, newIndex));
+    },
+    [updateMapData]
+  );
+
+  const handleToggleShowLayerBelow = useCallback(
+    (layerId: LayerId): void => {
+      updateMapData((prev: MapData) => {
+        const layer = getLayerById(prev, layerId);
+        if (!layer) return prev;
+        return updateLayer(prev, layerId, { showLayerBelow: layer.showLayerBelow !== true });
+      });
+    },
+    [updateMapData]
+  );
+
+  const handleSetLayerBelowOpacity = useCallback(
+    (layerId: LayerId, opacity: number): void => {
+      // Clamp opacity to valid range
+      const clampedOpacity = Math.max(0.1, Math.min(0.5, opacity));
+      updateMapData((prev: MapData) => updateLayer(prev, layerId, { layerBelowOpacity: clampedOpacity }));
+    },
+    [updateMapData]
+  );
+
+  const handleUpdateLayerDisplay = useCallback(
+    (layerId: LayerId, newName: string, icon: string | null): void => {
+      // A null icon removes it
+      const updates: Partial<MapLayer> = { name: newName, icon: icon ?? undefined };
+      updateMapData((prev: MapData) => updateLayer(prev, layerId, updates));
+    },
+    [updateMapData]
   );
 
   // =========================================================================
   // Return Value
   // =========================================================================
+
+  const activeStack = mapData != null
+    ? stacksRef.current[mapData.activeLayerId] as LayerHistoryStacks[LayerId] | undefined
+    : undefined;
+  const canUndo = activeStack != null && activeStack.index > 0;
+  const canRedo = activeStack != null && activeStack.index < activeStack.entries.length;
 
   const layerActions: LayerActions = {
     handleLayerSelect,
@@ -443,7 +554,9 @@ function useLayerHistory({
     handleUndo,
     handleRedo,
     addToHistory,
-    isApplyingHistory
+    recordMapChange,
+    isApplyingHistory,
+    clearTransient
   };
 
   return {
@@ -462,7 +575,9 @@ function useLayerHistory({
     handleUndo,
     handleRedo,
     addToHistory,
-    isApplyingHistory
+    recordMapChange,
+    isApplyingHistory,
+    clearTransient
   };
 }
 

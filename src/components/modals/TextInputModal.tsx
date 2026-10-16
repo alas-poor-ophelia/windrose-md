@@ -31,7 +31,7 @@ function openNativeTextInputModal(options: {
       private inputEl!: HTMLInputElement;
       private submitted = false;
 
-      onOpen(): void {
+      override onOpen(): void {
         const { contentEl, titleEl } = this;
         titleEl.setText(title);
 
@@ -83,7 +83,7 @@ function openNativeTextInputModal(options: {
         }
       }
 
-      onClose(): void {
+      override onClose(): void {
         if (!this.submitted && onCancel) {
           onCancel();
         }

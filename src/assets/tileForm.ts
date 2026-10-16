@@ -15,7 +15,7 @@
  * remains the only persisted render mode; `TileForm` is a read-time projection.
  */
 
-import type { TileForm, TileMetadataEntry, TilesetDef } from '#types/tiles/tile.types';
+import type { TileForm, TileMetadataEntry, TilesetDef, TileSubtoolId } from '#types/tiles/tile.types';
 import { DEFAULT_PIXELS_PER_CELL } from './spanPredictor';
 
 /** DD source dirs drawn ALONG edges/curves (swept strips). */
@@ -55,18 +55,15 @@ function deriveTileForm(
   return 'cell';
 }
 
-/** A placement subtool the ribbon can offer. */
-export type TileSubtoolId = 'paint' | 'stamp' | 'scatter' | 'fill' | 'brush' | 'line' | 'autotile' | 'opening';
-
 /**
  * How a form grades a subtool:
  *   recommended — bright; a natural fit for the form
  *   available   — dimmed but clickable; unusual pairing, manual override
  *   disabled    — truly impossible (missing required metadata/machinery)
  */
-export type SubtoolGate = 'recommended' | 'available' | 'disabled';
+type SubtoolGate = 'recommended' | 'available' | 'disabled';
 
-export interface TileSubtoolDef {
+interface TileSubtoolDef {
   id: TileSubtoolId;
   label: string;
   icon: string;
@@ -250,18 +247,4 @@ function deriveOpeningWidthCells(
   return Math.max(lo, Math.min(hi, raw));
 }
 
-export {
-  deriveTileForm,
-  deriveOpeningWidthCells,
-  formDef,
-  subtoolMeta,
-  subtoolGate,
-  ribbonSubtoolsForForm,
-  FORM_DEFS,
-  SUBTOOL_META,
-  RIBBON_SUBTOOL_ORDER,
-  LINE_DD_SOURCES,
-  OPENING_DD_SOURCES,
-  THRESHOLD_ENTRY_ID,
-  THRESHOLD_ENTRY,
-};
+export { deriveTileForm, deriveOpeningWidthCells, formDef, subtoolMeta, subtoolGate, ribbonSubtoolsForForm, FORM_DEFS, SUBTOOL_META, RIBBON_SUBTOOL_ORDER, OPENING_DD_SOURCES, THRESHOLD_ENTRY };

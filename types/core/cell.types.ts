@@ -87,30 +87,12 @@ export interface HexCell {
 export type Cell = GridCell | HexCell;
 
 // ===========================================
-// Type Guards
+// Type Guards (implementations live in src/geometry/core/cellAccessor.ts)
 // ===========================================
 
-/** Check if cell is a grid cell (has x, y) */
-export function isGridCell(cell: Cell): cell is GridCell {
-  return 'x' in cell && 'y' in cell;
-}
-
-/** Check if cell is a hex cell (has q, r) */
-export function isHexCell(cell: Cell): cell is HexCell {
-  return 'q' in cell && 'r' in cell;
-}
-
-/** Check if cell has partial fill (segments with entries) */
-export function hasSegments(cell: Cell): cell is SegmentGridCell {
-  return isGridCell(cell) && 
-    cell.segments !== undefined && 
-    Object.keys(cell.segments).length > 0;
-}
-
-/** Check if cell is simple (fully painted, no segments) */
-export function isSimpleCell(cell: Cell): boolean {
-  return !hasSegments(cell);
-}
+// TEMPORARY SHIM for importers outside wave-10-c ownership; delete once they
+// import from cellAccessor directly.
+export { isGridCell, isHexCell, hasSegments, isSimpleCell } from '../../src/geometry/core/cellAccessor';
 
 // ===========================================
 // Cell Maps (Storage)
@@ -158,4 +140,3 @@ export interface LocalCellPosition {
 // Re-export Point for convenience
 // ===========================================
 
-export type { Point };

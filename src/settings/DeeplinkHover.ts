@@ -1,172 +1,145 @@
-import { renderHoverPreview, unmountHoverPreview } from '../components/WindroseHoverPreview';
+// DeeplinkHover.ts
+// Hover controller for windrose: deep links. One preview popover at a time,
+// shown after a short rest over a link and torn down on pointer leave,
+// Escape, a press outside the popover, or plugin unload. The popover lives in
+// the link element's own document, so links in popout windows preview there.
 
-interface LinkState {
-  showTimer: number | null;
-  hideTimer: number | null;
-  popover: { hide(): void } | null;
-  hoverEl: HTMLElement | null;
-  host: HTMLElement | null;
+import type { DeepLinkData } from '../persistence/deepLinkHandler';
+import { renderHoverPreview, unmountHoverPreview, getPreviewDimensions } from '../components/WindroseHoverPreview';
+
+const HL = '[Windrose:Hover]';
+const SHOW_DELAY_MS = 400;
+const HIDE_GRACE_MS = 300;
+
+interface ActivePopover {
+  href: string;
+  popoverEl: HTMLElement;
+  host: HTMLElement;
+  doc: Document;
+  onKeyDown: (e: KeyboardEvent) => void;
+  onPointerDown: (e: PointerEvent) => void;
 }
 
-interface ParsedDeepLink {
-  mapId: string;
-  x: number;
-  y: number;
-  zoom: number;
-  layerId: string;
-  notePath: string;
+interface PendingShow {
+  href: string;
+  timer: number;
 }
 
-interface HoverPlugin {
-  settings: { hoverPreviewScale?: number; [key: string]: unknown };
+let pending: PendingShow | null = null;
+let active: ActivePopover | null = null;
+let hideTimer: number | null = null;
+
+function cancelShow(): void {
+  if (pending != null) {
+    window.clearTimeout(pending.timer);
+    pending = null;
+  }
 }
 
-const DeeplinkHover = (() => {
-  const HL = '[Windrose:Hover]';
-  const SHOW_DELAY_MS = 400;
-  const HIDE_GRACE_MS = 300;
-
-  // state: { el: HTMLElement -> { showTimer, hideTimer, popover, hoverEl } }
-  const linkState = new WeakMap<HTMLElement, LinkState>();
-  let currentLink: HTMLElement | null = null;
-
-  function clearTimers(state: LinkState | undefined): void {
-    if (!state) return;
-    if (state.showTimer != null) { window.clearTimeout(state.showTimer); state.showTimer = null; }
-    if (state.hideTimer != null) { window.clearTimeout(state.hideTimer); state.hideTimer = null; }
+function cancelHide(): void {
+  if (hideTimer != null) {
+    window.clearTimeout(hideTimer);
+    hideTimer = null;
   }
+}
 
-  function destroyPopover(state: LinkState | undefined): void {
-    if (!state) return;
-    if (state.hoverEl && state.host) {
-      try { unmountHoverPreview(state.host); } catch { /* ignore */ }
-    }
-    if (state.popover) {
-      try { state.popover.hide(); } catch { /* ignore */ }
-      state.popover = null;
-    }
-    state.hoverEl = null;
-    state.host = null;
-  }
+/** Tear down the visible popover (if any) and every pending timer. */
+function hide(): void {
+  cancelShow();
+  cancelHide();
+  if (active == null) return;
+  const { popoverEl, host, doc, onKeyDown, onPointerDown } = active;
+  active = null;
+  doc.removeEventListener('keydown', onKeyDown, true);
+  doc.removeEventListener('pointerdown', onPointerDown, true);
+  unmountHoverPreview(host);
+  popoverEl.remove();
+}
 
-  function scheduleHide(linkEl: HTMLElement): void {
-    const state = linkState.get(linkEl);
-    if (!state) return;
-    if (state.hideTimer != null) return;
-    state.hideTimer = window.setTimeout(() => {
-      state.hideTimer = null;
-      destroyPopover(state);
-      if (currentLink === linkEl) currentLink = null;
-    }, HIDE_GRACE_MS);
-  }
+function scheduleHide(): void {
+  if (hideTimer != null || active == null) return;
+  hideTimer = window.setTimeout(() => {
+    hideTimer = null;
+    hide();
+  }, HIDE_GRACE_MS);
+}
 
-  function cancelHide(linkEl: HTMLElement): void {
-    const state = linkState.get(linkEl);
-    if (state && state.hideTimer != null) {
-      window.clearTimeout(state.hideTimer);
-      state.hideTimer = null;
-    }
-  }
+function show(linkEl: HTMLElement, href: string, parsed: DeepLinkData): void {
+  hide();
+  if (!linkEl.isConnected) return;
 
-  function showPopover(plugin: HoverPlugin, linkEl: HTMLElement, parsed: ParsedDeepLink): void {
-    if (currentLink && currentLink !== linkEl) {
-      const prev = linkState.get(currentLink);
-      clearTimers(prev);
-      destroyPopover(prev);
-    }
-    currentLink = linkEl;
+  const doc = linkEl.ownerDocument;
+  const win = doc.defaultView ?? window;
+  const dims = getPreviewDimensions();
 
-    const state: LinkState = linkState.get(linkEl) ?? { showTimer: null, hideTimer: null, popover: null, hoverEl: null, host: null };
-    linkState.set(linkEl, state);
+  const popoverEl = doc.body.createDiv({ cls: 'windrose-hover-preview-popover popover' });
+  const rect = linkEl.getBoundingClientRect();
+  const viewportW = win.innerWidth || 1200;
+  const viewportH = win.innerHeight || 800;
+  // Below the link by default; flip above when it would overflow.
+  const estWidth = dims.width + 20;
+  const estHeight = dims.height + 64;
+  const left = Math.min(Math.max(8, rect.left), viewportW - estWidth - 8);
+  let top = rect.bottom + 8;
+  if (top + estHeight > viewportH - 8) top = Math.max(8, rect.top - estHeight - 8);
+  popoverEl.setCssStyles({ position: 'fixed', zIndex: 'var(--layer-popover)', left: `${left}px`, top: `${top}px` });
 
-    // Custom popover div — simpler and more reliable than HoverPopover which
-    // requires internal lifecycle we don't have access to.
-    const popoverEl = activeDocument.body.createDiv({ cls: 'windrose-hover-preview-popover popover' });
-    popoverEl.setCssStyles({ position: 'fixed', zIndex: '1000' });
+  const host = popoverEl.createDiv({ cls: 'windrose-hover-preview-host' });
+  popoverEl.addEventListener('mouseenter', cancelHide);
+  popoverEl.addEventListener('mouseleave', scheduleHide);
 
-    const rect = linkEl.getBoundingClientRect();
-    const viewportW = window.innerWidth || 1200;
-    const viewportH = window.innerHeight || 800;
-    // Position below the link by default; flip above if it would overflow.
-    const previewScale = Math.max(0.5, Math.min(2.0, Number(plugin.settings.hoverPreviewScale) || 1.0));
-    const estWidth = Math.round(240 * previewScale) + 20;
-    const estHeight = Math.round(180 * previewScale) + 64;
-    const left = Math.min(Math.max(8, rect.left), viewportW - estWidth - 8);
-    let top = rect.bottom + 8;
-    if (top + estHeight > viewportH - 8) {
-      top = Math.max(8, rect.top - estHeight - 8);
-    }
-    popoverEl.style.left = left + 'px';
-    popoverEl.style.top = top + 'px';
-
-    state.popover = { hide: () => popoverEl.remove() };
-    state.hoverEl = popoverEl;
-
-    const container = popoverEl.createDiv({ cls: 'windrose-hover-preview-host' });
-    state.host = container;
-    popoverEl.addEventListener('mouseenter', () => cancelHide(linkEl));
-    popoverEl.addEventListener('mouseleave', () => scheduleHide(linkEl));
-
-    try {
-      renderHoverPreview(container, {
-        mapId: parsed.mapId,
-        x: Number.isFinite(parsed.x) ? parsed.x : 0,
-        y: Number.isFinite(parsed.y) ? parsed.y : 0,
-        zoom: Number.isFinite(parsed.zoom) && parsed.zoom > 0 ? parsed.zoom : undefined,
-        layerId: parsed.layerId || '',
-        notePath: parsed.notePath || ''
-      });
-    } catch (err: unknown) {
-      console.error(HL, 'renderPreview failed', err);
-      container.setText('Preview failed to load.');
-    }
-  }
-
-  function onHoverEnter(plugin: HoverPlugin, linkEl: HTMLElement, parsed: ParsedDeepLink): void {
-    if (linkEl == null || parsed == null) return;
-
-    const state: LinkState = linkState.get(linkEl) ?? { showTimer: null, hideTimer: null, popover: null, hoverEl: null, host: null };
-    linkState.set(linkEl, state);
-
-    cancelHide(linkEl);
-
-    if (state.showTimer != null) return;
-    if (state.popover) return;
-
-    state.showTimer = window.setTimeout(() => {
-      state.showTimer = null;
-      showPopover(plugin, linkEl, parsed);
-    }, SHOW_DELAY_MS);
-  }
-
-  function onHoverLeave(linkEl: HTMLElement): void {
-    if (linkEl == null) return;
-    const state = linkState.get(linkEl);
-    if (!state) return;
-    if (state.showTimer != null) {
-      window.clearTimeout(state.showTimer);
-      state.showTimer = null;
-    }
-    if (state.popover) scheduleHide(linkEl);
-  }
-
-  function attachReadingModeHover(plugin: HoverPlugin, anchor: HTMLElement, parsed: ParsedDeepLink): void {
-    anchor.addEventListener('mouseenter', () => onHoverEnter(plugin, anchor, parsed));
-    anchor.addEventListener('mouseleave', () => onHoverLeave(anchor));
-  }
-
-  // Live Preview: called from CM6 mouseover handler with the resolved windrose href.
-  function onLivePreviewPointer(plugin: HoverPlugin, linkEl: HTMLElement, parsed: ParsedDeepLink, kind: string): void {
-    if (kind === 'enter') onHoverEnter(plugin, linkEl, parsed);
-    else if (kind === 'leave') onHoverLeave(linkEl);
-  }
-
-  return {
-    attachReadingModeHover,
-    onLivePreviewPointer,
-    onHoverEnter,
-    onHoverLeave
+  const onKeyDown = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape') hide();
   };
-})();
+  const onPointerDown = (e: PointerEvent): void => {
+    const target = e.target as Node | null;
+    if (target == null || !popoverEl.contains(target)) hide();
+  };
+  doc.addEventListener('keydown', onKeyDown, true);
+  doc.addEventListener('pointerdown', onPointerDown, true);
 
-export { DeeplinkHover };
+  active = { href, popoverEl, host, doc, onKeyDown, onPointerDown };
+
+  try {
+    renderHoverPreview(host, {
+      mapId: parsed.mapId,
+      x: Number.isFinite(parsed.x) ? parsed.x : 0,
+      y: Number.isFinite(parsed.y) ? parsed.y : 0,
+      zoom: parsed.zoom,
+      layerId: parsed.layerId || '',
+      subHexPath: parsed.subHexPath,
+      notePath: parsed.notePath || ''
+    });
+  } catch (err: unknown) {
+    console.error(HL, 'renderPreview failed', err);
+    host.setText('Preview failed to load.');
+  }
+}
+
+/**
+ * Pointer came to rest over a deep link. `href` identifies the link across
+ * the child spans CodeMirror renders, so moving between them does not flicker.
+ */
+function onEnter(linkEl: HTMLElement, href: string, parsed: DeepLinkData): void {
+  if (active?.href === href) {
+    cancelHide();
+    return;
+  }
+  if (pending?.href === href) return;
+  cancelShow();
+  pending = {
+    href,
+    timer: window.setTimeout(() => {
+      pending = null;
+      show(linkEl, href, parsed);
+    }, SHOW_DELAY_MS),
+  };
+}
+
+/** Pointer left a deep link. */
+function onLeave(): void {
+  cancelShow();
+  scheduleHide();
+}
+
+export const DeeplinkHover = { onEnter, onLeave, hide };

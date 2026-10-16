@@ -43,15 +43,12 @@ const AreaSelectLayer = ({ currentTool }: AreaSelectLayerProps): VNode | null =>
 
   const {
     handleAreaSelectClick,
-    cancelAreaSelect,
-    isAreaSelecting,
     areaSelectHoverPosition,
     updateAreaSelectHover
   } = useAreaSelect(currentTool);
 
   useLayerHandlers('areaSelect', {
-    handleAreaSelectClick, cancelAreaSelect,
-    isAreaSelecting, areaSelectStart, updateAreaSelectHover
+    handleAreaSelectClick, areaSelectStart, updateAreaSelectHover
   });
 
   useEffect(() => {

@@ -138,60 +138,8 @@
   }
 }
 
-/* Pop-out button shown on docked panels in full-pane mode */
-.windrose-popout-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: none;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--windrose-text-muted);
-  cursor: pointer;
-  line-height: 0;
-  opacity: 0;
-  transition: var(--windrose-transition);
-
-  svg {
-    display: block;
-  }
-
-  &:hover {
-    background: oklch(from var(--windrose-border-primary) l c h / 0.2);
-    color: var(--windrose-text-primary);
-    opacity: 1;
-  }
-}
-
-/* Show popout button on panel hover */
-.windrose-layer-controls:hover .windrose-popout-btn,
-.windrose-region-panel:hover .windrose-popout-btn {
-  opacity: 0.6;
-
-  &:hover {
-    opacity: 1;
-  }
-}
-
-/* Layer controls footer: add button + popout side by side */
-.windrose-layer-controls-footer {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
 /* Override docked styles when inside a floating panel */
 .windrose-floating-panel-content {
-  .windrose-layer-controls {
-    opacity: 1;
-    transform: none;
-    pointer-events: auto;
-    padding: 8px;
-  }
-
   /* Color picker in floating mode: strip chrome that FloatingPanel provides */
   .windrose-color-picker-floating {
     border: none;

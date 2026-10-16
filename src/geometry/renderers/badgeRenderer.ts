@@ -10,6 +10,22 @@
  * without side effects.
  */
 
+/** Note-link badge: max share of the object's short side, size relative to scaledSize, floor, glyph share. */
+const NOTE_BADGE_MAX_OBJECT_RATIO = 0.3;
+const NOTE_BADGE_SIZE_RATIO = 0.25;
+const NOTE_BADGE_MIN_PX = 8;
+const NOTE_BADGE_GLYPH_RATIO = 0.7;
+
+/** Tooltip indicator dot: size relative to scaledSize and its pixel floor. */
+const TOOLTIP_DOT_SIZE_RATIO = 0.12;
+const TOOLTIP_DOT_MIN_PX = 4;
+
+/** Object-link badge: size relative to scaledSize, pixel floor, glyph share of the badge. */
+const LINK_BADGE_SIZE_RATIO = 0.15;
+const LINK_BADGE_MIN_PX = 6;
+const LINK_BADGE_GLYPH_RATIO = 0.6;
+
+
 interface BadgePosition {
   screenX: number;
   screenY: number;
@@ -33,8 +49,8 @@ function renderNoteLinkBadge(
   const { screenX, screenY, objectWidth, objectHeight } = position;
   const { scaledSize } = config;
 
-  const maxBadgeSize = Math.min(objectWidth, objectHeight) * 0.3;
-  const badgeSize = Math.min(maxBadgeSize, Math.max(8, scaledSize * 0.25));
+  const maxBadgeSize = Math.min(objectWidth, objectHeight) * NOTE_BADGE_MAX_OBJECT_RATIO;
+  const badgeSize = Math.min(maxBadgeSize, Math.max(NOTE_BADGE_MIN_PX, scaledSize * NOTE_BADGE_SIZE_RATIO));
   const badgeX = screenX + objectWidth - badgeSize - 3;
   const badgeY = screenY + 3;
 
@@ -43,7 +59,7 @@ function renderNoteLinkBadge(
   ctx.arc(badgeX + badgeSize / 2, badgeY + badgeSize / 2, badgeSize / 2, 0, Math.PI * 2);
   ctx.fill();
 
-  const badgeFontSize = badgeSize * 0.7;
+  const badgeFontSize = badgeSize * NOTE_BADGE_GLYPH_RATIO;
   ctx.font = `${badgeFontSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
@@ -63,7 +79,7 @@ function renderTooltipIndicator(
   const { screenX, screenY, objectWidth, objectHeight } = position;
   const { scaledSize } = config;
 
-  const indicatorSize = Math.max(4, scaledSize * 0.12);
+  const indicatorSize = Math.max(TOOLTIP_DOT_MIN_PX, scaledSize * TOOLTIP_DOT_SIZE_RATIO);
   const indicatorX = screenX + objectWidth - indicatorSize - 2;
   const indicatorY = screenY + objectHeight - indicatorSize - 2;
 
@@ -89,7 +105,7 @@ function renderObjectLinkIndicator(
   const { screenX, screenY } = position;
   const { scaledSize } = config;
 
-  const linkSize = Math.max(6, scaledSize * 0.15);
+  const linkSize = Math.max(LINK_BADGE_MIN_PX, scaledSize * LINK_BADGE_SIZE_RATIO);
   const linkX = screenX + 2;
   const linkY = screenY + 2;
 
@@ -103,7 +119,7 @@ function renderObjectLinkIndicator(
   ctx.stroke();
 
   // Draw chain link icon
-  const iconSize = linkSize * 0.6;
+  const iconSize = linkSize * LINK_BADGE_GLYPH_RATIO;
   ctx.font = `${iconSize}px 'Noto Emoji', 'Noto Sans Symbols 2', monospace`;
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';

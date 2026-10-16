@@ -14,6 +14,8 @@ const cache = new Map<string, string>();
 const pending = new Set<string>();
 const queue: Array<{ path: string; app: App }> = [];
 let processing = false;
+/** Bumped by clearAll so a batch in flight across a clear is discarded (MEM-05). */
+let queueGeneration = 0;
 const subscribers = new Set<() => void>();
 
 const scratchCanvas = createEl('canvas');
@@ -57,40 +59,58 @@ function requestBatch(app: App, paths: string[]): void {
   if (added && !processing) void processQueue();
 }
 
+/**
+ * Drain the queue in batches. Each item is isolated (MEM-21): a throw while
+ * rendering one thumbnail still closes its bitmap, clears its pending flag and
+ * caches an empty sentinel, and `processing` is always reset in `finally` so a
+ * single failure can never stall the queue. clearAll() stops the loop: the
+ * generation check drops the in-flight batch and leaves `processing` to the
+ * next run.
+ */
 async function processQueue(): Promise<void> {
-  if (queue.length === 0) {
-    processing = false;
-    return;
-  }
+  const generation = queueGeneration;
   processing = true;
+  try {
+    while (queue.length > 0 && generation === queueGeneration) {
+      const batch = queue.splice(0, BATCH_SIZE);
 
-  const batch = queue.splice(0, BATCH_SIZE);
+      const loaded = await Promise.all(
+        batch.map(async ({ path, app }) => {
+          const img = await loadSourceImage(app, path);
+          return { path, img };
+        })
+      );
 
-  const loaded = await Promise.all(
-    batch.map(async ({ path, app }) => {
-      const img = await loadSourceImage(app, path);
-      return { path, img };
-    })
-  );
+      if (generation !== queueGeneration) {
+        for (const { img } of loaded) img?.close();
+        return;
+      }
 
-  for (const { path, img } of loaded) {
-    if (!img) {
-      // Terminal failure (missing/unreadable file): cache an empty sentinel.
-      // Leaving it un-cached keeps the UI in "loading" forever — the shimmer
-      // placeholder animates indefinitely, which is per-frame main-thread
-      // paint work for every dead tile.
-      cache.set(path, '');
-      pending.delete(path);
-      continue;
+      for (const { path, img } of loaded) {
+        try {
+          // A null img is a terminal failure (missing/unreadable file); the
+          // sentinel below covers it.
+          if (img) renderThumbnail(path, img);
+        } catch (error) {
+          console.warn(`[thumbnailCache] Failed to render thumbnail: ${path}`, error);
+        } finally {
+          img?.close();
+          // Empty sentinel for anything that did not produce a URL. Leaving it
+          // un-cached keeps the UI in "loading" forever — the shimmer
+          // placeholder animates indefinitely, which is per-frame main-thread
+          // paint work for every dead tile.
+          if (!cache.has(path)) cache.set(path, '');
+          pending.delete(path);
+        }
+      }
+
+      notify();
+
+      await new Promise<void>(resolve => { window.setTimeout(resolve, 0); });
     }
-    renderThumbnail(path, img);
-    img.close();
+  } finally {
+    if (generation === queueGeneration) processing = false;
   }
-
-  notify();
-
-  await new Promise<void>(resolve => { window.setTimeout(resolve, 0); });
-  void processQueue();
 }
 
 async function loadSourceImage(app: App, vaultPath: string): Promise<ImageBitmap | null> {
@@ -180,15 +200,12 @@ function renderThumbnail(path: string, img: ImageBitmap): void {
   }
 }
 
-function clearThumbnail(path: string): void {
-  cache.delete(path);
-  pending.delete(path);
-}
-
 function clearAll(): void {
+  queueGeneration++;
   cache.clear();
   pending.clear();
   queue.length = 0;
+  processing = false;
 }
 
-export { subscribe, getUrl, request, requestBatch, clearThumbnail, clearAll, THUMB_SIZE };
+export { subscribe, getUrl, request, requestBatch, clearAll, THUMB_SIZE };

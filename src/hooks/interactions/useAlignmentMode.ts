@@ -5,17 +5,18 @@
  * tracking offsets, and coordinating with the settings modal.
  * Extracted from DungeonMapTracker.tsx.
  *
- * Note: useImageAlignment.ts handles the drag mechanics within alignment mode.
+ * Note: the background-image drag mechanics live in ImageAlignmentMode.tsx.
  * This hook handles the mode toggle and settings modal coordination.
  */
 
 import type { MapData } from '#types/core/map.types';
+import type { MapDataUpdater } from '#types/hooks/mapData.types';
 
 import { useCallback, useState } from 'preact/hooks';
 
 interface UseAlignmentModeOptions {
   mapData: MapData | null;
-  updateMapData: (data: MapData) => void;
+  updateMapData: MapDataUpdater;
   setShowSettingsModal: (v: boolean) => void;
 }
 
@@ -50,25 +51,31 @@ function useAlignmentMode({ mapData, updateMapData, setShowSettingsModal }: UseA
     setAlignmentOffsetY(newY);
 
     if (mapData && mapData.backgroundImage) {
-      updateMapData({
-        ...mapData,
-        backgroundImage: {
-          ...mapData.backgroundImage,
-          offsetX: newX,
-          offsetY: newY
-        }
+      updateMapData((prev: MapData) => {
+        if (!prev.backgroundImage) return prev;
+        return {
+          ...prev,
+          backgroundImage: {
+            ...prev.backgroundImage,
+            offsetX: newX,
+            offsetY: newY
+          }
+        };
       });
     }
   }, [mapData, updateMapData]);
 
   const handleAlignmentGridSizeChange = useCallback((newSize: number) => {
     if (mapData && mapData.backgroundImage) {
-      updateMapData({
-        ...mapData,
-        backgroundImage: {
-          ...mapData.backgroundImage,
-          imageGridSize: newSize
-        }
+      updateMapData((prev: MapData) => {
+        if (!prev.backgroundImage) return prev;
+        return {
+          ...prev,
+          backgroundImage: {
+            ...prev.backgroundImage,
+            imageGridSize: newSize
+          }
+        };
       });
     }
   }, [mapData, updateMapData]);
@@ -84,13 +91,16 @@ function useAlignmentMode({ mapData, updateMapData, setShowSettingsModal }: UseA
     setAlignmentOffsetY(originalY);
 
     if (mapData && mapData.backgroundImage) {
-      updateMapData({
-        ...mapData,
-        backgroundImage: {
-          ...mapData.backgroundImage,
-          offsetX: originalX,
-          offsetY: originalY
-        }
+      updateMapData((prev: MapData) => {
+        if (!prev.backgroundImage) return prev;
+        return {
+          ...prev,
+          backgroundImage: {
+            ...prev.backgroundImage,
+            offsetX: originalX,
+            offsetY: originalY
+          }
+        };
       });
     }
 

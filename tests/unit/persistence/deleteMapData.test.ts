@@ -2,7 +2,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { App } from 'obsidian';
 import { TFile } from 'obsidian';
 
-import { deleteMapData, saveMapData, createNewMap } from '../../../src/persistence/fileOperations';
+import {
+  deleteMapData, saveMapData, createNewMap, loadMapData, loadMapDataWithGeneration, MapDeletedError,
+} from '../../../src/persistence/fileOperations';
 import type { MapData } from '../../../types/core/map.types';
 
 const DATA_PATH = 'windrose-md-data.json';
@@ -125,9 +127,46 @@ describe('deleted-map tombstones (saveMapData guard)', () => {
     await deleteMapData(app, 'tomb-1');
     const saveResult = await saveMapData(app, 'tomb-1', map);
 
-    expect(saveResult.status).toBe('saved');
+    // DATA-02: reported as 'deleted', never 'saved' (no false "Saved").
+    expect(saveResult.status).toBe('deleted');
     const after = JSON.parse(read()) as { maps: Record<string, MapData> };
     expect(after.maps['tomb-1']).toBeUndefined();
+  });
+
+  it('a save queued before the delete but run after it reports deleted', async () => {
+    const map = createNewMap('Tomb', 'grid');
+    const { app, read } = makeApp(fileWith({ 'tomb-3': map }));
+
+    // Hold the mutex so both ops queue; the save is enqueued FIRST but the
+    // tombstone lands synchronously before it runs.
+    const savePromise = saveMapData(app, 'tomb-3', map);
+    const deletePromise = deleteMapData(app, 'tomb-3');
+    const [saveResult] = await Promise.all([savePromise, deletePromise]);
+
+    expect(saveResult.status).toBe('deleted');
+    const after = JSON.parse(read()) as { maps: Record<string, MapData> };
+    expect(after.maps['tomb-3']).toBeUndefined();
+  });
+
+  it('loadMapData refuses a tombstoned ID instead of returning a blank map', async () => {
+    const map = createNewMap('Tomb', 'grid');
+    const { app } = makeApp(fileWith({ 'tomb-4': map }));
+
+    await deleteMapData(app, 'tomb-4');
+
+    await expect(loadMapDataWithGeneration(app, 'tomb-4', 'Tomb', 'grid'))
+      .rejects.toBeInstanceOf(MapDeletedError);
+    await expect(loadMapData(app, 'tomb-4')).rejects.toMatchObject({ mapId: 'tomb-4' });
+  });
+
+  it('a load queued behind the delete also refuses', async () => {
+    const map = createNewMap('Tomb', 'grid');
+    const { app } = makeApp(fileWith({ 'tomb-5': map }));
+
+    const deletePromise = deleteMapData(app, 'tomb-5');
+    const loadPromise = loadMapData(app, 'tomb-5');
+    await deletePromise;
+    await expect(loadPromise).rejects.toBeInstanceOf(MapDeletedError);
   });
 
   it('deleteMapData then saveMapData (unawaited ordering) leaves the map absent', async () => {

@@ -9,10 +9,9 @@ import type { MapObject } from '#types/objects/object.types';
 import type { TextLabel } from '#types/objects/note.types';
 import type { RendererSelectedItem } from '#types/hooks/canvasRenderer.types';
 import type { IGeometry } from '#types/core/geometry.types';
+import type { HexGeometryLike as SharedHexGeometryLike } from '../hex/hexRegionMath';
 
-export interface HexGeometryLike {
-  hexToWorld: (q: number, r: number) => { worldX: number; worldY: number };
-}
+export type HexGeometryLike = Pick<SharedHexGeometryLike, 'hexToWorld'>;
 
 interface SelectionRenderContext {
   ctx: CanvasRenderingContext2D;

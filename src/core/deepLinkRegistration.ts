@@ -2,6 +2,14 @@ import { Notice } from 'obsidian';
 import type { Plugin } from 'obsidian';
 import { parseDeepLink, emitNavigationEvent } from '../persistence/deepLinkHandler';
 import type { DeepLinkData } from '../persistence/deepLinkHandler';
+import { DeeplinkHover } from '../settings/DeeplinkHover';
+import {
+  DEEP_LINK_SELECTOR,
+  LIVE_PREVIEW_LINK_SELECTOR,
+  hrefFromHoverTarget,
+  findWindroseHrefInLine,
+  resolveHoverTarget,
+} from './deepLinkHoverTarget';
 
 async function navigateToLink(plugin: Plugin, parsed: DeepLinkData, sourcePath: string): Promise<void> {
   const currentPath = sourcePath ?? '';
@@ -39,6 +47,8 @@ export function registerDeepLinks(plugin: Plugin): void {
   registerPostProcessor(plugin);
   registerDomCapture(plugin);
   registerEditorExtension(plugin);
+  // Drop any open link preview when the plugin unloads.
+  plugin.register(() => DeeplinkHover.hide());
 }
 
 function registerProtocolHandler(plugin: Plugin): void {
@@ -74,12 +84,21 @@ function registerPostProcessor(plugin: Plugin): void {
         : dataHref.startsWith('windrose:') ? dataHref : '';
       if (original === '') return;
 
-      const replacement = activeWindow.createEl('a');
+      // Create in the link's own document so popout windows stay correct.
+      const replacement = link.ownerDocument.win.createEl('a');
       replacement.textContent = link.textContent;
       replacement.className = 'windrose-deep-link';
       replacement.setAttribute('href', '#');
       replacement.setAttribute('data-windrose-href', original);
       link.replaceWith(replacement);
+
+      // Reading-view hover preview. Listeners live on the anchor itself, so
+      // they go away with it when the section re-renders.
+      const parsed = resolveHoverTarget(original);
+      if (parsed != null) {
+        replacement.addEventListener('mouseenter', () => DeeplinkHover.onEnter(replacement, original, parsed));
+        replacement.addEventListener('mouseleave', () => DeeplinkHover.onLeave());
+      }
     });
   });
 }
@@ -89,10 +108,9 @@ function registerDomCapture(plugin: Plugin): void {
     const target = e.target as HTMLElement;
     if (target?.closest == null) return;
 
-    const link = target.closest(
-      'a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]'
-    );
+    const link = target.closest(DEEP_LINK_SELECTOR);
     if (link == null) return;
+    DeeplinkHover.hide();
 
     e.preventDefault();
     e.stopPropagation();
@@ -115,7 +133,7 @@ type CMExtension = Parameters<Plugin['registerEditorExtension']>[0];
 
 /** The slice of a CM EditorView instance the click handler reads. */
 interface CMEditorViewInstance {
-  posAtCoords(coords: { x: number; y: number }): number | null;
+  posAtCoords(coords: { x: number; y: number }, precise?: boolean): number | null;
   state: { doc: { lineAt(pos: number): { text: string; from: number } } };
 }
 
@@ -173,7 +191,7 @@ function registerEditorExtension(plugin: Plugin): void {
         const target = event.target as HTMLElement;
         if (target?.closest == null) return false;
 
-        const anchor = target.closest('a[href^="windrose:"], a[data-href^="windrose:"], a[data-windrose-href]');
+        const anchor = target.closest(DEEP_LINK_SELECTOR);
         if (anchor != null) {
           const href = anchor.getAttribute('data-windrose-href')
             ?? anchor.getAttribute('href')
@@ -210,7 +228,45 @@ function registerEditorExtension(plugin: Plugin): void {
       }
     });
 
-    plugin.registerEditorExtension([windroseEditorExt]);
+    /**
+     * Live-preview hover target: a rendered anchor, or a CodeMirror link span
+     * whose source line holds a windrose: link covering the pointer.
+     */
+    const hoverTargetAt = (event: MouseEvent, view: CMEditorViewInstance): { el: HTMLElement; href: string; parsed: DeepLinkData } | null => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest == null) return null;
+      const anchorHref = hrefFromHoverTarget(target);
+      if (anchorHref != null) {
+        const parsed = resolveHoverTarget(anchorHref);
+        const el = target.closest<HTMLElement>(DEEP_LINK_SELECTOR);
+        return parsed != null && el != null ? { el, href: anchorHref, parsed } : null;
+      }
+      const span = target.closest<HTMLElement>(LIVE_PREVIEW_LINK_SELECTOR);
+      if (span == null) return null;
+      const pos = view.posAtCoords({ x: event.clientX, y: event.clientY }, false);
+      if (pos == null) return null;
+      try {
+        const line = view.state.doc.lineAt(pos);
+        const href = findWindroseHrefInLine(line.text, pos - line.from);
+        const parsed = resolveHoverTarget(href);
+        return href != null && parsed != null ? { el: span, href, parsed } : null;
+      } catch { return null; }
+    };
+
+    const windroseHoverExt = cmView.EditorView.domEventHandlers({
+      mouseover(event: MouseEvent, view: CMEditorViewInstance) {
+        const hit = hoverTargetAt(event, view);
+        if (hit != null) DeeplinkHover.onEnter(hit.el, hit.href, hit.parsed);
+        else DeeplinkHover.onLeave();
+        return false;
+      },
+      mouseleave() {
+        DeeplinkHover.onLeave();
+        return false;
+      }
+    });
+
+    plugin.registerEditorExtension([windroseEditorExt, windroseHoverExt]);
   } catch (err) {
     console.warn('[Windrose] Could not register CM6 extension:', err);
   }

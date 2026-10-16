@@ -21,14 +21,26 @@ import type {
   ToolStateActions
 } from '#types/tools/tool.types';
 
+import type { MapData } from '#types/core/map.types';
+import type { MapDataUpdater } from '#types/hooks/mapData.types';
+
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { DEFAULT_COLOR } from '../../drawing/colorOperations';
 
 
 /**
+ * UseToolStateOptions with the functional-capable writer, so the opacity
+ * persist derives from the latest map (DATA-09). Fold into tool.types.ts when
+ * types/ is next touched.
+ */
+type ToolStateOptions = Omit<UseToolStateOptions, 'updateMapData'> & {
+  updateMapData?: MapDataUpdater | null;
+};
+
+/**
  * Hook for managing tool and color state
  */
-function useToolState(options: UseToolStateOptions = {}): UseToolStateResult {
+function useToolState(options: ToolStateOptions = {}): UseToolStateResult {
   const {
     initialTool = 'select',
     initialColor = DEFAULT_COLOR,
@@ -54,21 +66,21 @@ function useToolState(options: UseToolStateOptions = {}): UseToolStateResult {
   const [editLevelLock, setEditLevelLock] = useState<number | null>(null);
 
   // Initialize opacity from mapData when loaded
+  const lastSelectedOpacity = mapData?.lastSelectedOpacity;
   useEffect(() => {
-    if (!mapData) return;
-    if (mapData.lastSelectedOpacity !== undefined) {
-      setSelectedOpacity(mapData.lastSelectedOpacity);
+    if (lastSelectedOpacity !== undefined) {
+      setSelectedOpacity(lastSelectedOpacity);
     }
-  }, [mapData?.lastSelectedOpacity]);
+  }, [lastSelectedOpacity]);
 
   // Handler to update opacity and persist to mapData
   const handleOpacityChange = useCallback((newOpacity: number) => {
     setSelectedOpacity(newOpacity);
     if (updateMapData && mapData) {
-      updateMapData({
-        ...mapData,
+      updateMapData((prev: MapData) => ({
+        ...prev,
         lastSelectedOpacity: newOpacity
-      });
+      }));
     }
   }, [updateMapData, mapData]);
 

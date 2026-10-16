@@ -50,7 +50,7 @@ export interface RenderHexCell {
 }
 
 /** Cell lookup set (keyed by "x,y" or "q,r" string) for O(1) membership checks */
-export type CellLookup = Set<string>;
+type CellLookup = Set<string>;
 
 // ===========================================
 // Edge Rendering

@@ -51,7 +51,7 @@ export type TravelTimeUnit = 'minutes' | 'hours' | 'days';
  * unit string (matching map units, e.g. 'mi') or a reference to one of the
  * pack's custom units by id.
  */
-export type TravelUnitRef =
+type TravelUnitRef =
   | { type: 'standard'; unit: string }
   | { type: 'custom'; unitId: string };
 

@@ -1,11 +1,13 @@
 /**
  * layerAccessor.ts
- * Helper functions for accessing and manipulating layer data in Windrose maps.
- * Part of Phase 1: Z-Layer Architecture
+ * Layer and board (floor) selectors and immutable reducers, strata promotion,
+ * and the v1 -> v2 layer-schema migration helpers (migrateToLayerSchema,
+ * needsMigration). Fog-of-war reducers live in fogOperations.ts and are
+ * re-exported from here.
  */
 
 // Type-only imports
-import type { IGeometry } from '#types/core/geometry.types';
+import { mintId } from '../core/ids';
 import type {
   MapData,
   MapLayer,
@@ -14,9 +16,6 @@ import type {
   BoardId,
   LayerUpdate,
   LegacyMapData,
-  FoggedCell,
-  FogState,
-  FogBounds,
   MigrationValidation
 } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
@@ -36,7 +35,7 @@ const DEFAULT_BOARD_ID = 'board-default';
 
 /** Generate a unique id for a board. */
 function generateBoardId(): BoardId {
-  return 'board-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+  return mintId('board');
 }
 
 
@@ -48,8 +47,18 @@ function generateBoardId(): BoardId {
  * Generate a unique ID for a layer
  */
 function generateLayerId(): LayerId {
-  return 'layer-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+  return mintId('layer');
 }
+
+/**
+ * Fresh id for a cloned entity (obj-, text-, curve-, edge-, wall-, tstroke-, gap-).
+ */
+function freshEntityId(prefix: string): string {
+  return mintId(prefix);
+}
+
+/** Schema version the v1 -> v2 layer migration produces (step 2 of the runner). */
+const LAYER_SCHEMA_VERSION = 2;
 
 // ============================================================================
 // LAYER ACCESS FUNCTIONS
@@ -297,6 +306,13 @@ function ensureBoards(mapData: MapData): MapData {
  * (one MapLayer per DEFAULT_TILE_LAYERS role) and switch to it.
  */
 function addBoard(mapData: MapData, name: string | null = null): MapData {
+  // A map with no boards registry (e.g. a sub-map created before it was built
+  // via createNewMap) implicitly lives on the default board. Register that
+  // board first, or the new floor would be the only one and the original
+  // layers would be stranded. ensureBoards mutates, so give it copies.
+  if (!Array.isArray(mapData.boards) || mapData.boards.length === 0) {
+    mapData = ensureBoards({ ...mapData, layers: mapData.layers.map(l => ({ ...l })) });
+  }
   const boards = getBoardsOrdered(mapData);
   const boardId = generateBoardId();
   const order = boards.length > 0 ? Math.max(...boards.map(b => b.order)) + 1 : 0;
@@ -321,7 +337,7 @@ function addBoard(mapData: MapData, name: string | null = null): MapData {
 
   return {
     ...mapData,
-    boards: [...(mapData.boards ?? []), board],
+    boards: [...boards, board],
     layers: [...mapData.layers, ...newLayers],
     activeLayerId: newLayers[0].id,
     activeBoardId: boardId,
@@ -711,18 +727,51 @@ function cloneLayer(mapData: MapData, layerId: LayerId, mode: 'all' | 'mapOnly')
 
   const sourceName = sourceLayer.name || String(sourceLayer.order + 1);
 
+  // Every entity in the copy gets a fresh id: ids are looked up map-wide
+  // (party range results by objectId, travel label maps, deep links,
+  // selection restore), so a duplicate would resolve to the wrong copy.
+  const withFreshIds = <T extends { id?: string }>(items: T[] | undefined, prefix: string): T[] =>
+    deepCopy(items ?? []).map(item => (item.id != null ? { ...item, id: freshEntityId(prefix) } : item));
+
+  const wallPaths = withFreshIds(sourceLayer.wallPaths, 'wall').map(w =>
+    w.gaps != null ? { ...w, gaps: w.gaps.map(g => ({ ...g, id: freshEntityId('gap') })) } : w
+  );
+
+  // Object links are pairs ({layerId, objectId} on both ends). A cloned object
+  // must not point at the source's partner: that partner links back to the
+  // source, and unlinking from the clone would strip the original pair. A
+  // link inside the source layer is remapped to the cloned partner; a link to
+  // another layer is dropped (the partner stays paired with the original).
+  const sourceObjects = sourceLayer.objects ?? [];
+  const freshObjects = mode === 'all' ? withFreshIds(sourceObjects, 'obj') : [];
+  const objectIdMap = new Map<string, string>();
+  freshObjects.forEach((o, i) => { objectIdMap.set(sourceObjects[i].id, o.id); });
+  const objects = freshObjects.map((o) => {
+    const next = o.layerId != null ? { ...o, layerId: cloneId } : { ...o };
+    const link = next.linkedObject;
+    if (link == null) return next;
+    const partner = link.layerId === sourceLayer.id ? objectIdMap.get(link.objectId) : undefined;
+    if (partner != null) return { ...next, linkedObject: { ...link, layerId: cloneId, objectId: partner } };
+    delete next.linkedObject;
+    return next;
+  });
+
   const clonedLayer: MapLayer = {
     id: cloneId,
     name: `Copy of ${sourceName}`,
     order: cloneOrder,
     visible: true,
     cells: deepCopy(sourceLayer.cells),
-    curves: deepCopy(sourceLayer.curves),
-    edges: deepCopy(sourceLayer.edges),
-    objects: mode === 'all' ? deepCopy(sourceLayer.objects) : [],
-    textLabels: mode === 'all' ? deepCopy(sourceLayer.textLabels) : [],
+    curves: withFreshIds(sourceLayer.curves, 'curve'),
+    edges: withFreshIds(sourceLayer.edges, 'edge'),
+    objects,
+    textLabels: mode === 'all' ? withFreshIds(sourceLayer.textLabels, 'text') : [],
     fogOfWar: mode === 'all' && sourceLayer.fogOfWar ? deepCopy(sourceLayer.fogOfWar) : null,
     tiles: deepCopy(sourceLayer.tiles ?? []),
+    // Map content in both modes (walls and terrain paint are drawn map
+    // features, like cells/curves/tiles). Previously omitted entirely.
+    wallPaths,
+    terrainStrokes: withFreshIds(sourceLayer.terrainStrokes, 'tstroke'),
   };
 
   // Ladder rungs travel with the map content in both modes. Conditional: a
@@ -853,9 +902,9 @@ function validateMigration(originalData: LegacyMapData, migratedData: MapData): 
     errors.push(`Migration data loss: edges count mismatch (original: ${originalEdges.length}, migrated: ${layerEdges.length})`);
   }
   
-  // Check schemaVersion is set correctly
-  if (migratedData.schemaVersion !== SCHEMA_VERSION) {
-    errors.push(`Migration failed: schemaVersion incorrect (expected: ${SCHEMA_VERSION}, got: ${migratedData.schemaVersion})`);
+  // Check schemaVersion is set correctly (this step produces v2 exactly)
+  if (migratedData.schemaVersion !== LAYER_SCHEMA_VERSION) {
+    errors.push(`Migration failed: schemaVersion incorrect (expected: ${LAYER_SCHEMA_VERSION}, got: ${migratedData.schemaVersion})`);
   }
   
   return { 
@@ -865,16 +914,23 @@ function validateMigration(originalData: LegacyMapData, migratedData: MapData): 
 }
 
 /**
- * Migrate legacy (v1) map data to the new layer schema (v2)
- * Includes backup creation and validation with automatic rollback on failure
+ * Migrate legacy (v1) map data to the layer schema (v2): the v1 -> v2 step of
+ * the schema runner (schemaMigration.ts).
+ * Includes backup creation and validation with automatic rollback on failure.
+ *
+ * The rebuild runs ONLY when the map has no layers array. A map that already
+ * has layers is v2+ by shape, whatever its schemaVersion says: it is stamped
+ * (when the version is missing or below 2), never rebuilt — rebuilding would
+ * replace every real layer with one built from empty root-level arrays.
  */
 function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMapData {
-  // Already migrated? Return as-is
-  if ((legacyMapData.schemaVersion ?? 0) >= SCHEMA_VERSION && 'layers' in legacyMapData) {
-    return legacyMapData;
+  if (Array.isArray((legacyMapData as Partial<MapData>).layers)) {
+    const v = legacyMapData.schemaVersion;
+    if (typeof v === 'number' && v >= LAYER_SCHEMA_VERSION) return legacyMapData;
+    return { ...legacyMapData, schemaVersion: LAYER_SCHEMA_VERSION };
   }
-  
-  console.debug('[layerAccessor] Starting migration to schema version', SCHEMA_VERSION);
+
+  console.debug('[layerAccessor] Starting migration to schema version', LAYER_SCHEMA_VERSION);
 
   // Create backup BEFORE any modifications
   const backup = createBackup(legacyMapData);
@@ -926,7 +982,7 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
     // Build migrated structure (spread original first, then override)
     const migratedData: MapData = {
       ...legacyMapData as Partial<MapData>,
-      schemaVersion: SCHEMA_VERSION,
+      schemaVersion: LAYER_SCHEMA_VERSION,
       mapType: legacyMapData.mapType ?? 'grid',
       activeLayerId: layerId,
       layerPanelVisible: false,
@@ -953,7 +1009,7 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
     // Store migration metadata for debugging
     cleanedData._migratedAt = new Date().toISOString();
     
-    console.debug('[layerAccessor] Migration successful to schema version', SCHEMA_VERSION);
+    console.debug('[layerAccessor] Migration successful to schema version', LAYER_SCHEMA_VERSION);
 
     return cleanedData;
 
@@ -965,21 +1021,24 @@ function migrateToLayerSchema(legacyMapData: LegacyMapData): MapData | LegacyMap
 }
 
 /**
- * Check if map data needs migration
+ * Whether map data needs ANY schema work on load: a v1 rebuild (no layers
+ * array), a registered step, or just a version stamp. It does NOT mean "run
+ * migrateToLayerSchema" — the version-stepped runner in schemaMigration.ts
+ * decides what each map gets; an existing layers array is never rebuilt.
  */
 function needsMigration(mapData: MapData | LegacyMapData | null | undefined): boolean {
   if (!mapData) return false;
-  
-  // Needs migration if no schemaVersion, or version is old, or no layers array
-  const needsIt = mapData.schemaVersion == null ||
-                  mapData.schemaVersion < SCHEMA_VERSION ||
-                  !('layers' in mapData);
+
+  const hasLayers = Array.isArray((mapData as Partial<MapData>).layers);
+  const needsIt = !hasLayers ||
+                  mapData.schemaVersion == null ||
+                  mapData.schemaVersion < SCHEMA_VERSION;
 
   if (needsIt) {
     console.debug('[layerAccessor] Map needs migration:', {
       currentVersion: mapData.schemaVersion ?? 'none',
       targetVersion: SCHEMA_VERSION,
-      hasLayers: 'layers' in mapData
+      hasLayers
     });
   }
 
@@ -987,265 +1046,16 @@ function needsMigration(mapData: MapData | LegacyMapData | null | undefined): bo
 }
 
 // ============================================================================
-// FOG OF WAR FUNCTIONS
-// ============================================================================
-
-/**
- * Initialize fog of war for a layer (first use)
- * Creates the fogOfWar structure with empty foggedCells array
- */
-function initializeFogOfWar(mapData: MapData, layerId: LayerId): MapData {
-  return updateLayer(mapData, layerId, {
-    fogOfWar: {
-      enabled: true,
-      foggedCells: [],
-      texture: null
-    }
-  });
-}
-
-/**
- * Check if a cell is fogged
- */
-function isCellFogged(layer: MapLayer, col: number, row: number): boolean {
-  if (!layer.fogOfWar || !layer.fogOfWar.enabled) return false;
-  return layer.fogOfWar.foggedCells.some(c => c.col === col && c.row === row);
-}
-
-/**
- * Add fog to a single cell
- */
-function fogCell(layer: MapLayer, col: number, row: number): MapLayer {
-  if (!layer.fogOfWar) return layer;
-  if (isCellFogged(layer, col, row)) return layer; // Already fogged
-  
-  return {
-    ...layer,
-    fogOfWar: {
-      ...layer.fogOfWar,
-      foggedCells: [...layer.fogOfWar.foggedCells, { col, row }]
-    }
-  };
-}
-
-/**
- * Remove fog from a single cell (reveal it)
- */
-function revealCell(layer: MapLayer, col: number, row: number): MapLayer {
-  if (!layer.fogOfWar) return layer;
-  
-  return {
-    ...layer,
-    fogOfWar: {
-      ...layer.fogOfWar,
-      foggedCells: layer.fogOfWar.foggedCells.filter(
-        c => !(c.col === col && c.row === row)
-      )
-    }
-  };
-}
-
-/**
- * Normalize rectangle corners and apply a fog operation to cells within bounds.
- */
-function modifyRectangleFog(
-  layer: MapLayer,
-  startCol: number,
-  startRow: number,
-  endCol: number,
-  endRow: number,
-  operation: 'fog' | 'reveal'
-): MapLayer {
-  if (!layer.fogOfWar) return layer;
-
-  const minCol = Math.min(startCol, endCol);
-  const maxCol = Math.max(startCol, endCol);
-  const minRow = Math.min(startRow, endRow);
-  const maxRow = Math.max(startRow, endRow);
-
-  if (operation === 'reveal') {
-    return {
-      ...layer,
-      fogOfWar: {
-        ...layer.fogOfWar,
-        foggedCells: layer.fogOfWar.foggedCells.filter(c =>
-          c.col < minCol || c.col > maxCol || c.row < minRow || c.row > maxRow
-        )
-      }
-    };
-  }
-
-  // fog: add cells not already fogged
-  const existingSet = new Set(
-    layer.fogOfWar.foggedCells.map(c => `${c.col},${c.row}`)
-  );
-  const newCells: FoggedCell[] = [];
-  for (let col = minCol; col <= maxCol; col++) {
-    for (let row = minRow; row <= maxRow; row++) {
-      if (!existingSet.has(`${col},${row}`)) {
-        newCells.push({ col, row });
-      }
-    }
-  }
-  if (newCells.length === 0) return layer;
-  return {
-    ...layer,
-    fogOfWar: {
-      ...layer.fogOfWar,
-      foggedCells: [...layer.fogOfWar.foggedCells, ...newCells]
-    }
-  };
-}
-
-function fogRectangle(layer: MapLayer, startCol: number, startRow: number, endCol: number, endRow: number): MapLayer {
-  return modifyRectangleFog(layer, startCol, startRow, endCol, endRow, 'fog');
-}
-
-function revealRectangle(layer: MapLayer, startCol: number, startRow: number, endCol: number, endRow: number): MapLayer {
-  return modifyRectangleFog(layer, startCol, startRow, endCol, endRow, 'reveal');
-}
-
-/**
- * Add fog to all cells within bounds
- */
-function fogAll(layer: MapLayer, bounds: FogBounds): MapLayer {
-  if (!layer.fogOfWar) return layer;
-
-  const allCells: FoggedCell[] = [];
-  for (let col = 0; col < bounds.maxCol; col++) {
-    for (let row = 0; row < bounds.maxRow; row++) {
-      allCells.push({ col, row });
-    }
-  }
-  
-  return {
-    ...layer,
-    fogOfWar: {
-      ...layer.fogOfWar,
-      foggedCells: allCells
-    }
-  };
-}
-
-/**
- * Fog all painted cells on a layer
- * For unbounded maps where we only want to fog cells that have been drawn
- */
-function fogPaintedCells(layer: MapLayer, geometry: IGeometry): MapLayer {
-  if (!layer.fogOfWar) return layer;
-  if (layer.cells.length === 0) return layer;
-  if (typeof geometry.cellToOffsetCoords !== 'function') {
-    console.warn('[fogPaintedCells] Invalid geometry provided');
-    return layer;
-  }
-  
-  const existingFogged = new Set(
-    layer.fogOfWar.foggedCells.map(c => `${c.col},${c.row}`)
-  );
-  
-  const newCells: FoggedCell[] = [];
-  for (const cell of layer.cells) {
-    const { col, row } = geometry.cellToOffsetCoords(cell);
-    const key = `${col},${row}`;
-    if (!existingFogged.has(key)) {
-      newCells.push({ col, row });
-      existingFogged.add(key);
-    }
-  }
-  
-  if (newCells.length === 0) return layer;
-  
-  return {
-    ...layer,
-    fogOfWar: {
-      ...layer.fogOfWar,
-      foggedCells: [...layer.fogOfWar.foggedCells, ...newCells]
-    }
-  };
-}
-
-/**
- * Remove all fog from a layer (reveal everything)
- */
-function revealAll(layer: MapLayer): MapLayer {
-  if (!layer.fogOfWar) return layer;
-  
-  return {
-    ...layer,
-    fogOfWar: {
-      ...layer.fogOfWar,
-      foggedCells: []
-    }
-  };
-}
-
-/**
- * Toggle fog visibility without changing fogged cells
- */
-function toggleFogVisibility(layer: MapLayer): MapLayer {
-  if (!layer.fogOfWar) return layer;
-  
-  return {
-    ...layer,
-    fogOfWar: {
-      ...layer.fogOfWar,
-      enabled: !layer.fogOfWar.enabled
-    }
-  };
-}
-
-/**
- * Set fog visibility explicitly
- */
-function setFogVisibility(layer: MapLayer, enabled: boolean): MapLayer {
-  if (!layer.fogOfWar) return layer;
-  
-  return {
-    ...layer,
-    fogOfWar: {
-      ...layer.fogOfWar,
-      enabled
-    }
-  };
-}
-
-/**
- * Check if a layer has any fog data (regardless of visibility)
- */
-function hasFogData(layer: MapLayer): boolean {
-  return layer.fogOfWar != null && layer.fogOfWar.foggedCells.length > 0;
-}
-
-/**
- * Get fog state summary for UI display
- */
-function getFogState(layer: MapLayer): FogState {
-  if (!layer.fogOfWar) {
-    return { initialized: false, enabled: false, cellCount: 0 };
-  }
-  return {
-    initialized: true,
-    enabled: layer.fogOfWar.enabled,
-    cellCount: layer.fogOfWar.foggedCells.length
-  };
-}
-
-// ============================================================================
 // EXPORTS
 // ============================================================================
 
-export {
-  generateLayerId,
-  getActiveLayer, getLayersOrdered, getLayerById, getLayerIndex, getLayerBelow,
-  updateLayer, updateActiveLayer, setActiveLayer, addLayer, cloneLayer, removeLayer, reorderLayers,
-  // Ladder levels (the only `levels` reader/writer)
+export { generateLayerId, getActiveLayer, getLayersOrdered, getLayerById, getLayerIndex, getLayerBelow, updateLayer, updateActiveLayer, setActiveLayer, addLayer, cloneLayer, removeLayer, reorderLayers, // Ladder levels (the only `levels` reader/writer)
   authoredCells, allAuthoredCells, authoredLevels, setLevelCells, normaliseLevels,
-  migrateToLayerSchema, needsMigration,
-  // Board (floor) projection
-  DEFAULT_BOARD_ID, generateBoardId, layerBoardId, getBoardsOrdered, getActiveBoardId,
-  getBoardLayers, getActiveBoardLayers, getBoardBelow, updateBoard, getRenderLayers, getExportLayers, getDefaultExportLayers, ensureBoards, addBoard, removeBoard, setActiveBoard,
-  promoteToStrata, setLayerMode,
+  migrateToLayerSchema, needsMigration, LAYER_SCHEMA_VERSION, // Board (floor) projection
+  DEFAULT_BOARD_ID, layerBoardId, getBoardsOrdered, getActiveBoardId, getBoardLayers, getActiveBoardLayers, getBoardBelow, updateBoard, getRenderLayers, getExportLayers, getDefaultExportLayers, ensureBoards, addBoard, removeBoard, setActiveBoard, promoteToStrata, setLayerMode };
+
+export {
   initializeFogOfWar, isCellFogged, fogCell, revealCell,
   fogRectangle, revealRectangle, fogAll, fogPaintedCells, revealAll,
   toggleFogVisibility, setFogVisibility, hasFogData, getFogState
-};
+} from './fogOperations';

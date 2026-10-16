@@ -29,11 +29,11 @@ import { consumePendingNavigate } from '../../persistence/deepLinkHandler';
 import type { NavigationEventDetail } from '../../persistence/deepLinkHandler';
 import type {
   SubHexCoordDetail,
-  SubHexExitDetail,
   RegionIdDetail,
   CreateObjectLinkDetail,
   RemoveObjectLinkDetail
 } from '../../core/windroseEvents';
+import type { SubHexExitDetail } from '#types/hooks/canvasInteraction.types';
 import { isForeignInstanceEvent } from '../../core/windroseEvents';
 import { useHexContextMenu } from './useHexContextMenu';
 import { DEFAULTS } from '../../core/dmtConstants';
@@ -56,6 +56,8 @@ interface UseCustomEventHandlersOptions {
   drillToSubHexPath?: (path: string | null, onArrive?: () => void) => void;
   isInSubHex: boolean;
   handleRegionsChange: (regions: Region[]) => void;
+  /** This map block's root element: document listeners bind to ITS document (popout-safe). */
+  containerRef?: { current: HTMLElement | null };
   /** Current drill-down path ('/'-joined hexKeys), null at root. */
   subHexPath?: string | null;
 }
@@ -85,7 +87,8 @@ function useCustomEventHandlers({
   drillToSubHexPath,
   isInSubHex,
   handleRegionsChange,
-  subHexPath
+  subHexPath,
+  containerRef
 }: UseCustomEventHandlersOptions): UseCustomEventHandlersResult {
   const app = useApp();
 
@@ -95,21 +98,23 @@ function useCustomEventHandlers({
   useEffect(() => {
     if (!isInSubHex) return undefined;
 
+    // Popout-safe: the document that owns this map block, captured once per run.
+    const doc = containerRef?.current?.ownerDocument ?? activeDocument;
     const handleEscape = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         if (isFocused === false) return;
         const target = e.target as HTMLElement;
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-        if (activeDocument.querySelector('.modal-container')) return;
+        if (doc.querySelector('.modal-container')) return;
         e.preventDefault();
         e.stopPropagation();
         exitSubHex();
       }
     };
 
-    activeDocument.addEventListener('keydown', handleEscape, true);
-    return () => activeDocument.removeEventListener('keydown', handleEscape, true);
-  }, [isInSubHex, exitSubHex, isFocused]);
+    doc.addEventListener('keydown', handleEscape, true);
+    return () => doc.removeEventListener('keydown', handleEscape, true);
+  }, [isInSubHex, exitSubHex, isFocused, containerRef]);
 
   // Direct sub-hex entry (seamless dive, double-click, context menu re-uses
   // enterSubHex itself). Formerly the windrose:enter-sub-hex listener.
@@ -292,9 +297,10 @@ function useCustomEventHandlers({
       }));
     };
 
-    activeDocument.addEventListener('windrose:center-on-region', handleCenterOnRegion);
-    return () => activeDocument.removeEventListener('windrose:center-on-region', handleCenterOnRegion);
-  }, [mapData, geometry, updateMapData, instanceId]);
+    const doc = containerRef?.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('windrose:center-on-region', handleCenterOnRegion);
+    return () => doc.removeEventListener('windrose:center-on-region', handleCenterOnRegion);
+  }, [mapData, geometry, updateMapData, instanceId, containerRef]);
 
   // Cross-layer object link events
   useEffect(() => {
@@ -352,7 +358,7 @@ function useCustomEventHandlers({
   }, [updateMapData, instanceId]);
 
   // Hex context menu (extracted)
-  useHexContextMenu({ app, mapData, mapId, instanceId, subHexPath, enterSubHex, updateMapData, handleRegionsChange });
+  useHexContextMenu({ app, mapData, mapId, instanceId, subHexPath, enterSubHex, updateMapData, handleRegionsChange, containerRef });
 
   return { requestEnterSubHex, requestExitSubHex };
 }

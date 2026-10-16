@@ -88,7 +88,7 @@ async function setupModalInteract(
   if (options.resizable === true) {
     const edges = ['top', 'right', 'bottom', 'left', 'top-right', 'top-left', 'bottom-right', 'bottom-left'];
     for (const edge of edges) {
-      const handle = activeWindow.createDiv();
+      const handle = (modalEl.ownerDocument.defaultView ?? activeWindow).createDiv();
       handle.className = `windrose-resize-handle windrose-resize-${edge}`;
       modalEl.appendChild(handle);
     }
@@ -188,10 +188,13 @@ function NativeModalPortal({
 
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  // The modal is opened once on mount from the first-render props.
+  const mountPropsRef = useRef({ app, modalClass, title, draggable, resizable });
 
   useEffect(() => {
+    const { app, modalClass, title, draggable, resizable } = mountPropsRef.current;
     const modal = new (class extends Modal {
-      onOpen(): void {
+      override onOpen(): void {
         if (title != null && title !== '') {
           this.titleEl.setText(title);
         }
@@ -210,7 +213,7 @@ function NativeModalPortal({
           });
         }
       }
-      onClose(): void {
+      override onClose(): void {
         closedExternallyRef.current = true;
         if (!closedByCodeRef.current) {
           onCloseRef.current();

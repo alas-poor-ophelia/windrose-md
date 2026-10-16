@@ -16,10 +16,12 @@ interface UsePlayerFogClearOptions {
   isApplyingHistory: () => boolean;
   /** Per-mount instance id — gates the fog-clear event (fail-open). */
   instanceId?: string;
+  /** This map block's root element: the listener binds to ITS document (popout-safe). */
+  containerRef?: { current: HTMLElement | null };
 }
 
 function usePlayerFogClear({
-  geometry, updateMapData, addToHistory, isApplyingHistory, instanceId
+  geometry, updateMapData, addToHistory, isApplyingHistory, instanceId, containerRef
 }: UsePlayerFogClearOptions): void {
   useEffect(() => {
     const handler = (e: CustomEvent<PlayerFogClearDetail>): void => {
@@ -96,9 +98,10 @@ function usePlayerFogClear({
       });
     };
 
-    activeDocument.addEventListener('windrose:player-fog-clear', handler);
-    return () => activeDocument.removeEventListener('windrose:player-fog-clear', handler);
-  }, [geometry, updateMapData, addToHistory, isApplyingHistory, instanceId]);
+    const doc = containerRef?.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('windrose:player-fog-clear', handler);
+    return () => doc.removeEventListener('windrose:player-fog-clear', handler);
+  }, [geometry, updateMapData, addToHistory, isApplyingHistory, instanceId, containerRef]);
 }
 
 export { usePlayerFogClear };

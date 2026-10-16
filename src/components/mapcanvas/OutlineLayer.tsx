@@ -16,13 +16,16 @@ import { useCallback, useEffect, useMemo, useRef } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useLiveOverlayRedraw } from '../../hooks/canvas/useLiveOverlayRedraw';
-import { calculateViewportOffset } from '../../geometry/core/BaseGeometry';
+import { useOverlayCanvas } from '../../hooks/canvas/useOverlayCanvas';
+import { applyNorthRotation, calculateViewportOffset } from '../../geometry/core/viewportMath';
+import { assertNever } from '../../utils/assertNever';
 import { useOutlineTools } from '../../hooks/interactions/useOutlineTools';
 import type { MenuItem } from 'obsidian';
 import { Modal, Menu } from 'obsidian';
 import { useApp } from '../../context/AppContext';
 import type { HexContextMenuDetail } from '../../core/windroseEvents';
 import { isForeignInstanceEvent } from '../../core/windroseEvents';
+import { mintId } from '../../core/ids';
 import { tooltipRef } from '../shared/obsidianTooltip';
 
 
@@ -53,10 +56,10 @@ interface LiveInputCommit {
  * hue/saturation square that is hundreds of events per second, and a range
  * slider is no better. Routing each one into updateOutline() replaced the
  * whole mapData object (rebroadcast to every layer) AND pushed a full
- * active-layer snapshot onto the undo stack, which addToHistory dedupes with
- * two JSON.stringify passes over that snapshot. One drag therefore cost
- * hundreds of whole-layer serialisations and buried the user's real undo
- * history under itself.
+ * active-layer snapshot onto the undo stack (addToHistory's dedupe, now the
+ * reference-based isSameHistoryState, cannot collapse a changing colour). One
+ * drag therefore cost hundreds of whole-map rebroadcasts and buried the
+ * user's real undo history under itself.
  *
  * A drag now only records its live value in a ref — optionally repainting the
  * overlay once per animation frame, the useLiveOverlayRedraw gate, so canvas
@@ -197,9 +200,11 @@ const OutlineLayer = ({
     modal.open();
   }, [app, onOutlinesChange]);
 
-  useLayerHandlers('outline', isOutlineTool
-    ? { handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick }
-    : {});
+  useLayerHandlers(
+    'outline',
+    { handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick },
+    { enabled: isOutlineTool }
+  );
 
   // ESC to cancel drawing, Delete/Backspace to delete selected
   useEffect(() => {
@@ -213,9 +218,10 @@ const OutlineLayer = ({
         deleteOutline(selectedOutlineId);
       }
     };
-    activeDocument.addEventListener('keydown', handler);
-    return () => activeDocument.removeEventListener('keydown', handler);
-  }, [isOutlineTool, cancelDrawing, selectedOutlineId, deleteOutline]);
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('keydown', handler);
+    return () => doc.removeEventListener('keydown', handler);
+  }, [isOutlineTool, cancelDrawing, selectedOutlineId, deleteOutline, canvasRef]);
 
   // Context menu via windrose:hex-context-menu
   useEffect(() => {
@@ -266,7 +272,7 @@ const OutlineLayer = ({
         item.onClick(() => {
           const dup: Outline = {
             ...outlineRef,
-            id: `outline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            id: mintId('outline', { randomLength: 6 }),
             order: (mapData.outlines ?? []).length
           };
           onOutlinesChange([...(mapData.outlines ?? []), dup]);
@@ -285,9 +291,10 @@ const OutlineLayer = ({
       menu.showAtPosition({ x: screenX, y: screenY });
     };
 
-    activeDocument.addEventListener('windrose:hex-context-menu', handler);
-    return () => activeDocument.removeEventListener('windrose:hex-context-menu', handler);
-  }, [isOutlineTool, mapData?.outlines, geometry, screenToWorld, deleteOutline, updateOutline, onOutlinesChange, instanceId]);
+    const doc = canvasRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('windrose:hex-context-menu', handler);
+    return () => doc.removeEventListener('windrose:hex-context-menu', handler);
+  }, [isOutlineTool, mapData?.outlines, geometry, screenToWorld, deleteOutline, updateOutline, onOutlinesChange, instanceId, canvasRef]);
 
   // ── Live-drag inputs (colour dialog, fill-opacity sliders) ────────
   // See useLiveInputCommit: each of these fires `input` on every pointer move
@@ -321,46 +328,28 @@ const OutlineLayer = ({
   const settingsFillOpacityDrag = useLiveInputCommit(commitSettingsFillOpacity);
 
   // ── Overlay canvas for in-progress drawing ────────────────────────
-  const overlayRef = useRef<HTMLCanvasElement | null>(null);
-
-  useEffect(() => {
-    const mainCanvas = canvasRef.current;
-    if (!mainCanvas || !mainCanvas.parentElement || !isOutlineTool) {
-      if (overlayRef.current && overlayRef.current.parentElement) {
-        overlayRef.current.parentElement.removeChild(overlayRef.current);
-        overlayRef.current = null;
-      }
-      return undefined;
-    }
-
-    if (!overlayRef.current) {
-      const overlay = activeWindow.createEl('canvas');
-      overlay.classList.add('windrose-overlay-layer');
-      mainCanvas.parentElement.appendChild(overlay);
-      overlayRef.current = overlay;
-    }
-
-    return () => {
-      if (overlayRef.current && overlayRef.current.parentElement) {
-        overlayRef.current.parentElement.removeChild(overlayRef.current);
-        overlayRef.current = null;
-      }
-    };
-  }, [canvasRef, isOutlineTool]);
+  // Present while the tool is active; resizing clears it, so repaint.
+  const { sized: sizedOverlay } = useOverlayCanvas(canvasRef, {
+    active: isOutlineTool,
+    onResize: () => { repaintOverlayRef.current(); },
+  });
 
   // Render drawing vertices and selected outline vertices on overlay.
   // View basis is a parameter so the live-pan subscription below can
   // redraw mid-gesture (same fix as RegionLayer/FreehandLayer).
   const drawOutlineOverlay = useCallback((viewState: StoredViewState) => {
-    const overlay = overlayRef.current;
-    const mainCanvas = canvasRef.current;
-    if (!overlay || !mainCanvas || !geometry || geometry.type !== 'hex' || !mapData) return;
-
-    overlay.width = mainCanvas.width;
-    overlay.height = mainCanvas.height;
+    if (!geometry || geometry.type !== 'hex' || !mapData) return;
+    // Resizes only when the main canvas size changed (MEM-18).
+    const overlay = sizedOverlay();
+    if (!overlay) return;
 
     const ctx = overlay.getContext('2d');
     if (!ctx) return;
+    // The size assignment no longer runs every draw, so reset context state
+    // it used to reset implicitly.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.setLineDash([]);
     ctx.clearRect(0, 0, overlay.width, overlay.height);
 
     const { offsetX, offsetY } = calculateViewportOffset(
@@ -371,9 +360,7 @@ const OutlineLayer = ({
     const northDirection = mapData.northDirection ?? 0;
     if (northDirection !== 0) {
       ctx.save();
-      ctx.translate(overlay.width / 2, overlay.height / 2);
-      ctx.rotate((northDirection * Math.PI) / 180);
-      ctx.translate(-overlay.width / 2, -overlay.height / 2);
+      applyNorthRotation(ctx, overlay.width, overlay.height, northDirection);
     }
 
     // Draw in-progress outline
@@ -389,7 +376,8 @@ const OutlineLayer = ({
       switch (outlineSettings.lineStyle) {
         case 'dotted': ctx.setLineDash([0.5, 8]); break;
         case 'dashed': ctx.setLineDash([12, 6]); break;
-        default: ctx.setLineDash([]); break;
+        case 'solid': ctx.setLineDash([]); break;
+        default: assertNever(outlineSettings.lineStyle, 'outline line style');
       }
       ctx.beginPath();
       ctx.moveTo(screenVerts[0].screenX, screenVerts[0].screenY);
@@ -429,7 +417,7 @@ const OutlineLayer = ({
     }
 
     if (northDirection !== 0) ctx.restore();
-  }, [drawingVertices, selectedOutlineId, canvasRef, geometry, mapData, selectedColor, outlineSettings, outlineColorDrag]);
+  }, [drawingVertices, selectedOutlineId, sizedOverlay, geometry, mapData, selectedColor, outlineSettings, outlineColorDrag]);
 
   const repaintOverlay = useCallback(() => {
     const vs = viewController?.getLive() ?? mapData?.viewState;

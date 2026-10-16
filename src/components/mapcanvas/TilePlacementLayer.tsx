@@ -16,18 +16,19 @@
 
 import type { ToolId } from '#types/tools/tool.types';
 import type { VNode } from 'preact';
-import type { TileAssignment, TileRotation, TileLayerRole, TilesetDef } from '#types/tiles/tile.types';
-import type { TileSubtoolId } from '../../assets/tileForm';
+import type { TileAssignment, TileRotation, TileLayerRole, TilesetDef, TileMetadataStore } from '#types/tiles/tile.types';
+import type { TileSubtoolId } from '#types/tiles/tile.types';
 
 import { Notice } from 'obsidian';
-import { useCallback, useRef } from 'preact/hooks';
-import { useMapState } from '../../context/MapContext';
+import { useCallback, useEffect, useRef } from 'preact/hooks';
+import { useMapState, useMapOperations } from '../../context/MapContext';
+import { assertNever } from '../../utils/assertNever';
 import { useLayerHandlers } from '../../hooks/canvas/useLayerHandlers';
 import { useApp } from '../../context/AppContext';
 import { getActiveLayer, getActiveBoardLayers } from '../../persistence/layerAccessor';
 import { preloadImage } from '../../assets/imageOperations';
 import { resolveTileEntry } from '../../assets/tilesetOperations';
-import { getTileMetadataForRender } from '../../persistence/tileMetadata';
+import { useTileMetadata } from '../../hooks/state/useTileMetadata';
 import type { ResolvedTileRender } from '../../assets/tileRenderResolution';
 import { resolveTileRender, EDGE_BLEND_FEATHER } from '../../assets/tileRenderResolution';
 import { cellsCoveredByAssignment } from '../../assets/tileFootprint';
@@ -51,9 +52,10 @@ function resolvePaintTimeRender(
   isGrid: boolean,
   entry: { vaultPath?: string } | undefined,
   tileset: TilesetDef | undefined,
-  paintEdgeBlend: boolean
+  paintEdgeBlend: boolean,
+  tileMetadata: TileMetadataStore
 ): { resolved: ResolvedTileRender | undefined; feather: number | undefined } {
-  const meta = isGrid && entry?.vaultPath != null && entry.vaultPath !== '' ? getTileMetadataForRender()[entry.vaultPath] : undefined;
+  const meta = isGrid && entry?.vaultPath != null && entry.vaultPath !== '' ? tileMetadata[entry.vaultPath] : undefined;
   const resolved = isGrid ? resolveTileRender(undefined, meta, tileset) : undefined;
   const feather = resolved?.renderMode === 'region'
     ? (paintEdgeBlend ? EDGE_BLEND_FEATHER : (resolved.edgeFeather > 0 ? 0 : undefined))
@@ -71,7 +73,6 @@ export interface TilePlacementLayerProps {
   selectedTileId: string | null;
   tileRotation: number;
   tileFlipH: boolean;
-  tileLayer: 'base' | 'overlay';
   tileFitMode: 'fill' | 'contain' | 'auto';
   /** Armed placement subtool from the drawer ribbon (null = no tile selected). */
   activeSubtool: TileSubtoolId | null;
@@ -83,13 +84,44 @@ export interface TilePlacementLayerProps {
   onTilesChange: (tiles: TileAssignment[], suppressHistory?: boolean) => void;
 }
 
+
+/**
+ * What an ending stroke commits: its live tile array, or null when there is
+ * no open stroke or the active layer changed since it started (the tiles
+ * handler writes the ACTIVE layer, so committing would overwrite the new
+ * layer's tiles with the old layer's; parallax-livefix 3).
+ */
+export function strokeCommitFor(
+  strokeTiles: TileAssignment[] | null,
+  strokeLayerId: string | null,
+  activeLayerId: string | null
+): TileAssignment[] | null {
+  if (strokeTiles === null) return null;
+  return strokeLayerId === activeLayerId ? strokeTiles : null;
+}
+
+/**
+ * Whether a window touchend/touchcancel ends the open stroke: only when the
+ * finger that started it lifted, or (identifier unknown) no touch remains.
+ * A second finger landing and lifting mid-stroke leaves it open
+ * (parallax-livefix 5).
+ */
+export function touchEndsStroke(e: TouchEvent, strokeTouchId: number | null): boolean {
+  if (strokeTouchId != null) {
+    for (const t of Array.from(e.changedTouches)) {
+      if (t.identifier === strokeTouchId) return true;
+    }
+    return false;
+  }
+  return e.touches.length === 0;
+}
+
 const TilePlacementLayer = ({
   currentTool,
   selectedTilesetId,
   selectedTileId,
   tileRotation,
   tileFlipH,
-  tileLayer,
   tileFitMode,
   activeSubtool,
   tileScale,
@@ -98,8 +130,10 @@ const TilePlacementLayer = ({
   tileDepth,
   onTilesChange
 }: TilePlacementLayerProps): VNode | null => {
-  const { mapData, geometry, ladder, screenToGrid, screenToWorld, screenToLevelCell, getEditLevel } = useMapState();
+  const { canvasRef, mapData, geometry, ladder, screenToGrid, screenToWorld, screenToLevelCell, getEditLevel } = useMapState();
   const app = useApp();
+  // Subscribed, so a classification change re-renders the layer (STRUCT-A-20).
+  const tileMetadata = useTileMetadata(app);
 
   const isTileTool = currentTool === 'tilePaint';
   const hasTileSelected = selectedTilesetId != null && selectedTilesetId !== '' && selectedTileId != null && selectedTileId !== '';
@@ -112,7 +146,7 @@ const TilePlacementLayer = ({
     if (!hasTileSelected || mapData?.tilesets == null) return false;
     const ts = mapData.tilesets.find(t => t.id === selectedTilesetId);
     const entry = ts != null ? resolveTileEntry(ts, selectedTileId ?? '') : null;
-    return entry?.vaultPath != null && getTileMetadataForRender()[entry.vaultPath]?.ddSourceType === 'portals';
+    return entry?.vaultPath != null && tileMetadata[entry.vaultPath]?.ddSourceType === 'portals';
   })();
 
   const paintedInStrokeRef = useRef<Set<string>>(new Set());
@@ -122,6 +156,11 @@ const TilePlacementLayer = ({
   // self-consistent even when pointer events outrun Preact's re-render (the
   // stale closure would otherwise commit pre-stroke tiles, erasing the stroke).
   const strokeTilesRef = useRef<TileAssignment[] | null>(null);
+  // Layer the open stroke started on, and the finger that started it (touch).
+  const strokeLayerIdRef = useRef<string | null>(null);
+  const strokeTouchIdRef = useRef<number | null>(null);
+  const activeLayerIdRef = useRef<string | null>(null);
+  activeLayerIdRef.current = mapData?.activeLayerId ?? null;
   const lastGridPosRef = useRef<{ col: number; row: number } | null>(null);
   const scatterLastDropRef = useRef<{ x: number; y: number } | null>(null);
   // Ladder rung the current gesture writes to, latched at pointerdown: zoom can
@@ -181,14 +220,12 @@ const TilePlacementLayer = ({
     const startTiles = currentTiles;
     let changed = false;
 
-    const targetPlacement = tileLayer === 'base' ? 'fill' : 'overlay';
-
     // Snapshot the tile's detected footprint (grid only) onto the placement so it
     // stays stable if the metadata later changes. A prop with span > 1 ignores
     // brush size and places a single footprint at the anchor. Resolution goes
     // through resolveTileRender so region tiles never carry a span (a seamless
     // texture's footprint would make each placement swallow its neighbours).
-    const { resolved, feather } = resolvePaintTimeRender(geometry?.type === 'grid', entry, ts, paintEdgeBlend);
+    const { resolved, feather } = resolvePaintTimeRender(geometry?.type === 'grid', entry, ts, paintEdgeBlend, tileMetadata);
     const spanW = resolved != null && resolved.spanW > 1 ? resolved.spanW : undefined;
     const spanH = resolved != null && resolved.spanH > 1 ? resolved.spanH : undefined;
     const hasFootprint = spanW != null || spanH != null;
@@ -204,9 +241,8 @@ const TilePlacementLayer = ({
         col: cell.col, row: cell.row,
         tilesetId: selectedTilesetId,
         tileId: selectedTileId,
-        rotation: (tileRotation || undefined) as TileRotation | undefined,
+        rotation: (tileRotation || undefined),
         flipH: tileFlipH || undefined,
-        placement: targetPlacement === 'fill' ? undefined : targetPlacement,
         depth: tileDepth === 'ground' ? undefined : tileDepth,
         fitMode: tileFitMode === 'auto' ? undefined : tileFitMode,
         scale: tileScale !== 1 ? tileScale : undefined,
@@ -221,7 +257,7 @@ const TilePlacementLayer = ({
       for (const c of cellsCoveredByAssignment(newTile)) {
         paintedInStrokeRef.current.add(`${c.col},${c.row}`);
       }
-      currentTiles = withTilePlaced(currentTiles, newTile, targetPlacement);
+      currentTiles = withTilePlaced(currentTiles, newTile, 'fill');
       changed = true;
     }
 
@@ -230,7 +266,7 @@ const TilePlacementLayer = ({
       if (isBatchedStroke) strokeTilesRef.current = currentTiles;
       onTilesChange(currentTiles, isBatchedStroke);
     }
-  }, [mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, tileScale, brushSize, paintEdgeBlend, tileDepth, onTilesChange, app, refuseDeepTiles]);
+  }, [mapData, geometry, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileFitMode, tileScale, brushSize, paintEdgeBlend, tileDepth, onTilesChange, app, tileMetadata, refuseDeepTiles]);
 
   const eraseTilesInBrush = useCallback((col: number, row: number) => {
     if (!mapData) return;
@@ -267,7 +303,7 @@ const TilePlacementLayer = ({
     const entry = resolveTileEntry(ts, selectedTileId);
     if (entry?.vaultPath != null && entry.vaultPath !== '') void preloadImage(app, entry.vaultPath);
 
-    const { feather } = resolvePaintTimeRender(geometry?.type === 'grid', entry, ts, paintEdgeBlend);
+    const { feather } = resolvePaintTimeRender(geometry?.type === 'grid', entry, ts, paintEdgeBlend, tileMetadata);
 
     const activeLayer = getActiveLayer(mapData);
     const currentTiles = activeLayer.tiles ?? [];
@@ -339,19 +375,17 @@ const TilePlacementLayer = ({
     }
     if (fillCells.length === 0) return;
 
-    const targetPlacement = tileLayer === 'base' ? 'fill' : 'overlay';
     const fillKeys = new Set(fillCells.map(c => `${c.col},${c.row}`));
 
-    const newTiles = withFillRegionCleared(currentTiles, fillKeys, targetPlacement, level);
+    const newTiles = withFillRegionCleared(currentTiles, fillKeys, 'fill', level);
 
     for (const cell of fillCells) {
       newTiles.push({
         col: cell.col, row: cell.row,
         tilesetId: selectedTilesetId,
         tileId: selectedTileId,
-        rotation: (tileRotation || undefined) as TileRotation | undefined,
+        rotation: (tileRotation || undefined),
         flipH: tileFlipH || undefined,
-        placement: targetPlacement === 'fill' ? undefined : targetPlacement,
         depth: tileDepth === 'ground' ? undefined : tileDepth,
         fitMode: tileFitMode === 'auto' ? undefined : tileFitMode,
         feather,
@@ -363,7 +397,7 @@ const TilePlacementLayer = ({
     // budget by the tiles it actually adds (up to FLOOD_FILL_LIMIT).
     if (refuseDeepTiles(currentTiles, newTiles)) return;
     onTilesChange(newTiles);
-  }, [app, mapData, geometry, ladder, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileLayer, tileFitMode, paintEdgeBlend, tileDepth, onTilesChange, refuseDeepTiles]);
+  }, [app, mapData, geometry, ladder, selectedTilesetId, selectedTileId, tileRotation, tileFlipH, tileFitMode, paintEdgeBlend, tileDepth, onTilesChange, tileMetadata, refuseDeepTiles]);
 
   const placeStampAtWorld = useCallback((
     worldX: number,
@@ -388,7 +422,7 @@ const TilePlacementLayer = ({
       col, row,
       tilesetId: selectedTilesetId,
       tileId: selectedTileId,
-      rotation: (rotation || undefined) as TileRotation | undefined,
+      rotation: (rotation || undefined),
       flipH: flipH || undefined,
       placement: 'overlay',
       fitMode: tileFitMode === 'auto' ? undefined : tileFitMode,
@@ -431,8 +465,81 @@ const TilePlacementLayer = ({
     });
   }, [geometry, ladder, tileScale, placeStampAtWorld]);
 
+  // End the open stroke: commit it as ONE history entry from the stroke ref,
+  // NOT the mapData closure (pointerup can fire before Preact re-renders from
+  // the stroke's state updates, and the stale closure would commit pre-stroke
+  // tiles). Idempotent: a second call finds no open stroke.
+  const { clearTransient } = useMapOperations();
+  const endStroke = useCallback(() => {
+    // Skipped when the active layer changed mid-stroke (see strokeCommitFor).
+    const hadStroke = strokeTilesRef.current !== null;
+    const commit = strokeCommitFor(strokeTilesRef.current, strokeLayerIdRef.current, activeLayerIdRef.current);
+    strokeTilesRef.current = null;
+    strokeLayerIdRef.current = null;
+    strokeTouchIdRef.current = null;
+    if (commit !== null) onTilesChange(commit, false);
+    // Layer switched mid-stroke: no commit, so drop the stroke's transient baseline
+    // or the next paint plus one undo would also remove the stroke's tiles.
+    else if (hadStroke) clearTransient?.();
+    isDraggingRef.current = false;
+    paintedInStrokeRef.current = new Set();
+    lastGridPosRef.current = null;
+    scatterLastDropRef.current = null;
+  }, [onTilesChange, clearTransient]);
+  const endStrokeRef = useRef(endStroke);
+  endStrokeRef.current = endStroke;
+
+  // A stroke's live writes are history-suppressed, so a stroke whose release
+  // never reaches the canvas route (released outside the canvas, a mouseup the
+  // coordinator consumes first, a tool switch mid-stroke) would leave its
+  // tiles on the map with no undo step (live check A5) and the brush stuck
+  // down. Close it from the window too, and when the tool disarms or unmounts.
+  // Listeners go on the canvas's OWN window (popout-safe), never a fallback
+  // to the main one: if the ref is not set yet, retry on the next frames.
+  useEffect(() => {
+    if (!isTileTool) return undefined;
+    const onMouseUp = (): void => { endStrokeRef.current(); };
+    const onTouchEnd = (e: TouchEvent): void => {
+      if (touchEndsStroke(e, strokeTouchIdRef.current)) endStrokeRef.current();
+    };
+    let win: Window | null = null;
+    let frame: number | null = null;
+    let tries = 0;
+    const attach = (): void => {
+      frame = null;
+      const w = canvasRef.current?.ownerDocument.defaultView ?? null;
+      if (w == null) {
+        if (tries++ < 30) frame = window.requestAnimationFrame(attach);
+        return;
+      }
+      win = w;
+      w.addEventListener('mouseup', onMouseUp);
+      w.addEventListener('touchend', onTouchEnd);
+      w.addEventListener('touchcancel', onTouchEnd);
+    };
+    attach();
+    return () => {
+      if (frame != null) window.cancelAnimationFrame(frame);
+      if (win != null) {
+        win.removeEventListener('mouseup', onMouseUp);
+        win.removeEventListener('touchend', onTouchEnd);
+        win.removeEventListener('touchcancel', onTouchEnd);
+      }
+      endStrokeRef.current();
+    };
+  }, [isTileTool, canvasRef]);
+
+  // Record where the stroke started: its layer and, for touch, its finger.
+  const beginStrokeSession = useCallback((e: PointerEvent): void => {
+    strokeLayerIdRef.current = activeLayerIdRef.current;
+    const touches = (e as unknown as Partial<TouchEvent>).changedTouches;
+    strokeTouchIdRef.current = touches != null && touches.length > 0 ? touches[0].identifier : null;
+  }, []);
+
   const handlePointerDown = useCallback((e: PointerEvent) => {
     if (!isTileTool || !geometry) return;
+    // A stroke still open here lost its release: commit it before starting anew.
+    if (strokeTilesRef.current !== null) endStroke();
     // Openings are seated by the wall tool; tilePaint never places them (mirrors
     // the 'line'/'brush' subtool no-ops below).
     if (isOpeningAsset) return;
@@ -492,6 +599,7 @@ const TilePlacementLayer = ({
           scatterLastDropRef.current = null;
           const layer = getActiveLayer(mapData);
           strokeTilesRef.current = [...(layer.tiles ?? [])];
+          beginStrokeSession(e);
           scatterAdvance(worldCoords.worldX, worldCoords.worldY, coords.x, coords.y);
           return;
         }
@@ -501,8 +609,13 @@ const TilePlacementLayer = ({
         case 'line':
           // 'line' arms the wall tool, so tilePaint never sees these events.
           return;
+        case 'paint':
+        case 'autotile': // autotile until built
+        case 'opening': // unreachable: openings return above
+        case null: // no subtool armed = paint
+          break; // grid brush stroke below
         default:
-          break; // 'paint' (and autotile until built) → grid brush stroke below
+          assertNever(activeSubtool, 'tile subtool');
       }
     }
 
@@ -512,18 +625,25 @@ const TilePlacementLayer = ({
 
     const activeLayer = getActiveLayer(mapData);
     strokeTilesRef.current = [...(activeLayer.tiles ?? [])];
+    beginStrokeSession(e);
 
     if (hasTileSelected) {
       placeTilesInBrush(coords.x, coords.y);
     } else {
       eraseTilesInBrush(coords.x, coords.y);
     }
-  }, [isTileTool, geometry, ladder, cellAtLevel, screenToWorld, hasTileSelected, isOpeningAsset, activeSubtool, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, scatterAdvance, floodFillAtCell, mapData, getEditLevel]);
+  }, [isTileTool, geometry, ladder, cellAtLevel, screenToWorld, hasTileSelected, isOpeningAsset, activeSubtool, placeTilesInBrush, eraseTilesInBrush, placeStampAtWorld, scatterAdvance, floodFillAtCell, mapData, getEditLevel, endStroke, beginStrokeSession]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     // Only the paint/erase grid stroke sets isDraggingRef; the click-only
     // subtools (stamp/fill/scatter-for-now) return from pointerdown early.
     if (!isDraggingRef.current || !isTileTool || !geometry) return;
+    // The active layer changed mid-stroke: further live writes would land the
+    // old layer's tiles on the new one. Close the stroke without a commit.
+    if (strokeTilesRef.current !== null && strokeLayerIdRef.current !== activeLayerIdRef.current) {
+      endStroke();
+      return;
+    }
 
     // The LATCHED rung, never the live one: zoom can drift mid-stroke.
     const coords = cellAtLevel(e.clientX, e.clientY, strokeLevelRef.current);
@@ -553,25 +673,15 @@ const TilePlacementLayer = ({
     }
 
     lastGridPosRef.current = current;
-  }, [isTileTool, geometry, cellAtLevel, screenToWorld, hasTileSelected, activeSubtool, placeTilesInBrush, eraseTilesInBrush, scatterAdvance]);
+  }, [isTileTool, geometry, cellAtLevel, screenToWorld, hasTileSelected, activeSubtool, placeTilesInBrush, eraseTilesInBrush, scatterAdvance, endStroke]);
 
-  const handlePointerUp = useCallback(() => {
-    if (strokeTilesRef.current !== null) {
-      // Commit the history entry from the stroke ref, NOT the mapData closure:
-      // pointerup can fire before Preact re-renders from the stroke's state
-      // updates, and the stale closure would commit pre-stroke tiles.
-      onTilesChange(strokeTilesRef.current, false);
-      strokeTilesRef.current = null;
-    }
-    isDraggingRef.current = false;
-    paintedInStrokeRef.current = new Set();
-    lastGridPosRef.current = null;
-    scatterLastDropRef.current = null;
-  }, [onTilesChange]);
+  const handlePointerUp = useCallback(() => { endStroke(); }, [endStroke]);
 
-  useLayerHandlers('tilePlacement', isTileTool
-    ? { handlePointerDown, handlePointerMove, handlePointerUp }
-    : {});
+  useLayerHandlers(
+    'tilePlacement',
+    { handlePointerDown, handlePointerMove, handlePointerUp },
+    { enabled: isTileTool }
+  );
 
   return null;
 };

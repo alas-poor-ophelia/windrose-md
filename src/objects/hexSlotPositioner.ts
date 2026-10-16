@@ -274,4 +274,4 @@ function getClickedObjectInCell(
   return closest;
 }
 
-export { FLAT_TOP_ARRANGEMENTS, POINTY_TOP_ARRANGEMENTS, getSlotOffset, assignSlot, reorganizeSlots, getMaxObjectsPerCell, getMultiObjectScale, getObjectsInCell, canAddObjectToCell, getOccupiedSlots, reorganizeAfterRemoval, getClickedObjectInCell, homeLevelOf, classicHitRung };
+export { getSlotOffset, assignSlot, getMaxObjectsPerCell, getMultiObjectScale, getObjectsInCell, canAddObjectToCell, getOccupiedSlots, reorganizeAfterRemoval, getClickedObjectInCell, homeLevelOf, classicHitRung };

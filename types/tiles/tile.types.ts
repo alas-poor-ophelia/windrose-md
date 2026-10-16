@@ -6,6 +6,13 @@
  */
 
 // ===========================================
+// Placement Subtools
+// ===========================================
+
+/** A placement subtool the ribbon can offer. */
+export type TileSubtoolId = 'paint' | 'stamp' | 'scatter' | 'fill' | 'brush' | 'line' | 'autotile' | 'opening';
+
+// ===========================================
 // Tileset Source Types
 // ===========================================
 
@@ -145,8 +152,13 @@ export interface TileEntry {
 // Tile Rotation
 // ===========================================
 
-/** Valid rotation angles for tiles. Hex: 60° increments. Grid: 90° increments. */
-export type TileRotation = 0 | 60 | 90 | 120 | 180 | 240 | 270 | 300;
+/**
+ * Tile rotation in degrees, [0, 360). The UI cycles cell-snapped tiles in 90°
+ * steps on grid maps and 60° steps on hex maps, and freeform stamps in 15°
+ * steps (see rotationStepsFor in src/assets/tileRotation.ts). Stored values off
+ * the current step grid (legacy data) are kept as authored and render as-is.
+ */
+export type TileRotation = number;
 
 // ===========================================
 // Tile Layer Roles

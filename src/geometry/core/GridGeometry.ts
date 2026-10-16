@@ -436,22 +436,6 @@ class GridGeometry extends BaseGeometry {
   }
   
   /**
-   * Calculate distance between two grid cells (Manhattan distance)
-   */
-  getManhattanDistance(x1: number, y1: number, x2: number, y2: number): number {
-    return Math.abs(x2 - x1) + Math.abs(y2 - y1);
-  }
-  
-  /**
-   * Calculate distance between two grid cells (Euclidean distance)
-   */
-  getEuclideanDistance(x1: number, y1: number, x2: number, y2: number): number {
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    return Math.sqrt(dx * dx + dy * dy);
-  }
-  
-  /**
    * Calculate game distance between two grid cells with configurable diagonal rules
    */
   getCellDistance(

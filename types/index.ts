@@ -3,7 +3,8 @@
  * Path: types/index.ts
  * 
  * Re-exports all types for convenient importing:
- *   import type { Point, Cell, MapObject } from '@types';
+ *   import type { Point, Cell, MapObject } from '#types';
+ *   (prefer direct '#types/core/...' imports; '#types' resolves to this barrel)
  */
 
 // ===========================================
@@ -134,13 +135,18 @@ export type {
 } from './objects/object.types';
 
 export type {
-  NotePinId,
-  NotePin,
   TextLabelId,
   TextAlign,
   FontWeight,
   TextLabel,
 } from './objects/note.types';
+
+export type {
+  PartyRangeNoteResult,
+  PartyRangeUnlinkedResult,
+  PartyRangeBeaconResult,
+  PartyRangeResults,
+} from './objects/partyRange.types';
 
 export type {
   IconCategory,
@@ -162,6 +168,7 @@ export type {
   TilesetOverrides,
   TileLayerRole,
   TileRenderContext,
+  TileSubtoolId,
 } from './tiles/tile.types';
 export { DEFAULT_TILE_LAYERS } from './tiles/tile.types';
 
@@ -213,8 +220,6 @@ export type {
   ExtendedGeometry,
   ExtendedGridGeometry,
   ExtendedHexGeometry,
-  DrawingLayerState,
-  PanZoomLayerState,
   MapStateContextValue,
   MapOperationsContextValue,
   SelectableItemType,
@@ -234,8 +239,8 @@ export type {
 // Hook Types
 // ===========================================
 export type {
-  HistoryState,
-  UseHistoryResult,
+  FieldDiff,
+  HistoryStack,
 } from './hooks/history.types';
 
 export type {
@@ -248,7 +253,8 @@ export type {
 
 export type {
   LayerHistorySnapshot,
-  LayerHistoryCache,
+  LayerHistoryEntry,
+  LayerHistoryStacks,
   UseLayerHistoryOptions,
   LayerActions,
   HistoryActions,
@@ -326,7 +332,6 @@ export type {
   CoordinateHelpers,
   ZoomHandlers,
   PanHandlers,
-  CanvasInteractionSetters,
   LastTouchTimeRef,
   OnViewStateChangeCallback,
   UseCanvasInteractionResult,
@@ -345,17 +350,14 @@ export type {
 export type {
   UseEventCoordinatorOptions,
   SyntheticPointerEvent,
-  PendingToolAction,
   AreaSelectPending,
-  HandlerFunction,
-  LayerHandlers,
+  PointerPhaseHandlers,
   RegisteredDrawingHandlers,
   ObjectHandlers,
   TextHandlers,
   NotePinHandlers,
   PanZoomHandlers,
   MeasureHandlers,
-  AlignmentHandlers,
   FogHandlers,
   AreaSelectHandlers,
   DiagonalFillHandlers,
@@ -427,6 +429,7 @@ export type {
   UseCanvasRendererOptions,
   UseCanvasRenderer,
 } from './hooks/canvasRenderer.types';
+export type { RenderFrame } from './rendering/renderFrame.types';
 
 export type {
   UsePanZoomCoordinatorOptions,
@@ -446,7 +449,6 @@ export type {
   HandleDeleteCustomColor,
   HandleUpdateColorOpacity,
   HandleViewStateChange,
-  HandleSidebarCollapseChange,
   HandleObjectSetChange,
   HandleTextLabelSettingsChange,
   HandleRegionsChange,
@@ -454,14 +456,6 @@ export type {
   MapDataHandlers,
   UseDataHandlersResult,
 } from './hooks/dataHandlers.types';
-
-export type {
-  UseImageAlignmentOptions,
-  ImageDragOffset,
-  DragClientPosition,
-  ImageDragHandlerResult,
-  UseImageAlignmentResult,
-} from './hooks/imageAlignment.types';
 
 // ===========================================
 // Content Pack Types

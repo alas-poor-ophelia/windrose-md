@@ -11,6 +11,8 @@
  */
 
 // Type-only imports
+import { INTERIOR_RATIO } from './renderConstants';
+import { calculateViewportOffset } from '../core/viewportMath';
 import type { Point, GridStyle } from '#types/core/geometry.types';
 import type {
   RenderViewState,
@@ -45,7 +47,8 @@ const gridRenderer = {
 
   /**
    * Calculate viewport offset for grid maps.
-   * Grid maps multiply center by scaled cell size.
+   * Delegates to the shared viewportMath rule (cell-unit centre scaled by cell size).
+   * Kept only because useCanvasRenderer's local Renderer interface still requires it.
    */
   calculateViewportOffset(
     geometry: IGridRenderer,
@@ -53,11 +56,7 @@ const gridRenderer = {
     canvasSize: { width: number; height: number },
     zoom: number
   ): { offsetX: number; offsetY: number } {
-    const scaledSize = geometry.getScaledCellSize(zoom);
-    return {
-      offsetX: canvasSize.width / 2 - center.x * scaledSize,
-      offsetY: canvasSize.height / 2 - center.y * scaledSize,
-    };
+    return calculateViewportOffset({ type: 'grid', cellSize: geometry.getScaledCellSize(1) }, center, canvasSize, zoom);
   },
 
   /**
@@ -208,7 +207,7 @@ const gridRenderer = {
   ): void {
     if (cells == null || cells.length === 0) return;
     
-    const { lineColor = '#666666', lineWidth = 1, interiorRatio = 0.5 } = style;
+    const { lineColor = '#666666', lineWidth = 1, interiorRatio = INTERIOR_RATIO } = style;
     const scaledSize = geometry.getScaledCellSize(viewState.zoom);
     const actualLineWidth = Math.max(1, lineWidth * interiorRatio);
     const halfWidth = actualLineWidth / 2;

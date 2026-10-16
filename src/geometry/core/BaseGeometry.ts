@@ -22,6 +22,7 @@
  * - Implementations map Point.x/y to their native coordinate names internally
  */
 
+import { calculateViewportOffset, viewCenterScale } from './viewportMath';
 import type {
   Point,
   BoundingBox,
@@ -182,6 +183,14 @@ abstract class BaseGeometry implements IGeometry {
 
   abstract readonly type: 'grid' | 'hex';
 
+  /**
+   * Canvas px per view-centre unit (StoredViewState.center is cell units on
+   * grid, world px on hex). The rule itself lives in viewportMath.
+   */
+  getViewCenterScale(zoom: number): number {
+    return viewCenterScale({ type: this.type, cellSize: this.getScaledCellSize(1) }, zoom);
+  }
+
   abstract getCellCenter(x: number, y: number): { worldX: number; worldY: number };
 
   /**
@@ -223,26 +232,6 @@ abstract class BaseGeometry implements IGeometry {
     x2: number,
     y2: number
   ): Point[];
-  
-  /**
-   * Calculate Euclidean distance between two cells
-   */
-  abstract getEuclideanDistance(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number
-  ): number;
-  
-  /**
-   * Calculate Manhattan distance between two cells
-   */
-  abstract getManhattanDistance(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number
-  ): number;
   
   /**
    * Calculate "game distance" between two cells with configurable rules
@@ -311,29 +300,6 @@ abstract class BaseGeometry implements IGeometry {
   abstract getCellBounds(cell: Cell): BoundingBox;
 
   abstract getObjectBounds(obj: { position: Point; size?: { width: number; height: number } }): BoundingBox;
-}
-
-/**
- * Calculate viewport offset for centering the map on canvas.
- * Grid maps multiply center by scaled cell size; hex maps multiply by zoom only.
- */
-function calculateViewportOffset(
-  geometry: { type: string; cellSize: number },
-  center: { x: number; y: number },
-  canvasSize: { width: number; height: number },
-  zoom: number
-): { offsetX: number; offsetY: number } {
-  if (geometry.type !== 'hex') {
-    const scaledSize = geometry.cellSize * zoom;
-    return {
-      offsetX: canvasSize.width / 2 - center.x * scaledSize,
-      offsetY: canvasSize.height / 2 - center.y * scaledSize,
-    };
-  }
-  return {
-    offsetX: canvasSize.width / 2 - center.x * zoom,
-    offsetY: canvasSize.height / 2 - center.y * zoom,
-  };
 }
 
 export { BaseGeometry, calculateViewportOffset };

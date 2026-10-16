@@ -10,6 +10,15 @@ import type { ObjectTypeDefinition, RenderChar } from '#types/objects/object.typ
 import type { MapLayer } from '#types/core/map.types';
 import type { IGeometry } from '#types/core/geometry.types';
 
+/** Share of the object's short side that an image icon / glyph fills. */
+const OBJECT_IMAGE_FILL_RATIO = 0.9;
+const OBJECT_GLYPH_FILL_RATIO = 0.8;
+
+/** Glyph outline stroke: floor in px and share of the font size. */
+const GLYPH_OUTLINE_MIN_PX = 2;
+const GLYPH_OUTLINE_FONT_RATIO = 0.08;
+
+
 interface ObjectRenderContext {
   ctx: CanvasRenderingContext2D;
   offsetX: number;
@@ -200,7 +209,7 @@ function renderSingleObject(
     const img = getCachedImage(renderInfo.imagePath);
     if (img && img.complete) {
       // Calculate image size (fits within object bounds with 90% fill)
-      const imgSize = Math.min(objectWidth, objectHeight) * 0.9 * objectScale;
+      const imgSize = Math.min(objectWidth, objectHeight) * OBJECT_IMAGE_FILL_RATIO * objectScale;
 
       ctx.save();
 
@@ -227,7 +236,7 @@ function renderSingleObject(
   }
 
   // Font-based rendering (icons and Unicode symbols)
-  const fontSize = Math.min(objectWidth, objectHeight) * 0.8 * objectScale;
+  const fontSize = Math.min(objectWidth, objectHeight) * OBJECT_GLYPH_FILL_RATIO * objectScale;
 
   if (rotation !== 0) {
     ctx.save();
@@ -243,7 +252,7 @@ function renderSingleObject(
   }
 
   ctx.strokeStyle = '#000000';
-  ctx.lineWidth = Math.max(2, fontSize * 0.08);
+  ctx.lineWidth = Math.max(GLYPH_OUTLINE_MIN_PX, fontSize * GLYPH_OUTLINE_FONT_RATIO);
   ctx.strokeText(renderInfo.char, centerX, centerY);
 
   ctx.fillStyle = obj.color ?? '#ffffff';

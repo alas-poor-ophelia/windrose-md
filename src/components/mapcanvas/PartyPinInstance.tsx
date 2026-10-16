@@ -19,7 +19,8 @@ import type { ResolvedDistanceSettings } from '../../drawing/distanceOperations'
 import { rangeUnitsToCells } from '../../drawing/rangeOperations';
 import { getPartyPinIconPlacement, removePartyPin, upsertPartyPin } from '../../objects/partyPinOperations';
 import { queryPartyBeacons, queryPartyRange } from '../../objects/partyRangeQuery';
-import type { NoteMetadataAccessor, PartyRangeResults } from '../../objects/partyRangeQuery';
+import type { NoteMetadataAccessor } from '../../objects/partyRangeQuery';
+import type { PartyRangeResults } from '#types/objects/partyRange.types';
 import type { RelatedNotes, RelatedNotesSource } from '../../objects/partyRelatedNotes';
 import { extractCacheTags, getRelatedByBacklinks, getRelatedByTags } from '../../objects/partyRelatedNotes';
 import type { PartyNoteContext, PartyNoteTravelLabels } from '../../persistence/partyNoteOperations';
@@ -27,7 +28,9 @@ import {
   buildPartyNoteContent,
   buildPartyNotePath,
   deletePartyNote,
-  upsertPartyNote
+  upsertPartyNote,
+  findPartyNoteByMarker,
+  onPartyNoteRenamed
 } from '../../persistence/partyNoteOperations';
 import { openNoteInNewTab } from '../../persistence/noteOperations';
 import { ConfirmModal } from '../../settings/modals/ConfirmModal';
@@ -43,7 +46,7 @@ const PARTY_NOTE_SAVE_DELAY_MS = 2000;
 /** Related notes shown per result before the "+N more" overflow */
 const PARTY_RELATED_CAP = 5;
 
-export interface PartyPinInstanceProps {
+interface PartyPinInstanceProps {
   pin: PartyPin;
   /** Show this beacon's controls card (it is the selected beacon) */
   showControls: boolean;
@@ -211,10 +214,32 @@ const PartyPinInstance = ({
     const pinForWrite = pin;
     const timer = window.setTimeout(() => {
       if (suppressNoteWritesRef.current) return;
-      void upsertPartyNote(app, pinForWrite, noteContent);
+      upsertPartyNote(app, pinForWrite, noteContent).catch((error: unknown) => {
+        console.error('[Windrose] Beacon note write failed:', error);
+      });
     }, PARTY_NOTE_SAVE_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [noteContent, pin, app]);
+
+  // Follow the note when it is renamed or moved: a live rename is broadcast
+  // from main.ts; a rename that happened while this map was closed is found
+  // again by the note's ownership marker.
+  const notePath = pin.partyNote?.path ?? '';
+  useEffect(() => {
+    if (notePath === '') return undefined;
+    const repoint = (newPath: string): void => {
+      const current = pinsRef.current.find(p => p.id === pin.id);
+      if (current?.partyNote == null || current.partyNote.path === newPath) return;
+      onPartyPinsChange(upsertPartyPin(pinsRef.current, { ...current, partyNote: { ...current.partyNote, path: newPath } }));
+    };
+    if (app.vault.getAbstractFileByPath(notePath) == null) {
+      const moved = findPartyNoteByMarker(app, pin.id);
+      if (moved != null) repoint(moved.path);
+    }
+    return onPartyNoteRenamed((oldPath, newPath) => {
+      if (oldPath === notePath) repoint(newPath);
+    });
+  }, [notePath, pin.id, app, onPartyPinsChange]);
 
   const handleCreatePartyNote = useCallback(async (folder: string): Promise<void> => {
     const path = buildPartyNotePath(folder, pin.label);

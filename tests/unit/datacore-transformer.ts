@@ -149,13 +149,12 @@ const MODULE_MAP: Record<string, string> = {
   'useFogOfWar.ts': './hooks/interactions/useFogOfWar.ts',
   'useFogTools.ts': './hooks/interactions/useFogTools.ts',
   'useRegionTools.ts': './hooks/interactions/useRegionTools.ts',
-  'useImageAlignment.ts': './hooks/interactions/useImageAlignment.ts',
   'useDistanceMeasurement.ts': './hooks/interactions/useDistanceMeasurement.ts',
   'useSubHexNavigation.ts': './hooks/interactions/useSubHexNavigation.ts',
   'useAlignmentMode.ts': './hooks/interactions/useAlignmentMode.ts',
   'useCustomEventHandlers.ts': './hooks/interactions/useCustomEventHandlers.ts',
-  'useToolbarPosition.ts': './hooks/interactions/useToolbarPosition.ts',
-  'useSelectionActions.ts': './hooks/interactions/useSelectionActions.ts',
+  'toolbarPosition.ts': './components/toolbars/toolbarPosition.ts',
+  'selectionActionBuilders.ts': './components/toolbars/selectionActionBuilders.ts',
 
   // Generation
   'dungeonGenerator.js': './generation/dungeonGenerator.js',
@@ -181,14 +180,10 @@ const MODULE_MAP: Record<string, string> = {
 
   // Components - panels
   'ObjectSidebar.tsx': './components/panels/ObjectSidebar.tsx',
-  'LayerControls.tsx': './components/panels/LayerControls.tsx',
   'RegionPanel.tsx': './components/panels/RegionPanel.tsx',
   'TileAssetBrowser.tsx': './components/panels/TileAssetBrowser.tsx',
 
   // Components - toolbars
-  'ObjectSelectionToolbar.tsx': './components/toolbars/ObjectSelectionToolbar.tsx',
-  'TextSelectionToolbar.tsx': './components/toolbars/TextSelectionToolbar.tsx',
-  'MultiSelectToolbar.tsx': './components/toolbars/MultiSelectToolbar.tsx',
   'ToolPalette.tsx': './components/toolbars/ToolPalette.tsx',
   'VisibilityToolbar.tsx': './components/toolbars/VisibilityToolbar.tsx',
   'FogOfWarToolbar.tsx': './components/toolbars/FogOfWarToolbar.tsx',

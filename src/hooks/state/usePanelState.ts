@@ -8,6 +8,7 @@
  * - Settings change listener (forces re-render on windrose-settings-changed)
  */
 
+import type { MapDataUpdater } from '#types/hooks/mapData.types';
 import type {
   MapData, MapLayer, MapObject, Cell, BackgroundImage,
   UIPreferences, MapSettings,
@@ -19,7 +20,7 @@ import type { LadderPatch } from '../../core/lodFlags';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { getLayerById } from '../../persistence/layerAccessor';
 
-import { axialToOffset, offsetToAxial, isWithinOffsetBounds } from '../../geometry/core/offsetCoordinates';
+import { offsetToAxial, isAxialInHexBounds, isOffsetInHexBounds } from '../../geometry/core/offsetCoordinates';
 import { HexGeometry } from '../../geometry/core/HexGeometry';
 import { DEFAULTS } from '../../core/dmtConstants';
 import { filterLevelsToBounds, ladderForAuthoredRungs } from '../../persistence/resizeOperations';
@@ -35,7 +36,7 @@ import { filterLevelsToBounds, ladderForAuthoredRungs } from '../../persistence/
 
 interface UsePanelStateOptions {
   mapData: MapData | null;
-  updateMapData: (data: MapData) => void;
+  updateMapData: MapDataUpdater;
 }
 
 interface UsePanelStateResult {
@@ -102,119 +103,107 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
   ): void => {
     if (!mapData) return;
 
-    let newMapData: MapData = {
-      ...mapData,
-      settings: settingsData,
-      uiPreferences: preferencesData,
-      objectSetId: settingsData.objectSetId ?? null
-    };
+    updateMapData((prev: MapData) => {
+      let newMapData: MapData = {
+        ...prev,
+        settings: settingsData,
+        uiPreferences: preferencesData,
+        objectSetId: settingsData.objectSetId ?? null
+      };
 
-    if (hexBounds !== null && mapData.mapType === 'hex') {
-      newMapData.hexBounds = hexBounds;
+      if (hexBounds !== null && prev.mapType === 'hex') {
+        newMapData.hexBounds = hexBounds;
 
-      if (deleteOrphanedContent) {
-        const orientation = mapData.orientation ?? 'flat';
-        const isRadial = hexBounds.maxRing !== undefined;
+        if (deleteOrphanedContent) {
+          const orientation = prev.orientation ?? 'flat';
+          // Same predicate the settings modal uses to count orphans
+          const isInBounds = (q: number, r: number): boolean =>
+            isAxialInHexBounds(q, r, hexBounds, orientation);
+          const isFogCellInBounds = (col: number, row: number): boolean =>
+            isOffsetInHexBounds(col, row, hexBounds, orientation);
 
-        const isInBounds = (q: number, r: number): boolean => {
-          if (isRadial) {
-            const ring = Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
-            return ring <= (hexBounds.maxRing ?? 0);
+          if (newMapData.layers.length > 0) {
+            newMapData.layers = newMapData.layers.map((layer: MapLayer) => {
+              const filteredCells = layer.cells?.filter((cell: Cell) =>
+                isHexCell(cell) && isInBounds(cell.q, cell.r)
+              );
+              // Root-bounds filter on level-0 objects only: an object homed on a
+              // ladder rung carries RUNG coordinates, which this root test would
+              // misread; filterLevelsToBounds judges those by their root ancestor.
+              const filteredObjects = layer.objects?.filter((obj: MapObject) =>
+                (obj.homeLevel ?? 0) > 0 || isInBounds(obj.position.x, obj.position.y)
+              );
+              const filteredFog = layer.fogOfWar?.foggedCells?.filter(
+                (fc: { col: number; row: number }) => isFogCellInBounds(fc.col, fc.row)
+              );
+              const fogChanged = filteredFog !== layer.fogOfWar?.foggedCells;
+              if (filteredCells === layer.cells && filteredObjects === layer.objects && !fogChanged) return layer;
+              return {
+                ...layer,
+                cells: filteredCells ?? [],
+                objects: filteredObjects ?? [],
+                ...(layer.fogOfWar && fogChanged ? {
+                  fogOfWar: { ...layer.fogOfWar, foggedCells: filteredFog ?? [] }
+                } : {})
+              };
+            });
           }
-          const { col, row } = axialToOffset(q, r, orientation);
-          return isWithinOffsetBounds(col, row, hexBounds);
-        };
 
-        const isFogCellInBounds = (col: number, row: number): boolean => {
-          if (isRadial) {
-            const { q, r } = offsetToAxial(col, row, orientation);
-            const ring = Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
-            return ring <= (hexBounds.maxRing ?? 0);
-          }
-          return isWithinOffsetBounds(col, row, hexBounds);
-        };
-
-        if (newMapData.layers.length > 0) {
-          newMapData.layers = newMapData.layers.map((layer: MapLayer) => {
-            const filteredCells = layer.cells?.filter((cell: Cell) =>
-              isHexCell(cell) && isInBounds(cell.q, cell.r)
-            );
-            // Root-bounds filter on level-0 objects only: an object homed on a
-            // ladder rung carries RUNG coordinates, which this root test would
-            // misread; filterLevelsToBounds judges those by their root ancestor.
-            const filteredObjects = layer.objects?.filter((obj: MapObject) =>
-              (obj.homeLevel ?? 0) > 0 || isInBounds(obj.position.x, obj.position.y)
-            );
-            const filteredFog = layer.fogOfWar?.foggedCells?.filter(
-              (fc: { col: number; row: number }) => isFogCellInBounds(fc.col, fc.row)
-            );
-            const fogChanged = filteredFog !== layer.fogOfWar?.foggedCells;
-            if (filteredCells === layer.cells && filteredObjects === layer.objects && !fogChanged) return layer;
-            return {
-              ...layer,
-              cells: filteredCells ?? [],
-              objects: filteredObjects ?? [],
-              ...(layer.fogOfWar && fogChanged ? {
-                fogOfWar: { ...layer.fogOfWar, foggedCells: filteredFog ?? [] }
-              } : {})
-            };
-          });
+          // Rung (>= 1) cells: keep only those whose lattice ancestor exists under
+          // the NEW bounds. Written through setLevelCells, so emptied rungs go away.
+          const ladder = ladderForAuthoredRungs(
+            newMapData,
+            new HexGeometry(hexSize ?? prev.hexSize ?? DEFAULTS.hexSize, orientation, hexBounds)
+          );
+          if (ladder !== null) newMapData = filterLevelsToBounds(newMapData, ladder);
         }
-
-        // Rung (>= 1) cells: keep only those whose lattice ancestor exists under
-        // the NEW bounds. Written through setLevelCells, so emptied rungs go away.
-        const ladder = ladderForAuthoredRungs(
-          newMapData,
-          new HexGeometry(hexSize ?? mapData.hexSize ?? DEFAULTS.hexSize, orientation, hexBounds)
-        );
-        if (ladder !== null) newMapData = filterLevelsToBounds(newMapData, ladder);
       }
-    }
 
-    if (hexBounds !== null && mapData.mapType === 'hex') {
-      const wasRadial = mapData.hexBounds?.maxRing !== undefined;
-      const isNowRadial = hexBounds.maxRing !== undefined;
-      if (wasRadial !== isNowRadial) {
-        if (isNowRadial) {
-          newMapData.viewState = { ...mapData.viewState, center: { x: 0, y: 0 }, zoom: mapData.viewState?.zoom ?? 1 };
-        } else {
-          const orientation = mapData.orientation ?? 'flat';
-          const hSize = hexSize ?? mapData.hexSize ?? 40;
-          const centerCol = Math.floor(hexBounds.maxCol / 2);
-          const centerRow = Math.floor(hexBounds.maxRow / 2);
-          const { q, r } = offsetToAxial(centerCol, centerRow, orientation);
-          let worldX: number, worldY: number;
-          if (orientation === 'flat') {
-            worldX = hSize * (3 / 2) * q;
-            worldY = hSize * (Math.sqrt(3) / 2 * q + Math.sqrt(3) * r);
+      if (hexBounds !== null && prev.mapType === 'hex') {
+        const wasRadial = prev.hexBounds?.maxRing !== undefined;
+        const isNowRadial = hexBounds.maxRing !== undefined;
+        if (wasRadial !== isNowRadial) {
+          if (isNowRadial) {
+            newMapData.viewState = { ...prev.viewState, center: { x: 0, y: 0 }, zoom: prev.viewState?.zoom ?? 1 };
           } else {
-            worldX = hSize * (Math.sqrt(3) * q + Math.sqrt(3) / 2 * r);
-            worldY = hSize * (3 / 2) * r;
+            const orientation = prev.orientation ?? 'flat';
+            const hSize = hexSize ?? prev.hexSize ?? 40;
+            const centerCol = Math.floor(hexBounds.maxCol / 2);
+            const centerRow = Math.floor(hexBounds.maxRow / 2);
+            const { q, r } = offsetToAxial(centerCol, centerRow, orientation);
+            let worldX: number, worldY: number;
+            if (orientation === 'flat') {
+              worldX = hSize * (3 / 2) * q;
+              worldY = hSize * (Math.sqrt(3) / 2 * q + Math.sqrt(3) * r);
+            } else {
+              worldX = hSize * (Math.sqrt(3) * q + Math.sqrt(3) / 2 * r);
+              worldY = hSize * (3 / 2) * r;
+            }
+            newMapData.viewState = { ...prev.viewState, center: { x: worldX, y: worldY }, zoom: prev.viewState?.zoom ?? 1 };
           }
-          newMapData.viewState = { ...mapData.viewState, center: { x: worldX, y: worldY }, zoom: mapData.viewState?.zoom ?? 1 };
         }
       }
-    }
 
-    newMapData.backgroundImage = backgroundImage ?? undefined;
+      newMapData.backgroundImage = backgroundImage ?? undefined;
 
-    if (hexSize !== null && mapData.mapType === 'hex') {
-      newMapData.hexSize = hexSize;
-    }
-
-    // Ladder patch from the settings opt-in (ladderSettingsPatch): `set`
-    // arrives already merged over the stored lod; `remove` only ever comes for
-    // a map without depth content, so there are no layer levels to clean up;
-    // `keep` leaves the stored lod exactly as it was.
-    if (mapData.mapType === 'hex') {
-      if (ladderPatch.kind === 'set') {
-        newMapData.lod = ladderPatch.lod;
-      } else if (ladderPatch.kind === 'remove') {
-        delete newMapData.lod;
+      if (hexSize !== null && prev.mapType === 'hex') {
+        newMapData.hexSize = hexSize;
       }
-    }
 
-    updateMapData(newMapData);
+      // Ladder patch from the settings opt-in (ladderSettingsPatch): `set`
+      // arrives already merged over the stored lod; `remove` only ever comes for
+      // a map without depth content, so there are no layer levels to clean up;
+      // `keep` leaves the stored lod exactly as it was.
+      if (prev.mapType === 'hex') {
+        if (ladderPatch.kind === 'set') {
+          newMapData.lod = ladderPatch.lod;
+        } else if (ladderPatch.kind === 'remove') {
+          delete newMapData.lod;
+        }
+      }
+
+      return newMapData;
+    });
     setSettingsVersion((prev: number) => prev + 1);
   };
 

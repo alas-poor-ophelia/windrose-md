@@ -41,7 +41,7 @@ import { ResizeConfirmDialog } from './ResizeConfirmDialog';
 
 
 /** Props for MapSettingsModal (provider props minus children/onClose, plus onCancel) */
-export type MapSettingsModalProps = Omit<MapSettingsProviderProps, 'children' | 'onClose'> & {
+type MapSettingsModalProps = Omit<MapSettingsProviderProps, 'children' | 'onClose'> & {
   onCancel: () => void;
 };
 
@@ -99,7 +99,6 @@ function MapSettingsModalContent(): VNode | null {
     setActiveTab,
     tabs,
     mapType,
-    isLoading,
     handleSave,
     handleCancel,
     isInSubHex,
@@ -151,15 +150,12 @@ function MapSettingsModalContent(): VNode | null {
               class="mod-warning"
               style={{ marginRight: 'auto' }}
               onClick={onDeleteMap}
-              disabled={isLoading}
             >
               Delete map…
             </button>
           )}
-          <button onClick={handleCancel} disabled={isLoading}>Cancel</button>
-          <button class="mod-cta" onClick={handleSave} disabled={isLoading}>
-            {isLoading ? 'Saving...' : 'Save'}
-          </button>
+          <button onClick={handleCancel}>Cancel</button>
+          <button class="mod-cta" onClick={handleSave}>Save</button>
         </div>
       </div>
       <ResizeConfirmDialog />

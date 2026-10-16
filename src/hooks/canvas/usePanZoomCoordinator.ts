@@ -16,9 +16,11 @@
 // Type-only imports
 import type { UsePanZoomCoordinatorOptions } from '#types/hooks/panZoomCoordinator.types';
 
-import { useEffect, useRef } from 'preact/hooks';
+import type { PanZoomHandlers } from '#types/hooks/eventCoordinator.types';
+
 import { useCanvasInteraction } from './useCanvasInteraction';
-import { useEventHandlerRegistration } from '../../context/EventHandlerContext';
+import { useEffect } from 'preact/hooks';
+import { useLayerHandlers } from './useLayerHandlers';
 import { useMapState } from '../../context/MapContext';
 
 
@@ -41,19 +43,17 @@ const usePanZoomCoordinator = ({
   // The drill path keys the parent-map backdrop captured on a dive; the
   // request callbacks route dives/surfaces DIRECTLY to this mount's
   // navigation hook (no document events — see core/windroseEvents.ts).
-  const { isInSubHex, subHexPath, requestEnterSubHex, requestExitSubHex } = useMapState();
+  const { isInSubHex, subHexPath, requestEnterSubHex, requestExitSubHex, cursorStore } = useMapState();
 
-  // Use canvas interaction hook for pan/zoom logic
+  // Use canvas interaction hook for pan/zoom logic. Only what the event
+  // coordinator reads is registered (PanZoomHandlers); raw pan-state
+  // setters stay private to useCanvasInteraction.
   const {
     isPanning,
     isTouchPanning,
     isTouchPanningRef,
-    touchPanStartRef,
-    initialPinchDistanceRef,
     panStart,
-    touchPanStart,
     spaceKeyPressed,
-    initialPinchDistance,
     lastTouchTimeRef,
     getClientCoords,
     getTouchCenter,
@@ -70,41 +70,50 @@ const usePanZoomCoordinator = ({
     startTouchPan,
     updateTouchPan,
     stopTouchPan,
-    setIsPanning,
-    setIsTouchPanning,
-    setPanStart,
-    setTouchPanStart,
-    setInitialPinchDistance
+    startPinch
   } = useCanvasInteraction(canvasRef, mapData, geometry, isFocused, viewController, isInSubHex === true, subHexPath ?? null, requestEnterSubHex, requestExitSubHex);
 
-  // Register pan/zoom handlers with EventHandlerContext for event coordination
-  const { registerHandlers, unregisterHandlers } = useEventHandlerRegistration();
-
-  // Ref holds the latest handler object; updated every render so consumers
-  // always get current closures without effect re-registration churn.
-  const handlersRef = useRef<Record<string, unknown> | null>(null);
-  handlersRef.current = {
+  // Latest handler object, swapped in every render; the registry holds a
+  // stable proxy over it (same latest-ref pattern as useLayerHandlers).
+  const handlers: PanZoomHandlers = {
     startPan, updatePan, stopPan, markPanAnchorStale,
-    startTouchPan, updateTouchPan, stopTouchPan,
+    startTouchPan, updateTouchPan, stopTouchPan, startPinch,
     handleWheel,
     handleGestureStart, handleGestureChange, handleGestureEnd,
     getClientCoords, getTouchCenter, getTouchDistance, screenToGrid,
-    isPanning, isTouchPanning, panStart, touchPanStart, spaceKeyPressed,
-    isTouchPanningRef, touchPanStartRef, initialPinchDistanceRef,
-    lastTouchTimeRef, initialPinchDistance,
-    setIsPanning, setIsTouchPanning, setPanStart, setTouchPanStart, setInitialPinchDistance
+    isPanning, panStart, spaceKeyPressed,
+    isTouchPanningRef, lastTouchTimeRef
   };
+  useLayerHandlers('panZoom', handlers);
 
-  // Register once on mount with stable proxy that delegates to handlersRef
+  // Cursor feed for THIS map's canvas (REACT-04): grabbing while a pan runs
+  // (middle button, Space+drag, select-tool drag, touch pan), grab while
+  // Space is held with the pointer over the canvas. Both flags flip only at
+  // gesture/key edges, so these effects never run per pointermove.
   useEffect(() => {
-    const proxy = new Proxy({}, {
-      get(_target, prop: string) {
-        return handlersRef.current?.[prop];
-      }
-    });
-    registerHandlers('panZoom', proxy);
-    return () => unregisterHandlers('panZoom');
-  }, [registerHandlers, unregisterHandlers]);
+    cursorStore?.setPanning(isPanning || isTouchPanning);
+  }, [cursorStore, isPanning, isTouchPanning]);
+  useEffect(() => {
+    cursorStore?.setSpaceHeld(spaceKeyPressed);
+  }, [cursorStore, spaceKeyPressed]);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (cursorStore == null || canvas == null) return undefined;
+    // Popout-safe: the window that owns this canvas, not the main window.
+    const win = canvas.ownerDocument.defaultView ?? window;
+    const enter = (): void => cursorStore.setPointerOver(true);
+    const leave = (): void => cursorStore.setPointerOver(false);
+    const blur = (): void => cursorStore.releaseTransient();
+    canvas.addEventListener('pointerenter', enter);
+    canvas.addEventListener('pointerleave', leave);
+    win.addEventListener('blur', blur);
+    return () => {
+      canvas.removeEventListener('pointerenter', enter);
+      canvas.removeEventListener('pointerleave', leave);
+      win.removeEventListener('blur', blur);
+      cursorStore.releaseTransient();
+    };
+  }, [cursorStore, canvasRef]);
 
   // Coordinator hooks don't return anything - they just set up behavior
 };

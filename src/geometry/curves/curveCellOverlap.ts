@@ -188,4 +188,4 @@ function buildMergeIndex(
   return { cellBordersToSuppress, curveCellRects };
 }
 
-export { buildMergeIndex, getCachedFlatPoly };
+export { buildMergeIndex };

@@ -91,4 +91,4 @@ function getCanvasDisplayMetrics(
 }
 
 export { createViewportTransform, getCanvasDisplayMetrics };
-export type { ViewportGeometry, ViewportTransformParams, ViewportTransform, CanvasDisplayMetrics };
+

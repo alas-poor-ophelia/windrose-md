@@ -5,7 +5,7 @@
  * Resets fixture files to clean state.
  */
 
-import { existsSync, mkdirSync, cpSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, cpSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from "fs";
 import path from "path";
 
 const PROJECT_ROOT = path.resolve(__dirname, "../..");
@@ -25,6 +25,32 @@ const GENERATION_TEST_TARGET = path.join(TEST_VAULT, "_testing/dungeon-generatio
 
 const WORKSPACE_CLEAN = path.join(FIXTURES_DIR, "workspace.clean.json");
 const WORKSPACE_TARGET = path.join(TEST_VAULT, ".obsidian", "workspace.json");
+
+/**
+ * Remove run artifacts the plugin writes into the test vault: rotated data-file
+ * backups (`dungeon-maps-data.bak<N>.json`, `.bak-daily.json`) next to the data
+ * file, and Beacon notes (`<label> - Nearby.md`) created at the vault root by
+ * the party-pin tests. Left behind they dirty the tree, and a stale backup or
+ * note can change what the next run sees.
+ */
+function cleanRunArtifacts(): void {
+  const removed: string[] = [];
+  const sweep = (dir: string, match: (name: string) => boolean, label: string) => {
+    if (!existsSync(dir)) return;
+    for (const name of readdirSync(dir)) {
+      if (!match(name)) continue;
+      try {
+        unlinkSync(path.join(dir, name));
+        removed.push(`${label}${name}`);
+      } catch {
+        // Ignore: a locked file is retried on the next setup/teardown
+      }
+    }
+  };
+  sweep(TEST_DATA_DIR, (n) => /^dungeon-maps-data\.bak(\d+|-daily)\.json$/.test(n), "_test-data/");
+  sweep(TEST_VAULT, (n) => n.endsWith(" - Nearby.md"), "");
+  if (removed.length > 0) console.log(`  Removed run artifacts: ${removed.join(", ")}`);
+}
 
 export async function setup() {
   console.log("Setting up test vault...");
@@ -54,6 +80,7 @@ export async function setup() {
     }
     cpSync(CLEAN_FIXTURE, DEV_FIXTURE_TARGET);
     console.log("  Reset: _test-data/dungeon-maps-data.json to clean state");
+    cleanRunArtifacts();
   } else {
     throw new Error(`Clean fixture not found at ${CLEAN_FIXTURE} — tests cannot run with stale state`);
   }
@@ -168,6 +195,7 @@ export async function teardown() {
     cpSync(CLEAN_FIXTURE, DEV_FIXTURE_TARGET);
     console.log("  Reset: _test-data/dungeon-maps-data.json to clean state");
   }
+  cleanRunArtifacts();
 
   // Clean up obsidian-test-* temp directories created by obsidian-testing-framework
   const os = await import("os");

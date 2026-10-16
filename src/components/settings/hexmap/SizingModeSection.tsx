@@ -8,6 +8,8 @@
 import type { VNode } from 'preact';
 
 import { useBackgroundImage, useHexGrid } from '../../../context/MapSettingsContext';
+import { GRID_DENSITY_PRESETS, columnsForDensity } from '../settingsReducer';
+import { calculateGridFromColumns, hexSizeToMeasurement, measurementToHexSize, getFineTuneRange, MEASUREMENT_EDGE, MEASUREMENT_CORNER } from '../../../geometry/core/hexMeasurements';
 import { CollapsibleSection } from '../../shared/CollapsibleSection';
 import { SettingItem } from '../SettingItem';
 import { NativeSlider } from '../NativeControls';
@@ -22,11 +24,7 @@ function DensityModeContent(): VNode {
     imageDimensions,
     orientation,
     handleDensityChange,
-    handleCustomColumnsChange,
-    GRID_DENSITY_PRESETS,
-    calculateGridFromColumns,
-    hexSizeToMeasurement,
-    MEASUREMENT_EDGE
+    handleCustomColumnsChange
   } = useBackgroundImage();
   const { hexBounds } = useHexGrid();
 
@@ -91,7 +89,7 @@ function DensityModeContent(): VNode {
           <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
             Result: {hexBounds.maxCol} columns × {hexBounds.maxRow} rows
             {(() => {
-              const columns = gridDensity === 'custom' ? customColumns : GRID_DENSITY_PRESETS[gridDensity]?.columns ?? 24;
+              const columns = columnsForDensity(gridDensity, customColumns);
               const calc = calculateGridFromColumns(imageDimensions.width, imageDimensions.height, columns, orientation);
               return ` (~${Math.round(hexSizeToMeasurement(calc.hexSize, MEASUREMENT_EDGE, orientation))}px hex width)`;
             })()}
@@ -114,10 +112,6 @@ function MeasurementModeContent(): VNode {
     handleMeasurementSizeChange,
     handleFineTuneChange,
     handleFineTuneReset,
-    MEASUREMENT_EDGE,
-    MEASUREMENT_CORNER,
-    measurementToHexSize,
-    getFineTuneRange,
     orientation
   } = useBackgroundImage();
   const { hexBounds } = useHexGrid();
@@ -392,4 +386,4 @@ function SizingModeSection(): VNode | null {
   );
 }
 
-export { SizingModeSection, DensityModeContent, MeasurementModeContent };
+export { SizingModeSection };

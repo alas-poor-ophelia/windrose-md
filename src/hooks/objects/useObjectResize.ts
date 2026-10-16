@@ -12,7 +12,7 @@ import type {
 } from '#types/hooks/objectInteractions.types';
 
 import { useCallback, useRef, useState } from 'preact/hooks';
-import { applyInverseRotation } from '../../objects/screenPositionUtils';
+import { calculateViewportOffset, clientToCanvasPx, unrotateCanvasPx } from '../../geometry/core/viewportMath';
 import { ladderObjectFootprint } from '../../objects/ladderHitTest';
 import { useMapState } from '../../context/MapContext';
 import { useMapOperations } from '../../context/MapContext';
@@ -42,7 +42,7 @@ function useObjectResize(): {
   beginResize: (corner: ResizeCorner, objects: MapObject[], dragStartData: ObjectDragStart) => void;
 } {
   const { mapData, geometry, canvasRef, screenToLevelCell, getClientCoords, ladder, viewController } = useMapState();
-  const { updateObject, onObjectsChange, isAreaFree } = useMapOperations();
+  const { updateObject, onObjectsChange, isAreaFree, clearTransient } = useMapOperations();
   const { selectedItem, setSelectedItem, isResizeMode, dragStart, setDragStart } = useMapSelection();
 
   const [isResizing, setIsResizing] = useState(false);
@@ -64,23 +64,15 @@ function useObjectResize(): {
     if (!canvasRef.current) return null;
 
     const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-
-    let x = clientX - rect.left;
-    let y = clientY - rect.top;
-
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    x *= scaleX;
-    y *= scaleY;
-
     if (mapData == null || geometry == null) return null;
     const { viewState } = mapData;
     if (viewState == null) return null;
     const { zoom, center } = viewState;
     const northDirection = mapData.northDirection ?? 0;
 
-    let offsetX: number, offsetY: number, objectWidth: number, objectHeight: number;
+    const canvasSize = { width: canvas.width, height: canvas.height };
+    const { offsetX, offsetY } = calculateViewportOffset(geometry, center, canvasSize, zoom);
+    let objectWidth: number, objectHeight: number;
     let ladderRect: { screenX: number; screenY: number } | null = null;
     if (ladder !== null) {
       // Ladder: the handles sit on the drawn footprint (home rung, held size),
@@ -90,32 +82,24 @@ function useObjectResize(): {
         ladder, level: ladder.activeLevel(live.zoom), zoom: live.zoom, orientation: mapData.orientation ?? 'flat'
       });
       if (rect === null) return null;
-      offsetX = canvas.width / 2 - live.center.x * live.zoom;
-      offsetY = canvas.height / 2 - live.center.y * live.zoom;
+      const liveOffset = calculateViewportOffset(geometry, live.center, canvasSize, live.zoom);
       objectWidth = rect.objectWidth;
       objectHeight = rect.objectHeight;
-      ladderRect = { screenX: offsetX + rect.screenX, screenY: offsetY + rect.screenY };
+      ladderRect = { screenX: liveOffset.offsetX + rect.screenX, screenY: liveOffset.offsetY + rect.screenY };
     } else if (geometry.type === 'hex') {
-      offsetX = canvas.width / 2 - center.x * zoom;
-      offsetY = canvas.height / 2 - center.y * zoom;
-
       const hexSize = geometry.hexSize;
       const size = object.size ?? { width: 1, height: 1 };
       objectWidth = size.width * hexSize * zoom;
       objectHeight = size.height * hexSize * zoom;
     } else {
       const scaledGridSize = geometry.getScaledCellSize != null ? geometry.getScaledCellSize(zoom) : zoom;
-      offsetX = canvas.width / 2 - center.x * scaledGridSize;
-      offsetY = canvas.height / 2 - center.y * scaledGridSize;
-
       const size = object.size ?? { width: 1, height: 1 };
       objectWidth = size.width * scaledGridSize;
       objectHeight = size.height * scaledGridSize;
     }
 
-    const rotated = applyInverseRotation(x, y, canvas.width, canvas.height, northDirection);
-    x = rotated.x;
-    y = rotated.y;
+    const canvasPx = clientToCanvasPx(canvas, clientX, clientY);
+    const { x, y } = unrotateCanvasPx(canvasPx.x, canvasPx.y, canvasSize, northDirection);
 
     let screenX: number, screenY: number;
     if (ladderRect !== null) {
@@ -271,11 +255,14 @@ function useObjectResize(): {
       if (resizeInitialStateRef.current !== null && mapData != null) {
         onObjectsChange(getActiveLayer(mapData).objects, false);
         resizeInitialStateRef.current = null;
+      } else {
+        // No commit: drop any live-move pin so the next unrelated commit cannot absorb it.
+        clearTransient?.();
       }
       return true;
     }
     return false;
-  }, [isResizing, setIsResizing, setResizeCorner, setDragStart, onObjectsChange, mapData]
+  }, [isResizing, setIsResizing, setResizeCorner, setDragStart, onObjectsChange, mapData, clearTransient]
   );
 
   return { isResizing, resizeCorner, getClickedCorner, handleObjectResizing, stopObjectResizing, beginResize };

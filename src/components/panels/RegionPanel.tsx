@@ -16,10 +16,9 @@ import { tooltipRef } from '../shared/obsidianTooltip';
 const REGION_NAME_MAX_LENGTH = 20;
 const REGION_NAME_TRUNCATE_AT = 17;
 
-export interface RegionPanelProps {
+interface RegionPanelProps {
   regions: Region[];
   onRegionsChange: (regions: Region[]) => void;
-  sidebarCollapsed: boolean;
   isOpen?: boolean;
   /** Per-mount instance id — stamped into center-on-region events. */
   instanceId?: string;
@@ -28,7 +27,6 @@ export interface RegionPanelProps {
 const RegionPanel = ({
   regions,
   onRegionsChange,
-  sidebarCollapsed,
   isOpen = false,
   instanceId
 }: RegionPanelProps): VNode | null => {
@@ -47,8 +45,10 @@ const RegionPanel = ({
     onRegionsChange(updated);
   };
 
-  const handleRegionClick = (regionId: string): void => {
-    activeDocument.dispatchEvent(new CustomEvent('windrose:center-on-region', {
+  const handleRegionClick = (regionId: string, e: MouseEvent): void => {
+    // Dispatch on the document that owns this panel (popout-safe).
+    const doc = e.currentTarget instanceof Node ? (e.currentTarget.ownerDocument ?? activeDocument) : activeDocument;
+    doc.dispatchEvent(new CustomEvent('windrose:center-on-region', {
       detail: { regionId, instanceId }
     }));
   };
@@ -61,7 +61,7 @@ const RegionPanel = ({
 
   return (
     <div
-      className={`windrose-region-panel ${sidebarCollapsed ? 'sidebar-closed' : 'sidebar-open'} ${isOpen ? 'windrose-region-panel-open' : ''}`}
+      className={`windrose-region-panel ${isOpen ? 'windrose-region-panel-open' : ''}`}
     >
       <div className="windrose-region-panel-header">
         <Icon icon="lucide-map" size={12} />
@@ -72,7 +72,7 @@ const RegionPanel = ({
         <button
           key={region.id}
           className={`windrose-region-item ${!region.visible ? 'windrose-region-item-hidden' : ''}`}
-          onClick={() => handleRegionClick(region.id)}
+          onClick={(e) => handleRegionClick(region.id, e)}
           ref={tooltipRef(`${region.name} (${region.hexes.length} hexes)`)}
         >
           <span

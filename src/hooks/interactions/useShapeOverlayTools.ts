@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { formatDistance } from '../../drawing/distanceOperations';
 import { snapShapeOverlayToGrid, hitTestShapeOverlay } from '../../objects/shapeOverlayOperations';
 import { useMapSelection } from '../../context/MapSelectionContext';
+import { mintId } from '../../core/ids';
 
 
 interface ShapeOverlayToolsOptions {
@@ -60,7 +61,7 @@ interface UseShapeOverlayToolsResult {
 }
 
 function generateShapeId(): string {
-  return `shape-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return mintId('shape', { randomLength: 6 });
 }
 
 function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverlayToolsResult {
@@ -177,6 +178,13 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
     };
   }, [firstClick, currentWorldPos, activeShape, computeShapeFromClicks, isFreeformPlacement, sizeToFormattedDistance]);
 
+  // Declared before handlePointerDown so it can be an honest dependency.
+  const cancelPlacement = useCallback(() => {
+    setFirstClick(null);
+    setCurrentWorldPos(null);
+    setModifierFreeform(false);
+  }, []);
+
   const handlePointerDown = useCallback((e: PointerEvent) => {
     if (!isShapeTool) return;
     const world = getWorldCoords(e);
@@ -214,7 +222,7 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
       setFirstClick(null);
       setCurrentWorldPos(null);
     }
-  }, [isShapeTool, getWorldCoords, mapData, firstClick, activeShape, selectedColor, selectedOpacity, computeShapeFromClicks, freeformPlacementMode, onShapeOverlaysChange]);
+  }, [isShapeTool, getWorldCoords, mapData, firstClick, activeShape, selectedColor, selectedOpacity, computeShapeFromClicks, freeformPlacementMode, onShapeOverlaysChange, cancelPlacement]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     if (!isShapeTool || !firstClick) return;
@@ -223,12 +231,6 @@ function useShapeOverlayTools(options: ShapeOverlayToolsOptions): UseShapeOverla
     setModifierFreeform(e.altKey && e.shiftKey);
     setCurrentWorldPos({ x: world.worldX, y: world.worldY });
   }, [isShapeTool, firstClick, getWorldCoords]);
-
-  const cancelPlacement = useCallback(() => {
-    setFirstClick(null);
-    setCurrentWorldPos(null);
-    setModifierFreeform(false);
-  }, []);
 
   const deleteShapeOverlay = useCallback((id: string) => {
     if (!mapData) return;

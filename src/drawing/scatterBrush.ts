@@ -9,8 +9,9 @@
  */
 
 import type { TileRotation } from '#types/tiles/tile.types';
+import { rotationStepsFor } from '../assets/tileRotation';
 
-export interface ScatterDrop {
+interface ScatterDrop {
   worldX: number;
   worldY: number;
   /** Absolute scale for the placement (already includes the brush tileScale). */
@@ -35,8 +36,9 @@ const SCATTER_POS_JITTER_CELLS = 0.25;
 const SCATTER_SCALE_MIN = 0.8;
 const SCATTER_SCALE_MAX = 1.2;
 
-const GRID_ROTATIONS: TileRotation[] = [0, 90, 180, 270];
-const HEX_ROTATIONS: TileRotation[] = [0, 60, 120, 180, 240, 300];
+
+const GRID_ROTATIONS = rotationStepsFor('grid', false);
+const HEX_ROTATIONS = rotationStepsFor('hex', false);
 
 /** World distance the pointer must travel before the next drop. */
 function scatterSpacing(cellSize: number, tileScale: number): number {
@@ -47,6 +49,8 @@ function scatterSpacing(cellSize: number, tileScale: number): number {
 function makeScatterDrop(worldX: number, worldY: number, params: ScatterParams): ScatterDrop {
   const { cellSize, tileScale, isHex, rng } = params;
   const jitter = SCATTER_POS_JITTER_CELLS * cellSize;
+  // Scatter jitters on the geometry's cell-snapped grid (unchanged by the
+  // freeform 15-degree cycle) so scattered props stay axis-aligned.
   const steps = isHex ? HEX_ROTATIONS : GRID_ROTATIONS;
   return {
     worldX: worldX + (rng() * 2 - 1) * jitter,

@@ -220,21 +220,6 @@ describe("GridGeometry", () => {
   // ===========================================================================
 
   describe("distance calculations", () => {
-    describe("getManhattanDistance", () => {
-      it("calculates Manhattan distance", () => {
-        expect(geometry.getManhattanDistance(0, 0, 3, 4)).toBe(7);
-        expect(geometry.getManhattanDistance(0, 0, 0, 0)).toBe(0);
-        expect(geometry.getManhattanDistance(-2, -2, 2, 2)).toBe(8);
-      });
-    });
-
-    describe("getEuclideanDistance", () => {
-      it("calculates Euclidean distance", () => {
-        expect(geometry.getEuclideanDistance(0, 0, 3, 4)).toBe(5); // 3-4-5 triangle
-        expect(geometry.getEuclideanDistance(0, 0, 0, 0)).toBe(0);
-      });
-    });
-
     describe("getCellDistance with diagonal rules", () => {
       it("equal diagonal rule (Chebyshev)", () => {
         expect(geometry.getCellDistance(0, 0, 3, 3, { diagonalRule: "equal" })).toBe(3);

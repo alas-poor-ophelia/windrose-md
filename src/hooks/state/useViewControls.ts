@@ -132,15 +132,11 @@ function useViewControls({
       return;
     }
     const rotations = [0, 90, 180, 270];
-    const currentIndex = rotations.indexOf(mapData.northDirection ?? 0);
-    const nextIndex = (currentIndex + 1) % rotations.length;
-    const newRotation = rotations[nextIndex] ?? 0;
-
-    const newMapData = {
-      ...mapData,
-      northDirection: newRotation
-    };
-    updateMapData(newMapData);
+    updateMapData((prev: MapData) => {
+      const currentIndex = rotations.indexOf(prev.northDirection ?? 0);
+      const nextIndex = (currentIndex + 1) % rotations.length;
+      return { ...prev, northDirection: rotations[nextIndex] ?? 0 };
+    });
   };
 
   const handleRecenterView = (): void => {

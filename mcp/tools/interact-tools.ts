@@ -149,7 +149,7 @@ export function registerInteractTools(server: McpServer): void {
       row: z.number().int().describe("Grid row (integer)"),
       tilesetId: z.string().describe("Tileset ID (from windrose_list_tiles)"),
       tileId: z.string().describe("Tile ID within the tileset (from windrose_list_tiles)"),
-      rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional().describe("Rotation in degrees: 0, 90, 180, or 270 (default: 0)"),
+      rotation: z.number().int().min(0).max(359).optional().describe("Rotation in degrees (default: 0). Grid maps: 0, 90, 180, 270. Hex maps: 0, 60, 120, 180, 240, 300. Other values are rejected."),
       depth: z.string().optional().describe("Depth tier string (e.g. 'floor', 'wall', 'object') — omit to use the tile's default depth"),
       scale: z.number().min(0.1).max(4).optional().describe("Scale factor 0.1–4 (default: 1.0)"),
       level: z.number().int().min(0).optional().describe("Ladder rung (default 0 = root). On a rung, coordinates are rung cell indices and must exist at that level"),

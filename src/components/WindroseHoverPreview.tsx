@@ -4,35 +4,30 @@
 // so the preview matches what the full map looks like.
 
 import type { MapData } from '#types/index';
-import type { ExtendedGeometry } from '#types/contexts/context.types';
-import type { RendererTheme } from '#types/hooks/canvasRenderer.types';
 
 import type { VNode } from 'preact';
 import { render } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { loadMapData } from '../persistence/fileOperations';
-import { renderCanvas } from '../hooks/canvas/useCanvasRenderer';
-import { GridGeometry } from '../geometry/core/GridGeometry';
+import { renderCanvas } from '../geometry/renderers/mapRenderer';
 import { HexGeometry } from '../geometry/core/HexGeometry';
-import { getApp, getSettings, getTheme, getEffectiveSettings } from '../core/settingsAccessor';
-import { DEFAULTS } from '../core/dmtConstants';
+import { getApp, getSettings, resolveTheme } from '../core/settingsAccessor';
+import { resolveHoverPreviewView } from '../core/deepLinkHoverTarget';
 import { isDepthQuarantined, isLadderView, ladderParamsFor } from '../core/lodFlags';
 import { createGeometryLadder } from '../geometry/core/createGeometryLadder';
 import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
 import { overrideRungFor } from '../geometry/renderers/elementBands';
 import { authoredLevels, getActiveLayer } from '../persistence/layerAccessor';
 
-
-
-
-
-
-
 const BASE_WIDTH = 240;
 const BASE_HEIGHT = 180;
 const DEFAULT_PREVIEW_SCALE = 1.0;
 const DEFAULT_PREVIEW_ZOOM = 0.5;
 
+/**
+ * Preview canvas size and the "Link preview zoom" slider value. The slider is
+ * a multiplier on the link's own zoom (see resolvePreviewZoom).
+ */
 function getPreviewDimensions(): { width: number; height: number; zoom: number } {
   try {
     const s = getSettings();
@@ -48,8 +43,11 @@ interface WindroseHoverPreviewProps {
   mapId: string;
   x: number;
   y: number;
+  /** The link's own zoom (multiplied by the slider); absent or <= 0 uses the slider alone. */
   zoom?: number;
   layerId?: string;
+  /** '/'-joined sub-hex drill path from the link, when it points inside a sub-hex. */
+  subHexPath?: string;
   notePath?: string;
 }
 
@@ -60,13 +58,13 @@ function noteBasename(notePath?: string): string {
   return base.replace(/\.md$/i, '');
 }
 
-function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }: WindroseHoverPreviewProps): VNode {
+function WindroseHoverPreview({ mapId, x, y, zoom: linkZoom, layerId, subHexPath, notePath }: WindroseHoverPreviewProps): VNode {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
   const [mapName, setMapName] = useState<string>('');
 
   const preview = getPreviewDimensions();
-  const zoom = zoomProp ?? preview.zoom;
+  const sliderZoom = preview.zoom;
 
   useEffect(() => {
     let cancelled = false;
@@ -82,33 +80,24 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
 
         setMapName((mapData.name) ?? mapId);
 
+        // Same centre/level resolution as the click navigation (hex q,r ->
+        // world px, sub-hex path -> that level's map), plus the linked item.
+        const view = resolveHoverPreviewView(
+          mapData,
+          { x, y, zoom: linkZoom ?? 0, layerId: layerId ?? '', subHexPath },
+          sliderZoom
+        );
+
         const focused: MapData = {
-          ...mapData,
-          viewState: { zoom, center: { x, y } },
-          activeLayerId: (layerId != null && layerId !== '') ? layerId : mapData.activeLayerId,
+          ...view.levelMap,
+          viewState: { zoom: view.zoom, center: view.center },
+          activeLayerId: view.layerId ?? view.levelMap.activeLayerId,
           northDirection: 0,
         };
 
-        const geometry: ExtendedGeometry = focused.mapType === 'hex'
-          ? new HexGeometry(
-              (focused.hexSize as number) || (DEFAULTS.hexSize),
-              focused.orientation ?? DEFAULTS.hexOrientation,
-              focused.hexBounds ?? null
-            )
-          : new GridGeometry((focused.gridSize as number) || (DEFAULTS.gridSize));
-
-        const effective = getEffectiveSettings(focused.settings);
-        const theme = {
-          grid: {
-            lines: effective.gridLineColor,
-            lineWidth: effective.gridLineWidth,
-            background: effective.backgroundColor
-          },
-          cells: {
-            border: effective.borderColor,
-            borderWidth: getTheme().cells.borderWidth
-          },
-        } as RendererTheme;
+        // Per-map theme: global settings with this map's overrides applied
+        // (a sub-map without its own settings inherits the root's).
+        const theme = resolveTheme(view.levelMap.settings ?? mapData.settings);
 
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -126,15 +115,15 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
         const deepestAuthored = focusedLevels.length > 0 ? focusedLevels[focusedLevels.length - 1] : 0;
         let previewLadder: GeometryLadder | null = null;
         let previewLevel = 0;
-        if (deepestAuthored > 0 && geometry instanceof HexGeometry && isLadderView(mapData)
-            && !isDepthQuarantined(mapData).quarantined) {
-          const { m, minCellPx, maxLevel } = ladderParamsFor(mapData);
-          const ladder = createGeometryLadder(geometry, { m, minCellPx, maxLevel });
-          previewLevel = overrideRungFor(ladder, deepestAuthored, zoom);
+        if (deepestAuthored > 0 && view.geometry instanceof HexGeometry && isLadderView(view.levelMap)
+            && !isDepthQuarantined(view.levelMap).quarantined) {
+          const { m, minCellPx, maxLevel } = ladderParamsFor(view.levelMap);
+          const ladder = createGeometryLadder(view.geometry, { m, minCellPx, maxLevel });
+          previewLevel = overrideRungFor(ladder, deepestAuthored, view.zoom);
           if (previewLevel > 0) previewLadder = ladder;
         }
 
-        renderCanvas(canvas, null, focused, geometry, [], {
+        renderCanvas(canvas, null, focused, view.geometry, view.highlight != null ? [view.highlight] : [], {
           theme,
           layerVisibility: { grid: true, objects: true, textLabels: true, hexCoordinates: false, regions: false, outlines: false },
           ...(previewLadder !== null ? { ladder: previewLadder, level: previewLevel, bypassSurfaceCache: true } : {})
@@ -189,14 +178,14 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
       }
     })();
     return () => { cancelled = true; };
-  }, [mapId, x, y, zoom, layerId, preview.width, preview.height]);
+  }, [mapId, x, y, linkZoom, sliderZoom, layerId, subHexPath, preview.width, preview.height]);
 
   const noteLabel = noteBasename(notePath);
   const headerMapName = mapName || mapId;
   const showHeader = status === 'ready' && (headerMapName !== '' || noteLabel !== '');
 
   return (
-    <div className="windrose-hover-preview">
+    <div className="windrose-hover-preview" style={{ width: `${preview.width}px` }}>
       {showHeader && (
         <div className="windrose-hover-preview-header">
           {headerMapName && <div className="windrose-hover-preview-header-map">{headerMapName}</div>}
@@ -207,7 +196,7 @@ function WindroseHoverPreview({ mapId, x, y, zoom: zoomProp, layerId, notePath }
         ref={canvasRef}
         width={preview.width}
         height={preview.height}
-        style={{ display: status === 'ready' ? 'block' : 'none' }}
+        style={{ display: status === 'ready' ? 'block' : 'none', width: `${preview.width}px`, height: `${preview.height}px` }}
       />
       {status === 'loading' && <div className="windrose-hover-preview-state">Loading…</div>}
       {status === 'missing' && <div className="windrose-hover-preview-state">Map not found</div>}
@@ -228,4 +217,4 @@ function unmountHoverPreview(el: HTMLElement): void {
   try { render(null, el); } catch { /* ignore */ }
 }
 
-export { WindroseHoverPreview, renderHoverPreview, unmountHoverPreview };
+export { renderHoverPreview, unmountHoverPreview, getPreviewDimensions };

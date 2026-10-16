@@ -24,7 +24,7 @@ Before writing code, find similar existing features:
 | New layer | `DrawingLayer.tsx`, `ObjectLayer.tsx` |
 | New modal/UI | `components/modals/`, `components/overlays/` |
 | New geometry operation | `geometry/core/GridGeometry.ts`, `geometry/core/HexGeometry.ts` |
-| New hook | `hooks/use*.ts` |
+| New hook | `hooks/{canvas,drawing,objects,state,interactions}/use*.ts` (see `src/hooks/CLAUDE.md` taxonomy) |
 | New context | `context/*Context.tsx` |
 
 ## Step 3: Create Files Following Conventions
@@ -32,10 +32,10 @@ Before writing code, find similar existing features:
 | Need | File Pattern | Location |
 |------|--------------|----------|
 | Shared state | `*Context.tsx` | `src/context/` |
-| Reusable logic | `use*.ts` | `src/hooks/` |
-| Pure functions | `*Operations.ts` | Appropriate domain dir |
+| Reusable logic | `use*.ts` | `src/hooks/<folder>/` (canvas, drawing, objects, state, interactions) |
+| Pure functions | `*Operations.ts` | Appropriate domain dir (`objects/`, `drawing/`, `text/`, `travel/`, `persistence/`, ...) |
 | Canvas rendering | `*Renderer.ts` | `src/geometry/renderers/` |
-| Data access | `*Accessor.ts` | `src/persistence/` |
+| Data access | `*Accessor.ts` | Next to its data: `layerAccessor` in `src/persistence/`, `cellAccessor` in `src/geometry/core/`, `settingsAccessor` in `src/core/` |
 | Preact component | `*.tsx` | `src/components/` |
 | Types | `*.types.ts` | `types/` (dev root) |
 
@@ -53,7 +53,8 @@ import { myFunction, MyComponent } from '../path/to/MyFile';
 
 **Type imports** (from the types directory):
 ```typescript
-import type { Cell, MapData } from '#types';
+import type { Cell } from '#types/core/cell.types';
+import type { MapData } from '#types/core/map.types';
 ```
 
 ## Step 5: Test Your Feature
@@ -67,9 +68,10 @@ import type { Cell, MapData } from '#types';
 **Always verify both grid AND hex maps** - geometry abstraction bugs often only appear on one type.
 
 ```bash
-npm run test:unit    # Fast, ~300ms
-npm run test:e2e     # Full integration
-npm run check        # Typecheck + lint
+npm run test:unit      # Fast, ~2,400 tests in ~4-5s (Vitest)
+npm run test:e2e       # Real Obsidian via obsidian-testing-framework; full suite 20-30+ min; run build:dev first
+npm run check          # Typecheck + lint
+npm run lint:scanner   # Store-scan replica lint (UI strings, directives); must be 0 problems before a release
 ```
 
 ## Checklist Before PR
@@ -82,3 +84,4 @@ npm run check        # Typecheck + lint
 - [ ] Unit tests for pure logic
 - [ ] E2E test if user-facing
 - [ ] `npm run check` passes
+- [ ] `npm run lint:scanner` passes (user-facing strings are sentence case; no inline eslint-disable for non-obsidianmd rules)

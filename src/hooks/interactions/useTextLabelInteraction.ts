@@ -57,6 +57,7 @@ const useTextLabelInteraction = (
   const {
     onTextLabelsChange,
     onMapDataUpdate,
+    clearTransient,
     getTextLabelAtPosition,
     addTextLabel,
     updateTextLabel,
@@ -412,6 +413,9 @@ const useTextLabelInteraction = (
       if (dragInitialStateRef.current !== null && mapData) {
         onTextLabelsChange(getActiveLayer(mapData).textLabels, false);
         dragInitialStateRef.current = null;
+      } else {
+        // No commit: drop any live-move pin so the next unrelated commit cannot absorb it.
+        clearTransient?.();
       }
       return true;
     }

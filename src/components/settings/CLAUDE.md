@@ -1,102 +1,68 @@
-# Settings Components
+# Settings Components (per-map settings modal)
 
 ## Purpose
 
-This directory contains the per-map settings modal and its constituent UI components. These handle map configuration, appearance, measurement settings, and hex-specific options.
+The per-map settings modal and its UI: appearance, measurement, preferences, and grid/hex-specific sections. (The plugin-wide Obsidian settings tab is a different thing: see `src/settings/CLAUDE.md`.)
 
 ## Structure
 
 ```
-MapSettingsModal.tsx         # Main modal container, tab navigation
-├── AppearanceTab.tsx        # Colors, grid appearance, visibility
-├── MeasurementTab.tsx       # Distance units, scale settings
-├── PreferencesTab.tsx       # UI preferences, behavior options
-├── NativeControls.tsx       # Native Obsidian modal controls
-├── SettingItem.tsx          # Reusable setting item component
-├── ResizeConfirmDialog.tsx  # Confirmation for destructive resizes
-├── settingsReducer.ts       # Settings state reducer
-├── gridmap/                 # Grid-specific settings sections
-└── hexmap/                  # Hex-specific settings sections (incl. LadderSection: "Enable detail ladder" opt-in toggle, then ladder params + opens-at readout; shown only with the lodLadder capability; save emits a LadderPatch keep/set/remove via ladderSettingsPatch)
+MapSettingsModal.tsx         # Modal shell + tab bar; wraps content in MapSettingsProvider via NativeModalPortal
+├── AppearanceTab.tsx        # Colors, line width, object set, fog image
+├── MeasurementTab.tsx       # Distance units / scale
+├── PreferencesTab.tsx       # Remember pan/zoom, sidebar, expanded state
+├── NativeControls.tsx       # Native Obsidian control wrappers (Setting components created imperatively)
+├── SettingItem.tsx          # Label + description + control row
+├── ImageSearchField.tsx     # Shared image-search input with autocomplete (grid + hex background image)
+├── ResizeConfirmDialog.tsx  # Confirmation for destructive bounds resizes
+├── settingsReducer.ts       # State shape, Actions, reducer, buildInitialState, bounds helpers
+├── gridmap/GridBackgroundTab.tsx
+└── hexmap/                  # HexGridTab + BackgroundImageSection, BoundsSection,
+                             #   CoordinateDisplaySection, SizingModeSection, SubHexBackdropSection,
+                             #   LadderSection ("Enable detail ladder" opt-in toggle, then ladder params +
+                             #   opens-at readout; shown only with the lodLadder capability; save emits a
+                             #   LadderPatch keep/set/remove via ladderSettingsPatch)
 ```
 
-Note: `CollapsibleSection` and `ColorPicker` now live in `components/shared/`.
+`CollapsibleSection` and `ColorPicker` live in `components/shared/`.
 
-## Patterns
+## State and Context
 
-### Tab Structure
-
-Each tab component:
-- Receives settings via `useMapSettings()` context
-- Dispatches changes via settings reducer actions
-- Groups related settings into Sections
-- Handles its own validation
-
-```javascript
-function SomeTab() {
-  const { settings, dispatch } = useMapSettings();
-  
-  const handleChange = (value) => {
-    dispatch({ type: 'UPDATE_SETTING', payload: { key: 'settingName', value } });
-  };
-  
-  return (
-    <CollapsibleSection title="Section Name">
-      {/* controls */}
-    </CollapsibleSection>
-  );
-}
-```
-
-### Section Components
-
-Sections are logical groupings within tabs:
-- Self-contained UI for related settings
-- Use `CollapsibleSection` for consistent expand/collapse
-- Handle local validation before dispatching
-
-### Modal Considerations
-
-- Modal renders via `ModalPortal.tsx` (portal to document body)
-- Must handle Escape key to close
-- Must trap focus for accessibility
-- Touch-friendly control sizing
-
-## State Flow
+- State is a `useReducer(settingsReducer, ...)` inside `MapSettingsProvider` (`src/context/MapSettingsContext.tsx`). The provider exists **only while this modal is open**.
+- Tabs read through four selector hooks (each throws outside the provider):
+  - `useModalShell()`: active tab, tabs, `mapType`/`isHexMap`, save/cancel, distance and preference fields
+  - `useAppearance()`: overrides, global settings, color picker state, object set, fog image
+  - `useBackgroundImage()`: image path/opacity/offset, sizing mode, density, measurement sizing, fine-tune
+  - `useHexGrid()`: hex bounds, bounds shape/lock, coordinate display, resize confirm
+- Tabs call the `handle*` / `set*` callbacks from these values; the provider dispatches reducer actions. Tabs rarely dispatch directly.
+- Actions are the `Actions` constant in `settingsReducer.ts` (for example `SET_TAB`, `SET_OVERRIDE`, `SET_DISTANCE_SETTING`, `SET_HEX_BOUNDS`, `IMAGE_SELECTED`, `SET_DENSITY`, `SET_SIZING_MODE`, `TOGGLE_BOUNDS_LOCK`, `SET_PARENT_BACKDROP`).
+- Save writes back into map data via the callbacks passed to the modal (see `onSave` flow in `MapSettingsContext.tsx`).
 
 ```
-User Input → Tab Component → dispatch(action) → settingsReducer → 
-  → MapSettingsContext updates → All consumers re-render
+User input -> tab handler (from a selector hook) -> dispatch(Actions.X) -> settingsReducer
+  -> provider recomputes context values -> consumers re-render -> Save -> onSave -> map data
 ```
 
-Settings persist to map data JSON via `useDataHandlers`.
+## Modal Notes
+
+- Opened through `NativeModalPortal` (`components/modals/`): a native Obsidian `Modal` hosting the Preact tree. `ModalPortal.tsx` is a different, fallback portal used by a few overlays; this modal does not use it.
+- Touch-friendly sizing; test on iPad (virtual keyboard).
 
 ## Conditional Rendering
 
-Many settings are grid-only or hex-only:
-```javascript
-const { settings } = useMapSettings();
-const isHex = settings.mapType === 'hex';
+Hex-only vs grid-only sections branch on `isHexMap`/`mapType` from `useModalShell()`; the tab list itself is built per map type. `SubHexBackdropSection` is only relevant while editing a sub-hex map's settings.
 
-return (
-  <>
-    {isHex && <HexSpecificControl />}
-    {!isHex && <GridSpecificControl />}
-    <SharedControl />
-  </>
-);
-```
+## Adding a New Setting
 
-## Adding New Settings
+1. Add the field to the right type (`types/settings/settings.types.ts`, or the `SettingsModalState` / `SettingsOverrides` shapes in `settingsReducer.ts`).
+2. Seed it in `buildInitialState` in `settingsReducer.ts`.
+3. Add an `Actions` entry and a `settingsReducer` case.
+4. Expose it (value + handler) through the matching sub-context in `MapSettingsContext.tsx` (add to its `*ContextValue` interface and the memoized value).
+5. Build the UI in the right tab/section using the selector hook.
+6. Include it in the save path so it reaches map data, and test grid and hex.
 
-1. Add to `types/settings/settings.types.ts` type definition
-2. Add default value in `settingsReducer.ts`
-3. Add reducer case for the action
-4. Create UI in appropriate Tab/Section
-5. Wire up via `dispatch({ type: 'UPDATE_SETTING', ... })`
+## Gotchas
 
-## Common Gotchas
-
-- **Don't mutate settings directly** - Always use dispatch
-- **Validate before dispatch** - Reducer assumes valid data
-- **Consider hex vs grid** - Most settings apply to both, some don't
-- **Test on iPad** - Modals are tricky with virtual keyboard
+- Don't mutate state directly; dispatch.
+- Don't import `MapSettingsContext` hooks from map layers: no provider exists there.
+- Most settings apply to both map types; guard the exceptions.

@@ -12,7 +12,12 @@ import {
   Actions,
   settingsReducer,
   deriveBoundsFromRing,
+  columnsForDensity,
+  buildInitialState,
+  GRID_DENSITY_PRESETS,
 } from "../../../src/components/settings/settingsReducer";
+import { calculateGridFromHexSize, measurementToHexSize, MEASUREMENT_CORNER } from "../../../src/geometry/core/hexMeasurements";
+import type { PluginSettings } from "../../../types/settings/settings.types";
 import type { SettingsModalState } from "../../../src/components/settings/settingsReducer";
 
 // Minimal state shape for testing IMAGE_SELECTED
@@ -69,11 +74,9 @@ function createMockState(overrides: Partial<SettingsModalState> = {}): SettingsM
     measurementSize: 86,
     fineTuneOffset: 0,
     activeColorPicker: null,
-    isLoading: false,
     showResizeConfirm: false,
     pendingBoundsChange: null,
     orphanInfo: { cells: 0, objects: 0 },
-    deleteOrphanedContent: false,
     boundsShape: 'rectangular',
     objectSetId: null,
     ladderEnabled: false,
@@ -292,5 +295,153 @@ describe("deriveBoundsFromRing", () => {
     });
 
     expect(newState.hexBounds).toEqual(deriveBoundsFromRing(9));
+  });
+});
+
+describe("boundsShape stays consistent with hexBounds.maxRing", () => {
+  const imagePayload = {
+    path: 'images/hex-map.png',
+    displayName: 'hex-map.png',
+    dimensions: { width: 1920, height: 1080 },
+    bounds: { maxCol: 30, maxRow: 25 },
+  };
+
+  it("IMAGE_SELECTED keeps maxRing while the shape is radial", () => {
+    const state = createMockState({ boundsShape: 'radial', hexBounds: deriveBoundsFromRing(5) });
+    const newState = settingsReducer(state, { type: Actions.IMAGE_SELECTED, payload: imagePayload });
+
+    expect(newState.boundsShape).toBe('radial');
+    expect(newState.hexBounds.maxRing).toBe(5);
+  });
+
+  it("IMAGE_SELECTED leaves rectangular bounds rectangular", () => {
+    const state = createMockState({ boundsShape: 'rectangular', hexBounds: { maxCol: 10, maxRow: 10 } });
+    const newState = settingsReducer(state, { type: Actions.IMAGE_SELECTED, payload: imagePayload });
+
+    expect(newState.hexBounds).toEqual({ maxCol: 30, maxRow: 25 });
+    expect(newState.hexBounds.maxRing).toBeUndefined();
+  });
+
+  it("a bounds recalculation (SET_DENSITY on a locked image) keeps maxRing while radial", () => {
+    const state = createMockState({
+      boundsShape: 'radial',
+      hexBounds: deriveBoundsFromRing(4),
+      imageDimensions: { width: 1920, height: 1080 },
+      boundsLocked: true,
+    });
+    const newState = settingsReducer(state, {
+      type: Actions.SET_DENSITY,
+      payload: { density: 'sparse', orientation: 'flat' },
+    });
+
+    expect(newState.boundsShape).toBe('radial');
+    expect(newState.hexBounds.maxRing).toBe(4);
+  });
+});
+
+describe("SET_HEX_BOUND_AXIS (STRUCT-B-13)", () => {
+  it("merges one axis into the CURRENT bounds", () => {
+    const state = createMockState({ boundsShape: 'rectangular', hexBounds: { maxCol: 26, maxRow: 20 } });
+    const s1 = settingsReducer(state, { type: Actions.SET_HEX_BOUND_AXIS, payload: { axis: 'maxCol', value: 30 } });
+    // A second edit dispatched without re-reading state still sees the first one
+    const s2 = settingsReducer(s1, { type: Actions.SET_HEX_BOUND_AXIS, payload: { axis: 'maxRow', value: 12 } });
+    expect(s1.hexBounds).toEqual({ maxCol: 30, maxRow: 20 });
+    expect(s2.hexBounds).toEqual({ maxCol: 30, maxRow: 12 });
+  });
+
+  it("matches SET_HEX_BOUNDS with the spread payload (radial derivation included)", () => {
+    const state = createMockState({ boundsShape: 'radial', hexBounds: { maxCol: 15, maxRow: 15, maxRing: 7 } });
+    const viaAxis = settingsReducer(state, { type: Actions.SET_HEX_BOUND_AXIS, payload: { axis: 'maxCol', value: 40 } });
+    const viaFull = settingsReducer(state, { type: Actions.SET_HEX_BOUNDS, payload: { ...state.hexBounds, maxCol: 40 } });
+    expect(viaAxis.hexBounds).toEqual(viaFull.hexBounds);
+  });
+});
+
+describe("hex sizing shares hexMeasurements (STRUCT-B-10)", () => {
+  it("columnsForDensity maps presets and custom", () => {
+    expect(columnsForDensity("medium", 99)).toBe(GRID_DENSITY_PRESETS.medium.columns);
+    expect(columnsForDensity("custom", 37)).toBe(37);
+  });
+
+  it.each(["flat", "pointy"] as const)("SET_FINE_TUNE sizes bounds like the measurement path (%s)", (orientation) => {
+    const state = createMockState({
+      imageDimensions: { width: 1000, height: 700 },
+      boundsLocked: true,
+      sizingMode: "measurement",
+      measurementMethod: MEASUREMENT_CORNER,
+      measurementSize: 86,
+    });
+    const base = measurementToHexSize(86, MEASUREMENT_CORNER, orientation);
+    const next = settingsReducer(state, {
+      type: Actions.SET_FINE_TUNE,
+      payload: { adjustedHexSize: base + 2, orientation },
+    });
+    const expected = calculateGridFromHexSize(1000, 700, base + 2, orientation);
+    expect(next.hexBounds).toEqual({ maxCol: expected.columns, maxRow: expected.rows });
+    expect(next.fineTuneOffset).toBeCloseTo(2);
+  });
+});
+
+describe("G1: measurement size and fine-tune give the same columns x rows", () => {
+  it.each([
+    ["flat", "corner"], ["flat", "edge"], ["pointy", "corner"], ["pointy", "edge"],
+  ] as const)("typing the fine-tuned size as a measurement matches the fine-tune bounds (%s, %s)", (orientation, method) => {
+    for (const size of [40, 86, 120.5]) {
+      const base = createMockState({
+        imageDimensions: { width: 1000, height: 700 },
+        boundsLocked: true,
+        sizingMode: "measurement",
+        measurementMethod: method,
+        measurementSize: size,
+      });
+      const tunedHex = measurementToHexSize(size, method, orientation) + 3;
+      const tuned = settingsReducer(base, { type: Actions.SET_FINE_TUNE, payload: { adjustedHexSize: tunedHex, orientation } });
+      const typedSize = method === MEASUREMENT_CORNER ? tunedHex * 2 : tunedHex * Math.sqrt(3);
+      const typed = settingsReducer(base, { type: Actions.SET_MEASUREMENT_SIZE, payload: { size: typedSize, orientation } });
+      expect(typed.hexBounds).toEqual(tuned.hexBounds);
+    }
+  });
+});
+
+describe("G4: fresh map defaults match the previous release (f7442a18)", () => {
+  // Literals copied from `git show f7442a18:src/components/settings/settingsReducer.ts` buildInitialState.
+  const OLD = {
+    gridLineColor: '#666666', gridLineWidth: 1, backgroundColor: '#1a1a1a', borderColor: '#8b6842',
+    coordinateKeyColor: '#c4a57b', coordinateTextColor: '#ffffff', coordinateTextShadow: '#000000',
+    canvasHeight: 600, canvasHeightMobile: 400, pictureFrameHeight: 400, pictureFrameHeightMobile: 300,
+    fogOfWarColor: '#000000', fogOfWarOpacity: 0.9, fogOfWarImage: null,
+    fogOfWarBlurEnabled: false, fogOfWarBlurFactor: 0.99, alwaysShowControls: false,
+  };
+  const noGlobals = {} as PluginSettings;
+
+  it("initial colours, heights and fog values equal the old fallback literals", () => {
+    const state = buildInitialState({ mapType: 'hex' }, noGlobals);
+    expect(state.overrides).toMatchObject(OLD);
+    expect(state.overrides.pictureFrameWidth).toBeUndefined();
+  });
+
+  it.each([
+    ['hex', 6, 'mi'], ['grid', 5, 'ft'],
+  ] as const)("%s map distance defaults are %s %s, alternating, both", (mapType, perCell, unit) => {
+    const state = buildInitialState({ mapType }, noGlobals);
+    expect(state.distanceSettings).toMatchObject({
+      useGlobalDistance: true, distancePerCell: perCell, distanceUnit: unit,
+      gridDiagonalRule: 'alternating', displayFormat: 'both',
+    });
+  });
+
+  it("global settings and per-map overrides keep the old precedence", () => {
+    const state = buildInitialState(
+      {
+        mapType: 'hex',
+        currentSettings: { useGlobalSettings: false, overrides: { gridLineColor: '#123456' } },
+        currentDistanceSettings: { useGlobalDistance: false, distancePerCell: 9 },
+      },
+      { gridLineColor: '#abcdef', canvasHeight: 777, distanceUnitHex: 'km' } as PluginSettings,
+    );
+    expect(state.overrides.gridLineColor).toBe('#123456');
+    expect(state.overrides.canvasHeight).toBe(777);
+    expect(state.distanceSettings.distancePerCell).toBe(9);
+    expect(state.distanceSettings.distanceUnit).toBe('km');
   });
 });

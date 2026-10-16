@@ -1,6 +1,7 @@
 import { TFile, TFolder } from 'obsidian';
 import type { App, Vault } from 'obsidian';
 import type { PluginSettings, ObjectSet, ObjectSetData } from '#types/settings/settings.types';
+import { mintId } from '../../core/ids';
 
 interface PluginLike {
   app: App;
@@ -19,7 +20,7 @@ function deepClone<T>(obj: T): T {
 
 export const ObjectSetHelpers = {
   generateId(): string {
-    return 'set-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+    return mintId('set');
   },
 
   resolveImagePaths(data: ObjectSetData, imagesFolder: string, vault: Vault): void {

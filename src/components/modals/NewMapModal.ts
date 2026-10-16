@@ -2,6 +2,8 @@ import type { App } from 'obsidian';
 import { Modal, Setting } from 'obsidian';
 import type { MapType } from '#types/index';
 import { isFeatureEnabled } from '../../core/featureFlags';
+import { mintId } from '../../core/ids';
+import { ensureDataFileForNewMap } from '../../persistence/fileOperations';
 import { isLodLadderEnabled } from '../../core/lodFlags';
 import { LADDER_DEFAULTS } from '../../geometry/core/lattice';
 
@@ -26,7 +28,7 @@ class NewMapModal extends Modal {
     this.onCreate = onCreate;
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-insert-map-modal');
@@ -120,16 +122,21 @@ class NewMapModal extends Modal {
 
   private submit(): void {
     if (!this.mapType) return;
-    const mapId = 'map-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
-    if (this.mapType === 'hex' && isLodLadderEnabled()) {
-      this.onCreate(mapId, this.mapName, this.mapType, this.ladderM);
-    } else {
-      this.onCreate(mapId, this.mapName, this.mapType);
-    }
+    const mapId = mintId('map');
+    const mapName = this.mapName;
+    const mapType = this.mapType;
+    const ladderM = mapType === 'hex' && isLodLadderEnabled() ? this.ladderM : undefined;
     this.close();
+    // First use: create the store before the block mounts, so a fresh vault's
+    // first map renders instead of the missing-store panel. Refuses when a
+    // prior store is evidenced (the panel then explains it).
+    void ensureDataFileForNewMap(this.app).finally(() => {
+      if (ladderM !== undefined) this.onCreate(mapId, mapName, mapType, ladderM);
+      else this.onCreate(mapId, mapName, mapType);
+    });
   }
 
-  onClose(): void {
+  override onClose(): void {
     this.contentEl.empty();
   }
 }

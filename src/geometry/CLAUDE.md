@@ -15,21 +15,43 @@ geometry/
 │   ├── createGeometry.ts  # Factory: MapData → Grid/HexGeometry with defaults
 │   ├── cellAccessor.ts    # Cell data access, manipulation, queries
 │   ├── hexMeasurements.ts # Hex-specific calculations
+│   ├── offsetCoordinates.ts # Coordinate system conversions
 │   ├── lattice.ts         # Lattice ladder math: rung ownership, zoom crossings, existsAt (LOD, flag-gated)
-│   └── offsetCoordinates.ts # Coordinate system conversions
+│   ├── contentFitView.ts  # Pure "fit to content" view (center + zoom) for the recenter control
+│   ├── viewportMath.ts    # Pure view math: client->canvas px, north (un)rotation, canvas<->world, pan deltas, anchored zoom
+│   └── subHexBackdrop.ts  # Pure placement math for the parent-map snapshot behind a sub-hex map
 ├── renderers/             # Canvas draw functions
+│   ├── mapRenderer.ts     # renderCanvas: whole-map render (backdrop, rotation, static cache blit, fog, selections); pure, no React
+│   ├── staticPasses.ts    # Static content as named passes over one RenderFrame (#types/rendering/renderFrame.types), in draw order
+│   ├── staticLayerCache.ts # Offscreen static snapshot cache (12M px budget, rotated maps blit under rotation, settle re-render)
+│   ├── layerCellsRenderer.ts # One layer's cells/borders/edges (viewport-culled) + grid/hex renderer dispatch
 │   ├── gridRenderer.ts, hexRenderer.ts, backgroundRenderer.ts
 │   ├── objectRenderer.ts, textLabelRenderer.ts, selectionRenderer.ts
 │   ├── badgeRenderer.ts, segmentRenderer.ts, regionRenderer.ts
-│   └── tileRenderer.ts, curveRenderer.ts, wallPathRenderer.ts
+│   ├── tileRenderer.ts (entry; composes canvasBlur.ts, regionFillRenderer.ts, computeTileDrawPlan.ts), curveRenderer.ts, wallPathRenderer.ts
+│   ├── outlineRenderer.ts       # Polygon outlines (hex)
+│   ├── shapeOverlayRenderer.ts  # Rectangle/circle shape overlays
+│   └── subHexBackdropRenderer.ts # Blits the parent snapshot, right after the background fill
 ├── fog/                   # Fog-of-war rendering pipeline
 │   ├── fogRenderer.ts, gridFogRenderer.ts, hexFogRenderer.ts
+├── strokes/
+│   └── terrainStrokeGeometry.ts # Pure terrain-brush stroke math (thinning, simplification, bounds, erase hit test)
 └── curves/                # Bezier math & boolean ops
     ├── curveBoolean.ts, curveCellOverlap.ts
     ├── curveFitting.ts, polygonClipping.ts
 ```
 
 Type definitions live in `types/core/geometry.types.ts` (path alias `#types/*`).
+
+### Lattice ladder rendering (LOD, dormant unless enabled)
+
+A ladder map (`isLadderView` + per-map opt-in) passes `ladder` to `renderCanvas` (`mapRenderer.ts`); every ladder branch is guarded by `ladder !== null`, so classic maps render exactly as before. `mapRenderer.ts` picks the rung (`ladder.activeLevel(zoom)`, or the `level` option for export/previews), claims the surface budget's active slot, strokes the lattice live after the blit (`latticeRenderer.ts`), draws objects and text labels live per home rung with the `elementBands.ts` floors and holds, filters selection chrome by the same bands, and records `ladderTelemetry`. `staticPasses.ts` (scene `ladder`/`level`) skips the baked grid and adjacent sub-hex previews, draws the materialised rung layer at level >= 1 (`materialiseLevel.ts`), and draws tiles per home rung with the crossing clip (`renderLadderTiles`, `tileClipRegion.ts`, `ladderTileClipAt`). `staticLayerCache.ts` keeps one surface per rung per canvas (drift at a crossing, bake at settle, max two per canvas, global `surfaceBudget` for ladder canvases only). One-shot canvases pass `bypassSurfaceCache` and draw the scene directly.
+
+### Extended geometry types
+
+`IGeometry` is the common contract. Code that needs more (cell size, hex vertices, ring queries) uses `ExtendedGeometry`, a union of `ExtendedGridGeometry | ExtendedHexGeometry` currently defined in `types/contexts/context.types.ts` (this is what `useMapState().geometry` returns). Renderers take `IGridRenderer` / `IHexRenderer` (`types/core/rendering.types.ts`). Several modules still declare local `*GeometryLike` shapes; prefer `Pick<>` of the extended types in new code.
+
+**Discriminator**: use `geometry.type === 'hex' | 'grid'` to narrow. Never `instanceof HexGeometry` / `GridGeometry` (none exist in `src/`; the union only narrows on `type`). Build instances with `createGeometry`.
 
 ## Coordinate Philosophy
 
@@ -76,9 +98,7 @@ interface IGeometry {
   getCellsInCircle(centerX: number, centerY: number, radius: number): Point[];
   getCellsInLine(x1: number, y1: number, x2: number, y2: number): Point[];
   
-  // Distance Calculations
-  getEuclideanDistance(x1: number, y1: number, x2: number, y2: number): number;
-  getManhattanDistance(x1: number, y1: number, x2: number, y2: number): number;
+  // Distance Calculations (hex ignores options; for world-pixel distance use getCellCenter + Math.hypot)
   getCellDistance(x1: number, y1: number, x2: number, y2: number, options?: DistanceOptions): number;
   
   // Neighbors and Bounds
@@ -128,6 +148,19 @@ interface DistanceOptions {
 ```
 
 Note: Hex ignores these options (hex has no diagonal ambiguity).
+
+## Viewport Math (screen <-> world)
+
+`core/viewportMath.ts` is the ONLY place that converts between client/canvas pixels and world coordinates. It owns the view-centre unit rule: `StoredViewState.center` is in **cell units on grid** and **world px on hex**; `viewCenterScale(geometry, zoom)` (also `IGeometry.getViewCenterScale(zoom)`) is cellSize*zoom on grid and zoom on hex. Callers pass a geometry and never branch on map type.
+
+- `clientToCanvasPx(canvas, clientX, clientY)`: honours CSS scaling (the canvas buffer can be larger than its CSS box).
+- `clientToWorld` / `canvasPxToWorld` / `worldToCanvasPx`: full chain incl. inverse north rotation about the buffer centre.
+- `calculateViewportOffset` (re-exported from `BaseGeometry` for old importers).
+- `screenDeltaToCenterUnits`: pan/wheel deltas -> centre delta (negate for drag-to-pan).
+- `anchoredZoomCenter`: zoom-to-cursor keeping the anchor's map point fixed (rotation and CSS scaling included).
+- `applyNorthRotation(ctx, w, h, deg)`: rotate a 2D context about the surface centre; caller owns save/restore.
+
+Do not hand-write `canvas.width / 2 - center.x * ...` or `northDirection * Math.PI / 180` outside this module.
 
 ## Grid vs Hex
 
@@ -184,7 +217,7 @@ Always use this for stroke operations instead of setting ctx properties directly
 
 ## Adding Geometry Features
 
-1. Add abstract method signature to `IGeometry` in `geometry_types.ts`
+1. Add abstract method signature to `IGeometry` in `types/core/geometry.types.ts`
 2. Add abstract method to `BaseGeometry.ts`
 3. Implement in both `GridGeometry.ts` and `HexGeometry.ts`
 4. Test with both map types

@@ -13,7 +13,7 @@ export class FolderSuggest extends AbstractInputSuggest<TFolder> {
     el.setText(folder.path === '' ? '/ (vault root)' : folder.path);
   }
 
-  selectSuggestion(folder: TFolder): void {
+  override selectSuggestion(folder: TFolder): void {
     this.setValue(folder.path);
     this.textInputEl.dispatchEvent(new Event('input'));
     this.close();

@@ -17,7 +17,6 @@ const TOOL_ID_TABLE = {
   draw: true,
   freehand: true,
   erase: true,
-  eyedropper: true,
   rectangle: true,
   circle: true,
   clearArea: true,
@@ -36,9 +35,7 @@ const TOOL_ID_TABLE = {
   tilePaint: true,
   outline: true,
   wall: true,
-  measure: true,
-  fog: true,
-  fogErase: true
+  measure: true
 } as const satisfies Record<ToolId, true>;
 
 const TOOL_IDS: readonly ToolId[] = Object.keys(TOOL_ID_TABLE) as ToolId[];

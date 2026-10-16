@@ -12,7 +12,7 @@ Guides you through the complete release process for the Windrose standalone Obsi
 Before running this skill:
 1. All source changes should be committed
 2. Know the new version number (semver; BRAT allows suffixes like `2.0.0-preview`)
-3. Changelog for this version should already be written in `src/Windrose Changelogs.md`
+3. Changelog for this version should already be written in `CHANGELOG.md`
 
 ## Commit Messages
 
@@ -22,7 +22,7 @@ Before running this skill:
 
 ### Step 1: Extract and Confirm Changelog
 
-1. Read `src/Windrose Changelogs.md`
+1. Read `CHANGELOG.md`
 2. Find the changelog section for the version being released
 3. Present the extracted changelog to the user for confirmation
 4. **Do NOT generate or modify changelog content** - only extract what's already there

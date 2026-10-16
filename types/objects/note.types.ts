@@ -10,25 +10,6 @@ import type { Point } from '../core/geometry.types';
 import type { HexColor } from '../core/common.types';
 
 // ===========================================
-// Note Pins
-// ===========================================
-
-/** Unique note pin ID */
-export type NotePinId = string;
-
-/** Note pin placed on the map */
-export interface NotePin {
-  id: NotePinId;
-  /** Ladder rung this entity was placed at (absent = 0). Pins are placed at the root only (design 06, s19 item 3); the field exists so a pin shares MapObject's rung-scoped cell matching. */
-  homeLevel?: number;
-  position: Point;
-  linkedNote?: string;  // Obsidian note path
-  label?: string;
-  color?: HexColor;
-  icon?: string;
-}
-
-// ===========================================
 // Note Index
 // ===========================================
 

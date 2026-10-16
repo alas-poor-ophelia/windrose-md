@@ -13,23 +13,29 @@
 import type { MapData } from '#types/core/map.types';
 import type { App } from 'obsidian';
 
-import { journalPending } from './saveJournal';
+import { journalPending, setJournalWriterLive } from './saveJournal';
 
 interface SaveInstance {
   /** The un-saved map data for this instance, or null when everything is saved. */
-  getPending: () => { mapId: string; data: MapData } | null;
+  getPending: () => { mapId: string; data: MapData; writerId?: string; version?: number } | null;
   /** Cancel the debounce and run the pending save now. Resolves when it lands. */
   flush: () => Promise<void>;
 }
 
 const instances = new Map<string, SaveInstance>();
 
+/**
+ * `id` is also the instance's journal writer id: while registered, its live
+ * journal slot is never offered to another pane for restore, nor pruned.
+ */
 function registerSaveInstance(id: string, instance: SaveInstance): void {
   instances.set(id, instance);
+  setJournalWriterLive(id, true);
 }
 
 function unregisterSaveInstance(id: string): void {
   instances.delete(id);
+  setJournalWriterLive(id, false);
 }
 
 /**
@@ -55,7 +61,9 @@ function journalAll(app: App): void {
   for (const instance of instances.values()) {
     try {
       const pending = instance.getPending();
-      if (pending != null) journalPending(app, pending.mapId, pending.data);
+      if (pending != null) {
+        journalPending(app, pending.mapId, pending.data, { writerId: pending.writerId, version: pending.version });
+      }
     } catch (e) {
       console.debug('[Windrose] Journaling an instance failed:', e);
     }
@@ -68,18 +76,68 @@ function journalAll(app: App): void {
  * Returns a disposer — register it with `Plugin.register`.
  */
 function installLifecycleJournaling(app: App): () => void {
-  const onHide = (): void => {
-    if (document.visibilityState === 'hidden') journalAll(app);
-  };
-  const onPageHide = (): void => { journalAll(app); };
+  // Listeners are attached once per WINDOW: the main window now, plus every
+  // popout window as it opens (a map in a popout must journal on THAT
+  // window's pagehide, which never fires on the main window).
+  const detachers = new Map<Window, () => void>();
 
-  document.addEventListener('visibilitychange', onHide);
-  window.addEventListener('pagehide', onPageHide);
+  const attach = (win: Window): void => {
+    if (detachers.has(win)) return;
+    const doc = win.document;
+    const onHide = (): void => {
+      if (doc.visibilityState === 'hidden') journalAll(app);
+    };
+    const onPageHide = (): void => { journalAll(app); };
+    doc.addEventListener('visibilitychange', onHide);
+    win.addEventListener('pagehide', onPageHide);
+    detachers.set(win, () => {
+      doc.removeEventListener('visibilitychange', onHide);
+      win.removeEventListener('pagehide', onPageHide);
+    });
+  };
+  const detach = (win: Window): void => {
+    detachers.get(win)?.();
+    detachers.delete(win);
+  };
+
+  attach(window);
+  app.workspace.iterateAllLeaves((leaf) => { attach(leaf.view.containerEl.win); });
+  const openRef = app.workspace.on('window-open', (_ws, win) => { attach(win); });
+  const closeRef = app.workspace.on('window-close', (_ws, win) => {
+    journalAll(app);
+    detach(win);
+  });
 
   return () => {
-    document.removeEventListener('visibilitychange', onHide);
-    window.removeEventListener('pagehide', onPageHide);
+    app.workspace.offref(openRef);
+    app.workspace.offref(closeRef);
+    for (const off of detachers.values()) off();
+    detachers.clear();
   };
+}
+
+/**
+ * A pane's save of a journal-restored tree landed. Other panes of the same map
+ * loaded the store BEFORE that write, so their base is now stale; a pane with
+ * no real edit of its own re-reads the store instead of being refused later
+ * (multi-pane restore). Module-level so popout windows share it.
+ */
+type RestoreLandedListener = (mapId: string, writerId: string) => void;
+const restoreLandedListeners = new Set<RestoreLandedListener>();
+
+function onRestoreLanded(listener: RestoreLandedListener): () => void {
+  restoreLandedListeners.add(listener);
+  return () => { restoreLandedListeners.delete(listener); };
+}
+
+function notifyRestoreLanded(mapId: string, writerId: string): void {
+  for (const listener of [...restoreLandedListeners]) {
+    try {
+      listener(mapId, writerId);
+    } catch (e) {
+      console.error('[Windrose] Restore-landed listener failed:', e);
+    }
+  }
 }
 
 /** Test/diagnostic helper: how many instances are currently registered. */
@@ -94,5 +152,7 @@ export {
   journalAll,
   installLifecycleJournaling,
   registeredInstanceCount,
+  onRestoreLanded,
+  notifyRestoreLanded,
 };
-export type { SaveInstance };
+

@@ -7,7 +7,7 @@
  */
 
 // Type-only imports
-import type { MapType, HexBounds, MeasurementMethod, LadderConfig } from '#types/core/map.types';
+import type { MapType, HexBounds, MeasurementMethod, SizingMode, LadderConfig } from '#types/core/map.types';
 import type {
   HexOrientation,
   DiagonalRule,
@@ -23,8 +23,10 @@ import type { Cell } from '#types/core/cell.types';
 import { isHexCell } from '#types/core/cell.types';
 import type { MapObject } from '#types/objects/object.types';
 
-import { axialToOffset, isWithinOffsetBounds } from '../../geometry/core/offsetCoordinates';
-import { calculateGridFromColumns, calculateGridFromMeasurement, measurementToHexSize, validateMeasurementSize, MEASUREMENT_CORNER } from '../../geometry/core/hexMeasurements';
+import { isAxialInHexBounds } from '../../geometry/core/offsetCoordinates';
+import { calculateGridFromColumns, calculateGridFromMeasurement, calculateGridFromHexSize, measurementToHexSize, validateMeasurementSize, MEASUREMENT_CORNER } from '../../geometry/core/hexMeasurements';
+import { mergeSettingsOverrides } from '../../core/settingsAccessor';
+import { getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
 import { getDisplayNameFromPath } from '../../assets/imageOperations';
 import { LADDER_DEFAULTS } from '../../geometry/core/lattice';
 
@@ -36,8 +38,7 @@ import { LADDER_DEFAULTS } from '../../geometry/core/lattice';
 /** Grid density preset key */
 export type GridDensityKey = 'sparse' | 'medium' | 'dense' | 'custom';
 
-/** Sizing mode for background image */
-export type SizingMode = 'density' | 'measurement';
+export type { SizingMode };
 
 /** Coordinate display mode */
 export type CoordinateDisplayMode = 'rectangular' | 'radial' | 'axial' | 'none';
@@ -178,13 +179,11 @@ export interface SettingsModalState {
   
   // UI state
   activeColorPicker: ColorPickerId;
-  isLoading: boolean;
-  
+
   // Resize confirmation
   showResizeConfirm: boolean;
   pendingBoundsChange: PendingBoundsChange | null;
   orphanInfo: OrphanInfo;
-  deleteOrphanedContent: boolean;
 
   // Per-map object set
   objectSetId: string | null;
@@ -257,6 +256,7 @@ const Actions = {
   TOGGLE_PREFERENCE: 'TOGGLE_PREFERENCE',
   SET_DISTANCE_SETTING: 'SET_DISTANCE_SETTING',
   SET_HEX_BOUNDS: 'SET_HEX_BOUNDS',
+  SET_HEX_BOUND_AXIS: 'SET_HEX_BOUND_AXIS',
   SET_COORDINATE_MODE: 'SET_COORDINATE_MODE',
   SET_IMAGE_SEARCH_RESULTS: 'SET_IMAGE_SEARCH_RESULTS',
   SET_IMAGE_DISPLAY_NAME: 'SET_IMAGE_DISPLAY_NAME',
@@ -275,10 +275,8 @@ const Actions = {
   SET_IMAGE_OFFSET_Y: 'SET_IMAGE_OFFSET_Y',
   SET_IMAGE_GRID_SIZE: 'SET_IMAGE_GRID_SIZE',
   SET_ACTIVE_COLOR_PICKER: 'SET_ACTIVE_COLOR_PICKER',
-  SET_LOADING: 'SET_LOADING',
   SHOW_RESIZE_CONFIRM: 'SHOW_RESIZE_CONFIRM',
   CANCEL_RESIZE: 'CANCEL_RESIZE',
-  CLEAR_DELETE_FLAG: 'CLEAR_DELETE_FLAG',
   SET_FOG_IMAGE_DISPLAY_NAME: 'SET_FOG_IMAGE_DISPLAY_NAME',
   SET_FOG_IMAGE_SEARCH_RESULTS: 'SET_FOG_IMAGE_SEARCH_RESULTS',
   FOG_IMAGE_SELECTED: 'FOG_IMAGE_SELECTED',
@@ -333,6 +331,12 @@ interface SetDistanceSettingAction {
 interface SetHexBoundsAction {
   type: typeof Actions.SET_HEX_BOUNDS;
   payload: HexBounds;
+}
+
+/** Set one rectangular bound axis against the CURRENT bounds (keeps handlers state-free) */
+interface SetHexBoundAxisAction {
+  type: typeof Actions.SET_HEX_BOUND_AXIS;
+  payload: { axis: 'maxCol' | 'maxRow'; value: number };
 }
 
 interface SetCoordinateModeAction {
@@ -423,11 +427,6 @@ interface SetActiveColorPickerAction {
   payload: ColorPickerId;
 }
 
-interface SetLoadingAction {
-  type: typeof Actions.SET_LOADING;
-  payload: boolean;
-}
-
 interface ShowResizeConfirmAction {
   type: typeof Actions.SHOW_RESIZE_CONFIRM;
   payload: { pendingBoundsChange: PendingBoundsChange; orphanInfo: OrphanInfo };
@@ -435,10 +434,6 @@ interface ShowResizeConfirmAction {
 
 interface CancelResizeAction {
   type: typeof Actions.CANCEL_RESIZE;
-}
-
-interface ClearDeleteFlagAction {
-  type: typeof Actions.CLEAR_DELETE_FLAG;
 }
 
 interface SetFogImageDisplayNameAction {
@@ -497,6 +492,7 @@ type SettingsAction =
   | TogglePreferenceAction
   | SetDistanceSettingAction
   | SetHexBoundsAction
+  | SetHexBoundAxisAction
   | SetCoordinateModeAction
   | SetImageSearchResultsAction
   | SetImageDisplayNameAction
@@ -515,10 +511,8 @@ type SettingsAction =
   | SetImageOffsetYAction
   | SetImageGridSizeAction
   | SetActiveColorPickerAction
-  | SetLoadingAction
   | ShowResizeConfirmAction
   | CancelResizeAction
-  | ClearDeleteFlagAction
   | SetFogImageDisplayNameAction
   | SetFogImageSearchResultsAction
   | FogImageSelectedAction
@@ -544,13 +538,6 @@ const GRID_DENSITY_PRESETS: Record<Exclude<GridDensityKey, 'custom'>, GridDensit
 // ===========================================
 
 /**
- * Ring distance from origin in axial coordinates
- */
-function getHexRing(q: number, r: number): number {
-  return Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
-}
-
-/**
  * Radial bounds for a given max ring: a ring-N hex spans a (2N+1)-hex square
  */
 function deriveBoundsFromRing(maxRing: number): HexBounds {
@@ -568,15 +555,9 @@ function getOrphanedContentInfo(
 ): OrphanInfo {
   if (mapType !== 'hex') return { cells: 0, objects: 0 };
 
-  const isRadial = newBounds.maxRing !== undefined;
-
-  const isOutOfBounds = (q: number, r: number): boolean => {
-    if (isRadial) {
-      return newBounds.maxRing != null && getHexRing(q, r) > newBounds.maxRing;
-    }
-    const { col, row } = axialToOffset(q, r, orientation);
-    return !isWithinOffsetBounds(col, row, newBounds);
-  };
+  // Same predicate usePanelState's delete path uses, so the count matches the deletion
+  const isOutOfBounds = (q: number, r: number): boolean =>
+    !isAxialInHexBounds(q, r, newBounds, orientation);
 
   // Rung (>= 1) cells that would be removed are counted by the caller (they need
   // the map's ladder) and folded into the painted-cell total.
@@ -607,6 +588,13 @@ function getOrphanedContentInfo(
   return { cells: orphanedCells, objects: orphanedObjects };
 }
 
+/** Column count for a density preset ('custom' uses the user's column count). */
+function columnsForDensity(gridDensity: GridDensityKey, customColumns: number): number {
+  return gridDensity === 'custom'
+    ? customColumns
+    : GRID_DENSITY_PRESETS[gridDensity]?.columns ?? 24;
+}
+
 /**
  * Calculate new bounds based on sizing mode and settings
  */
@@ -622,10 +610,7 @@ function calculateBoundsFromSettings(
   if (!imageDimensions) return null;
   
   if (sizingMode === 'density') {
-    const columns = gridDensity === 'custom' 
-      ? customColumns 
-      : GRID_DENSITY_PRESETS[gridDensity]?.columns ?? 24;
-    const calc = calculateGridFromColumns(imageDimensions.width, imageDimensions.height, columns, orientation);
+    const calc = calculateGridFromColumns(imageDimensions.width, imageDimensions.height, columnsForDensity(gridDensity, customColumns), orientation);
     return { maxCol: calc.columns, maxRow: calc.rows };
   } else {
     const calc = calculateGridFromMeasurement(imageDimensions.width, imageDimensions.height, measurementSize, measurementMethod, orientation);
@@ -647,41 +632,38 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
     currentDistanceSettings
   } = props;
   
-  const isHexMap = mapType === 'hex';
-  const defaultDistancePerCell = isHexMap
-    ? (globalSettings.distancePerCellHex ?? 6)
-    : (globalSettings.distancePerCellGrid ?? 5);
-  const defaultDistanceUnit = isHexMap
-    ? (globalSettings.distanceUnitHex ?? 'mi')
-    : (globalSettings.distanceUnitGrid ?? 'ft');
-
-  const o = (currentSettings?.overrides ?? {}) as Partial<SettingsOverrides>;
+  const o = (currentSettings?.overrides ?? {}) as Partial<PluginSettings>;
+  // One merge (fallback defaults < global < this map's stored overrides). The
+  // overrides are seeded even while useGlobalSettings is on, so unticking it
+  // starts from the map's previous values.
+  const seed = mergeSettingsOverrides(globalSettings, o);
+  const distance = getEffectiveDistanceSettings(mapType, globalSettings, currentDistanceSettings);
 
   return {
     activeTab: initialTab ?? 'appearance',
 
     useGlobalSettings: currentSettings?.useGlobalSettings ?? true,
     overrides: {
-      gridLineColor: o.gridLineColor ?? globalSettings.gridLineColor ?? '#666666',
-      gridLineWidth: o.gridLineWidth ?? globalSettings.gridLineWidth ?? 1,
-      backgroundColor: o.backgroundColor ?? globalSettings.backgroundColor ?? '#1a1a1a',
-      borderColor: o.borderColor ?? globalSettings.borderColor ?? '#8b6842',
-      coordinateKeyColor: o.coordinateKeyColor ?? globalSettings.coordinateKeyColor ?? '#c4a57b',
-      coordinateTextColor: o.coordinateTextColor ?? globalSettings.coordinateTextColor ?? '#ffffff',
-      coordinateTextShadow: o.coordinateTextShadow ?? globalSettings.coordinateTextShadow ?? '#000000',
-      canvasHeight: o.canvasHeight ?? globalSettings.canvasHeight ?? 600,
-      canvasHeightMobile: o.canvasHeightMobile ?? globalSettings.canvasHeightMobile ?? 400,
-      pictureFrameHeight: o.pictureFrameHeight ?? globalSettings.pictureFrameHeight ?? 400,
-      pictureFrameHeightMobile: o.pictureFrameHeightMobile ?? globalSettings.pictureFrameHeightMobile ?? 300,
+      gridLineColor: seed.gridLineColor,
+      gridLineWidth: seed.gridLineWidth,
+      backgroundColor: seed.backgroundColor,
+      borderColor: seed.borderColor,
+      coordinateKeyColor: seed.coordinateKeyColor,
+      coordinateTextColor: seed.coordinateTextColor,
+      coordinateTextShadow: seed.coordinateTextShadow,
+      canvasHeight: seed.canvasHeight,
+      canvasHeightMobile: seed.canvasHeightMobile,
+      pictureFrameHeight: seed.pictureFrameHeight,
+      pictureFrameHeightMobile: seed.pictureFrameHeightMobile,
       // No numeric fallback: undefined means the frame spans the note column
-      pictureFrameWidth: o.pictureFrameWidth ?? globalSettings.pictureFrameWidth,
-      pictureFrameWidthMobile: o.pictureFrameWidthMobile ?? globalSettings.pictureFrameWidthMobile,
-      fogOfWarColor: o.fogOfWarColor ?? globalSettings.fogOfWarColor ?? '#000000',
-      fogOfWarOpacity: o.fogOfWarOpacity ?? globalSettings.fogOfWarOpacity ?? 0.9,
-      fogOfWarImage: o.fogOfWarImage ?? globalSettings.fogOfWarImage ?? null,
-      fogOfWarBlurEnabled: o.fogOfWarBlurEnabled ?? globalSettings.fogOfWarBlurEnabled ?? false,
-      fogOfWarBlurFactor: o.fogOfWarBlurFactor ?? globalSettings.fogOfWarBlurFactor ?? 0.99,
-      alwaysShowControls: o.alwaysShowControls ?? globalSettings.alwaysShowControls ?? false
+      pictureFrameWidth: seed.pictureFrameWidth,
+      pictureFrameWidthMobile: seed.pictureFrameWidthMobile,
+      fogOfWarColor: seed.fogOfWarColor,
+      fogOfWarOpacity: seed.fogOfWarOpacity,
+      fogOfWarImage: seed.fogOfWarImage ?? null,
+      fogOfWarBlurEnabled: seed.fogOfWarBlurEnabled,
+      fogOfWarBlurFactor: seed.fogOfWarBlurFactor,
+      alwaysShowControls: seed.alwaysShowControls
     },
     
     preferences: {
@@ -692,10 +674,10 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
     
     distanceSettings: {
       useGlobalDistance: currentDistanceSettings?.useGlobalDistance ?? true,
-      distancePerCell: currentDistanceSettings?.distancePerCell ?? defaultDistancePerCell,
-      distanceUnit: currentDistanceSettings?.distanceUnit ?? defaultDistanceUnit,
-      gridDiagonalRule: currentDistanceSettings?.gridDiagonalRule ?? (globalSettings.gridDiagonalRule ?? 'alternating'),
-      displayFormat: currentDistanceSettings?.displayFormat ?? (globalSettings.distanceDisplayFormat ?? 'both')
+      distancePerCell: distance.distancePerCell,
+      distanceUnit: distance.distanceUnit,
+      gridDiagonalRule: distance.gridDiagonalRule,
+      displayFormat: distance.displayFormat
     },
     
     boundsShape: currentHexBounds?.maxRing !== undefined ? 'radial' : 'rectangular',
@@ -739,12 +721,10 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
     fineTuneOffset: currentBackgroundImage?.fineTuneOffset ?? 0,
     
     activeColorPicker: null,
-    isLoading: false,
-    
+
     showResizeConfirm: false,
     pendingBoundsChange: null,
     orphanInfo: { cells: 0, objects: 0 },
-    deleteOrphanedContent: false,
 
     objectSetId: props.currentObjectSetId ?? null
   };
@@ -754,9 +734,21 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
 // Helpers
 // ===========================================
 
+/**
+ * Replacement bounds that keep boundsShape and hexBounds.maxRing consistent:
+ * while the shape is radial, the current maxRing is carried over so the
+ * modal never shows radial controls over rectangular bounds (and saves the
+ * shape the user picked).
+ */
+function keepBoundsShape(state: SettingsModalState, bounds: HexBounds): HexBounds {
+  if (state.boundsShape !== 'radial' || bounds.maxRing !== undefined) return bounds;
+  const maxRing = state.hexBounds.maxRing;
+  return maxRing !== undefined ? { ...bounds, maxRing } : bounds;
+}
+
 /** Apply grid bounds from a calculation result, mutating newState.hexBounds in place. */
 function applyBoundsCalc(newState: SettingsModalState, calc: GridCalculation): SettingsModalState {
-  newState.hexBounds = { maxCol: calc.columns, maxRow: calc.rows };
+  newState.hexBounds = keepBoundsShape(newState, { maxCol: calc.columns, maxRow: calc.rows });
   return newState;
 }
 
@@ -803,7 +795,7 @@ function applyImageSelected(
     backgroundImageDisplayName: displayName,
     imageDimensions: dimensions,
     imageSearchResults: [],
-    ...(bounds ? { hexBounds: bounds, boundsLocked: true } : {})
+    ...(bounds ? { hexBounds: keepBoundsShape(state, bounds), boundsLocked: true } : {})
   };
 }
 
@@ -896,6 +888,12 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
       }
       return { ...state, hexBounds: newBounds };
     }
+
+    case Actions.SET_HEX_BOUND_AXIS: {
+      const { axis, value } = action.payload;
+      // Same semantics as SET_HEX_BOUNDS with { ...state.hexBounds, [axis]: value }
+      return settingsReducer(state, { type: Actions.SET_HEX_BOUNDS, payload: { ...state.hexBounds, [axis]: value } });
+    }
     
     case Actions.SET_COORDINATE_MODE:
       return { ...state, coordinateDisplayMode: action.payload };
@@ -929,10 +927,7 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
     
     case Actions.SET_DENSITY: {
       const { density, orientation } = action.payload;
-      const columns = density === 'custom'
-        ? state.customColumns
-        : GRID_DENSITY_PRESETS[density]?.columns ?? 24;
-      return recalcFromColumns(state, { ...state, gridDensity: density }, columns, orientation);
+      return recalcFromColumns(state, { ...state, gridDensity: density }, columnsForDensity(density, state.customColumns), orientation);
     }
 
     case Actions.SET_CUSTOM_COLUMNS: {
@@ -976,13 +971,12 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
       const baseHexSize = measurementToHexSize(state.measurementSize, state.measurementMethod, orientation);
       const offset = adjustedHexSize - baseHexSize;
       
-      const columns = Math.ceil(state.imageDimensions.width / (adjustedHexSize * (orientation === 'pointy' ? Math.sqrt(3) : 1.5)));
-      const rows = Math.ceil(state.imageDimensions.height / (adjustedHexSize * (orientation === 'flat' ? Math.sqrt(3) : 1.5)));
+      const calc = calculateGridFromHexSize(state.imageDimensions.width, state.imageDimensions.height, adjustedHexSize, orientation);
       
       return {
         ...state,
         fineTuneOffset: offset,
-        hexBounds: { maxCol: columns, maxRow: rows }
+        hexBounds: keepBoundsShape(state, { maxCol: calc.columns, maxRow: calc.rows })
       };
     }
     
@@ -1013,9 +1007,6 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
     case Actions.SET_ACTIVE_COLOR_PICKER:
       return { ...state, activeColorPicker: action.payload };
     
-    case Actions.SET_LOADING:
-      return { ...state, isLoading: action.payload };
-    
     case Actions.SHOW_RESIZE_CONFIRM:
       return {
         ...state,
@@ -1030,9 +1021,6 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
         showResizeConfirm: false,
         pendingBoundsChange: null
       };
-    
-    case Actions.CLEAR_DELETE_FLAG:
-      return { ...state, deleteOrphanedContent: false };
     
     // Fog of War image picker actions
     case Actions.SET_FOG_IMAGE_DISPLAY_NAME:
@@ -1086,4 +1074,4 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
 // Exports
 // ===========================================
 
-export { Actions, GRID_DENSITY_PRESETS, settingsReducer, buildInitialState, calculateBoundsFromSettings, getOrphanedContentInfo, deriveBoundsFromRing };
+export { Actions, GRID_DENSITY_PRESETS, settingsReducer, buildInitialState, calculateBoundsFromSettings, columnsForDensity, getOrphanedContentInfo, deriveBoundsFromRing };

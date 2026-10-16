@@ -20,6 +20,7 @@ import type {
 
 import { renderHexBackgroundImage } from './backgroundRenderer';
 import { offsetToAxial } from '../core/offsetCoordinates';
+import { calculateViewportOffset } from '../core/viewportMath';
 
 
 // ===========================================
@@ -41,19 +42,17 @@ const hexRenderer = {
   },
 
   /**
-   * Calculate viewport offset for hex maps.
-   * Hex maps multiply center by zoom only (center is in world coordinates).
+   * Calculate viewport offset for hex maps (centre is world px).
+   * Delegates to the shared viewportMath rule. Kept only because
+   * useCanvasRenderer's local Renderer interface still requires it.
    */
   calculateViewportOffset(
-    _geometry: IHexRenderer,
+    geometry: IHexRenderer,
     center: { x: number; y: number },
     canvasSize: { width: number; height: number },
     zoom: number
   ): { offsetX: number; offsetY: number } {
-    return {
-      offsetX: canvasSize.width / 2 - center.x * zoom,
-      offsetY: canvasSize.height / 2 - center.y * zoom,
-    };
+    return calculateViewportOffset({ type: 'hex', cellSize: geometry.getScaledCellSize(1) }, center, canvasSize, zoom);
   },
 
   /**

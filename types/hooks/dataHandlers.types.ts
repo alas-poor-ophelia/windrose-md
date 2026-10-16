@@ -17,7 +17,7 @@ import type { Edge } from '../core/rendering.types';
 import type { TileAssignment } from '../tiles/tile.types';
 import type { MapDataUpdater } from '../hooks/mapData.types';
 import type { DepthWriteContext, DepthWriteResult } from '../../src/persistence/depthAuthoring';
-import type { LayerHistorySnapshot } from '../hooks/layerHistory.types';
+import type { AddToHistoryOptions, LayerHistorySnapshot } from '../hooks/layerHistory.types';
 
 // ===========================================
 // Hook Options
@@ -27,7 +27,7 @@ import type { LayerHistorySnapshot } from '../hooks/layerHistory.types';
 export interface UseDataHandlersOptions {
   mapData: MapData | null;
   updateMapData: MapDataUpdater;
-  addToHistory: (state: LayerHistorySnapshot) => void;
+  addToHistory: (state: LayerHistorySnapshot, options?: AddToHistoryOptions) => void;
   isApplyingHistory: () => boolean;
 }
 
@@ -61,10 +61,10 @@ export type HandleCurvesChange = LayerDataChangeHandler<Curve[]>;
 export type HandleTilesChange = LayerDataChangeHandler<TileAssignment[]>;
 
 /** Handle wall paths change */
-export type HandleWallPathsChange = LayerDataChangeHandler<WallPath[]>;
+type HandleWallPathsChange =LayerDataChangeHandler<WallPath[]>;
 
 /** Handle terrain strokes change */
-export type HandleTerrainStrokesChange = LayerDataChangeHandler<TerrainStroke[]>;
+type HandleTerrainStrokesChange =LayerDataChangeHandler<TerrainStroke[]>;
 
 /** Handle map name change */
 export type HandleNameChange = (newName: string) => void;
@@ -81,9 +81,6 @@ export type HandleUpdateColorOpacity = (colorId: string, newOpacity: number) => 
 /** Handle view state change */
 export type HandleViewStateChange = (newViewState: StoredViewState) => void;
 
-/** Handle sidebar collapse change */
-export type HandleSidebarCollapseChange = (collapsed: boolean) => void;
-
 /** Handle object set change */
 export type HandleObjectSetChange = (setId: string | null) => void;
 
@@ -91,7 +88,7 @@ export type HandleObjectSetChange = (setId: string | null) => void;
 export type HandleTextLabelSettingsChange = (settings: TextLabelSettings) => void;
 
 /** Handle regions change (hex maps only) */
-export type HandleRegionsChange = (regions: Region[]) => void;
+export type HandleRegionsChange = (regions: Region[], suppressHistory?: boolean) => void;
 
 // ===========================================
 // Grouped Handlers
@@ -123,7 +120,6 @@ export interface MapDataHandlers {
   handleDeleteCustomColor: HandleDeleteCustomColor;
   handleUpdateColorOpacity: HandleUpdateColorOpacity;
   handleViewStateChange: HandleViewStateChange;
-  handleSidebarCollapseChange: HandleSidebarCollapseChange;
   handleObjectSetChange: HandleObjectSetChange;
   handleTextLabelSettingsChange: HandleTextLabelSettingsChange;
   handleRegionsChange: HandleRegionsChange;
@@ -161,7 +157,6 @@ export interface UseDataHandlersResult {
   handleDeleteCustomColor: HandleDeleteCustomColor;
   handleUpdateColorOpacity: HandleUpdateColorOpacity;
   handleViewStateChange: HandleViewStateChange;
-  handleSidebarCollapseChange: HandleSidebarCollapseChange;
   handleObjectSetChange: HandleObjectSetChange;
   handleTextLabelSettingsChange: HandleTextLabelSettingsChange;
   handleRegionsChange: HandleRegionsChange;

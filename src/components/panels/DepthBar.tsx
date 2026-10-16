@@ -1,6 +1,5 @@
 import type { VNode } from 'preact';
 import type { TileLayerRole } from '#types/tiles/tile.types';
-import type { RoleMeta as DepthMeta } from '../../assets/tileRoles';
 
 import { useState, useCallback } from 'preact/hooks';
 import { Icon } from '../shared/Icon';
@@ -193,5 +192,5 @@ function DepthRibbon({ active, onPick, hidden, onToggleHide, tileCounts }: Depth
   );
 }
 
-export { DepthBar, DepthRibbon, EyeToggle, DEPTHS, depthMeta };
-export type { DepthBarProps, DepthRibbonProps, DepthMeta };
+export { DepthBar, DepthRibbon, depthMeta };
+

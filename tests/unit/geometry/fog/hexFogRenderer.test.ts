@@ -417,7 +417,7 @@ describe("hexFogRenderer", () => {
         mockAxialToOffset
       );
 
-      expect(ctx.strokeStyle).toBe('rgba(255, 255, 255, 0.15)');
+      expect(ctx.strokeStyle).toBe('rgba(255, 255, 255, 0.28)');
     });
   });
 

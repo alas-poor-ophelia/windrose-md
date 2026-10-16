@@ -14,7 +14,8 @@ import { useMapSelection } from '../../context/MapSelectionContext';
 import { getClickedObjectInCell, classicHitRung } from '../../objects/hexSlotPositioner';
 import { pickLadderObject } from '../../objects/ladderHitTest';
 import { rungFogPredicate } from '../canvas/rungFog';
-import { getActiveLayer, isCellFogged } from '../../persistence/layerAccessor';
+import { getActiveLayer } from '../../persistence/layerAccessor';
+import { isCellFoggedIndexed } from '../../geometry/fog/foggedCellIndex';
 
 
 
@@ -94,7 +95,7 @@ function useObjectHover(): {
         // exactly as the renderer hides it (rungFog).
         if (activeLayer.fogOfWar?.enabled === true && geometry != null) {
           const home = obj.homeLevel ?? 0;
-          const fogged = ladder !== null && home > 0 ? rungFogPredicate(ladder, home, isCellFogged) : isCellFogged;
+          const fogged = ladder !== null && home > 0 ? rungFogPredicate(ladder, home, isCellFoggedIndexed) : isCellFoggedIndexed;
           const objOffset = geometry.toOffsetCoords(obj.position.x, obj.position.y);
           if (fogged(activeLayer, objOffset.col, objOffset.row)) {
             obj = null;
@@ -102,9 +103,13 @@ function useObjectHover(): {
         }
       }
 
+      // useState bails out on an identical value, so an unchanged hover
+      // (same object, or still nothing) does not re-render.
       setHoveredObject(obj);
 
-      const container = containerRef.current;
+      // The cursor position only feeds the hover tooltip; skip the per-move
+      // state write when nothing is hovered (REACT-01).
+      const container = obj ? containerRef.current : null;
       if (container) {
         const rect = container.getBoundingClientRect();
         const relativeX = clientX - rect.left;

@@ -7,18 +7,11 @@
 
 import type { Point } from '#types/core/geometry.types';
 import type { Region } from '#types/core/map.types';
+import { hexKey, computeBoundaryEdges, type HexGeometryLike } from '../hex/hexRegionMath';
+
+export type { HexGeometryLike };
 
 // â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-export interface HexGeometryLike {
-  hexSize: number;
-  orientation: string;
-  hexToWorld(q: number, r: number): { worldX: number; worldY: number };
-  getHexVertices(q: number, r: number): { worldX: number; worldY: number }[];
-  worldToScreen(worldX: number, worldY: number, offsetX: number, offsetY: number, zoom: number): { screenX: number; screenY: number };
-  getNeighbors(x: number, y: number): Point[];
-  isWithinBounds(q: number, r: number): boolean;
-}
 
 interface ViewState {
   x: number;       // offsetX
@@ -32,10 +25,6 @@ interface RegionRenderOptions {
 
 // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-function hexKey(q: number, r: number): string {
-  return `${q},${r}`;
-}
-
 function computeCentroid(hexes: Point[], geometry: HexGeometryLike): { worldX: number; worldY: number } {
   let sumX = 0;
   let sumY = 0;
@@ -45,35 +34,6 @@ function computeCentroid(hexes: Point[], geometry: HexGeometryLike): { worldX: n
     sumY += worldY;
   }
   return { worldX: sumX / hexes.length, worldY: sumY / hexes.length };
-}
-
-/**
- * Find the outer boundary edges of a region.
- * Returns pairs of vertex indices that form the exterior boundary.
- * Each edge is [hex, vertexIndex] where the edge goes from vertex[i] to vertex[(i+1)%6].
- */
-function computeBoundaryEdges(
-  hexes: Point[],
-  geometry: HexGeometryLike
-): Array<{ q: number; r: number; edgeIndex: number }> {
-  const memberSet = new Set<string>();
-  for (const h of hexes) {
-    memberSet.add(hexKey(h.x, h.y));
-  }
-
-  const edges: Array<{ q: number; r: number; edgeIndex: number }> = [];
-
-  for (const h of hexes) {
-    const neighbors = geometry.getNeighbors(h.x, h.y);
-    for (let i = 0; i < 6; i++) {
-      const neighbor = neighbors[i];
-      if (!memberSet.has(hexKey(neighbor.x, neighbor.y))) {
-        edges.push({ q: h.x, r: h.y, edgeIndex: i });
-      }
-    }
-  }
-
-  return edges;
 }
 
 // â”€â”€ Render Functions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -238,4 +198,4 @@ function renderRegions(
   }
 }
 
-export { renderRegions, renderRegionFill, renderRegionBorder, renderRegionLabel, computeBoundaryEdges, computeCentroid, getRegionLabelWorldPosition };
+export { renderRegions, computeBoundaryEdges, computeCentroid, getRegionLabelWorldPosition };

@@ -80,16 +80,16 @@ const MeasurementLayer = ({
 
   // Travel packs come from plugin settings; re-read when settings change
   // (packs can be edited in settings while a map view is open)
-  const [settingsVersion, setSettingsVersion] = useState(0);
+  const [pluginSettings, setPluginSettings] = useState(() => getSettings());
   useEffect(() => {
-    const handler = (): void => setSettingsVersion(v => v + 1);
+    const handler = (): void => setPluginSettings(getSettings());
     window.addEventListener('windrose-settings-changed', handler);
     return () => window.removeEventListener('windrose-settings-changed', handler);
   }, []);
 
   const enabledPacks = useMemo(
-    () => getEnabledTravelPacks(getSettings().travelPacks),
-    [settingsVersion]
+    () => getEnabledTravelPacks(pluginSettings.travelPacks),
+    [pluginSettings]
   );
 
   const enabledTerrains = useMemo(() => collectEnabledTerrains(enabledPacks), [enabledPacks]);
@@ -161,7 +161,7 @@ const MeasurementLayer = ({
     handleMeasureClick(cellX, cellY, isTouch);
   }, [handleMeasureClick, handleSaveRoute, waypoints.length]);
 
-  useLayerHandlers('measure', { handleMeasureClick: handleMeasureClickOrFinish, handleMeasureMove, clearMeasurement });
+  useLayerHandlers('measure', { handleMeasureClick: handleMeasureClickOrFinish, handleMeasureMove });
 
   const [terrainPicker, setTerrainPicker] = useState<TerrainPickerState | null>(null);
 
@@ -188,9 +188,10 @@ const MeasurementLayer = ({
         e.preventDefault();
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [isMeasuring, removeLastWaypoint, clearMeasurement, terrainPicker, handleSaveRoute]);
+    const win = canvasRef.current?.ownerDocument.defaultView ?? window;
+    win.addEventListener('keydown', handler);
+    return () => win.removeEventListener('keydown', handler);
+  }, [isMeasuring, removeLastWaypoint, clearMeasurement, terrainPicker, handleSaveRoute, canvasRef]);
 
   // Route edits shift segment indices out from under an open picker
   useEffect(() => {
@@ -204,10 +205,10 @@ const MeasurementLayer = ({
   // Read-time fallback: an unset/empty per-map selection inherits the global
   // default (settings.defaultTravelSettings). No data migration — the map's
   // own travelSettings still override, and a user edit still writes per-map.
-  // Re-read on settingsVersion so a changed global default takes effect live.
+  // Re-read on the settings snapshot so a changed global default takes effect live.
   const travelSettings = useMemo(
-    () => getEffectiveTravelSettings(getSettings().defaultTravelSettings, mapData?.travelSettings),
-    [mapData?.travelSettings, settingsVersion]
+    () => getEffectiveTravelSettings(pluginSettings.defaultTravelSettings, mapData?.travelSettings),
+    [mapData?.travelSettings, pluginSettings]
   );
   const selectedModes = useMemo(
     () => resolveSelectedModes(enabledPacks, travelSettings?.modeIds ?? []),
@@ -272,7 +273,7 @@ const MeasurementLayer = ({
   // Capture the current effective selection as the global default for new/unset
   // maps. GLOBAL plugin setting (like tilesetArtScales): write + saveSettings on
   // the live plugin; saveSettings fires windrose-settings-changed, which our
-  // settingsVersion listener picks up.
+  // settings-snapshot listener picks up.
   const handleSetTravelDefault = useCallback((): void => {
     try {
       const plugin = app.plugins.plugins['windrose-md'] as unknown as

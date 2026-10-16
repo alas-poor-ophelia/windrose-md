@@ -85,11 +85,12 @@ const DockLayerList = ({
       }
     };
 
-    activeDocument.addEventListener('keydown', handleEscape);
-    activeDocument.addEventListener('pointerdown', handleClickOutside, true);
+    const doc = listRef.current?.ownerDocument ?? activeDocument;
+    doc.addEventListener('keydown', handleEscape);
+    doc.addEventListener('pointerdown', handleClickOutside, true);
     return () => {
-      activeDocument.removeEventListener('keydown', handleEscape);
-      activeDocument.removeEventListener('pointerdown', handleClickOutside, true);
+      doc.removeEventListener('keydown', handleEscape);
+      doc.removeEventListener('pointerdown', handleClickOutside, true);
     };
   }, [expandedLayerId]);
 

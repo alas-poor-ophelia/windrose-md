@@ -28,7 +28,7 @@ class ObjectSetImportModal extends Modal {
     this.onImport = onImport;
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('windrose-import-modal');
@@ -147,7 +147,7 @@ class ObjectSetImportModal extends Modal {
     };
   }
 
-  onClose(): void {
+  override onClose(): void {
     this.contentEl.empty();
   }
 }

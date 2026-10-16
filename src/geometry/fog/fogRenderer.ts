@@ -7,6 +7,8 @@
  */
 
 import type { FoggedCell } from '#types/core/map.types';
+import { THEME } from '../../core/dmtConstants';
+import { applyNorthRotation } from '../core/viewportMath';
 
 interface FogOfWar {
   enabled: boolean;
@@ -34,17 +36,16 @@ interface FogRenderContext {
 }
 
 import type { IGeometry } from '#types/core/geometry.types';
+import type { HexGeometryLike as SharedHexGeometryLike } from '../hex/hexRegionMath';
 
-export interface GridGeometryLike {
+interface GridGeometryLike {
   cellSize: number;
 }
 
-export interface HexGeometryLike {
-  hexSize: number;
-  getHexVertices: (q: number, r: number) => Array<{ worldX: number; worldY: number }>;
-  hexToWorld: (q: number, r: number) => { worldX: number; worldY: number };
-  getNeighbors: (q: number, r: number) => Array<{ x: number; y: number }>;
-}
+export type HexGeometryLike = Pick<
+  SharedHexGeometryLike,
+  'hexSize' | 'getHexVertices' | 'hexToWorld' | 'getNeighbors'
+>;
 
 interface MapBounds {
   hexBounds?: { maxCol: number; maxRow: number };
@@ -61,7 +62,7 @@ type RenderGridFogFn = (
 
 type RenderHexFogFn = (
   fogCells: FoggedCell[],
-  context: { ctx: CanvasRenderingContext2D; fogCtx: CanvasRenderingContext2D | null; offsetX: number; offsetY: number; zoom: number },
+  context: { ctx: CanvasRenderingContext2D; fogCtx: CanvasRenderingContext2D | null; offsetX: number; offsetY: number; zoom: number; cull?: { minX: number; minY: number; maxX: number; maxY: number } },
   options: { fowOpacity: number; fowBlurEnabled: boolean; blurRadius: number; useGlobalAlpha: boolean },
   visibleBounds: { minCol: number; maxCol: number; minRow: number; maxRow: number },
   hexGeometry: HexGeometryLike,
@@ -88,7 +89,10 @@ function getFogSettings(effectiveSettings: FogSettingsSource): FogSettings {
     fowOpacity: effectiveSettings.fogOfWarOpacity ?? 0.9,
     fowImagePath: effectiveSettings.fogOfWarImage ?? undefined,
     fowBlurEnabled: effectiveSettings.fogOfWarBlurEnabled ?? false,
-    fowBlurFactor: effectiveSettings.fogOfWarBlurFactor ?? 0.08,
+    // One default for the whole app: the resolver's (settingsAccessor DEFAULTS
+    // seed fogOfWarBlurFactor from THEME.fogOfWar.blurFactor). This fallback
+    // only fires for callers that bypass the resolver.
+    fowBlurFactor: effectiveSettings.fogOfWarBlurFactor ?? THEME.fogOfWar.blurFactor,
   };
 }
 
@@ -135,6 +139,12 @@ function getFogPatternSource(
   return entry;
 }
 
+/**
+ * Last pattern built per context. Fog renders every frame; the pattern only
+ * changes when the (downscaled) source does, so reuse it until then.
+ */
+const fogPatternByCtx = new WeakMap<CanvasRenderingContext2D, { source: CanvasImageSource; pattern: CanvasPattern }>();
+
 /** Create the repeat pattern from the (downscaled) source, restoring original on-screen scale. */
 function createFogPattern(
   ctx: CanvasRenderingContext2D,
@@ -143,10 +153,13 @@ function createFogPattern(
 ): CanvasPattern | null {
   try {
     const { source, invScale } = getFogPatternSource(fowImagePath, fowImage);
+    const cached = fogPatternByCtx.get(ctx);
+    if (cached && cached.source === source) return cached.pattern;
     const pattern = ctx.createPattern(source, 'repeat');
     if (pattern && invScale !== 1 && typeof pattern.setTransform === 'function') {
       pattern.setTransform(new DOMMatrix([invScale, 0, 0, invScale, 0, 0]));
     }
+    if (pattern) fogPatternByCtx.set(ctx, { source, pattern });
     return pattern;
   } catch {
     return null;
@@ -217,14 +230,14 @@ function setupFogCanvas(
   }
 
   const cssBlurAmount = Math.max(4, blurRadius * 0.6);
-  fogCanvas.style.filter = `blur(${cssBlurAmount}px)`;
+  const filter = `blur(${cssBlurAmount}px)`;
+  // Style writes per frame invalidate style even when unchanged; write on change.
+  if (fogCanvas.style.filter !== filter) fogCanvas.style.filter = filter;
 
   fogCtx.clearRect(0, 0, width, height);
 
   fogCtx.save();
-  fogCtx.translate(width / 2, height / 2);
-  fogCtx.rotate((northDirection * Math.PI) / 180);
-  fogCtx.translate(-width / 2, -height / 2);
+  applyNorthRotation(fogCtx, width, height, northDirection);
 
   fogCtx.fillStyle = fowColor;
 
@@ -279,6 +292,32 @@ function calculateHexVisibleBounds(
     minRow: 0,
     maxRow: bounds.maxRow,
   };
+}
+
+/**
+ * Screen-space (pre-rotation) rectangle a hex fog cell centre must fall in to
+ * be drawn. Rotated maps widen to the square circumscribing the viewport (fog
+ * is traced under the canvas rotation). The margin covers the hex itself, the
+ * widest blur pass and the CSS blur halo.
+ */
+function calculateHexFogCullRect(
+  width: number,
+  height: number,
+  hexScreenRadius: number,
+  blurRadius: number,
+  northDirection: number
+): { minX: number; minY: number; maxX: number; maxY: number } {
+  const margin = hexScreenRadius * 1.5 + blurRadius * 2;
+  if (northDirection % 360 !== 0) {
+    const halfDiag = Math.sqrt(width * width + height * height) / 2;
+    return {
+      minX: width / 2 - halfDiag - margin,
+      maxX: width / 2 + halfDiag + margin,
+      minY: height / 2 - halfDiag - margin,
+      maxY: height / 2 + halfDiag + margin,
+    };
+  }
+  return { minX: -margin, minY: -margin, maxX: width + margin, maxY: height + margin };
 }
 
 /**
@@ -337,10 +376,11 @@ function renderFog(
   // Calculate visible bounds and render
   if (isHexMap && hexGeometry) {
     const visibleBounds = calculateHexVisibleBounds(mapBounds.hexBounds);
+    const cull = calculateHexFogCullRect(width, height, hexGeometry.hexSize * zoom, blurRadius, northDirection);
 
     renderHexFog(
       fow.foggedCells,
-      { ctx, fogCtx, offsetX, offsetY, zoom },
+      { ctx, fogCtx, offsetX, offsetY, zoom, cull },
       { fowOpacity, fowBlurEnabled, blurRadius, useGlobalAlpha },
       visibleBounds,
       hexGeometry,
@@ -381,8 +421,8 @@ function clearFogCanvas(fogCanvas: HTMLCanvasElement | null): void {
   if (fogCtx) {
     fogCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
     const noFilter = 'none';
-    fogCanvas.style.filter = noFilter;
+    if (fogCanvas.style.filter !== noFilter) fogCanvas.style.filter = noFilter;
   }
 }
 
-export { getFogSettings, createFogFillStyle, calculateBlurRadius, setupFogCanvas, calculateGridVisibleBounds, calculateHexVisibleBounds, clearFogCanvas, renderFog };
+export { getFogSettings, createFogFillStyle, calculateBlurRadius, setupFogCanvas, calculateGridVisibleBounds, calculateHexVisibleBounds, calculateHexFogCullRect, clearFogCanvas, renderFog };

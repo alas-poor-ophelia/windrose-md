@@ -27,8 +27,6 @@ import type {
   HexOrientation,
   SettingsTabId,
   ImageDimensions,
-  GridCalculation as SharedGridCalculation,
-  GridDensityPreset,
 } from '#types/settings/settings.types';
 import type {
   SettingsModalState,
@@ -58,8 +56,7 @@ import { getSettings } from '../core/settingsAccessor';
 import { isLodLadderEnabled, hasSubHexChildren, hasDepthContent, ladderSettingsPatch, type LadderPatch } from '../core/lodFlags';
 import { THEME } from '../core/dmtConstants';
 import { getImageDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, getImageDimensions } from '../assets/imageOperations';
-import type { FineTuneRange } from '../geometry/core/hexMeasurements';
-import { calculateGridFromColumns, calculateGridFromMeasurement, measurementToHexSize, hexSizeToMeasurement, MEASUREMENT_EDGE, MEASUREMENT_CORNER, getFineTuneRange } from '../geometry/core/hexMeasurements';
+import { calculateGridFromColumns, measurementToHexSize, MEASUREMENT_CORNER } from '../geometry/core/hexMeasurements';
 
 
 
@@ -184,7 +181,6 @@ interface MapSettingsHandlers {
   handleBoundsLockToggle: () => void;
 
   // Hex grid settings
-  boundsShape: BoundsShape;
   handleBoundsShapeChange: (shape: BoundsShape) => void;
   handleRadiusChange: (value: string) => void;
   handleHexBoundsChange: (axis: 'maxCol' | 'maxRow', value: string) => void;
@@ -213,13 +209,12 @@ interface MapSettingsHandlers {
 // ===========================================
 
 /** Modal shell context - UI chrome + tab-specific data for the settings modal */
-export interface ModalShellContextValue {
+interface ModalShellContextValue {
   isOpen: boolean;
   activeTab: SettingsTabId;
   tabs: SettingsTab[];
   mapType: MapType;
   isHexMap: boolean;
-  isLoading: boolean;
   setActiveTab: (tab: SettingsTabId) => void;
   handleSave: () => void;
   handleCancel: () => void;
@@ -266,7 +261,7 @@ export interface AppearanceContextValue {
 }
 
 /** Background image context - image, sizing, density, measurement */
-export interface BackgroundImageContextValue {
+interface BackgroundImageContextValue {
   backgroundImagePath: string | null;
   backgroundImageDisplayName: string;
   imageDimensions: ImageDimensions | null;
@@ -298,14 +293,6 @@ export interface BackgroundImageContextValue {
   handleMeasurementSizeChange: (size: number) => void;
   handleFineTuneChange: (adjustedHexSize: number) => void;
   handleFineTuneReset: () => void;
-  GRID_DENSITY_PRESETS: Record<Exclude<GridDensityKey, 'custom'>, GridDensityPreset>;
-  MEASUREMENT_EDGE: MeasurementMethod;
-  MEASUREMENT_CORNER: MeasurementMethod;
-  calculateGridFromColumns: (width: number, height: number, columns: number, orientation?: HexOrientation) => SharedGridCalculation;
-  calculateGridFromMeasurement: (width: number, height: number, size: number, method: MeasurementMethod, orientation?: HexOrientation) => SharedGridCalculation;
-  measurementToHexSize: (measurement: number, method: MeasurementMethod, orientation?: HexOrientation) => number;
-  hexSizeToMeasurement: (hexSize: number, method: MeasurementMethod, orientation?: HexOrientation) => number;
-  getFineTuneRange: (baseHexSize: number) => FineTuneRange;
 }
 
 /** Hex grid context - bounds, coordinates, resize confirmation */
@@ -445,7 +432,9 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   mapId,
   onDeleteMap
 }) => {
-  const globalSettings = getSettings();
+  // Read once per open: getSettings() returns a fresh object every call, which
+  // would invalidate AppearanceContext on every provider render (REACT-06).
+  const globalSettings = useMemo(() => getSettings(), [isOpen]);
   const isHexMap = mapType === 'hex';
 
   // State via reducer
@@ -460,6 +449,9 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
   const imageSearchSeqRef = useRef(0);
   const fogImageSearchSeqRef = useRef(0);
+  // Sequence for background-image selection: the open effect's dimension fetch and
+  // handleImageSelect both dispatch IMAGE_SELECTED after awaiting; only the latest wins.
+  const imageSelectSeqRef = useRef(0);
 
   // Derived: available tabs
   const tabs = useMemo<SettingsTab[]>(() => {
@@ -488,9 +480,14 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     });
 
     // Load image dimensions async if path exists
+    // Invalidate any selection still in flight from a previous open
+    const openSeq = ++imageSelectSeqRef.current;
+
     if (currentBackgroundImage?.path != null && currentBackgroundImage.path !== '') {
       const bgPath = currentBackgroundImage.path;
       void getImageDimensions(bgPath).then((dims: ImageDimensions | null) => {
+        // A newer selection (or a close/reopen) superseded this fetch
+        if (openSeq !== imageSelectSeqRef.current) return;
         if (!dims) return;
 
         // For hex maps, calculate bounds from image dimensions
@@ -529,6 +526,11 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
         }
       });
     }
+
+    return () => {
+      // Closing (or re-running on reopen) cancels the pending dimension fetch
+      imageSelectSeqRef.current++;
+    };
   }, [isOpen]);
 
   // Close color picker on outside click
@@ -552,15 +554,21 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       }
     };
 
+    // The provider renders inside an Obsidian Modal (NativeModalPortal) and
+    // holds no element of its own; the modal opens in the focused window, and
+    // the picker is opened by a click inside it, so activeDocument here IS the
+    // modal's document. Captured once so add and remove hit the same document
+    // even if focus moves to another window before cleanup.
+    const doc = activeDocument;
     const timeoutId = window.setTimeout(() => {
-      activeDocument.addEventListener('mousedown', handleClickOutside);
-      activeDocument.addEventListener('touchstart', handleClickOutside, { passive: true });
+      doc.addEventListener('mousedown', handleClickOutside);
+      doc.addEventListener('touchstart', handleClickOutside, { passive: true });
     }, 0);
 
     return () => {
       window.clearTimeout(timeoutId);
-      activeDocument.removeEventListener('mousedown', handleClickOutside);
-      activeDocument.removeEventListener('touchstart', handleClickOutside);
+      doc.removeEventListener('mousedown', handleClickOutside);
+      doc.removeEventListener('touchstart', handleClickOutside);
     };
   }, [state.activeColorPicker]);
 
@@ -579,23 +587,32 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     dispatch({ type: Actions.SET_IMAGE_SEARCH_RESULTS, payload: filterImagesByTerm(allImages, searchTerm) });
   }, [dispatch]);
 
+  // Latest reducer state for async handlers, so they keep a stable identity
+  // instead of listing (and rebuilding on) the state fields they read.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   const handleImageSelect = useCallback(async (displayName: string): Promise<void> => {
+    const seq = ++imageSelectSeqRef.current;
     const fullPath = await getFullPathFromDisplayName(displayName);
+    if (seq !== imageSelectSeqRef.current) return;
     if (fullPath == null || fullPath === '') return;
 
     const dims = await getImageDimensions(fullPath);
+    if (seq !== imageSelectSeqRef.current) return;
     if (!dims) return;
 
+    const cur = stateRef.current;
     const bounds = calculateBoundsFromSettings(
-      dims, state.sizingMode, state.gridDensity, state.customColumns,
-      state.measurementSize, state.measurementMethod, orientation
+      dims, cur.sizingMode, cur.gridDensity, cur.customColumns,
+      cur.measurementSize, cur.measurementMethod, orientation
     );
 
     dispatch({
       type: Actions.IMAGE_SELECTED,
       payload: { path: fullPath, displayName, dimensions: dims, bounds }
     });
-  }, [state.sizingMode, state.gridDensity, state.customColumns, state.measurementSize, state.measurementMethod, orientation, dispatch]);
+  }, [orientation, dispatch]);
 
   const handleFogImageSearch = useCallback(async (searchTerm: string): Promise<void> => {
     if (searchTerm == null || searchTerm.trim() === '') {
@@ -672,8 +689,9 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   ]);
 
   // Core save logic - forceDelete bypasses orphan check
+  // onSave is synchronous (it hands new map data to the debounced saver), so there
+  // is no in-flight state to show: the modal closes in the same tick.
   const doSave = (forceDelete: boolean = false): void => {
-    dispatch({ type: Actions.SET_LOADING, payload: true });
     const mapSettings: MapSettings = {
       useGlobalSettings: settingsData.useGlobalSettings,
       overrides: settingsData.overrides as Record<string, unknown>,
@@ -689,8 +707,6 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       ? ladderSettingsPatch(mapData?.lod, state.ladderEnabled, state.lod, mapData !== null && hasDepthContent(mapData))
       : { kind: 'keep' };
     onSave(mapSettings, state.preferences, mapType === 'hex' ? state.hexBounds : null, backgroundImageData, calculatedHexSize, forceDelete, ladderPatch);
-    dispatch({ type: Actions.CLEAR_DELETE_FLAG });
-    dispatch({ type: Actions.SET_LOADING, payload: false });
     onClose();
   };
 
@@ -761,7 +777,10 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     setLadderEnabled: (enabled) => dispatch({ type: Actions.SET_LADDER_ENABLED, payload: enabled }),
     setActiveColorPicker: (picker) => dispatch({ type: Actions.SET_ACTIVE_COLOR_PICKER, payload: picker as ColorPickerId }),
     setBackgroundImageDisplayName: (name) => dispatch({ type: Actions.SET_IMAGE_DISPLAY_NAME, payload: name }),
-    handleImageClear: () => dispatch({ type: Actions.CLEAR_IMAGE }),
+    handleImageClear: () => {
+      imageSelectSeqRef.current++; // a pending selection must not resurrect the cleared image
+      dispatch({ type: Actions.CLEAR_IMAGE });
+    },
     handleSizingModeChange: (mode) => dispatch({ type: Actions.SET_SIZING_MODE, payload: mode }),
     handleBoundsLockToggle: () => dispatch({ type: Actions.TOGGLE_BOUNDS_LOCK }),
     setImageOpacity: (opacity) => dispatch({ type: Actions.SET_IMAGE_OPACITY, payload: opacity }),
@@ -773,8 +792,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     handleObjectSetChange: (setId) => dispatch({ type: Actions.SET_OBJECT_SET_ID, payload: setId }),
     handleCancel: () => onCloseRef.current(),
 
-    // Bounds shape
-    boundsShape: state.boundsShape,
+    // Bounds shape (the boundsShape VALUE lives in HexGridContext)
     handleBoundsShapeChange: (shape) => {
       dispatch({ type: Actions.SET_BOUNDS_SHAPE, payload: shape });
     },
@@ -785,13 +803,12 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       dispatch({ type: Actions.SET_HEX_BOUNDS, payload: { maxCol: derived, maxRow: derived, maxRing: numValue } });
     },
 
-    // Dispatches needing context for orphan checks
+    // The reducer merges the axis into the CURRENT bounds, so this handler does
+    // not close over state.hexBounds and stays identity-stable while typing.
     handleHexBoundsChange: (axis, value) => {
       const numValue = parseInt(value, 10);
       if (isNaN(numValue) || numValue <= 0 || numValue > 1000) return;
-
-      const newBounds = { ...state.hexBounds, [axis]: numValue };
-      dispatch({ type: Actions.SET_HEX_BOUNDS, payload: newBounds });
+      dispatch({ type: Actions.SET_HEX_BOUND_AXIS, payload: { axis, value: numValue } });
     },
 
     handleDensityChange: (density) => {
@@ -834,7 +851,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     handleFogImageSearch,
     handleFogImageSelect,
     handleFogImageClear: () => dispatch({ type: Actions.CLEAR_FOG_IMAGE })
-  }), [dispatch, orientation, state.hexBounds, state.boundsShape, stableHandleSave, stableHandleResizeConfirmDelete, handleImageSearch, handleImageSelect, handleFogImageSearch, handleFogImageSelect]);
+  }), [dispatch, orientation, stableHandleSave, stableHandleResizeConfirmDelete, handleImageSearch, handleImageSelect, handleFogImageSearch, handleFogImageSelect]);
 
   // ===========================================================================
   // Memoized Sub-Context Values
@@ -842,7 +859,6 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
 
   const modalShellValue = useMemo((): ModalShellContextValue => ({
     isOpen, activeTab: state.activeTab, tabs, mapType, isHexMap,
-    isLoading: state.isLoading,
     setActiveTab: handlers.setActiveTab,
     handleSave: stableHandleSave,
     handleCancel: handlers.handleCancel,
@@ -854,7 +870,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     mapData, geometry, layerVisibility,
     isInSubHex, subMapName,
     mapId, onDeleteMap
-  }), [isOpen, state.activeTab, state.isLoading, state.distanceSettings, state.preferences, isInSubHex, subMapName,
+  }), [isOpen, state.activeTab, state.distanceSettings, state.preferences, isInSubHex, subMapName,
     geometry, isHexMap, mapData, layerVisibility, mapType, tabs, stableHandleSave, mapId, onDeleteMap,
     handlers.handleCancel, handlers.handlePreferenceToggle, handlers.setActiveTab, handlers.setDistanceSettings]);
 
@@ -918,10 +934,6 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     handleMeasurementSizeChange: handlers.handleMeasurementSizeChange,
     handleFineTuneChange: handlers.handleFineTuneChange,
     handleFineTuneReset: handlers.handleFineTuneReset,
-    GRID_DENSITY_PRESETS,
-    MEASUREMENT_EDGE, MEASUREMENT_CORNER,
-    calculateGridFromColumns, calculateGridFromMeasurement,
-    measurementToHexSize, hexSizeToMeasurement, getFineTuneRange,
   }), [
     state.backgroundImagePath, state.backgroundImageDisplayName,
     state.imageDimensions, state.imageSearchResults,

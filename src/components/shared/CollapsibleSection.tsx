@@ -10,7 +10,7 @@
 import { useState } from 'preact/hooks';
 import type { VNode, ComponentChildren } from 'preact';
 import { Icon } from './Icon';
-export interface CollapsibleSectionProps {
+interface CollapsibleSectionProps {
   /** Section title */
   title: string;
   /** Whether section starts expanded (uncontrolled mode) */

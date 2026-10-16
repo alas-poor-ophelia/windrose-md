@@ -92,6 +92,10 @@ function FloatingPanel({
   }
   wasFloatingRef.current = isFloating;
 
+  // Latest-ref: the drag setup is keyed on layout props, not on the callback.
+  const onPositionChangeRef = useRef(onPositionChange);
+  onPositionChangeRef.current = onPositionChange;
+
   useEffect(() => {
     if (!isFloating || !panelRef.current) return undefined;
 
@@ -129,7 +133,7 @@ function FloatingPanel({
           el.style.top = `${positionRef.current.y}px`;
         },
         end: () => {
-          onPositionChange?.(positionRef.current);
+          onPositionChangeRef.current?.(positionRef.current);
         },
       },
     });
@@ -209,26 +213,5 @@ function FloatingPanel({
   );
 }
 
-interface PopoutButtonProps {
-  onClick: (position: { x: number; y: number }) => void;
-  className?: string;
-}
+export { FloatingPanel, clampPanelPosition };
 
-function PopoutButton({ onClick, className }: PopoutButtonProps): VNode {
-  return (
-    <button
-      className={`windrose-popout-btn ${className ?? ''}`}
-      onClick={(e) => {
-        e.stopPropagation();
-        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        onClick({ x: rect.left, y: rect.top });
-      }}
-      ref={tooltipRef('Pop out panel')}
-    >
-      <Icon icon="lucide-maximize-2" size={12} />
-    </button>
-  );
-}
-
-export { FloatingPanel, PopoutButton, clampPanelPosition };
-export type { FloatingPanelProps, PopoutButtonProps };

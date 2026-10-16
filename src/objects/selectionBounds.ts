@@ -12,7 +12,7 @@ import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
 
 import { calculateObjectScreenPosition } from './screenPositionUtils';
 import { getShapeBoundingHalfExtents } from './shapeOverlayOperations';
-import { calculateViewportOffset } from '../geometry/core/BaseGeometry';
+import { calculateViewportOffset, rotateAboutCanvasCenter } from '../geometry/core/viewportMath';
 import { getActiveLayer } from '../persistence/layerAccessor';
 
 interface SelectionBounds {
@@ -29,7 +29,7 @@ interface ContainerRef {
 }
 
 interface SelectedItem {
-  type: 'object' | 'text' | 'notePin' | 'shapeOverlay';
+  type: 'object' | 'text' | 'shapeOverlay';
   id: string;
   data?: MapObject;
 }
@@ -63,19 +63,12 @@ function applyNorthRotation(
   canvas: HTMLCanvasElement,
   northDirection: number | undefined
 ): { x: number; y: number } {
-  const angle = northDirection ?? 0;
-  if (angle === 0) return { x: screenX, y: screenY };
-
-  const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2;
-  const relX = screenX - centerX;
-  const relY = screenY - centerY;
-  const angleRad = (angle * Math.PI) / 180;
-
-  return {
-    x: centerX + relX * Math.cos(angleRad) - relY * Math.sin(angleRad),
-    y: centerY + relX * Math.sin(angleRad) + relY * Math.cos(angleRad)
-  };
+  return rotateAboutCanvasCenter(
+    screenX,
+    screenY,
+    { width: canvas.width, height: canvas.height },
+    northDirection ?? 0
+  );
 }
 
 function calculateTextLabelBounds(
@@ -168,7 +161,7 @@ function getSelectionBounds(
     const item = selectedItems[0];
     const activeLayer = getActiveLayer(mapData);
 
-    if (item.type === 'object' || item.type === 'notePin') {
+    if (item.type === 'object') {
       const obj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
       if (!obj) return null;
       return getObjectBounds(obj, canvasRef, containerRef, mapData, geometry, ladder);
@@ -245,7 +238,7 @@ function getSelectionBounds(
   let maxScreenY = -Infinity;
 
   for (const item of selectedItems) {
-    if (item.type === 'object' || item.type === 'notePin') {
+    if (item.type === 'object') {
       const obj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
       if (!obj) continue;
 
@@ -300,4 +293,4 @@ function getSelectionBounds(
   };
 }
 
-export { getSelectionBounds, getObjectBounds, calculateTextLabelBounds };
+export { getSelectionBounds, getObjectBounds };

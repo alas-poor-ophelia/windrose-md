@@ -7,6 +7,7 @@
 import type { CSSProperties, TargetedEvent, TargetedMouseEvent, TargetedTouchEvent, VNode } from 'preact';
 import { Fragment } from 'preact';
 import type { CustomColor, HexColor } from '#types/core/common.types';
+import type { ColorOpacityOverrides } from '#types/core/map.types';
 
 import type { MutableRef } from 'preact/hooks';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
@@ -21,7 +22,7 @@ import { tooltipRef } from './obsidianTooltip';
 
 
 /** Color definition from palette */
-export interface ColorDef {
+interface ColorDef {
   id: string;
   color: HexColor;
   label: string;
@@ -32,13 +33,10 @@ export interface ColorDef {
 }
 
 /** Position for color picker */
-export type PickerPosition = 'below' | 'above' | null;
+type PickerPosition = 'below' | 'above' | null;
 
 /** Alignment for color picker */
-export type PickerAlign = 'left' | 'right';
-
-/** Per-color opacity overrides */
-export type ColorOpacityOverrides = Record<string, number>;
+type PickerAlign = 'left' | 'right';
 
 /** Bounding rect of the swatch the edit panel is anchored to (viewport coordinates) */
 interface EditAnchorRect {
@@ -201,11 +199,13 @@ const ColorPicker = ({
       });
     };
 
-    window.addEventListener('resize', recompute);
-    window.addEventListener('scroll', recompute, true);
+    // The swatch's window, not the ambient one (popout-safe).
+    const win = editTargetElRef.current?.ownerDocument.defaultView ?? window;
+    win.addEventListener('resize', recompute);
+    win.addEventListener('scroll', recompute, true);
     return () => {
-      window.removeEventListener('resize', recompute);
-      window.removeEventListener('scroll', recompute, true);
+      win.removeEventListener('resize', recompute);
+      win.removeEventListener('scroll', recompute, true);
     };
   }, [editTargetId]);
 
@@ -381,7 +381,7 @@ const ColorPicker = ({
       position: 'fixed',
       left: `${rect.left}px`,
       ...(position === 'above'
-        ? { bottom: `${window.innerHeight - rect.top + gap}px` }
+        ? { bottom: `${(anchorRef.current.ownerDocument.defaultView ?? window).innerHeight - rect.top + gap}px` }
         : { top: `${rect.bottom + gap}px` }
       )
     };

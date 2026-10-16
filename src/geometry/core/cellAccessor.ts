@@ -13,12 +13,10 @@
  * Higher-level code (hooks, components) only sees Point.
  * Storage and geometry internals use native coordinates.
  * 
- * NOTE: cellExists and getCellFill are exported for API completeness.
  */
 
  
 
-// Type-only imports - stripped at runtime
 import type { Point } from '#types/core/geometry.types';
 import type {
   Cell,
@@ -30,8 +28,7 @@ import type {
   CellMap,
   CellKey,
   CellUpdate,
-  LocalCellPosition,
-  AnyCoords
+  LocalCellPosition
 } from '#types/core/cell.types';
 import type { IGeometry } from '#types/core/geometry.types';
 
@@ -61,6 +58,42 @@ export type {
 
 
 // ============================================================================
+// CELL KIND GUARDS (runtime; types/ holds types only)
+// ============================================================================
+
+/** Check if cell is a grid cell (has x, y) */
+function isGridCell(cell: Cell): cell is GridCell {
+  return 'x' in cell && 'y' in cell;
+}
+
+/** Check if cell is a hex cell (has q, r) */
+function isHexCell(cell: Cell): cell is HexCell {
+  return 'q' in cell && 'r' in cell;
+}
+
+/** Check if cell has partial fill (segments with entries) */
+function hasSegments(cell: Cell): cell is SegmentGridCell {
+  return isGridCell(cell) &&
+    cell.segments !== undefined &&
+    Object.keys(cell.segments).length > 0;
+}
+
+/** Check if cell is simple (fully painted, no segments) */
+function isSimpleCell(cell: Cell): boolean {
+  return !hasSegments(cell);
+}
+
+/** Segments of a cell, or undefined when it is not a partially filled grid cell. */
+function getSegments(cell: Cell): SegmentMap | undefined {
+  return hasSegments(cell) ? cell.segments : undefined;
+}
+
+/** The single "a,b" key format for every coordinate-keyed lookup (x,y or q,r). */
+function pointKey(a: number, b: number): string {
+  return `${a},${b}`;
+}
+
+// ============================================================================
 // GEOMETRY TYPE DETECTION
 // ============================================================================
 
@@ -69,47 +102,6 @@ export type {
  */
 function isGridGeometry(geometry: IGeometry): boolean {
   return geometry.type === 'grid';
-}
-
-/**
- * Check if geometry is hex-based
- */
-function isHexGeometry(geometry: IGeometry): boolean {
-  return geometry.type === 'hex';
-}
-
-// ============================================================================
-// TYPE GUARDS (re-implemented locally to avoid import issues at runtime)
-// ============================================================================
-
-/**
- * Check if cell is a grid cell (has x, y)
- */
-function isGridCell(cell: Cell): cell is GridCell {
-  return 'x' in cell && 'y' in cell;
-}
-
-/**
- * Check if cell is a hex cell (has q, r)
- */
-function isHexCell(cell: Cell): cell is HexCell {
-  return 'q' in cell && 'r' in cell;
-}
-
-/**
- * Check if cell has partial fill (segments)
- */
-function hasSegments(cell: Cell): cell is SegmentGridCell {
-  return isGridCell(cell) && 
-    cell.segments !== undefined && 
-    Object.keys(cell.segments).length > 0;
-}
-
-/**
- * Check if cell is a simple (full) cell
- */
-function isSimpleCell(cell: Cell): boolean {
-  return !hasSegments(cell);
 }
 
 // ============================================================================
@@ -126,16 +118,6 @@ function cellToPoint(cell: Cell): Point {
   return { x: cell.q, y: cell.r };
 }
 
-/**
- * Normalize any coordinate format to Point.
- */
-function normalizeToPoint(coords: AnyCoords): Point {
-  return {
-    x: coords.x ?? coords.gridX ?? coords.q ?? coords.col ?? 0,
-    y: coords.y ?? coords.gridY ?? coords.r ?? coords.row ?? 0
-  };
-}
-
 // ============================================================================
 // CELL KEY GENERATION
 // ============================================================================
@@ -145,10 +127,8 @@ function normalizeToPoint(coords: AnyCoords): Point {
  * Uses Point coordinates for consistency.
  */
 function cellKey(coords: Point, geometry: IGeometry): CellKey {
-  if (isGridGeometry(geometry)) {
-    return `${coords.x},${coords.y}`;
-  }
-  return `${coords.x},${coords.y}`;  // Same format, geometry interprets meaning
+  void geometry; // Same format for every geometry; the geometry interprets meaning
+  return pointKey(coords.x, coords.y);
 }
 
 /**
@@ -298,14 +278,6 @@ function removeCellsInBounds(
 // ============================================================================
 
 /**
- * Get fill color for cell (handles both simple and segment cells).
- */
-function getCellFill(cell: Cell | null): string | null {
-  if (!cell) return null;
-  return cell.color;
-}
-
-/**
  * Get array of filled segment names for a cell.
  * Simple cells return all 8 segments; segment cells return only filled ones.
  */
@@ -443,73 +415,6 @@ function setSegments(
 }
 
 /**
- * Remove segments from a cell.
- * If all segments are removed, removes the cell entirely.
- * 
- * @param coords - Point coordinates
- * @param segmentList - Array of segment names to remove
- */
-function removeSegments(
-  cells: Cell[],
-  coords: Point,
-  segmentList: SegmentName[],
-  geometry: IGeometry
-): Cell[] {
-  // Grid-only feature check
-  if (!isGridGeometry(geometry)) {
-    console.warn('removeSegments: Segment painting is only supported for grid maps');
-    return cells;
-  }
-  
-  const index = getCellIndex(cells, coords, geometry);
-  if (index === -1) return cells; // Cell doesn't exist
-  
-  const existingCell = cells[index] as GridCell;
-  const newCells = [...cells];
-  
-  if (isSimpleCell(existingCell)) {
-    // Simple cell - convert to segment cell with specified segments removed
-    const remainingSegments: SegmentMap = {};
-    for (const seg of SEGMENT_NAMES) {
-      if (!segmentList.includes(seg)) {
-        remainingSegments[seg] = true;
-      }
-    }
-    
-    if (Object.keys(remainingSegments).length === 0) {
-      // All segments removed - remove cell
-      return cells.filter((_, i) => i !== index);
-    }
-    
-    // Create segment cell with remaining segments
-    const segmentCell: SegmentGridCell = { 
-      x: existingCell.x,
-      y: existingCell.y,
-      segments: remainingSegments, 
-      color: existingCell.color, 
-      opacity: existingCell.opacity ?? 1 
-    };
-    newCells[index] = segmentCell;
-    return newCells;
-  }
-  
-  // Existing segment cell - remove specified segments
-  const segmentCell = existingCell as SegmentGridCell;
-  const updatedSegments: SegmentMap = { ...segmentCell.segments };
-  for (const seg of segmentList) {
-    delete updatedSegments[seg];
-  }
-  
-  if (Object.keys(updatedSegments).length === 0) {
-    // All segments removed - remove cell
-    return cells.filter((_, i) => i !== index);
-  }
-  
-  newCells[index] = { ...segmentCell, segments: updatedSegments };
-  return newCells;
-}
-
-/**
  * Check if neighbor segment is filled (for border calculation).
  * 
  * @param cellMap - Cell lookup map from buildCellMap
@@ -586,9 +491,10 @@ function getLocalCellPosition(
 // ============================================================================
 
 export { // Geometry type detection
-  isGridGeometry, isHexGeometry, // Type guards
-  isGridCell, isHexCell, hasSegments, isSimpleCell, // Coordinate utilities
-  normalizeToPoint, cellKey, cellKeyFromCell, cellToPoint, // Query functions
+  isGridGeometry, // Type guards
+  isGridCell, isHexCell, hasSegments, isSimpleCell, getSegments, pointKey,
+  // Coordinate utilities
+  cellKey, cellKeyFromCell, cellToPoint, // Query functions
   getCellAt, getCellIndex, cellExists, buildCellMap, // Modification functions (immutable)
   setCell, removeCell, setCells, removeCellsInBounds, // Segment support (partial cell painting)
-  getCellFill, getFilledSegments, normalizeCell, setSegments, removeSegments, neighborSegmentFilled, getSegmentAtPosition, getLocalCellPosition };
+  getFilledSegments, normalizeCell, setSegments, neighborSegmentFilled, getSegmentAtPosition, getLocalCellPosition };

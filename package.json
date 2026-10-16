@@ -11,7 +11,7 @@
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 0",
     "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
     "typecheck": "tsc --noEmit -p tsconfig.check.json",
-    "check": "npm run typecheck && npm run lint",
+    "check": "npm run typecheck && npm run lint && npm run lint:knip",
     "test:unit": "vitest run --config vitest.unit.config.ts",
     "test:unit:watch": "vitest --config vitest.unit.config.ts",
     "test:e2e": "vitest run",
@@ -28,27 +28,31 @@
     "build:css:watch": "sass scss/main.scss styles.css --no-source-map --no-charset --watch",
     "deploy": "bun run build:dev && node -e \"const fs=require('fs');const d='C:/Users/whipl/OneDrive/Documents/MiniSheet Dev/.obsidian/plugins/windrose-md';['main.js','styles.css','manifest.json'].forEach(f=>fs.copyFileSync(f,d+'/'+f));console.log('Deployed to '+d)\"",
     "lint:scanner": "eslint --config eslint.scanner-replica.mjs \"src/**/*.ts\" \"src/**/*.tsx\"",
-    "postinstall": "patch-package",
+    "lint:knip": "knip",
     "prepare": "git config core.hooksPath .githooks || true"
   },
+  "//devDependencies": "ajv, brace-expansion, minimatch, and picomatch are NOT imported by src/ — they are direct-dependency security pins forcing the resolver onto patched versions for the Obsidian store dependency scan. They stay as direct devDependencies (not runtime dependencies, and not overrides: ajv 6 / minimatch 3-9 / picomatch 2 are still needed by eslint and other tooling, so a name-global override would break them). Do not prune them as unused.",
   "devDependencies": {
     "@playwright/test": "^1.48.1",
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
-    "brace-expansion": "^5.0.9",
+    "ajv": "^8.20.0",
+    "brace-expansion": "^5.0.12",
     "esbuild": "^0.28.1",
     "eslint": "^9.17.0",
     "eslint-plugin-obsidianmd": "0.4.1",
     "eslint-plugin-react-hooks": "^5.1.0",
     "happy-dom": "^20.8.9",
     "interactjs": "^1.10.27",
-    "obsidian": "^1.13.1",
+    "knip": "^6.41.0",
+    "minimatch": "^10.2.6",
+    "obsidian": "^1.14.4",
     "obsidian-testing-framework": "0.1.6",
     "obsidian-typings": "5.22.0",
-    "patch-package": "^8.0.1",
+    "picomatch": "^4.0.5",
     "polygon-clipping": "^0.15.7",
     "preact": "^10.28.2",
-    "sass": "^1.100.0",
+    "sass": "^1.105.1",
     "typescript": "^5.7.0",
     "vitest": "^4.1.11"
   },
@@ -59,14 +63,9 @@
     "ttrpg"
   ],
   "license": "MIT",
-  "//dependencies": "ajv, brace-expansion, minimatch, and picomatch are NOT imported by src/ — they are direct-dependency security pins forcing the resolver onto patched versions for the Obsidian store dependency scan (see //overrides). Do not prune them as unused. fflate is the only genuinely imported runtime dependency here besides preact (pinned in devDependencies).",
   "dependencies": {
     "@tanstack/virtual-core": "^3.17.0",
-    "ajv": "^8.20.0",
-    "brace-expansion": "^5.0.9",
-    "fflate": "^0.8.3",
-    "minimatch": "^10.2.6",
-    "picomatch": "^4.0.5"
+    "fflate": "^0.8.3"
   },
   "//overrides": "electron is the E2E chassis only (obsidian-testing-framework runs the installed Obsidian app.asar on the npm electron via Playwright; Obsidian itself ships on the 39 line) and is held at the first line the advisory scan accepts. brace-expansion is deliberately NOT overridden: minimatch 3.x/8.x/9.x (eslint, glob, asar) can only load the 1.x/2.x lines, and the patched 1.1.12+/2.0.2+ releases are advisory-clean, so each minimatch resolves its own compatible copy. Security pins for transitive dev/test tooling flagged by the Obsidian store dependency scan. None of these ship in main.js (esbuild externalizes obsidian/electron/codemirror; the mermaid subtree comes from obsidian-typings for type annotations only and is never imported at runtime). preact is the sole runtime-bundled package and is pinned separately in devDependencies.",
   "overrides": {
@@ -84,7 +83,8 @@
     "yaml": "^2.8.3",
     "js-yaml": "^4.3.1",
     "flatted": "^3.4.2",
-    "fast-uri": "^3.1.6"
+    "fast-uri": "^3.1.8",
+    "moment": "^2.31.0"
   },
   "resolutions": {
     "mermaid": "^11.16.0",
@@ -99,6 +99,11 @@
     "yaml": "^2.8.3",
     "js-yaml": "^4.3.1",
     "flatted": "^3.4.2",
-    "fast-uri": "^3.1.6"
+    "fast-uri": "^3.1.8",
+    "moment": "^2.31.0"
+  },
+  "//patchedDependencies": "obsidian-testing-framework is patched by bun's native patchedDependencies (applied at install, hash recorded in bun.lock). patch-package was removed because its find-yarn-workspace-root > micromatch > braces chain carries GHSA-vfj7-8cjw-p6xm, which has no patched braces release. Edit the patch with `bun patch obsidian-testing-framework` / `bun patch --commit`, or hand-edit it (paths are relative to the package root).",
+  "patchedDependencies": {
+    "obsidian-testing-framework@0.1.6": "patches/obsidian-testing-framework+0.1.6.patch"
   }
 }

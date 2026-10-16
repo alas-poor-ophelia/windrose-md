@@ -7,50 +7,13 @@
  */
 
 import { describe, it, expect } from "vitest";
+import type { Point } from "#types/core/geometry.types";
+import type { Cell, GridCell, HexCell, SegmentGridCell, SegmentName, CellKey } from "../../../../src/geometry/core/cellAccessor";
+import { isGridCell, isHexCell, hasSegments, isSimpleCell } from "../../../../src/geometry/core/cellAccessor";
 
 // =============================================================================
 // TYPES (mirrors cellAccessor.ts types)
 // =============================================================================
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface GridCell {
-  x: number;
-  y: number;
-  color: string;
-  opacity?: number;
-}
-
-interface HexCell {
-  q: number;
-  r: number;
-  color: string;
-  opacity?: number;
-}
-
-type SegmentName = "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw";
-
-interface SegmentMap {
-  n?: boolean;
-  ne?: boolean;
-  e?: boolean;
-  se?: boolean;
-  s?: boolean;
-  sw?: boolean;
-  w?: boolean;
-  nw?: boolean;
-}
-
-interface SegmentGridCell extends GridCell {
-  segments: SegmentMap;
-}
-
-type Cell = GridCell | HexCell | SegmentGridCell;
-
-type CellKey = string;
 
 interface CellUpdate {
   coords: Point;
@@ -78,27 +41,6 @@ const SEGMENT_NAMES: readonly SegmentName[] = [
 // =============================================================================
 // EXTRACTED PURE FUNCTIONS (mirrors cellAccessor.ts logic)
 // =============================================================================
-
-function isGridCell(cell: Cell): cell is GridCell {
-  return "x" in cell && "y" in cell;
-}
-
-function isHexCell(cell: Cell): cell is HexCell {
-  return "q" in cell && "r" in cell && !("x" in cell);
-}
-
-function hasSegments(cell: Cell): cell is SegmentGridCell {
-  return (
-    isGridCell(cell) &&
-    "segments" in cell &&
-    cell.segments !== undefined &&
-    Object.keys(cell.segments).length > 0
-  );
-}
-
-function isSimpleCell(cell: Cell): boolean {
-  return !hasSegments(cell);
-}
 
 function cellToPoint(cell: Cell): Point {
   if (isGridCell(cell)) {
