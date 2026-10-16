@@ -52,7 +52,7 @@ const LadderLevelOverlay = (): VNode | null => {
   return (
     <div className="windrose-ladder-host">
       <div
-        className="windrose-ladder-levels"
+        className="windrose-ladder-hud windrose-ladder-levels"
         role="group"
         aria-label="Ladder levels"
         onPointerDown={stop}
@@ -61,12 +61,12 @@ const LadderLevelOverlay = (): VNode | null => {
         onWheel={stop}
       >
         {levels.map((level) => {
-          const lockClass = locked && level === editLevelLock ? ' windrose-ladder-chip-locked' : '';
+          const lockClass = locked && level === editLevelLock ? ' is-locked' : '';
           if (level === camera) {
             return (
               <span
                 key={level}
-                className={`windrose-breadcrumb-current windrose-ladder-chip${lockClass}`}
+                className={`windrose-ladder-chip is-current${lockClass}`}
                 aria-current="true"
               >
                 <span className="windrose-ladder-chip-prefix">L</span>{level}
@@ -77,7 +77,7 @@ const LadderLevelOverlay = (): VNode | null => {
             <button
               key={level}
               type="button"
-              className={`windrose-breadcrumb-link windrose-ladder-chip${lockClass}`}
+              className={`windrose-ladder-chip${lockClass}`}
               aria-label={`Zoom to level ${level}`}
               onClick={() => zoomToRung(level)}
             >

@@ -352,8 +352,8 @@ async function readOverlay(page: any): Promise<OverlayState> {
     const root = document.querySelector(".windrose-ladder-levels");
     const chips = Array.from(document.querySelectorAll(".windrose-ladder-chip")).map((el) => ({
       level: Number((el.textContent ?? "").replace(/\D/g, "")),
-      current: el.classList.contains("windrose-breadcrumb-current"),
-      locked: el.classList.contains("windrose-ladder-chip-locked"),
+      current: el.classList.contains("is-current"),
+      locked: el.classList.contains("is-locked"),
       isButton: el.tagName === "BUTTON",
     }));
     const lock = document.querySelector(".windrose-ladder-lock");

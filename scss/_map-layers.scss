@@ -665,8 +665,8 @@ button.windrose-breadcrumb-link {
   padding: 2px 4px;
 }
 
-/* Lattice ladder level chips (LadderLevelOverlay). Chips reuse the breadcrumb
-   link/current classes; this block only places the row and adds the lock. */
+/* Lattice ladder HUD (LadderLevelOverlay): gold-bordered translucent row with
+   uppercase chips, a padlock and a level readout. */
 /* The host spans the canvas container's bottom edge and is the size container
    the row queries: narrow embeds drop the readout, then the "L" prefixes. The
    row is centred inside a side reserve that clears the bottom-left compass in
@@ -697,23 +697,69 @@ button.windrose-breadcrumb-link {
   align-items: center;
   gap: 2px;
   padding: 2px 6px;
-  background: var(--windrose-bg-secondary);
-  border: 1px solid var(--windrose-bg-tertiary);
-  border-radius: 6px;
-  font-size: 12px;
-  color: var(--windrose-text-secondary);
   pointer-events: auto;
   user-select: none;
 }
 
-.windrose-ladder-chip {
-  font-variant-numeric: tabular-nums;
+/* HUD surface: the shared gold-bordered translucent blurred floating look. */
+.windrose-ladder-hud {
+  background: color-mix(in srgb, var(--windrose-bg-primary) 80%, transparent);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.4);
+  border-radius: 6px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 16px oklch(0 0 0 / 0.5);
 }
 
-.windrose-ladder-chip-locked {
-  outline: 1px solid var(--windrose-accent-blue);
-  outline-offset: -1px;
+/* Chip: works as a button or a span. Button reset is doubled with the
+   .is-tablet twin so Obsidian's app.css cannot restyle it. */
+.is-tablet button.windrose-ladder-chip,
+button.windrose-ladder-chip,
+.windrose-ladder-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 6px;
+  background: none;
+  border: 1px solid transparent;
+  box-shadow: none;
   border-radius: 3px;
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.is-tablet button.windrose-ladder-chip:hover,
+button.windrose-ladder-chip:hover,
+.windrose-ladder-chip:hover {
+  background: var(--windrose-bg-tertiary);
+  text-decoration: none;
+}
+
+.is-tablet button.windrose-ladder-chip.is-current,
+button.windrose-ladder-chip.is-current,
+.windrose-ladder-chip.is-current {
+  background: oklch(from var(--windrose-border-primary) l c h / 0.18);
+  color: var(--windrose-gold-bright);
+  cursor: default;
+}
+
+.is-tablet button.windrose-ladder-chip.is-locked,
+button.windrose-ladder-chip.is-locked,
+.windrose-ladder-chip.is-locked {
+  border-color: oklch(from var(--windrose-border-primary) l c h / 0.8);
+}
+
+.is-tablet button.windrose-ladder-chip.is-disabled,
+button.windrose-ladder-chip.is-disabled,
+.windrose-ladder-chip.is-disabled {
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 .is-tablet button.windrose-ladder-lock,
@@ -721,6 +767,7 @@ button.windrose-ladder-lock {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-height: 24px;
   background: none;
   border: none;
   box-shadow: none;
@@ -736,7 +783,7 @@ button.windrose-ladder-lock {
   }
 
   &.is-locked {
-    color: var(--windrose-accent-blue);
+    color: var(--windrose-gold-bright);
   }
 }
 
@@ -744,12 +791,17 @@ button.windrose-ladder-lock {
   display: inline-flex;
   gap: 6px;
   margin-left: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: oklch(from var(--windrose-border-primary) l c h / 0.8);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .windrose-ladder-readout-edit {
-  color: var(--windrose-accent-blue);
+  color: var(--windrose-gold-bright);
 }
 
 /* Narrow host: the padlock outline already marks a locked edit rung, so the
@@ -771,9 +823,9 @@ button.windrose-ladder-lock {
     padding: 2px 3px;
   }
 
-  /* Two classes outrank the breadcrumb's button.windrose-breadcrumb-link
-     padding and the .is-tablet lock twin. */
-  .windrose-ladder-levels .windrose-ladder-chip {
+  /* Two classes outrank the chip's single-class padding. */
+  .windrose-ladder-levels .windrose-ladder-chip,
+  .is-tablet .windrose-ladder-levels button.windrose-ladder-chip {
     padding-inline: 3px;
   }
 
