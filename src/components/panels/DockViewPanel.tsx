@@ -10,14 +10,14 @@ import { useApp } from '../../context/AppContext';
 import { Icon } from '../shared/Icon';
 import { tooltipRef } from '../shared/obsidianTooltip';
 import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
-import { useWeather } from '../../hooks/state/useWeather';
+import { useWeatherStore } from '../../context/WeatherContext';
 
 interface LayerDef {
   id: keyof LayerVisibility;
   icon: string;
   label: string;
   hexOnly?: boolean;
-  /** Offered only while the weather plugin is usable and a region is bound to it */
+  /** Offered only while the weather plugin is usable and the map has weather */
   requiresWeather?: boolean;
 }
 
@@ -28,7 +28,7 @@ const LAYERS: LayerDef[] = [
   { id: 'hexCoordinates', icon: 'lucide-key-round', label: 'Coords', hexOnly: true },
   { id: 'regions', icon: 'lucide-hexagon', label: 'Regions', hexOnly: true },
   { id: 'outlines', icon: 'lucide-spline', label: 'Outlines', hexOnly: true },
-  { id: 'weather', icon: 'lucide-cloud-sun', label: 'Weather', hexOnly: true, requiresWeather: true },
+  { id: 'weather', icon: 'lucide-cloud-sun', label: 'Weather', requiresWeather: true },
 ];
 
 interface FogToolDef {
@@ -49,8 +49,6 @@ interface DockViewPanelProps {
   onZoomOut: () => void;
   layerVisibility: LayerVisibility;
   onToggleLayer: (layerId: keyof LayerVisibility) => void;
-  /** True when the map has a region bound to a weather zone */
-  hasWeatherRegions?: boolean;
   mapType: MapType;
   fogOfWarState: FogOfWarState;
   onFogToolSelect: (tool: FogToolId) => void;
@@ -65,7 +63,6 @@ const DockViewPanel = ({
   onZoomOut,
   layerVisibility,
   onToggleLayer,
-  hasWeatherRegions = false,
   mapType,
   fogOfWarState,
   onFogToolSelect,
@@ -75,7 +72,9 @@ const DockViewPanel = ({
 }: DockViewPanelProps): VNode => {
   const app = useApp();
   const featureFlags = useFeatureFlags();
-  const weatherAvailable = useWeather().available && hasWeatherRegions;
+  // Map has weather = a bound region or a map-level (or inherited) zone
+  const weather = useWeatherStore();
+  const weatherAvailable = weather.available && weather.areas.length > 0;
   const visibleLayers = LAYERS.filter(l =>
     (l.hexOnly !== true || mapType === 'hex') &&
     (l.requiresWeather !== true || weatherAvailable)

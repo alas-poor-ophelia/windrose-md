@@ -13,6 +13,7 @@ Share map state and operations down the component tree without prop drilling. Al
 | `MapSelectionContext.tsx` | `MapSelectionProvider` | `useMapSelection()`, `useHoverState()` | Selected item/objects, drag state, multi-select, `layerVisibility` (prop); `useHoverState()` reads a separate hover sub-context (`hoveredObject`, `mousePosition`) so pointer moves re-render only `ObjectHoverTooltip` |
 | `ObjectLinkingContext.tsx` | `ObjectLinkingProvider` | `useLinkingMode()` | Note-linking mode state |
 | `EventHandlerContext.tsx` | `EventHandlerProvider` | `useEventHandlerRegistration()`, `useRegisteredHandlers()` | Registry of per-layer pointer handlers (see below) |
+| `WeatherContext.tsx` | `WeatherProvider` (one per map instance, mounted by `DungeonMapTracker.tsx` around its whole render) | `useWeatherStore()` | The per-map weather store (`types/contexts/weather.types.ts`) over `weather/weatherStore.ts`. **Returns an inert unavailable store outside a provider** (weather is an optional companion), so it never throws. Also publishes the ROOT map's zones for the weather plugin's zone resolver |
 | `MapSettingsContext.tsx` | `MapSettingsProvider` | `useModalShell()`, `useAppearance()`, `useBackgroundImage()`, `useHexGrid()` | Four selector sub-contexts. **Exists only inside the per-map settings modal** (mounted by `components/settings/MapSettingsModal.tsx`); map layers do NOT read it |
 
 ## Context Pattern
@@ -58,7 +59,7 @@ MapSelectionProvider            (takes layerVisibility)
           └ Coordinators + canvas + {children} (layers passed in by DungeonMapTracker)
 ```
 
-`AppContext` is provided above this (plugin mount / view). `MapSettingsProvider` is separate: only `MapSettingsModal` mounts it.
+`AppContext` is provided above this (plugin mount / view). `WeatherProvider` wraps the whole `DungeonMapTracker` render (toolbars, panels, MapCanvas, settings modal), so it sits above these. `MapSettingsProvider` is separate: only `MapSettingsModal` mounts it.
 
 ## EventHandlerContext
 

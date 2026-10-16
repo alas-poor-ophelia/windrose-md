@@ -103,7 +103,10 @@ const FALLBACK_SETTINGS: PluginSettings = {
   shapePreviewTouch: false,
 
   // Debug/diagnostic command palette entries hidden by default
-  developerMode: false
+  developerMode: false,
+
+  // Weather travel rules: Windrose's own interpreter
+  weatherTravelInterpreter: 'windrose.travel'
 };
 
 /** Default object customization settings */

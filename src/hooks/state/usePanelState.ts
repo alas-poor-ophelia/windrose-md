@@ -15,6 +15,7 @@ import type {
 } from '#types/index';
 import { isHexCell } from '#types/core/cell.types';
 import type { HexBounds } from '#types/core/map.types';
+import type { MapWeatherSave } from '../../context/MapSettingsContext';
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { getLayerById } from '../../persistence/layerAccessor';
@@ -48,7 +49,8 @@ interface UsePanelStateResult {
     hexBounds?: HexBounds | null,
     backgroundImage?: BackgroundImage | null,
     hexSize?: number | null,
-    deleteOrphanedContent?: boolean
+    deleteOrphanedContent?: boolean,
+    weather?: MapWeatherSave | null
   ) => void;
   handleSettingsClose: () => void;
 }
@@ -93,7 +95,8 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
     hexBounds: HexBounds | null = null,
     backgroundImage: BackgroundImage | null = null,
     hexSize: number | null = null,
-    deleteOrphanedContent: boolean = false
+    deleteOrphanedContent: boolean = false,
+    weather: MapWeatherSave | null = null
   ): void => {
     if (!mapData) return;
 
@@ -104,6 +107,15 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
         uiPreferences: preferencesData,
         objectSetId: settingsData.objectSetId ?? null
       };
+
+      // Weather tab (only when it was offered): absent = no map-level zone /
+      // animation on, so the keys are removed rather than stored as defaults
+      if (weather != null) {
+        delete newMapData.weatherZoneId;
+        delete newMapData.weatherAnimate;
+        if (weather.weatherZoneId != null && weather.weatherZoneId !== '') newMapData.weatherZoneId = weather.weatherZoneId;
+        if (weather.weatherAnimate === false) newMapData.weatherAnimate = false;
+      }
 
       if (hexBounds !== null && prev.mapType === 'hex') {
         newMapData.hexBounds = hexBounds;

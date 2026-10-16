@@ -3,13 +3,15 @@
  *
  * Pure lookups from map cells to weather zones. A region carries an
  * optional `weatherZoneId` (absent = no weather); its member hexes inherit
- * the zone. Also the registry of mounted maps the weather plugin's zone
- * resolver reads, and the per-segment fold used by route travel times.
+ * the zone; a map may also carry a map-level `weatherZoneId` that covers
+ * every hex no bound region claims. Also the registry of mounted maps the
+ * weather plugin's zone resolver reads, and the per-segment fold used by
+ * route travel times.
  */
 
 // Type-only imports
 import type { Point } from '#types/core/geometry.types';
-import type { Region } from '#types/core/map.types';
+import type { MapData, Region } from '#types/core/map.types';
 import type { WeatherTravelEffect } from './weatherTravelRules';
 
 import { combineCellEffects } from './weatherTravelRules';
@@ -54,14 +56,15 @@ function collectBoundZoneIds(regions: Region[] | null | undefined): string[] {
 
 /**
  * Weather effect per route segment (index i = points[i] → points[i+1]),
- * from the cells each segment crosses. A segment that touches no weather
- * comes back as the neutral effect, so the result always lines up with the
- * route's segment arrays.
+ * from the cells each segment crosses. `zoneAt` answers the weather zone of
+ * a cell (null = no weather). A segment that touches no weather comes back
+ * as the neutral effect, so the result always lines up with the route's
+ * segment arrays.
  */
 function computeSegmentWeatherEffects(
   points: Point[],
   getCellsInLine: (x1: number, y1: number, x2: number, y2: number) => Point[],
-  cellZones: CellZoneIndex,
+  zoneAt: (x: number, y: number) => string | null,
   effectForZone: (zoneId: string) => WeatherTravelEffect | null
 ): WeatherTravelEffect[] {
   const effects: WeatherTravelEffect[] = [];
@@ -70,7 +73,7 @@ function computeSegmentWeatherEffects(
     const b = points[i + 1];
     const cells = getCellsInLine(a.x, a.y, b.x, b.y);
     effects.push(combineCellEffects(cells.map(cell => {
-      const zoneId = cellZones.get(cellKey(cell.x, cell.y));
+      const zoneId = zoneAt(cell.x, cell.y);
       return zoneId != null ? effectForZone(zoneId) : null;
     })));
   }
@@ -78,46 +81,97 @@ function computeSegmentWeatherEffects(
 }
 
 // ===========================================
-// Mounted-map registry (zone resolver backing)
+// Map zone snapshots (zone resolver backing)
+// ===========================================
+
+/** Everything the zone resolver needs to answer for one map */
+export interface MapZoneSnapshot {
+  /** Hex cell key → zone of the topmost bound region */
+  cells: CellZoneIndex;
+  /** Region id → zone */
+  regions: Map<string, string>;
+  /** The map-level zone ("whole map"), or null */
+  mapZoneId: string | null;
+}
+
+/** Zone fields of a map (root or sub-hex level) */
+type ZoneSource = Pick<MapData, 'regions' | 'weatherZoneId'> | null | undefined;
+
+function mapLevelZoneId(map: ZoneSource): string | null {
+  const id = map?.weatherZoneId;
+  return typeof id === 'string' && id !== '' ? id : null;
+}
+
+function buildMapZoneSnapshot(map: ZoneSource): MapZoneSnapshot {
+  const regions = new Map<string, string>();
+  for (const region of map?.regions ?? []) {
+    if (hasWeatherZone(region)) regions.set(region.id, region.weatherZoneId);
+  }
+  return { cells: buildCellZoneIndex(map?.regions), regions, mapZoneId: mapLevelZoneId(map) };
+}
+
+/** Zone at a hex: its bound region's, else the map-level zone, else null */
+function zoneAtHex(snapshot: MapZoneSnapshot, q: number, r: number): string | null {
+  return snapshot.cells.get(cellKey(q, r)) ?? snapshot.mapZoneId;
+}
+
+/** Zone a region is bound to, else the map-level zone (a region of an unbound map has none) */
+function zoneOfRegion(snapshot: MapZoneSnapshot, regionId: string): string | null {
+  return snapshot.regions.get(regionId) ?? snapshot.mapZoneId;
+}
+
+// ===========================================
+// Mounted-map registry
 // ===========================================
 
 /**
- * The weather plugin's zone resolver is synchronous and map data loads
- * asynchronously, so only maps currently open can answer "which zone is
- * this hex in". Each mounted map publishes its index here.
+ * The weather plugin's synchronous resolver can only answer for maps that
+ * are open, so each mounted map publishes a snapshot of its ROOT level
+ * here (WeatherProvider). Unmounted maps are answered by resolveAsync.
  */
-const mountedMapZones = new Map<string, CellZoneIndex[]>();
+const mountedMapZones = new Map<string, MapZoneSnapshot[]>();
 
 /**
- * Publish a mounted map's index; returns the retraction for unmount. One
+ * Publish a mounted map's snapshot; returns the retraction for unmount. One
  * map can be open in several views at once (an embed and a full pane), so
- * each view's index is kept and closing one leaves the others answering.
+ * each view's snapshot is kept and closing one leaves the others answering.
  */
-function publishMapZones(mapId: string, index: CellZoneIndex): () => void {
+function publishMapZones(mapId: string, snapshot: MapZoneSnapshot): () => void {
   const published = mountedMapZones.get(mapId) ?? [];
-  published.push(index);
+  published.push(snapshot);
   mountedMapZones.set(mapId, published);
   return () => {
-    const remaining = (mountedMapZones.get(mapId) ?? []).filter(entry => entry !== index);
+    const remaining = (mountedMapZones.get(mapId) ?? []).filter(entry => entry !== snapshot);
     if (remaining.length > 0) mountedMapZones.set(mapId, remaining);
     else mountedMapZones.delete(mapId);
   };
 }
 
-/** Zone bound at a hex of an open map, or null (unbound hex, or map not open) */
-function resolveMountedHexZone(mapId: string, q: number, r: number): string | null {
+/** The latest published snapshot of an open map, or null when it is not open */
+function getMountedMapZones(mapId: string): MapZoneSnapshot | null {
   const published = mountedMapZones.get(mapId);
-  if (published == null) return null;
   // Most recently published view first: it holds the latest edit
-  return published[published.length - 1].get(cellKey(q, r)) ?? null;
+  return published != null && published.length > 0 ? published[published.length - 1] : null;
+}
+
+/** Zone at a hex of an open map, or null (no weather there, or map not open) */
+function resolveMountedHexZone(mapId: string, q: number, r: number): string | null {
+  const snapshot = getMountedMapZones(mapId);
+  return snapshot != null ? zoneAtHex(snapshot, q, r) : null;
 }
 
 export type { CellZoneIndex };
 export {
+  cellKey,
   hasWeatherZone,
+  mapLevelZoneId,
   buildCellZoneIndex,
   collectBoundZoneIds,
   computeSegmentWeatherEffects,
+  buildMapZoneSnapshot,
+  zoneAtHex,
+  zoneOfRegion,
   publishMapZones,
+  getMountedMapZones,
   resolveMountedHexZone,
 };

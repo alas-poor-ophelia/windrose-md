@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Weather spike: sky engine demo</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #101318; }
+  body { color: #dfe7f2; font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #stage { position: relative; width: 1600px; height: 860px; }
+  #stage canvas { position: absolute; left: 0; top: 0; }
+  #hud { position: absolute; right: 10px; bottom: 8px; font: 11px ui-monospace, monospace; opacity: 0.75; }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="map" width="1600" height="860"></canvas>
+    <canvas id="sky" width="1600" height="860"></canvas>
+    <canvas id="labels" width="1600" height="860"></canvas>
+    <div id="hud"></div>
+  </div>
+  <script src="dist/bundle.js"></script>
+</body>
+</html>

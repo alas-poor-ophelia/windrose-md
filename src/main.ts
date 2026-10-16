@@ -17,15 +17,16 @@ import { writeCanvasCapabilityReport } from './utils/canvasCapabilityReport';
 import { recordInputEventProbe } from './utils/inputEventProbe';
 import { recordZoomTrace } from './utils/zoomTraceProbe';
 import { scanTilesetFolder } from './assets/tilesetOperations';
-import { buildMapEntry, createMapEntry, getSaveQueue, listMapsResult } from './persistence/fileOperations';
+import { buildMapEntry, createMapEntry, getSaveQueue, listMapsResult, readRawMapEntry } from './persistence/fileOperations';
 import { noteStoreFileModified, noteStoreFilePathGone } from './persistence/storeCache';
 import { disposeImageCache } from './assets/imageOperations';
 import { clearAll as clearThumbnailCache } from './assets/thumbnailCache';
 import { flushAll, installLifecycleJournaling, journalAll } from './persistence/saveCoordinator';
 import { pruneJournal } from './persistence/saveJournal';
 import { notifyPartyNoteRenamed } from './persistence/partyNoteOperations';
-import { connectZoneResolver } from './weather/wadjetBridge';
-import { resolveMountedHexZone } from './weather/weatherZones';
+import { connectInterpreter, connectZoneResolver } from './weather/wadjetBridge';
+import { createWindroseZoneAnswers, mapLoaderFromRawEntries } from './weather/windroseZoneResolver';
+import { windroseTravelInterpreter } from './weather/travelInterpreter';
 import { runImportDetectionPass } from './assets/importDetectionPass';
 import {
   ensureTileMetadataLoaded,
@@ -319,9 +320,16 @@ export default class WindrosePlugin extends Plugin {
       });
     });
 
-    // Optional companion: lets the weather plugin ask which zone a hex of an
-    // open map is in. A no-op when that plugin is absent.
-    this.register(connectZoneResolver(this.app, resolveMountedHexZone));
+    // Optional companion (U+13080 Weather): answer its zone resolver for
+    // Windrose hexes and regions (open maps synchronously, closed maps by a
+    // read-only load), and register Windrose's travel interpreter. Both are
+    // replayed on every wadjet:ready (re-enable builds a new API) and
+    // removed on unload. No-ops when that plugin is absent.
+    this.register(connectZoneResolver(
+      this.app,
+      createWindroseZoneAnswers(mapLoaderFromRawEntries(mapId => readRawMapEntry(this.app, mapId)))
+    ));
+    this.register(connectInterpreter(this.app, windroseTravelInterpreter));
   }
 
   /**

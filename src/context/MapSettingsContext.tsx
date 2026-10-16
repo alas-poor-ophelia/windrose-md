@@ -41,7 +41,9 @@ import type {
   GridDensityKey,
   SizingMode,
   BoundsShape,
+  SettingsWeather,
 } from '../components/settings/settingsReducer';
+import type { WadjetZoneSummary } from '#types/integrations/wadjet.types';
 
 import type { ComponentChildren, FunctionComponent } from 'preact';
 import { createContext } from 'preact';
@@ -150,9 +152,12 @@ interface MapSettingsHandlers {
   setDistanceSettings: (updates: Partial<DistanceSettings>) => void;
   setCoordinateDisplayMode: (mode: CoordinateDisplayMode) => void;
 
-  // Sub-hex parent map backdrop override
   setShowParentBackdrop: (value: boolean | undefined) => void;
 
+  // Weather tab
+  setWeather: (updates: Partial<SettingsWeather>) => void;
+
+  // Color picker
   // Color picker
   setActiveColorPicker: (picker: string | null) => void;
 
@@ -217,6 +222,10 @@ interface ModalShellContextValue {
   // Preferences tab fields
   preferences: SettingsPreferences;
   handlePreferenceToggle: (key: PreferenceKey) => void;
+  // Weather tab fields (tab shown only when weatherZones is non-null)
+  weatherZones: WadjetZoneSummary[] | null;
+  weather: SettingsWeather;
+  setWeather: (updates: Partial<SettingsWeather>) => void;
   // Export (PreferencesTab)
   mapData: MapData | null;
   geometry: ExtendedGeometry | null;
@@ -318,7 +327,8 @@ export interface MapSettingsProviderProps {
     hexBounds: HexBounds | null,
     backgroundImage: BackgroundImage | null,
     hexSize: number | null,
-    deleteOrphanedContent: boolean
+    deleteOrphanedContent: boolean,
+    weather: MapWeatherSave | null
   ) => void;
   onOpenAlignmentMode?: (currentX: number, currentY: number) => void;
   initialTab?: SettingsTabId | null;
@@ -339,6 +349,19 @@ export interface MapSettingsProviderProps {
   subMapName?: string | null;
   mapId?: string;
   onDeleteMap?: () => void;
+  /** This map level's stored weather fields */
+  currentWeather?: Partial<SettingsWeather>;
+  /** The weather plugin's zones; null/absent = plugin unavailable (no Weather tab) */
+  weatherZones?: WadjetZoneSummary[] | null;
+}
+
+/**
+ * Weather fields handed to onSave: absent keys are removed from the map
+ * (no map-level zone; animation on). Null = leave the map's fields alone.
+ */
+export interface MapWeatherSave {
+  weatherZoneId?: string;
+  weatherAnimate?: boolean;
 }
 
 // ===========================================
@@ -414,7 +437,9 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   isInSubHex = false,
   subMapName = null,
   mapId,
-  onDeleteMap
+  onDeleteMap,
+  currentWeather,
+  weatherZones = null
 }) => {
   // Read once per open: getSettings() returns a fresh object every call, which
   // would invalidate AppearanceContext on every provider render (REACT-06).
@@ -424,7 +449,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   // State via reducer
   const [state, dispatch] = useReducer(
     settingsReducer,
-    { props: { initialTab: initialTab ?? undefined, mapType, currentSettings: currentSettings ?? undefined, currentPreferences: currentPreferences ?? undefined, currentHexBounds: currentHexBounds ?? undefined, currentBackgroundImage: currentBackgroundImage ?? undefined, currentDistanceSettings: currentDistanceSettings ?? undefined, currentObjectSetId }, globalSettings },
+    { props: { initialTab: initialTab ?? undefined, mapType, currentSettings: currentSettings ?? undefined, currentPreferences: currentPreferences ?? undefined, currentHexBounds: currentHexBounds ?? undefined, currentBackgroundImage: currentBackgroundImage ?? undefined, currentDistanceSettings: currentDistanceSettings ?? undefined, currentObjectSetId, currentWeather }, globalSettings },
     (init: { props: BuildInitialStateProps; globalSettings: PluginSettings }) => buildInitialState(init.props, init.globalSettings)
   );
 
@@ -437,15 +462,17 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   // handleImageSelect both dispatch IMAGE_SELECTED after awaiting; only the latest wins.
   const imageSelectSeqRef = useRef(0);
 
-  // Derived: available tabs
+  // Derived: available tabs (Weather only while the weather plugin is usable)
+  const hasWeatherTab = weatherZones != null;
   const tabs = useMemo<SettingsTab[]>(() => {
     const baseTabs: SettingsTab[] = [{ id: 'appearance', label: 'Appearance' }];
     if (mapType === 'hex') baseTabs.push({ id: 'hexgrid', label: 'Hex Grid' });
     if (mapType === 'grid') baseTabs.push({ id: 'gridbackground', label: 'Background' });
     baseTabs.push({ id: 'measurement', label: 'Measurement' });
+    if (hasWeatherTab) baseTabs.push({ id: 'weather', label: 'Weather' });
     baseTabs.push({ id: 'preferences', label: 'Preferences' });
     return baseTabs;
-  }, [mapType]);
+  }, [mapType, hasWeatherTab]);
 
   // ===========================================================================
   // Effects
@@ -458,7 +485,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     dispatch({
       type: Actions.INITIALIZE,
       payload: {
-        props: { initialTab: initialTab ?? undefined, mapType, currentSettings: currentSettings ?? undefined, currentPreferences: currentPreferences ?? undefined, currentHexBounds: currentHexBounds ?? undefined, currentBackgroundImage: currentBackgroundImage ?? undefined, currentDistanceSettings: currentDistanceSettings ?? undefined, currentObjectSetId },
+        props: { initialTab: initialTab ?? undefined, mapType, currentSettings: currentSettings ?? undefined, currentPreferences: currentPreferences ?? undefined, currentHexBounds: currentHexBounds ?? undefined, currentBackgroundImage: currentBackgroundImage ?? undefined, currentDistanceSettings: currentDistanceSettings ?? undefined, currentObjectSetId, currentWeather },
         globalSettings
       }
     });
@@ -684,7 +711,12 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       objectSetId: settingsData.objectSetId,
       showParentBackdrop: settingsData.showParentBackdrop,
     };
-    onSave(mapSettings, state.preferences, mapType === 'hex' ? state.hexBounds : null, backgroundImageData, calculatedHexSize, forceDelete);
+    // Weather fields are written only when the Weather tab was offered
+    const weatherSave: MapWeatherSave | null = weatherZones == null ? null : {
+      ...(state.weather.weatherZoneId !== '' ? { weatherZoneId: state.weather.weatherZoneId } : {}),
+      ...(state.weather.weatherAnimate ? {} : { weatherAnimate: false }),
+    };
+    onSave(mapSettings, state.preferences, mapType === 'hex' ? state.hexBounds : null, backgroundImageData, calculatedHexSize, forceDelete, weatherSave);
     onClose();
   };
 
@@ -748,6 +780,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     setDistanceSettings: (updates) => dispatch({ type: Actions.SET_DISTANCE_SETTING, payload: updates }),
     setCoordinateDisplayMode: (mode) => dispatch({ type: Actions.SET_COORDINATE_MODE, payload: mode }),
     setShowParentBackdrop: (value) => dispatch({ type: Actions.SET_PARENT_BACKDROP, payload: value }),
+    setWeather: (updates) => dispatch({ type: Actions.SET_WEATHER, payload: updates }),
     setActiveColorPicker: (picker) => dispatch({ type: Actions.SET_ACTIVE_COLOR_PICKER, payload: picker as ColorPickerId }),
     setBackgroundImageDisplayName: (name) => dispatch({ type: Actions.SET_IMAGE_DISPLAY_NAME, payload: name }),
     handleImageClear: () => {
@@ -840,12 +873,15 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     setDistanceSettings: handlers.setDistanceSettings,
     preferences: state.preferences,
     handlePreferenceToggle: handlers.handlePreferenceToggle,
+    weatherZones,
+    weather: state.weather,
+    setWeather: handlers.setWeather,
     mapData, geometry, layerVisibility,
     isInSubHex, subMapName,
     mapId, onDeleteMap
-  }), [isOpen, state.activeTab, state.distanceSettings, state.preferences, isInSubHex, subMapName,
+  }), [isOpen, state.activeTab, state.distanceSettings, state.preferences, state.weather, weatherZones, isInSubHex, subMapName,
     geometry, isHexMap, mapData, layerVisibility, mapType, tabs, stableHandleSave, mapId, onDeleteMap,
-    handlers.handleCancel, handlers.handlePreferenceToggle, handlers.setActiveTab, handlers.setDistanceSettings]);
+    handlers.handleCancel, handlers.handlePreferenceToggle, handlers.setActiveTab, handlers.setDistanceSettings, handlers.setWeather]);
 
   const appearanceValue = useMemo((): AppearanceContextValue => ({
     useGlobalSettings: state.useGlobalSettings,

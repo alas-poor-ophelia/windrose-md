@@ -31,9 +31,10 @@ import {
   resolveSelectedModes,
 } from '../../travel/travelTimeOperations';
 import type { WeatherTravelEffect } from '../../weather/weatherTravelRules';
-import { computeWeatherTimeRatio, evaluateWeatherTravel, formatWeatherNote } from '../../weather/weatherTravelRules';
-import { buildCellZoneIndex, computeSegmentWeatherEffects } from '../../weather/weatherZones';
-import { useWeather } from '../../hooks/state/useWeather';
+import { computeWeatherTimeRatio, formatWeatherNote } from '../../weather/weatherTravelRules';
+import { computeSegmentWeatherEffects } from '../../weather/weatherZones';
+import { travelEffectFromInterpretation } from '../../weather/travelInterpreter';
+import { useWeatherStore } from '../../context/WeatherContext';
 import { MeasurementOverlay } from '../overlays/MeasurementOverlay';
 import { MeasurementControls } from '../overlays/MeasurementControls';
 import { TerrainPickerPopup } from '../overlays/TerrainPickerPopup';
@@ -226,61 +227,61 @@ const MeasurementLayer = ({
     [enabledPacks, travelSettings]
   );
 
-  // Weather over each segment, from the weather plugin when it is present
-  // and regions are bound to its zones. Kept apart from the terrain sampler:
-  // weather changes with the world's day and never writes segmentTerrains.
-  // Parked unless the measure tool is active, like the sampler.
-  // The whole route is costed with the world's CURRENT day: a journey longer
-  // than a day is not walked against the forecast, so it over- or under-
-  // states weather that changes en route.
-  const weather = useWeather();
-  const regions = mapData?.regions;
-  const weatherActive = currentTool === 'measure' && weather.available;
-  const cellZones = useMemo(
-    () => buildCellZoneIndex(weatherActive ? regions : null),
-    [weatherActive, regions]
+  // Weather over each segment, from the map's weather store: cells in a
+  // bound region or under the map-level zone, costed by the selected
+  // "Weather travel rules" interpreter (Windrose's own by default). Kept
+  // apart from the terrain sampler: weather changes with the day and never
+  // writes segmentTerrains. Parked unless the measure tool is active.
+  // The whole route is costed with ONE day (the store's view day, today by
+  // default): a journey longer than a day is not walked against the forecast.
+  const weather = useWeatherStore();
+  const weatherDay = weather.viewDay;
+  const weatherActive = currentTool === 'measure' && weather.available && weatherDay != null && weather.areas.length > 0;
+  const zoneAt = useMemo(
+    () => (x: number, y: number): string | null => weather.areaAt({ x, y })?.zoneId ?? null,
+    [weather]
   );
   const effectForZone = useMemo(() => {
     const zoneEffects = new Map<string, WeatherTravelEffect | null>();
     return (zoneId: string): WeatherTravelEffect | null => {
       let effect = zoneEffects.get(zoneId);
       if (effect === undefined) {
-        const report = weather.reportFor(zoneId);
-        effect = report != null ? evaluateWeatherTravel(report) : null;
+        const report = weatherDay != null ? weather.report(zoneId, weatherDay) : null;
+        effect = report != null ? travelEffectFromInterpretation(weather.interpretTravel(report)) : null;
         zoneEffects.set(zoneId, effect);
       }
       return effect;
     };
-  }, [weather]);
+  }, [weather, weatherDay]);
 
   // Committed segments and the live preview segment are costed apart: the
   // preview moves with the pointer and must not re-walk the whole route.
   // Without weather both stay on shared constants, so the travel lines
   // below recompute exactly as often as they did before weather existed.
   const committedWeather = useMemo((): WeatherTravelEffect[] => {
-    if (cellZones.size === 0 || geometry == null || waypoints.length < 2) return NO_SEGMENT_WEATHER;
+    if (!weatherActive || geometry == null || waypoints.length < 2) return NO_SEGMENT_WEATHER;
     return computeSegmentWeatherEffects(
       waypoints,
       (x1, y1, x2, y2) => geometry.getCellsInLine(x1, y1, x2, y2),
-      cellZones,
+      zoneAt,
       effectForZone
     );
-  }, [cellZones, geometry, waypoints, effectForZone]);
+  }, [weatherActive, geometry, waypoints, zoneAt, effectForZone]);
 
   const lastWaypoint = waypoints.length > 0 ? waypoints[waypoints.length - 1] : null;
   const previewX = previewTarget?.x;
   const previewY = previewTarget?.y;
   const previewWeather = useMemo((): WeatherTravelEffect | null => {
-    if (cellZones.size === 0 || geometry == null || lastWaypoint == null ||
+    if (!weatherActive || geometry == null || lastWaypoint == null ||
         previewX == null || previewY == null || previewDistance <= 0) return null;
     const effects = computeSegmentWeatherEffects(
       [lastWaypoint, { x: previewX, y: previewY }],
       (x1, y1, x2, y2) => geometry.getCellsInLine(x1, y1, x2, y2),
-      cellZones,
+      zoneAt,
       effectForZone
     );
     return effects[0] ?? null;
-  }, [cellZones, geometry, lastWaypoint, previewX, previewY, previewDistance, effectForZone]);
+  }, [weatherActive, geometry, lastWaypoint, previewX, previewY, previewDistance, zoneAt, effectForZone]);
 
   const segmentWeather = useMemo(
     () => (previewWeather != null ? [...committedWeather, previewWeather] : committedWeather),

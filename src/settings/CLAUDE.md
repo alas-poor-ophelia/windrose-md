@@ -29,6 +29,10 @@ WindroseSettingsTab.ts        # PluginSettingTab subclass: getSettingDefinitions
 - `WindroseSettingsTab.getControlValue`/`setControlValue` delegate to these. Saving goes through `plugin.saveSettings()`.
 - Definitions must stay synchronous; async data (e.g. whether old-plugin data exists) is cached on the tab and read in `visible()`.
 
+## Weather group
+
+`buildWeatherGroup` (Measurement & travel page) holds "Weather travel rules" (`weatherTravelInterpreter`, a DIRECT key). Its dropdown options are built when definitions are built, from the weather plugin's `listInterpreters("travel")` (built-in rules first; a saved id no longer registered stays listed). The group is visible only while the weather plugin is usable.
+
 ## Adding a setting
 
 1. Add the field to `PluginSettings` in `types/settings/settings.types.ts` (and a default in `core/settingsAccessor.ts`).

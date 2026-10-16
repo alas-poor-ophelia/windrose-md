@@ -105,7 +105,7 @@ describe('buildSettingDefinitions', () => {
       'Color palette',
       'Dungeon generation',
       'Fog of war',
-      'Distance measurement', 'Travel packs',
+      'Distance measurement', 'Travel packs', 'Weather',
       'Tile sets',
       'Object types', 'Object sets', 'Object customization'
     ];

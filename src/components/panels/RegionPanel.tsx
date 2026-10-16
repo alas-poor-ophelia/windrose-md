@@ -12,7 +12,7 @@ import type { VNode } from 'preact';
 import { useMemo } from 'preact/hooks';
 import { Icon } from '../shared/Icon';
 import { tooltipRef } from '../shared/obsidianTooltip';
-import { useWeather } from '../../hooks/state/useWeather';
+import { useWeatherStore } from '../../context/WeatherContext';
 import { hasWeatherZone } from '../../weather/weatherZones';
 
 const REGION_NAME_MAX_LENGTH = 20;
@@ -59,17 +59,17 @@ const RegionPanel = ({
     return [...regions].sort((a, b) => a.order - b.order);
   }, [regions]);
 
-  // Today's weather per weather-bound region, in the weather plugin's own
-  // wording; no entry when unbound or the plugin is unavailable
-  const weather = useWeather();
+  // The view day's weather per weather-bound region, in the weather
+  // plugin's own wording; no entry when unbound or the plugin is unavailable
+  const weather = useWeatherStore();
   const weatherLines = useMemo(() => {
     const lines = new Map<string, string>();
-    if (!weather.available) return lines;
+    const day = weather.viewDay;
+    if (!weather.available || day == null) return lines;
     for (const region of regions) {
       if (!hasWeatherZone(region)) continue;
-      const report = weather.reportFor(region.weatherZoneId);
-      const line = report != null ? weather.describe(report) : 'Weather zone not found';
-      if (line != null) lines.set(region.id, line);
+      const report = weather.report(region.weatherZoneId, day);
+      lines.set(region.id, report != null ? weather.describe(report) : 'Weather zone not found');
     }
     return lines;
   }, [weather, regions]);

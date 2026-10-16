@@ -141,6 +141,10 @@ export interface SettingsModalState {
   // Sub-hex parent map backdrop override (undefined = inherit global)
   showParentBackdrop?: boolean;
 
+  // Weather (U+13080 Weather plugin): map-level zone ('' = none / inherit)
+  // and the per-map "Animate weather" switch
+  weather: SettingsWeather;
+
   // Background image
   backgroundImagePath: string | null;
   backgroundImageDisplayName: string;
@@ -231,6 +235,14 @@ export interface BuildInitialStateProps {
   currentBackgroundImage?: CurrentBackgroundImage;
   currentDistanceSettings?: CurrentDistanceSettings;
   currentObjectSetId?: string | null;
+  currentWeather?: Partial<SettingsWeather>;
+}
+
+/** Map-level weather fields edited in the Weather tab */
+export interface SettingsWeather {
+  /** '' = no map-level zone (sub-hex levels then inherit the parent hex) */
+  weatherZoneId: string;
+  weatherAnimate: boolean;
 }
 
 // ===========================================
@@ -274,7 +286,8 @@ const Actions = {
   CLEAR_FOG_IMAGE: 'CLEAR_FOG_IMAGE',
   SET_OBJECT_SET_ID: 'SET_OBJECT_SET_ID',
   SET_BOUNDS_SHAPE: 'SET_BOUNDS_SHAPE',
-  SET_PARENT_BACKDROP: 'SET_PARENT_BACKDROP'
+  SET_PARENT_BACKDROP: 'SET_PARENT_BACKDROP',
+  SET_WEATHER: 'SET_WEATHER'
 } as const;
 
 /** Action type union */
@@ -459,6 +472,11 @@ interface SetParentBackdropAction {
   payload: boolean | undefined;
 }
 
+interface SetWeatherAction {
+  type: typeof Actions.SET_WEATHER;
+  payload: Partial<SettingsWeather>;
+}
+
 /** Discriminated union of all actions */
 type SettingsAction =
   | InitializeAction
@@ -496,7 +514,8 @@ type SettingsAction =
   | ClearFogImageAction
   | SetObjectSetIdAction
   | SetBoundsShapeAction
-  | SetParentBackdropAction;
+  | SetParentBackdropAction
+  | SetWeatherAction;
 
 // ===========================================
 // Constants
@@ -659,6 +678,10 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
     coordinateDisplayMode: (currentSettings?.coordinateDisplayMode ?? 'rectangular') as CoordinateDisplayMode,
 
     showParentBackdrop: currentSettings?.showParentBackdrop,
+    weather: {
+      weatherZoneId: props.currentWeather?.weatherZoneId ?? '',
+      weatherAnimate: props.currentWeather?.weatherAnimate ?? true
+    },
 
     backgroundImagePath: currentBackgroundImage?.path ?? null,
     backgroundImageDisplayName: currentBackgroundImage?.path != null && currentBackgroundImage.path !== ''
@@ -866,6 +889,9 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
 
     case Actions.SET_PARENT_BACKDROP:
       return { ...state, showParentBackdrop: action.payload };
+
+    case Actions.SET_WEATHER:
+      return { ...state, weather: { ...state.weather, ...action.payload } };
 
     case Actions.SET_IMAGE_SEARCH_RESULTS:
       return { ...state, imageSearchResults: action.payload };

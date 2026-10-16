@@ -79,6 +79,7 @@ function createMockState(overrides: Partial<SettingsModalState> = {}): SettingsM
     orphanInfo: { cells: 0, objects: 0 },
     boundsShape: 'rectangular',
     objectSetId: null,
+    weather: { weatherZoneId: '', weatherAnimate: true },
     ...overrides,
   };
 }

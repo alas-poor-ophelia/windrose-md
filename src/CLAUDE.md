@@ -121,6 +121,20 @@ src/
 ├── drawing/               # Pure map-editing math: cells, edges, walls, wall gaps, routes, tiles, scatter, terrain strokes
 ├── text/                  # Text label domain
 ├── travel/                # Travel packs (units, terrains, modes, allowances) and segment terrain sampler
+├── weather/               # Optional U+13080 Weather plugin (id `wadjet`) integration — public API only
+│   ├── wadjetBridge.ts    # The ONE contact point: API lookup, 0.3.x vs apiVersion-1 feature detection, safe reads,
+│   │                      #   event subscription (payloads, unload), connectZoneResolver / connectInterpreter
+│   ├── weatherStore.ts    # WeatherStoreCore: per-map store core (report cache, view time, invalidation, rebind)
+│   ├── weatherAreas.ts    # Weather areas of the shown level (bound regions + map-level zone, sub-hex inheritance)
+│   ├── weatherZones.ts    # Region/cell → zone lookups, route segment fold, mounted-map zone snapshots
+│   ├── windroseZoneResolver.ts # Answers `hex` and `windrose.region` locators (open maps sync, closed maps read-only async)
+│   ├── travelInterpreter.ts # `windrose.travel` interpreter; documents Windrose's travel result shape { speedMultiplier, label? }
+│   ├── weatherTravelRules.ts # Rule table: report → speed multiplier + reasons
+│   ├── weatherClassify.ts # Local classify/describe fallbacks for 0.3.x plugins
+│   ├── weatherVisuals.ts  # Report → region tint / badge
+│   ├── weatherRegionMenu.ts # Region context-menu zone binding
+│   ├── groundState.ts     # Snow cover / mud derivation (Windrose's, not the plugin's)
+│   └── sky/               # Animated Sky layer engine
 ├── assets/                # Icons, tileset operations, and the tile import/prediction pipeline (import*, *Predictor, tile*)
 ├── content-packs/         # Content pack browser/download/install/registry, DD pack import
 ├── persistence/           # Data I/O & vault interaction (fileOperations, saveCoordinator, schemaMigration, exportOperations, layerAccessor, fogOperations, subHexPath)
@@ -168,6 +182,7 @@ Non-source files live outside `src/`: `CHANGELOG.md` (read by the release workfl
 | Feature | Files |
 |---------|-------|
 | Beacon (party pin) | `objects/partyPinOperations.ts`, `objects/partyRangeQuery.ts`, `objects/partyRelatedNotes.ts`, `persistence/partyNoteOperations.ts`, `components/mapcanvas/PartyPinLayer.tsx` + `PartyPinInstance.tsx`, `components/overlays/PartyPin*.tsx`, `hooks/interactions/usePartyPin*.ts` |
+| Weather (U+13080 Weather plugin) | `weather/`, `context/WeatherContext.tsx` (WeatherProvider + `useWeatherStore()`, one per mounted map, mounted in `DungeonMapTracker.tsx`), `components/mapcanvas/WeatherLayer.tsx`, `components/settings/WeatherTab.tsx`, `types/integrations/wadjet.types.ts` (verbatim mirror of the plugin's `types/wadjet.d.ts` + a 0.3.x tolerance layer), `types/contexts/weather.types.ts` |
 | Travel and routes | `travel/` (packs, time, segment terrain sampler), `drawing/routeOperations.ts`, `components/mapcanvas/RouteLayer.tsx` + `MeasurementLayer.tsx`, `hooks/interactions/useTerrainSampling.ts`, `components/modals/SaveRouteModal.ts`, `settings/modals/TravelPackEditModal.ts` |
 | Openings (wall gaps) | `drawing/wallGapOperations.ts`, `drawing/wallEditGeometry.ts`, `components/mapcanvas/WallLayer.tsx`, `hooks/walls/` (`useWallTools.ts` state + handlers, `useWallOverlay.ts` overlay canvas, `useWallToolSurface.ts` drawer-footer controls) (walls/paths: `drawing/wallPath*.ts`, `geometry/renderers/wallPathRenderer.ts`) |
 | Full-pane view | `views/WindroseMapView.ts` |

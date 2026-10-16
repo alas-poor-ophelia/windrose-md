@@ -11,7 +11,7 @@ import type { LayerVisibility } from '#types/contexts/context.types';
 import type { VNode } from 'preact';
 import { Icon } from '../shared/Icon';
 import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
-import { useWeather } from '../../hooks/state/useWeather';
+import { useWeatherStore } from '../../context/WeatherContext';
 import { tooltipRef } from '../shared/obsidianTooltip';
 
 /** Fog of War tool identifiers */
@@ -30,7 +30,7 @@ interface LayerDef {
   icon: string;
   tooltip: string;
   hexOnly?: boolean;
-  /** Offered only while the weather plugin is usable and a region is bound to it */
+  /** Offered only while the weather plugin is usable and the map has weather */
   requiresWeather?: boolean;
 }
 
@@ -39,8 +39,6 @@ interface VisibilityToolbarProps {
   isOpen: boolean;
   layerVisibility: LayerVisibility;
   onToggleLayer: (layerId: keyof LayerVisibility) => void;
-  /** True when the map has a region bound to a weather zone */
-  hasWeatherRegions?: boolean;
   mapType: MapType;
   showFogTools?: boolean;
   onFogToolsToggle?: () => void;
@@ -56,7 +54,6 @@ const VisibilityToolbar = ({
   isOpen,
   layerVisibility,
   onToggleLayer,
-  hasWeatherRegions = false,
   mapType,
   showFogTools = false,
   onFogToolsToggle,
@@ -65,7 +62,9 @@ const VisibilityToolbar = ({
   onToggleViewLock
 }: VisibilityToolbarProps): VNode => {
   const featureFlags = useFeatureFlags();
-  const weatherAvailable = useWeather().available && hasWeatherRegions;
+  // Map has weather = a bound region or a map-level (or inherited) zone
+  const weather = useWeatherStore();
+  const weatherAvailable = weather.available && weather.areas.length > 0;
   const layers: LayerDef[] = [
     {
       id: 'grid',
@@ -109,7 +108,6 @@ const VisibilityToolbar = ({
       id: 'weather',
       icon: 'lucide-cloud-sun',
       tooltip: 'Toggle weather visibility',
-      hexOnly: true,
       requiresWeather: true
     }
   ];

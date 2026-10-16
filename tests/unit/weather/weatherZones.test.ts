@@ -10,6 +10,9 @@ import { describe, it, expect } from "vitest";
 
 import {
   buildCellZoneIndex,
+  buildMapZoneSnapshot,
+  zoneAtHex,
+  zoneOfRegion,
   collectBoundZoneIds,
   computeSegmentWeatherEffects,
   hasWeatherZone,
@@ -106,11 +109,12 @@ describe("weatherZones", () => {
       buildRegion("coast", [{ x: 2, y: 0 }, { x: 3, y: 0 }], { weatherZoneId: "ashfall" }),
     ]);
     const effectForZone = (zoneId: string) => (zoneId === "ashfall" ? SNOW : null);
+    const zoneAt = (x: number, y: number) => index.get(`${x},${y}`) ?? null;
 
     it("returns one effect per segment, aligned with the route", () => {
       const effects = computeSegmentWeatherEffects(
         [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 3, y: 0 }],
-        lineAlongX, index, effectForZone
+        lineAlongX, zoneAt, effectForZone
       );
       expect(effects).toHaveLength(2);
       // First segment (cells 0,1) never enters the region
@@ -121,22 +125,48 @@ describe("weatherZones", () => {
     });
 
     it("is empty for fewer than two points", () => {
-      expect(computeSegmentWeatherEffects([{ x: 0, y: 0 }], lineAlongX, index, effectForZone)).toEqual([]);
-      expect(computeSegmentWeatherEffects([], lineAlongX, index, effectForZone)).toEqual([]);
+      expect(computeSegmentWeatherEffects([{ x: 0, y: 0 }], lineAlongX, zoneAt, effectForZone)).toEqual([]);
+      expect(computeSegmentWeatherEffects([], lineAlongX, zoneAt, effectForZone)).toEqual([]);
     });
 
     it("treats a bound zone with no report as no weather", () => {
       const effects = computeSegmentWeatherEffects(
-        [{ x: 2, y: 0 }, { x: 3, y: 0 }], lineAlongX, index, () => null
+        [{ x: 2, y: 0 }, { x: 3, y: 0 }], lineAlongX, zoneAt, () => null
       );
       expect(effects).toEqual([{ multiplier: 1, reasons: [] }]);
     });
   });
 
+  describe("map zone snapshots", () => {
+    const snapshot = buildMapZoneSnapshot({
+      regions: [
+        buildRegion("coast", [{ x: 4, y: -2 }], { weatherZoneId: "ashfall" }),
+        buildRegion("plain", [{ x: 0, y: 0 }]),
+      ],
+      weatherZoneId: "greywold",
+    });
+
+    it("answers a bound hex with its region's zone, any other hex with the map-level zone", () => {
+      expect(zoneAtHex(snapshot, 4, -2)).toBe("ashfall");
+      expect(zoneAtHex(snapshot, 9, 9)).toBe("greywold");
+      expect(zoneAtHex(buildMapZoneSnapshot({ regions: [] }), 9, 9)).toBeNull();
+    });
+
+    it("answers a region with its zone, else the map-level zone", () => {
+      expect(zoneOfRegion(snapshot, "coast")).toBe("ashfall");
+      expect(zoneOfRegion(snapshot, "plain")).toBe("greywold");
+      expect(zoneOfRegion(buildMapZoneSnapshot(null), "plain")).toBeNull();
+    });
+
+    it("treats an empty map-level id as none", () => {
+      expect(buildMapZoneSnapshot({ weatherZoneId: "" }).mapZoneId).toBeNull();
+    });
+  });
+
   describe("mounted-map registry", () => {
-    const index = buildCellZoneIndex([
+    const index = buildMapZoneSnapshot({ regions: [
       buildRegion("coast", [{ x: 4, y: -2 }], { weatherZoneId: "ashfall" }),
-    ]);
+    ] });
 
     it("resolves a hex only while its map is published", () => {
       expect(resolveMountedHexZone("map-a", 4, -2)).toBeNull();
@@ -150,9 +180,9 @@ describe("weatherZones", () => {
 
     it("does not let a stale retraction remove a newer index", () => {
       const retractOld = publishMapZones("map-a", index);
-      const newer = buildCellZoneIndex([
+      const newer = buildMapZoneSnapshot({ regions: [
         buildRegion("coast", [{ x: 4, y: -2 }], { weatherZoneId: "greywold" }),
-      ]);
+      ] });
       const retractNew = publishMapZones("map-a", newer);
       retractOld();
       expect(resolveMountedHexZone("map-a", 4, -2)).toBe("greywold");
@@ -163,9 +193,9 @@ describe("weatherZones", () => {
       // An embed and a full pane of one map: closing the later one must not
       // take the earlier one's answers with it
       const retractEmbed = publishMapZones("map-a", index);
-      const retractPane = publishMapZones("map-a", buildCellZoneIndex([
+      const retractPane = publishMapZones("map-a", buildMapZoneSnapshot({ regions: [
         buildRegion("coast", [{ x: 4, y: -2 }], { weatherZoneId: "ashfall" }),
-      ]));
+      ] }));
       retractPane();
       expect(resolveMountedHexZone("map-a", 4, -2)).toBe("ashfall");
       retractEmbed();

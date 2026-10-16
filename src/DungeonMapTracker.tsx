@@ -42,7 +42,7 @@ import { useCustomEventHandlers } from './hooks/interactions/useCustomEventHandl
 import { useKeyboardShortcuts } from './hooks/interactions/useKeyboardShortcuts';
 import { usePlayerFogClear } from './hooks/interactions/usePlayerFogClear';
 import { useUILayout } from './hooks/state/useUILayout';
-import { hasWeatherZone } from './weather/weatherZones';
+import { WeatherProvider } from './context/WeatherContext';
 import { useFloatingPanels } from './hooks/state/useFloatingPanels';
 import { usePanelState } from './hooks/state/usePanelState';
 import { useViewControls } from './hooks/state/useViewControls';
@@ -216,12 +216,6 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     showVisibilityToolbar, setShowVisibilityToolbar,
     layerVisibility, handleToggleLayerVisibility
   } = useUILayout({ mapData, updateMapData, fullPane });
-
-  // The weather visibility toggle is offered only where it can do something
-  const hasWeatherRegions = useMemo(
-    () => (mapData?.regions ?? []).some(hasWeatherZone),
-    [mapData?.regions]
-  );
 
   // The MAIN map canvas is the first <canvas> under this container (fog
   // canvas renders after it) — same contract getCanvasSize relies on.
@@ -617,16 +611,17 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // One prop set per panel (STRUCT-A-02): every layout spreads the same bag.
   const bags = buildPanelBags({
     mapData, tool: toolState, layerHistory, data: dataHandlers, fog, tileBrush,
-    uiLayout: { layerVisibility, handleToggleLayerVisibility, isFocused }, hasWeatherRegions,
+    uiLayout: { layerVisibility, handleToggleLayerVisibility, isFocused },
     boards: boardHandlers, drawer: drawerState, flyouts, art: artHandlers, featureFlags,
     availableTilesets, getCachedImage, onEditLayer: setEditingLayerId, onLayerClone: handleCloneLayerRequest,
     onZoomIn: handleZoomIn, onZoomOut: handleZoomOut, onUndo: wrappedHandleUndo,
     onTileDepthChange: handleTileDepthChange, collapseTileBrowser, expandTileBrowser,
   });
 
-  // Main render
+  // Main render. WeatherProvider: the one weather store for this map
+  // instance (toolbars, panels, layers, measure tool, settings modal).
   return (
-    <>
+    <WeatherProvider mapId={mapId} rootMapData={rootMapData} subHexPath={subHexPath}>
       <div
         ref={containerRef}
         className={`windrose-container interactive-child${fullPane ? '' : ' windrose-container-block'}${pictureFrameActive ? ' windrose-picture-frame' : ''}`}
@@ -675,7 +670,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             paletteDocked={!isFloating('toolPalette')}
             onPopOutPalette={(pos) => toggleFloat('toolPalette', pos)}
             visibility={fullPane ? null : {
-              isOpen: showVisibilityToolbar, layerVisibility, onToggleLayer: handleToggleLayerVisibility, hasWeatherRegions,
+              isOpen: showVisibilityToolbar, layerVisibility, onToggleLayer: handleToggleLayerVisibility,
               mapType: mapData.mapType, showFogTools, onFogToolsToggle: handleFogToolsToggle,
               onTogglePictureFrame: handleTogglePictureFrame,
               viewLocked: rootMapData?.lockedViewState != null, onToggleViewLock: handleToggleViewLock,
@@ -872,6 +867,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           currentPreferences={mapData.uiPreferences}
           currentHexBounds={mapData.mapType === 'hex' ? mapData.hexBounds : null}
           currentObjectSetId={mapData.objectSetId}
+          currentWeather={{ weatherZoneId: mapData.weatherZoneId, weatherAnimate: mapData.weatherAnimate }}
           currentBackgroundImage={mapData.backgroundImage ?? null}
           currentCells={mapData.mapType === 'hex' ? getActiveLayer(mapData).cells : []}
           currentObjects={mapData.mapType === 'hex' ? getActiveLayer(mapData).objects : []}
@@ -916,7 +912,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             both code-block and full-pane paths (same component). */}
         {onboarding === 'pending' && <OnboardingSurvey />}
       </div>
-    </>
+    </WeatherProvider>
   );
 };
 

@@ -20,11 +20,12 @@ vi.mock('../../../../src/core/settingsAccessor', async (importOriginal) => {
 });
 vi.mock('../../../../src/components/shared/obsidianTooltip', () => ({ tooltipRef: () => () => {} }));
 vi.mock('../../../../src/components/shared/Icon', () => ({ Icon: () => null }));
-// The weather toggle subscribes to the weather plugin through app.workspace; these
-// harnesses mount with a bare App, so stand the weather plugin in as absent.
-vi.mock('../../../../src/hooks/state/useWeather', () => ({
-  useWeather: () => ({ available: false, dayOrdinal: null, units: 'metric', zones: [], reportFor: () => null, describe: () => null }),
-}));
+// The weather toggle reads the per-map weather store; these harnesses mount
+// without a WeatherProvider, so stand the weather plugin in as absent.
+vi.mock('../../../../src/context/WeatherContext', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/context/WeatherContext')>();
+  return { ...actual, useWeatherStore: () => actual.UNAVAILABLE_WEATHER_STORE };
+});
 
 import { StageToolbars } from '../../../../src/components/hosts/StageToolbars';
 import { DockViewPanel } from '../../../../src/components/panels/DockViewPanel';
