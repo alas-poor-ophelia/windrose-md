@@ -12,7 +12,8 @@ files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx)$' 
 [ -z "$files" ] && exit 0
 
 # shellcheck disable=SC2086
-echo "$files" | xargs npx eslint
+# -n keeps each eslint call under the Windows command-line limit (a 470-file merge hit it).
+echo "$files" | xargs -n 40 npx eslint
 status=$?
 if [ "$status" -ne 0 ]; then
   echo ""
