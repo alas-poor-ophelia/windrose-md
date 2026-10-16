@@ -10,6 +10,7 @@
  */
 
 import type { BundleState } from '../../assets/bundles/bundleRegistry';
+import type { BundleFolderResult } from '../../assets/bundles/bundleFolderInPlace';
 
 interface BundleStateLike {
   state: BundleState;
@@ -23,6 +24,8 @@ interface BundleBadgeCounts {
   tiles?: number;
   /** Shard files and their total size; null while unknown. */
   shards?: { count: number; bytes: number } | null;
+  /** A bundle write to this folder is running right now (isBundleWriteInProgress). */
+  writing?: boolean;
 }
 
 interface BundleNotice {
@@ -35,8 +38,8 @@ interface BundleNotice {
 
 const NOT_SYNCED_MESSAGE = "This pack's bundle files have not synced to this device. In Sync settings, turn on Sync all other types.";
 
-/** `index-missing` with the marker present: an import on this device stopped before its commit point. */
-const INCOMPLETE_MESSAGE = 'Tile bundle is incomplete (import did not finish). Import the pack again to complete it.';
+/** `index-missing` with the marker present: a bundle write on this device stopped before its commit point. */
+const INCOMPLETE_MESSAGE = 'Tile bundle is incomplete (bundling did not finish). Bundle the folder again, or re-import the pack, to complete it.';
 
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
@@ -50,6 +53,7 @@ function formatMegabytes(bytes: number): string {
 /** Short status line for one tileset folder. Null info = not looked at yet. */
 function formatBundleBadge(info: BundleStateLike | null, counts: BundleBadgeCounts = {}): string {
   if (info == null) return 'Checking folder…';
+  if (counts.writing === true && info.state === 'not-on-device' && info.reason === 'index-missing') return 'Bundling…';
   switch (info.state) {
     case 'loose':
       return counts.looseFiles == null ? 'Loose: counting files…' : `Loose: ${plural(counts.looseFiles, 'file', 'files')}`;
@@ -64,7 +68,7 @@ function formatBundleBadge(info: BundleStateLike | null, counts: BundleBadgeCoun
     }
     case 'not-on-device':
       if (info.reason === 'folder-absent') return 'Folder not found';
-      return info.reason === 'index-missing' ? 'Tile bundle is incomplete (import did not finish)' : 'Bundle not on this device yet';
+      return info.reason === 'index-missing' ? 'Tile bundle is incomplete (bundling did not finish)' : 'Bundle not on this device yet';
     case 'unmounted-corrupt':
       return `Bundle could not be loaded (${info.reason !== '' ? info.reason : 'corrupt index'})`;
     case 'unsupported-version':
@@ -73,8 +77,9 @@ function formatBundleBadge(info: BundleStateLike | null, counts: BundleBadgeCoun
 }
 
 /** True when the badge describes a problem the user should notice. */
-function isBundleBadgeProblem(info: BundleStateLike | null): boolean {
+function isBundleBadgeProblem(info: BundleStateLike | null, writing = false): boolean {
   if (info == null) return false;
+  if (writing && info.state === 'not-on-device' && info.reason === 'index-missing') return false;
   return info.state === 'unmounted-corrupt' || info.state === 'unsupported-version'
     || (info.state === 'not-on-device' && info.reason !== 'folder-absent');
 }
@@ -125,7 +130,33 @@ function shouldShowBundleNotice(opts: {
   return opts.scopedTileCount === 0 && !opts.filtersActive;
 }
 
+/** Confirm-modal question before "Bundle folder" (files = loose image count). */
+function bundleFolderConfirmMessage(files: number | null): string {
+  return `Bundle ${files == null ? 'the images in this folder' : plural(files, 'file', 'files')} into a few shard files? The images keep working exactly as before. ` +
+    'The loose files are moved to the trash only after every one has been read back byte-identical from the bundle.';
+}
+
+/** Completion sentence for a "Bundle folder" run (or its refusal). */
+function formatBundleFolderResult(result: BundleFolderResult): string {
+  if (result.status === 'refused') return result.message;
+  let text = `Bundled ${plural(result.bundled, 'tile', 'tiles')} in ${result.folder} into ` +
+    `${plural(result.shards, 'shard', 'shards')} (${formatMegabytes(result.bytes)}).`;
+  const skipped = result.skipped.length;
+  if (skipped > 0) text += ` Left out ${plural(skipped, 'file', 'files')} that could not be read (see developer console).`;
+  if (result.replaced > 0) text += ` Replaced ${plural(result.replaced, 'loose file', 'loose files')} with the bundle.`;
+  const kept = result.kept.length;
+  if (kept > 0) {
+    text += ` Kept ${plural(kept, 'loose file', 'loose files')} the bundle does not replace with identical bytes (see developer console).`;
+  }
+  if (result.keptPermanentDelete > 0) {
+    text += ` Kept ${plural(result.keptPermanentDelete, 'loose file', 'loose files')} because your trash setting deletes files permanently; ` +
+      'remove them yourself once the bundle looks right.';
+  }
+  return text;
+}
+
 export {
+  bundleFolderConfirmMessage, formatBundleFolderResult,
   formatBundleBadge, isBundleBadgeProblem, collectBundleNotices, shouldShowBundleNotice, formatMegabytes,
   NOT_SYNCED_MESSAGE, INCOMPLETE_MESSAGE,
 };

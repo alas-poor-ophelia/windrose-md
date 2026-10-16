@@ -1,5 +1,5 @@
 import type { SettingDefinitionItem, SettingGroupItem } from 'obsidian';
-import { Notice } from 'obsidian';
+import { Notice, Platform } from 'obsidian';
 import type { TravelPack } from '#types/settings/travelPack.types';
 import { BUILT_IN_COLORS } from '../core/settingsAccessor';
 import { isFeatureEnabled } from '../core/featureFlags';
@@ -21,9 +21,13 @@ import { TravelPackEditModal } from './modals/TravelPackEditModal';
 import { AddTilesModal } from './modals/AddTilesModal';
 import type { SettingsTabThis } from './tabs/settingsTabContext';
 import { scanTilesetFolder, isBundleFailureState, bundleFailureLabel } from '../assets/tilesetScan';
-import { entriesFor, getBundleStateInfo, subscribeBundleRegistry } from '../assets/bundles/bundleRegistry';
+import type { BundleState } from '../assets/bundles/bundleRegistry';
+import { entriesFor, getBundleStateInfo, isBundleWriteInProgress, subscribeBundleRegistry } from '../assets/bundles/bundleRegistry';
+import { bundleFolderInPlace } from '../assets/bundles/bundleFolderInPlace';
 import { SHARDS_DIR, SHARD_EXT } from '../assets/bundles/bundleFormat';
-import { formatBundleBadge, isBundleBadgeProblem } from './helpers/bundleStatus';
+import {
+  bundleFolderConfirmMessage, formatBundleBadge, formatBundleFolderResult, isBundleBadgeProblem,
+} from './helpers/bundleStatus';
 
 // settingDefinitionLists.ts
 // Declarative Settings API (Obsidian 1.13+) list sections: Color palette,
@@ -399,7 +403,19 @@ async function statBundleShards(tab: SettingsTabThis, folder: string): Promise<{
  * mount bumps the registry and a per-bump rescan would loop. Shard stats are
  * keyed on state + entry count, so unrelated bumps reuse them.
  */
-function attachBundleBadge(tab: SettingsTabThis, descEl: HTMLElement, initialFolder: string): { setFolder: (folder: string) => void; dispose: () => void } {
+interface BundleBadgeView {
+  folder: string;
+  state: BundleState | null;
+  reason?: string;
+  looseFiles: number | null;
+}
+
+function attachBundleBadge(
+  tab: SettingsTabThis,
+  descEl: HTMLElement,
+  initialFolder: string,
+  onUpdate?: (view: BundleBadgeView) => void,
+): { setFolder: (folder: string) => void; dispose: () => void } {
   const badgeEl = descEl.createDiv({ cls: 'windrose-tileset-bundle-badge' });
   let folder = normalizeFolder(initialFolder);
   let generation = 0;
@@ -411,7 +427,7 @@ function attachBundleBadge(tab: SettingsTabThis, descEl: HTMLElement, initialFol
 
   const refresh = (): void => {
     if (disposed) return;
-    if (folder === '') { badgeEl.setText(''); return; }
+    if (folder === '') { badgeEl.setText(''); onUpdate?.({ folder, state: null, reason: '', looseFiles: null }); return; }
     const info = getBundleStateInfo(folder);
     const gen = generation;
     if (!scanStarted && (info == null || info.state === 'loose')) {
@@ -436,8 +452,10 @@ function attachBundleBadge(tab: SettingsTabThis, descEl: HTMLElement, initialFol
         });
       }
     }
-    badgeEl.setText(formatBundleBadge(info, { looseFiles, tiles, shards }));
-    badgeEl.toggleClass('is-problem', isBundleBadgeProblem(info));
+    const writing = isBundleWriteInProgress(folder);
+    badgeEl.setText(formatBundleBadge(info, { looseFiles, tiles, shards, writing }));
+    badgeEl.toggleClass('is-problem', isBundleBadgeProblem(info, writing));
+    onUpdate?.({ folder, state: info?.state ?? null, reason: info?.reason ?? '', looseFiles });
   };
 
   const unsubscribe = subscribeBundleRegistry(refresh);
@@ -458,12 +476,74 @@ function attachBundleBadge(tab: SettingsTabThis, descEl: HTMLElement, initialFol
   };
 }
 
+/**
+ * "Bundle folder": confirm, bundle the loose folder in place with progress in
+ * a Notice, then report the counts. The badge refreshes from the registry
+ * bumps of the mount and remount.
+ */
+async function runBundleFolderAction(tab: SettingsTabThis, folder: string, files: number | null): Promise<void> {
+  const confirmed = await new ConfirmModal(tab.app, {
+    message: bundleFolderConfirmMessage(files),
+    confirmText: 'Bundle',
+    cancelText: 'Cancel',
+  }).openAndGetValue();
+  if (!confirmed) return;
+  const progress = new Notice(`Bundling ${folder}…`, 0);
+  try {
+    const result = await bundleFolderInPlace(tab.app, folder, {
+      onProgress: (done, total) => progress.setMessage(`Bundling ${folder}: ${done} of ${total} files…`),
+    });
+    progress.hide();
+    new Notice(formatBundleFolderResult(result), 10_000);
+  } catch (err) {
+    progress.hide();
+    console.error('[Windrose] Bundling the tile folder failed:', folder, err);
+    new Notice(`Bundling ${folder} failed: ${(err as Error)?.message ?? String(err)}`);
+  }
+}
+
 function tilesetFolderRow(tab: SettingsTabThis, folderPath: string, index: number): SettingGroupItem {
   return {
     name: `Tile folder ${index + 1}`,
     render: (setting) => {
       let detectTimer: number | undefined;
-      const badge = attachBundleBadge(tab, setting.descEl, folderPath);
+      // Desktop only: bundling holds a 4 MiB shard plus a full image in memory
+      // and rewrites the folder; mobile never shows the action.
+      let bundleBtn: HTMLButtonElement | null = null;
+      let view: BundleBadgeView = { folder: '', state: null, looseFiles: null };
+      let running = false;
+      const syncBundleButton = (): void => {
+        if (bundleBtn == null) return;
+        const writing = isBundleWriteInProgress(view.folder);
+        const offerLoose = view.folder !== '' && view.state === 'loose' && (view.looseFiles ?? 0) > 0;
+        // An interrupted run (marker and shards, no index) can be finished by running again.
+        const resume = view.folder !== '' && view.state === 'not-on-device' && view.reason === 'index-missing' && !writing;
+        bundleBtn.setText(resume ? 'Resume bundling' : 'Bundle folder');
+        bundleBtn.toggle(offerLoose || resume || running);
+        bundleBtn.disabled = running || writing;
+      };
+      const badge = attachBundleBadge(tab, setting.descEl, folderPath, next => {
+        view = next;
+        syncBundleButton();
+      });
+      if (Platform.isDesktopApp) {
+        setting.addButton(btn => {
+          bundleBtn = btn.buttonEl;
+          btn.setButtonText('Bundle folder')
+            .setTooltip('Store the images of this folder as a tile bundle in the same folder')
+            .onClick(() => {
+              if (running || view.folder === '') return;
+              if (view.looseFiles == null && view.reason !== 'index-missing') return;
+              running = true;
+              syncBundleButton();
+              void runBundleFolderAction(tab, view.folder, view.looseFiles).finally(() => {
+                running = false;
+                syncBundleButton();
+              });
+            });
+        });
+        syncBundleButton();
+      }
       setting.addSearch(search => {
         new FolderSuggest(tab.app, search.inputEl);
         search

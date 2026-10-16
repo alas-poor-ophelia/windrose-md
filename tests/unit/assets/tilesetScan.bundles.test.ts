@@ -118,7 +118,7 @@ describe('scanTilesetFolder with a tile bundle', () => {
     expect(notices).toEqual([]);
     endBundleWrite(FOLDER);
     await scanTilesetFolder(fv.app, FOLDER);
-    expect(notices).toEqual([`Tile bundle in ${FOLDER} is incomplete (import did not finish).`]);
+    expect(notices).toEqual([`Tile bundle in ${FOLDER} is incomplete (bundling did not finish).`]);
   });
 
   it('a folder with no bundle scans exactly as before', async () => {

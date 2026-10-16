@@ -168,7 +168,7 @@ export default class WindrosePlugin extends Plugin {
     });
     this.addCommand({
       id: 'bundle-tile-folder-dev',
-      name: 'Bundle tile folder to sibling (developer)',
+      name: 'Bundle tile folder in place (developer)',
       checkCallback: (checking) => {
         if (this.settings.developerMode !== true) return false;
         if (checking) return true;

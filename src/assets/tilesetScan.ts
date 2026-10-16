@@ -37,7 +37,7 @@ const STATE_LABELS: Partial<Record<BundleState, string>> = {
 };
 
 /** Label for `index-missing`: a marker and shards but no committed index (an import that did not finish). */
-const INCOMPLETE_LABEL = 'import did not finish';
+const INCOMPLETE_LABEL = 'bundling did not finish';
 
 /** Folders already told about a failed bundle this session. */
 const noticedBundleFailures = new Set<string>();

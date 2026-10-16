@@ -67,7 +67,7 @@ describe('collectBundleNotices', () => {
 describe('incomplete local import (index-missing)', () => {
   it('words index-missing as an unfinished import, not a Sync problem', () => {
     expect(formatBundleBadge({ state: 'not-on-device', reason: 'index-missing' }))
-      .toBe('Tile bundle is incomplete (import did not finish)');
+      .toBe('Tile bundle is incomplete (bundling did not finish)');
     expect(formatBundleBadge({ state: 'not-on-device', reason: 'no-index-no-shards' })).toBe('Bundle not on this device yet');
     const notices = collectBundleNotices(['P/half', 'P/sync'], f => (f === 'P/half'
       ? { state: 'not-on-device', reason: 'index-missing' }
@@ -76,7 +76,20 @@ describe('incomplete local import (index-missing)', () => {
       { folder: 'P/half', kind: 'failed', title: 'P/half', message: INCOMPLETE_MESSAGE },
       { folder: 'P/sync', kind: 'not-on-device', title: 'P/sync', message: NOT_SYNCED_MESSAGE },
     ]);
-    expect(INCOMPLETE_MESSAGE).toContain('Tile bundle is incomplete (import did not finish)');
+    expect(INCOMPLETE_MESSAGE).toContain('Tile bundle is incomplete (bundling did not finish)');
+  });
+});
+
+describe('in-progress bundling', () => {
+  const info = { state: 'not-on-device' as const, reason: 'index-missing' };
+  it('shows Bundling... and no problem while a write runs', () => {
+    expect(formatBundleBadge(info, { writing: true })).toBe('Bundling…');
+    expect(isBundleBadgeProblem(info, true)).toBe(false);
+    expect(isBundleBadgeProblem(info, false)).toBe(true);
+    expect(formatBundleBadge(info, { writing: false })).toBe('Tile bundle is incomplete (bundling did not finish)');
+  });
+  it('words the browser notice for a hand-registered folder', () => {
+    expect(INCOMPLETE_MESSAGE).toBe('Tile bundle is incomplete (bundling did not finish). Bundle the folder again, or re-import the pack, to complete it.');
   });
 });
 
