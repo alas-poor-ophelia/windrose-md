@@ -10946,3 +10946,45 @@ button.windrose-dock-settings-btn:hover {
  * animated components, by component-scoped `prefers-reduced-motion` rules. A
  * plugin must not ship a global `*` reset — it reaches into every note and other
  * plugins' UI. */
+/* ============================================
+   PHONE TOLERANCE
+   Windrose is designed for desktop and tablet; phones are best-effort. These
+   rules only keep every control reachable on a narrow screen (wrap or scroll
+   instead of clipping). They are scoped to Obsidian's body.is-phone class so
+   tablets and desktop are untouched. No layout redesign belongs here.
+   ============================================ */
+.is-phone {
+  /* Horizontal tool palette: wrap onto extra rows instead of running off the
+     right edge. Wrapping (not overflow-x scrolling) keeps the sub-tool flyouts,
+     which are absolutely positioned children, from being clipped. */
+}
+.is-phone .windrose-tool-palette:not(.windrose-tool-palette-vertical) {
+  flex-wrap: wrap;
+}
+.is-phone {
+  /* Insert dungeon modal: the 400px floor is wider than a phone screen. */
+}
+.is-phone .windrose-insert-dungeon-modal {
+  min-width: 0;
+  /* On phones Obsidian makes .modal-content a scrolling flex column. Sections
+     with overflow: hidden (the visualizer header, the Advanced options box)
+     get a zero automatic min-height there and are crushed to fit instead of
+     overflowing, so the modal never becomes scrollable. Keep them full size. */
+}
+.is-phone .windrose-insert-dungeon-modal > * {
+  flex-shrink: 0;
+}
+.is-phone {
+  /* Map settings modal: the 70vh content cap plus the wrapped tab bar and
+     Obsidian's stacked phone buttons leave the scrolling body ~180px tall.
+     The phone modal is already bounded by the screen, so drop the cap. */
+}
+.is-phone .windrose-settings-native-modal .modal-content {
+  max-height: none;
+}
+.is-phone {
+  /* Four style buttons in one row clip their label and swatches; go two by two. */
+}
+.is-phone .windrose-dungeon-style-btn {
+  flex-basis: calc(50% - 4px);
+}
