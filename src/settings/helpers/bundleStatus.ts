@@ -11,6 +11,9 @@
 
 import type { BundleState } from '../../assets/bundles/bundleRegistry';
 import type { BundleFolderResult } from '../../assets/bundles/bundleFolderInPlace';
+import type { CompactBundleResult } from '../../assets/bundles/bundleCompactExisting';
+import type { UnbundleResult } from '../../assets/bundles/bundleUnbundle';
+import type { BundleCleanupResult, BundleOrphan } from '../../assets/bundles/bundleCleanup';
 
 interface BundleStateLike {
   state: BundleState;
@@ -26,6 +29,8 @@ interface BundleBadgeCounts {
   shards?: { count: number; bytes: number } | null;
   /** A bundle write to this folder is running right now (isBundleWriteInProgress). */
   writing?: boolean;
+  /** Modes of the serving segments (getBundleModes); one exact or compact mode is named in the badge. */
+  modes?: readonly string[];
 }
 
 interface BundleNotice {
@@ -59,7 +64,9 @@ function formatBundleBadge(info: BundleStateLike | null, counts: BundleBadgeCoun
       return counts.looseFiles == null ? 'Loose: counting files…' : `Loose: ${plural(counts.looseFiles, 'file', 'files')}`;
     case 'mounted':
     case 'partial': {
-      let line = `Bundled: ${plural(counts.tiles ?? 0, 'tile', 'tiles')}`;
+      const mode = counts.modes?.length === 1 && (counts.modes[0] === 'exact' || counts.modes[0] === 'compact')
+        ? ` (${counts.modes[0]})` : '';
+      let line = `Bundled${mode}: ${plural(counts.tiles ?? 0, 'tile', 'tiles')}`;
       if (counts.shards != null) {
         line += ` in ${plural(counts.shards.count, 'shard', 'shards')}, ${formatMegabytes(counts.shards.bytes)}`;
       }
@@ -155,7 +162,86 @@ function formatBundleFolderResult(result: BundleFolderResult): string {
   return text;
 }
 
+/** Confirm-modal question before "Compact bundle". */
+function compactBundleConfirmMessage(folder: string): string {
+  return `Compact ${folder}? Large images are re-encoded as smaller WebP (small images stay exact). ` +
+    'This is one-way: the exact bytes are moved to the trash after the compact copy is verified. ' +
+    'Re-import the pack to get them back.';
+}
+
+/** Completion sentence for a "Compact bundle" run (or its refusal). */
+function formatCompactBundleResult(result: CompactBundleResult): string {
+  if (result.status !== 'done') return result.message;
+  const counts = `${plural(result.reencoded, 'image', 'images')} re-encoded, ${result.keptExact} kept exact`;
+  let text: string;
+  if (!result.retired) {
+    text = `Wrote a compact copy of ${result.folder} (${counts}), but kept the exact copy because ${result.keptReason}. ` +
+      'The exact copy still serves every tile (see developer console).';
+  } else {
+    const saved = Math.max(0, result.bytesBefore - result.bytesAfter);
+    text = `Compacted ${result.folder}: ${counts}, saved ${formatMegabytes(saved)} (now ${formatMegabytes(result.bytesAfter)}).`;
+  }
+  return result.message !== '' ? `${text} ${result.message}` : text;
+}
+
+/** Confirm-modal question before "Unbundle" (images = served entries). */
+function unbundleConfirmMessage(images: number, compact: boolean): string {
+  let text = `Write the ${plural(images, 'image', 'images')} of this bundle back as loose files and move the bundle files to the trash?`;
+  if (compact) text += ' This bundle is compact: the files will be the re-encoded copies, not the original pack images.';
+  return text;
+}
+
+/** Completion sentence for an "Unbundle" run (or its refusal). */
+function formatUnbundleResult(result: UnbundleResult): string {
+  if (result.status !== 'done') return result.message;
+  const written = `${plural(result.written, 'file', 'files')} written`;
+  let text: string;
+  if (result.retired) {
+    text = `Unbundled ${result.folder}: ${written}, bundle files moved to the trash.`;
+  } else if (result.keptPermanentDelete) {
+    text = `Unbundled ${result.folder}: ${written}. The bundle files were left in place because your trash setting deletes files permanently. ` +
+      "When the loose files look right, delete the folder's bundle.wrbundle file and its index, shards and thumbs folders.";
+  } else if (result.idMismatches.length > 0) {
+    text = `Unbundled ${result.folder}: ${written}. Kept the bundle: ` +
+      `${plural(result.idMismatches.length, 'tile', 'tiles')} would get different ids as loose files (see developer console).`;
+  } else {
+    text = `Unbundled ${result.folder}: ${written}, bundle files kept.`;
+  }
+  if (result.identical > 0) text += ` ${plural(result.identical, 'file was', 'files were')} already there with the same bytes.`;
+  if (result.conflicts.length > 0) text += ` Kept ${plural(result.conflicts.length, 'conflicting file', 'conflicting files')} (see developer console).`;
+  if (result.failed.length > 0) text += ` Could not export ${plural(result.failed.length, 'image', 'images')} (see developer console).`;
+  if (result.newSegment) text += ' New bundle files arrived during the run (sync); unbundle again to export them.';
+  if (result.trashFailed > 0) {
+    text += ` Could not move ${plural(result.trashFailed, 'bundle file', 'bundle files')} to the trash; the bundle still serves its tiles.`;
+  }
+  if (result.compact) text += ' The exported files are the re-encoded copies, not the original pack images.';
+  return text;
+}
+
+/** Confirm-modal question before "Clean up" (old = trashable, young = kept). */
+function cleanupConfirmMessage(old: readonly BundleOrphan[], young: readonly BundleOrphan[]): string {
+  const bytes = [...old, ...young].reduce((n, o) => n + o.size, 0);
+  let text = `Found ${plural(old.length + young.length, 'unused bundle file', 'unused bundle files')} (${formatMegabytes(bytes)}). ` +
+    'Move the ones older than 7 days to the trash?';
+  if (young.length > 0) text += ` ${young.length} of them ${young.length === 1 ? 'is' : 'are'} younger than 7 days and will be kept.`;
+  return text;
+}
+
+/** Completion sentence for a "Clean up" run. */
+function formatCleanupResult(result: BundleCleanupResult): string {
+  if (result.refused != null) return result.refused;
+  const bytes = result.trashed.reduce((n, o) => n + o.size, 0);
+  let text = `Cleaned up ${result.folder}: moved ${plural(result.trashed.length, 'unused bundle file', 'unused bundle files')} ` +
+    `(${formatMegabytes(bytes)}) to the trash.`;
+  if (result.keptYoung.length > 0) text += ` Kept ${plural(result.keptYoung.length, 'file', 'files')} younger than 7 days.`;
+  if (result.failed.length > 0) text += ` Could not move ${plural(result.failed.length, 'file', 'files')} (see developer console).`;
+  if (result.stopped === true) text += ' Stopped early because new bundle files arrived during the clean-up; run it again later.';
+  return text;
+}
+
 export {
+  unbundleConfirmMessage, formatUnbundleResult, cleanupConfirmMessage, formatCleanupResult,
+  compactBundleConfirmMessage, formatCompactBundleResult,
   bundleFolderConfirmMessage, formatBundleFolderResult,
   formatBundleBadge, isBundleBadgeProblem, collectBundleNotices, shouldShowBundleNotice, formatMegabytes,
   NOT_SYNCED_MESSAGE, INCOMPLETE_MESSAGE,

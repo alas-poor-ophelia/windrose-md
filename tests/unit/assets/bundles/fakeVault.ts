@@ -26,6 +26,10 @@ export interface FakeVault {
   trashFails: Set<string>;
   /** Values vault.getConfig returns (e.g. trashOption); set getConfig = false to drop the API. */
   config: Record<string, unknown>;
+  /** Per-path mtime / ctime adapter.stat reports (default 0 for both). */
+  times: Map<string, { mtime?: number; ctime?: number }>;
+  /** When true, vault.createBinary registers the new file as indexed at once (default false: like Obsidian, indexed later). */
+  indexOnCreate: boolean;
 }
 
 function parentsOf(path: string): string[] {
@@ -47,7 +51,7 @@ export function makeFakeVault(): FakeVault {
   const config: Record<string, unknown> = {};
   const fv = {
     files, folders, reads, indexed, inFlight, readDelayMs: 0, existsCalls, readHook: null, trashed, trashHook: null,
-    trashFails, config,
+    trashFails, config, times: new Map(), indexOnCreate: false,
   } as unknown as FakeVault;
   const toBuf = (u: Uint8Array): ArrayBuffer => u.slice().buffer;
   const exists = (p: string): boolean => files.has(p) || folders.has(p);
@@ -56,7 +60,8 @@ export function makeFakeVault(): FakeVault {
     exists: (p: string) => { existsCalls.push(p); return Promise.resolve(exists(p)); },
     stat: (p: string) => {
       const f = files.get(p);
-      if (f) return Promise.resolve({ type: 'file', size: f.byteLength, ctime: 0, mtime: 0 });
+      const t = fv.times.get(p);
+      if (f) return Promise.resolve({ type: 'file', size: f.byteLength, ctime: t?.ctime ?? 0, mtime: t?.mtime ?? 0 });
       return Promise.resolve(folders.has(p) ? { type: 'folder', size: 0, ctime: 0, mtime: 0 } : null);
     },
     remove: (p: string) => {
@@ -101,6 +106,7 @@ export function makeFakeVault(): FakeVault {
         if (!folders.has(parent)) return Promise.reject(new Error(`no folder ${parent}`));
       }
       files.set(p, new Uint8Array(data.slice(0)));
+      if (fv.indexOnCreate) indexed.add(p);
       return Promise.resolve();
     },
     createFolder: (p: string) => {

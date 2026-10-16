@@ -87,6 +87,47 @@ async function scanTilesetFolder(app: App, folderPath: string): Promise<TileEntr
   return [...(await scan)];
 }
 
+/** True when the scan accepts `path` as a tile image (by extension). */
+function isTileImagePath(path: string): boolean {
+  const dotIdx = path.lastIndexOf('.');
+  if (dotIdx < 0) return false;
+  return IMAGE_EXTENSIONS.has(path.slice(dotIdx + 1).toLowerCase());
+}
+
+/**
+ * Every loose tile image under `folder` (vault paths), in the scan's walk
+ * order: adapter.list per directory, subfolders queued LIFO, files in listing
+ * order, image extensions only. A folder that cannot be listed is skipped.
+ */
+async function listLooseImagePaths(app: App, folder: string): Promise<string[]> {
+  const out: string[] = [];
+  const queue = [folder];
+  while (queue.length > 0) {
+    const dir = queue.pop();
+    if (dir == null) continue;
+    let listing: { files: string[]; folders: string[] };
+    try {
+      listing = await app.vault.adapter.list(dir);
+    } catch {
+      continue; // folder may not exist
+    }
+    for (const sub of listing.folders) queue.push(sub);
+    for (const filePath of listing.files) if (isTileImagePath(filePath)) out.push(filePath);
+  }
+  return out;
+}
+
+/**
+ * Ids a plain loose scan (no bundle) mints for folder-relative paths given in
+ * walk order: relative path -> id, with the scan's fresh seen-set semantics.
+ */
+function mintIdsForLayout(relativePaths: readonly string[]): Map<string, string> {
+  const seenIds = new Set<string>();
+  const out = new Map<string, string>();
+  for (const rel of relativePaths) out.set(rel, mintTileId(rel, seenIds));
+  return out;
+}
+
 async function walkTilesetFolder(app: App, folderPath: string): Promise<TileEntry[]> {
   const normalizedFolder = folderPath.endsWith('/')
     ? folderPath.slice(0, -1)
@@ -128,41 +169,19 @@ async function walkTilesetFolder(app: App, folderPath: string): Promise<TileEntr
     }
   }
 
-  // Recursively collect image files via adapter.list (folder-scoped, not vault-wide)
-  const queue = [normalizedFolder];
-  while (queue.length > 0) {
-    const dir = queue.pop();
-    if (dir == null) continue;
-    let listing: { files: string[]; folders: string[] };
-    try {
-      listing = await app.vault.adapter.list(dir);
-    } catch {
-      continue; // folder may not exist
+  for (const filePath of await listLooseImagePaths(app, normalizedFolder)) {
+    const relativePath = filePath.slice(normalizedFolder.length + 1);
+    const { filename, category, tags } = categoryForRelativePath(relativePath);
+
+    const bundleIdx = bundleIndexByKey.get(relativePath);
+    if (bundleIdx != null) {
+      // Loose wins at the same key; keep the stored id (same path, same tile).
+      tiles[bundleIdx] = { id: tiles[bundleIdx].id, filename, vaultPath: filePath, category, tags };
+      continue;
     }
 
-    for (const sub of listing.folders) {
-      queue.push(sub);
-    }
-
-    for (const filePath of listing.files) {
-      const dotIdx = filePath.lastIndexOf('.');
-      if (dotIdx < 0) continue;
-      const ext = filePath.slice(dotIdx + 1).toLowerCase();
-      if (!IMAGE_EXTENSIONS.has(ext)) continue;
-
-      const relativePath = filePath.slice(normalizedFolder.length + 1);
-      const { filename, category, tags } = categoryForRelativePath(relativePath);
-
-      const bundleIdx = bundleIndexByKey.get(relativePath);
-      if (bundleIdx != null) {
-        // Loose wins at the same key; keep the stored id (same path, same tile).
-        tiles[bundleIdx] = { id: tiles[bundleIdx].id, filename, vaultPath: filePath, category, tags };
-        continue;
-      }
-
-      const id = mintTileId(relativePath, seenIds);
-      tiles.push({ id, filename, vaultPath: filePath, category, tags });
-    }
+    const id = mintTileId(relativePath, seenIds);
+    tiles.push({ id, filename, vaultPath: filePath, category, tags });
   }
 
   return tiles;
@@ -174,4 +193,7 @@ function _resetBundleNoticesForTests(): void {
   noticedDuplicateIds.clear();
 }
 
-export { scanTilesetFolder, categoryForRelativePath, isBundleFailureState, bundleFailureLabel, _resetBundleNoticesForTests };
+export {
+  scanTilesetFolder, categoryForRelativePath, isTileImagePath, listLooseImagePaths, mintIdsForLayout,
+  isBundleFailureState, bundleFailureLabel, _resetBundleNoticesForTests,
+};

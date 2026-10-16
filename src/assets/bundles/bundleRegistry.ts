@@ -21,6 +21,13 @@
  *   markLooseShadow(vaultPath) / isLooseShadowed(vaultPath)
  *       per-path "a loose file sits on top of this bundle entry" answers
  *       (tileBytes.ts); cleared for a folder's prefix whenever it (re|un)mounts.
+ *   getBundleSegments(folder): BundleSegmentInfo[]   (loaded segments of a serving folder; [] otherwise)
+ *   getBundleModes(folder): BundleMode[]             (distinct modes of the segments that win at least one key)
+ *   getBundleMarker(folder): BundleMarker | null
+ *   readSegmentEntryBytes(app, folder, segment, key, opts?)
+ *       one key resolved within ONE segment (no union, no runner-up fallback,
+ *       no negative cache or pending marks): the read-back a writer runs
+ *       before it retires the segments a new one supersedes.
  *   getBundleRegistryVersion(): number; subscribeBundleRegistry(cb): () => void
  *   _resetBundleRegistryForTests()
  *
@@ -120,6 +127,34 @@ export interface BundleBytes {
 
 type Candidate = ResolvedEntry & SegmentPrecedence;
 
+/** One loaded index segment, as getBundleSegments reports it. */
+export interface BundleSegmentInfo {
+  /** File stem (sha16). */
+  hash: string;
+  /** Vault path of the .wridx file. */
+  file: string;
+  mode: BundleMode;
+  createdAt: string;
+  /** Size of the index file in bytes. */
+  indexBytes: number;
+  /** Folder-relative keys the segment holds (sorted). */
+  keys: string[];
+  /** Main and thumb shard files the segment lists (vault paths, sizes from the index). */
+  files: Array<{ path: string; size: number }>;
+  /** True when the segment wins the union for at least one key. */
+  serving: boolean;
+}
+
+interface SegmentRecord {
+  hash: string;
+  file: string;
+  mode: BundleMode;
+  createdAt: string;
+  indexBytes: number;
+  files: Array<{ path: string; size: number }>;
+  entries: Map<string, Candidate>;
+}
+
 /** One index reference into a shard, checked against the shard's own table. */
 interface ShardRefCheck {
   key: string;
@@ -145,6 +180,8 @@ interface FolderRecord {
   negative: Map<string, BundleReadFailure>;
   /** Shard path -> every index reference into it (all segments). */
   shardRefs: Map<string, ShardRefCheck[]>;
+  /** Every good segment by file stem, with its own entries. */
+  segments: Map<string, SegmentRecord>;
 }
 
 // ===========================================
@@ -407,7 +444,7 @@ function newRecord(app: App, folder: string, token: number): FolderRecord {
   return {
     folder, app, token, state: 'loose', reason: '', marker: null,
     badSegments: [], entries: new Map(), runnerUps: new Map(), pending: new Set(),
-    badShards: new Map(), negative: new Map(), shardRefs: new Map(),
+    badShards: new Map(), negative: new Map(), shardRefs: new Map(), segments: new Map(),
   };
 }
 
@@ -476,8 +513,10 @@ async function buildRecord(app: App, folder: string, token: number): Promise<Fol
   for (const file of indexFiles) {
     const hash = stemOf(file);
     let seg;
+    let indexBytes = 0;
     try {
       const bytes = new Uint8Array(await app.vault.adapter.readBinary(file));
+      indexBytes = bytes.byteLength;
       if (hash !== await contentName(bytes)) {
         hashMismatches++;
         rec.badSegments.push(`${file}: index-hash-mismatch`);
@@ -490,6 +529,14 @@ async function buildRecord(app: App, folder: string, token: number): Promise<Fol
     }
     goodSegments++;
     const prec: SegmentPrecedence = { mode: seg.mode, createdAt: seg.createdAt, hash };
+    const segRec: SegmentRecord = {
+      hash, file, mode: seg.mode, createdAt: seg.createdAt, indexBytes, entries: new Map(),
+      files: [
+        ...seg.shards.map(s => ({ path: `${folder}/${SHARDS_DIR}/${s.name}`, size: s.size })),
+        ...(seg.thumbShards ?? []).map(s => ({ path: `${folder}/${THUMBS_DIR}/${s.name}`, size: s.size })),
+      ],
+    };
+    rec.segments.set(hash, segRec);
     for (const [key, e] of Object.entries(seg.entries)) {
       // decodeIndexSegment guarantees shard indexes are in range.
       const shard = seg.shards[e.shard];
@@ -510,6 +557,7 @@ async function buildRecord(app: App, folder: string, token: number): Promise<Fol
         main,
         thumb,
       };
+      segRec.entries.set(key, candidate);
       const current = rec.entries.get(key);
       if (!current || compareSegmentPrecedence(candidate, current) > 0) {
         if (current) rec.runnerUps.set(key, current);
@@ -524,6 +572,7 @@ async function buildRecord(app: App, folder: string, token: number): Promise<Fol
   if (goodSegments === 0) {
     rec.entries.clear();
     rec.runnerUps.clear();
+    rec.segments.clear();
     return done('unmounted-corrupt',
       hashMismatches === rec.badSegments.length ? 'index-hash-mismatch' : 'all index segments unreadable');
   }
@@ -657,6 +706,40 @@ export function entriesFor(folderIn: string): { state: BundleState; reason: stri
   return { state: rec.state, reason: rec.reason, entries };
 }
 
+function servingRecord(folderIn: string): FolderRecord | null {
+  const rec = _folders.get(normFolder(folderIn));
+  return rec && isServing(rec.state) ? rec : null;
+}
+
+/** Loaded segments of a serving folder (sorted by file); [] for every other state. */
+export function getBundleSegments(folderIn: string): BundleSegmentInfo[] {
+  const rec = servingRecord(folderIn);
+  if (!rec) return [];
+  const winners = new Set<string>();
+  for (const e of rec.entries.values()) winners.add(e.segment);
+  return [...rec.segments.values()]
+    .sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0))
+    .map(s => ({
+      hash: s.hash, file: s.file, mode: s.mode, createdAt: s.createdAt, indexBytes: s.indexBytes,
+      keys: [...s.entries.keys()].sort(), files: s.files.map(f => ({ ...f })), serving: winners.has(s.hash),
+    }));
+}
+
+/** Distinct modes of the segments that serve at least one key; [] when not serving. */
+export function getBundleModes(folderIn: string): BundleMode[] {
+  const rec = servingRecord(folderIn);
+  if (!rec) return [];
+  const modes = new Set<BundleMode>();
+  for (const e of rec.entries.values()) modes.add(e.mode);
+  return [...modes].sort();
+}
+
+/** The folder's parsed marker (a copy), or null when it has none or never mounted. */
+export function getBundleMarker(folderIn: string): BundleMarker | null {
+  const m = _folders.get(normFolder(folderIn))?.marker;
+  return m ? { ...m } : null;
+}
+
 function servingRecordFor(vaultPath: string): FolderRecord | null {
   let best: FolderRecord | null = null;
   for (const rec of _folders.values()) {
@@ -743,6 +826,30 @@ export async function readEntryBytes(
     return result;
   }
   const mime = thumb ? sniffImageMime(new Uint8Array(result.bytes)) ?? served.mime : served.mime;
+  return { ok: true, bytes: result.bytes, mime };
+}
+
+/**
+ * Read `key` as ONE segment stores it (main image, or thumb with
+ * `{ thumb: true }`). No union winner, no runner-up, and no negative-cache or
+ * pending writes: a failure here says only that this segment cannot serve the
+ * key. Shard loads share the cache and its size and table checks.
+ */
+export async function readSegmentEntryBytes(
+  app: App,
+  folderIn: string,
+  segment: string,
+  key: string,
+  opts: { thumb?: boolean } = {},
+): Promise<BundleBytes | BundleReadFailure> {
+  const rec = servingRecord(folderIn);
+  const entry = rec?.segments.get(segment)?.entries.get(key);
+  if (!rec || !entry) return fail('not-mounted', `segment ${segment} has no entry ${key}`);
+  const loc = opts.thumb === true ? entry.thumb : entry.main;
+  if (!loc) return fail('not-mounted', `segment ${segment} has no thumbnail for ${key}`);
+  const result = await readSlice(app, rec, loc);
+  if (!result.ok) return result;
+  const mime = opts.thumb === true ? sniffImageMime(new Uint8Array(result.bytes)) ?? entry.mime : entry.mime;
   return { ok: true, bytes: result.bytes, mime };
 }
 
