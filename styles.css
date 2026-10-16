@@ -10962,6 +10962,28 @@ button.windrose-dock-settings-btn:hover {
   flex-wrap: wrap;
 }
 .is-phone {
+  /* Block-mode tile drawer: as a 240px flex item it leaves the map a 40-70px
+     sliver while open. Cap its in-flow box at the folded ribbon width (46px,
+     BlockTileDrawer ribbonWidth; max-width beats the inline width) so the folded
+     layout is unchanged, and while open let the right-pinned 240px panel layer
+     spill left over the map instead of squeezing it. z-index clears
+     .windrose-controls (100). (No :has() here: the store scan rejects it.) */
+}
+.is-phone .windrose-canvas-wrapper > .windrose-tile-drawer {
+  max-width: 46px;
+  z-index: 101;
+}
+.is-phone .windrose-canvas-wrapper > .windrose-tile-drawer.is-open {
+  overflow: visible;
+}
+.is-phone .windrose-canvas-wrapper > .windrose-tile-drawer {
+  /* The drawer head is transparent by design (the folded spine shows through
+     it); over the map, the compass and canvas would show through too. */
+}
+.is-phone .windrose-canvas-wrapper > .windrose-tile-drawer.is-open .windrose-cd-head {
+  background: var(--windrose-bg-primary);
+}
+.is-phone {
   /* Insert dungeon modal: the 400px floor is wider than a phone screen. */
 }
 .is-phone .windrose-insert-dungeon-modal {

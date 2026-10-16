@@ -12,12 +12,13 @@
 
 import type { CSSProperties, VNode } from 'preact';
 import { Fragment } from 'preact';
-import { useMemo, useState } from 'preact/hooks';
+import { useMemo, useRef, useState } from 'preact/hooks';
 
 import { RA_ICONS, searchIcons } from '../../assets/rpgAwesomeIcons';
 import { ModalPortal } from '../modals/ModalPortal';
 import { Icon } from './Icon';
 import { tooltipRef } from './obsidianTooltip';
+import { clampPopoverLeft, popoverOpensAbove, usePopoverSize } from './popoverClamp';
 
 /** Props for IconPickerPopup */
 interface IconPickerPopupProps {
@@ -56,6 +57,8 @@ const IconPickerPopup = ({
   anchorRef
 }: IconPickerPopupProps): VNode | null => {
   const [query, setQuery] = useState('');
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const pickerSize = usePopoverSize(pickerRef, isOpen && portalled);
 
   const results = useMemo(() => {
     const trimmed = query.trim();
@@ -74,11 +77,13 @@ const IconPickerPopup = ({
   if (portalled && anchorRef?.current) {
     const rect = anchorRef.current.getBoundingClientRect();
     const gap = 8;
+    const win = anchorRef.current.ownerDocument.defaultView ?? window;
+    const above = popoverOpensAbove(position === 'above', rect.top, rect.bottom, pickerSize?.height ?? 0, gap, win.innerHeight);
     pickerStyle = {
       position: 'fixed',
-      left: `${rect.left}px`,
-      ...(position === 'above'
-        ? { bottom: `${(anchorRef.current.ownerDocument.defaultView ?? window).innerHeight - rect.top + gap}px` }
+      left: `${clampPopoverLeft(rect.left, pickerSize?.width ?? 0, win.innerWidth)}px`,
+      ...(above
+        ? { bottom: `${win.innerHeight - rect.top + gap}px` }
         : { top: `${rect.bottom + gap}px` }
       )
     };
@@ -95,6 +100,7 @@ const IconPickerPopup = ({
 
   const pickerEl = (
     <div
+      ref={pickerRef}
       className="windrose-icon-picker"
       style={pickerStyle}
       onClick={(e) => e.stopPropagation()}
