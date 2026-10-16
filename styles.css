@@ -4626,6 +4626,31 @@ button.windrose-sel-icon-btn,
   color: var(--windrose-bg-primary);
 }
 
+/* Ladder level picker popup (kgc.31): anchored under the selection toolbar's
+   Levels action. Chip look comes from .windrose-ladder-chip (_map-layers);
+   only the container and the multi-selection mixed state live here. */
+.windrose-level-picker {
+  position: absolute;
+  min-width: 150px;
+  transform: translateX(-50%);
+}
+.windrose-level-picker-title {
+  padding: 2px 4px 4px;
+  color: var(--windrose-text-primary);
+  font-size: 11px;
+  font-weight: 600;
+}
+.windrose-level-picker-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px;
+}
+.windrose-level-picker .windrose-ladder-chip.is-mixed {
+  border-style: dashed;
+  background: oklch(from var(--windrose-border-primary) l c h/0.12);
+}
+
 /* ==========================================================================
    Party Pin Controls (floating card shown with the party pin tool)
    Card shell/brackets come from .windrose-selection-card; this partial

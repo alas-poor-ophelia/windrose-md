@@ -187,6 +187,21 @@ function normalizeShapeOverlays(shapes: ShapeOverlay[]): void {
 }
 
 /**
+ * Normalise an element's explicit ladder rung set (kgc.31) in place: keep
+ * non-negative integers only, dedupe, sort; delete the key when it is not an
+ * array or nothing survives (absent = Auto, never an empty set).
+ */
+function sanitizeVisibleLevels(element: { visibleLevels?: unknown }): void {
+  if (!('visibleLevels' in element)) return;
+  const raw = element.visibleLevels;
+  const kept = Array.isArray(raw)
+    ? [...new Set(raw.filter((n): n is number => Number.isInteger(n) && (n as number) >= 0))].sort((a, b) => a - b)
+    : [];
+  if (kept.length === 0) delete element.visibleLevels;
+  else element.visibleLevels = kept;
+}
+
+/**
  * Defaults, crash filters, wall-gap sanitation and the two legacy-shape
  * upgrades for ONE layer (in place). Shared by the root and every sub-hex
  * level so they can no longer drift apart.
@@ -211,6 +226,9 @@ function sanitizeLayer(layer: MapLayer): void {
       delete legacy.layer;
     }
   }
+
+  for (const obj of layer.objects ?? []) sanitizeVisibleLevels(obj);
+  for (const label of layer.textLabels ?? []) sanitizeVisibleLevels(label);
 
   layer.wallPaths ??= [];
   layer.wallPaths = layer.wallPaths.filter(w => Array.isArray(w.vertices) && w.vertices.length >= 2 &&
@@ -395,6 +413,7 @@ export {
   migrateMapData,
   migrateOneMap,
   sanitizeLayer,
+  sanitizeVisibleLevels,
   sanitizeWallGaps,
   normalizeShapeOverlays,
   runSchemaMigrations,

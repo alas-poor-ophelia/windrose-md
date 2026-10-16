@@ -6,7 +6,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 import { migrateMapData, createNewMap } from '../../../src/persistence/fileOperations';
-import { migrations, runSchemaMigrations, detectSchemaVersion } from '../../../src/persistence/schemaMigration';
+import { migrations, runSchemaMigrations, detectSchemaVersion, sanitizeLayer } from '../../../src/persistence/schemaMigration';
 import { needsMigration, migrateToLayerSchema } from '../../../src/persistence/layerAccessor';
 import { SCHEMA_VERSION } from '../../../src/core/dmtConstants';
 import type { MapData, MapLayer } from '../../../types/core/map.types';
@@ -192,5 +192,28 @@ describe('migrateMapData reaches nested sub-hex maps (DATA-07)', () => {
       expect(m.shapeOverlays).toEqual([]);
       expect(m.savedRoutes).toEqual([]);
     }
+  });
+});
+
+describe('sanitizeLayer: visibleLevels (kgc.31)', () => {
+  it('keeps non-negative integers deduped and sorted, deletes empty or non-array sets', () => {
+    const layer = {
+      objects: [
+        { id: 'a', visibleLevels: [3, 1, 1, -2, 1.5, 'x', 0] },
+        { id: 'b', visibleLevels: [] },
+        { id: 'c', visibleLevels: 'all' },
+        { id: 'd' }
+      ],
+      textLabels: [{ id: 't', visibleLevels: [-1] }, { id: 'u', visibleLevels: [2] }]
+    } as unknown as MapLayer;
+    sanitizeLayer(layer);
+    const objs = layer.objects as unknown as Array<Record<string, unknown>>;
+    expect(objs[0].visibleLevels).toEqual([0, 1, 3]);
+    expect('visibleLevels' in objs[1]).toBe(false);
+    expect('visibleLevels' in objs[2]).toBe(false);
+    expect('visibleLevels' in objs[3]).toBe(false);
+    const labels = layer.textLabels as unknown as Array<Record<string, unknown>>;
+    expect('visibleLevels' in labels[0]).toBe(false);
+    expect(labels[1].visibleLevels).toEqual([2]);
   });
 });

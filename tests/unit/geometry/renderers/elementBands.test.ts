@@ -16,6 +16,9 @@ import {
   LABEL_FLOOR_PX,
   depthModeOf,
   groupByDepth,
+  elementVisibleAt,
+  effectiveVisibleLevels,
+  withLevelMembership,
   tilesByHomeForRung,
   overrideRungFor,
   objectVisible,
@@ -214,5 +217,44 @@ describe("floors and sizing", () => {
       }
     }
     expect(scaledSizeForRung(ladder, 0, 2)).toBe(hexRenderer.getScaledSize(root, 2));
+  });
+});
+
+describe("explicit visibleLevels (kgc.31)", () => {
+  it("absent = the Auto band, exactly as objectVisible / labelVisible", () => {
+    for (const home of [0, 1, 2, 3]) {
+      for (const mode of ["pop", "persist"] as DepthMode[]) {
+        for (let active = 0; active <= 3; active++) {
+          expect(elementVisibleAt({ homeLevel: home, depthMode: mode }, active, "object")).toBe(objectVisible(home, active, mode));
+          expect(elementVisibleAt({ homeLevel: home, depthMode: mode }, active, "label")).toBe(labelVisible(home, active, mode));
+        }
+      }
+    }
+  });
+
+  it("present = visible iff the active rung is in the set, overriding band and mode", () => {
+    const el = { homeLevel: 0, depthMode: "pop" as DepthMode, visibleLevels: [1, 3] };
+    expect([0, 1, 2, 3].map((l) => elementVisibleAt(el, l, "object"))).toEqual([false, true, false, true]);
+    expect([0, 1, 2, 3].map((l) => elementVisibleAt(el, l, "label"))).toEqual([false, true, false, true]);
+  });
+
+  it("groupByDepth splits members by their explicit set", () => {
+    const groups = groupByDepth([{ homeLevel: 1 }, { homeLevel: 1, visibleLevels: [1] }, { homeLevel: 1 }, { homeLevel: 1, visibleLevels: [1] }]);
+    expect(groups.map((g) => [g.levels, g.members.length])).toEqual([[undefined, 2], [[1], 2]]);
+  });
+
+  it("effective set seeds the picker from the Auto band; empty edits revert to Auto", () => {
+    expect(effectiveVisibleLevels({ homeLevel: 2, depthMode: "pop" }, 3, "object")).toEqual([1, 2]);
+    expect(effectiveVisibleLevels({ homeLevel: 2 }, 3, "label")).toEqual([0, 1, 2, 3]);
+    expect(withLevelMembership({ homeLevel: 2, depthMode: "pop" }, 1, false, 3, "object")).toEqual([2]);
+    expect(withLevelMembership({ homeLevel: 2, depthMode: "pop" }, 3, true, 3, "object")).toEqual([1, 2, 3]);
+    expect(withLevelMembership({ visibleLevels: [2] }, 2, false, 3, "object")).toBeUndefined();
+  });
+
+  it("size floors still apply to an explicitly visible element", () => {
+    // Home 0 object seen from rung 0 at a tiny zoom: in its set, but under the floor.
+    const zoom = 0.01;
+    expect(elementVisibleAt({ visibleLevels: [0] }, 0, "object")).toBe(true);
+    expect(objectRenderedPx(ladder, 0, zoom, 1)).toBeLessThan(OBJECT_FLOOR_PX);
   });
 });

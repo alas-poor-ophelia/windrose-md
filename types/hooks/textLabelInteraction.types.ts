@@ -111,6 +111,8 @@ export interface UseTextLabelInteractionResult {
   handleRotateClick: HandleRotateClick;
   /** Ladder maps: flips the selected label's depth mode (pop at the next rung / hold its size). */
   handleDepthModeToggle: HandleRotateClick;
+  /** Ladder level picker: set the selected label's explicit rungs (undefined = Auto). */
+  handleVisibleLevelsChange: (visibleLevels: number[] | undefined) => void;
   handleEditClick: HandleEditClick;
   handleCanvasDoubleClick: HandleCanvasDoubleClick;
 }

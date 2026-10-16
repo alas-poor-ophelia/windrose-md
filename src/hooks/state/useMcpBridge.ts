@@ -43,6 +43,7 @@ import { buildGapFlatten, clampGapToSegment, pointAtLength } from '../../drawing
 import { withTilePlaced, homeLevelFields } from '../../drawing/tilePlacementOps';
 import { resolveEditLevel, resolveViewportZoom } from './layerHistoryOps';
 import { placeObject as opsPlaceObject } from '../../objects/objectOperations';
+import { sanitizeVisibleLevels } from '../../persistence/schemaMigration';
 import { getResolvedObjectTypes } from '../../objects/objectTypeResolver';
 
 /**
@@ -423,7 +424,7 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
       listObjectTypes: (): Array<{ id: string; label: string; category: string }> =>
         getResolvedObjectTypes(S().mapData.mapType ?? 'grid', S().mapData.objectSetId)
           .map(t => ({ id: t.id, label: t.label, category: t.category })),
-      listObjects: (level?: number): Array<{ id: string; type: string; x: number; y: number; label?: string; level: number }> => {
+      listObjects: (level?: number): Array<{ id: string; type: string; x: number; y: number; label?: string; level: number; depthMode?: 'pop' | 'persist'; visibleLevels?: number[] }> => {
         const { mapData } = S();
         const activeLayer = getActiveLayer(mapData);
         if (activeLayer == null) return [];
@@ -436,9 +437,11 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
             y: o.position.y,
             label: o.label,
             level: o.homeLevel ?? 0,
+            ...(o.depthMode !== undefined ? { depthMode: o.depthMode } : {}),
+            ...(o.visibleLevels !== undefined ? { visibleLevels: o.visibleLevels } : {}),
           }));
       },
-      placeObject: (typeId: string, x: number, y: number, level: number = 0): { ok: boolean; objectId?: string; error?: string } => {
+      placeObject: (typeId: string, x: number, y: number, level: number = 0, visibleLevels?: number[]): { ok: boolean; objectId?: string; error?: string } => {
         const { mapData } = S();
         const activeLayer = getActiveLayer(mapData);
         if (activeLayer == null) return { ok: false, error: 'No active layer' };
@@ -451,8 +454,18 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
           homeLevel: level,
         });
         if (!result.success) return { ok: false, error: result.error };
-        S().handleObjectsChange(result.objects);
-        return { ok: true, objectId: result.object?.id };
+        let objects = result.objects;
+        const placedId = result.object?.id;
+        if (visibleLevels !== undefined && placedId !== undefined) {
+          // Same normalisation as load: integers >= 0, deduped, sorted; empty = Auto.
+          const levels: { visibleLevels?: unknown } = { visibleLevels };
+          sanitizeVisibleLevels(levels);
+          if (levels.visibleLevels !== undefined) {
+            objects = objects.map(o => (o.id === placedId ? { ...o, visibleLevels: levels.visibleLevels as number[] } : o));
+          }
+        }
+        S().handleObjectsChange(objects);
+        return { ok: true, objectId: placedId };
       },
       openDrawer: (pane: 'tiles' | 'objects' | 'layers' | 'colors' | 'regions' | 'view' | null): { ok: boolean; note?: string } => {
         if (pane === 'tiles' || pane === 'objects') {

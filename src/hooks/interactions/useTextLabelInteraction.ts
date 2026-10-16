@@ -371,6 +371,17 @@ const useTextLabelInteraction = (
   };
 
   /**
+   * Ladder level picker (kgc.31): write the label's explicit rung set
+   * (undefined = Auto, the home band).
+   */
+  const handleVisibleLevelsChange = (visibleLevels: number[] | undefined): void => {
+    if (!selectedItem || selectedItem.type !== 'text' || !selectedItem.data || !mapData) return;
+    const updatedLabels = updateTextLabel(getActiveLayer(mapData).textLabels, selectedItem.id, { visibleLevels });
+    onTextLabelsChange(updatedLabels);
+    setSelectedItem({ ...selectedItem, data: { ...selectedItem.data, visibleLevels } });
+  };
+
+  /**
    * Handle edit button click
    */
   const handleEditClick = (e?: Event): void => {
@@ -439,6 +450,7 @@ const useTextLabelInteraction = (
     handleTextCancel,
     handleRotateClick,
     handleDepthModeToggle,
+    handleVisibleLevelsChange,
     handleEditClick,
     handleCanvasDoubleClick
   };

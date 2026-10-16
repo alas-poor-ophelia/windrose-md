@@ -197,7 +197,7 @@ export function registerInteractTools(server: McpServer): void {
         : `var r=ops.listObjects(${level !== undefined ? level : ""});return JSON.stringify({objects:r,count:r.length});`;
       const result = await obsidianEvalJson<{
         catalog?: Array<{ id: string; label: string; category: string }>;
-        objects?: Array<{ id: string; type: string; x: number; y: number; label?: string; level: number }>;
+        objects?: Array<{ id: string; type: string; x: number; y: number; label?: string; level: number; depthMode?: "pop" | "persist"; visibleLevels?: number[] }>;
         count: number;
         error?: string;
       }>(opCall(body));
@@ -222,10 +222,12 @@ export function registerInteractTools(server: McpServer): void {
       x: z.number().describe("World X coordinate"),
       y: z.number().describe("World Y coordinate"),
       level: z.number().int().min(0).optional().describe("Ladder rung (default 0 = root). On a rung, coordinates are rung cell indices and must exist at that level"),
+      visibleLevels: z.array(z.number().int().min(0)).optional().describe("Ladder maps: explicit rungs the object is visible on (omit = Auto, the home band)"),
     },
-    async ({ typeId, x, y, level }) => {
+    async ({ typeId, x, y, level, visibleLevels }) => {
+      const levelsArg = visibleLevels !== undefined && visibleLevels.length > 0 ? `,${JSON.stringify(visibleLevels)}` : "";
       const body =
-        `var r=ops.placeObject(${jsStr(typeId)},${x},${y}${level ? `,${level}` : ""});` +
+        `var r=ops.placeObject(${jsStr(typeId)},${x},${y},${level ?? 0}${levelsArg});` +
         `return JSON.stringify(r);`;
       const result = await obsidianEvalJson<{ ok: boolean; objectId?: string; error?: string }>(opCall(body));
       if (result.error) {

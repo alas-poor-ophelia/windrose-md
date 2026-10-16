@@ -32,7 +32,7 @@ import { getFogSettings, clearFogCanvas, renderFog } from '../fog/fogRenderer';
 import { renderSelections, renderObjectSelections, renderTextLabelSelections } from './selectionRenderer';
 import { renderObjects } from './objectRenderer';
 import { renderTextLabels } from './textLabelRenderer';
-import { OBJECT_FLOOR_PX, LABEL_FLOOR_PX, groupByDepth, objectVisible, labelVisible, elementZoom, elementScale, objectRenderedPx, scaledSizeForRung } from './elementBands';
+import { OBJECT_FLOOR_PX, LABEL_FLOOR_PX, groupByDepth, groupVisibleAt, elementZoom, elementScale, objectRenderedPx, scaledSizeForRung } from './elementBands';
 import { createLatticeClipCache, drawLadderLattice } from './latticeRenderer';
 import type { LatticeClipCache } from './latticeRenderer';
 import type { GeometryLadder } from '../core/createGeometryLadder';
@@ -273,8 +273,9 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   if (ladder !== null && !showCoordinates) {
     if (visibility.objects && activeLayer.objects.length > 0) {
       const objectDeps = objectRenderDeps(mapData);
-      for (const { home, mode, members } of groupByDepth(activeLayer.objects)) {
-        if (!objectVisible(home, level, mode)) continue;
+      for (const group of groupByDepth(activeLayer.objects)) {
+        if (!groupVisibleAt(group, level, 'object')) continue;
+        const { home, mode, members } = group;
         // The floor judges each object's own rendered width, not the cell's.
         const objects = members.filter((o) => objectRenderedPx(ladder, home, zoom, o.size?.width ?? 1, mode) >= OBJECT_FLOOR_PX);
         if (objects.length === 0) continue;
@@ -290,8 +291,9 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       }
     }
     if (visibility.textLabels && activeLayer.textLabels.length > 0) {
-      for (const { home, mode, members } of groupByDepth(activeLayer.textLabels)) {
-        if (!labelVisible(home, level, mode)) continue;
+      for (const group of groupByDepth(activeLayer.textLabels)) {
+        if (!groupVisibleAt(group, level, 'label')) continue;
+        const { home, mode, members } = group;
         const fontZoom = elementZoom(ladder, home, zoom, mode);
         const labels = members.filter(label => label.fontSize * fontZoom >= LABEL_FLOOR_PX);
         if (labels.length === 0) continue;
@@ -353,8 +355,9 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
     // was drawn with. Hidden groups (pop mode below home) get no chrome.
     if (itemsArray.length > 0 && !showCoordinates) {
       if (visibility.textLabels !== false) {
-        for (const { home, mode, members } of groupByDepth(activeLayer.textLabels)) {
-          if (!labelVisible(home, level, mode)) continue;
+        for (const group of groupByDepth(activeLayer.textLabels)) {
+          if (!groupVisibleAt(group, level, 'label')) continue;
+          const { home, mode, members } = group;
           const fontZoom = elementZoom(ladder, home, zoom, mode);
           const labels = members.filter(label => label.fontSize * fontZoom >= LABEL_FLOOR_PX);
           if (labels.length === 0) continue;
@@ -362,8 +365,9 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
         }
       }
       if (visibility.objects !== false) {
-        for (const { home, mode, members } of groupByDepth(activeLayer.objects)) {
-          if (!objectVisible(home, level, mode)) continue;
+        for (const group of groupByDepth(activeLayer.objects)) {
+          if (!groupVisibleAt(group, level, 'object')) continue;
+          const { home, mode, members } = group;
           // Same floor as the draw pass: no chrome around an element that was not drawn.
           const ids = new Set(members.filter((o) => objectRenderedPx(ladder, home, zoom, o.size?.width ?? 1, mode) >= OBJECT_FLOOR_PX).map((o) => o.id));
           const items = itemsArray.filter((it) => it.type === 'object' && ids.has(it.id));

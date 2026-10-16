@@ -25,9 +25,10 @@ import {
   OBJECT_FLOOR_PX,
   depthModeOf,
   elementScale,
+  elementVisibleAt,
   groupByDepth,
+  groupVisibleAt,
   objectRenderedPx,
-  objectVisible,
   scaledSizeForRung
 } from '../geometry/renderers/elementBands';
 import { getObjectsInCell, getSlotOffset, getMultiObjectScale } from './hexSlotPositioner';
@@ -82,7 +83,7 @@ function indexedSlotDeps(objects: MapObject[]): SlotDeps {
 function ladderObjectFootprint(obj: MapObject, allObjects: MapObject[], view: LadderHitView, deps: SlotDeps = slotDeps): FootprintRect | null {
   const home = obj.homeLevel ?? 0;
   const mode = depthModeOf(obj);
-  if (!objectVisible(home, view.level, mode)) return null;
+  if (!elementVisibleAt(obj, view.level, 'object')) return null;
   if (objectRenderedPx(view.ladder, home, view.zoom, obj.size?.width ?? 1, mode) < OBJECT_FLOOR_PX) return null;
   return calculateObjectPosition(
     obj,
@@ -127,9 +128,9 @@ function pickLadderObject(objects: MapObject[], worldX: number, worldY: number, 
   const py = worldY * view.zoom;
   const deps = indexedSlotDeps(objects);
   let hit: MapObject | null = null;
-  for (const { home, mode, members } of groupByDepth(objects)) {
-    if (!objectVisible(home, view.level, mode)) continue;
-    for (const obj of members) {
+  for (const group of groupByDepth(objects)) {
+    if (!groupVisibleAt(group, view.level, 'object')) continue;
+    for (const obj of group.members) {
       const rect = ladderObjectFootprint(obj, objects, view, deps);
       if (rect !== null && rectContains(rect, px, py)) hit = obj;
     }

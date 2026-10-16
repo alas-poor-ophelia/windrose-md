@@ -37,7 +37,9 @@ import { buildObjectActions, buildMultiActions } from '../toolbars/selectionActi
 import { calculateObjectScreenPosition } from '../../objects/screenPositionUtils';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { convertObjectToFreeform, snapObjectToGrid } from '../../objects/objectOperations';
-import { toggledDepthMode } from '../../geometry/renderers/elementBands';
+import { toggledDepthMode, effectiveVisibleLevels, withLevelMembership } from '../../geometry/renderers/elementBands';
+import { LevelPickerPopup, levelPickerAnchor, chipStateOf } from '../overlays/LevelPickerPopup';
+import type { ChipState } from '../overlays/LevelPickerPopup';
 import { isLadderView } from '../../core/lodFlags';
 import { copyDeepLinkToClipboard } from '../../persistence/deepLinkHandler';
 import { LinkingModeBanner } from '../overlays/LinkingModeBanner';
@@ -134,7 +136,7 @@ const ObjectLayer = ({
   const freeformPlacementModeRef = useRef(freeformPlacementMode);
   freeformPlacementModeRef.current = freeformPlacementMode;
 
-  const { handleRotateAll, handleDuplicateAll, handleDeleteAll } = useMultiSelectionActions(onObjectsChange);
+  const { handleRotateAll, handleDuplicateAll, handleDeleteAll, handleSetVisibleLevelsAll } = useMultiSelectionActions(onObjectsChange);
 
   const handleCopyLink = useCallback(() => {
     if (!selectedItem || !mapData || mapId == null || mapId === '' || notePath == null || notePath === '') return;
@@ -300,6 +302,53 @@ const ObjectLayer = ({
     applyObjectUpdates({ depthMode: toggledDepthMode(obj) });
   };
 
+  // Ladder level picker (kgc.31): which rungs the selection is visible on.
+  // `key` ties the open popup to the selection it was opened for.
+  const [levelPicker, setLevelPicker] = useState<{ x: number; y: number; key: string } | null>(null);
+  const closeLevelPicker = useCallback(() => setLevelPicker(null), []);
+  const maxLevel = ladder?.params.maxLevel ?? 0;
+  const levelPickerKey = hasMultiSelection ? 'multi' : selectedItem?.type === 'object' ? `object:${selectedItem.id}` : null;
+  const openLevelPicker = (e?: Event): void => {
+    if (levelPickerKey === null) return;
+    e?.preventDefault();
+    e?.stopPropagation();
+    setLevelPicker({ ...levelPickerAnchor(e, containerRef.current), key: levelPickerKey });
+  };
+  /** The selected elements as stored now (selection data can lag a commit). */
+  const levelPickerElements = (): Array<{ el: MapObject | TextLabel; kind: 'object' | 'label' }> => {
+    if (!mapData) return [];
+    const layer = getActiveLayer(mapData);
+    const items = hasMultiSelection ? selectedItems : selectedItem != null ? [selectedItem] : [];
+    const out: Array<{ el: MapObject | TextLabel; kind: 'object' | 'label' }> = [];
+    for (const item of items) {
+      if (item.type === 'object') {
+        const el = layer.objects?.find((o: MapObject) => o.id === item.id);
+        if (el) out.push({ el, kind: 'object' });
+      } else if (item.type === 'text') {
+        const el = layer.textLabels?.find((l: TextLabel) => l.id === item.id);
+        if (el) out.push({ el, kind: 'label' });
+      }
+    }
+    return out;
+  };
+  const levelStateFor = (level: number): ChipState =>
+    chipStateOf(levelPickerElements().map(({ el, kind }) => effectiveVisibleLevels(el, maxLevel, kind).includes(level)));
+  const autoState = (): ChipState => chipStateOf(levelPickerElements().map(({ el }) => el.visibleLevels === undefined));
+  const handleLevelToggle = (level: number): void => {
+    const on = levelStateFor(level) !== 'on';
+    if (hasMultiSelection) {
+      handleSetVisibleLevelsAll({ kind: 'level', level, on }, maxLevel);
+      return;
+    }
+    const target = levelPickerElements()[0];
+    if (target?.kind !== 'object') return;
+    applyObjectUpdates({ visibleLevels: withLevelMembership(target.el, level, on, maxLevel, 'object') });
+  };
+  const handleLevelAuto = (): void => {
+    if (hasMultiSelection) handleSetVisibleLevelsAll({ kind: 'auto' }, maxLevel);
+    else applyObjectUpdates({ visibleLevels: undefined });
+  };
+
   // Single-object action handlers: shared by the selection toolbar and the
   // right-click menu (which reads them at click time).
   const objectActionHandlers: ObjectMenuHandlers = {
@@ -317,7 +366,8 @@ const ObjectLayer = ({
     onDelete: handleObjectDeletion,
     onPlayerToggle: handlePlayerToggle,
     onMeasureToggle: toggleMeasureMovement,
-    onDepthModeToggle: handleDepthModeToggle
+    onDepthModeToggle: handleDepthModeToggle,
+    onLevels: openLevelPicker
   };
 
   useObjectContextMenu({
@@ -411,8 +461,9 @@ const ObjectLayer = ({
           actions={buildMultiActions(selectionCount || selectedItems.length, {
             onRotateAll: handleRotateAll,
             onDuplicateAll: handleDuplicateAll,
-            onDeleteAll: handleDeleteAll
-          })}
+            onDeleteAll: handleDeleteAll,
+            onLevels: openLevelPicker
+          }, { isLadder: isLadderView(mapData), hasExplicitLevels: levelPickerElements().some(({ el }) => el.visibleLevels !== undefined) })}
           mapData={mapData}
           canvasRef={canvasRef}
           containerRef={containerRef}
@@ -461,6 +512,19 @@ const ObjectLayer = ({
           onLightColorPickerClose={() => setShowLightColorPicker(false)}
           lightColorButtonRef={lightColorBtnRef}
           distanceUnit={(() => { const s = mapData?.settings?.overrides ?? {}; const unit = s.distanceUnit as string | undefined; return unit != null && unit !== '' ? unit : 'ft'; })()}
+        />
+      )}
+
+      {levelPicker !== null && levelPicker.key === levelPickerKey && !isDraggingSelection && ladder !== null && (
+        <LevelPickerPopup
+          x={levelPicker.x}
+          y={levelPicker.y}
+          maxLevel={maxLevel}
+          autoState={autoState()}
+          levelState={levelStateFor}
+          onToggleLevel={handleLevelToggle}
+          onAuto={handleLevelAuto}
+          onClose={closeLevelPicker}
         />
       )}
 

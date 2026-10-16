@@ -17,6 +17,12 @@
  * Above the home rung (coarser camera) both modes behave alike: the element
  * shrinks by m per rung and drops out under its floor or its band edge.
  *
+ * Explicit levels (kgc.31): an element carrying `visibleLevels` (sorted unique
+ * rung indices) is visible on exactly those rungs, overriding the band and the
+ * depth mode; absent means "Auto", the band rule above. Size floors and holds
+ * still apply either way. Every per-element decision goes through
+ * `elementVisibleAt`.
+ *
  * Pure functions only: the renderer applies them per frame in its live pass.
  */
 
@@ -46,27 +52,68 @@ function toggledDepthMode(element: { depthMode?: DepthMode }): DepthMode {
 interface DepthGroup<T> {
   home: number;
   mode: DepthMode;
+  /** Explicit rung set shared by every member, or undefined for Auto. */
+  levels: readonly number[] | undefined;
   members: T[];
 }
 
+/** What a band decision needs from an element. */
+interface BandedElement {
+  homeLevel?: number;
+  depthMode?: DepthMode;
+  visibleLevels?: readonly number[];
+}
+
+type BandKind = 'object' | 'label';
+
 /**
- * Buckets elements by (home rung, depth mode): every member of a group is
+ * Buckets elements by (home rung, depth mode, explicit levels): every member of a group is
  * visible, sized and held identically, so the renderer draws one group per call.
  * Insertion order is preserved within a group; groups are ordered by the first
  * appearance of each key, so toggling an element's mode can change its stacking
  * against overlapping elements of another group.
  */
-function groupByDepth<T extends { homeLevel?: number; depthMode?: DepthMode }>(elements: readonly T[]): DepthGroup<T>[] {
+function groupByDepth<T extends BandedElement>(elements: readonly T[]): DepthGroup<T>[] {
   const groups = new Map<string, DepthGroup<T>>();
   for (const element of elements) {
     const home = element.homeLevel ?? 0;
     const mode = depthModeOf(element);
-    const key = `${home}:${mode}`;
+    const levels = element.visibleLevels;
+    const key = `${home}:${mode}:${levels === undefined ? 'auto' : levels.join(',')}`;
     const group = groups.get(key);
     if (group !== undefined) group.members.push(element);
-    else groups.set(key, { home, mode, members: [element] });
+    else groups.set(key, { home, mode, levels, members: [element] });
   }
   return [...groups.values()];
+}
+
+/**
+ * THE visibility decision for one object or text label on `activeLevel`: the
+ * explicit `visibleLevels` set when present, else the Auto band for its kind.
+ */
+function elementVisibleAt(element: BandedElement, activeLevel: number, kind: BandKind): boolean {
+  if (element.visibleLevels !== undefined) return element.visibleLevels.includes(activeLevel);
+  const home = element.homeLevel ?? 0;
+  const mode = depthModeOf(element);
+  return kind === 'label' ? labelVisible(home, activeLevel, mode) : objectVisible(home, activeLevel, mode);
+}
+
+/** A depth group's decision: its members share home, mode and level set. */
+function groupVisibleAt<T>(group: DepthGroup<T>, activeLevel: number, kind: BandKind): boolean {
+  return elementVisibleAt({ homeLevel: group.home, depthMode: group.mode, visibleLevels: group.levels }, activeLevel, kind);
+}
+
+/**
+ * The rungs 0..maxLevel an element shows on today: its explicit set, or the
+ * Auto band evaluated rung by rung. The level picker seeds its first edit from
+ * this, so leaving Auto starts from what is already visible.
+ */
+function effectiveVisibleLevels(element: BandedElement, maxLevel: number, kind: BandKind): number[] {
+  const out: number[] = [];
+  for (let level = 0; level <= maxLevel; level++) {
+    if (elementVisibleAt(element, level, kind)) out.push(level);
+  }
+  return out;
 }
 
 /** Objects appear one rung above their home; `pop` hides them past it, `persist` keeps them at every finer rung. */
@@ -79,6 +126,20 @@ function objectVisible(homeLevel: number, activeLevel: number, mode: DepthMode =
 function labelVisible(homeLevel: number, activeLevel: number, mode: DepthMode = DEFAULT_DEPTH_MODE): boolean {
   if (activeLevel < homeLevel - 2) return false;
   return mode === 'persist' || activeLevel <= homeLevel;
+}
+
+/**
+ * The `visibleLevels` a picker writes when rung `level` is switched `on` (or
+ * off) for `element`: the edit starts from the CURRENT effective set (Auto's
+ * band when the field is absent), and an emptied set reverts to Auto
+ * (undefined), so no element is ever stored invisible everywhere.
+ */
+function withLevelMembership(element: BandedElement, level: number, on: boolean, maxLevel: number, kind: BandKind): number[] | undefined {
+  const set = new Set(effectiveVisibleLevels(element, maxLevel, kind));
+  if (on) set.add(level);
+  else set.delete(level);
+  const next = [...set].sort((a, b) => a - b);
+  return next.length === 0 ? undefined : next;
 }
 
 /** Party pins are drawn at every level. */
@@ -160,7 +221,7 @@ function overrideRungFor(ladder: GeometryLadder, deepestAuthored: number, zoom: 
   return Math.max(0, Math.min(deepestAuthored, ladder.activeLevel(zoom)));
 }
 
-export type { DepthMode, DepthGroup };
+export type { DepthMode, DepthGroup, BandedElement, BandKind };
 export {
   DEFAULT_DEPTH_MODE,
   OBJECT_FLOOR_PX,
@@ -168,6 +229,10 @@ export {
   depthModeOf,
   toggledDepthMode,
   groupByDepth,
+  elementVisibleAt,
+  groupVisibleAt,
+  effectiveVisibleLevels,
+  withLevelMembership,
   tilesByHomeForRung,
   overrideRungFor,
   objectVisible,

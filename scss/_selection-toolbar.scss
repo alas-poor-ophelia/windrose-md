@@ -485,3 +485,31 @@
     }
   }
 }
+
+/* Ladder level picker popup (kgc.31): anchored under the selection toolbar's
+   Levels action. Chip look comes from .windrose-ladder-chip (_map-layers);
+   only the container and the multi-selection mixed state live here. */
+.windrose-level-picker {
+  position: absolute;
+  min-width: 150px;
+  transform: translateX(-50%);
+
+  &-title {
+    padding: 2px 4px 4px;
+    color: var(--windrose-text-primary);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  &-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 2px;
+  }
+
+  .windrose-ladder-chip.is-mixed {
+    border-style: dashed;
+    background: oklch(from var(--windrose-border-primary) l c h/0.12);
+  }
+}

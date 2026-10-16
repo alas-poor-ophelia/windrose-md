@@ -339,3 +339,15 @@ describe('classicHitRung: classic-branch index hit-tests on a lod map (cross-mod
     expect(getObjectAtPosition([at('deep', 2)], 3, -1, scope)).toBeNull();
   });
 });
+
+describe('explicit visibleLevels (kgc.31)', () => {
+  it('an object limited to rung 2 is not pickable at rung 1, though Auto would show it there', () => {
+    const zoomRung1 = 3; // between crossingZoom(1) and crossingZoom(2)
+    expect(view(zoomRung1).level).toBe(1);
+    const auto = obj({ id: 'auto', homeLevel: 2 });
+    const pinned = obj({ id: 'pinned', homeLevel: 2, visibleLevels: [2] });
+    expect(ladderObjectFootprint(auto, [auto], view(zoomRung1))).not.toBeNull();
+    expect(ladderObjectFootprint(pinned, [pinned], view(zoomRung1))).toBeNull();
+    expect(ladderObjectFootprint(pinned, [pinned], view(ZOOM_RUNG2))).not.toBeNull();
+  });
+});

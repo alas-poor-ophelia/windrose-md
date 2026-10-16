@@ -139,6 +139,12 @@ export interface MapObject {
    * size it had when the next rung activated.
    */
   depthMode?: 'pop' | 'persist';
+  /**
+   * Explicit ladder rungs this entity is visible on (sorted unique integers).
+   * Absent = Auto (the home band plus `depthMode`). Present overrides the band;
+   * the size floors still apply. Classic maps ignore it.
+   */
+  visibleLevels?: number[];
   type: ObjectTypeId;     // typeId reference
   position: Point;
   size: ObjectSize;

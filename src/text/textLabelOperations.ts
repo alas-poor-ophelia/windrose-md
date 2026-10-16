@@ -9,7 +9,7 @@
 import { mintId } from '../core/ids';
 import type { HexColor } from '#types/core/common.types';
 import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
-import { LABEL_FLOOR_PX, depthModeOf, elementScale, elementZoom, labelVisible } from '../geometry/renderers/elementBands';
+import { LABEL_FLOOR_PX, depthModeOf, elementScale, elementVisibleAt, elementZoom } from '../geometry/renderers/elementBands';
 import type { TextLabel, TextLabelId } from '#types/objects/note.types';
 import { updateById, removeById } from '../objects/entityList';
 
@@ -198,7 +198,7 @@ function getTextLabelAtPosition(
     if (view !== undefined && ladder !== null) {
       const home = label.homeLevel ?? 0;
       const mode = depthModeOf(label);
-      if (!labelVisible(home, view.activeLevel, mode)) continue;
+      if (!elementVisibleAt(label, view.activeLevel, 'label')) continue;
       if ((label.fontSize || 16) * elementZoom(ladder, home, view.zoom, mode) < LABEL_FLOOR_PX) continue;
       scale = elementScale(ladder, home, view.zoom, mode);
     }

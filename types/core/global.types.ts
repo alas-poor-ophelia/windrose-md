@@ -87,9 +87,9 @@ interface WindroseMcpOps {
   /** Resolved object types for the active map's type + object set. */
   listObjectTypes: () => Array<{ id: string; label: string; category: string }>;
   /** Objects on the active layer. */
-  listObjects: (level?: number) => Array<{ id: string; type: string; x: number; y: number; label?: string; level: number }>;
+  listObjects: (level?: number) => Array<{ id: string; type: string; x: number; y: number; label?: string; level: number; depthMode?: 'pop' | 'persist'; visibleLevels?: number[] }>;
   /** Place an object via the imperative placement API. */
-  placeObject: (typeId: string, x: number, y: number, level?: number) => { ok: boolean; objectId?: string; error?: string };
+  placeObject: (typeId: string, x: number, y: number, level?: number, visibleLevels?: number[]) => { ok: boolean; objectId?: string; error?: string };
   /** Open a drawer pane or edge-rail flyout; null closes the rail. */
   openDrawer: (pane: 'tiles' | 'objects' | 'layers' | 'colors' | 'regions' | 'view' | null) => { ok: boolean; note?: string };
   /** Computed gap skip-intervals + seated-art transforms for the active board's walls (G-F9). */
