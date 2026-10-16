@@ -27,6 +27,14 @@ node --experimental-strip-types --no-warnings run.ts --windrose C:/Dev/windrose 
 | `--out <dir>` | output dir (default `./out`) |
 | `--keep-open <ms>` | hold the window open after capture |
 | `--width/--height` | window size, default 1600x1000 (Obsidian adds ~16px frame insets) |
+| `--reduced-motion` | emulate `prefers-reduced-motion: reduce` before the note opens |
+| `--vault <dir>` | scratch vault path (must contain `scratch-vaults`; also `WEATHER_HARNESS_VAULT`); default `C:/Dev/scratch-vaults/windrose-weather`. Use a distinct one when two runs may overlap |
+| `--map-patch <file.json>` | `{ "<mapId>": { ...fields } }` shallow-merged into the seeded maps (e.g. a `measurementRoute`, a `viewState`); see `ribbon/map-patch.json` |
+| `--shot-selector <css>` | also capture the first matching element as `<out>/element.png` |
+
+Environment: `WADJET_DAY=<n>` sets the weather world's current day (fixture default 1; `HEX_NORTH=<deg>` rotates the hex demo map; 34 = rain in the highlands, 42 = snow in both regions, 52 = rain on the coast / grid map).
+
+Sky evals (`evals/`): `fullpane.js` / `fullpane-grid.js` open the hex / grid demo map full-pane with the side panels folded and return the Sky's frame stats (`canvas.windroseSky`); `pause-check.js` proves the embed's loop stops when its tab is hidden; `crop.py` tiles cropped frames side by side.
 
 The child Electron is always killed in `finally` (matched by its `--user-data-dir`).
 

@@ -671,3 +671,55 @@ button.windrose-breadcrumb-link {
   font-weight: 500;
   padding: 2px 4px;
 }
+
+/* ── Weather: wind on the compass ───────────────────────────────────────
+   Needle points downwind; the badge at its tail holds the Beaufort force. */
+body {
+  --windrose-wind-needle: oklch(0.84 0.09 225);
+  --windrose-wind-needle-casing: rgba(0, 0, 0, 0.8);
+  --windrose-wind-badge-bg: rgba(14, 26, 40, 0.92);
+}
+
+.windrose-compass-wind {
+  pointer-events: none;
+
+  &-casing {
+    stroke: var(--windrose-wind-needle-casing);
+    stroke-width: 3.6;
+    stroke-linecap: round;
+  }
+
+  &-shaft {
+    stroke: var(--windrose-wind-needle);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+  }
+
+  &-fletch {
+    fill: none;
+    stroke: var(--windrose-wind-needle);
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &-head {
+    fill: var(--windrose-wind-needle);
+    stroke: var(--windrose-wind-needle-casing);
+    stroke-width: 0.9;
+    stroke-linejoin: round;
+  }
+
+  &-badge {
+    fill: var(--windrose-wind-badge-bg);
+    stroke: var(--windrose-wind-needle);
+    stroke-width: 1.2;
+  }
+
+  &-force {
+    fill: #ffffff;
+    font-family: var(--font-interface, sans-serif);
+    font-size: 11px;
+    font-weight: 700;
+  }
+}

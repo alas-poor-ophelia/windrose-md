@@ -24,13 +24,16 @@ interface RegionPanelProps {
   isOpen?: boolean;
   /** Per-mount instance id — stamped into center-on-region events. */
   instanceId?: string;
+  /** Present while the Almanac is offered: opens it on a weather-bound region */
+  onOpenInAlmanac?: (regionId: string) => void;
 }
 
 const RegionPanel = ({
   regions,
   onRegionsChange,
   isOpen = false,
-  instanceId
+  instanceId,
+  onOpenInAlmanac
 }: RegionPanelProps): VNode | null => {
 
   const getDisplayName = (name: string): string => {
@@ -104,11 +107,20 @@ const RegionPanel = ({
           <span className="windrose-region-name">
             {getDisplayName(region.name)}
           </span>
-          {weatherLines.has(region.id) && (
+          {weatherLines.has(region.id) && (onOpenInAlmanac != null ? (
+            <button
+              className="windrose-region-visibility-btn windrose-region-almanac-btn"
+              onClick={(e: Event) => { e.stopPropagation(); onOpenInAlmanac(region.id); }}
+              ref={tooltipRef('Open in almanac')}
+              aria-label="Open in almanac"
+            >
+              <Icon icon="lucide-cloud-sun" size={12} />
+            </button>
+          ) : (
             <span className="windrose-region-weather-icon">
               <Icon icon="lucide-cloud-sun" size={12} />
             </span>
-          )}
+          ))}
           <button
             className="windrose-region-visibility-btn"
             onClick={(e: Event) => handleToggleVisibility(region.id, e)}

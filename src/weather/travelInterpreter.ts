@@ -19,6 +19,21 @@
  *   saying so. Results are plain JSON-serialisable objects.
  * - `label` names the reason(s) shown beside the travel time ("Heavy snow, Gale").
  *
+ * ## Options: ground state (also a Windrose convention)
+ *
+ * Windrose's weather store calls every travel interpreter, its own and any
+ * third party's, with `options.ground`: a GroundState (src/weather/groundState.ts)
+ * for the report's zone on the report's day, derived by Windrose from the
+ * previous 14 days of daily reports:
+ *
+ *     { snowDepthCm: number; mud: number (0..1); label: string; travelMultiplier: number }
+ *
+ * `ground.travelMultiplier` is a TIME factor (>= 1 slows). Windrose's rules
+ * turn it into a speed factor (1 / travelMultiplier) and multiply it with the
+ * weather's: "Heavy snow, deep snow cover". Ground effects under
+ * GROUND_MIN_EFFECT are ignored. Interpreters called without options (the
+ * weather plugin's code block, another plugin) see weather only.
+ *
  * Third-party interpreters selected in the "Weather travel rules" setting
  * are read defensively: a finite `speedMultiplier` is used; failing that, a
  * finite `multiplier` is ALSO read as a speed factor; anything else is
@@ -29,6 +44,7 @@
 import type { WadjetInterpretContext, WadjetInterpreter, WadjetWeatherReport } from '#types/integrations/wadjet.types';
 import type { WeatherTravelResult } from '#types/contexts/weather.types';
 import type { WeatherTravelEffect } from './weatherTravelRules';
+import type { GroundState } from './groundState';
 
 import { evaluateWeatherTravel } from './weatherTravelRules';
 
@@ -47,23 +63,65 @@ const MAX_TRAVEL_SPEED = 2;
 /** Windrose's "travel" facet result (see the file header) */
 type TravelInterpretation = WeatherTravelResult;
 
+/** Ground slowdowns (time factor) at or under 1 + this are treated as none */
+const GROUND_MIN_EFFECT = 0.02;
+
+/** How each ground label reads in a travel label (lower case, joined after the weather's) */
+const GROUND_PHRASES: Record<string, string> = {
+  'light snow': 'light snow cover',
+  'snow': 'snow cover',
+  'deep snow': 'deep snow cover',
+  'muddy': 'mud',
+  'waterlogged': 'waterlogged ground',
+};
+const SOFT_GROUND_PHRASE = 'soft ground';
+
 const NO_TRAVEL_EFFECT: TravelInterpretation = { speedMultiplier: 1 };
 
 function clampSpeed(value: number): number {
   return Math.min(MAX_TRAVEL_SPEED, Math.max(MIN_TRAVEL_SPEED, value));
 }
 
+/** Three decimals: stable JSON, no 0.30000000000000004 */
+function roundSpeed(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
+
+/** `options.ground` when it is a usable GroundState slowdown; null otherwise */
+function readGround(options: Record<string, unknown> | undefined): Pick<GroundState, 'label' | 'travelMultiplier'> | null {
+  const raw = options?.ground;
+  if (raw == null || typeof raw !== 'object') return null;
+  const record = raw as Record<string, unknown>;
+  const factor = record.travelMultiplier;
+  if (typeof factor !== 'number' || !Number.isFinite(factor) || factor <= 1 + GROUND_MIN_EFFECT) return null;
+  const label = typeof record.label === 'string' ? record.label : '';
+  return { label: label as GroundState['label'], travelMultiplier: factor };
+}
+
+function capitalize(text: string): string {
+  return text.length > 0 ? text[0].toUpperCase() + text.slice(1) : text;
+}
+
 /**
  * Windrose's own rules: the weather rule table (weatherTravelRules.ts)
- * expressed in the travel convention. `options` is reserved for derived
- * inputs (ground state) and ignored for now.
+ * expressed in the travel convention, combined with `options.ground` when
+ * present (see the file header).
  */
-function interpretTravelLocally(report: WadjetWeatherReport, _options?: Record<string, unknown>): TravelInterpretation {
+function interpretTravelLocally(report: WadjetWeatherReport, options?: Record<string, unknown>): TravelInterpretation {
   const effect = evaluateWeatherTravel(report);
-  if (effect.reasons.length === 0) return NO_TRAVEL_EFFECT;
+  const ground = readGround(options);
+  if (effect.reasons.length === 0 && ground == null) return NO_TRAVEL_EFFECT;
+
+  const parts = effect.reasons.map(reason => reason.label);
+  let speed = effect.reasons.length > 0 ? effect.multiplier : 1;
+  if (ground != null) {
+    speed *= 1 / ground.travelMultiplier;
+    const phrase = GROUND_PHRASES[ground.label] ?? SOFT_GROUND_PHRASE;
+    parts.push(parts.length === 0 ? capitalize(phrase) : phrase);
+  }
   return {
-    speedMultiplier: clampSpeed(effect.multiplier),
-    label: effect.reasons.map(reason => reason.label).join(', '),
+    speedMultiplier: roundSpeed(clampSpeed(speed)),
+    label: parts.join(', '),
   };
 }
 
@@ -111,7 +169,7 @@ const windroseTravelInterpreter: WadjetInterpreter<TravelInterpretation> = {
   id: WINDROSE_TRAVEL_INTERPRETER_ID,
   label: 'Windrose travel rules',
   facet: TRAVEL_FACET,
-  description: 'Travel speed from precipitation, wind, visibility and temperature. Result: { speedMultiplier, label }.',
+  description: 'Travel speed from precipitation, wind, visibility and temperature, plus snow cover and mud when given options.ground. Result: { speedMultiplier, label }.',
   interpret: (report: WadjetWeatherReport, ctx: WadjetInterpretContext) => interpretTravelLocally(report, ctx?.options),
   format: formatTravelInterpretation,
 };

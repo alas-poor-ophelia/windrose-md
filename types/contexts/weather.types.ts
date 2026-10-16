@@ -7,6 +7,7 @@
  */
 
 import type { WadjetClassification, WadjetReport, WadjetZoneSummary } from '#types/integrations/wadjet.types';
+import type { GroundState } from '../../src/weather/groundState';
 
 /** The view's position in time, independent of the weather plugin's calendar */
 export interface WeatherViewTime {
@@ -54,7 +55,8 @@ export interface WeatherStore {
   viewDay: number | null;
   /** Bound regions (topmost first) then the map-level area */
   areas: WeatherArea[];
-  areaAt(cell: { x: number; y: number }): WeatherArea | null;
+  /** A plain function (safe to pass detached) */
+  areaAt: (cell: { x: number; y: number }) => WeatherArea | null;
   /** Cached per (zone, day, hour); null when unavailable or unusable; never throws */
   report(zoneId: string, day: number, hour?: number | null): WadjetReport | null;
   /** Daily reports from..to inclusive, cached; [] when unavailable; never throws */
@@ -71,7 +73,17 @@ export interface WeatherStore {
   canAdvance: boolean;
   /** Move the world's date; false when refused or unsupported */
   advance(days: number): Promise<boolean>;
-  /** The selected "Weather travel rules" interpreter, falling back to Windrose's rules */
+  /**
+   * Windrose's derived ground state (snow cover, mud) for a zone on a day,
+   * from the 14 days of daily reports ending on it. Cached per (zone, day),
+   * cleared with the report cache; null when unavailable. Never throws.
+   */
+  ground(zoneId: string, day: number): GroundState | null;
+  /**
+   * The selected "Weather travel rules" interpreter, falling back to
+   * Windrose's rules. The interpreter's options carry `ground` (the
+   * report's zone and day) unless `ctx` supplies its own.
+   */
   interpretTravel(report: WadjetReport, ctx?: Record<string, unknown>): WeatherTravelResult;
   /** Bumps whenever anything above changes (use as a memo dependency) */
   version: number;

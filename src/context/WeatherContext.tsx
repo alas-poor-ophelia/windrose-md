@@ -48,6 +48,7 @@ const UNAVAILABLE_WEATHER_STORE: WeatherStore = {
   describe: describeLocally,
   canAdvance: false,
   advance: () => Promise.resolve(false),
+  ground: () => null,
   interpretTravel: (report, ctx) => interpretTravelLocally(report, ctx),
   version: 0,
 };
@@ -126,6 +127,7 @@ const WeatherProvider = ({ mapId, rootMapData, subHexPath, children }: WeatherPr
     formatDay: (day: number) => core.formatDay(day),
     describe: (report: WadjetReport) => core.describe(report),
     advance: (days: number) => core.advance(days),
+    ground: (zoneId: string, day: number) => core.ground(zoneId, day),
     interpretTravel: (report: WadjetReport, ctx?: Record<string, unknown>) => core.interpretTravel(report, ctx),
   }), [core]);
 
@@ -152,6 +154,7 @@ const WeatherProvider = ({ mapId, rootMapData, subHexPath, children }: WeatherPr
       describe: methods.describe,
       canAdvance: snapshot.canAdvance,
       advance: methods.advance,
+      ground: methods.ground,
       interpretTravel: methods.interpretTravel,
       version: versionRef.current,
     };

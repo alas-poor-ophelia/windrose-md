@@ -53,6 +53,41 @@ describe("interpretTravelLocally", () => {
   });
 });
 
+describe("interpretTravelLocally with options.ground", () => {
+  const deepSnow = { snowDepthCm: 60, mud: 0, label: "deep snow", travelMultiplier: 2 };
+  const heavySnow = buildReport({ precipitation: { type: "snow", amountMm: 20, intensity: 0.7 } });
+
+  it("multiplies the weather's speed by 1 / the ground's time factor and merges the labels", () => {
+    expect(interpretTravelLocally(heavySnow, { ground: deepSnow })).toEqual({ speedMultiplier: 0.25, label: "Heavy snow, deep snow cover" });
+  });
+
+  it("names the ground alone on a fair day", () => {
+    expect(interpretTravelLocally(dry, { ground: { snowDepthCm: 0, mud: 1, label: "waterlogged", travelMultiplier: 1.5 } }))
+      .toEqual({ speedMultiplier: 0.667, label: "Waterlogged ground" });
+    expect(interpretTravelLocally(dry, { ground: { snowDepthCm: 0, mud: 0.2, label: "bare", travelMultiplier: 1.1 } }))
+      .toEqual({ speedMultiplier: 0.909, label: "Soft ground" });
+  });
+
+  it("ignores bare or negligible ground and junk", () => {
+    expect(interpretTravelLocally(dry, { ground: { snowDepthCm: 0, mud: 0, label: "dry", travelMultiplier: 1 } })).toEqual({ speedMultiplier: 1 });
+    expect(interpretTravelLocally(dry, { ground: { label: "muddy", travelMultiplier: 1.01 } })).toEqual({ speedMultiplier: 1 });
+    expect(interpretTravelLocally(dry, { ground: { label: "muddy", travelMultiplier: Number.NaN } })).toEqual({ speedMultiplier: 1 });
+    expect(interpretTravelLocally(dry, { ground: "deep" })).toEqual({ speedMultiplier: 1 });
+  });
+
+  it("clamps the combined speed to the convention's floor", () => {
+    const blizzard = buildReport({ precipitation: { type: "snow", amountMm: 30, intensity: 0.8 }, wind: { speedKph: 110, directionDeg: 0 } });
+    const result = interpretTravelLocally(blizzard, { ground: deepSnow });
+    expect(result.speedMultiplier).toBeGreaterThanOrEqual(0.05);
+    expect(JSON.parse(JSON.stringify(result))).toEqual(result);
+  });
+
+  it("reaches the registered interpreter through ctx.options", () => {
+    const ctx = { zoneId: "coast", classification: classifyLocally(heavySnow), time: { dayOrdinal: 2, yearPhase: 0, yearLength: 365, source: "x" }, options: { ground: deepSnow } };
+    expect(windroseTravelInterpreter.interpret(heavySnow, ctx)).toEqual({ speedMultiplier: 0.25, label: "Heavy snow, deep snow cover" });
+  });
+});
+
 describe("normalizeTravelResult", () => {
   it("reads speedMultiplier, else multiplier, as a speed factor", () => {
     expect(normalizeTravelResult({ speedMultiplier: 0.5, label: "Mud" })).toEqual({ speedMultiplier: 0.5, label: "Mud" });

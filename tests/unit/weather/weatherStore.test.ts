@@ -12,7 +12,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import { WeatherStoreCore } from "../../../src/weather/weatherStore";
 import { windroseTravelInterpreter } from "../../../src/weather/travelInterpreter";
-import type { WadjetInterpreter } from "#types/integrations/wadjet.types";
+import type { WadjetInterpreter, WeatherReport } from "#types/integrations/wadjet.types";
 import { buildReport, createFakeApi, createFakeApiV1, createFakeApp } from "./fakeWadjet";
 
 /** Run scheduled work on demand */
@@ -25,9 +25,27 @@ function manualScheduler() {
   };
 }
 
-function setup(kind: "old" | "v1", options: { interpreterId?: string } = {}) {
+/** Every day of the fake's weather (reports and ranges) */
+function withDays(weather: ReturnType<typeof createFakeApi>, days: Partial<WeatherReport> | ((day: number) => Partial<WeatherReport>)) {
+  const at = (day: number) => typeof days === "function" ? days(day) : days;
+  weather.api.getReport = (zoneId, time) => buildReport({ zoneId, dayOrdinal: time?.dayOrdinal ?? 2, hour: time?.hour, ...at(time?.dayOrdinal ?? 2) });
+  weather.api.getRange = (zoneId, from, to) => {
+    const out: WeatherReport[] = [];
+    for (let d = from; d <= to; d++) out.push(buildReport({ zoneId, dayOrdinal: d, ...at(d) }));
+    return out;
+  };
+}
+
+const DRY_DAYS: Partial<WeatherReport> = {
+  precipitation: { type: "none", amountMm: 0, intensity: 0 },
+  temperature: { high: 18, low: 8, mean: 13 },
+  humidity: 0.5,
+};
+
+function setup(kind: "old" | "v1", options: { interpreterId?: string; days?: Partial<WeatherReport> | ((day: number) => Partial<WeatherReport>) } = {}) {
   const fake = createFakeApp();
   const weather = kind === "v1" ? createFakeApiV1() : createFakeApi();
+  if (options.days != null) withDays(weather, options.days);
   const getReport = vi.fn(weather.api.getReport);
   weather.api.getReport = getReport;
   fake.install(weather.api);
@@ -303,13 +321,13 @@ describe("WeatherStoreCore", () => {
     const snow = buildReport({ precipitation: { type: "snow", amountMm: 20, intensity: 0.7 } });
 
     it("runs Windrose's own rules locally by default (speed factor)", () => {
-      const { core } = setup("v1");
+      const { core } = setup("v1", { days: DRY_DAYS });
       expect(core.interpretTravel(snow)).toEqual({ speedMultiplier: 0.5, label: "Heavy snow" });
       expect(core.interpretTravel(buildReport({ precipitation: { type: "none", amountMm: 0, intensity: 0 } }))).toEqual({ speedMultiplier: 1 });
     });
 
     it("runs the selected third-party interpreter through the API", () => {
-      const { core, weather } = setup("v1", { interpreterId: "pf2e.travel" });
+      const { core, weather } = setup("v1", { interpreterId: "pf2e.travel", days: DRY_DAYS });
       weather.interpreters.push({
         id: "pf2e.travel", label: "Pathfinder", facet: "travel",
         interpret: () => ({ speedMultiplier: 0.25, label: "Blizzard" }),
@@ -318,7 +336,7 @@ describe("WeatherStoreCore", () => {
     });
 
     it("reads a third-party `multiplier` as a speed factor, and ignores junk", () => {
-      const { core, weather } = setup("v1", { interpreterId: "other.travel" });
+      const { core, weather } = setup("v1", { interpreterId: "other.travel", days: DRY_DAYS });
       const interpreter = { id: "other.travel", label: "Other", facet: "travel", interpret: (): unknown => ({ multiplier: 0.8 }) };
       weather.interpreters.push(interpreter as WadjetInterpreter);
       expect(core.interpretTravel(snow)).toEqual({ speedMultiplier: 0.8 });
@@ -327,18 +345,96 @@ describe("WeatherStoreCore", () => {
     });
 
     it("falls back to Windrose's rules for an unknown id, a throwing interpreter, or an old plugin", () => {
-      expect(setup("v1", { interpreterId: "missing.travel" }).core.interpretTravel(snow).speedMultiplier).toBe(0.5);
-      const { core, weather } = setup("v1", { interpreterId: "bad.travel" });
+      expect(setup("v1", { interpreterId: "missing.travel", days: DRY_DAYS }).core.interpretTravel(snow).speedMultiplier).toBe(0.5);
+      const { core, weather } = setup("v1", { interpreterId: "bad.travel", days: DRY_DAYS });
       weather.interpreters.push({ id: "bad.travel", label: "Bad", facet: "travel", interpret: () => { throw new Error("x"); } } as WadjetInterpreter);
       expect(core.interpretTravel(snow).speedMultiplier).toBe(0.5);
-      expect(setup("old", { interpreterId: "pf2e.travel" }).core.interpretTravel(snow).speedMultiplier).toBe(0.5);
+      expect(setup("old", { interpreterId: "pf2e.travel", days: DRY_DAYS }).core.interpretTravel(snow).speedMultiplier).toBe(0.5);
     });
 
     it("gives the same answer locally and through the registered windrose.travel", () => {
-      const { core, weather } = setup("v1");
+      const { core, weather } = setup("v1", { days: DRY_DAYS });
       weather.interpreters.push(windroseTravelInterpreter as WadjetInterpreter);
       const viaApi = weather.api.interpret?.("windrose.travel", snow as never);
       expect(viaApi).toEqual(core.interpretTravel(snow));
+    });
+
+    it("folds the zone's ground state into Windrose's rules", () => {
+      // Two weeks of cold heavy snow: deep snow cover on the report's day
+      const { core } = setup("v1", { days: { precipitation: { type: "snow", amountMm: 25, intensity: 0.8 }, temperature: { high: -4, low: -12, mean: -8 } } });
+      const ground = core.ground("coast", 2);
+      expect(ground?.label).toBe("deep snow");
+      const result = core.interpretTravel(snow);
+      expect(result.label).toBe("Heavy snow, deep snow cover");
+      expect(result.speedMultiplier).toBeCloseTo(0.5 / (ground?.travelMultiplier ?? 1), 3);
+      expect(JSON.parse(JSON.stringify(result))).toEqual(result);
+    });
+
+    it("passes the ground state to a third-party interpreter as options.ground, and a caller's ground wins", () => {
+      const { core, weather } = setup("v1", { interpreterId: "pf2e.travel", days: { precipitation: { type: "rain", amountMm: 30, intensity: 0.8 } } });
+      const seen: unknown[] = [];
+      weather.interpreters.push({
+        id: "pf2e.travel", label: "Pathfinder", facet: "travel",
+        interpret: (_report, ctx) => { seen.push(ctx.options?.ground); return { speedMultiplier: 0.9 }; },
+      } as WadjetInterpreter);
+      core.interpretTravel(snow);
+      expect(seen[0]).toEqual(core.ground("coast", 2));
+      expect((seen[0] as { label: string }).label).toBe("waterlogged");
+      const mine = { snowDepthCm: 0, mud: 0, label: "dry", travelMultiplier: 1 };
+      core.interpretTravel(snow, { ground: mine });
+      expect(seen[1]).toEqual(mine);
+    });
+
+    it("gives the same answer through the registered windrose.travel when handed the same ground", () => {
+      const { core, weather } = setup("v1", { days: { precipitation: { type: "rain", amountMm: 30, intensity: 0.8 } } });
+      weather.interpreters.push(windroseTravelInterpreter as WadjetInterpreter);
+      const viaApi = weather.api.interpret?.("windrose.travel", snow as never, { ground: core.ground("coast", 2) });
+      expect(viaApi).toEqual(core.interpretTravel(snow));
+    });
+  });
+
+  describe("ground", () => {
+    it("derives from the 14 days ending on the day, cached per (zone, day)", () => {
+      const { core, weather } = setup("v1", { days: DRY_DAYS });
+      const getRange = vi.fn(weather.api.getRange);
+      weather.api.getRange = getRange;
+      const a = core.ground("coast", 20);
+      expect(a).toMatchObject({ label: "dry", travelMultiplier: 1 });
+      expect(getRange).toHaveBeenCalledWith("coast", 7, 20);
+      expect(core.ground("coast", 20)).toBe(a);
+      expect(getRange).toHaveBeenCalledTimes(1);
+    });
+
+    it("sees snow fallen in the window and not before it", () => {
+      const snowUntil = (last: number) => (day: number) => day <= last
+        ? { precipitation: { type: "snow" as const, amountMm: 20, intensity: 0.8 }, temperature: { high: -5, low: -12, mean: -8 } }
+        : { precipitation: { type: "none" as const, amountMm: 0, intensity: 0 }, temperature: { high: -5, low: -12, mean: -8 } };
+      const { core } = setup("v1", { days: snowUntil(10) });
+      expect(core.ground("coast", 12)?.label).toBe("deep snow");
+      // Day 30's window starts on day 17: none of the snow is in it
+      expect(core.ground("coast", 30)?.snowDepthCm).toBe(0);
+    });
+
+    it("is cleared with the report cache", () => {
+      const { core, weather } = setup("v1", { days: DRY_DAYS });
+      const before = core.ground("coast", 5);
+      weather.emit("time-changed", { type: "time-changed", current: 3, adapterId: "x" });
+      expect(core.ground("coast", 5)).not.toBe(before);
+      const again = core.ground("coast", 5);
+      weather.emit("profiles-changed", { type: "profiles-changed", all: false, zoneIds: ["coast"] });
+      expect(core.ground("coast", 5)).not.toBe(again);
+    });
+
+    it("is null when unavailable, for bad days, or for a zone with no reports", () => {
+      const fake = createFakeApp();
+      const core = new WeatherStoreCore(fake.app);
+      core.start();
+      expect(core.ground("coast", 2)).toBeNull();
+      const { core: live, weather } = setup("v1");
+      expect(live.ground("coast", 2.5)).toBeNull();
+      weather.api.getRange = () => { throw new RangeError("Unknown zone"); };
+      weather.api.getReport = () => { throw new RangeError("Unknown zone"); };
+      expect(live.ground("gone", 2)).toBeNull();
     });
   });
 });

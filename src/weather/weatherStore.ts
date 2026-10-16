@@ -25,6 +25,7 @@ import type {
 } from '#types/integrations/wadjet.types';
 import type { WeatherTravelResult, WeatherViewTime } from '#types/contexts/weather.types';
 import type { WeatherChange } from './wadjetBridge';
+import type { GroundDay, GroundPrecipType, GroundState } from './groundState';
 
 import {
   advanceWeather,
@@ -45,6 +46,7 @@ import {
 } from './wadjetBridge';
 import { classifyLocally, describeLocally } from './weatherClassify';
 import { WINDROSE_TRAVEL_INTERPRETER_ID, interpretTravelLocally, normalizeTravelResult } from './travelInterpreter';
+import { deriveGroundState } from './groundState';
 
 /** The store's plain state; a new object after every change */
 interface WeatherStoreSnapshot {
@@ -67,6 +69,24 @@ interface WeatherStoreCoreOptions {
 
 const MAX_RANGE_SPAN_DAYS = 3660;
 const DAILY = 'd';
+/** Days of daily history (the target day included) ground state is derived from */
+const GROUND_HISTORY_DAYS = 14;
+
+const GROUND_PRECIP_TYPES: ReadonlySet<string> = new Set<GroundPrecipType>(['none', 'drizzle', 'rain', 'sleet', 'snow']);
+
+/** A daily report as one step of the ground-state model */
+function groundDayFromReport(report: WadjetWeatherReport): GroundDay {
+  const type = report.precipitation?.type;
+  return {
+    dayOrdinal: report.dayOrdinal,
+    precipType: typeof type === 'string' && GROUND_PRECIP_TYPES.has(type) ? type : 'none',
+    amountMm: report.precipitation?.amountMm ?? 0,
+    tempMeanC: report.temperature?.mean ?? Number.NaN,
+    tempHighC: report.temperature?.high ?? Number.NaN,
+    windKph: report.wind?.speedKph ?? 0,
+    humidity: report.humidity,
+  };
+}
 
 class WeatherStoreCore {
   private readonly app: App;
@@ -79,6 +99,8 @@ class WeatherStoreCore {
   private reports = new Map<string, Map<string, WadjetWeatherReport | null>>();
   /** zoneId → (from:to → reports) */
   private ranges = new Map<string, Map<string, WadjetWeatherReport[]>>();
+  /** zoneId → (day → derived ground state or null) */
+  private grounds = new Map<string, Map<number, GroundState | null>>();
   private dayLabels = new Map<number, string>();
   private classifications = new WeakMap<WadjetWeatherReport, WadjetClassification>();
   private glyphs = new WeakMap<WadjetWeatherReport, string | null>();
@@ -153,10 +175,12 @@ class WeatherStoreCore {
         if (change.zoneIds == null || this.snapshot.apiVersion < 1) {
           this.reports.clear();
           this.ranges.clear();
+          this.grounds.clear();
         } else {
           for (const zoneId of change.zoneIds) {
             this.reports.delete(zoneId);
             this.ranges.delete(zoneId);
+            this.grounds.delete(zoneId);
           }
         }
         this.update({ zones: listWeatherZones(this.api) });
@@ -199,6 +223,7 @@ class WeatherStoreCore {
   private clearCaches(): void {
     this.reports.clear();
     this.ranges.clear();
+    this.grounds.clear();
     this.dayLabels.clear();
     this.classifications = new WeakMap();
     this.glyphs = new WeakMap();
@@ -321,6 +346,28 @@ class WeatherStoreCore {
     return reports;
   }
 
+  /**
+   * Windrose's ground state (snow cover, mud) on `day`, derived from the
+   * zone's daily reports over the GROUND_HISTORY_DAYS days ending on it.
+   * Cached per (zone, day) and cleared with the report cache; null when
+   * the plugin is unavailable or the zone has no reports.
+   */
+  ground(zoneId: string, day: number): GroundState | null {
+    if (typeof zoneId !== 'string' || !Number.isInteger(day)) return null;
+    if (this.liveApi() == null) return null;
+    let zone = this.grounds.get(zoneId);
+    const cached = zone?.get(day);
+    if (cached !== undefined) return cached;
+    const history = this.range(zoneId, day - (GROUND_HISTORY_DAYS - 1), day);
+    const state = history.length > 0 ? deriveGroundState(history.map(groundDayFromReport)) : null;
+    if (zone == null) {
+      zone = new Map();
+      this.grounds.set(zoneId, zone);
+    }
+    zone.set(day, state);
+    return state;
+  }
+
   classify(report: WadjetWeatherReport): WadjetClassification {
     const cached = this.classifications.get(report);
     if (cached != null) return cached;
@@ -365,8 +412,18 @@ class WeatherStoreCore {
    * through api.interpret and falls back to Windrose's rules when the API
    * is old, the id is unknown, the interpreter throws, or its result has no
    * usable factor.
+   *
+   * Every interpreter receives the options `{ ground }`: the report's zone's
+   * ground state on its day (Windrose's convention; see travelInterpreter.ts).
+   * A caller's own `ground` in `ctx` wins.
    */
   interpretTravel(report: WadjetWeatherReport, ctx?: Record<string, unknown>): WeatherTravelResult {
+    const ground = this.ground(report.zoneId, report.dayOrdinal);
+    const options: Record<string, unknown> | undefined = ground != null ? { ground, ...ctx } : ctx;
+    return this.interpretWithOptions(report, options);
+  }
+
+  private interpretWithOptions(report: WadjetWeatherReport, ctx?: Record<string, unknown>): WeatherTravelResult {
     const id = this.getTravelInterpreterId();
     if (id !== '' && id !== WINDROSE_TRAVEL_INTERPRETER_ID) {
       const api = this.liveApi();

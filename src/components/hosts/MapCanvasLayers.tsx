@@ -1,6 +1,7 @@
 // MapCanvasLayers.tsx - The interaction/overlay layer children of MapCanvas
 // (drawing, freehand, objects, text, pins, fog, tiles, terrain brush, walls,
-// regions, outlines, shapes, Beacon, routes, measure, diagonal fill, reroll).
+// regions, outlines, shapes, weather and its Sky, Beacon, routes, measure,
+// diagonal fill, reroll).
 // Rendered as MapCanvas children; every layer reads the map through context.
 
 import type { VNode, ComponentProps } from 'preact';
@@ -171,6 +172,9 @@ const MapCanvasLayers = ({
 
       {/* WeatherLayer - weather over weather-bound regions (below the beacons) */}
       <MapCanvas.WeatherLayer visible={showWeather} />
+
+      {/* WeatherSkyLayer - animated Sky over the weather areas (same toggle; off when the map's "Animate weather" is off) */}
+      <MapCanvas.WeatherSkyLayer visible={showWeather} />
 
       {/* PartyPinLayer - party pin marker and range ring */}
       <MapCanvas.PartyPinLayer currentTool={currentTool} onPartyPinsChange={data.handlePartyPinsChange} />

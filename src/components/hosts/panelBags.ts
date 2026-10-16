@@ -11,6 +11,7 @@ import type { TileAssetBrowser } from '../panels/TileAssetBrowser';
 import type { ObjectSidebar } from '../panels/ObjectSidebar';
 import type { DrawerDock } from '../panels/DrawerDock';
 import type { ToolPalette } from '../toolbars/ToolPalette';
+import type { AlmanacPanelProps } from '../panels/AlmanacPanel';
 
 type TileAssetBrowserProps = ComponentProps<typeof TileAssetBrowser>;
 
@@ -30,6 +31,9 @@ type DrawerDockBag = Pick<
   | 'flyoutRecent' | 'flyoutStarred' | 'onFlyoutSelect' | 'pane' | 'onPane' | 'tilesEnabled'
 >;
 
+/** Almanac props shared by the rail and dock copies (`active` is added per host). */
+type AlmanacBag = Required<Pick<AlmanacPanelProps, 'areaId' | 'onAreaChange'>>;
+
 /** ToolPalette props shared by the docked and floating palettes. */
 type ToolPaletteBag = Omit<ComponentProps<typeof ToolPalette>, 'vertical' | 'dockButton'>;
 
@@ -42,6 +46,7 @@ interface PanelBags {
   objectsPane: ObjectsPaneBag;
   drawer: DrawerDockBag;
   toolPalette: ToolPaletteBag;
+  almanac: AlmanacBag;
 }
 
-export type { PanelBags, TileBrowserBag, ObjectsPaneBag, DrawerDockBag, ToolPaletteBag };
+export type { PanelBags, TileBrowserBag, ObjectsPaneBag, DrawerDockBag, ToolPaletteBag, AlmanacBag };

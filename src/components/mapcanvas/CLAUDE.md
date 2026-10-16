@@ -26,6 +26,8 @@ MapCanvas.tsx               # Providers (MapSelection, ObjectLinking, EventHandl
 ├── PartyPinInstance.tsx      # One Beacon: range query, ring overlay, controls card when selected
 ├── MeasurementLayer.tsx      # Measure tool, terrain picker, auto segment terrain (useTerrainSampling)
 ├── RouteLayer.tsx            # Saved measurement routes (SVG, always visible)
+├── WeatherLayer.tsx          # Weather tint, ground sheen and region badges per weather area (SVG, WeatherOverlay)
+├── WeatherSkyLayer.tsx       # Animated weather Sky (overlay canvas, own rAF loop; engine in weather/sky, clips in weather/skyClip.ts)
 ├── AreaSelectLayer.tsx       # Multi-select rectangle
 ├── HexCoordinateLayer.tsx    # Hex coordinates (hex only)
 ├── DiagonalFillOverlay.tsx   # Diagonal fill preview/handlers
@@ -55,7 +57,7 @@ Layers do NOT read `MapSettingsContext`: that provider exists only inside the pe
 ### Canvas Rendering
 
 - Committed content is drawn by `useCanvasRenderer` onto the main canvas; do not draw map content to it from layers.
-- Layers that need live feedback own a private overlay `<canvas>` through `useOverlayCanvas` (hooks/canvas): Freehand, TerrainBrush, Wall, Outline, Region. Do not hand-roll the create/size/remove lifecycle. `MapCanvas` also owns the fog blur canvas.
+- Layers that need live feedback own a private overlay `<canvas>` through `useOverlayCanvas` (hooks/canvas): Freehand, TerrainBrush, Wall, Outline, Region, WeatherSky. WeatherSky is the only layer with a continuous animation loop: it pauses when hidden, offscreen (IntersectionObserver) or in a hidden document, draws one still frame under reduced motion, and re-projects its clips only on view/fog/area changes. Do not hand-roll the create/size/remove lifecycle. `MapCanvas` also owns the fog blur canvas.
 - Pan/zoom goes through `useViewController` (live state off the Preact path; commit at gesture end), driven by `usePanZoomCoordinator`. Anything positioned in screen space must follow live ticks: `useLiveOverlayRedraw` for overlay canvases, `useLiveOverlayTransform` for SVG groups (RouteLayer, MeasurementOverlay, PartyPinOverlay). See "Live Pan/Zoom" in `hooks/CLAUDE.md`.
 
 ## Context Dependencies

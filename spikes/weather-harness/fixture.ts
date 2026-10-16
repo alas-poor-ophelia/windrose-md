@@ -9,11 +9,30 @@ export const WEATHER_ZONE_B = "ashfall-coast";
 
 type Cell = { q: number; r: number; color: string };
 
+/** Weather day the scratch world starts on (env WADJET_DAY overrides) */
+export const WADJET_DAY = Number(process.env.WADJET_DAY ?? "1");
+
+/**
+ * The Wadjet data fixture, patched for the harness: current generator
+ * version (no "generator was updated" toast) and the chosen current day.
+ */
+export function patchWadjetData(data: Record<string, unknown>): Record<string, unknown> {
+  return { ...data, generatorVersion: "wadjet-gen/0.0.3", currentDayOrdinal: WADJET_DAY };
+}
+
+/** Fogged hexes (offset col,row): a patch inside the highlands and one on the coast */
+function hexFog() {
+  const cells: { col: number; row: number }[] = [];
+  for (let col = 2; col <= 4; col++) for (let row = 4; row <= 7; row++) cells.push({ col, row });
+  for (let col = 16; col <= 17; col++) for (let row = 9; row <= 12; row++) cells.push({ col, row });
+  return { enabled: true, foggedCells: cells, texture: null };
+}
+
 const hexMap = (cells: Cell[], regions: unknown[]) => ({
   name: "Weather Demo",
   description: "",
   mapType: "hex",
-  northDirection: 0,
+  northDirection: Number(process.env.HEX_NORTH ?? "0"),
   customColors: [],
   sidebarCollapsed: false,
   expandedState: false,
@@ -24,12 +43,12 @@ const hexMap = (cells: Cell[], regions: unknown[]) => ({
   activeLayerId: "hex-layer-1",
   layerPanelVisible: false,
   layers: [
-    { id: "hex-layer-1", name: "Layer 1", order: 0, visible: true, cells, curves: [], edges: [], objects: [], textLabels: [], fogOfWar: null },
+    { id: "hex-layer-1", name: "Layer 1", order: 0, visible: true, cells, curves: [], edges: [], objects: [], textLabels: [], fogOfWar: hexFog() },
   ],
   hexSize: 16,
   hexBounds: { maxCol: 30, maxRow: 20 },
   dimensions: { width: 300, height: 300 },
-  viewState: { zoom: 1, center: { x: 280, y: 200 } },
+  viewState: { zoom: 1.1, center: { x: 276, y: 367 } },
   regions,
   objects: [],
   textLabels: [],
@@ -86,11 +105,16 @@ export function buildGridMap() {
     activeLayerId: "grid-layer-1",
     layerPanelVisible: false,
     layers: [
-      { id: "grid-layer-1", name: "Layer 1", order: 0, visible: true, cells, curves: [], edges: [], objects: [], textLabels: [], fogOfWar: null },
+      {
+        id: "grid-layer-1", name: "Layer 1", order: 0, visible: true, cells, curves: [], edges: [], objects: [], textLabels: [],
+        fogOfWar: { enabled: true, foggedCells: [{ col: 6, row: 4 }, { col: 7, row: 4 }, { col: 6, row: 5 }, { col: 7, row: 5 }, { col: 8, row: 5 }], texture: null },
+      },
     ],
     gridSize: 32,
     dimensions: { width: 16, height: 12 },
-    viewState: { zoom: 1, center: { x: 256, y: 192 } },
+    viewState: { zoom: 1, center: { x: 8, y: 6 } },
+    // Whole-map weather; a few fogged cells in the middle
+    weatherZoneId: WEATHER_ZONE_B,
     objects: [],
     textLabels: [],
     edges: [],

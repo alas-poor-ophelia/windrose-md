@@ -42,6 +42,9 @@ interface PanelBagSources {
   onTileDepthChange: (depth: TileLayerRole) => void;
   collapseTileBrowser: () => void;
   expandTileBrowser: () => void;
+  /** Almanac's selected weather area (null = its default) */
+  almanacAreaId: string | null;
+  onAlmanacAreaChange: (areaId: string) => void;
 }
 
 function buildPanelBags(src: PanelBagSources): PanelBags {
@@ -176,6 +179,10 @@ function buildPanelBags(src: PanelBagSources): PanelBags {
       mapType: mapData.mapType,
       isFocused: uiLayout.isFocused,
       fogArmed: fog.fogActiveTool != null,
+    },
+    almanac: {
+      areaId: src.almanacAreaId,
+      onAreaChange: src.onAlmanacAreaChange,
     },
   };
 }

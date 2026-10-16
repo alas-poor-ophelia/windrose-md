@@ -5372,6 +5372,204 @@ button.windrose-sel-icon-btn,
   color: var(--windrose-text-primary);
 }
 
+/* ==========================================================================
+   Forecast walk: weather delta, itinerary, departure window (measure card)
+   ========================================================================== */
+.windrose-measure-controls-travel-delta {
+  font-size: 10px;
+  white-space: nowrap;
+  color: oklch(78% 0.07 235deg);
+}
+
+.windrose-measure-itinerary {
+  display: grid;
+  gap: 2px;
+  max-width: 340px;
+  max-height: 172px;
+  margin-top: 2px;
+  padding: 4px 2px 0;
+  overflow-y: auto;
+  border-top: 1px dashed oklch(from var(--windrose-border-primary) l c h/0.25);
+  overscroll-behavior: contain;
+}
+.windrose-measure-itinerary-caption {
+  font-size: 10px;
+  opacity: 0.6;
+}
+.windrose-measure-itinerary-day {
+  display: grid;
+  grid-template-columns: auto 16px minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: 6px;
+  min-height: 18px;
+}
+.windrose-measure-itinerary-index {
+  grid-area: 1/1;
+  min-width: 18px;
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.6;
+}
+.windrose-measure-itinerary-glyph {
+  grid-area: 1/2;
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+}
+.windrose-measure-itinerary-glyph > svg {
+  width: 100%;
+  height: 100%;
+}
+.windrose-measure-itinerary-label {
+  grid-area: 1/3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.windrose-measure-itinerary-distance {
+  grid-area: 1/4;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.windrose-measure-itinerary-lost {
+  grid-area: 1/5;
+  font-size: 10px;
+  white-space: nowrap;
+  color: oklch(72% 0.13 50deg);
+}
+.windrose-measure-itinerary-weather {
+  grid-area: 2/3/3/-1;
+  margin-top: -2px;
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: oklch(78% 0.07 235deg);
+}
+
+.windrose-measure-departures {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 340px;
+  margin-top: 2px;
+  padding: 4px 2px 0;
+  border-top: 1px dashed oklch(from var(--windrose-border-primary) l c h/0.25);
+}
+.windrose-measure-departures-title {
+  font-size: 10px;
+  opacity: 0.7;
+}
+.windrose-measure-departures-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.is-tablet button.windrose-measure-departure, button.windrose-measure-departure, .windrose-measure-departure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 44px;
+  max-width: 88px;
+  height: auto;
+  min-height: unset;
+  padding: 3px 5px;
+  background: transparent;
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.3);
+  border-radius: 4px;
+  box-shadow: none;
+  color: var(--windrose-text-primary);
+  line-height: 1.15;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+}
+.is-tablet button.windrose-measure-departure:hover, button.windrose-measure-departure:hover, .windrose-measure-departure:hover {
+  border-color: oklch(from var(--windrose-border-primary) l c h/0.7);
+}
+.is-tablet button.windrose-measure-departure.is-best, button.windrose-measure-departure.is-best, .windrose-measure-departure.is-best {
+  border-color: oklch(74% 0.12 150deg / 0.8);
+  background: oklch(74% 0.12 150deg / 0.14);
+}
+.is-tablet button.windrose-measure-departure.is-selected, button.windrose-measure-departure.is-selected, .windrose-measure-departure.is-selected {
+  border-color: oklch(from var(--windrose-border-primary) l c h/0.95);
+  box-shadow: inset 0 0 0 1px oklch(from var(--windrose-border-primary) l c h/0.6);
+}
+.is-tablet button.windrose-measure-departure .windrose-measure-departure-day, button.windrose-measure-departure .windrose-measure-departure-day, .windrose-measure-departure .windrose-measure-departure-day {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+.is-tablet button.windrose-measure-departure .windrose-measure-departure-time, button.windrose-measure-departure .windrose-measure-departure-time, .windrose-measure-departure .windrose-measure-departure-time {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Route ribbon on the map: a soft band per travel day under the route line */
+.windrose-measure-day-ribbon {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  --windrose-day-tint-0: oklch(72% 0.13 15deg);
+  --windrose-day-tint-1: oklch(75% 0.1 200deg);
+  --windrose-day-tint-2: oklch(72% 0.12 300deg);
+  --windrose-day-tint-3: oklch(76% 0.12 145deg);
+}
+.windrose-measure-day-ribbon-stretch {
+  fill: none;
+  stroke-width: 12px;
+  stroke-linecap: butt;
+  stroke-linejoin: round;
+  stroke-opacity: 0.55;
+}
+.windrose-measure-day-ribbon .is-tint-0.windrose-measure-day-ribbon-stretch {
+  stroke: var(--windrose-day-tint-0);
+}
+.windrose-measure-day-ribbon .is-tint-0.windrose-measure-day-marker rect {
+  fill: rgba(26, 26, 26, 0.9);
+  stroke: var(--windrose-day-tint-0);
+  stroke-width: 1px;
+}
+.windrose-measure-day-ribbon .is-tint-1.windrose-measure-day-ribbon-stretch {
+  stroke: var(--windrose-day-tint-1);
+}
+.windrose-measure-day-ribbon .is-tint-1.windrose-measure-day-marker rect {
+  fill: rgba(26, 26, 26, 0.9);
+  stroke: var(--windrose-day-tint-1);
+  stroke-width: 1px;
+}
+.windrose-measure-day-ribbon .is-tint-2.windrose-measure-day-ribbon-stretch {
+  stroke: var(--windrose-day-tint-2);
+}
+.windrose-measure-day-ribbon .is-tint-2.windrose-measure-day-marker rect {
+  fill: rgba(26, 26, 26, 0.9);
+  stroke: var(--windrose-day-tint-2);
+  stroke-width: 1px;
+}
+.windrose-measure-day-ribbon .is-tint-3.windrose-measure-day-ribbon-stretch {
+  stroke: var(--windrose-day-tint-3);
+}
+.windrose-measure-day-ribbon .is-tint-3.windrose-measure-day-marker rect {
+  fill: rgba(26, 26, 26, 0.9);
+  stroke: var(--windrose-day-tint-3);
+  stroke-width: 1px;
+}
+
+.windrose-measure-day-marker text {
+  fill: #fff;
+  font-family: var(--font-interface, sans-serif);
+  font-size: 10px;
+  font-weight: 600;
+}
+
 /* ============================================
    TEXT LABEL/MODAL SYSTEM
    ============================================ */
@@ -7289,6 +7487,52 @@ button.windrose-breadcrumb-link {
   color: var(--windrose-text-primary);
   font-weight: 500;
   padding: 2px 4px;
+}
+
+/* ── Weather: wind on the compass ───────────────────────────────────────
+   Needle points downwind; the badge at its tail holds the Beaufort force. */
+body {
+  --windrose-wind-needle: oklch(0.84 0.09 225);
+  --windrose-wind-needle-casing: rgba(0, 0, 0, 0.8);
+  --windrose-wind-badge-bg: rgba(14, 26, 40, 0.92);
+}
+
+.windrose-compass-wind {
+  pointer-events: none;
+}
+.windrose-compass-wind-casing {
+  stroke: var(--windrose-wind-needle-casing);
+  stroke-width: 3.6;
+  stroke-linecap: round;
+}
+.windrose-compass-wind-shaft {
+  stroke: var(--windrose-wind-needle);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.windrose-compass-wind-fletch {
+  fill: none;
+  stroke: var(--windrose-wind-needle);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.windrose-compass-wind-head {
+  fill: var(--windrose-wind-needle);
+  stroke: var(--windrose-wind-needle-casing);
+  stroke-width: 0.9;
+  stroke-linejoin: round;
+}
+.windrose-compass-wind-badge {
+  fill: var(--windrose-wind-badge-bg);
+  stroke: var(--windrose-wind-needle);
+  stroke-width: 1.2;
+}
+.windrose-compass-wind-force {
+  fill: #ffffff;
+  font-family: var(--font-interface, sans-serif);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 /* ==========================================================================
@@ -10950,6 +11194,446 @@ button.windrose-dock-settings-btn:hover {
 :is(.windrose-dock-right, .windrose-floating-panel-content) .windrose-tile-browser {
   border-left: none;
   flex-shrink: 1;
+}
+
+/* ==========================================================================
+   Almanac panel (weather instrument): area picker, hero reading, facts,
+   seven-day strip, day/hour scrubbers, time-lapse. Lives in the block-mode
+   edge rail (widened to 252px for it) and the full-pane dock column.
+   Buttons use the `button.` prefix to beat Obsidian's
+   `button:not(.clickable-icon)` fill/bevel (see the edge-rail note).
+   ========================================================================== */
+.windrose-almanac {
+  /* Light theme first; .theme-dark below swaps the palette */
+  --almanac-accent: var(--windrose-border-primary-dark);
+  --almanac-high: oklch(0.56 0.15 42);
+  --almanac-low: oklch(0.52 0.13 248);
+  --almanac-line: oklch(from var(--windrose-border-primary) l c h / 0.4);
+  --almanac-wash: oklch(from var(--windrose-border-primary) l c h / 0.1);
+  --almanac-surface: color-mix(in oklch, var(--windrose-bg-primary) 93%, var(--windrose-border-primary));
+  --almanac-glow: oklch(from var(--windrose-border-primary) l c h / 0.16);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 9px 9px;
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h/0.55);
+  border-radius: 4px;
+  background: radial-gradient(120% 60% at 50% 0%, var(--almanac-glow), transparent 72%), var(--almanac-surface);
+  box-shadow: inset 0 0 0 2px var(--windrose-bg-primary), inset 0 0 0 3px oklch(from var(--windrose-border-primary) l c h/0.18);
+  color: var(--windrose-text-primary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.windrose-almanac-bracket {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  z-index: 1;
+}
+.windrose-almanac-bracket-tl {
+  top: 2px;
+  left: 2px;
+}
+.windrose-almanac-bracket-tr {
+  top: 2px;
+  right: 2px;
+  transform: scaleX(-1);
+}
+.windrose-almanac-bracket-bl {
+  bottom: 2px;
+  left: 2px;
+  transform: scaleY(-1);
+}
+.windrose-almanac-bracket-br {
+  bottom: 2px;
+  right: 2px;
+  transform: scale(-1, -1);
+}
+.windrose-almanac-empty {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--windrose-text-muted);
+  line-height: 1.4;
+}
+.windrose-almanac {
+  /* ---- Area ---- */
+}
+.windrose-almanac-area {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--almanac-accent);
+  min-width: 0;
+}
+.windrose-almanac-area > span:first-child {
+  display: flex;
+  flex: none;
+}
+.windrose-almanac-area-name {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.windrose-almanac select.windrose-almanac-area-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 24px;
+  padding: 0 22px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--almanac-accent);
+  background-color: transparent;
+  border: 1px solid var(--almanac-line);
+  border-radius: 3px;
+  box-shadow: none;
+}
+.windrose-almanac {
+  /* ---- Hero ---- */
+}
+.windrose-almanac-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--almanac-line);
+}
+.windrose-almanac-when {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.windrose-almanac-day {
+  font-family: var(--font-interface);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--windrose-text-primary);
+  line-height: 1.25;
+}
+.windrose-almanac-when-sub {
+  font-size: 9.5px;
+  color: var(--windrose-text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.windrose-almanac-hero-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 2px 0;
+}
+.windrose-almanac-hero-body .windrose-almanac-glyph {
+  color: var(--windrose-text-primary);
+  filter: drop-shadow(0 0 6px var(--almanac-glow));
+}
+.windrose-almanac-temps {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+}
+.windrose-almanac-temp-now {
+  font-size: 30px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  color: var(--windrose-text-primary);
+}
+.windrose-almanac-temp-range {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 10px;
+}
+.windrose-almanac-temp-range .is-high {
+  color: var(--almanac-high);
+}
+.windrose-almanac-temp-range .is-low {
+  color: var(--almanac-low);
+}
+.windrose-almanac-describe {
+  text-align: center;
+  font-size: 11px;
+  color: var(--windrose-text-secondary);
+  line-height: 1.35;
+}
+.windrose-almanac-missing {
+  text-align: center;
+  color: var(--windrose-text-muted);
+  padding: 8px 0;
+}
+.windrose-almanac {
+  /* ---- Glyph ---- */
+}
+.windrose-almanac-glyph {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: var(--windrose-text-secondary);
+}
+.windrose-almanac-glyph > span {
+  display: flex;
+}
+.windrose-almanac-glyph-svg:empty {
+  display: none;
+}
+.windrose-almanac-glyph-svg svg {
+  display: block;
+  overflow: visible;
+}
+.windrose-almanac {
+  /* ---- Facts ---- */
+}
+.windrose-almanac-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  margin: 0;
+}
+.windrose-almanac-facts > div {
+  display: contents;
+}
+.windrose-almanac-facts dt {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--windrose-text-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.windrose-almanac-facts dt > span {
+  display: flex;
+  opacity: 0.8;
+}
+.windrose-almanac-facts dd {
+  margin: 0;
+  text-align: right;
+  color: var(--windrose-text-primary);
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.windrose-almanac-beaufort {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  margin-right: 4px;
+  padding: 0 3px;
+  border-radius: 7px;
+  border: 1px solid var(--almanac-accent);
+  color: var(--almanac-accent);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: 1px;
+}
+.windrose-almanac {
+  /* ---- Week strip ---- */
+}
+.windrose-almanac-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+  padding: 6px 0 2px;
+  border-top: 1px solid var(--almanac-line);
+}
+.windrose-almanac button.windrose-almanac-week-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  height: auto;
+  min-width: 0;
+  padding: 4px 0 3px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--windrose-text-secondary);
+  cursor: pointer;
+  transition: var(--windrose-transition);
+  line-height: 1;
+}
+.windrose-almanac button.windrose-almanac-week-day:hover {
+  background: var(--almanac-wash);
+  color: var(--windrose-text-primary);
+}
+.windrose-almanac button.windrose-almanac-week-day:focus-visible {
+  outline: 1px solid var(--almanac-accent);
+  outline-offset: 0;
+}
+.windrose-almanac button.windrose-almanac-week-day.is-selected {
+  border-color: oklch(from var(--almanac-accent) l c h/0.6);
+  background: oklch(from var(--almanac-accent) l c h/0.12);
+  color: var(--windrose-text-primary);
+}
+.windrose-almanac button.windrose-almanac-week-day.is-today .windrose-almanac-week-label {
+  color: var(--almanac-accent);
+  font-weight: 700;
+}
+.windrose-almanac-week-label {
+  font-size: 8.5px;
+  letter-spacing: 0.02em;
+  color: var(--windrose-text-muted);
+}
+.windrose-almanac-week-high {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--almanac-high);
+}
+.windrose-almanac-week-low {
+  font-size: 9.5px;
+  color: var(--almanac-low);
+}
+.windrose-almanac {
+  /* Precip gauge: a slim vial filled to the day's share of the week's wettest */
+}
+.windrose-almanac-week-precip {
+  position: relative;
+  width: 4px;
+  height: 16px;
+  margin-top: 1px;
+  border-radius: 2px;
+  background: oklch(from var(--windrose-border-primary) l c h/0.12);
+  overflow: hidden;
+}
+.windrose-almanac-week-precip > span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 2px;
+  background: linear-gradient(to top, oklch(60% 0.12 240deg), oklch(78% 0.08 220deg));
+}
+.windrose-almanac-week-amount {
+  font-size: 7.5px;
+  color: var(--windrose-text-muted);
+  white-space: nowrap;
+}
+.windrose-almanac {
+  /* ---- Time controls ---- */
+}
+.windrose-almanac-time {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 7px;
+  border-top: 1px solid var(--almanac-line);
+}
+.windrose-almanac-slider {
+  display: grid;
+  grid-template-columns: 30px 1fr 38px;
+  align-items: center;
+  gap: 6px;
+}
+.windrose-almanac-slider input[type=range] {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  accent-color: var(--almanac-accent);
+}
+.windrose-almanac-slider.is-all-day input[type=range] {
+  opacity: 0.45;
+}
+.windrose-almanac-slider-label {
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--windrose-text-muted);
+}
+.windrose-almanac-slider-value {
+  text-align: right;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--almanac-accent);
+}
+.windrose-almanac-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  margin-top: 2px;
+}
+.windrose-almanac button.windrose-almanac-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 24px;
+  min-width: 0;
+  padding: 0 6px;
+  border: 1px solid var(--almanac-line);
+  border-radius: 3px;
+  background: var(--almanac-wash);
+  box-shadow: none;
+  color: var(--windrose-text-secondary);
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: var(--windrose-transition);
+  line-height: 0;
+}
+.windrose-almanac button.windrose-almanac-btn span {
+  line-height: normal;
+  white-space: nowrap;
+}
+.windrose-almanac button.windrose-almanac-btn > span:first-child {
+  display: flex;
+}
+.windrose-almanac button.windrose-almanac-btn:hover:not(:disabled) {
+  background: oklch(from var(--windrose-border-primary) l c h/0.16);
+  color: var(--windrose-text-primary);
+}
+.windrose-almanac button.windrose-almanac-btn:focus-visible {
+  outline: 1px solid var(--almanac-accent);
+  outline-offset: 1px;
+}
+.windrose-almanac button.windrose-almanac-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.windrose-almanac button.windrose-almanac-btn.is-on {
+  border-color: oklch(from var(--almanac-accent) l c h/0.65);
+  background: oklch(from var(--almanac-accent) l c h/0.14);
+  color: var(--almanac-accent);
+}
+.windrose-almanac button.windrose-almanac-advance {
+  width: 100%;
+}
+
+.theme-dark .windrose-almanac {
+  --almanac-accent: var(--windrose-gold-bright);
+  --almanac-high: oklch(0.8 0.1 55);
+  --almanac-low: oklch(0.76 0.08 235);
+  --almanac-line: oklch(from var(--windrose-border-primary) l c h / 0.22);
+  --almanac-wash: oklch(from var(--windrose-border-primary) l c h / 0.07);
+  --almanac-surface: color-mix(in oklch, var(--windrose-bg-primary) 90%, oklch(0.3 0.03 75));
+  --almanac-glow: oklch(from var(--windrose-gold-bright) l c h / 0.09);
+}
+
+/* Inside the dock column the dock panel already draws a frame: keep the
+   instrument but drop the outer border so the two do not double up. */
+.windrose-dock-panel-body .windrose-almanac {
+  border-color: transparent;
+}
+
+/* Tablet: Obsidian's .is-tablet injects padding/height onto every <button> */
+.is-tablet .windrose-almanac button.windrose-almanac-btn {
+  height: 30px;
+  padding: 0 6px;
+}
+.is-tablet .windrose-almanac button.windrose-almanac-week-day {
+  height: auto;
+  padding: 4px 0 3px;
 }
 
 /* ============================================

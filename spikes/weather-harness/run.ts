@@ -5,6 +5,7 @@
  *   node --experimental-strip-types --no-warnings run.ts \
  *     --windrose <dir> --wadjet <dir> [--note <path>] [--eval <file.js>]
  *     [--shots n --interval ms] [--out dir] [--keep-open ms] [--width 1600 --height 1000]
+ *     [--vault <scratch dir>] [--map-patch <file.json>] [--shot-selector <css>]
  */
 import { _electron as electron, type ElectronApplication, type Page } from "playwright";
 import { execFileSync, spawnSync } from "child_process";
@@ -13,7 +14,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import os from "os";
 import path from "path";
 import { randomBytes } from "crypto";
-import { buildVaultFiles } from "./fixture.ts";
+import { buildVaultFiles, patchWadjetData } from "./fixture.ts";
 
 // bun -> node trampoline (Playwright CDP websocket hangs under bun on Windows).
 const SELF = fileURLToPath(import.meta.url);
@@ -38,6 +39,12 @@ const EVAL_FILE = opt("eval");
 const SHOTS = Number(opt("shots", "0"));
 const INTERVAL = Number(opt("interval", "1000"));
 const KEEP_OPEN = Number(opt("keep-open", "0"));
+const REDUCED_MOTION = argv.includes("--reduced-motion");
+// Optional extras (defaults unchanged): a private scratch vault so two runs cannot collide,
+// a JSON patch shallow-merged into maps of the seeded store ({ "<mapId>": { ...fields } }),
+// and a CSS selector whose element is also captured as <out>/element.png.
+const MAP_PATCH = opt("map-patch");
+const SHOT_SELECTOR = opt("shot-selector");
 if (!WINDROSE_DIR || !WADJET_DIR) { console.error("need --windrose <dir> and --wadjet <dir>"); process.exit(2); }
 
 // Main windrose checkout hosts electron and the phone harness helper (reused by path).
@@ -45,7 +52,7 @@ const MAIN = "C:\\Dev\\windrose";
 const PHONE_MAIN = path.join(MAIN, "spikes/phone/phone-main.cjs");
 const WADJET_REPO = "C:\\Dev\\U+13080";
 const WADJET_DATA_FIXTURE = path.join(WADJET_REPO, "test/e2e/data.fixture.json");
-const SCRATCH_VAULT = "C:\\Dev\\scratch-vaults\\windrose-weather";
+const SCRATCH_VAULT = path.resolve(opt("vault", process.env.WEATHER_HARNESS_VAULT ?? "C:\\Dev\\scratch-vaults\\windrose-weather")!);
 const ASAR = path.join(process.env.LOCALAPPDATA ?? "", "Programs", "Obsidian", "resources", "app.asar");
 const ELECTRON_EXE = path.join(MAIN, "node_modules/electron/dist", readFileSync(path.join(MAIN, "node_modules/electron/path.txt"), "utf8").trim());
 
@@ -84,9 +91,18 @@ function prepareVault(): string[] {
   const wt = installPlugin(WINDROSE_DIR!, "windrose-md");
   writeFileSync(path.join(wt, "data.json"), JSON.stringify({ onboardingState: "done" }, null, 2));
   const wj = installPlugin(WADJET_DIR!, "wadjet");
-  cpSync(WADJET_DATA_FIXTURE, path.join(wj, "data.json"));
+  const wadjetData = patchWadjetData(JSON.parse(readFileSync(WADJET_DATA_FIXTURE, "utf8")));
+  writeFileSync(path.join(wj, "data.json"), JSON.stringify(wadjetData, null, 2));
   writeFileSync(path.join(SCRATCH_VAULT, ".obsidian/community-plugins.json"), JSON.stringify(ids));
   for (const [rel, content] of Object.entries(buildVaultFiles())) writeFileSync(path.join(SCRATCH_VAULT, rel), content);
+  if (MAP_PATCH) {
+    const storePath = path.join(SCRATCH_VAULT, "windrose-md-data.json");
+    const store = JSON.parse(readFileSync(storePath, "utf8"));
+    const patch = JSON.parse(readFileSync(path.resolve(MAP_PATCH), "utf8")) as Record<string, Record<string, unknown>>;
+    for (const [mapId, fields] of Object.entries(patch)) store.maps[mapId] = { ...store.maps[mapId], ...fields };
+    writeFileSync(storePath, JSON.stringify(store, null, 2));
+    log(`map patch applied: ${Object.keys(patch).join(", ")}`);
+  }
   return ids;
 }
 
@@ -202,6 +218,7 @@ async function main() {
     const dims = await page.evaluate(() => [window.innerWidth, window.innerHeight, document.body.className.includes("is-mobile")]);
     log(`plugins ready; window ${dims[0]}x${dims[1]} mobile=${dims[2]}`);
 
+    if (REDUCED_MOTION) { await page.emulateMedia({ reducedMotion: "reduce" }); log("emulating prefers-reduced-motion: reduce"); }
     if (NOTE) {
       await openNote(page, NOTE);
       await page.locator(".windrose-container").first().waitFor({ state: "visible", timeout: 30000 });
@@ -219,6 +236,11 @@ async function main() {
     const first = path.join(OUT, "shot.png");
     await page.screenshot({ path: first });
     log(`screenshot -> ${first}`);
+    if (SHOT_SELECTOR) {
+      const el = path.join(OUT, "element.png");
+      try { await page.locator(SHOT_SELECTOR).first().screenshot({ path: el }); log(`element ${SHOT_SELECTOR} -> ${el}`); }
+      catch (e: any) { log(`element ${SHOT_SELECTOR} not captured: ${e?.message ?? e}`); }
+    }
     for (let i = 0; i < SHOTS; i++) {
       if (i > 0) await sleep(INTERVAL);
       const f = path.join(OUT, `frame-${String(i + 1).padStart(3, "0")}.png`);

@@ -224,6 +224,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Block-mode left icon rail: which flyout (if any) is open. Canvas controls
   // (MapControls Layers/Regions buttons) drive this too, so it's lifted here.
   const [railOpenId, setRailOpenId] = useState<string | null>(null);
+  // Almanac's selected weather area, shared by its rail and dock copies
+  const [almanacAreaId, setAlmanacAreaId] = useState<string | null>(null);
 
   const floating = useFloatingPanels({ fullPane, savedState: savedPanelState, onStateChange: onPanelStateChange });
   const { isFloating, toggleFloat } = floating;
@@ -616,6 +618,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     availableTilesets, getCachedImage, onEditLayer: setEditingLayerId, onLayerClone: handleCloneLayerRequest,
     onZoomIn: handleZoomIn, onZoomOut: handleZoomOut, onUndo: wrappedHandleUndo,
     onTileDepthChange: handleTileDepthChange, collapseTileBrowser, expandTileBrowser,
+    almanacAreaId, onAlmanacAreaChange: setAlmanacAreaId,
   });
 
   // Main render. WeatherProvider: the one weather store for this map
