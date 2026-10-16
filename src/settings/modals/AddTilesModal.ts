@@ -1,10 +1,13 @@
 /**
  * AddTilesModal — the "Add tiles" import wizard (design: organize.jsx).
  *
- * One entry point for every tile source, three steps:
+ * One entry point for every tile source, three steps (four for a pack):
  *   1. Source — Dungeondraft pack or folder of images. Picking a pack hands
  *      off to DungeondraftImportModal (packs arrive pre-grouped/pre-tagged,
  *      so their steps 2-3 are already answered by the pack itself).
+ *   1b. Storage (packs only) — Exact (default, byte for byte) or Compact
+ *      (large images re-encoded as WebP, desktop only, one-way), with a
+ *      sampled size estimate and an exact-vs-compact preview lineup.
  *   2. Map folders → tiers — one confident-or-check tier vote per subfolder,
  *      fixable with a dropdown (the "approved spine").
  *   3. Tags — folder-name tags are applied automatically; filename-mined
@@ -14,15 +17,19 @@
  * shared import detection pass (signals, render mode, footprint).
  */
 
-import { Modal, Notice } from 'obsidian';
+import { Modal, Notice, Platform } from 'obsidian';
 import type { App } from 'obsidian';
 import { ConfirmModal } from './ConfirmModal';
 import type { TileEntry, TileLayerRole } from '#types/tiles/tile.types';
 import type { InstalledPack } from '#types/content-packs/contentPack.types';
-import type { PluginLike, PckWizardAnalysis, DdWizardDecisions } from '../../content-packs/ddImportCore';
-import { runDdImport, analyzePckForWizard } from '../../content-packs/ddImportCore';
-import type { PckArchive, PckSource } from '../../content-packs/pckParser';
-import { parsePck, FilePckSource } from '../../content-packs/pckParser';
+import type { PluginLike, PckWizardAnalysis, DdWizardDecisions, DdStorage } from '../../content-packs/ddImportCore';
+import { runDdImport, analyzePckForWizard, listTextureEntries } from '../../content-packs/ddImportCore';
+import type { PckArchive, PckFileEntry, PckSource } from '../../content-packs/pckParser';
+import { parsePck, FilePckSource, extractFileData } from '../../content-packs/pckParser';
+import { sniffImageMime } from '../../assets/bundles/bundleFormat';
+import {
+  COMPACT_FLOOR_BYTES, COMPACT_QUALITY, compactEncode, estimateCompactRatio,
+} from '../../assets/bundles/bundleCompact';
 import type { DungeondraftPackMeta } from '../../content-packs/pckMetadata';
 import { parsePackMetadata } from '../../content-packs/pckMetadata';
 import { FolderSuggest } from '../helpers/FolderSuggest';
@@ -47,7 +54,16 @@ const TIER_LABELS: Record<TileLayerRole, string> = {
   decoration: 'Decoration',
 };
 const TIER_ORDER: TileLayerRole[] = ['ground', 'structure', 'props', 'decoration'];
-const STEP_LABELS = ['Source', 'Tiers', 'Tags'];
+type StepId = 'source' | 'storage' | 'tiers' | 'tags';
+const STEP_TITLES: Record<StepId, string> = { source: 'Source', storage: 'Storage', tiers: 'Tiers', tags: 'Tags' };
+/** Textures sampled (evenly spaced) for the compact size estimate. */
+const ESTIMATE_SAMPLES = 40;
+const PREVIEW_ZOOMS = [1, 2, 4];
+const PREVIEW_CELL_PX = 150;
+
+function formatMb(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 const FOLDER_SCAN_DEBOUNCE_MS = 500;
 
 type SourceKind = 'pack' | 'folder';
@@ -78,6 +94,12 @@ class AddTilesModal extends Modal {
   private appliedTags = new Map<string, string>();
   /** manual tags applied to every imported tile */
   private manualTags: string[] = [];
+
+  /** Bundle storage for a pack import (Storage step); folder sources never use it. */
+  private storage: DdStorage = 'exact';
+  /** Sampled size estimate for the current pack; null until computed. */
+  private estimate: { exact: number; compact: number } | null = null;
+  private estimating: Promise<void> | null = null;
 
   private finished = false;
   /** True while an import is writing files — close() speedbumps until done. */
@@ -141,19 +163,38 @@ class AddTilesModal extends Modal {
     const body = contentEl.createDiv({ cls: 'windrose-wz-body' });
     const foot = contentEl.createDiv({ cls: 'windrose-wz-foot' });
 
-    if (this.step === 0) this.renderSource(body, foot);
-    else if (this.step === 1) this.renderTiers(body, foot);
+    const id = this.stepIds()[this.step] ?? 'source';
+    if (id === 'source') this.renderSource(body, foot);
+    else if (id === 'storage') this.renderStorage(body, foot);
+    else if (id === 'tiers') this.renderTiers(body, foot);
     else this.renderTags(body, foot);
+  }
+
+  /** The wizard's steps for the current source: packs add Storage after Source. */
+  private stepIds(): StepId[] {
+    return this.source === 'pack' ? ['source', 'storage', 'tiers', 'tags'] : ['source', 'tiers', 'tags'];
+  }
+
+  private goTo(id: StepId): void {
+    this.step = Math.max(0, this.stepIds().indexOf(id));
+    this.render();
+  }
+
+  /** The step before the current one (Back). */
+  private goBack(): void {
+    this.step = Math.max(0, this.step - 1);
+    this.render();
   }
 
   private renderStepper(parent: HTMLElement): void {
     const steps = parent.createDiv({ cls: 'windrose-wz-steps' });
-    STEP_LABELS.forEach((label, i) => {
+    const labels = this.stepIds().map(id => STEP_TITLES[id]);
+    labels.forEach((label, i) => {
       const cls = i === this.step ? 'on' : i < this.step ? 'done' : '';
       const step = steps.createDiv({ cls: 'windrose-wz-step ' + cls });
       step.createSpan({ cls: 'windrose-wz-num', text: i < this.step ? '✓' : String(i + 1) });
       step.createSpan({ cls: 'windrose-wz-lbl', text: label });
-      if (i < STEP_LABELS.length - 1) steps.createDiv({ cls: 'windrose-wz-sep' });
+      if (i < labels.length - 1) steps.createDiv({ cls: 'windrose-wz-sep' });
     });
   }
 
@@ -269,8 +310,7 @@ class AddTilesModal extends Modal {
       this.tierRows = aggregateFolderTiers(this.tiles);
       this.tierChoice = new Map(this.tierRows.map(r => [r.category, r.tier]));
       this.suggestions = mineFilenameTags(this.tiles);
-      this.step = 1;
-      this.render();
+      this.goTo(this.source === 'pack' ? 'storage' : 'tiers');
     };
 
     select(this.source);
@@ -282,6 +322,8 @@ class AddTilesModal extends Modal {
     this.packArchive = null;
     this.packMeta = null;
     this.packAnalysis = null;
+    this.estimate = null;
+    this.estimating = null;
     preview.createEl('p', { text: 'Reading pack…' });
 
     try {
@@ -359,6 +401,116 @@ class AddTilesModal extends Modal {
     }
   }
 
+  // ========================= 1b: Storage (packs) =========================
+
+  private renderStorage(body: HTMLElement, foot: HTMLElement): void {
+    const desktop = Platform.isDesktopApp;
+    if (!desktop) this.storage = 'exact';
+    body.createDiv({
+      cls: 'windrose-wz-lead',
+      text: 'How should the tiles be stored? You can re-import the pack later to change this.',
+    });
+    const cards = body.createDiv({ cls: 'windrose-wz-cards' });
+    const exactCard = this.renderChoiceCard(cards, 'Exact', 'Keeps every image byte for byte. Reversible.');
+    const compactCard = this.renderChoiceCard(cards, 'Compact',
+      'Re-encodes large images as smaller WebP (about 7× smaller on typical packs). ' +
+      'Small images under 64 KB stay exact. One-way: the original bytes are not kept; re-import the pack to go back.');
+    if (!desktop) {
+      compactCard.addClass('is-disabled');
+      compactCard.querySelector('.windrose-wz-src-main')
+        ?.createDiv({ cls: 'windrose-wz-warning', text: 'Compact needs the desktop app.' });
+    }
+    const select = (mode: DdStorage): void => {
+      this.storage = mode;
+      exactCard.toggleClass('on', mode === 'exact');
+      compactCard.toggleClass('on', mode === 'compact');
+    };
+    exactCard.onclick = (): void => select('exact');
+    compactCard.onclick = (): void => { if (desktop) select('compact'); };
+    select(this.storage);
+
+    const estimateLine = body.createDiv({ cls: 'windrose-wz-estimate' });
+    const showEstimate = (): void => {
+      const e = this.estimate;
+      estimateLine.setText(e == null
+        ? 'Estimated size: estimating…'
+        : `Estimated size: Exact ${formatMb(e.exact)} · Compact about ${formatMb(e.compact)}`);
+    };
+    if (desktop) {
+      showEstimate();
+      void this.ensureEstimate().then(showEstimate, () => estimateLine.setText('Estimated size: unavailable'));
+      const previewBtn = body.createEl('button', { text: 'Preview', cls: 'windrose-wz-preview-btn' });
+      previewBtn.onclick = (): void => {
+        if (this.packSource == null) return;
+        new CompactPreviewModal(this.app, this.packSource, this.previewEntries()).open();
+      };
+    } else {
+      estimateLine.setText(`Estimated size: Exact ${formatMb(this.packTextureBytes())}`);
+    }
+
+    const backBtn = foot.createEl('button', { text: 'Back' });
+    backBtn.onclick = (): void => this.goBack();
+    foot.createSpan({ cls: 'windrose-wz-cap' });
+    const continueBtn = foot.createEl('button', { text: 'Continue →', cls: 'mod-cta' });
+    continueBtn.onclick = (): void => this.goTo('tiers');
+  }
+
+  /** A radio card in the source-card style (title, description, radio dot). */
+  private renderChoiceCard(parent: HTMLElement, title: string, desc: string): HTMLElement {
+    const card = parent.createDiv({ cls: 'windrose-wz-src' });
+    const main = card.createDiv({ cls: 'windrose-wz-src-main' });
+    main.createDiv({ cls: 'windrose-wz-src-title', text: title });
+    main.createDiv({ cls: 'windrose-wz-src-desc', text: desc });
+    card.createDiv({ cls: 'windrose-wz-radio' });
+    return card;
+  }
+
+  private packTextures(): PckFileEntry[] {
+    return this.packArchive == null ? [] : listTextureEntries(this.packArchive);
+  }
+
+  private packTextureBytes(): number {
+    return this.packTextures().reduce((n, e) => n + e.size, 0);
+  }
+
+  /** Compute the sampled estimate once per pack (joins an estimate already running). */
+  private ensureEstimate(): Promise<void> {
+    if (this.estimate != null) return Promise.resolve();
+    if (this.estimating != null) return this.estimating;
+    const source = this.packSource;
+    const textures = this.packTextures();
+    const run = (async (): Promise<void> => {
+      if (source == null) return;
+      const k = Math.min(ESTIMATE_SAMPLES, textures.length);
+      const samples: Array<{ bytes: Uint8Array; mime: string }> = [];
+      for (let i = 0; i < k; i++) {
+        const entry = textures[Math.floor((i * textures.length) / k)];
+        try {
+          const bytes = await extractFileData(source, entry);
+          const mime = sniffImageMime(bytes);
+          if (mime != null) samples.push({ bytes, mime });
+        } catch {
+          // An unreadable sample just drops out of the estimate.
+        }
+      }
+      const ratio = await estimateCompactRatio(samples);
+      const exact = textures.reduce((n, e) => n + e.size, 0);
+      if (this.packSource === source) this.estimate = { exact, compact: exact * ratio };
+    })();
+    const tracked = run.finally(() => { if (this.estimating === tracked) this.estimating = null; });
+    this.estimating = tracked;
+    return tracked;
+  }
+
+  /** Preview picks: the largest texture, a median-sized one, and the smallest at or above the floor. */
+  private previewEntries(): PckFileEntry[] {
+    const bySize = this.packTextures().filter(e => e.size >= COMPACT_FLOOR_BYTES).sort((a, b) => b.size - a.size);
+    if (bySize.length === 0) return [];
+    const picks = [bySize[0], bySize[Math.floor(bySize.length / 2)], bySize[bySize.length - 1]];
+    return picks.filter((e, i) => picks.indexOf(e) === i);
+  }
+
+
   // ========================= 2: Tiers =========================
 
   private renderTiers(body: HTMLElement, foot: HTMLElement): void {
@@ -400,19 +552,13 @@ class AddTilesModal extends Modal {
     }
 
     const backBtn = foot.createEl('button', { text: 'Back' });
-    backBtn.onclick = (): void => {
-      this.step = 0;
-      this.render();
-    };
+    backBtn.onclick = (): void => this.goBack();
     foot.createSpan({
       cls: 'windrose-wz-cap',
       text: `${autoCount} auto · ${checkCount} to check`,
     });
     const continueBtn = foot.createEl('button', { text: 'Continue →', cls: 'mod-cta' });
-    continueBtn.onclick = (): void => {
-      this.step = 2;
-      this.render();
-    };
+    continueBtn.onclick = (): void => this.goTo('tags');
   }
 
   // ========================= 3: Tags =========================
@@ -491,10 +637,7 @@ class AddTilesModal extends Modal {
     renderManual();
 
     const backBtn = foot.createEl('button', { text: 'Back' });
-    backBtn.onclick = (): void => {
-      this.step = 1;
-      this.render();
-    };
+    backBtn.onclick = (): void => this.goBack();
     foot.createSpan({ cls: 'windrose-wz-cap' });
     const finishBtn = foot.createEl('button', { text: 'Finish import', cls: 'mod-cta' });
     finishBtn.onclick = (): void => {
@@ -662,6 +805,7 @@ class AddTilesModal extends Modal {
         },
         this.buildWizardDecisions(),
         () => this.cancelRequested,
+        { storage: this.storage },
       );
 
       if (result.cancelled) {
@@ -695,6 +839,9 @@ class AddTilesModal extends Modal {
           (kept > 0 ? ` Kept ${kept} loose ${kept === 1 ? 'file' : 'files'} the bundle does not replace with identical bytes (see developer console).` : '') +
           (keptPermanent > 0
             ? ` Kept ${keptPermanent} loose ${keptPermanent === 1 ? 'file' : 'files'} from the earlier import because your trash setting deletes files permanently; remove them yourself once the bundle looks right.`
+            : '') +
+          (result.compact != null
+            ? ` Compact: ${result.compact.compacted} images re-encoded, ${result.compact.keptExact} kept exact, saved ${formatMb(result.compact.bytesSaved)}.`
             : ''),
       });
       new Notice(`${result.packName} imported (${result.imported}/${result.total} textures).`);
@@ -835,6 +982,97 @@ class AddTilesModal extends Modal {
       finishBtn.disabled = false;
     }
   }
+}
+
+/**
+ * Exact vs Compact lineup: per texture, rows Exact / Compact, columns 100 /
+ * 200 / 400 %, each a centre crop drawn with bilinear smoothing over a
+ * checkerboard (the way the dev lineup compared candidates).
+ */
+class CompactPreviewModal extends Modal {
+  private readonly bitmaps: ImageBitmap[] = [];
+  private closed = false;
+
+  constructor(app: App, private readonly source: PckSource, private readonly entries: PckFileEntry[]) {
+    super(app);
+  }
+
+  override onOpen(): void {
+    this.modalEl.addClass('windrose-add-tiles-modal');
+    this.contentEl.createEl('h2', { text: 'Compact preview' });
+    if (this.entries.length === 0) {
+      this.contentEl.createEl('p', { text: 'This pack has no images large enough to re-encode.' });
+      return;
+    }
+    const status = this.contentEl.createEl('p', { cls: 'windrose-wz-cap', text: 'Encoding…' });
+    void this.renderAll().then(() => status.remove(), (e: unknown) => {
+      status.setText('Preview failed: ' + (e instanceof Error ? e.message : String(e)));
+    });
+  }
+
+  override onClose(): void {
+    this.closed = true;
+    for (const b of this.bitmaps) b.close();
+    this.bitmaps.length = 0;
+    this.contentEl.empty();
+  }
+
+  private async bitmap(bytes: Uint8Array, mime: string): Promise<ImageBitmap> {
+    const bmp = await createImageBitmap(new Blob([bytes.slice()], { type: mime }));
+    if (this.closed) bmp.close(); else this.bitmaps.push(bmp);
+    return bmp;
+  }
+
+  private async renderAll(): Promise<void> {
+    for (const entry of this.entries) {
+      if (this.closed) return;
+      const bytes = await extractFileData(this.source, entry);
+      const mime = sniffImageMime(bytes) ?? 'image/png';
+      const enc = await compactEncode(bytes, mime, { quality: COMPACT_QUALITY, floorBytes: COMPACT_FLOOR_BYTES });
+      const exactBmp = await this.bitmap(bytes, mime);
+      const compactBmp = enc.kind === 'compact' ? await this.bitmap(enc.bytes, enc.mime) : exactBmp;
+      if (this.closed) return;
+      const block = this.contentEl.createDiv({ cls: 'windrose-wz-lineup' });
+      const name = entry.path.split('/').pop() ?? entry.path;
+      block.createDiv({
+        cls: 'windrose-wz-lineup-title',
+        text: enc.kind === 'compact'
+          ? `${name}: ${formatMb(bytes.byteLength)} → ${formatMb(enc.bytes.byteLength)}`
+          : `${name}: ${formatMb(bytes.byteLength)}, kept exact (${enc.reason ?? 'no gain'})`,
+      });
+      const grid = block.createDiv({ cls: 'windrose-wz-lineup-grid' });
+      grid.createDiv();
+      for (const z of PREVIEW_ZOOMS) grid.createDiv({ cls: 'windrose-wz-cap', text: `${z * 100} %` });
+      const rows: Array<[string, ImageBitmap]> = [['Exact', exactBmp], ['Compact', compactBmp]];
+      for (const [label, bmp] of rows) {
+        grid.createDiv({ cls: 'windrose-wz-cap', text: label });
+        for (const z of PREVIEW_ZOOMS) drawLineupCell(grid.createEl('canvas'), bmp, z);
+      }
+    }
+  }
+}
+
+/** Checkerboard, then the bitmap's centre crop at `zoom`, bilinear. */
+function drawLineupCell(canvas: HTMLCanvasElement, bmp: ImageBitmap, zoom: number): void {
+  canvas.width = PREVIEW_CELL_PX;
+  canvas.height = PREVIEW_CELL_PX;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const sq = 10;
+  for (let y = 0; y < PREVIEW_CELL_PX; y += sq) {
+    for (let x = 0; x < PREVIEW_CELL_PX; x += sq) {
+      ctx.fillStyle = ((x + y) / sq) % 2 === 0 ? '#cccccc' : '#ffffff';
+      ctx.fillRect(x, y, sq, sq);
+    }
+  }
+  const side = PREVIEW_CELL_PX / zoom;
+  const sw = Math.min(side, bmp.width);
+  const sh = Math.min(side, bmp.height);
+  const sx = (bmp.width - sw) / 2;
+  const sy = (bmp.height - sh) / 2;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'low';
+  ctx.drawImage(bmp, sx, sy, sw, sh, (PREVIEW_CELL_PX - sw * zoom) / 2, (PREVIEW_CELL_PX - sh * zoom) / 2, sw * zoom, sh * zoom);
 }
 
 export { AddTilesModal };

@@ -4,7 +4,10 @@
  *
  * Public API
  *   new BundleWriter(app, folder, { packId, name, mode, targetShardBytes, createdAt? })
- *   await writer.add(key, bytes, mime, id, { w, h }, thumb?)   // async: may flush a shard
+ *   await writer.add(key, bytes, mime, id, { w, h }, thumb?, src?)   // async: may flush a shard
+ *
+ * `src` (compact mode) is the identity of the ORIGINAL bytes when `bytes` is a
+ * re-encode; it is stored on the entry as-is. Entries kept exact omit it.
  *   await writer.finish(): Promise<BundleWriteResult>
  *
  * Order of writes: marker (only if absent; an existing marker with another
@@ -123,6 +126,7 @@ interface PendingEntry {
   h: number;
   main: Slot;
   thumb?: Slot;
+  src?: IndexEntry['src'];
 }
 
 export class BundleWriter {
@@ -158,6 +162,7 @@ export class BundleWriter {
     id: string,
     dims: { w: number; h: number },
     thumb?: Uint8Array,
+    src?: IndexEntry['src'],
   ): Promise<void> {
     if (this.finished) throw new Error('BundleWriter already finished');
     if (this.entries.has(key)) { this.skipped.push({ key, reason: 'duplicate key' }); return; }
@@ -186,7 +191,7 @@ export class BundleWriter {
       if (thumbMime !== null) thumbSlot = await this.thumbs.push(key, thumb, thumbMime);
     }
     this.ids.set(id, key);
-    this.entries.set(key, { id, mime: sniffed, w: dims.w, h: dims.h, main: mainSlot, thumb: thumbSlot });
+    this.entries.set(key, { id, mime: sniffed, w: dims.w, h: dims.h, main: mainSlot, thumb: thumbSlot, src });
   }
 
   async finish(): Promise<BundleWriteResult> {
@@ -202,7 +207,7 @@ export class BundleWriter {
     const entries: Record<string, IndexEntry> = {};
     for (const [key, e] of this.entries) {
       const ref = (s: Slot): ShardRef => ({ shard: s.shard, o: s.o, l: s.l });
-      entries[key] = { id: e.id, ...ref(e.main), mime: e.mime, w: e.w, h: e.h, ...(e.thumb ? { thumb: ref(e.thumb) } : {}) };
+      entries[key] = { id: e.id, ...ref(e.main), mime: e.mime, w: e.w, h: e.h, ...(e.thumb ? { thumb: ref(e.thumb) } : {}), ...(e.src ? { src: e.src } : {}) };
     }
     const segment: IndexSegment = {
       format: BUNDLE_FORMAT,

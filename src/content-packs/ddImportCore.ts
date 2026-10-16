@@ -7,7 +7,7 @@
  */
 
 import type { App } from 'obsidian';
-import { Notice, TFile, TFolder } from 'obsidian';
+import { Notice, Platform, TFile } from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type { InstalledPack } from '#types/content-packs/contentPack.types';
 import type { TileEntry, TileLayerRole } from '#types/tiles/tile.types';
@@ -29,12 +29,16 @@ import { runImportDetectionPass } from '../assets/importDetectionPass';
 import { ensureFolder } from '../persistence/vaultFolders';
 import { mintTileId } from '../assets/tileIds';
 import { BundleWriter } from '../assets/bundles/bundleWriter';
-import { isSafeBundleKey, sha256Hex, sniffImageMime } from '../assets/bundles/bundleFormat';
+import { sha256Hex, sniffImageMime } from '../assets/bundles/bundleFormat';
 import {
-	beginBundleWrite, endBundleWrite, isBundleReadFailure, mountBundleFolder, readEntryBytes,
+	beginBundleWrite, endBundleWrite, mountBundleFolder,
 } from '../assets/bundles/bundleRegistry';
-import { INDEX_DIR, MARKER_FILE, SHARDS_DIR, THUMBS_DIR } from '../assets/bundles/bundleFormat';
+import {
+	indexLooseByContent, listLooseImages, retireLooseImages, trashOptionOf,
+} from '../assets/bundles/bundleRetire';
 import { acceptShippedThumb, decodeTile } from '../assets/bundles/bundleThumbs';
+import { COMPACT_FLOOR_BYTES, COMPACT_QUALITY, compactEncode } from '../assets/bundles/bundleCompact';
+import type { CompactResult } from '../assets/bundles/bundleCompact';
 
 interface PluginLike {
 	app: App;
@@ -312,6 +316,10 @@ interface DdImportResult {
 	 * permanently (0 when retirement ran or nothing was loose).
 	 */
 	looseKeptPermanentDelete?: number;
+	/** Storage the bundle was written with (bundle imports only; mobile is always exact). */
+	storage?: DdStorage;
+	/** Compact runs only: re-encoded entries, entries kept exact, and source bytes minus stored bytes over the re-encoded ones. */
+	compact?: { compacted: number; keptExact: number; bytesSaved: number };
 }
 
 type DdProgressFn = (done: number, total: number, stage: string) => void;
@@ -319,6 +327,18 @@ type DdProgressFn = (done: number, total: number, stage: string) => void;
 interface DdImportOptions {
 	/** Store textures as a tile bundle (default true); false writes loose files. */
 	bundle?: boolean;
+	/**
+	 * Bundle storage (default 'exact'). 'compact' re-encodes large images as
+	 * WebP (bundleCompact); it is desktop only, so mobile always writes exact.
+	 */
+	storage?: DdStorage;
+}
+
+type DdStorage = 'exact' | 'compact';
+
+/** The storage a run actually uses: compact only when asked for on the desktop app. */
+function effectiveStorage(opts: DdImportOptions): DdStorage {
+	return opts.storage === 'compact' && Platform.isDesktopApp === true ? 'compact' : 'exact';
 }
 
 /** One texture's routing: everything derived from its pack path before extraction. */
@@ -347,40 +367,6 @@ function keyDirOf(key: string): string {
 /** Filename part of a bundle key. */
 function keyBaseOf(key: string): string {
 	return key.slice(key.lastIndexOf('/') + 1);
-}
-
-/**
- * Loose images from an earlier import, indexed by content: sha256 -> their
- * folder-relative keys (sorted), plus the set of byte lengths so textures
- * of any other length are never read twice. Unreadable files and keys a
- * bundle cannot hold are left out (default routing applies and retirement
- * keeps them).
- */
-async function indexLooseByContent(
-	app: App,
-	basePath: string,
-	loosePaths: string[],
-): Promise<{ sizes: Set<number>; byHash: Map<string, string[]> }> {
-	const sizes = new Set<number>();
-	const byHash = new Map<string, string[]>();
-	for (const path of loosePaths) {
-		const key = path.slice(basePath.length + 1);
-		if (!isSafeBundleKey(key)) continue;
-		let bytes: Uint8Array;
-		try {
-			bytes = new Uint8Array(await app.vault.adapter.readBinary(path));
-		} catch {
-			continue;
-		}
-		if (bytes.byteLength === 0) continue;
-		sizes.add(bytes.byteLength);
-		const hash = await sha256Hex(bytes);
-		const keys = byHash.get(hash);
-		if (keys != null) keys.push(key);
-		else byHash.set(hash, [key]);
-	}
-	for (const keys of byHash.values()) keys.sort();
-	return { sizes, byHash };
 }
 
 /**
@@ -446,8 +432,13 @@ function indexShippedThumbs(archive: PckArchive): Map<string, PckFileEntry> {
 }
 
 /**
- * Write the planned textures into a tile bundle at basePath (exact mode,
- * 4 MiB shards), in category-then-filename order. Ids are minted over the
+ * Write the planned textures into a tile bundle at basePath (4 MiB shards),
+ * in category-then-filename order. Storage 'compact' writes a mode
+ * 'compact' segment: the mode describes the policy, so entries compactEncode
+ * kept exact (below the floor, ICC, lossy WebP, poor gain, failed verify)
+ * hold their original bytes and no `src`, while re-encoded entries hold the
+ * WebP and `src` = sha256/size/mime of the original. Dims and thumbnails
+ * always come from the original. Ids are minted over the
  * keys exactly as the loose scan would mint them over the same layout.
  * Zero-byte, unrecognised, undecodable and duplicate-path textures are
  * skipped and reported; a shipped thumbnail is used when it is a small
@@ -463,8 +454,10 @@ async function extractToBundle(
 	meta: DungeondraftPackMeta,
 	onProgress: DdProgressFn | undefined,
 	isCancelled: (() => boolean) | undefined,
+	storage: DdStorage = 'exact',
 ): Promise<{
 	landed: TexturePlan[];
+	compact: { compacted: number; keptExact: number; bytesSaved: number };
 	skipped: Array<{ key: string; reason: string }>;
 	failed: number;
 	cancelled: boolean;
@@ -478,8 +471,11 @@ async function extractToBundle(
 		keyDirOf(a.key).localeCompare(keyDirOf(b.key)) || keyBaseOf(a.key).localeCompare(keyBaseOf(b.key)));
 	const shippedThumbs = indexShippedThumbs(archive);
 	const writer = new BundleWriter(app, basePath, {
-		packId: meta.id, name: meta.name, mode: 'exact', targetShardBytes: BUNDLE_TARGET_SHARD_BYTES,
+		packId: meta.id, name: meta.name, mode: storage, targetShardBytes: BUNDLE_TARGET_SHARD_BYTES,
 	});
+	const compact = { compacted: 0, keptExact: 0, bytesSaved: 0 };
+	/** Original sha256 -> encode result, so byte-identical textures encode once. */
+	const encodedBySha = new Map<string, CompactResult>();
 	const added: TexturePlan[] = [];
 	const skipped: Array<{ key: string; reason: string }> = [];
 	const seenKeys = new Set<string>();
@@ -520,7 +516,27 @@ async function extractToBundle(
 				continue;
 			}
 			const id = mintTileId(plan.key, seenIds);
-			await writer.add(plan.key, data, mime, id, decoded.dims, shippedThumb ?? decoded.thumb ?? undefined);
+			const thumb = shippedThumb ?? decoded.thumb ?? undefined;
+			if (storage === 'compact') {
+				const sha256 = await sha256Hex(data);
+				let enc = encodedBySha.get(sha256);
+				// A byte-identical repeat is stored once either way: it saves nothing more.
+				const repeat = enc != null;
+				if (enc == null) {
+					enc = await compactEncode(data, mime, { quality: COMPACT_QUALITY, floorBytes: COMPACT_FLOOR_BYTES });
+					encodedBySha.set(sha256, enc);
+				}
+				if (enc.kind === 'compact') {
+					await writer.add(plan.key, enc.bytes, enc.mime, id, decoded.dims, thumb, { sha256, bytes: data.byteLength, mime });
+					compact.compacted++;
+					if (!repeat) compact.bytesSaved += data.byteLength - enc.bytes.byteLength;
+				} else {
+					await writer.add(plan.key, data, mime, id, decoded.dims, thumb);
+					compact.keptExact++;
+				}
+			} else {
+				await writer.add(plan.key, data, mime, id, decoded.dims, thumb);
+			}
 			added.push(plan);
 		} catch (e) {
 			failed++;
@@ -556,7 +572,7 @@ async function extractToBundle(
 	} catch (e) {
 		console.error('[Windrose] Failed to mount the tile bundle at', basePath, e);
 	}
-	return { landed, skipped, failed, cancelled, commitError };
+	return { landed, skipped, failed, cancelled, commitError, compact };
 }
 
 /**
@@ -576,155 +592,6 @@ async function readShippedThumb(
 		console.warn('[Windrose] Shipped thumbnail unreadable for', key, '- rendering one instead', e);
 		return null;
 	}
-}
-
-const LOOSE_IMAGE_RE = /\.(png|jpe?g|gif|webp)$/i;
-
-/**
- * Loose image files under basePath (an earlier loose import of this pack),
- * excluding the bundle's own index/, shards/ and thumbs/ folders. Vault paths.
- */
-async function listLooseImages(app: App, basePath: string): Promise<string[]> {
-	const skipDirs = new Set([INDEX_DIR, SHARDS_DIR, THUMBS_DIR].map(d => `${basePath}/${d}`));
-	const out: string[] = [];
-	const queue = [basePath];
-	while (queue.length > 0) {
-		const dir = queue.pop();
-		if (dir == null) continue;
-		let listing: { files: string[]; folders: string[] };
-		try {
-			listing = await app.vault.adapter.list(dir);
-		} catch {
-			continue;
-		}
-		for (const sub of listing.folders) if (!skipDirs.has(sub)) queue.push(sub);
-		for (const f of listing.files) {
-			if (f === `${basePath}/${MARKER_FILE}`) continue;
-			if (LOOSE_IMAGE_RE.test(f)) out.push(f);
-		}
-	}
-	return out.sort();
-}
-
-/** Why a loose image from an earlier import was left in place. */
-type LooseKeptReason = 'differs' | 'not-in-bundle' | 'not-indexed' | 'not-served' | 'trash-failed';
-
-/** Same length and every byte equal. */
-function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
-	if (a.byteLength !== b.byteLength) return false;
-	for (let i = 0; i < a.byteLength; i++) if (a[i] !== b[i]) return false;
-	return true;
-}
-
-/**
- * Obsidian's "Deleted files" setting (`system` | `local` | `none`), or null
- * when this build does not expose vault.getConfig (mobile, older API): the
- * caller then retires through fileManager.trashFile, which uses `.trash`.
- */
-function trashOptionOf(app: App): string | null {
-	const vault = app.vault as unknown as { getConfig?: (key: string) => unknown };
-	if (typeof vault.getConfig !== 'function') return null;
-	try {
-		const v = vault.getConfig('trashOption');
-		return typeof v === 'string' ? v : null;
-	} catch {
-		return null;
-	}
-}
-
-/**
- * Move loose images to the trash once the mounted bundle serves the SAME
- * bytes for their paths. Each candidate is read back through readEntryBytes
- * (a real shard read, not an index lookup) and compared byte-for-byte with
- * the loose file; anything else stays, loose-wins keeps it in force, and it
- * is reported with a reason: `differs` (pack update or user override),
- * `not-in-bundle` (this run bundled nothing at that key and no mounted
- * segment serves it), `not-served` (the bundle has the key but the read
- * failed, or the loose file could not be read),
- * `not-indexed` (the vault has no TFile for it), `trash-failed`. Folders left
- * empty below basePath are trashed too. fileManager.trashFile honours the
- * user's trash setting; the caller skips this entirely when that setting
- * deletes permanently.
- */
-async function retireLooseImages(
-	app: App,
-	basePath: string,
-	loosePaths: string[],
-	/** Folder-relative keys this run bundled. */
-	bundledKeys: ReadonlySet<string>,
-): Promise<{ replaced: number; kept: Array<{ path: string; reason: LooseKeptReason }> }> {
-	const kept: Array<{ path: string; reason: LooseKeptReason }> = [];
-	if (loosePaths.length === 0) return { replaced: 0, kept };
-	let replaced = 0;
-	const touchedDirs = new Set<string>();
-	for (const path of loosePaths) {
-		const rel = path.slice(basePath.length + 1);
-		const file = app.vault.getAbstractFileByPath(path);
-		if (!(file instanceof TFile)) {
-			kept.push({ path: rel, reason: 'not-indexed' });
-			continue;
-		}
-		const served = await readEntryBytes(app, path);
-		if (isBundleReadFailure(served)) {
-			kept.push({ path: rel, reason: bundledKeys.has(rel) ? 'not-served' : 'not-in-bundle' });
-			continue;
-		}
-		let looseBytes: Uint8Array;
-		try {
-			looseBytes = new Uint8Array(await app.vault.adapter.readBinary(path));
-		} catch {
-			kept.push({ path: rel, reason: 'not-served' });
-			continue;
-		}
-		if (!sameBytes(new Uint8Array(served.bytes), looseBytes)) {
-			kept.push({ path: rel, reason: 'differs' });
-			continue;
-		}
-		try {
-			await app.fileManager.trashFile(file);
-			replaced++;
-			touchedDirs.add(path.slice(0, path.lastIndexOf('/')));
-		} catch (e) {
-			kept.push({ path: rel, reason: 'trash-failed' });
-			console.error('[Windrose] Could not move the loose tile to the trash:', path, e);
-		}
-	}
-	// Deepest first, walking up to (never including) basePath.
-	const dirs = new Set<string>();
-	for (let d of touchedDirs) {
-		while (d.startsWith(basePath + '/')) {
-			dirs.add(d);
-			d = d.slice(0, d.lastIndexOf('/'));
-		}
-	}
-	for (const dir of [...dirs].sort((a, b) => b.split('/').length - a.split('/').length)) {
-		try {
-			const listing = await app.vault.adapter.list(dir);
-			if (listing.files.length > 0 || listing.folders.length > 0) continue;
-			const folder = app.vault.getAbstractFileByPath(dir);
-			if (folder instanceof TFolder) await app.fileManager.trashFile(folder);
-		} catch (e) {
-			console.warn('[Windrose] Could not remove the empty folder', dir, e);
-		}
-	}
-	if (kept.length > 0) {
-		const groups = new Map<LooseKeptReason, string[]>();
-		for (const k of kept) {
-			const g = groups.get(k.reason);
-			if (g != null) g.push(k.path);
-			else groups.set(k.reason, [k.path]);
-		}
-		const lines = [...groups].map(([reason, paths]) => `  ${reason} (${paths.length}):\n    ${paths.join('\n    ')}`);
-		console.warn(`[Windrose] ${kept.length} loose file(s) in ${basePath} kept:\n${lines.join('\n')}`);
-		const names = kept.slice(0, 3).map(k => k.path.split('/').pop() ?? k.path);
-		const more = kept.length > 3 ? ', and more' : '';
-		new Notice(
-			`Windrose: kept ${kept.length} loose ${kept.length === 1 ? 'file' : 'files'} the new bundle does not replace ` +
-			`(${names.join(', ')}${more}). See the developer console for details.`,
-			10_000,
-		);
-	}
-	return { replaced, kept };
 }
 
 /**
@@ -830,6 +697,8 @@ async function runDdImportUnlocked(
 	let looseKept: string[] = [];
 	let looseKeptReasons: Array<{ path: string; reason: string }> = [];
 	let looseKeptPermanentDelete = 0;
+	const storage = effectiveStorage(opts);
+	let compactStats: DdImportResult['compact'];
 	if (opts.bundle !== false) {
 		// The vault watcher stays out of this folder until the bundle is
 		// committed and mounted and any replaced loose files are gone.
@@ -838,7 +707,7 @@ async function runDdImportUnlocked(
 		try {
 			const loose = await listLooseImages(app, basePath);
 			const routed = await preferLooseKeys(app, source, plans, basePath, loose);
-			out = await extractToBundle(app, source, archive, routed, basePath, meta, onProgress, isCancelled);
+			out = await extractToBundle(app, source, archive, routed, basePath, meta, onProgress, isCancelled, storage);
 			// A cancelled run holds a partial bundle: it may still register
 			// (below), but it never retires the earlier loose files.
 			if (out.commitError == null && !out.cancelled && loose.length > 0) {
@@ -875,6 +744,7 @@ async function runDdImportUnlocked(
 		}
 		cancelled = out.cancelled;
 		failedCount += out.failed;
+		if (storage === 'compact') compactStats = out.compact;
 		skipped = out.skipped;
 		if (out.commitError != null) {
 			// Nothing from this run is visible: leave tilesetFolders and
@@ -1060,7 +930,8 @@ async function runDdImportUnlocked(
 		total: textures.length,
 		packName: meta.name,
 		cancelled,
-		...(opts.bundle !== false ? { looseReplaced, looseKept, looseKeptReasons, looseKeptPermanentDelete } : {}),
+		...(opts.bundle !== false ? { looseReplaced, looseKept, looseKeptReasons, looseKeptPermanentDelete, storage } : {}),
+		...(compactStats != null ? { compact: compactStats } : {}),
 	};
 }
 
@@ -1111,5 +982,6 @@ export {
 	isEndCapFilename,
 	destFolderOf,
 	analyzePckForWizard,
+	listTextureEntries,
 };
-export type { PluginLike, PckWizardAnalysis, DdWizardDecisions, DdImportOptions, DdImportResult };
+export type { PluginLike, PckWizardAnalysis, DdWizardDecisions, DdImportOptions, DdImportResult, DdStorage };

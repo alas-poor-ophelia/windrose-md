@@ -22,6 +22,10 @@ const thumbFault = { throws: false };
 const notices: string[] = [];
 /** When armed, the importer's next mountBundleFolder call rejects. */
 const mountFault = { armed: false };
+/** Platform.isDesktopApp seen by the importer (compact storage is desktop only). */
+const platform = vi.hoisted(() => ({ isDesktopApp: true, isMobile: false, isDesktop: true }));
+/** compactEncode calls the importer made (source sizes). */
+const compactCalls: number[] = [];
 
 vi.mock('obsidian', async (importOriginal) => {
 	const orig = await importOriginal<typeof import('obsidian')>();
@@ -29,6 +33,20 @@ vi.mock('obsidian', async (importOriginal) => {
 		...orig,
 		Notice: class {
 			constructor(message: string) { notices.push(message); }
+		},
+		Platform: platform,
+	};
+});
+// No canvas here: compact re-encode is faked as "half the bytes, a WebP" for sources at or above the floor.
+vi.mock('../../../src/assets/bundles/bundleCompact', async (importOriginal) => {
+	const orig = await importOriginal<typeof import('../../../src/assets/bundles/bundleCompact')>();
+	const { fakeImage: img } = await import('../assets/bundles/fakeVault');
+	return {
+		...orig,
+		compactEncode: (bytes: Uint8Array, _mime: string, opts: { floorBytes: number }) => {
+			compactCalls.push(bytes.byteLength);
+			if (bytes.byteLength < opts.floorBytes) return Promise.resolve({ kind: 'exact', reason: 'below the size floor' });
+			return Promise.resolve({ kind: 'compact', bytes: img('webp', bytes.byteLength / 2, bytes[100]), mime: 'image/webp' });
 		},
 	};
 });
@@ -86,6 +104,7 @@ const {
 	_resetBundleRegistryForTests, entriesFor, beginBundleWrite, endBundleWrite, isBundleWriteInProgress,
 } = await import('../../../src/assets/bundles/bundleRegistry');
 const { BundleWriter } = await import('../../../src/assets/bundles/bundleWriter');
+const { decodeIndexSegment, sha256Hex } = await import('../../../src/assets/bundles/bundleFormat');
 
 const PACK = 'res://packs/packX';
 const BASE = 'windrose-content/dungeondraft-packs/packX';
@@ -582,5 +601,78 @@ describe('retiring an earlier loose import', () => {
 		expect(plugin.saves).toBe(1);
 		const again = await importInto(fv, true, packFiles(), plugin);
 		expect(again.error).toBeUndefined();
+	});
+});
+
+describe('runDdImport with compact storage', () => {
+	const bigA = fakeImage('png', 100_000, 21);
+	const bigB = fakeImage('webp', 80_000, 22);
+	const files = (): Array<{ path: string; data: Uint8Array }> => [
+		{ path: `${PACK}/pack.json`, data: new TextEncoder().encode('{}') },
+		{ path: `${PACK}/textures/objects/BigA.png`, data: bigA },
+		{ path: `${PACK}/textures/objects/BigB.webp`, data: bigB },
+		{ path: `${PACK}/textures/objects/Rock.png`, data: rockPng },
+	];
+	const run = async (fv: FakeVault, storage: 'exact' | 'compact' | undefined) => {
+		const source = buildPckSource(files());
+		const archive = await parsePck(source);
+		return runDdImport(fv.app, makePlugin(fv), source, archive, META, undefined, undefined, undefined, { storage });
+	};
+	const segment = (fv: FakeVault) => {
+		const [idx] = under(fv, 'index');
+		return decodeIndexSegment(fv.files.get(idx) ?? new Uint8Array(0));
+	};
+
+	beforeEach(() => {
+		_resetBundleRegistryForTests();
+		compactCalls.length = 0;
+		platform.isDesktopApp = true;
+		vi.stubGlobal('window', { setTimeout: globalThis.setTimeout, dispatchEvent: () => true });
+		vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		vi.restoreAllMocks();
+	});
+
+	it('writes a compact segment: re-encoded entries carry src, small ones stay plain', async () => {
+		const fv = makeFakeVault();
+		const result = await run(fv, 'compact');
+		expect(result.error).toBeUndefined();
+		expect(result.storage).toBe('compact');
+		expect(result.compact).toEqual({ compacted: 2, keptExact: 1, bytesSaved: 50_000 + 40_000 });
+		const seg = segment(fv);
+		expect(seg.mode).toBe('compact');
+		const a = seg.entries['objects/BigA.png'];
+		expect(a.mime).toBe('image/webp');
+		expect(a.l).toBe(50_000);
+		expect(a.src).toEqual({ sha256: await sha256Hex(bigA), bytes: 100_000, mime: 'image/png' });
+		expect(seg.entries['objects/BigB.webp'].src).toEqual({ sha256: await sha256Hex(bigB), bytes: 80_000, mime: 'image/webp' });
+		const rock = seg.entries['objects/Rock.png'];
+		expect(rock.src).toBeUndefined();
+		expect(rock.mime).toBe('image/png');
+		expect(rock.l).toBe(rockPng.byteLength);
+	});
+
+	it('leaves an exact import unchanged (no re-encode, exact segment, no src)', async () => {
+		const fv = makeFakeVault();
+		const result = await run(fv, undefined);
+		expect(compactCalls).toEqual([]);
+		expect(result.storage).toBe('exact');
+		expect(result.compact).toBeUndefined();
+		const seg = segment(fv);
+		expect(seg.mode).toBe('exact');
+		expect(Object.values(seg.entries).every(e => e.src === undefined)).toBe(true);
+		expect(seg.entries['objects/BigA.png'].l).toBe(100_000);
+	});
+
+	it('forces exact on mobile even when compact was asked for', async () => {
+		platform.isDesktopApp = false;
+		const fv = makeFakeVault();
+		const result = await run(fv, 'compact');
+		expect(compactCalls).toEqual([]);
+		expect(result.storage).toBe('exact');
+		expect(result.compact).toBeUndefined();
+		expect(segment(fv).mode).toBe('exact');
 	});
 });
