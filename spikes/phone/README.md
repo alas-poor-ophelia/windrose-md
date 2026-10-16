@@ -33,7 +33,10 @@ Probes kept from the first phone pass (2026-10-16): `probe-phone.js` (palette
 fit, canvas width, dungeon modal with Advanced expanded), `probe-flyouts.js`
 (sub-tool flyouts against the viewport), `probe-settings.js` (map settings
 modal tabs), `probe-color.js` (edge-rail color picker), `probe-chain.js` and
-`probe-tree.js` (ancestor / DOM dumps for diagnosing a layout).
+`probe-tree.js` (ancestor / DOM dumps for diagnosing a layout), `probe-drawer.js`
+(block tile drawer open vs folded), `probe-stack.js` (stacking and hit-test at
+the compass), `probe-object-color.js` (selection overlay color picker near the
+screen edge).
 
 Overflow report rules: an element under `.modal` or any `[class*=windrose-]`
 root is listed if its *visible* rect (clipped by overflow ancestors) passes the
