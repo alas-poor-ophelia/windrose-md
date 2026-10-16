@@ -12,7 +12,17 @@ import type { MapData } from "#types/core/map.types";
 import type { RendererTheme } from "#types/hooks/canvasRenderer.types";
 import { renderCanvas } from "../../../../src/hooks/canvas/useCanvasRenderer";
 import { createGeometry } from "../../../../src/geometry/core/createGeometry";
+import { createGeometryLadder } from "../../../../src/geometry/core/createGeometryLadder";
+import { HexGeometry } from "../../../../src/geometry/core/HexGeometry";
+import { LADDER_DEFAULTS } from "../../../../src/geometry/core/lattice";
 import { makeLayer, makeMapData } from "../../helpers/fixtures";
+
+// The lattice-ladder capability, switchable per test (TEST-05 flag on/off oracle).
+const flags = vi.hoisted(() => ({ lodLadder: false }));
+vi.mock("../../../../src/core/settingsAccessor", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../../src/core/settingsAccessor")>();
+  return { ...actual, getSettings: () => ({ ...actual.getSettings(), lodLadder: flags.lodLadder }) };
+});
 
 type Log = string[];
 
@@ -119,6 +129,40 @@ function hexFixture(): MapData {
   } as never);
 }
 
+/**
+ * Classic hex map with every element kind the ladder touched: an object, a text
+ * label, a tile, a fogged cell, a second layer and a sub-hex child (which keeps
+ * the map classic even with the capability on).
+ */
+function richClassicFixture(): MapData {
+  return makeMapData({
+    mapType: "hex",
+    hexSize: 40,
+    orientation: "flat",
+    northDirection: 0,
+    hexBounds: { maxCol: 10, maxRow: 10 },
+    viewState: { zoom: 1, center: { x: 60, y: 40 } },
+    activeLayerId: "layer-1",
+    layers: [
+      makeLayer({
+        cells: [
+          { q: 0, r: 0, color: "#ff0000" },
+          { q: 1, r: 0, color: "#00ff00" },
+          { q: 1, r: 1, color: "#0000ff" },
+        ],
+        objects: [{ id: "o1", type: "entrance", position: { x: 1, y: 0 }, size: { width: 1, height: 1 } }],
+        textLabels: [{ id: "t1", position: { x: 60, y: 40 }, content: "Keep", fontSize: 16, fontFace: "sans-serif", color: "#ffffff" }],
+        tiles: [{ col: 0, row: 0, tilesetId: "ts", tileId: "floor" }],
+        fogOfWar: { enabled: true, foggedCells: [{ col: 1, row: 1 }], texture: null },
+      } as never),
+      makeLayer({ id: "layer-2", name: "Layer 2", order: 1, cells: [{ q: 2, r: 0, color: "#ffff00" }] } as never),
+    ],
+    subHexMaps: {
+      "1,0": { mapData: { layers: [makeLayer({ cells: [{ q: 0, r: 0, color: "#123456" }] } as never)] } },
+    },
+  } as never);
+}
+
 describe("renderCanvas call-sequence snapshot", () => {
   let offscreenLog: Log;
 
@@ -163,5 +207,107 @@ describe("renderCanvas call-sequence snapshot", () => {
     expect(live.some(l => l.startsWith("live.drawImage(off"))).toBe(true);
     expect(off.some(l => l.startsWith("off.arc("))).toBe(true);
     expect({ live, off, paths }).toMatchSnapshot();
+  });
+
+  it("classic hex map with object, label, tile, fog and a second layer", () => {
+    const { live, off, paths } = render(richClassicFixture());
+    expect([...live, ...off].some(l => l.includes("Keep"))).toBe(true);
+    expect({ live, off, paths }).toMatchSnapshot();
+  });
+
+  describe("classic dormancy: capability on and off draw identical frames (TEST-05)", () => {
+    const fixtures: Array<[string, () => MapData, Record<string, unknown>]> = [
+      ["grid", gridFixture, {}],
+      ["rotated hex", hexFixture, { adjacentEmptySlots: [{ dq: 1, dr: 0 }] }],
+      ["rich hex", richClassicFixture, {}],
+    ];
+
+    afterEach(() => {
+      flags.lodLadder = false;
+    });
+
+    for (const [name, make, extra] of fixtures) {
+      it(`${name}: flag on equals flag off`, () => {
+        flags.lodLadder = false;
+        offscreenLog.length = 0;
+        const off = render(make(), extra);
+        const offLogs = { live: [...off.live], off: [...off.off], paths: [...off.paths] };
+
+        flags.lodLadder = true;
+        offscreenLog.length = 0;
+        pathLog = [];
+        pathSeq = 0;
+        const on = render(make(), extra);
+        expect(offLogs.live.length).toBeGreaterThan(5);
+        expect({ live: on.live, off: on.off, paths: on.paths }).toEqual(offLogs);
+      });
+    }
+  });
+
+  // TEST-04: a ladder frame (the export path: ladder + level + bypassSurfaceCache)
+  // at the deepest rung, with an object pinned to another rung and a fogged root hex.
+  describe("ladder frame at depth: visibleLevels and rung fog (TEST-04)", () => {
+    const LEVEL = 2;
+    const LABEL_AT = { x: 60, y: 40 };
+
+    function depthFixture(over: { pinned?: number[]; fogged?: boolean; pinnedLabel?: boolean }): MapData {
+      const deepLabel = (id: string, content: string, visibleLevels?: number[]) => ({
+        id, position: LABEL_AT, content, fontSize: 24, fontFace: "sans-serif", color: "#ffffff",
+        homeLevel: LEVEL, depthMode: "persist", ...(visibleLevels ? { visibleLevels } : {}),
+      });
+      return makeMapData({
+        mapType: "hex",
+        hexSize: 40,
+        orientation: "flat",
+        northDirection: 0,
+        hexBounds: { maxCol: 10, maxRow: 10 },
+        viewState: { zoom: 1, center: { x: 60, y: 40 } },
+        lod: { m: LADDER_DEFAULTS.m, minCellPx: LADDER_DEFAULTS.minCellPx, maxLevel: LADDER_DEFAULTS.maxLevel },
+        layers: [makeLayer({
+          cells: [{ q: 0, r: 0, color: "#ff0000" }],
+          textLabels: [
+            deepLabel("auto", "AUTO-LABEL"),
+            ...(over.pinnedLabel === false ? [] : [deepLabel("pin", "PINNED-LABEL", over.pinned ?? [1])]),
+          ],
+          fogOfWar: { enabled: true, foggedCells: over.fogged === true ? [{ col: 0, row: 0 }] : [], texture: null },
+        } as never)],
+      } as never);
+    }
+
+    function renderDepth(mapData: MapData): Log {
+      const geometry = createGeometry(mapData) as HexGeometry;
+      const ladder = createGeometryLadder(geometry, { ...LADDER_DEFAULTS });
+      const live: Log = [];
+      pathLog = [];
+      pathSeq = 0;
+      const canvas = recordingCanvas("live", 800, 600, live);
+      renderCanvas(canvas, null, mapData, geometry, [], {
+        theme: THEME, ladder, level: LEVEL, bypassSurfaceCache: true,
+      });
+      return live;
+    }
+
+    const textDrawn = (log: Log, text: string) => log.some(l => l.includes(JSON.stringify(text)));
+
+    it("omits an element pinned to another rung and draws the unpinned one", () => {
+      const log = renderDepth(depthFixture({ pinned: [1] }));
+      expect(textDrawn(log, "AUTO-LABEL")).toBe(true);
+      expect(textDrawn(log, "PINNED-LABEL")).toBe(false);
+    });
+
+    it("draws the pinned element once its set includes the render rung", () => {
+      const log = renderDepth(depthFixture({ pinned: [1, LEVEL] }));
+      expect(textDrawn(log, "PINNED-LABEL")).toBe(true);
+    });
+
+    it("pinned-away elements leave the frame identical to a map without them", () => {
+      expect(renderDepth(depthFixture({ pinned: [1] }))).toEqual(renderDepth(depthFixture({ pinnedLabel: false })));
+    });
+
+    it("a fogged root hex changes the frame (fog applies to depth content)", () => {
+      const clear = renderDepth(depthFixture({ fogged: false }));
+      const fogged = renderDepth(depthFixture({ fogged: true }));
+      expect(fogged).not.toEqual(clear);
+    });
   });
 });

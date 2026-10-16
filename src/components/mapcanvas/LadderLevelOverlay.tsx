@@ -11,26 +11,39 @@
  * differ. Renders null on classic maps.
  *
  * Mounted inside MapCanvas's provider tree (it needs `ladder` and the live
- * view controller); re-renders on live view ticks so it tracks a zoom gesture.
+ * view controller); follows a zoom gesture by subscribing to the live view and
+ * re-rendering only when the camera rung changes.
  */
 
 import type { VNode } from 'preact';
+import { useEffect, useState } from 'preact/hooks';
 
 import { useMapState, useMapOperations } from '../../context/MapContext';
-import { useLiveViewTick } from '../../hooks/canvas/useLiveOverlayTransform';
 import { resolveEditLevel, viewStateAtRung } from '../../hooks/state/layerHistoryOps';
 import { getMaxZoom } from '../../core/lodFlags';
 import { Icon } from '../shared/Icon';
+import { LevelChip } from '../overlays/LevelChip';
 
 const LadderLevelOverlay = (): VNode | null => {
   const { ladder, viewController, editLevelLock, setEditLevelLock, mapData } = useMapState();
   const { onMapDataUpdate } = useMapOperations();
-  useLiveViewTick(ladder !== null ? viewController : null);
+
+  // The camera rung is state, updated from the live view subscription: Preact
+  // bails out when the value is unchanged, so pans and in-band zooms never
+  // re-render this overlay, only a rung crossing does.
+  const [camera, setCamera] = useState(() => (
+    ladder !== null && viewController !== undefined ? ladder.activeLevel(viewController.getLive().zoom) : 0
+  ));
+  useEffect(() => {
+    if (ladder === null || viewController === undefined) return undefined;
+    setCamera(ladder.activeLevel(viewController.getLive().zoom));
+    return viewController.subscribeLive((view) => {
+      setCamera(ladder.activeLevel(view.zoom));
+    });
+  }, [ladder, viewController]);
 
   if (ladder === null || viewController === undefined) return null;
 
-  const live = viewController.getLive();
-  const camera = ladder.activeLevel(live.zoom);
   const edit = resolveEditLevel(editLevelLock, camera);
   const locked = editLevelLock !== null;
   const levels = Array.from({ length: ladder.params.maxLevel + 1 }, (_, i) => i);
@@ -60,35 +73,20 @@ const LadderLevelOverlay = (): VNode | null => {
         onTouchStart={stop}
         onWheel={stop}
       >
-        {levels.map((level) => {
-          const lockClass = locked && level === editLevelLock ? ' is-locked' : '';
-          if (level === camera) {
-            return (
-              <span
-                key={level}
-                className={`windrose-ladder-chip is-current${lockClass}`}
-                aria-current="true"
-              >
-                <span className="windrose-ladder-chip-prefix">L</span>{level}
-              </span>
-            );
-          }
-          return (
-            <button
-              key={level}
-              type="button"
-              className={`windrose-ladder-chip${lockClass}`}
-              aria-label={`Zoom to level ${level}`}
-              onClick={() => zoomToRung(level)}
-            >
-              <span className="windrose-ladder-chip-prefix">L</span>{level}
-            </button>
-          );
-        })}
+        {levels.map((level) => (
+          <LevelChip
+            key={level}
+            level={level}
+            state={level === camera ? 'current' : 'off'}
+            locked={locked && level === editLevelLock}
+            ariaLabel={`Zoom to level ${level}`}
+            onClick={level === camera ? undefined : () => zoomToRung(level)}
+          />
+        ))}
         <button
           type="button"
           className={`windrose-ladder-lock${locked ? ' is-locked' : ''}`}
-          aria-label={locked ? 'Unlock edit level' : 'Lock edit level'}
+          aria-label="Lock edit level"
           aria-pressed={locked}
           onClick={toggleLock}
         >

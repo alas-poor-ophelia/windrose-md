@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { h, render } from 'preact';
+import { act } from 'preact/test-utils';
 
 import { LevelPickerPopup, chipStateOf } from '../../../../src/components/overlays/LevelPickerPopup';
 
@@ -27,7 +28,7 @@ describe('LevelPickerPopup', () => {
     }), root);
     const chips = [...root.querySelectorAll('button.windrose-ladder-chip')];
     expect(chips.map(c => c.textContent)).toEqual(['Auto', 'L0', 'L1', 'L2']);
-    expect(chips[1].classList.contains('is-current')).toBe(true);
+    expect(chips[1].classList.contains('is-on')).toBe(true);
     expect(chips[2].classList.contains('is-mixed')).toBe(true);
     expect(chips[2].getAttribute('aria-pressed')).toBe('mixed');
     expect(chips[3].getAttribute('aria-label')).toBe('Level 2 visible');
@@ -35,6 +36,35 @@ describe('LevelPickerPopup', () => {
     (chips[0] as HTMLButtonElement).click();
     expect(onToggleLevel).toHaveBeenCalledWith(2);
     expect(onAuto).toHaveBeenCalledTimes(1);
+  });
+
+  it('has role and label', () => {
+    root = document.createElement('div');
+    document.body.appendChild(root);
+    render(h(LevelPickerPopup, {
+      x: 10, y: 10, maxLevel: 1, autoState: 'on' as const, levelState: () => 'off' as const,
+      onToggleLevel: () => {}, onAuto: () => {}, onClose: () => {}
+    }), root);
+    expect(root.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Visible on levels');
+  });
+
+  it('Escape closes and does not clear the selection', () => {
+    root = document.createElement('div');
+    document.body.appendChild(root);
+    const onClose = vi.fn();
+    const mapKey = vi.fn();
+    document.body.addEventListener('keydown', mapKey);
+    const el = root;
+    act(() => { render(h(LevelPickerPopup, {
+      x: 10, y: 10, maxLevel: 1, autoState: 'on' as const, levelState: () => 'off' as const,
+      onToggleLevel: () => {}, onAuto: () => {}, onClose
+    }), el); });
+    const ev = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    document.body.dispatchEvent(ev);
+    document.body.removeEventListener('keydown', mapKey);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    // The capture listener on the document stops it before the map's own handler.
+    expect(mapKey).not.toHaveBeenCalled();
   });
 
   it('chipStateOf: all on, some on, none on', () => {

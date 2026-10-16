@@ -184,6 +184,25 @@ describe('levelsShapeIsValid (C3)', () => {
   });
 });
 
+describe('levels identity is load-bearing (REACT-05)', () => {
+  it('a deep write changes levels identity; a cosmetic write does not', () => {
+    const base = setLevelCells(mapWith(layer()), 'L1', 2, [cell(16, 0)]);
+    const levelsBefore = base.layers[0].levels;
+
+    // A deep write on another rung replaces the record, and the rung it did not touch is shared.
+    const deeper = setLevelCells(base, 'L1', 3, [cell(48, 0)]);
+    expect(deeper.layers[0].levels).not.toBe(levelsBefore);
+    expect(authoredCells(deeper.layers[0], 2)).toBe(authoredCells(base.layers[0], 2));
+
+    // A cosmetic layer edit (a rename, a level-0 cell) leaves the record and its rungs alone.
+    const renamed = { ...base, layers: base.layers.map(l => ({ ...l, name: 'renamed', cells: [...l.cells, cell(5, 5)] })) };
+    expect(renamed.layers[0].levels).toBe(levelsBefore);
+
+    // A no-op deep write keeps the whole map identity.
+    expect(setLevelCells(base, 'L1', 2, authoredCells(base.layers[0], 2))).toBe(base);
+  });
+});
+
 describe('cloneLayer carries levels', () => {
   it.each(['all', 'mapOnly'] as const)('%s mode deep-copies levels', (mode) => {
     const src = layer({ levels: { 2: [cell(16, 0)] } });

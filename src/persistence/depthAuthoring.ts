@@ -37,7 +37,7 @@ import { MAX_JOURNAL_PAYLOAD, journalPayloadLength } from './saveJournal';
  * to what the journal actually stores, not to its raw JSON or UTF-8 size.
  */
 const DEPTH_BUDGET_BYTES = Math.floor(MAX_JOURNAL_PAYLOAD * 0.8);
-/** Cells one operation may ADD to a rung (design section 3.6). */
+/** Cells one operation may ADD to a rung (bounds one stroke or paste; see src/geometry/CLAUDE.md, Ladder invariants). */
 const MAX_CELLS_PER_DEPTH_OP = 4096;
 /** Serialised bytes per hex cell, measured on the fixture (q, r, colour). */
 const BYTES_PER_CELL_ESTIMATE = 36;
@@ -67,6 +67,7 @@ function elementBytes(value: unknown): number {
 type DepthWriteRefusal =
   | 'not-a-ladder'
   | 'nested-classic'
+  | 'nested-level'
   | 'quarantined'
   | 'level-out-of-range'
   | 'too-many-cells'
@@ -77,7 +78,7 @@ type DepthWriteRefusal =
  * Optional context for a write that is one tick of a longer operation (a brush
  * stroke). Both are measured at the operation's START, so the per-op cap and the
  * budget apply to the operation as a whole and the map is serialised once per
- * operation instead of once per tick (kgc.23).
+ * operation instead of once per tick.
  */
 interface DepthWriteContext {
   /** The rung's cells when the operation began; the cap counts cells added since. Default: the rung's current cells. */
@@ -91,7 +92,7 @@ interface DepthWriteContext {
   /**
    * Serialised bytes the write ADDS beyond cells (objects, text, tiles homed on
    * the rung). Such a write grows the map even when the rung's cells do not, so
-   * it is held to the budget (kgc.25). Default 0.
+   * it is held to the same byte budget as cell writes. Default 0.
    */
   addedBytes?: number;
   /**
@@ -102,6 +103,14 @@ interface DepthWriteContext {
    * Default false: the stamp is kept.
    */
   lodAbsentAtStart?: boolean;
+  /**
+   * True when the write targets a sub-hex child map (any level below the root).
+   * Depth authoring is refused there outright (decision D-1): the budget is
+   * measured on the child while the save journal stores the root with every
+   * sibling, so a child could pass the gate and still push the root entry past
+   * the journal cap. Default false.
+   */
+  nested?: boolean;
 }
 
 type DepthWriteResult =
@@ -123,8 +132,8 @@ function canBeginDepthAuthoring(mapData: MapData | null | undefined): boolean {
 function depthEntryRefusal(mapData: MapData): DepthWriteRefusal | null {
   if (canBeginDepthAuthoring(mapData)) return null;
   if (isDepthQuarantined(mapData).quarantined) return 'quarantined';
-  // A classic map with sub-hex children never takes the lod stamp (design s9):
-  // the stamp would hide its children behind the ladder for good (kgc.15).
+  // A classic map with sub-hex children never takes the lod stamp: the stamp
+  // would hide its children behind the ladder for good.
   if (mapData.lod === undefined && hasSubHexChildren(mapData)) return 'nested-classic';
   return 'not-a-ladder';
 }
@@ -136,7 +145,7 @@ function depthEntryRefusal(mapData: MapData): DepthWriteRefusal | null {
  * stored block must repeat them: stamping the bare defaults under an `m` or
  * `maxLevel` override would re-partition the map on the next frame and read the
  * stroke's cells back at the wrong positions, or quarantine the map at once for
- * content past its stored maxLevel (kgc.16). Same reference when present.
+ * content past its stored maxLevel. Same reference when present.
  */
 function withLod(mapData: MapData): MapData {
   if (mapData.lod !== undefined) return mapData;
@@ -176,7 +185,7 @@ function countAddedCells(next: Cell[], from: Cell[]): number {
  * Check a proposed rung write without applying it. `nextCells` is the FULL
  * intended content of the rung after the write. A write that adds no cell
  * position (identity, erase, recolour) and adds no element bytes is never refused on size: the stroke-end history write
- * re-writes the current rung and must always land (kgc.23 e).
+ * re-writes the current rung and must always land.
  */
 function guardDepthWrite(
   mapData: MapData,
@@ -185,6 +194,7 @@ function guardDepthWrite(
   nextCells: Cell[],
   context: DepthWriteContext = {}
 ): DepthWriteRefusal | null {
+  if (context.nested === true) return 'nested-level';
   const entry = depthEntryRefusal(mapData);
   if (entry !== null) return entry;
   const params = ladderParamsFor(withLod(mapData));

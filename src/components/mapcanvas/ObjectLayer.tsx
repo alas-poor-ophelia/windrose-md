@@ -38,9 +38,9 @@ import { calculateObjectScreenPosition } from '../../objects/screenPositionUtils
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { convertObjectToFreeform, snapObjectToGrid } from '../../objects/objectOperations';
 import { toggledDepthMode, effectiveVisibleLevels, withLevelMembership } from '../../geometry/renderers/elementBands';
-import { LevelPickerPopup, levelPickerAnchor, chipStateOf } from '../overlays/LevelPickerPopup';
+import { LevelPickerPopup, chipStateOf } from '../overlays/LevelPickerPopup';
 import type { ChipState } from '../overlays/LevelPickerPopup';
-import { isLadderView } from '../../core/lodFlags';
+import { useLevelPicker, selectionKeyOf } from '../../hooks/objects/useLevelPicker';
 import { copyDeepLinkToClipboard } from '../../persistence/deepLinkHandler';
 import { LinkingModeBanner } from '../overlays/LinkingModeBanner';
 import { CardinalIndicators } from './CardinalIndicators';
@@ -302,18 +302,13 @@ const ObjectLayer = ({
     applyObjectUpdates({ depthMode: toggledDepthMode(obj) });
   };
 
-  // Ladder level picker (kgc.31): which rungs the selection is visible on.
-  // `key` ties the open popup to the selection it was opened for.
-  const [levelPicker, setLevelPicker] = useState<{ x: number; y: number; key: string } | null>(null);
-  const closeLevelPicker = useCallback(() => setLevelPicker(null), []);
+  // Ladder level picker: which rungs the selection is visible on. Tied to the
+  // selected ids, so any selection change closes it.
   const maxLevel = ladder?.params.maxLevel ?? 0;
-  const levelPickerKey = hasMultiSelection ? 'multi' : selectedItem?.type === 'object' ? `object:${selectedItem.id}` : null;
-  const openLevelPicker = (e?: Event): void => {
-    if (levelPickerKey === null) return;
-    e?.preventDefault();
-    e?.stopPropagation();
-    setLevelPicker({ ...levelPickerAnchor(e, containerRef.current), key: levelPickerKey });
-  };
+  const levelPickerKey = hasMultiSelection
+    ? selectionKeyOf('multi', selectedItems.map(item => item.id))
+    : selectedItem?.type === 'object' ? selectionKeyOf('object', [selectedItem.id]) : null;
+  const { picker: levelPicker, open: openLevelPicker, close: closeLevelPicker } = useLevelPicker(levelPickerKey, containerRef);
   /** The selected elements as stored now (selection data can lag a commit). */
   const levelPickerElements = (): Array<{ el: MapObject | TextLabel; kind: 'object' | 'label' }> => {
     if (!mapData) return [];
@@ -463,7 +458,7 @@ const ObjectLayer = ({
             onDuplicateAll: handleDuplicateAll,
             onDeleteAll: handleDeleteAll,
             onLevels: openLevelPicker
-          }, { isLadder: isLadderView(mapData), hasExplicitLevels: levelPickerElements().some(({ el }) => el.visibleLevels !== undefined) })}
+          }, { isLadder: ladder !== null, hasExplicitLevels: levelPickerElements().some(({ el }) => el.visibleLevels !== undefined) })}
           mapData={mapData}
           canvasRef={canvasRef}
           containerRef={containerRef}
@@ -481,7 +476,7 @@ const ObjectLayer = ({
             selectedItem,
             objectActionHandlers,
             mapData,
-            { isResizeMode, isPlayer: selectedItem.data?.isPlayer === true, isMeasuring: measureMovement, isLadder: isLadderView(mapData) }
+            { isResizeMode, isPlayer: selectedItem.data?.isPlayer === true, isMeasuring: measureMovement, isLadder: ladder !== null }
           )]}
           mapData={mapData}
           canvasRef={canvasRef}
@@ -515,7 +510,7 @@ const ObjectLayer = ({
         />
       )}
 
-      {levelPicker !== null && levelPicker.key === levelPickerKey && !isDraggingSelection && ladder !== null && (
+      {levelPicker !== null && !isDraggingSelection && ladder !== null && (
         <LevelPickerPopup
           x={levelPicker.x}
           y={levelPicker.y}

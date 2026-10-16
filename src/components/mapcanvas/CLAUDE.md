@@ -33,6 +33,7 @@ MapCanvas.tsx               # Providers (MapSelection, ObjectLinking, EventHandl
 ├── SegmentHoverOverlay.tsx   # Segment hover feedback
 ├── SegmentPickerOverlay.tsx  # Segment picker UI
 ├── LadderLevelOverlay.tsx    # Ladder level chips (L0..Lmax, click zooms to a rung), edit-level padlock, level readout
+├── (components/overlays/LevelPickerPopup.tsx)  # Not in this folder: per-object Visible levels picker, opened from the selection toolbar
 ├── CardinalIndicators.tsx    # N/S/E/W indicators
 ├── RerollDungeonButton.tsx   # Dungeon generation reroll
 └── viewportTransform.ts      # Pure world/screen viewport math shared by overlays (not a component)

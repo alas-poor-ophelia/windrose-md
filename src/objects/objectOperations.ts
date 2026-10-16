@@ -524,17 +524,25 @@ const DUPLICATE_MAX_RING = 10;
  *
  * `objects` must include everything already placed, including copies made
  * earlier in the same bulk duplicate, so successive copies do not collide.
+ *
+ * `cellExists(home, x, y)`, when given, skips cells that do not exist on the
+ * source's rung (a deep rung cell past the root edge), so a duplicate lands
+ * only where placement could put it. Omitted, every cell counts as existing.
  */
 function findDuplicateTarget(
   objects: MapObject[] | null | undefined,
   source: Pick<MapObject, 'position' | 'homeLevel'>,
-  mapType: MapType
+  mapType: MapType,
+  cellExists?: (home: number, x: number, y: number) => boolean
 ): DuplicateTarget | null {
   const list = objects ?? [];
   const { x: sourceX, y: sourceY } = source.position;
   // The copy keeps the source's ladder rung (callers spread the source), so it
   // looks for room among that rung's cells, not the root's.
   const home = homeLevelOf(source);
+
+  const free = (x: number, y: number): boolean =>
+    (cellExists === undefined || cellExists(home, x, y)) && canPlaceObjectAt(list, x, y, mapType, home);
 
   const withSlot = (x: number, y: number): DuplicateTarget => {
     if (mapType !== 'hex') return { x, y };
@@ -546,7 +554,7 @@ function findDuplicateTarget(
     : [[1, 0], [0, 1], [-1, 0], [0, -1]];
 
   for (const [dx, dy] of directions) {
-    if (canPlaceObjectAt(list, sourceX + dx, sourceY + dy, mapType, home)) {
+    if (free(sourceX + dx, sourceY + dy)) {
       return withSlot(sourceX + dx, sourceY + dy);
     }
   }
@@ -555,7 +563,7 @@ function findDuplicateTarget(
     for (let dx = -ring; dx <= ring; dx++) {
       for (let dy = -ring; dy <= ring; dy++) {
         if (Math.abs(dx) !== ring && Math.abs(dy) !== ring) continue;
-        if (canPlaceObjectAt(list, sourceX + dx, sourceY + dy, mapType, home)) {
+        if (free(sourceX + dx, sourceY + dy)) {
           return withSlot(sourceX + dx, sourceY + dy);
         }
       }

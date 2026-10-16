@@ -443,7 +443,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const { cloningLayerId, setCloningLayerId, handleCloneLayerRequest } = useCloneLayerRequest(app, mapData, handleLayerClone);
 
   // Data change handlers (extracted to useDataHandlers hook)
-  const dataHandlers = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
+  const dataHandlers = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory, levelKey: subHexPath });
   const {
     handleNameChange,
     handleCellsChange,

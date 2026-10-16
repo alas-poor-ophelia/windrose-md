@@ -85,7 +85,8 @@ export function duplicateSelection(
   items: SelectedItem[],
   mapType: MapType,
   gridSize: number | undefined,
-  makeTextId: () => string = defaultTextId
+  makeTextId: () => string = defaultTextId,
+  cellExists?: (home: number, x: number, y: number) => boolean
 ): DuplicateSelectionResult {
   const objects = [...(layer.objects ?? [])];
   const textLabels = [...(layer.textLabels ?? [])];
@@ -100,7 +101,7 @@ export function duplicateSelection(
       // Same placement rules as single duplicate: first free neighbour, then
       // rings; hex gets a free slot. Searching the growing list keeps copies
       // made earlier in this loop from landing on each other.
-      const dest = findDuplicateTarget(objects, sourceObj, mapType);
+      const dest = findDuplicateTarget(objects, sourceObj, mapType, cellExists);
       if (!dest) {
         skippedObjects++;
         continue;
@@ -193,7 +194,7 @@ export interface MultiSelectionActions {
 export function useMultiSelectionActions(
   onObjectsChange: (objects: MapObject[], suppressHistory?: boolean) => void
 ): MultiSelectionActions {
-  const { mapData } = useMapState();
+  const { mapData, ladder } = useMapState();
   const { onTextLabelsChange } = useMapOperations();
   const { selectedItems, hasMultiSelection, selectMultiple, clearSelection, updateSelectedItemsData } = useMapSelection();
 
@@ -208,7 +209,8 @@ export function useMultiSelectionActions(
   const handleDuplicateAll = useCallback(() => {
     if (!hasMultiSelection || !mapData) return;
     const { objects, textLabels, newSelectedItems, skippedObjects } =
-      duplicateSelection(getActiveLayer(mapData), selectedItems, mapData.mapType, mapData.gridSize);
+      duplicateSelection(getActiveLayer(mapData), selectedItems, mapData.mapType, mapData.gridSize, undefined,
+        (home, x, y) => ladder === null || home <= 0 || ladder.existsAt(home, x, y));
     onObjectsChange(objects, true);
     onTextLabelsChange(textLabels, false);
     if (skippedObjects > 0) {
@@ -217,7 +219,7 @@ export function useMultiSelectionActions(
     if (newSelectedItems.length > 0) {
       selectMultiple(newSelectedItems);
     }
-  }, [hasMultiSelection, mapData, selectedItems, onObjectsChange, onTextLabelsChange, selectMultiple]);
+  }, [hasMultiSelection, mapData, ladder, selectedItems, onObjectsChange, onTextLabelsChange, selectMultiple]);
 
   const handleDeleteAll = useCallback(() => {
     if (!hasMultiSelection || !mapData) return;

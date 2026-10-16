@@ -15,6 +15,7 @@ import type { MapObject } from '#types/objects/object.types';
 import { HexGeometry } from '../../../src/geometry/core/HexGeometry';
 import { createGeometryLadder } from '../../../src/geometry/core/createGeometryLadder';
 import { getItemsInWorldRect } from '../../../src/objects/multiSelectOperations';
+import { setSelectionVisibleLevels } from '../../../src/hooks/objects/useMultiSelectionActions';
 import { ladderLabelBounds } from '../../../src/text/textLabelOperations';
 import type { TextLabel } from '#types/objects/note.types';
 import { makeLayer, makeMapData } from '../helpers/fixtures';
@@ -142,5 +143,72 @@ describe('getItemsInWorldRect labels with a ladder view (INT-02)', () => {
     const inside = box.width / 2 - 0.01;
     const hit = getItemsInWorldRect(map, { worldX: inside, worldY: -1 }, { worldX: inside + 1, worldY: 1 }, root, null, view);
     expect(ids(hit)).toEqual(['held']);
+  });
+});
+
+describe('setSelectionVisibleLevels (TEST-03)', () => {
+  const MAX = 3;
+  const label = (over: Partial<TextLabel> & { id: string }): TextLabel =>
+    ({ position: { x: 0, y: 0 }, content: 'x', fontSize: 16, fontFace: 'sans-serif', color: '#fff', ...over }) as TextLabel;
+  const sel = (type: 'object' | 'text', id: string) => ({ type, id }) as never;
+
+  // Object at home 2 is Auto-visible on rungs 1..3; an explicit [3] object only on 3.
+  const autoObj = obj({ id: 'auto', homeLevel: 2 });
+  const pinnedObj = obj({ id: 'pinned', homeLevel: 2, visibleLevels: [3] });
+  const bystander = obj({ id: 'other', homeLevel: 2 });
+  const layer = { objects: [autoObj, pinnedObj, bystander], textLabels: [] as TextLabel[] };
+
+  it('mixed Auto and explicit: each element edits from its own effective set', () => {
+    const out = setSelectionVisibleLevels(layer, [sel('object', 'auto'), sel('object', 'pinned')], { kind: 'level', level: 2, on: true }, MAX);
+    expect(out.objects.find(o => o.id === 'auto')?.visibleLevels).toEqual([1, 2, 3]);
+    expect(out.objects.find(o => o.id === 'pinned')?.visibleLevels).toEqual([2, 3]);
+  });
+
+  it('turning off the last visible level reverts the element to Auto (undefined)', () => {
+    const out = setSelectionVisibleLevels(layer, [sel('object', 'pinned')], { kind: 'level', level: 3, on: false }, MAX);
+    const edited = out.objects.find(o => o.id === 'pinned');
+    expect(edited?.visibleLevels).toBeUndefined();
+    expect(out.updates).toEqual([{ id: 'pinned', visibleLevels: undefined }]);
+  });
+
+  it('turning a level off from Auto seeds the set from the band, minus that level', () => {
+    const out = setSelectionVisibleLevels(layer, [sel('object', 'auto')], { kind: 'level', level: 1, on: false }, MAX);
+    expect(out.objects.find(o => o.id === 'auto')?.visibleLevels).toEqual([2, 3]);
+  });
+
+  it('Auto clears every selected element and leaves the rest untouched', () => {
+    const out = setSelectionVisibleLevels(layer, [sel('object', 'pinned')], { kind: 'auto' }, MAX);
+    expect(out.objects.find(o => o.id === 'pinned')?.visibleLevels).toBeUndefined();
+    expect(out.objects.find(o => o.id === 'other')).toBe(bystander);
+    expect(out.objects.find(o => o.id === 'auto')).toBe(autoObj);
+  });
+
+  it('objects and labels in one selection each use their own band', () => {
+    const lab = label({ id: 'lab', homeLevel: 2 });
+    const out = setSelectionVisibleLevels(
+      { objects: layer.objects, textLabels: [lab, label({ id: 'unselected', homeLevel: 2 })] },
+      [sel('object', 'auto'), sel('text', 'lab')],
+      { kind: 'level', level: 0, on: true },
+      MAX
+    );
+    // Objects start at home-1 (rung 1), labels at home-2 (rung 0): adding rung 0 changes only the object.
+    expect(out.objects.find(o => o.id === 'auto')?.visibleLevels).toEqual([0, 1, 2, 3]);
+    expect(out.textLabels.find(l => l.id === 'lab')?.visibleLevels).toEqual([0, 1, 2, 3]);
+    expect(out.textLabels.find(l => l.id === 'unselected')?.visibleLevels).toBeUndefined();
+  });
+
+  it('updates lists exactly what was written, objects first then labels', () => {
+    const lab = label({ id: 'lab', homeLevel: 2 });
+    const out = setSelectionVisibleLevels(
+      { objects: layer.objects, textLabels: [lab] },
+      [sel('text', 'lab'), sel('object', 'pinned')],
+      { kind: 'level', level: 1, on: true },
+      MAX
+    );
+    expect(out.updates).toEqual([
+      { id: 'pinned', visibleLevels: out.objects.find(o => o.id === 'pinned')?.visibleLevels },
+      { id: 'lab', visibleLevels: out.textLabels[0].visibleLevels },
+    ]);
+    expect(out.updates[0].visibleLevels).toEqual([1, 3]);
   });
 });

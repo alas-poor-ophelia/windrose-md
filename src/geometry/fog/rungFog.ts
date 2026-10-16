@@ -1,5 +1,5 @@
 /**
- * Fog of war for elements homed on a finer ladder rung (kgc.23 b).
+ * Fog of war for elements homed on a finer ladder rung.
  *
  * Fog is level-0 cell data: `isCellFogged(layer, col, row)` takes OFFSET coords
  * on the ROOT geometry. The object renderer, drawing a depth group on its home
@@ -14,8 +14,8 @@
  * offset <-> axial conversion is the same on every rung.
  */
 import type { MapLayer } from '#types/core/map.types';
-import type { GeometryLadder } from '../../geometry/core/createGeometryLadder';
-import { offsetToAxial } from '../../geometry/core/offsetCoordinates';
+import type { GeometryLadder } from '../core/createGeometryLadder';
+import { offsetToAxial } from '../core/offsetCoordinates';
 
 type FogPredicate = (layer: MapLayer, col: number, row: number) => boolean;
 

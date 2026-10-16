@@ -15,7 +15,7 @@ import type { VNode } from 'preact';
 import type { HexColor } from '#types/core/common.types';
 import type { CustomColor } from '#types/core/common.types';
 
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useTextLabelInteraction } from '../../hooks/interactions/useTextLabelInteraction';
 import { useMapState } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
@@ -27,8 +27,8 @@ import { buildTextActions } from '../toolbars/selectionActionBuilders';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { copyDeepLinkToClipboard } from '../../persistence/deepLinkHandler';
 import { depthModeOf, effectiveVisibleLevels, withLevelMembership } from '../../geometry/renderers/elementBands';
-import { LevelPickerPopup, levelPickerAnchor } from '../overlays/LevelPickerPopup';
-import { isLadderView } from '../../core/lodFlags';
+import { LevelPickerPopup } from '../overlays/LevelPickerPopup';
+import { useLevelPicker } from '../../hooks/objects/useLevelPicker';
 
 
 
@@ -144,19 +144,15 @@ const TextLayer = ({
     handleCanvasDoubleClick, handleTextKeyDown
   });
 
-  // Ladder level picker (kgc.31), tied to the label it was opened for.
-  const [levelPicker, setLevelPicker] = useState<{ x: number; y: number; id: string } | null>(null);
-  const closeLevelPicker = useCallback(() => setLevelPicker(null), []);
+  // Ladder level picker, tied to the label it was opened for.
   const maxLevel = ladder?.params.maxLevel ?? 0;
   const pickedLabel: TextLabel | undefined = selectedItem?.type === 'text' && mapData
     ? getActiveLayer(mapData).textLabels?.find((l: TextLabel) => l.id === selectedItem.id)
     : undefined;
-  const openLevelPicker = (e?: Event): void => {
-    if (selectedItem?.type !== 'text') return;
-    e?.preventDefault();
-    e?.stopPropagation();
-    setLevelPicker({ ...levelPickerAnchor(e, containerRef.current), id: selectedItem.id });
-  };
+  const { picker: levelPicker, open: openLevelPicker, close: closeLevelPicker } = useLevelPicker(
+    selectedItem?.type === 'text' ? `text:${selectedItem.id}` : null,
+    containerRef
+  );
   const handleLevelToggle = (level: number): void => {
     if (!pickedLabel) return;
     const on = !effectiveVisibleLevels(pickedLabel, maxLevel, 'label').includes(level);
@@ -179,7 +175,7 @@ const TextLayer = ({
             onDelete: handleTextDeletion,
             onDepthModeToggle: handleDepthModeToggle,
             onLevels: openLevelPicker
-          }, { isLadder: isLadderView(mapData), depthMode: depthModeOf(selectedItem.data ?? {}), hasExplicitLevels: pickedLabel?.visibleLevels !== undefined })}
+          }, { isLadder: ladder !== null, depthMode: depthModeOf(selectedItem.data ?? {}), hasExplicitLevels: pickedLabel?.visibleLevels !== undefined })}
           mapData={mapData}
           canvasRef={canvasRef}
           containerRef={containerRef}
@@ -188,7 +184,7 @@ const TextLayer = ({
         />
       )}
 
-      {levelPicker !== null && pickedLabel !== undefined && levelPicker.id === pickedLabel.id && !isDraggingSelection && ladder !== null && (
+      {levelPicker !== null && pickedLabel !== undefined && !isDraggingSelection && ladder !== null && (
         <LevelPickerPopup
           x={levelPicker.x}
           y={levelPicker.y}

@@ -13,7 +13,6 @@ import { useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { getClickedObjectInCell, classicHitRung } from '../../objects/hexSlotPositioner';
 import { pickLadderObject } from '../../objects/ladderHitTest';
-import { rungFogPredicate } from '../canvas/rungFog';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { isCellFoggedIndexed } from '../../geometry/fog/foggedCellIndex';
 
@@ -57,9 +56,13 @@ function useObjectHover(): {
           return;
         }
         const zoom = viewController?.getLive().zoom ?? mapData.viewState?.zoom ?? 1;
-        obj = pickLadderObject(getActiveLayer(mapData).objects, worldCoords.worldX, worldCoords.worldY, {
+        const activeLayer = getActiveLayer(mapData);
+        // Fogged objects are skipped inside the pick (a deep one at its root
+        // ancestor, as the renderer hides it), so a visible one beneath wins.
+        const fog = activeLayer.fogOfWar?.enabled === true ? { layer: activeLayer, isCellFogged: isCellFoggedIndexed } : undefined;
+        obj = pickLadderObject(activeLayer.objects, worldCoords.worldX, worldCoords.worldY, {
           ladder, level: getActiveLevel(), zoom, orientation: mapData.orientation ?? 'flat'
-        });
+        }, fog);
       } else {
         const coords = screenToGrid(clientX, clientY);
         if (!coords) {
@@ -89,15 +92,13 @@ function useObjectHover(): {
         obj ??= getObjectAtPosition(getActiveLayer(mapData).objects, x, y, classicHitRung(mapData));
       }
 
-      if (obj) {
+      // Classic path: a fogged object is not hoverable. (The ladder pick skips
+      // fogged candidates itself.)
+      if (obj && ladder === null) {
         const activeLayer = getActiveLayer(mapData);
-        // Fog is level-0 cell data: a deep object is fogged at its root ancestor,
-        // exactly as the renderer hides it (rungFog).
         if (activeLayer.fogOfWar?.enabled === true && geometry != null) {
-          const home = obj.homeLevel ?? 0;
-          const fogged = ladder !== null && home > 0 ? rungFogPredicate(ladder, home, isCellFoggedIndexed) : isCellFoggedIndexed;
           const objOffset = geometry.toOffsetCoords(obj.position.x, obj.position.y);
-          if (fogged(activeLayer, objOffset.col, objOffset.row)) {
+          if (isCellFoggedIndexed(activeLayer, objOffset.col, objOffset.row)) {
             obj = null;
           }
         }

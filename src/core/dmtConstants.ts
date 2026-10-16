@@ -221,10 +221,20 @@ const THEME: Theme = {
  * only together with a registered `migrations[N]` step, and never with a step
  * that rebuilds `layers`.
  *
- * v3 (detail ladder) is a per-map fence, not a reshaping: the writer stamps 3
- * only on entries that carry `lod`, rung `levels` or `homeLevel` (so builds
- * that predate the ladder refuse them instead of dropping rungs) and keeps
- * every classic entry at 2, byte-identical (schemaMigration.stampSchemaVersions).
+ * v3 (detail ladder) is a per-entry stamp, not a reshaping: the writer stamps
+ * 3 only on entries that carry `lod`, rung `levels` or an element homed on a
+ * rung >= 1, and keeps every classic entry at 2, byte-identical
+ * (schemaMigration.stampSchemaVersions).
+ *
+ * What the fence does: builds from the 2026-10-13 audit onward check each
+ * entry's version when it is opened and refuse a v3 entry (MapSchemaError
+ * 'newer-version') when they cannot read it; the rest of the store keeps
+ * working.
+ * What it does NOT do: released 2.4.x and older builds have no such check.
+ * They open a v3 entry as a v2 map and may strip or restamp `lod`, `levels`
+ * and `homeLevel` on the next rebuild or save. Therefore ladder writes must
+ * not be exposed to users until the fence-aware release has adoption
+ * (decision D-12 in the audit REPORT.md).
  */
 const SCHEMA_VERSION: number = 3;
 

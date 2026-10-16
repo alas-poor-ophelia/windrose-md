@@ -36,8 +36,10 @@ import { OBJECT_FLOOR_PX, LABEL_FLOOR_PX, groupByDepth, groupVisibleAt, elementZ
 import { createLatticeClipCache, drawLadderLattice } from './latticeRenderer';
 import type { LatticeClipCache } from './latticeRenderer';
 import type { GeometryLadder } from '../core/createGeometryLadder';
-import { fogDepsForRung } from '../../hooks/canvas/rungFog';
-import { recordFrame, recordRebuild, recordPhase } from '../../hooks/canvas/ladderTelemetry';
+import { fogDepsForRung } from '../fog/rungFog';
+import { recordFrame, recordRebuild, recordPhase } from './ladderTelemetry';
+import { canvasIdOf } from './surfaceBudget';
+import { isLodLadderEnabled } from '../../core/lodFlags';
 import { getFontCss } from '../../text/fontOptions';
 import { calculateViewportOffset, applyNorthRotation } from '../core/viewportMath';
 import { renderSubHexBackdrop } from './subHexBackdropRenderer';
@@ -71,7 +73,7 @@ const lastLadderLevels = new WeakMap<HTMLCanvasElement, number>();
  */
 function ladderTileClipKnob(): unknown {
   if (typeof activeWindow === 'undefined') return null;
-  return (activeWindow as unknown as { __windroseLadder?: { tileClip?: unknown } }).__windroseLadder?.tileClip ?? null;
+  return activeWindow.__windroseLadder?.tileClip ?? null;
 }
 
 function clipCacheFor(canvas: HTMLCanvasElement, ladder: GeometryLadder): LatticeClipCache {
@@ -92,7 +94,10 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // does carry a ladder also sets `bypassSurfaceCache`, which keeps it out of the
   // surface cache, the budget's active slot and the live telemetry.
   const ladderOn = ladder !== null && !bypassSurfaceCache;
-  const frameStart = ladderOn ? performance.now() : 0;
+  // Frame telemetry is measurement, not rendering: recorded only while the ladder
+  // capability is on (read once per frame), so other users pay no timing cost.
+  const telemetryOn = ladderOn && isLodLadderEnabled();
+  const frameStart = telemetryOn ? performance.now() : 0;
 
   // Normalize selectedItems to array (backward compatibility)
   const itemsArray: RendererSelectedItem[] = Array.isArray(selectedItems) ? selectedItems : (selectedItems != null ? [selectedItems] : []);
@@ -237,7 +242,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
 
   // A bake is the one part of a frame worth attributing separately, and it happens
   // inside the draw callback — both the first bake of a level and the settle bake.
-  const staticDraw: DrawStaticFn = !ladderOn
+  const staticDraw: DrawStaticFn = !telemetryOn
     ? drawStaticContent
     : (tctx, ox, oy, w, h, cullNorth): void => {
         const bakeStart = performance.now();
@@ -251,9 +256,9 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   } else {
     // Rotated maps share the cache: the snapshot is unrotated and the blit runs
     // under the rotation transform applied above (MEM-09).
-    const blitStart = ladderOn ? performance.now() : 0;
+    const blitStart = telemetryOn ? performance.now() : 0;
     blitStaticContent(canvas, ctx, staticDraw, offsetX, offsetY, zoom, width, height, staticKey, getImageCacheVersion(), northDirection ?? 0, level, ladderOn);
-    if (ladderOn) recordPhase('blit', performance.now() - blitStart);
+    if (telemetryOn) recordPhase('blit', performance.now() - blitStart);
   }
 
   // The live lattice, stroked in screen space straight after the blit so line
@@ -261,7 +266,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // is skipped at every level under the ladder. `visibility.grid` still hides it —
   // it is the same user-facing grid, drawn a different way.
   if (ladder !== null && visibility.grid !== false) {
-    const latticeStart = ladderOn ? performance.now() : 0;
+    const latticeStart = telemetryOn ? performance.now() : 0;
     drawLadderLattice(
       ctx,
       ladder,
@@ -270,10 +275,10 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
       LADDER_EPOCH,
       clipCacheFor(canvas, ladder),
       { active: THEME.grid.lines, district: THEME.grid.lines, activeWidth: THEME.grid.lineWidth ?? 1 },
-      ladderOn ? recordPhase : ignorePhase,
+      telemetryOn ? recordPhase : ignorePhase,
       crossing
     );
-    if (ladderOn) recordPhase('lattice', performance.now() - latticeStart);
+    if (telemetryOn) recordPhase('lattice', performance.now() - latticeStart);
   }
 
   // Elements at depth (objects and labels on their home rung, shown per their
@@ -418,7 +423,7 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // Restore context
   ctx.restore();
 
-  if (ladderOn) recordFrame(performance.now() - frameStart, level, crossing);
+  if (telemetryOn) recordFrame(performance.now() - frameStart, level, crossing, undefined, canvasIdOf(canvas));
 };
 
 export { renderCanvas, ladderTileClipKnob };

@@ -15,7 +15,7 @@ import type {
 } from '#types/index';
 import { isHexCell } from '#types/core/cell.types';
 import type { HexBounds } from '#types/core/map.types';
-import { hasDepthContent, type LadderPatch } from '../../core/lodFlags';
+import { hasDepthContent, deepestAuthoredRung, isDepthQuarantined, type LadderPatch } from '../../core/lodFlags';
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { getLayerById } from '../../persistence/layerAccessor';
@@ -196,9 +196,24 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
       // snapshot, so it is re-checked against the LIVE map: rungs written
       // since (another pane, an MCP write) turn it into `keep`, because
       // stripping `lod` under depth content would quarantine the map (PX-07).
+      // `set` is re-checked the same way. Under live depth content the stored
+      // `m` is kept (a new `m` re-partitions every rung cell) and `maxLevel`
+      // never drops below the deepest authored rung. A map quarantined for
+      // rungs without a `lod` block is left as it is: a `set` would
+      // un-quarantine it with parameters its content was never laid out on.
       if (prev.mapType === 'hex') {
         if (ladderPatch.kind === 'set') {
-          newMapData.lod = ladderPatch.lod;
+          if (isDepthQuarantined(prev).reason === 'levels-without-lod') {
+            // keep: the stored state (no lod) stays exactly as it was
+          } else if (prev.lod != null && hasDepthContent(prev)) {
+            newMapData.lod = {
+              ...ladderPatch.lod,
+              m: prev.lod.m,
+              maxLevel: Math.max(ladderPatch.lod.maxLevel, deepestAuthoredRung(prev))
+            };
+          } else {
+            newMapData.lod = ladderPatch.lod;
+          }
         } else if (ladderPatch.kind === 'remove' && !hasDepthContent(prev)) {
           delete newMapData.lod;
         }

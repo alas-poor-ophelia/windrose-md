@@ -31,69 +31,97 @@ import type { LayerHistorySnapshot } from '#types/hooks/layerHistory.types';
 import { useCallback, useMemo, useRef } from 'preact/hooks';
 import { getActiveLayer, updateActiveLayer, promoteToStrata, getActiveBoardLayers, setActiveLayer, authoredCells } from '../../persistence/layerAccessor';
 import { snapshotLevelsOf, lodStampForCommit, type ParkedLodStamp } from './layerHistoryOps';
-import { writeDepthCells, guardDepthWrite, elementBytes, withLod, type DepthWriteContext, type DepthWriteRefusal, type DepthWriteResult } from '../../persistence/depthAuthoring';
+import { homeLevelOf } from '../../core/homeLevel';
+import { writeDepthCells, guardDepthWrite, elementBytes, withLod, depthBudgetBytesOf, type DepthWriteContext, type DepthWriteRefusal, type DepthWriteResult } from '../../persistence/depthAuthoring';
 
 /** Rung (>= 1) an element is homed on; 0 for root or a malformed value. */
 function elementHome(item: unknown): number {
-  if (typeof item !== 'object' || item === null) return 0;
-  const home = (item as { homeLevel?: unknown }).homeLevel;
-  return typeof home === 'number' && Number.isInteger(home) && home > 0 ? home : 0;
-}
-
-/** Identity of an element on its rung: its id when it has one, else the object itself. */
-function elementKey(item: object, home: number): unknown {
-  const id = (item as { id?: unknown }).id;
-  return typeof id === 'string' ? `${id}@${home}` : item;
+  return homeLevelOf(item);
 }
 
 /**
- * Elements of `next` homed on a rung >= 1 that `prev` did not already hold on
- * that rung (by id, or by reference for id-less elements), grouped by rung. A
- * move or edit of an existing deep element adds nothing; a placement, a
- * duplicate or a re-home onto another rung does. Empty for every classic write.
+ * Identity of an element on its rung. An element with an id keys by it, so a
+ * move, rotation or edit keeps its key. Tiles carry no id and are rebuilt on
+ * every edit, so they key structurally by tileset, tile, cell and (freeform)
+ * world position: a rotation, flip or rescale keeps the key, a move changes it
+ * (and is paired with the removal of the old key below, so it adds nothing).
  */
-function addedDeepElements(prev: unknown, next: unknown): Map<number, unknown[]> {
-  const added = new Map<number, unknown[]>();
-  if (!Array.isArray(next)) return added;
-  let existing: Set<unknown> | null = null;
-  for (const item of next as unknown[]) {
+function elementKey(item: object, home: number): string {
+  const el = item as { id?: unknown; tilesetId?: unknown; tileId?: unknown; col?: unknown; row?: unknown; worldX?: unknown; worldY?: unknown };
+  if (typeof el.id === 'string') return `id:${el.id}@${home}`;
+  return `tile:${String(el.tilesetId)}|${String(el.tileId)}|${String(el.col)},${String(el.row)}|${String(el.worldX)},${String(el.worldY)}@${home}`;
+}
+
+/** Elements one write adds to and removes from a rung (multiset by `elementKey`). */
+interface RungDelta { added: unknown[]; removed: unknown[] }
+
+/**
+ * Per rung >= 1, the elements of `next` that `prev` did not hold and the
+ * elements of `prev` that `next` no longer holds, compared by `elementKey` as
+ * multisets (two stacked identical tiles count twice). Empty for every classic
+ * write and for a write that only edits existing deep elements in place.
+ */
+function deepElementDelta(prev: unknown, next: unknown): Map<number, RungDelta> {
+  const delta = new Map<number, RungDelta>();
+  if (!Array.isArray(next)) return delta;
+  const nextItems = next as unknown[];
+  const pending = new Map<string, unknown[]>();
+  for (const old of (Array.isArray(prev) ? prev : []) as unknown[]) {
+    const home = elementHome(old);
+    if (home === 0) continue;
+    const key = elementKey(old as object, home);
+    const list = pending.get(key);
+    if (list === undefined) pending.set(key, [old]);
+    else list.push(old);
+  }
+  const rung = (home: number): RungDelta => {
+    let d = delta.get(home);
+    if (d === undefined) { d = { added: [], removed: [] }; delta.set(home, d); }
+    return d;
+  };
+  for (const item of nextItems) {
     const home = elementHome(item);
     if (home === 0) continue;
-    if (existing === null) {
-      existing = new Set();
-      for (const old of (Array.isArray(prev) ? prev : []) as unknown[]) {
-        const oldHome = elementHome(old);
-        if (oldHome > 0) existing.add(elementKey(old as object, oldHome));
-      }
-    }
-    if (existing.has(elementKey(item as object, home))) continue;
-    const list = added.get(home);
-    if (list === undefined) added.set(home, [item]);
-    else list.push(item);
+    const list = pending.get(elementKey(item as object, home));
+    if (list !== undefined && list.length > 0) { list.pop(); continue; }
+    rung(home).added.push(item);
   }
-  return added;
+  for (const list of pending.values()) {
+    for (const old of list) rung(elementHome(old)).removed.push(old);
+  }
+  return delta;
 }
 
 /**
- * Apply an element write through the depth gate (DATA-03). Every rung that
- * gains an element must pass `guardDepthWrite` (capability, ladder view,
- * quarantine, byte budget) against the LIVE map; a refusal returns the reason
- * and the caller leaves the map alone. The first newly added deep element
- * stamps `lod` exactly as the first deep cell write does. The gate has already
- * refused a quarantined map, so a stamp never re-activates one, and a write
- * that only moves or edits existing deep elements never stamps (PX-02).
+ * Apply an element write through the depth gate (DATA-03). A rung GROWS when
+ * the write adds more elements to it than it removes (a placement, a duplicate,
+ * a re-home onto it); a move, rotation or rescale of an existing deep element
+ * pairs one removal with one addition and is not a growth, so it is never
+ * refused (flag off or near the budget alike) and never stamps. Every growing
+ * rung must pass `guardDepthWrite` against the LIVE map, budgeted on the NET
+ * bytes the rung gains. The map is measured at most once per write: the
+ * caller's gesture measurement (`context.serialisedBytes`) when given, else
+ * once here, and only when some rung grows. A refusal returns the reason and
+ * the caller leaves the map alone. The first growth stamps `lod` exactly as the
+ * first deep cell write does; the gate has already refused a quarantined map,
+ * so a stamp never re-activates one (PX-02).
  */
 function applyElementWrite(
   current: MapData,
   prevValue: unknown,
   newValue: unknown,
-  write: (mapData: MapData) => MapData
+  write: (mapData: MapData) => MapData,
+  context: DepthWriteContext = {}
 ): { refusal: DepthWriteRefusal } | { refusal: null; mapData: MapData } {
-  const added = addedDeepElements(prevValue, newValue);
-  if (added.size === 0) return { refusal: null, mapData: write(current) };
+  const delta = deepElementDelta(prevValue, newValue);
+  const growing = [...delta].filter(([, d]) => d.added.length > d.removed.length);
+  if (growing.length === 0) return { refusal: null, mapData: write(current) };
   const layer = getActiveLayer(current);
-  for (const [home, items] of added) {
-    const refusal = guardDepthWrite(current, layer.id, home, authoredCells(layer, home), { addedBytes: elementBytes(items) });
+  const serialisedBytes = context.serialisedBytes ?? depthBudgetBytesOf(current);
+  let grownBytes = 0;
+  for (const [home, d] of growing) {
+    grownBytes += Math.max(0, elementBytes(d.added) - elementBytes(d.removed));
+    const refusal = guardDepthWrite(current, layer.id, home, authoredCells(layer, home), { serialisedBytes, addedBytes: grownBytes, nested: context.nested });
     if (refusal !== null) return { refusal };
   }
   return { refusal: null, mapData: withLod(write(current)) };
@@ -107,8 +135,16 @@ function useDataHandlers({
   mapData: _mapData,
   updateMapData,
   addToHistory,
-  isApplyingHistory
+  isApplyingHistory,
+  levelKey = null
 }: UseDataHandlersOptions): UseDataHandlersResult {
+
+  // A sub-hex child map (any level below the root; the same signal
+  // useLayerHistory keys its stacks by) never takes depth authoring (D-1):
+  // every deep write made while one is open is refused 'nested-level'. A ref,
+  // so the handlers stay stable across navigation.
+  const nestedRef = useRef(levelKey !== null);
+  nestedRef.current = levelKey !== null;
 
   // =========================================================================
   // Helper: Build history state from layer + name
@@ -176,7 +212,7 @@ function useDataHandlers({
   }, []);
 
   const createLayerDataHandler = useCallback(<T,>(field: LayerField) => {
-    return (newValue: T, suppressHistory = false): DepthWriteRefusal | null => {
+    return (newValue: T, suppressHistory = false, context?: DepthWriteContext): DepthWriteRefusal | null => {
       if (isApplyingHistory()) return null;
 
       // Like handleLevelCellsChange: Preact runs the functional update
@@ -184,6 +220,9 @@ function useDataHandlers({
       // back to the caller (the MCP bridge reports it).
       let refusal: DepthWriteRefusal | null = null;
       updateMapData((currentMapData) => {
+        // Each run decides afresh: an updater run twice must not report the
+        // first run's verdict.
+        refusal = null;
         if (currentMapData == null) return currentMapData;
 
         // An element homed on a rung >= 1 is laid out on the ladder's lattice:
@@ -191,7 +230,7 @@ function useDataHandlers({
         // `lod` (the history entry records it, so undo lifts it). A refusal
         // leaves the map untouched and records nothing.
         const activeLayer = getActiveLayer(currentMapData);
-        const applied = applyElementWrite(currentMapData, activeLayer[field], newValue, (m) => updateActiveLayer(m, { [field]: newValue }));
+        const applied = applyElementWrite(currentMapData, activeLayer[field], newValue, (m) => updateActiveLayer(m, { [field]: newValue }), { ...context, nested: context?.nested === true || nestedRef.current });
         if (applied.refusal !== null) {
           refusal = applied.refusal;
           return currentMapData;
@@ -230,10 +269,11 @@ function useDataHandlers({
       // (possibly stale) snapshot (review finding, phase 3c).
       let outcome: DepthWriteResult | null = null;
       updateMapData((currentMapData) => {
+        outcome = null;
         if (currentMapData == null) return currentMapData;
 
         const layer = getActiveLayer(currentMapData);
-        const result = writeDepthCells(currentMapData, layer.id, level, update(authoredCells(layer, level)), context);
+        const result = writeDepthCells(currentMapData, layer.id, level, update(authoredCells(layer, level)), { ...context, nested: context?.nested === true || nestedRef.current });
         outcome = result;
         if (!result.ok) return currentMapData;
 
@@ -288,16 +328,17 @@ function useDataHandlers({
   // surface the Board→Strata→Layer hierarchy by default. promoteToStrata is the
   // same idempotent operation the Simple/Strata toggle runs.
   const handleTilesChange = useCallback(
-    (newValue: TileAssignment[], suppressHistory = false): DepthWriteRefusal | null => {
+    (newValue: TileAssignment[], suppressHistory = false, context?: DepthWriteContext): DepthWriteRefusal | null => {
       if (isApplyingHistory()) return null;
 
       let refusal: DepthWriteRefusal | null = null;
       updateMapData((currentMapData) => {
+        refusal = null;
         if (currentMapData == null) return currentMapData;
 
         // Deep tiles pass the same gate as deep objects (createLayerDataHandler).
         const activeLayer = getActiveLayer(currentMapData);
-        const applied = applyElementWrite(currentMapData, activeLayer.tiles, newValue, (m) => updateActiveLayer(m, { tiles: newValue }));
+        const applied = applyElementWrite(currentMapData, activeLayer.tiles, newValue, (m) => updateActiveLayer(m, { tiles: newValue }), { ...context, nested: context?.nested === true || nestedRef.current });
         if (applied.refusal !== null) {
           refusal = applied.refusal;
           return currentMapData;

@@ -78,7 +78,7 @@ describe('useDataHandlers: ladder element writes', () => {
     root.remove();
   });
 
-  function mount(initial: MapData): Harness {
+  function mount(initial: MapData, levelKey: string | null = null): Harness {
     let current = initial;
     let api: UseDataHandlersResult | null = null;
     const addToHistory = vi.fn();
@@ -87,7 +87,7 @@ describe('useDataHandlers: ladder element writes', () => {
       current = typeof u === 'function' ? u(current) : u;
     };
     function Probe(): null {
-      api = useDataHandlers({ mapData: current, updateMapData, addToHistory, isApplyingHistory: () => false });
+      api = useDataHandlers({ mapData: current, updateMapData, addToHistory, isApplyingHistory: () => false, levelKey });
       return null;
     }
     act(() => { render(h(Probe, {}), root); });
@@ -158,6 +158,64 @@ describe('useDataHandlers: ladder element writes', () => {
     getSettings.mockReturnValue({});
     expect(t.handlers().handleObjectsChange(dup)).toBe('not-a-ladder');
     expect(t.map()).toBe(afterMove);
+  });
+
+  const LOD = { m: 4, minCellPx: 64, maxLevel: 3 };
+  const deepTile = (col: number, over: Partial<TileAssignment> = {}): TileAssignment =>
+    ({ col, row: 0, tilesetId: 'ts', tileId: 't', homeLevel: 2, ...over } as unknown as TileAssignment);
+  const withTiles = (map: MapData, tiles: TileAssignment[]): MapData =>
+    ({ ...map, layers: map.layers.map((l, i) => (i === 0 ? { ...l, tiles } : l)) });
+
+  it('deep tile move with the capability flag off is not refused', () => {
+    getSettings.mockReturnValue({});
+    const t = mount(withTiles({ ...createNewMap('Off', 'hex'), lod: LOD }, [deepTile(4)]));
+
+    // Tiles carry no id and are rebuilt per edit: a move, a rotation and a
+    // rescale are edits of the existing tile, not adds.
+    expect(t.handlers().handleTilesChange([deepTile(5)])).toBeNull();
+    expect(t.map().layers[0].tiles).toEqual([deepTile(5)]);
+    expect(t.handlers().handleTilesChange([deepTile(5, { rotation: 90, scale: 1.5 } as Partial<TileAssignment>)])).toBeNull();
+    expect(t.map().layers[0].tiles?.[0].rotation).toBe(90);
+    expect(t.addToHistory).toHaveBeenCalledTimes(2);
+  });
+
+  it('deep tile move at ~79% of budget is not refused', () => {
+    // Padded so ~20 more bytes still fit: a whole tile's bytes would not.
+    const t = mount(padUnderBudget(withTiles({ ...createNewMap('Full', 'hex'), lod: LOD }, [deepTile(4)])));
+    expect(t.handlers().handleTilesChange([deepTile(5)])).toBeNull();
+    expect(t.map().layers[0].tiles).toEqual([deepTile(5)]);
+  });
+
+  it('deep tile add still goes through the gate', () => {
+    const t = mount(padUnderBudget(withTiles({ ...createNewMap('Add', 'hex'), lod: LOD }, [deepTile(4)])));
+    const before = t.map();
+    // A second tile on the same rung (even stacked on the first cell) is growth.
+    expect(t.handlers().handleTilesChange([deepTile(4), deepTile(4)])).toBe('over-budget');
+    expect(t.handlers().handleTilesChange([deepTile(4), deepTile(6)])).toBe('over-budget');
+    expect(t.map()).toBe(before);
+    getSettings.mockReturnValue({});
+    expect(t.handlers().handleTilesChange([deepTile(4), deepTile(6)])).toBe('not-a-ladder');
+    expect(t.map()).toBe(before);
+    expect(t.addToHistory).not.toHaveBeenCalled();
+  });
+
+  it('a deep write in a sub-hex child is refused nested-level and stamps nothing', () => {
+    // A leaf child with no lod would pass the flag-on gate on its own (finding C).
+    const child = createNewMap('Child', 'hex');
+    const t = mount(child, '0,0');
+
+    expect(t.handlers().handleObjectsChange([obj('deep', 4, 0, 1)])).toBe('nested-level');
+    expect(t.handlers().handleTilesChange([deepTile(4)])).toBe('nested-level');
+    const outcome = t.handlers().handleLevelCellsChange(1, (cells) => [...cells, { q: 4, r: 0, color: '#123456' }]);
+    expect(outcome?.ok).toBe(false);
+    if (outcome !== null && !outcome.ok) expect(outcome.reason).toBe('nested-level');
+    expect(t.map()).toBe(child);
+    expect(t.map().lod).toBeUndefined();
+    expect(t.addToHistory).not.toHaveBeenCalled();
+
+    // Level-0 writes in the child are untouched.
+    expect(t.handlers().handleObjectsChange([obj('root', 1, 1)])).toBeNull();
+    expect(t.map().lod).toBeUndefined();
   });
 
   it('classic writes are untouched by the gate', () => {

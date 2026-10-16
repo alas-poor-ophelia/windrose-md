@@ -111,7 +111,9 @@ src/
 ├── core/                  # App infrastructure
 │   ├── dmtConstants.ts    # Constants, theme, defaults, schema version, segment tables
 │   ├── settingsAccessor.ts # Plugin settings read/write
-│   ├── lodFlags.ts        # Lattice ladder capability flag (developer setting, default off)
+│   ├── lodFlags.ts        # Lattice ladder capability flag (developer setting, default off) plus the ladder predicates (isLadderView, ladderParamsFor, isDepthQuarantined)
+│   ├── homeLevel.ts       # homeLevelOf: reads an element's homeLevel, a malformed value counts as root
+│   ├── toolIds.ts         # Runtime ToolId table; the MCP bridge's set_tool rejects ids outside it
 │   ├── featureFlags.ts    # Feature gating (absent = enabled)
 │   ├── windroseEvents.ts  # Typed registry of windrose:* custom DOM events
 │   ├── paintedViewStore.ts # Per-canvas record of the viewState last actually painted
@@ -181,7 +183,7 @@ Non-source files live outside `src/`: `CHANGELOG.md` (read by the release workfl
 | Pan/zoom performance | `hooks/canvas/useViewController.ts`, `useLiveOverlay*.ts` |
 | Content packs | `content-packs/` |
 | Save durability | `persistence/saveCoordinator.ts`, `saveJournal.ts`, `fileOperations.ts`, `hooks/state/useDebouncedSave.ts` |
-| Lattice detail ladder (LOD, dormant unless `core/lodFlags.ts` is on and the map opts in) | Geometry: `geometry/core/createGeometryLadder.ts`, `lattice.ts`, `materialiseLevel.ts`; render: `geometry/renderers/latticeRenderer.ts`, `elementBands.ts`, `tileClipRegion.ts`, `hooks/canvas/levelSurfaces.ts`, `surfaceBudget.ts`, `rungFog.ts`, `ladderTelemetry.ts`; authoring: `persistence/depthAuthoring.ts` (the single deep-write gate), `drawing/depthCellOps.ts`, `drawing/tilePlacementOps.ts` (rung-scoped tiles), `objects/ladderHitTest.ts`, `groupDragOps.ts`, `hooks/state/layerHistoryOps.ts`; UI: `components/mapcanvas/LadderLevelOverlay.tsx`, `components/settings/hexmap/LadderSection.tsx`. Objects, tiles and labels carry `homeLevel` (absent = 0); classic maps never see it. Objects and labels may carry `visibleLevels` (explicit rungs; overrides the band via `elementVisibleAt`, picked in `components/overlays/LevelPickerPopup.tsx`) |
+| Lattice detail ladder (LOD, dormant unless `core/lodFlags.ts` is on and the map opts in) | Geometry: `geometry/core/createGeometryLadder.ts`, `lattice.ts`, `materialiseLevel.ts`; render: `geometry/renderers/latticeRenderer.ts`, `elementBands.ts`, `tileClipRegion.ts`, `geometry/renderers/levelSurfaces.ts`, `surfaceBudget.ts`, `ladderTelemetry.ts`, `geometry/fog/rungFog.ts`; authoring: `persistence/depthAuthoring.ts` (the single deep-write gate), `drawing/depthCellOps.ts`, `drawing/tilePlacementOps.ts` (rung-scoped tiles), `objects/ladderHitTest.ts`, `groupDragOps.ts`, `hooks/state/layerHistoryOps.ts`; UI: `components/mapcanvas/LadderLevelOverlay.tsx`, `components/settings/hexmap/LadderSection.tsx`. Objects, tiles and labels carry `homeLevel` (absent = 0); classic maps never see it. Objects and labels may carry `visibleLevels` (explicit rungs; overrides the band via `elementVisibleAt`, picked in `components/overlays/LevelPickerPopup.tsx`) |
 
 ## Key Principles
 

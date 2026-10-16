@@ -6,7 +6,7 @@
  * the median NON-crossing frame in its OWN level band, never a global median.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CAPACITY, recordFrame, recordRebuild, crossingStats, snapshot, reset } from '../../../../src/hooks/canvas/ladderTelemetry';
+import { CAPACITY, recordFrame, recordRebuild, crossingStats, snapshot, reset } from '../../../../src/geometry/renderers/ladderTelemetry';
 
 describe('ladderTelemetry', () => {
   beforeEach(() => {
@@ -119,6 +119,22 @@ describe('ladderTelemetry', () => {
       recordFrame(11, 2, false);
       expect(snapshot().frames[0].rebuildMs).toBeNull();
       expect(crossingStats().maxCrossingRatio).toBe(0);
+    });
+  });
+
+  describe('per-canvas filtering', () => {
+    it('two panes interleaving frames are measured separately by canvasId', () => {
+      recordFrame(10, 1, false, null, 1);
+      recordFrame(100, 1, false, null, 2);
+      recordFrame(10, 1, false, null, 1);
+      recordFrame(100, 1, false, null, 2);
+      recordFrame(30, 1, true, null, 1);
+      expect(snapshot(1).frames.map(f => f.frameMs)).toEqual([10, 10, 30]);
+      expect(snapshot(2).frames.every(f => f.canvasId === 2)).toBe(true);
+      expect(crossingStats(1).maxCrossingRatio).toBe(3);
+      expect(crossingStats(2).crossingFrames).toEqual([]);
+      // Unfiltered keeps the mixed view, with each frame tagged.
+      expect(snapshot().frames).toHaveLength(5);
     });
   });
 });

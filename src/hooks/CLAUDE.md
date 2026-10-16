@@ -16,7 +16,7 @@ Encapsulate stateful logic, side effects, and event handling. Hooks sit between 
 | `app/` | Composition hooks for the root map component (DungeonMapTracker): drawer state, map-list actions, board handlers, adjacent sub-maps, tileset art handlers, chrome state. Only DMT calls these |
 | `interactions/` | Every other tool/feature interaction (fog, regions, outlines, measure, Beacon, sub-hex, keyboard) |
 
-Only real hooks use the `use*` prefix. The former non-hook files `useSelectionActions.ts` and `useToolbarPosition.ts` now live in `components/toolbars/` as `selectionActionBuilders.ts` and `toolbarPosition.ts`.
+Only real hooks use the `use*` prefix. The former non-hook files `useSelectionActions.ts` and `useToolbarPosition.ts` now live in `components/toolbars/` as `selectionActionBuilders.ts` and `toolbarPosition.ts`. Likewise the ladder's non-hook render support (`levelSurfaces`, `surfaceBudget`, `ladderTelemetry`) lives in `geometry/renderers/` and `rungFog` in `geometry/fog/`.
 
 ## Directory Structure
 
@@ -24,8 +24,6 @@ Only real hooks use the `use*` prefix. The former non-hook files `useSelectionAc
 hooks/
 ├── canvas/
 │   ├── useCanvasRenderer.ts        # rAF-coalesced renderCanvas scheduling + static-cache lifecycle (renderer itself: geometry/renderers/mapRenderer.ts)
-│   ├── levelSurfaces.ts            # Per-level surface selection for the lattice ladder (crossing is a drift)
-│   ├── rungFog.ts                  # Fog for deep-rung elements: maps rung cells to their root ancestor
 │   ├── useCanvasInteraction.ts     # Pan/touch/space-key state for the canvas
 │   ├── useSeamlessSubHex.ts        # Seamless sub-hex dive/surface zoom transition (cooldown, approach prewarm); used by useCanvasInteraction
 │   ├── useEventCoordinator.ts      # Attaches canvas listeners; routes pointer events to registered layer handlers by current tool
@@ -130,7 +128,7 @@ Pointer events are routed centrally; layers never attach their own canvas listen
 
 ### Level-aware Interaction (lattice ladder)
 
-Dormant unless the map is on the ladder view (`core/lodFlags.ts`, per-map opt-in); with `ladder === null` every path below is main's classic path. `screenToGrid` stays level 0 for its many consumers; `screenToLevelCell(clientX, clientY, level)` (useCanvasInteraction, via MapState) serves paint/erase/shape and objects on their home rung. Paint/erase/shape latch the stroke level at pointerdown and write deep cells only through `persistence/depthAuthoring` (one undo entry per deep stroke via `onLevelCellsChange`). Object hover, select/drag, resize handles, linking, context menu and group drag hit-test what is DRAWN (`objects/ladderHitTest.ts`, world-space, home rung, held size); group drag plans per rung via `objects/groupDragOps.ts`. Deep objects fog at their root ancestor (`rungFog`). On a `lod` map off the ladder view, `classicHitRung` scopes hits to rung 0. The wheel/pinch ceiling is `getMaxZoom(mapData)`, and a zoom-in never dives into a sub-hex on the ladder view.
+Dormant unless the map is on the ladder view (`core/lodFlags.ts`, per-map opt-in); with `ladder === null` every path below is main's classic path. `screenToGrid` stays level 0 for its many consumers; `screenToLevelCell(clientX, clientY, level)` (useCanvasInteraction, via MapState) serves paint/erase/shape and objects on their home rung. Paint/erase/shape latch the stroke level at pointerdown and write deep cells only through `persistence/depthAuthoring` (one undo entry per deep stroke via `onLevelCellsChange`). Object hover, select/drag, resize handles, linking, context menu and group drag hit-test what is DRAWN (`objects/ladderHitTest.ts`, world-space, home rung, held size); group drag plans per rung via `objects/groupDragOps.ts`. Deep objects fog at their root ancestor (`geometry/fog/rungFog.ts`); `pickLadderObject` takes the layer's fog and skips fogged candidates, so a visible object beneath a fogged one is picked. A single drag refuses a rung cell that does not exist (`singleDragCellExists`), as group drag and placement do. On a `lod` map off the ladder view, `classicHitRung` scopes hits to rung 0. The wheel/pinch ceiling is `getMaxZoom(mapData)`, and a zoom-in never dives into a sub-hex on the ladder view.
 
 ### Sub-hex Navigation
 

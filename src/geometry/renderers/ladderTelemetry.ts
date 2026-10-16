@@ -1,21 +1,26 @@
 /**
  * ladderTelemetry.ts
  *
- * Frame instrumentation for the lattice ladder's measurement gates (design
- * .claude/lod-rd/06-integration-design.md section 13). A crossing must cost no
+ * Frame instrumentation for the lattice ladder's measurement gate (see
+ * src/geometry/CLAUDE.md, Ladder invariants: a crossing only drifts surfaces). A crossing must cost no
  * more than a normal frame, so the gate is a RATIO, not an absolute time: the
  * slowest crossing frame divided by the median non-crossing frame in the same
  * level band. Comparing a crossing against the global median would flatter it
  * whenever the coarse band is intrinsically cheaper than the fine one.
  *
- * Nothing here runs unless a ladder is active: every call site in
- * `useCanvasRenderer` is behind the same `ladder !== null` guard as the rest of
- * the ladder wiring, so classic maps pay literally nothing.
+ * Nothing here runs unless a ladder is active and the ladder capability is on:
+ * every call site in `mapRenderer` is behind `ladder !== null` plus
+ * `isLodLadderEnabled()` (read once per frame), so classic maps and users
+ * without the capability pay nothing. Each frame carries the id of the canvas
+ * that painted it (surfaceBudget's `canvasIdOf`), so two ladder panes can be
+ * measured separately: pass that id to `crossingStats` / `snapshot`.
  */
 
 /** One rendered frame. `t` is the `performance.now()` stamp at record time. */
 interface LadderFrame {
   t: number;
+  /** surfaceBudget's id for the canvas that painted the frame; 0 when not given. */
+  canvasId: number;
   frameMs: number;
   level: number;
   crossing: boolean;
@@ -58,13 +63,13 @@ let pendingPhases: Record<string, number> = {};
 let bridgePublished = false;
 
 /** Frames in chronological order, oldest first. */
-function frames(): LadderFrame[] {
+function frames(canvasId?: number): LadderFrame[] {
   const out: LadderFrame[] = [];
   const count = written < CAPACITY ? written : CAPACITY;
   const start = written < CAPACITY ? 0 : writeIndex;
   for (let i = 0; i < count; i++) {
     const frame = ring[(start + i) % CAPACITY];
-    if (frame !== null) out.push(frame);
+    if (frame !== null && (canvasId === undefined || frame.canvasId === canvasId)) out.push(frame);
   }
   return out;
 }
@@ -83,10 +88,11 @@ function median(values: number[]): number {
  */
 function publishBridge(): void {
   if (bridgePublished) return;
-  // Absent outside a browser context (unit tests run on node).
-  if (typeof activeWindow === 'undefined') return;
-  const bridge = (activeWindow as unknown as { __windrose?: Record<string, unknown> }).__windrose;
-  if (bridge === undefined || bridge === null) return;
+  // Absent outside a browser context (unit tests run on node). The bridge lives on
+  // the main `window` (main.ts creates it there), not on a pop-out's activeWindow.
+  if (typeof window === 'undefined') return;
+  const bridge = window.__windrose;
+  if (bridge === undefined) return;
   bridge.ladder = { snapshot, crossingStats, reset };
   bridgePublished = true;
 }
@@ -95,7 +101,7 @@ function publishBridge(): void {
  * Record a rendered frame. `rebuildMs` defaults to whatever the frame's static
  * bake reported through `recordRebuild`, which is consumed either way.
  */
-function recordFrame(frameMs: number, level: number, crossing: boolean, rebuildMs?: number | null): void {
+function recordFrame(frameMs: number, level: number, crossing: boolean, rebuildMs?: number | null, canvasId = 0): void {
   publishBridge();
   const bake = rebuildMs === undefined ? pendingRebuildMs : rebuildMs;
   pendingRebuildMs = null;
@@ -103,6 +109,7 @@ function recordFrame(frameMs: number, level: number, crossing: boolean, rebuildM
   pendingPhases = {};
   ring[writeIndex] = {
     t: typeof performance === 'undefined' ? 0 : performance.now(),
+    canvasId,
     frameMs,
     level,
     crossing,
@@ -123,8 +130,9 @@ function recordPhase(name: string, ms: number): void {
   pendingPhases[name] = (pendingPhases[name] ?? 0) + ms;
 }
 
-function crossingStats(): LadderCrossingStats {
-  const all = frames();
+/** Crossing statistics; restricted to one canvas when `canvasId` is given. */
+function crossingStats(canvasId?: number): LadderCrossingStats {
+  const all = frames(canvasId);
   const bands = new Map<number, number[]>();
   for (const frame of all) {
     if (frame.crossing) continue;
@@ -150,8 +158,8 @@ function crossingStats(): LadderCrossingStats {
   return { crossingFrames, medianBandFrameMs, maxCrossingRatio };
 }
 
-function snapshot(): LadderSnapshot {
-  return { capacity: CAPACITY, frames: frames(), stats: crossingStats() };
+function snapshot(canvasId?: number): LadderSnapshot {
+  return { capacity: CAPACITY, frames: frames(canvasId), stats: crossingStats(canvasId) };
 }
 
 function reset(): void {

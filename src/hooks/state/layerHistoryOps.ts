@@ -1,8 +1,8 @@
 /**
  * layerHistoryOps.ts
  *
- * Pure helpers that let the undo stack see ladder rungs (`MapLayer.levels`,
- * design 06 s5 and s19 items 3 and 10). Kept out of the hooks so they can be
+ * Pure helpers that let the undo stack see ladder rungs (`MapLayer.levels`;
+ * see src/geometry/CLAUDE.md, Ladder invariants). Kept out of the hooks so they can be
  * unit tested without a DOM.
  *
  * - Snapshots carry `levels` BY REFERENCE and only when the layer has it; a
@@ -55,7 +55,7 @@ function applySnapshotLevels(layer: MapLayer, snapshot: Pick<LayerHistorySnapsho
 }
 
 /**
- * Cross-rung undo (design 06 s5, council KA-9): a history entry edited on rung
+ * Cross-rung undo (an undo that lands off-screen reads as dead): a history entry edited on rung
  * `level` is invisible unless that rung is the ACTIVE one, so applying it while
  * the camera sits on another rung looks like a dead undo. Returns the view that
  * makes `level` active (same centre, zoom at the geometric middle of the rung's
@@ -89,7 +89,7 @@ function viewStateAtRung(view: StoredViewState, level: number, params: LadderPar
 }
 
 /**
- * The rung authoring tools write to (design 06 s10): the camera's rung, or the
+ * The rung authoring tools write to (the edit-level lock, session-only): the camera's rung, or the
  * locked rung when it is SHALLOWER. A lock deeper than the camera cannot be
  * honoured (the finer rung is not materialised on screen), so it falls back to
  * the camera's rung. `lock === null` means unlocked.

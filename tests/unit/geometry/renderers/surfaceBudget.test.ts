@@ -24,7 +24,7 @@ import {
   SURFACE_BYTES_PER_PX,
   snapshot,
   resetSurfaceBudget,
-} from '../../../../src/hooks/canvas/surfaceBudget';
+} from '../../../../src/geometry/renderers/surfaceBudget';
 
 const MIB = 1024 * 1024;
 

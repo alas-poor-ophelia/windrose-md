@@ -7374,23 +7374,25 @@ button.windrose-ladder-chip:hover,
 
 .is-tablet button.windrose-ladder-chip.is-current,
 button.windrose-ladder-chip.is-current,
-.windrose-ladder-chip.is-current {
+.windrose-ladder-chip.is-current,
+.is-tablet button.windrose-ladder-chip.is-on,
+button.windrose-ladder-chip.is-on,
+.windrose-ladder-chip.is-on {
   background: oklch(from var(--windrose-border-primary) l c h/0.18);
   color: var(--windrose-gold-bright);
   cursor: default;
+}
+
+/* Picker chips are toggles: "on" stays clickable. */
+.is-tablet button.windrose-ladder-chip.is-on,
+button.windrose-ladder-chip.is-on {
+  cursor: pointer;
 }
 
 .is-tablet button.windrose-ladder-chip.is-locked,
 button.windrose-ladder-chip.is-locked,
 .windrose-ladder-chip.is-locked {
   border-color: oklch(from var(--windrose-border-primary) l c h/0.8);
-}
-
-.is-tablet button.windrose-ladder-chip.is-disabled,
-button.windrose-ladder-chip.is-disabled,
-.windrose-ladder-chip.is-disabled {
-  opacity: 0.4;
-  pointer-events: none;
 }
 
 .is-tablet button.windrose-ladder-lock,
@@ -7458,6 +7460,37 @@ button.windrose-ladder-lock.is-locked {
   }
   .windrose-ladder-levels button.windrose-ladder-lock {
     margin-left: 2px;
+  }
+}
+/* Touch: 44px targets for the chips and the padlock (HUD and level picker).
+   The row wraps so a deep ladder stays reachable instead of clipping. */
+.is-tablet .windrose-ladder-chip,
+.is-tablet button.windrose-ladder-chip,
+.is-tablet .is-tablet button.windrose-ladder-chip,
+.is-tablet button.windrose-ladder-lock,
+.is-tablet .is-tablet button.windrose-ladder-lock {
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
+}
+.is-tablet .windrose-ladder-levels {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+@media (pointer: coarse) {
+  .windrose-ladder-chip,
+  button.windrose-ladder-chip,
+  .is-tablet button.windrose-ladder-chip,
+  button.windrose-ladder-lock,
+  .is-tablet button.windrose-ladder-lock {
+    min-height: 44px;
+    min-width: 44px;
+    justify-content: center;
+  }
+  .windrose-ladder-levels {
+    flex-wrap: wrap;
+    justify-content: center;
   }
 }
 @media (prefers-reduced-motion: reduce) {

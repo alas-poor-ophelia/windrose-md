@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { App } from 'obsidian';
 import { TFile } from 'obsidian';
+import type { MapData } from '#types/core/map.types';
 
 const getSettings = vi.fn(() => ({} as Record<string, unknown>));
 vi.mock('../../../src/core/settingsAccessor', async (importOriginal) => {
@@ -18,7 +19,7 @@ vi.mock('../../../src/core/settingsAccessor', async (importOriginal) => {
   return { ...actual, getSettings };
 });
 
-const { createNewMap, loadMapData, saveMapData } = await import('../../../src/persistence/fileOperations');
+const { createNewMap, loadMapData, saveMapData, createEmptyDataFile } = await import('../../../src/persistence/fileOperations');
 const { isLodLadderEnabled } = await import('../../../src/core/lodFlags');
 const { setLevelCells } = await import('../../../src/persistence/layerAccessor');
 
@@ -127,6 +128,76 @@ describe('ladder byte oracle: a classic map is byte-identical with the capabilit
   it('never writes a lod block, a levels key, or an empty container', async () => {
     getSettings.mockReturnValue({ lodLadder: true });
     const on = await loadEditSave(initial);
+    expect(on).not.toMatch(/"lod"\s*:/);
+    expect(on).not.toMatch(/"levels"\s*:/);
+  });
+});
+
+/** A classic hex map carrying every element kind and a sub-hex child (TEST-06 b). */
+function richClassicMap(): MapData {
+  const base = createNewMap('Oracle', 'hex');
+  const child = createNewMap('Child', 'hex');
+  child.layers[0].cells = [{ q: 0, r: 0, color: '#123456' } as never];
+  const layer = base.layers[0];
+  layer.cells = [{ q: 1, r: 0, color: '#8b5a2b' } as never];
+  layer.objects = [{ id: 'o1', type: 'entrance', position: { x: 1, y: 0 }, size: { width: 1, height: 1 } } as never];
+  layer.textLabels = [{ id: 't1', position: { x: 10, y: 20 }, content: 'Keep', fontSize: 16, fontFace: 'sans-serif', color: '#ffffff' } as never];
+  layer.tiles = [{ col: 1, row: 0, tilesetId: 'ts', tileId: 'floor' } as never];
+  return { ...base, subHexMaps: { '1,0': { subdivisionRings: 7, mapData: child, lastModified: '2026-01-01T00:00:00.000Z' } } };
+}
+
+describe('ladder byte oracle: a classic map with objects, labels, tiles and a sub-hex stays classic', () => {
+  beforeEach(() => {
+    getSettings.mockReset();
+    getSettings.mockReturnValue({});
+  });
+
+  async function settle(): Promise<string> {
+    const h = makeApp();
+    expect((await saveMapData(h.app, 'oracle', richClassicMap())).status).toBe('saved');
+    return h.read();
+  }
+
+  async function loadResave(initial: string): Promise<string> {
+    const h = makeApp(initial);
+    const loaded = await loadMapData(h.app, 'oracle', 'Oracle', 'hex');
+    expect((await saveMapData(h.app, 'oracle', loaded)).status).toBe('saved');
+    return h.read();
+  }
+
+  it('flag on and flag off produce the same bytes, with no ladder fields anywhere', async () => {
+    getSettings.mockReturnValue({ lodLadder: false });
+    const initial = await settle();
+    const off = await loadResave(initial);
+    getSettings.mockReturnValue({ lodLadder: true });
+    const on = await loadResave(initial);
+
+    expect(on).toBe(off);
+    expect(off).toContain('"Keep"');
+    expect(off).toContain('"floor"');
+    expect(off).toContain('subHexMaps');
+    for (const key of ['homeLevel', 'visibleLevels', 'depthMode', '"lod"', '"levels"']) {
+      expect(off).not.toContain(key);
+    }
+    const parsed = JSON.parse(off) as { maps: Record<string, { schemaVersion?: unknown }> };
+    expect(parsed.maps.oracle.schemaVersion).toBe(2);
+  });
+
+  it('flag on, store missing: creating the store and a classic map writes the flag-off bytes', async () => {
+    const createFromMissing = async (): Promise<string> => {
+      const h = makeApp(null);
+      expect(await createEmptyDataFile(h.app)).toBe(true);
+      const fresh = await loadMapData(h.app, 'oracle', 'Oracle', 'hex');
+      expect((await saveMapData(h.app, 'oracle', fresh)).status).toBe('saved');
+      // Minted layer ids carry a timestamp; everything else must match byte for byte.
+      return h.read().replace(/layer-\d+-[a-z0-9]+/g, 'layer-ID');
+    };
+    getSettings.mockReturnValue({ lodLadder: false });
+    const off = await createFromMissing();
+    getSettings.mockReturnValue({ lodLadder: true });
+    const on = await createFromMissing();
+
+    expect(on).toBe(off);
     expect(on).not.toMatch(/"lod"\s*:/);
     expect(on).not.toMatch(/"levels"\s*:/);
   });

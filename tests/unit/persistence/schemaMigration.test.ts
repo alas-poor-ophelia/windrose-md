@@ -286,6 +286,14 @@ describe('the v3 ladder fence (DATA-05)', () => {
     expect(parent.subHexMaps?.['0,0'].mapData.schemaVersion).toBe(2);
   });
 
+  it("homeLevel 0 or '2' on a classic map does not stamp v3", () => {
+    for (const homeLevel of [0, '2', null, 1.5]) {
+      const map = createNewMap('Root', 'hex');
+      map.layers[0].objects = [{ id: 'o', type: 'chest', position: { x: 1, y: 1 }, homeLevel }] as unknown as MapLayer['objects'];
+      expect(stampSchemaVersions(map).schemaVersion).toBe(LAYER_SCHEMA_VERSION);
+    }
+  });
+
   it('never downgrades a newer stamp', () => {
     const future = { ...createNewMap('F', 'grid'), schemaVersion: SCHEMA_VERSION + 1 };
     expect(stampSchemaVersions(future)).toBe(future);

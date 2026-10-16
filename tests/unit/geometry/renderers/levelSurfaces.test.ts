@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { driftAllowed, driftCandidates } from "../../../../src/hooks/canvas/levelSurfaces";
+import { driftAllowed, driftCandidates } from "../../../../src/geometry/renderers/levelSurfaces";
 
 describe("driftAllowed (outside a crossing, drift only while the level owns no surface)", () => {
   it("drifts on a crossing in progress: no own surface, rung above 0, no bake request", () => {

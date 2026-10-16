@@ -11,7 +11,7 @@ import { describe, it, expect } from "vitest";
 
 import { createGeometryLadder } from "../../../../src/geometry/core/createGeometryLadder";
 import { HexGeometry } from "../../../../src/geometry/core/HexGeometry";
-import { fogDepsForRung, rungFogPredicate } from "../../../../src/hooks/canvas/rungFog";
+import { fogDepsForRung, rungFogPredicate } from "../../../../src/geometry/fog/rungFog";
 import type { MapLayer } from "#types/core/map.types";
 
 const layer = {} as MapLayer;

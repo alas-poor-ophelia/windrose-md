@@ -314,12 +314,11 @@ describe("Lattice ladder view", () => {
     await wheelZoomAtCenter(page, 10);
 
     const snapshot = await ladderSnapshot(page);
-    if (snapshot != null) {
-      expect(
-        snapshot.frames.length,
-        `expected no new ladder frames with lodLadder off, got ${JSON.stringify(snapshot.frames)}`
-      ).toBe(0);
-    }
+    // With the capability off the bridge may be absent (null) or empty; it must never hold frames.
+    expect(
+      snapshot?.frames.length ?? 0,
+      `expected no new ladder frames with lodLadder off, got ${JSON.stringify(snapshot?.frames)}`
+    ).toBe(0);
 
     expect(errors).toHaveLength(0);
   });
@@ -338,7 +337,7 @@ describe("Lattice ladder view", () => {
 interface OverlayState {
   present: boolean;
   chips: Array<{ level: number; current: boolean; locked: boolean; isButton: boolean }>;
-  lockLabel: string | null;
+  lockPressed: string | null;
   lockIsLocked: boolean;
   readout: string;
   activeLevel: number | null;
@@ -360,7 +359,7 @@ async function readOverlay(page: any): Promise<OverlayState> {
     return {
       present: root != null,
       chips,
-      lockLabel: lock?.getAttribute("aria-label") ?? null,
+      lockPressed: lock?.getAttribute("aria-pressed") ?? null,
       lockIsLocked: lock?.classList.contains("is-locked") ?? false,
       readout: document.querySelector(".windrose-ladder-readout")?.textContent ?? "",
       activeLevel: inst?.getActiveLevel?.() ?? null,
@@ -371,7 +370,7 @@ async function readOverlay(page: any): Promise<OverlayState> {
 
 /** Never leave the edit-level lock set: it is per-mount state. */
 async function ensureUnlocked(page: any): Promise<void> {
-  const lock = page.locator('.windrose-ladder-lock[aria-label="Unlock edit level"]');
+  const lock = page.locator('.windrose-ladder-lock[aria-pressed="true"]');
   if (await lock.count() > 0) await lock.first().click();
 }
 
@@ -390,7 +389,8 @@ describe("Lattice ladder phase 6 UI", () => {
       expect(current, "exactly one current chip").toHaveLength(1);
       expect(current[0].isButton, "the camera rung is a span, not a button").toBe(false);
       expect(before.readout).toContain(`level: L${current[0].level}`);
-      if (before.activeLevel != null) expect(before.activeLevel).toBe(current[0].level);
+      expect(before.activeLevel, "instance exposes getActiveLevel").not.toBeNull();
+      expect(before.activeLevel).toBe(current[0].level);
 
       // Click a rung other than the camera's; zoom jumps to that rung and the
       // readout follows (fixture: L1 chip -> zoom 3.2, see header comment).
@@ -401,7 +401,8 @@ describe("Lattice ladder phase 6 UI", () => {
       const after = await readOverlay(page);
       expect(after.readout).toContain(`level: L${target.level}`);
       expect(after.chips.find((c) => c.current)?.level).toBe(target.level);
-      if (after.activeLevel != null) expect(after.activeLevel).toBe(target.level);
+      expect(after.activeLevel, "instance exposes getActiveLevel").not.toBeNull();
+      expect(after.activeLevel).toBe(target.level);
     } finally {
       await ensureUnlocked(page);
       await setHexViewport(page, 0, 0, 0.8);
@@ -418,26 +419,30 @@ describe("Lattice ladder phase 6 UI", () => {
       const low = await readOverlay(page);
       const lockedLevel = low.chips.find((c) => c.current)!.level;
 
-      await page.locator('.windrose-ladder-lock[aria-label="Lock edit level"]').click();
+      await page.locator(".windrose-ladder-lock").click();
       await setHexViewport(page, 0, 0, 8);
       await page.waitForTimeout(500);
 
       const locked = await readOverlay(page);
       const cameraLevel = locked.chips.find((c) => c.current)!.level;
       expect(cameraLevel, "zoom 8 vs 0.5 must land on different rungs for this test to mean anything").not.toBe(lockedLevel);
-      expect(locked.lockLabel).toBe("Unlock edit level");
+      expect(locked.lockPressed).toBe("true");
       expect(locked.lockIsLocked).toBe(true);
       expect(locked.readout).toContain(`edit: L${lockedLevel}`);
       expect(locked.chips.find((c) => c.level === lockedLevel)?.locked).toBe(true);
-      if (locked.activeLevel != null) expect(locked.activeLevel).toBe(cameraLevel);
-      if (locked.editLevel != null) expect(locked.editLevel).toBe(lockedLevel);
+      expect(locked.activeLevel, "instance exposes getActiveLevel").not.toBeNull();
+      expect(locked.activeLevel).toBe(cameraLevel);
+      expect(locked.editLevel, "instance exposes getEditLevel").not.toBeNull();
+      expect(locked.editLevel).toBe(lockedLevel);
 
-      await page.locator('.windrose-ladder-lock[aria-label="Unlock edit level"]').click();
+      await page.locator(".windrose-ladder-lock").click();
       await page.waitForTimeout(200);
       const unlocked = await readOverlay(page);
       expect(unlocked.lockIsLocked).toBe(false);
+      expect(unlocked.lockPressed).toBe("false");
       expect(unlocked.readout).not.toContain("edit:");
-      if (unlocked.editLevel != null) expect(unlocked.editLevel).toBe(cameraLevel);
+      expect(unlocked.editLevel, "instance exposes getEditLevel").not.toBeNull();
+      expect(unlocked.editLevel).toBe(cameraLevel);
     } finally {
       await ensureUnlocked(page);
       await setHexViewport(page, 0, 0, 0.8);
@@ -487,4 +492,74 @@ describe("Lattice ladder phase 6 UI", () => {
   // NewMapModal "Detail ladder" dropdown: no existing E2E test creates a map
   // through the modal, so the open/create path is unestablished.
   test.skip("new hex map modal offers a Detail ladder preset", async () => {});
+});
+
+// ===========================================
+// Depth authoring on the `lod-fixture` map (TEST-08). NOT RUN yet (needs the
+// Guildmaster's go-ahead for E2E). The map ships in tests/fixtures/test-vault
+// (_test-data/dungeon-maps-data.json, mirrored in dungeon-maps-data.clean.json)
+// with a note at _testing/lod-fixture.md: one rung-2 cell at (3,-1), and two
+// objects homed at rung 1, one of them pinned to visibleLevels [2].
+// ===========================================
+
+const LOD_FIXTURE_NOTE = "_testing/lod-fixture.md";
+
+/** Run ops[fn](...args) in the page against the lod-fixture instance. */
+async function onFixtureOps<T>(page: any, fn: string, args: unknown[] = []): Promise<T> {
+  return page.evaluate(({ notePath, fn, args }: { notePath: string; fn: string; args: unknown[] }) => {
+    const w = window as unknown as { __windrose?: { mcpInstances?: Record<string, { notePath: string; ops: Record<string, (...a: unknown[]) => unknown> }> } };
+    const inst = Object.values(w.__windrose?.mcpInstances ?? {}).find((c) => c.notePath === notePath);
+    if (inst == null) throw new Error("lod-fixture instance not found");
+    if (typeof inst.ops[fn] !== "function") throw new Error("ops." + fn + " missing");
+    return inst.ops[fn](...args);
+  }, { notePath: LOD_FIXTURE_NOTE, fn, args }) as Promise<T>;
+}
+
+async function gotoLodFixture(page: any): Promise<void> {
+  await enableLadder(page);
+  await navigateToMap(page, LOD_FIXTURE_NOTE);
+  await waitForContainer(page);
+  await page.waitForFunction((notePath: string) => {
+    const w = window as unknown as WindrosePageWindow;
+    return Object.values(w.__windrose?.mcpInstances ?? {}).some((i) => i.notePath === notePath);
+  }, LOD_FIXTURE_NOTE, { timeout: 10000 });
+}
+
+type RungCell = { x: number; y: number };
+
+describe("Lattice ladder depth authoring (lod-fixture)", () => {
+  test("the fixture loads with its authored rung-2 cell and both objects", async ({ page }) => {
+    const errors = setupErrorTracking(page);
+    await gotoLodFixture(page);
+    const rung2 = await onFixtureOps<RungCell[]>(page, "getCells", [undefined, 2]);
+    expect(rung2.some((c) => c.x === 3 && c.y === -1), "rung-2 cell (3,-1) is authored").toBe(true);
+    const objects = await onFixtureOps<Array<{ id: string; visibleLevels?: number[] }>>(page, "listObjects", [1]);
+    expect(objects.map((o) => o.id).sort()).toEqual(["lod-obj-home1", "lod-obj-pinned2"]);
+    expect(objects.find((o) => o.id === "lod-obj-pinned2")?.visibleLevels).toEqual([2]);
+    expect(errors).toHaveLength(0);
+  });
+
+  test("paint at depth lands in levels, undo reverts it, redo restores it", async ({ page }) => {
+    const errors = setupErrorTracking(page);
+    await gotoLodFixture(page);
+    const has = async (x: number, y: number): Promise<boolean> =>
+      (await onFixtureOps<RungCell[]>(page, "getCells", [undefined, 2])).some((c) => c.x === x && c.y === y);
+    expect(await has(4, -1)).toBe(false);
+
+    await onFixtureOps(page, "paintCell", [4, -1, "#8b5a2b", 1, 2]);
+    expect(await has(4, -1), "cell painted on rung 2").toBe(true);
+
+    await onFixtureOps(page, "undo");
+    expect(await has(4, -1), "undo removes the deep cell").toBe(false);
+    expect(await has(3, -1), "the authored fixture cell survives the undo").toBe(true);
+
+    await onFixtureOps(page, "redo");
+    expect(await has(4, -1), "redo restores the deep cell").toBe(true);
+    expect(errors).toHaveLength(0);
+  });
+
+  // The level picker opens from an object's context menu at a screen position
+  // that depends on the rung geometry; write it after the first live walk has
+  // fixed the click coordinates (windrose_inspect_layout).
+  test.skip("level picker toggles hide the pinned object at its rung", async () => {});
 });

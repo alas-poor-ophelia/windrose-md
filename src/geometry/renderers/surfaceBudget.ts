@@ -157,10 +157,11 @@ function resetPeak(): void {
  */
 function publishBridge(): void {
   if (bridgePublished) return;
-  // Absent outside a browser context (unit tests run on node).
-  if (typeof activeWindow === 'undefined') return;
-  const bridge = (activeWindow as unknown as { __windrose?: Record<string, unknown> }).__windrose;
-  if (bridge === undefined || bridge === null) return;
+  // Absent outside a browser context (unit tests run on node). The bridge lives on
+  // the main `window` (main.ts creates it there), not on a pop-out's activeWindow.
+  if (typeof window === 'undefined') return;
+  const bridge = window.__windrose;
+  if (bridge === undefined) return;
   bridge.surfaces = { peakBytes, currentBytes, snapshot };
   bridgePublished = true;
 }
@@ -344,6 +345,7 @@ function resetSurfaceBudget(): void {
 
 export type { SurfaceEviction, SurfaceSnapshot, SurfaceSnapshotEntry };
 export {
+  canvasIdOf,
   SURFACE_BYTES_PER_PX,
   budgetBytes,
   maxSurfacePixels,

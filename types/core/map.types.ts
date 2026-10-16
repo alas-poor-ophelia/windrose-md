@@ -309,8 +309,7 @@ export interface MapLayer {
 }
 
 /**
- * Lattice ladder descriptor. Presence on MapData = ladder mode (design 06, s2.1
- * and s19). Absent = classic map. Stored values are never rewritten on load.
+ * Lattice ladder descriptor. Presence on MapData = ladder mode (see src/geometry/CLAUDE.md, Ladder invariants). Absent = classic map. Stored values are never rewritten on load.
  */
 export interface LadderConfig {
   /** Linear subdivision per rung. Allowlist in LADDER_M_ALLOWLIST. Immutable once any rung > 0 has content. */

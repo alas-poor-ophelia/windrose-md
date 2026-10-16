@@ -80,7 +80,8 @@ const useDrawingTools = (
     getTextLabelAtPosition,
     removeTextLabel,
     getObjectAtPosition,
-    removeObjectsInRectangle
+    removeObjectsInRectangle,
+    clearTransient
   } = useMapOperations();
 
   // Compose sub-hooks
@@ -90,7 +91,7 @@ const useDrawingTools = (
     onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
     onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange,
     getTextLabelAtPosition, removeTextLabel, getObjectAtPosition,
-    ladder, getEditLevel, screenToLevelCell, onLevelCellsChange
+    ladder, getEditLevel, screenToLevelCell, onLevelCellsChange, clearTransient
   });
 
   const edgeDrag = useEdgeDragTool({

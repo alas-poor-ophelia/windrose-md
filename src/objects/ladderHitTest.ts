@@ -18,6 +18,7 @@
  */
 
 import type { MapObject } from '#types/objects/object.types';
+import type { MapLayer } from '#types/core/map.types';
 import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
 
 import { calculateObjectPosition } from '../geometry/renderers/objectRenderer';
@@ -32,6 +33,8 @@ import {
   scaledSizeForRung
 } from '../geometry/renderers/elementBands';
 import { getObjectsInCell, getSlotOffset, getMultiObjectScale } from './hexSlotPositioner';
+import { rungFogPredicate } from '../geometry/fog/rungFog';
+import type { FogPredicate } from '../geometry/fog/rungFog';
 
 /** The camera as the hit-test sees it: the ladder, its active rung and the live zoom. */
 interface LadderHitView {
@@ -119,20 +122,38 @@ function ladderFootprintContains(obj: MapObject, allObjects: MapObject[], worldX
 }
 
 /**
+ * Fog input for a pick: the layer whose fog applies and its level-0 predicate.
+ * Pass it only when that layer's fog is enabled.
+ */
+interface LadderPickFog {
+  layer: MapLayer;
+  isCellFogged: FogPredicate;
+}
+
+/**
  * The object drawn under world point (worldX, worldY), or null. Walks the same
  * depth-group order the renderer paints in and keeps the LAST hit, so the
- * object painted on top is the one picked.
+ * object painted on top is the one picked. With `fog`, an object the renderer
+ * hides under fog (a deep one at its root ancestor, via rungFogPredicate) is
+ * skipped, so a visible object beneath it is picked instead.
  */
-function pickLadderObject(objects: MapObject[], worldX: number, worldY: number, view: LadderHitView): MapObject | null {
+function pickLadderObject(objects: MapObject[], worldX: number, worldY: number, view: LadderHitView, fog?: LadderPickFog): MapObject | null {
   const px = worldX * view.zoom;
   const py = worldY * view.zoom;
   const deps = indexedSlotDeps(objects);
+  const { root } = view.ladder;
   let hit: MapObject | null = null;
   for (const group of groupByDepth(objects)) {
     if (!groupVisibleAt(group, view.level, 'object')) continue;
+    const fogged = fog === undefined ? null : rungFogPredicate(view.ladder, group.home, fog.isCellFogged);
     for (const obj of group.members) {
       const rect = ladderObjectFootprint(obj, objects, view, deps);
-      if (rect !== null && rectContains(rect, px, py)) hit = obj;
+      if (rect === null || !rectContains(rect, px, py)) continue;
+      if (fogged !== null && fog !== undefined) {
+        const offset = root.toOffsetCoords(obj.position.x, obj.position.y);
+        if (fogged(fog.layer, offset.col, offset.row)) continue;
+      }
+      hit = obj;
     }
   }
   return hit;

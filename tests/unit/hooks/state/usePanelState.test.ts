@@ -17,6 +17,7 @@ import { usePanelState } from '../../../../src/hooks/state/usePanelState';
 import type { MapData, MapLayer } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
 import type { UIPreferences } from '#types/index';
+import type { LadderPatch } from '../../../../src/core/lodFlags';
 
 const LOD = { m: 4, minCellPx: 64, maxLevel: 3 };
 
@@ -31,16 +32,18 @@ const hexMap = (l: MapLayer): MapData => ({
 } as unknown as MapData);
 
 /** Open the modal on `snapshot`, but let the save land on `live`. */
-function saveRemove(snapshot: MapData, live: MapData): MapData {
+function save(snapshot: MapData, live: MapData, patch: LadderPatch): MapData {
   let saved: MapData | null = null;
   const { handleSettingsSave } = usePanelState({
     mapData: snapshot,
     updateMapData: (d) => { saved = typeof d === 'function' ? d(live) : d; }
   });
-  handleSettingsSave({ useGlobalSettings: true, overrides: {} }, {} as UIPreferences, null, null, null, false, { kind: 'remove' });
+  handleSettingsSave({ useGlobalSettings: true, overrides: {} }, {} as UIPreferences, null, null, null, false, patch);
   if (!saved) throw new Error('updateMapData not called');
   return saved;
 }
+
+const saveRemove = (snapshot: MapData, live: MapData): MapData => save(snapshot, live, { kind: 'remove' });
 
 describe('usePanelState ladder patch (PX-07)', () => {
   it('remove strips lod from a map without depth content', () => {
@@ -53,6 +56,32 @@ describe('usePanelState ladder patch (PX-07)', () => {
     const live = hexMap(layer({ levels: { 1: [{ q: 2, r: 0, color: '#fff' } as unknown as Cell] } }));
     const saved = saveRemove(snapshot, live);
     expect(saved.lod).toEqual(LOD);
+    expect(saved.layers[0].levels).toBe(live.layers[0].levels);
+  });
+
+  const rungCell = { q: 2, r: 0, color: '#fff' } as unknown as Cell;
+
+  it('stale set with a different m keeps the stored m', () => {
+    // The modal opened on a map with no rungs; rungs 1 and 3 appeared since.
+    const snapshot = hexMap(layer());
+    const live = hexMap(layer({ levels: { 1: [rungCell], 3: [rungCell] } }));
+    const saved = save(snapshot, live, { kind: 'set', lod: { m: 3, minCellPx: 48, maxLevel: 2 } });
+    expect(saved.lod).toEqual({ m: 4, minCellPx: 48, maxLevel: 3 });
+    expect(saved.layers[0].levels).toBe(live.layers[0].levels);
+  });
+
+  it('set without live depth content applies as given', () => {
+    const m = hexMap(layer());
+    expect(save(m, m, { kind: 'set', lod: { m: 3, minCellPx: 48, maxLevel: 2 } }).lod).toEqual({ m: 3, minCellPx: 48, maxLevel: 2 });
+  });
+
+  it('set on a quarantined map does not un-quarantine', () => {
+    // Rungs without a lod block: quarantined 'levels-without-lod'.
+    const { lod: _lod, ...quarantined } = hexMap(layer({ levels: { 1: [rungCell] } }));
+    void _lod;
+    const live = quarantined as MapData;
+    const saved = save(live, live, { kind: 'set', lod: { m: 4, minCellPx: 64, maxLevel: 3 } });
+    expect(saved.lod).toBeUndefined();
     expect(saved.layers[0].levels).toBe(live.layers[0].levels);
   });
 });

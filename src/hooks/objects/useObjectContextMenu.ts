@@ -147,7 +147,8 @@ export function useObjectContextMenu({ handlers, idActions, measureMovement }: O
         onColorClick: (ev?: Event) => latest().onColorClick(ev),
         onResize: (ev?: Event) => latest().onResize(ev),
         onMeasureToggle: (ev?: Event) => latest().onMeasureToggle?.(ev),
-        onDepthModeToggle: (ev?: Event) => latest().onDepthModeToggle?.(ev)
+        onDepthModeToggle: (ev?: Event) => latest().onDepthModeToggle?.(ev),
+        onLevels: (ev?: Event) => latest().onLevels?.(ev)
       }, s.mapData, { isResizeMode: s.isResizeMode, isMeasuring: s.measureMovement, isLadder: isLadderView(s.mapData) });
 
       const menu = new Menu();

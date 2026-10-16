@@ -29,6 +29,13 @@ export interface UseDataHandlersOptions {
   updateMapData: MapDataUpdater;
   addToHistory: (state: LayerHistorySnapshot, options?: AddToHistoryOptions) => void;
   isApplyingHistory: () => boolean;
+  /**
+   * The open sub-hex level's path (useSubHexNavigation's `subHexPath`, the key
+   * useLayerHistory takes too); null or absent at the root. Non-null means the
+   * current map is a sub-hex child, where every deep write is refused
+   * 'nested-level' (decision D-1).
+   */
+  levelKey?: string | null;
 }
 
 // ===========================================
@@ -42,9 +49,12 @@ export interface UseDataHandlersOptions {
 /**
  * Layer data change handler. Returns the depth gate's refusal when the write
  * adds an element on a ladder rung >= 1 and the gate refuses it (the map is
- * then unchanged and nothing is recorded); null otherwise.
+ * then unchanged and nothing is recorded); null otherwise. `context` is the
+ * gesture's DepthWriteContext: pass `serialisedBytes` (depthBudgetBytesOf at
+ * gesture start) so a brush that adds deep elements per tick measures the map
+ * once; without it the write measures the map only when it adds one.
  */
-export type LayerDataChangeHandler<T> = (newValue: T, suppressHistory?: boolean) => DepthWriteRefusal | null;
+export type LayerDataChangeHandler<T> = (newValue: T, suppressHistory?: boolean, context?: DepthWriteContext) => DepthWriteRefusal | null;
 
 /** Handle cells change */
 export type HandleCellsChange = LayerDataChangeHandler<Cell[]>;

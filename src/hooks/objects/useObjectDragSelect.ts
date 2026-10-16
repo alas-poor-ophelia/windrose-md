@@ -21,9 +21,10 @@ import { useMapSelection } from '../../context/MapSelectionContext';
 import { calculateEdgeAlignment, removeObjectFromHex } from '../../objects/objectOperations';
 import { getClickedObjectInCell, getObjectsInCell, assignSlot, classicHitRung } from '../../objects/hexSlotPositioner';
 import { pickLadderObject } from '../../objects/ladderHitTest';
-import { rungFogPredicate } from '../canvas/rungFog';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { isCellFoggedIndexed } from '../../geometry/fog/foggedCellIndex';
+import type { GeometryLadder } from '../../geometry/core/createGeometryLadder';
+import type { RungCellExists } from '../../objects/groupDragOps';
 
 
 
@@ -41,6 +42,16 @@ import { isCellFoggedIndexed } from '../../geometry/fog/foggedCellIndex';
 
 
 
+
+/**
+ * Existence gate for a single drag's target cell on rung `home`: a deep rung
+ * asks `ladder.existsAt` (as group drag and placement do), so a deep object is
+ * never moved onto a rung cell past the root edge. Level 0 and classic maps
+ * keep the shipped behaviour (no bounds check on a single drag).
+ */
+function singleDragCellExists(ladder: GeometryLadder | null): RungCellExists {
+  return (home, x, y) => ladder === null || home <= 0 || ladder.existsAt(home, x, y);
+}
 
 function useObjectDragSelect(
   currentTool: ToolId,
@@ -98,9 +109,13 @@ function useObjectDragSelect(
       const worldCoords = screenToWorld(clientX, clientY);
       if (worldCoords) {
         const zoom = viewController?.getLive().zoom ?? mapData.viewState?.zoom ?? 1;
-        object = pickLadderObject(getActiveLayer(mapData).objects ?? [], worldCoords.worldX, worldCoords.worldY, {
+        const activeLayer = getActiveLayer(mapData);
+        // Fogged objects are skipped inside the pick (a deep one at its root
+        // ancestor, as the renderer hides it), so a visible one beneath wins.
+        const fog = activeLayer.fogOfWar?.enabled === true ? { layer: activeLayer, isCellFogged: isCellFoggedIndexed } : undefined;
+        object = pickLadderObject(activeLayer.objects ?? [], worldCoords.worldX, worldCoords.worldY, {
           ladder, level: getActiveLevel(), zoom, orientation: mapData.orientation ?? 'flat'
-        });
+        }, fog);
       }
       if (object != null) {
         const cell = screenToLevelCell(clientX, clientY, object.homeLevel ?? 0);
@@ -136,15 +151,13 @@ function useObjectDragSelect(
       object = getObjectAtPosition(getActiveLayer(mapData).objects ?? [], gridX, gridY, classicHitRung(mapData));
     }
 
-    if (object != null) {
+    // Classic path: a fogged object is not selectable. (The ladder pick skips
+    // fogged candidates itself.)
+    if (object != null && ladder === null) {
       const activeLayer = getActiveLayer(mapData);
-      // Fog is level-0 cell data: a deep object is fogged at its root ancestor,
-      // exactly as the renderer hides it (rungFog).
       if (activeLayer.fogOfWar?.enabled === true) {
-        const home = object.homeLevel ?? 0;
-        const fogged = ladder !== null && home > 0 ? rungFogPredicate(ladder, home, isCellFoggedIndexed) : isCellFoggedIndexed;
         const objOffset = geometry.toOffsetCoords(object.position.x, object.position.y);
-        if (fogged(activeLayer, objOffset.col, objOffset.row)) {
+        if (isCellFoggedIndexed(activeLayer, objOffset.col, objOffset.row)) {
           object = null;
         }
       }
@@ -249,6 +262,9 @@ function useObjectDragSelect(
     // cell centres come from that rung's geometry (level 0 is screenToGrid).
     const home = currentObject?.homeLevel ?? 0;
     const cellGeometry = ladder !== null && home > 0 ? ladder.geometryForLevel(home) : geometry;
+    // A target on a rung cell that does not exist is refused: the object stays
+    // on its last valid cell (the drag carries on from there).
+    const cellExists = singleDragCellExists(ladder);
 
     // Alt+Shift drag inversion: temporarily flip snap behavior
     const isInverted = altKeyPressedRef.current && shiftKeyPressedRef.current;
@@ -284,6 +300,7 @@ function useObjectDragSelect(
 
         const nearestGrid = screenToLevelCell(clientX, clientY, home);
         if (objectId == null) return true;
+        if (nearestGrid != null && !cellExists(home, nearestGrid.x, nearestGrid.y)) return true;
         const updatedObjects = updateObject(
           getActiveLayer(mapData).objects,
           objectId,
@@ -305,6 +322,7 @@ function useObjectDragSelect(
         const targetX = coords.x - offsetX;
         const targetY = coords.y - offsetY;
 
+        if (!cellExists(home, targetX, targetY)) return true;
         const cellCenter = cellGeometry.getCellCenter(targetX, targetY);
 
         if (objectId == null) return true;
@@ -348,6 +366,7 @@ function useObjectDragSelect(
       const nearestGrid = screenToLevelCell(clientX, clientY, home);
 
       if (objectId == null) return true;
+      if (nearestGrid != null && !cellExists(home, nearestGrid.x, nearestGrid.y)) return true;
       const updatedObjects = updateObject(
         getActiveLayer(mapData).objects,
         objectId,
@@ -371,6 +390,7 @@ function useObjectDragSelect(
     const offsetY = dragStart.offsetY ?? 0;
     const targetX = x - offsetX;
     const targetY = y - offsetY;
+    if (!cellExists(home, targetX, targetY)) return true;
 
     if (x !== dragStart.gridX || y !== dragStart.gridY) {
       if (!currentObject) return true;
@@ -520,4 +540,4 @@ function useObjectDragSelect(
   return { handleObjectSelection, handleObjectDragging, stopObjectDragging };
 }
 
-export { useObjectDragSelect };
+export { useObjectDragSelect, singleDragCellExists };

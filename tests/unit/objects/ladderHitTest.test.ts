@@ -135,6 +135,47 @@ describe('pickLadderObject', () => {
     const c = centreWorld(ladderObjectFootprint(over, [under, over], v)!, ZOOM_RUNG2);
     expect(pickLadderObject([under, over], c.x, c.y, v)?.id).toBe('over');
   });
+
+  it('fogged top footprint skipped; the visible object beneath is picked', () => {
+    const v = view(ZOOM_RUNG2);
+    // Fog every root hex except (0,0).
+    const origin = root.toOffsetCoords(0, 0);
+    const layer = { id: 'L', fogOfWar: { enabled: true } } as unknown as MapLayer;
+    const isCellFogged = (_l: MapLayer, col: number, row: number): boolean => !(col === origin.col && row === origin.row);
+    const inRootOrigin = (q: number, r: number): boolean => {
+      const centre = rung2.getCellCenter(q, r);
+      const container = root.worldToGrid(centre.worldX, centre.worldY);
+      return container.x === 0 && container.y === 0;
+    };
+    // A 3x3 rung-2 object `under` homed inside root (0,0) (visible) and a nearby
+    // rung-2 object `over` homed outside it (fogged), drawn later in the same depth
+    // group, with over's footprint centre inside under's footprint.
+    let found: { under: MapObject; over: MapObject; at: { x: number; y: number } } | null = null;
+    const dirs: number[][] = [];
+    for (let dq = -2; dq <= 2; dq++) for (let dr = -2; dr <= 2; dr++) if (dq !== 0 || dr !== 0) dirs.push([dq, dr]);
+    for (let q = -20; q <= 20 && found === null; q++) {
+      for (let r = -20; r <= 20 && found === null; r++) {
+        if (!inRootOrigin(q, r)) continue;
+        for (const [dq, dr] of dirs) {
+          if (inRootOrigin(q + dq, r + dr)) continue;
+          const under = obj({ id: 'under', homeLevel: 2, position: { x: q, y: r }, size: { width: 3, height: 3 } });
+          const over = obj({ id: 'over', homeLevel: 2, position: { x: q + dq, y: r + dr } });
+          const overRect = ladderObjectFootprint(over, [under, over], v);
+          if (overRect === null) continue;
+          const at = centreWorld(overRect, ZOOM_RUNG2);
+          if (!ladderFootprintContains(under, [under, over], at.x, at.y, v)) continue;
+          found = { under, over, at };
+          break;
+        }
+      }
+    }
+    expect(found).not.toBeNull();
+    const { under, over, at } = found!;
+    const objects = [under, over];
+    // Without fog the object drawn on top wins; with fog it is skipped.
+    expect(pickLadderObject(objects, at.x, at.y, v)?.id).toBe('over');
+    expect(pickLadderObject(objects, at.x, at.y, v, { layer, isCellFogged })?.id).toBe('under');
+  });
 });
 
 describe('ladderFootprintContains', () => {

@@ -75,4 +75,21 @@ describe('findDuplicateTarget', () => {
     const second = findDuplicateTarget(objects, a, 'grid')!;
     expect(second).not.toEqual({ x: first.x, y: first.y });
   });
+
+  it('findDuplicateTarget skips rung cells that do not exist', () => {
+    const src = { ...obj('a', 5, 5), homeLevel: 2 } as MapObject;
+    const seen: Array<[number, number, number]> = [];
+    // Only x <= 5 exists on rung 2: east (6,5) is past the edge.
+    const cellExists = (home: number, x: number, y: number): boolean => {
+      seen.push([home, x, y]);
+      return x <= 5;
+    };
+    const dest = findDuplicateTarget([src], src, 'grid', cellExists);
+    expect(dest).toEqual({ x: 5, y: 6 });
+    expect(seen.every(([home]) => home === 2)).toBe(true);
+    // Nothing exists: no target rather than an off-lattice one.
+    expect(findDuplicateTarget([src], src, 'grid', () => false)).toBeNull();
+    // Omitted predicate keeps the shipped behaviour.
+    expect(findDuplicateTarget([src], src, 'grid')).toEqual({ x: 6, y: 5 });
+  });
 });

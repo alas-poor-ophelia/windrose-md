@@ -25,9 +25,12 @@ type SchemaStep = (mapData: MapData) => MapData;
 
 /**
  * Version stamped on entries that carry detail-ladder data (`lod`, rung
- * `levels`, `homeLevel`, here or in any nested sub-hex map). Builds that
- * predate it refuse such an entry (MapSchemaError 'newer-version') instead of
- * opening it and dropping its rungs on the first Strata promotion (DATA-05).
+ * `levels`, an element homed on a rung >= 1, here or in any nested sub-hex
+ * map). Builds from the 2026-10-13 audit onward refuse such an entry, per
+ * entry, with MapSchemaError 'newer-version' when they predate the ladder.
+ * Released 2.4.x and older builds do NOT: they open a v3 entry as v2 and may
+ * strip or restamp its ladder fields (see SCHEMA_VERSION in dmtConstants.ts,
+ * decision D-12).
  */
 const LADDER_SCHEMA_VERSION = 3;
 
@@ -152,9 +155,10 @@ function runSchemaMigrations(mapData: MapData): MapData {
 // Per-entry version stamp (write time)
 // ===========================================
 
+/** Whether any element is homed on a rung >= 1 (homeLevelOf: 0, null, "2" or 1.5 count as root). */
 function hasHomedElement(elements: readonly unknown[] | undefined): boolean {
   if (!Array.isArray(elements)) return false;
-  return elements.some(e => e !== null && typeof e === 'object' && (e as { homeLevel?: unknown }).homeLevel !== undefined);
+  return elements.some(e => homeLevelOf(e) > 0);
 }
 
 /** Whether this map level ITSELF (not its sub-hex children) carries ladder data. */

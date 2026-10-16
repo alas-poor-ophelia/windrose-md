@@ -318,6 +318,24 @@ describe('depthAuthoring growth by key and size unit (Codex review)', () => {
   });
 });
 
+describe('sub-hex child maps refuse depth authoring (D-1)', () => {
+  beforeEach(() => { getSettings.mockReset(); getSettings.mockReturnValue({ lodLadder: true }); });
+
+  it('a deep write in a sub-hex child is refused nested-level and stamps nothing', () => {
+    const child = hexMap();
+    expect(canBeginDepthAuthoring(child)).toBe(true);
+    const cells = [{ q: 4, r: 0, color: '#123456' }];
+    expect(guardDepthWrite(child, child.layers[0].id, 1, cells, { nested: true })).toBe('nested-level');
+    const r = writeDepthCells(child, child.layers[0].id, 1, cells, { nested: true });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('nested-level');
+    expect(r.mapData).toBe(child);
+    expect(r.mapData.lod).toBeUndefined();
+    // Without the flag the same write goes through (the refusal is the nesting, nothing else).
+    expect(writeDepthCells(child, child.layers[0].id, 1, cells).ok).toBe(true);
+  });
+});
+
 describe('a deep write that changes nothing never stamps lod (DATA-02)', () => {
   beforeEach(() => { getSettings.mockReset(); getSettings.mockReturnValue({ lodLadder: true }); });
 

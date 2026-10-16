@@ -107,12 +107,12 @@ export interface MapStateContextValue {
   ladder: GeometryLadder | null;
   /**
    * The camera's ladder rung, read from the LIVE zoom at call time (a function,
-   * not a value: design section 4.1). 0 when there is no ladder. Tools latch it
+   * not a value, so a zoom change never re-renders consumers). 0 when there is no ladder. Tools latch it
    * at pointerdown; nothing should read it per render.
    */
   getActiveLevel: () => number;
   /**
-   * Edit-level lock (design 06 s10): the rung authoring tools are pinned to,
+   * Edit-level lock: the rung authoring tools are pinned to,
    * or null when unlocked (edit follows the camera). Session-only, never
    * persisted; cleared on map change and when the map stops being a ladder view.
    */

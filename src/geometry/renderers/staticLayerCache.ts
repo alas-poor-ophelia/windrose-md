@@ -48,8 +48,8 @@ import {
   releaseSurface,
   evictIfNeeded,
   maxSurfacePixels,
-} from '../../hooks/canvas/surfaceBudget';
-import { driftAllowed, driftCandidates } from '../../hooks/canvas/levelSurfaces';
+} from './surfaceBudget';
+import { driftAllowed, driftCandidates } from './levelSurfaces';
 
 interface StaticLayerCacheEntry {
   off: HTMLCanvasElement;

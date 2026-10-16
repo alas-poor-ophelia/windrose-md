@@ -19,15 +19,13 @@ import {
   cellPx,
   coarseCells,
   existsAt,
-  hexRing,
   loeschianNorm,
-  measureRosetteSeat,
-  opensAtLevelZero,
   cellKey,
   LADDER_DEFAULTS,
   LADDER_M_ALLOWLIST,
   type LadderParams,
 } from "../../../../src/geometry/core/lattice";
+import { hexRing, measureRosetteSeat, opensAtLevelZero } from "./latticeProofs";
 import { HexGeometry } from "../../../../src/geometry/core/HexGeometry";
 import { DEFAULTS } from "../../../../src/core/dmtConstants";
 

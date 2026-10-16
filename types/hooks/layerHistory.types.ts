@@ -58,7 +58,7 @@ export interface LayerHistorySnapshot {
   /** Fog of war state (layer-level, tracked for compound undo with player moves) */
   fogOfWar?: FogOfWar | null;
   /**
-   * Ladder rungs >= 1 of the layer, by reference (design 06 s5). Present ONLY
+   * Ladder rungs >= 1 of the layer, by reference. Present ONLY
    * when the layer has `levels`; never `levels: undefined`. Undo/redo restores
    * this whole record.
    */

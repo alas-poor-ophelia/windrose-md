@@ -81,3 +81,13 @@ Layers register pointer handlers; `useEventCoordinator` (hooks/canvas) reads the
 - **Missing provider**: access hooks throw outside their provider. `MapSettings` hooks throw anywhere except the settings modal.
 - **Don't overload**: keep contexts focused; split state from operations when consumers differ.
 - **Contexts shouldn't depend on each other.**
+
+## Ladder fields (MapContext)
+
+The lattice detail ladder adds fields to the MapContext value (`types/contexts/context.types.ts`):
+
+- `ladder: GeometryLadder | null`. `null` on every classic map; check it before any ladder logic.
+- `getActiveLevel()` and `getEditLevel()` are LIVE getters (the camera's rung read from the live zoom, and the rung authoring writes to). Call them inside handlers, latch at pointerdown; never read them per render, or every zoom tick re-renders consumers.
+- `editLevelLock` / `setEditLevelLock(level | null)` hold the edit-level lock. It is session-only: never persisted, cleared on map change and when the map stops being a ladder view.
+- `screenToLevelCell(clientX, clientY, level)` is the rung-scoped cell lookup; `screenToGrid` stays level 0 only.
+- `onLevelCellsChange` is the rung write path; it goes through the single deep-write gate (`persistence/depthAuthoring.ts`) and may refuse. Rules: `src/geometry/CLAUDE.md`, Ladder invariants.

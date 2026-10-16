@@ -22,7 +22,7 @@ import {
   setActiveCanvas,
   snapshot,
   SURFACE_BYTES_PER_PX,
-} from "../../../../src/hooks/canvas/surfaceBudget";
+} from "../../../../src/geometry/renderers/surfaceBudget";
 import { ladderTileClipKnob } from "../../../../src/geometry/renderers/mapRenderer";
 
 const platformFlags = Platform as unknown as { isIosApp: boolean };

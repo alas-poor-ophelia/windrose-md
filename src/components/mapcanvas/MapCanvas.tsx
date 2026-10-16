@@ -66,7 +66,7 @@ import { WallLayer } from './WallLayer';
 import { focusMapOnPointerDown, shouldHandleMapKey } from '../../utils/keyboardTargets';
 import { RerollDungeonButton } from './RerollDungeonButton';
 import { getSetting } from '../../core/settingsAccessor';
-import { setActiveCanvas, releaseActiveCanvas } from '../../hooks/canvas/surfaceBudget';
+import { setActiveCanvas, releaseActiveCanvas } from '../../geometry/renderers/surfaceBudget';
 import { usePanZoomCoordinator } from '../../hooks/canvas/usePanZoomCoordinator';
 import { useEventCoordinator } from '../../hooks/canvas/useEventCoordinator';
 

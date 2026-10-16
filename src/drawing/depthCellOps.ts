@@ -107,6 +107,7 @@ function depthRefusalMessage(reason: DepthWriteRefusal): string {
     case 'level-out-of-range': return 'Deep edit refused: this zoom level cannot be edited.';
     case 'quarantined': return 'Deep edit refused: this map\'s detail levels are read-only here.';
     case 'nested-classic': return 'Deep edit refused: this map has sub-maps, and converting it is not available yet.';
+    case 'nested-level': return 'Detail levels are not available inside a sub-hex map.';
     case 'not-a-ladder': return 'Deep edit refused: this map cannot take detail edits.';
     case 'unknown-layer': return 'Deep edit refused: that layer no longer exists.';
   }

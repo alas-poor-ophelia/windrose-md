@@ -17,6 +17,8 @@ geometry/
 │   ├── hexMeasurements.ts # Hex-specific calculations
 │   ├── offsetCoordinates.ts # Coordinate system conversions
 │   ├── lattice.ts         # Lattice ladder math: rung ownership, zoom crossings, existsAt (LOD, flag-gated)
+│   ├── createGeometryLadder.ts # GeometryLadder: one geometry per rung over the root, activeLevel(zoom), existsAt, ancestorAt
+│   ├── materialiseLevel.ts # Rung layer for level >= 1: root cells and authored rung cells resolved onto that rung
 │   ├── contentFitView.ts  # Pure "fit to content" view (center + zoom) for the recenter control
 │   ├── viewportMath.ts    # Pure view math: client->canvas px, north (un)rotation, canvas<->world, pan deltas, anchored zoom
 │   └── subHexBackdrop.ts  # Pure placement math for the parent-map snapshot behind a sub-hex map
@@ -24,6 +26,12 @@ geometry/
 │   ├── mapRenderer.ts     # renderCanvas: whole-map render (backdrop, rotation, static cache blit, fog, selections); pure, no React
 │   ├── staticPasses.ts    # Static content as named passes over one RenderFrame (#types/rendering/renderFrame.types), in draw order
 │   ├── staticLayerCache.ts # Offscreen static snapshot cache (12M px budget, rotated maps blit under rotation, settle re-render)
+│   ├── levelSurfaces.ts   # Ladder: which per-level surface a frame may drift from at a crossing (pure selection)
+│   ├── surfaceBudget.ts   # Ladder: global byte budget and LRU eviction for per-level surfaces; active canvas slot; __windrose.surfaces
+│   ├── ladderTelemetry.ts # Ladder: frame ring buffer and crossing/median ratio per canvas, recorded only with the capability on; __windrose.ladder
+│   ├── latticeRenderer.ts # Ladder: live lattice stroke after the blit (active rung plus district rungs)
+│   ├── elementBands.ts    # Ladder: per-home-rung visibility bands, floors and held sizes for objects and labels
+│   ├── tileClipRegion.ts  # Ladder: crossing clip for tiles homed on a finer rung
 │   ├── layerCellsRenderer.ts # One layer's cells/borders/edges (viewport-culled) + grid/hex renderer dispatch
 │   ├── gridRenderer.ts, hexRenderer.ts, backgroundRenderer.ts
 │   ├── objectRenderer.ts, textLabelRenderer.ts, selectionRenderer.ts
@@ -34,6 +42,8 @@ geometry/
 │   └── subHexBackdropRenderer.ts # Blits the parent snapshot, right after the background fill
 ├── fog/                   # Fog-of-war rendering pipeline
 │   ├── fogRenderer.ts, gridFogRenderer.ts, hexFogRenderer.ts
+│   ├── foggedCellIndex.ts # Indexed isCellFogged lookups
+│   ├── rungFog.ts         # Ladder: fog for deep-rung elements, answered at the root hex containing the rung cell's centre
 ├── strokes/
 │   └── terrainStrokeGeometry.ts # Pure terrain-brush stroke math (thinning, simplification, bounds, erase hit test)
 └── curves/                # Bezier math & boolean ops
@@ -46,6 +56,17 @@ Type definitions live in `types/core/geometry.types.ts` (path alias `#types/*`).
 ### Lattice ladder rendering (LOD, dormant unless enabled)
 
 A ladder map (`isLadderView` + per-map opt-in) passes `ladder` to `renderCanvas` (`mapRenderer.ts`); every ladder branch is guarded by `ladder !== null`, so classic maps render exactly as before. `mapRenderer.ts` picks the rung (`ladder.activeLevel(zoom)`, or the `level` option for export/previews), claims the surface budget's active slot, strokes the lattice live after the blit (`latticeRenderer.ts`), draws objects and text labels live per home rung with the `elementBands.ts` floors and holds, filters selection chrome by the same bands, and records `ladderTelemetry`. `staticPasses.ts` (scene `ladder`/`level`) skips the baked grid and adjacent sub-hex previews, draws the materialised rung layer at level >= 1 (`materialiseLevel.ts`), and draws tiles per home rung with the crossing clip (`renderLadderTiles`, `tileClipRegion.ts`, `ladderTileClipAt`). `staticLayerCache.ts` keeps one surface per rung per canvas (drift at a crossing, bake at settle, max two per canvas, global `surfaceBudget` for ladder canvases only). One-shot canvases pass `bypassSurfaceCache` and draw the scene directly.
+
+The ladder's non-hook support modules live here, not in `hooks/`: geometry never imports `hooks/` at runtime (type-only imports from `#types/hooks/*` are the exception). Debug bridges `__windrose.ladder` and `__windrose.surfaces` are typed on `WindroseGlobal` (`types/core/global.types.ts`) and attach to the main `window`.
+
+### Ladder invariants
+
+Code comments elsewhere cite these by name ("src/geometry/CLAUDE.md, Ladder invariants").
+
+1. **A crossing is a drift.** A zoom crossing only drifts the existing per-level surfaces (`levelSurfaces.ts`, `staticLayerCache.ts`); no synchronous bake runs in the crossing frame, the bake happens at settle.
+2. **Quarantine is derived.** Whether a map's depth content is quarantined is computed from its data on every check (`isDepthQuarantined` in `core/lodFlags.ts`), never stored, and nothing un-quarantines a map.
+3. **The depth budget is in encoded bytes.** The depth budget is measured in the save journal's own unit, the encoded payload length (`journalPayloadLength`), not in cells or elements.
+4. **One deep-write gate.** Every deep write, cells and elements alike, goes through `persistence/depthAuthoring.ts` (`guardDepthWrite`, `writeDepthCells`).
 
 ### Extended geometry types
 

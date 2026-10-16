@@ -79,6 +79,12 @@ interface UsePaintToolOptions {
   getEditLevel?: () => number;
   screenToLevelCell?: MapStateContextValue['screenToLevelCell'];
   onLevelCellsChange?: HandleLevelCellsChange;
+  /**
+   * Drops held transient-history pins (useLayerHistory.clearTransient). A deep
+   * stroke that ends with its rung unchanged (paint then erase the same cell)
+   * records no entry, so the pins its suppressed ticks took are released here.
+   */
+  clearTransient?: () => void;
 }
 
 interface UsePaintToolResult {
@@ -100,7 +106,7 @@ function usePaintTool({
   onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
   onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange,
   getTextLabelAtPosition, removeTextLabel, getObjectAtPosition,
-  ladder = null, getEditLevel, screenToLevelCell, onLevelCellsChange
+  ladder = null, getEditLevel, screenToLevelCell, onLevelCellsChange, clearTransient
 }: UsePaintToolOptions): UsePaintToolResult {
 
   const [paintIsDrawing, setPaintIsDrawing] = useState<boolean>(false);
@@ -496,6 +502,10 @@ function usePaintTool({
       const finalLevelCells = authoredCells(layer, level);
       if (strokeChanged(finalLevelCells, initialLevelCells)) {
         onLevelCellsChange(level, (cells: Cell[]) => cells, false);
+      } else {
+        // No commit claims the pins the suppressed ticks took; holding them
+        // would fold this no-op stroke into the next unrelated entry.
+        clearTransient?.();
       }
     }
 

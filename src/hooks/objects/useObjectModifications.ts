@@ -29,7 +29,7 @@ const useObjectModifications = (): {
   handleObjectDeletion: (target?: string | Event) => void;
   handleObjectDuplicate: (target?: string | Event) => void;
 } => {
-  const { mapData, screenToGrid } = useMapState();
+  const { mapData, screenToGrid, ladder } = useMapState();
   const { updateObject, removeObject, onObjectsChange } = useMapOperations();
   const { selectedItem, setSelectedItem } = useMapSelection();
 
@@ -133,7 +133,8 @@ const useObjectModifications = (): {
     const sourceObject = layerObjects.find((obj: MapObject) => obj.id === targetId);
     if (!sourceObject) return;
 
-    const dest = findDuplicateTarget(layerObjects, sourceObject, mapData.mapType);
+    const dest = findDuplicateTarget(layerObjects, sourceObject, mapData.mapType,
+      (home, x, y) => ladder === null || home <= 0 || ladder.existsAt(home, x, y));
     if (!dest) {
       console.warn('No empty space found for duplicate');
       return;
@@ -153,7 +154,7 @@ const useObjectModifications = (): {
       type: 'object',
       id: newObject.id
     });
-  }, [resolveTargetId, mapData, onObjectsChange, setSelectedItem]);
+  }, [resolveTargetId, mapData, ladder, onObjectsChange, setSelectedItem]);
 
   return {
     handleObjectWheel,

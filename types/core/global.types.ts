@@ -1,4 +1,6 @@
 import type { TileForm } from '../tiles/tile.types';
+import type { LadderCrossingStats, LadderSnapshot } from '../../src/geometry/renderers/ladderTelemetry';
+import type { SurfaceSnapshot } from '../../src/geometry/renderers/surfaceBudget';
 
 /**
  * One wall's gap geometry, as computed by the render/edit-derive pipeline
@@ -144,11 +146,36 @@ interface WindroseGlobal {
   /** Set to true once the plugin has fully initialized */
   ready?: boolean;
   mcpInstances?: Record<string, WindroseMcpInstance>;
+  /** Ladder frame telemetry (geometry/renderers/ladderTelemetry.ts), attached on the first recorded ladder frame. */
+  ladder?: {
+    snapshot: (canvasId?: number) => LadderSnapshot;
+    crossingStats: (canvasId?: number) => LadderCrossingStats;
+    reset: () => void;
+  };
+  /** Surface budget counters (geometry/renderers/surfaceBudget.ts), attached on the first surface registration. */
+  surfaces?: {
+    peakBytes: () => number;
+    currentBytes: () => number;
+    snapshot: () => SurfaceSnapshot;
+  };
+}
+
+/**
+ * Developer-only ladder parameter overrides (`window.__windroseLadder`), read by
+ * core/lodFlags.ts and the renderer's tile-clip knob. Dev-set input: readers keep
+ * their typeof checks.
+ */
+interface WindroseLadderDevKnobs {
+  m?: unknown;
+  minCellPx?: unknown;
+  maxLevel?: unknown;
+  tileClip?: unknown;
 }
 
 declare global {
   interface Window {
     __windrose?: WindroseGlobal;
+    __windroseLadder?: WindroseLadderDevKnobs;
   }
 }
 

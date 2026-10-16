@@ -69,10 +69,10 @@ type LadderTileClipMode = 'none' | 'hex' | 'smart';
  * How the ladder clips root tiles when painting rung `level`.
  *
  * Level 0 never clips (it is the classic draw). At rungs >= 1 the default is
- * 'smart' (kgc.26): a root tile is clipped to the union of its own hexagon and
+ * 'smart': a root tile is clipped to the union of its own hexagon and
  * every neighbouring root hexagon that holds no deep content, so wide art keeps
  * running across empty neighbours (the 2026-10-12 lineup rejected the whole-hex
- * clip for cutting wall art into one-hex dashes, kgc.23 item k) but stops hard
+ * clip for cutting wall art into one-hex dashes) but stops hard
  * at the edge of a neighbour with deep paint instead of covering it.
  *
  * Developer knob for comparisons, flag-gated like the other overrides:
@@ -97,10 +97,10 @@ function ladderTileClipAt(level: number): LadderTileClipMode {
  *
  * Hex only, and never a rotated map: the rotated branch of the renderer
  * bypasses the surface cache the ladder's per-rung bake lives in. Mode is data
- * (design 06, s19 item 2): a map carrying `lod` is a ladder map on every
+ * (not a flag; see src/geometry/CLAUDE.md, Ladder invariants): a map carrying `lod` is a ladder map on every
  * install, flag or no flag; without `lod` the capability flag decides.
  *
- * Never a quarantined map (s19 item 1): it renders level 0 on the classic
+ * Never a quarantined map (a map whose `lod`/`levels` this build cannot read is held untouched): it renders level 0 on the classic
  * path, clamps at the classic zoom, and refuses deep edits. Gating here, in
  * the one predicate every ladder consumer shares, is what keeps an invalid
  * `lod` (an m off the allowlist, a non-positive minCellPx) away from
@@ -127,7 +127,7 @@ function hasSubHexChildren(mapData: MapData): boolean {
 
 /**
  * Deepest rung >= 1 holding depth content across `layers`: authored rung
- * cells, or an object, text label or tile homed on a rung (kgc.12; the home is
+ * cells, or an object, text label or tile homed on a rung (the home is
  * read through `homeLevelOf`, so a malformed value counts as root). 0 when
  * none. Export uses it over the exported layers only.
  */
@@ -169,15 +169,14 @@ function deepestAuthoredRung(mapData: MapData): number {
 
 /**
  * Does any layer hold authored cells on a rung >= 1? Such content is laid out
- * on the unrotated lattice, so rotating the map would misplace it (design 06,
- * s19 item 2). False on every classic map, including one with `levels: {}`.
+ * on the unrotated lattice, so rotating the map would misplace it. False on every classic map, including one with `levels: {}`.
  */
 function hasDepthContent(mapData: MapData): boolean {
   return deepestAuthoredRung(mapData) > 0;
 }
 
 /**
- * Depth quarantine (design 06, s19 item 1): a PURE derived predicate, never
+ * Depth quarantine (validation never destroys data): a PURE derived predicate, never
  * persisted. A quarantined map renders level 0, refuses deep edits, and keeps
  * its bytes untouched.
  */
@@ -224,7 +223,7 @@ function canAuthorDepth(mapData: MapData | null | undefined): boolean {
 /**
  * Ladder parameters for a map. A map carrying `lod` uses its stored m /
  * minCellPx / maxLevel, and the developer override may adjust minCellPx and
- * maxLevel only, NEVER m (design 06, s19 item 1). Otherwise: defaults, then the
+ * maxLevel only, NEVER m (changing m would re-partition authored cells). Otherwise: defaults, then the
  * full developer override.
  */
 function ladderParamsFor(mapData: MapData): LadderParams {
