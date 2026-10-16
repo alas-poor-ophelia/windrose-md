@@ -21,6 +21,7 @@ import { scanTilesetFolder } from './assets/tilesetOperations';
 import { isBundleWriteInProgress, mountBundleFolder, remountOnRename } from './assets/bundles/bundleRegistry';
 import { clearTileBytesNegativeCache } from './assets/tileBytes';
 import { openBundleTileFolderDev } from './assets/bundles/bundleDevCommand';
+import { AddTilesModal } from './settings/modals/AddTilesModal';
 import { buildMapEntry, createMapEntry, getSaveQueue, listMapsResult } from './persistence/fileOperations';
 import { noteStoreFileModified, noteStoreFilePathGone } from './persistence/storeCache';
 import { disposeImageCache } from './assets/imageOperations';
@@ -163,6 +164,17 @@ export default class WindrosePlugin extends Plugin {
         if (this.settings.developerMode !== true) return false;
         if (checking) return true;
         void recordPerfTelemetry(this.app);
+        return true;
+      },
+    });
+    this.addCommand({
+      id: 'add-tiles-dev',
+      name: 'Add tiles (developer)',
+      checkCallback: (checking) => {
+        if (this.settings.developerMode !== true) return false;
+        if (checking) return true;
+        const pluginLike = { app: this.app, settings: this.settings, saveSettings: () => this.saveSettings() };
+        new AddTilesModal(this.app, pluginLike, () => { void this.saveSettings(); }).open();
         return true;
       },
     });

@@ -136,7 +136,7 @@ describe('compactEncode verification', () => {
     expect((await run(png(SIZE), 'image/png', codec({ decoded: within }))).kind).toBe('compact');
   });
 
-  it('rejects a re-encode below 40 dB PSNR, ignoring color under alpha 8', async () => {
+  it('rejects a re-encode below 36 dB PSNR, ignoring color under alpha 8', async () => {
     const noisy = pixels(8, 8, i => (i % 2 === 0 ? [140, 60, 40, 255] : [120, 80, 40, 255]));
     const r = await run(png(SIZE), 'image/png', codec({ decoded: noisy }));
     expect(r.kind).toBe('exact');

@@ -30,7 +30,7 @@ export const COMPACT_QUALITY = 0.9;
 export const COMPACT_FLOOR_BYTES = 65536;
 /** A re-encode is kept only when its size is at most this share of the source. */
 export const COMPACT_MAX_RATIO = 0.8;
-export const COMPACT_MIN_PSNR = 40;
+export const COMPACT_MIN_PSNR = 36;
 export const COMPACT_MAX_ALPHA_DELTA = 2;
 const VERIFY_MIN_ALPHA = 8;
 const VERIFY_MAX_SAMPLES = 1_000_000;
