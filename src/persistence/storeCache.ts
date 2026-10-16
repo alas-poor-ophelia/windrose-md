@@ -57,7 +57,7 @@ const RACY_WINDOW_MS = 2500;
 let cache: CachedStore | null = null;
 
 /**
- * Bumps on every vault modify / delete / rename event of the data file,
+ * Bumps on every vault create / modify / delete / rename event of the data file,
  * whoever wrote it. Read-only consumers that keep something derived from
  * the stored maps (the weather zone resolver's closed-map cache) key it on
  * getDataFileStamp(); it never gates a write.
@@ -192,6 +192,15 @@ function noteStoreFileModified(file: TAbstractFile): void {
   }
 }
 
+/**
+ * Vault 'create' handler: the data file appearing (first use, a restore, a
+ * sync bringing it in) moves the stamp like any other change. A cache is
+ * kept only when the stat is our own just-committed write.
+ */
+function noteStoreFileCreated(file: TAbstractFile): void {
+  noteStoreFileModified(file);
+}
+
 /** Vault 'delete' / 'rename' handler: any store path change drops the cache. */
 function noteStoreFilePathGone(path: string): void {
   if (path === getDataFilePath()) dataFileGeneration++;
@@ -206,6 +215,6 @@ function hasStoreCache(): boolean {
 export type { CachedEntry, StoreSnapshot };
 export {
   invalidateStoreCache, snapshotFromParsed, serializeStore, cachedEntry, utf8ByteLength,
-  getValidStoreCache, commitStoreCache, noteStoreFileModified, noteStoreFilePathGone, hasStoreCache,
+  getValidStoreCache, commitStoreCache, noteStoreFileModified, noteStoreFileCreated, noteStoreFilePathGone, hasStoreCache,
   getDataFileStamp,
 };

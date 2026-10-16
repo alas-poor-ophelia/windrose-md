@@ -18,7 +18,7 @@ import { recordInputEventProbe } from './utils/inputEventProbe';
 import { recordZoomTrace } from './utils/zoomTraceProbe';
 import { scanTilesetFolder } from './assets/tilesetOperations';
 import { buildMapEntry, createMapEntry, getSaveQueue, listMapsResult, readRawMapEntry } from './persistence/fileOperations';
-import { noteStoreFileModified, noteStoreFilePathGone } from './persistence/storeCache';
+import { noteStoreFileCreated, noteStoreFileModified, noteStoreFilePathGone } from './persistence/storeCache';
 import { disposeImageCache } from './assets/imageOperations';
 import { clearAll as clearThumbnailCache } from './assets/thumbnailCache';
 import { flushAll, installLifecycleJournaling, journalAll } from './persistence/saveCoordinator';
@@ -297,6 +297,9 @@ export default class WindrosePlugin extends Plugin {
     // Store cache (MEM-12): any change to the data file not made by this
     // session's own write drops the cached store, so the next save re-reads.
     this.registerEvent(this.app.vault.on('modify', (file) => noteStoreFileModified(file)));
+    // Creation (first use, a restore) also moves the data-file stamp, so the
+    // weather zone resolver's closed-map cache never outlives a recreated file.
+    this.registerEvent(this.app.vault.on('create', (file) => noteStoreFileCreated(file)));
     this.registerEvent(this.app.vault.on('delete', (file) => noteStoreFilePathGone(file.path)));
     this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
       noteStoreFilePathGone(oldPath);

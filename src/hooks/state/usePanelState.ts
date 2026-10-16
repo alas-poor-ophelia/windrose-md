@@ -109,12 +109,13 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
       };
 
       // Weather tab (only when it was offered): absent = no map-level zone /
-      // animation on, so the keys are removed rather than stored as defaults
+      // animation on (root) or inherited (sub-hex level), so the keys are
+      // removed rather than stored as defaults
       if (weather != null) {
         delete newMapData.weatherZoneId;
         delete newMapData.weatherAnimate;
         if (weather.weatherZoneId != null && weather.weatherZoneId !== '') newMapData.weatherZoneId = weather.weatherZoneId;
-        if (weather.weatherAnimate === false) newMapData.weatherAnimate = false;
+        if (typeof weather.weatherAnimate === 'boolean') newMapData.weatherAnimate = weather.weatherAnimate;
       }
 
       if (hexBounds !== null && prev.mapType === 'hex') {

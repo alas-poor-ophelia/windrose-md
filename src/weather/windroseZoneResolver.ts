@@ -12,7 +12,7 @@
  * published root snapshot). `resolveAsync` also answers for maps that are
  * not open, by reading the stored entry READ-ONLY through `loadMap`; the
  * parsed zone fields are cached per map until the data file is modified
- * (getDataFileStamp: any vault modify/delete/rename of the file). Never
+ * (getDataFileStamp: any vault create/modify/delete/rename of the file). Never
  * writes, never shows a Notice.
  */
 

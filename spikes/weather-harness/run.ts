@@ -213,6 +213,18 @@ async function main() {
     page.on("pageerror", (e) => log("pageerror:", e.message));
     page.on("console", (m) => { if (m.type() === "error") log("console.error:", m.text().slice(0, 300)); });
     await page.waitForLoadState("domcontentloaded");
+    // Evals can capture mid-sequence: `await window.__harnessShot("name")` writes <out>/name.png
+    await page.exposeFunction("__harnessShot", async (name: string) => {
+      const f = path.join(OUT, `${String(name).replace(/[^\w.-]/g, "_")}.png`);
+      await page.screenshot({ path: f });
+      log(`shot -> ${f}`);
+      return f;
+    });
+    // ... and click like a user: `await window.__harnessClick(css)` (real pointer events, first match)
+    await page.exposeFunction("__harnessClick", async (selector: string) => {
+      await page.locator(selector).first().click({ timeout: 5000 });
+      return true;
+    });
     await page.waitForFunction(() => !!(window as any).app?.workspace, undefined, { timeout: 60000 });
     await setup(page, ids);
     const dims = await page.evaluate(() => [window.innerWidth, window.innerHeight, document.body.className.includes("is-mobile")]);

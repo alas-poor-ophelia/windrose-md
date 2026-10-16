@@ -11,7 +11,8 @@ MapSettingsModal.tsx         # Modal shell + tab bar; wraps content in MapSettin
 ├── AppearanceTab.tsx        # Colors, line width, object set, fog image
 ├── MeasurementTab.tsx       # Distance units / scale
 ├── WeatherTab.tsx           # Map-level weather zone + "Animate weather" (tab offered only while the weather plugin is usable;
-│                            #   weatherAnimate is stored only when false; sub-hex levels inherit it, read as store.animate)
+│                            #   root: weatherAnimate stored only when false; sub-hex: tri-state dropdown, absent = inherit the parent hex,
+│                            #   true/false stored explicitly (buildWeatherSave); read as store.animate)
 ├── PreferencesTab.tsx       # Remember pan/zoom, sidebar, expanded state
 ├── NativeControls.tsx       # Native Obsidian control wrappers (Setting components created imperatively)
 ├── SettingItem.tsx          # Label + description + control row

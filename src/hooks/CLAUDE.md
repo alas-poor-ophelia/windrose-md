@@ -34,7 +34,8 @@ hooks/
 │   ├── useViewController.ts        # Live pan/zoom state held OFF the Preact path during a gesture
 │   ├── useLiveOverlayTransform.ts  # Keeps SVG overlay groups locked to the canvas during live gestures
 │   ├── useLiveOverlayRedraw.ts     # Same, for overlay <canvas> redraws (rAF-coalesced)
-│   └── useOverlayCanvas.ts         # A layer's private overlay <canvas>: guarded create, size follows main canvas, remove/unmount
+│   ├── useOverlayCanvas.ts         # A layer's private overlay <canvas>: guarded create, size follows main canvas, remove/unmount
+│   └── useWeatherShapes.ts         # World-space weather area outlines (src/weather/skyClip), traced once per input change and shared by WeatherLayer + WeatherSkyLayer
 ├── drawing/
 │   ├── useDrawingTools.ts          # Orchestrator composing the drawing hooks below
 │   ├── usePaintTool.ts             # Paint/erase drag: cells, edges, objects, labels, curves, tiles, walls, terrain strokes
@@ -108,6 +109,7 @@ hooks/
     ├── useOutlineTools.ts          # Polygon outline tools (hex)
     ├── useShapeOverlayTools.ts     # Shape overlay (rectangle/circle) placement
     ├── useDistanceMeasurement.ts   # Multi-waypoint measure tool
+    ├── useRouteWeather.ts          # Measure tool travel times with weather: forecast walk itinerary, departure window, per-day stretches (src/travel/forecastWalk.ts)
     ├── useTerrainSampling.ts       # Auto route-segment terrain (sampler context)
     ├── usePartyPinInteraction.ts   # Beacon (party pin) place/drag
     ├── usePartyPinCardPosition.ts  # Beacon controls card anchor/placement

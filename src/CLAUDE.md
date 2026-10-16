@@ -132,7 +132,7 @@ src/
 │   │                      #   revealedAreas; regions revealed at >= 50% unfogged). Weather never reveals fogged cells/areas
 │   ├── weatherZones.ts    # Region/cell → zone lookups, route segment fold, mounted-map zone snapshots
 │   ├── windroseZoneResolver.ts # Answers `hex` and `windrose.region` locators (open maps sync; closed maps read-only async,
-│   │                      #   parsed zones cached per map until the data file is modified)
+│   │                      #   parsed zones cached per map until the data file is created or modified)
 │   ├── travelInterpreter.ts # `windrose.travel` interpreter; documents Windrose's travel result shape { speedMultiplier, label? }
 │   ├── weatherTravelRules.ts # Rule table: report → speed multiplier + reasons
 │   ├── weatherClassify.ts # Local classify/describe fallbacks for 0.3.x plugins

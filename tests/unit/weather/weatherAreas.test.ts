@@ -11,7 +11,7 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 
 import { buildAreaLookup, inheritedZoneId, resolveWeatherAnimate, resolveWeatherAreas, sameWeatherAreas } from "../../../src/weather/weatherAreas";
 import { withRegionWeatherZone } from "../../../src/weather/weatherRegionMenu";
-import { getDataFileStamp, noteStoreFileModified, noteStoreFilePathGone } from "../../../src/persistence/storeCache";
+import { getDataFileStamp, noteStoreFileCreated, noteStoreFileModified, noteStoreFilePathGone } from "../../../src/persistence/storeCache";
 import { TFile } from "obsidian";
 import { createWindroseZoneAnswers, mapLoaderFromRawEntries } from "../../../src/weather/windroseZoneResolver";
 import { buildMapZoneSnapshot, publishMapZones } from "../../../src/weather/weatherZones";
@@ -228,6 +228,27 @@ describe("windroseZoneResolver", () => {
     await missing.resolveAsync({ kind: "hex", mapId: "x", q: 0, r: 0 });
     await missing.resolveAsync({ kind: "hex", mapId: "x", q: 0, r: 0 });
     expect(none).toHaveBeenCalledTimes(1);
+  });
+
+  it("the data-file stamp moves when the data file is created (first use, restore)", () => {
+    const dataFile = Object.assign(new TFile(), { path: "windrose-md-data.json", stat: { mtime: 1, size: 1, ctime: 1 } });
+    const other = Object.assign(new TFile(), { path: "notes/created.md", stat: { mtime: 1, size: 1, ctime: 1 } });
+    const s0 = getDataFileStamp();
+    noteStoreFileCreated(other);
+    expect(getDataFileStamp()).toBe(s0);
+    noteStoreFileCreated(dataFile);
+    expect(getDataFileStamp()).not.toBe(s0);
+  });
+
+  it("a closed-map answer cached before the data file existed is dropped once it is created", async () => {
+    const dataFile = Object.assign(new TFile(), { path: "windrose-md-data.json", stat: { mtime: 1, size: 1, ctime: 1 } });
+    let raw: string | null = null;
+    const readRaw = vi.fn(() => Promise.resolve(raw));
+    const answers = createWindroseZoneAnswers(mapLoaderFromRawEntries(readRaw));
+    await expect(answers.resolveAsync({ kind: "hex", mapId: "closed-map", q: 2, r: -1 })).resolves.toBeNull();
+    raw = JSON.stringify(stored);
+    noteStoreFileCreated(dataFile);
+    await expect(answers.resolveAsync({ kind: "hex", mapId: "closed-map", q: 2, r: -1 })).resolves.toBe("upland");
   });
 
   it("the data-file stamp moves on a modify, delete or rename of the data file only", () => {

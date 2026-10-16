@@ -130,5 +130,9 @@ export function buildVaultFiles(): Record<string, string> {
     "windrose-md-data.json": JSON.stringify({ maps: { "weather-demo-001": buildHexMap(), "weather-grid-001": buildGridMap() } }, null, 2),
     "Weather Demo.md": note("weather-demo-001", "Weather Demo", "hex"),
     "Weather Grid Demo.md": note("weather-grid-001", "Weather Grid Demo", "grid"),
+    // Two-way showcase: the weather plugin's own block shows Windrose's travel ruling
+    "Weather Ruling.md": "# Weather ruling\n\n```wadjet\nzone: ashfall-coast\nstyle: card\ninterpret: windrose.travel\n```\n",
+    // Frontmatter zone: a block without zone: resolves through `weather-zone`
+    "Weather Frontmatter.md": "---\nweather-zone: ashfall-coast\n---\n# Frontmatter zone\n\n```wadjet\nstyle: line\n```\n",
   };
 }

@@ -3,8 +3,8 @@
  *
  * The plugin-wide "Weather travel rules" setting (default, DIRECT_KEYS
  * plumbing, options from the weather plugin's interpreter registry, hidden
- * without the plugin) and the per-map Weather tab state (reducer seed and
- * SET_WEATHER).
+ * without the plugin) and the per-map Weather tab state (reducer seed,
+ * SET_WEATHER, and the root vs sub-hex save rule of buildWeatherSave).
  */
 
 import { afterEach, describe, it, expect, vi } from "vitest";
@@ -13,7 +13,9 @@ import type { SettingDefinitionControl, SettingDefinitionGroup, SettingDefinitio
 import { buildSettingDefinitions, getSettingControlValue, setSettingControlValue } from "../../../src/settings/settingDefinitions";
 import type { SettingsTabThis } from "../../../src/settings/tabs/settingsTabContext";
 import { FALLBACK_SETTINGS, clearPlugin } from "../../../src/core/settingsAccessor";
-import { Actions, buildInitialState, settingsReducer } from "../../../src/components/settings/settingsReducer";
+import { Actions, buildInitialState, buildWeatherSave, settingsReducer } from "../../../src/components/settings/settingsReducer";
+import { resolveWeatherAnimate } from "../../../src/weather/weatherAreas";
+import type { MapData } from "#types/core/map.types";
 import type { PluginSettings } from "#types/settings/settings.types";
 import type { WadjetInterpreter } from "#types/integrations/wadjet.types";
 import { createFakeApi, createFakeApiV1, createFakeApp } from "./fakeWadjet";
@@ -100,18 +102,50 @@ describe("Weather travel rules setting", () => {
 });
 
 describe("Weather tab state", () => {
-  it("seeds from the map's fields: no zone = '', animation on unless stored off", () => {
+  it("seeds from the map's fields: no zone = '', no stored animation = null", () => {
     const blank = buildInitialState({ mapType: "hex" }, FALLBACK_SETTINGS);
-    expect(blank.weather).toEqual({ weatherZoneId: "", weatherAnimate: true });
+    expect(blank.weather).toEqual({ weatherZoneId: "", weatherAnimate: null });
     const set = buildInitialState({ mapType: "grid", currentWeather: { weatherZoneId: "coast", weatherAnimate: false } }, FALLBACK_SETTINGS);
     expect(set.weather).toEqual({ weatherZoneId: "coast", weatherAnimate: false });
+    const on = buildInitialState({ mapType: "hex", currentWeather: { weatherAnimate: true } }, FALLBACK_SETTINGS);
+    expect(on.weather.weatherAnimate).toBe(true);
   });
 
   it("updates through SET_WEATHER", () => {
     const state = buildInitialState({ mapType: "hex" }, FALLBACK_SETTINGS);
     const next = settingsReducer(state, { type: Actions.SET_WEATHER, payload: { weatherZoneId: "moor" } });
-    expect(next.weather).toEqual({ weatherZoneId: "moor", weatherAnimate: true });
+    expect(next.weather).toEqual({ weatherZoneId: "moor", weatherAnimate: null });
     expect(settingsReducer(next, { type: Actions.SET_WEATHER, payload: { weatherAnimate: false } }).weather)
       .toEqual({ weatherZoneId: "moor", weatherAnimate: false });
+  });
+});
+
+function map(overrides: Partial<MapData> = {}): MapData {
+  return { name: "m", mapType: "hex", layers: [], ...overrides } as unknown as MapData;
+}
+
+function withSub(parent: MapData, key: string, child: MapData): MapData {
+  return { ...parent, subHexMaps: { [key]: { subdivisionRings: 7, mapData: child, lastModified: "" } } };
+}
+
+describe("Weather tab save", () => {
+  it("a root map stores animation only when it is off", () => {
+    expect(buildWeatherSave({ weatherZoneId: "", weatherAnimate: null }, false)).toEqual({});
+    expect(buildWeatherSave({ weatherZoneId: "", weatherAnimate: true }, false)).toEqual({});
+    expect(buildWeatherSave({ weatherZoneId: "coast", weatherAnimate: false }, false)).toEqual({ weatherZoneId: "coast", weatherAnimate: false });
+  });
+
+  it("a sub-hex level stores on and off explicitly and nothing to inherit", () => {
+    expect(buildWeatherSave({ weatherZoneId: "", weatherAnimate: null }, true)).toEqual({});
+    expect(buildWeatherSave({ weatherZoneId: "", weatherAnimate: true }, true)).toEqual({ weatherAnimate: true });
+    expect(buildWeatherSave({ weatherZoneId: "", weatherAnimate: false }, true)).toEqual({ weatherAnimate: false });
+  });
+
+  it("a sub-hex level saved on turns the Sky back on under a parent that turned it off", () => {
+    const child = map({});
+    const root = withSub(map({ weatherAnimate: false }), "0,0", { ...child, ...buildWeatherSave({ weatherZoneId: "", weatherAnimate: true }, true) });
+    expect(resolveWeatherAnimate(root, ["0,0"])).toBe(true);
+    const inheriting = withSub(map({ weatherAnimate: false }), "0,0", { ...child, ...buildWeatherSave({ weatherZoneId: "", weatherAnimate: null }, true) });
+    expect(resolveWeatherAnimate(inheriting, ["0,0"])).toBe(false);
   });
 });

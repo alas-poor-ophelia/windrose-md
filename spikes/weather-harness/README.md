@@ -43,7 +43,12 @@ The child Electron is always killed in `finally` (matched by its `--user-data-di
 - Wadjet `data.json` from `C:\Dev\U+13080\test\e2e\data.fixture.json` (zones `greywold-highlands`, `ashfall-coast`).
 - Windrose `data.json` with `onboardingState: "done"`; map store `windrose-md-data.json` at the vault root.
 - `Weather Demo.md` (hex map `weather-demo-001`: 24x16 painted hexes, regions Greywold Highlands -> `greywold-highlands`, Ashfall Coast -> `ashfall-coast`, Unbound Plains with no zone) and `Weather Grid Demo.md` (square grid `weather-grid-001`).
+- `Weather Ruling.md` (a ```` ```wadjet ```` card for `ashfall-coast` with `interpret: windrose.travel`) and `Weather Frontmatter.md` (`weather-zone: ashfall-coast` frontmatter, block without `zone:`).
 - Extend the maps in `fixture.ts` (`buildVaultFiles()`).
+
+## Final walkthrough (`evals/final/`, `final-run.sh`)
+
+`./final-run.sh <name> <eval.js> [run.ts args]` concatenates `evals/final/common.js` (console.error / onerror / rejection capture into `__errs`, `wait`, `shot`, `skyOf`, `openFullPane`, `skyVsFog`) with the eval, uses the private vault `C:/Dev/scratch-vaults/weather-final`, and writes to `out-final/<name>/`. `WADJET_SRC=<dir>` swaps the weather plugin build (e.g. `C:/Dev/U+13080` for the published 0.3.1). Evals can call `await __harnessShot(name)` (screenshot to `<out>/<name>.png`) and `await __harnessClick(css)` (a real Playwright click).
 
 ## Traps
 
@@ -51,3 +56,5 @@ The child Electron is always killed in `finally` (matched by its `--user-data-di
 - Wait for `wadjet.api.ready === true` as well as both plugins loaded; enabling returns before onload finishes.
 - Notes embed the map small with the objects drawer open; use `--eval` to drive the map or open full-pane if you need more room.
 - This is not a test runner: no assertions, no E2E fixtures.
+- Obsidian's `activeWindow`/`activeDocument` stay on another (hidden) window under the quiet launch, so a `Modal` (map settings, plugin settings) mounts where the eval cannot see it. Set `window.activeWindow = window; window.activeDocument = document` at the top of an eval that opens modals.
+- A scripted `.click()` on the Map settings rail button does work once activeDocument is fixed; the modal was opening in the other document.

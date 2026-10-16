@@ -242,7 +242,27 @@ export interface BuildInitialStateProps {
 export interface SettingsWeather {
   /** '' = no map-level zone (sub-hex levels then inherit the parent hex) */
   weatherZoneId: string;
-  weatherAnimate: boolean;
+  /**
+   * The level's own "Animate weather" value; null = none stored. A root map
+   * reads null as on; a sub-hex level reads it as "same as the parent hex".
+   */
+  weatherAnimate: boolean | null;
+}
+
+/**
+ * The map's weather fields to save from the Weather tab: absent keys are
+ * removed from the map. A root map stores animation only when it is off (on
+ * is the default); a sub-hex level stores on and off explicitly so it can
+ * override its parent either way, and stores nothing to inherit.
+ */
+export function buildWeatherSave(weather: SettingsWeather, isInSubHex: boolean): { weatherZoneId?: string; weatherAnimate?: boolean } {
+  const animate = isInSubHex
+    ? weather.weatherAnimate
+    : (weather.weatherAnimate === false ? false : null);
+  return {
+    ...(weather.weatherZoneId !== '' ? { weatherZoneId: weather.weatherZoneId } : {}),
+    ...(animate != null ? { weatherAnimate: animate } : {}),
+  };
 }
 
 // ===========================================
@@ -680,7 +700,7 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
     showParentBackdrop: currentSettings?.showParentBackdrop,
     weather: {
       weatherZoneId: props.currentWeather?.weatherZoneId ?? '',
-      weatherAnimate: props.currentWeather?.weatherAnimate ?? true
+      weatherAnimate: props.currentWeather?.weatherAnimate ?? null
     },
 
     backgroundImagePath: currentBackgroundImage?.path ?? null,

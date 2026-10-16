@@ -49,7 +49,7 @@ import type { ComponentChildren, FunctionComponent } from 'preact';
 import { createContext } from 'preact';
 import type { MutableRef } from 'preact/hooks';
 import { useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'preact/hooks';
-import { Actions, GRID_DENSITY_PRESETS, settingsReducer, buildInitialState, calculateBoundsFromSettings, getOrphanedContentInfo } from '../components/settings/settingsReducer';
+import { Actions, GRID_DENSITY_PRESETS, settingsReducer, buildInitialState, calculateBoundsFromSettings, getOrphanedContentInfo, buildWeatherSave } from '../components/settings/settingsReducer';
 import type { CurrentSettings, CurrentBackgroundImage, CurrentDistanceSettings } from '../components/settings/settingsReducer';
 import { getSettings } from '../core/settingsAccessor';
 import { THEME } from '../core/dmtConstants';
@@ -356,7 +356,8 @@ export interface MapSettingsProviderProps {
 
 /**
  * Weather fields handed to onSave: absent keys are removed from the map
- * (no map-level zone; animation on). Null = leave the map's fields alone.
+ * (no map-level zone; animation on at the root, inherited on a sub-hex
+ * level). Null = leave the map's fields alone.
  */
 export interface MapWeatherSave {
   weatherZoneId?: string;
@@ -711,10 +712,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       showParentBackdrop: settingsData.showParentBackdrop,
     };
     // Weather fields are written only when the Weather tab was offered
-    const weatherSave: MapWeatherSave | null = weatherZones == null ? null : {
-      ...(state.weather.weatherZoneId !== '' ? { weatherZoneId: state.weather.weatherZoneId } : {}),
-      ...(state.weather.weatherAnimate ? {} : { weatherAnimate: false }),
-    };
+    const weatherSave: MapWeatherSave | null = weatherZones == null ? null : buildWeatherSave(state.weather, isInSubHex);
     onSave(mapSettings, state.preferences, mapType === 'hex' ? state.hexBounds : null, backgroundImageData, calculatedHexSize, forceDelete, weatherSave);
     onClose();
   };

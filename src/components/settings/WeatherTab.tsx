@@ -4,8 +4,9 @@
  * Weather tab of MapSettingsModal, offered only while the U+13080 Weather
  * plugin is usable. Sets the map-level zone ("whole map" weather: a grid
  * map's weather, and the fallback for hexes no bound region claims) and
- * the per-map "Animate weather" switch. On a sub-hex level an unset zone
- * inherits the weather of the hex it was drilled from.
+ * the per-map "Animate weather" setting. On a sub-hex level an unset zone
+ * or animation setting inherits from the hex it was drilled from, so both
+ * are three-way choices there; a root map has a plain on/off (default on).
  */
 
 import type { VNode } from 'preact';
@@ -13,6 +14,13 @@ import type { VNode } from 'preact';
 import { useModalShell } from '../../context/MapSettingsContext';
 import { SettingItem } from './SettingItem';
 import { NativeDropdown, NativeToggle } from './NativeControls';
+
+/** Sub-hex animation choices: '' stores nothing and inherits the parent hex */
+const ANIMATE_OPTIONS = [
+  { value: '', label: 'Same as the parent hex' },
+  { value: 'on', label: 'On' },
+  { value: 'off', label: 'Off' },
+];
 
 function WeatherTab(): VNode {
   const { weatherZones, weather, setWeather, isInSubHex, isHexMap } = useModalShell();
@@ -42,10 +50,18 @@ function WeatherTab(): VNode {
         />
       </SettingItem>
       <SettingItem name="Animate weather" description="Show falling rain and snow, drifting fog and cloud shadows on this map">
-        <NativeToggle
-          value={weather.weatherAnimate}
-          onChange={() => setWeather({ weatherAnimate: !weather.weatherAnimate })}
-        />
+        {isInSubHex ? (
+          <NativeDropdown
+            value={weather.weatherAnimate == null ? '' : (weather.weatherAnimate ? 'on' : 'off')}
+            options={ANIMATE_OPTIONS}
+            onChange={(value: string) => setWeather({ weatherAnimate: value === '' ? null : value === 'on' })}
+          />
+        ) : (
+          <NativeToggle
+            value={weather.weatherAnimate !== false}
+            onChange={() => setWeather({ weatherAnimate: weather.weatherAnimate === false ? null : false })}
+          />
+        )}
       </SettingItem>
     </div>
   );
