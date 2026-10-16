@@ -24,6 +24,8 @@ import { clearAll as clearThumbnailCache } from './assets/thumbnailCache';
 import { flushAll, installLifecycleJournaling, journalAll } from './persistence/saveCoordinator';
 import { pruneJournal } from './persistence/saveJournal';
 import { notifyPartyNoteRenamed } from './persistence/partyNoteOperations';
+import { connectZoneResolver } from './weather/wadjetBridge';
+import { resolveMountedHexZone } from './weather/weatherZones';
 import { runImportDetectionPass } from './assets/importDetectionPass';
 import {
   ensureTileMetadataLoaded,
@@ -316,6 +318,10 @@ export default class WindrosePlugin extends Plugin {
         if (result.status === 'ok') pruneJournal(this.app, { liveMapIds: result.maps.map(m => m.id) });
       });
     });
+
+    // Optional companion: lets the weather plugin ask which zone a hex of an
+    // open map is in. A no-op when that plugin is absent.
+    this.register(connectZoneResolver(this.app, resolveMountedHexZone));
   }
 
   /**

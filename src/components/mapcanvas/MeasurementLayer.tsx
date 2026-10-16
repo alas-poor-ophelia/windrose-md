@@ -30,6 +30,10 @@ import {
   resolveSelectedAllowance,
   resolveSelectedModes,
 } from '../../travel/travelTimeOperations';
+import type { WeatherTravelEffect } from '../../weather/weatherTravelRules';
+import { computeWeatherTimeRatio, evaluateWeatherTravel, formatWeatherNote } from '../../weather/weatherTravelRules';
+import { buildCellZoneIndex, computeSegmentWeatherEffects } from '../../weather/weatherZones';
+import { useWeather } from '../../hooks/state/useWeather';
 import { MeasurementOverlay } from '../overlays/MeasurementOverlay';
 import { MeasurementControls } from '../overlays/MeasurementControls';
 import { TerrainPickerPopup } from '../overlays/TerrainPickerPopup';
@@ -60,6 +64,9 @@ interface TerrainPickerState {
   x: number;
   y: number;
 }
+
+/** Shared "no weather on any segment" value — one identity, so memos keyed on it hold */
+const NO_SEGMENT_WEATHER: WeatherTravelEffect[] = [];
 
 const MeasurementLayer = ({
   currentTool,
@@ -219,8 +226,69 @@ const MeasurementLayer = ({
     [enabledPacks, travelSettings]
   );
 
-  const travelLines = useMemo((): TravelTimeLine[] => {
-    if (selectedModes.length === 0 || waypoints.length === 0) return [];
+  // Weather over each segment, from the weather plugin when it is present
+  // and regions are bound to its zones. Kept apart from the terrain sampler:
+  // weather changes with the world's day and never writes segmentTerrains.
+  // Parked unless the measure tool is active, like the sampler.
+  // The whole route is costed with the world's CURRENT day: a journey longer
+  // than a day is not walked against the forecast, so it over- or under-
+  // states weather that changes en route.
+  const weather = useWeather();
+  const regions = mapData?.regions;
+  const weatherActive = currentTool === 'measure' && weather.available;
+  const cellZones = useMemo(
+    () => buildCellZoneIndex(weatherActive ? regions : null),
+    [weatherActive, regions]
+  );
+  const effectForZone = useMemo(() => {
+    const zoneEffects = new Map<string, WeatherTravelEffect | null>();
+    return (zoneId: string): WeatherTravelEffect | null => {
+      let effect = zoneEffects.get(zoneId);
+      if (effect === undefined) {
+        const report = weather.reportFor(zoneId);
+        effect = report != null ? evaluateWeatherTravel(report) : null;
+        zoneEffects.set(zoneId, effect);
+      }
+      return effect;
+    };
+  }, [weather]);
+
+  // Committed segments and the live preview segment are costed apart: the
+  // preview moves with the pointer and must not re-walk the whole route.
+  // Without weather both stay on shared constants, so the travel lines
+  // below recompute exactly as often as they did before weather existed.
+  const committedWeather = useMemo((): WeatherTravelEffect[] => {
+    if (cellZones.size === 0 || geometry == null || waypoints.length < 2) return NO_SEGMENT_WEATHER;
+    return computeSegmentWeatherEffects(
+      waypoints,
+      (x1, y1, x2, y2) => geometry.getCellsInLine(x1, y1, x2, y2),
+      cellZones,
+      effectForZone
+    );
+  }, [cellZones, geometry, waypoints, effectForZone]);
+
+  const lastWaypoint = waypoints.length > 0 ? waypoints[waypoints.length - 1] : null;
+  const previewX = previewTarget?.x;
+  const previewY = previewTarget?.y;
+  const previewWeather = useMemo((): WeatherTravelEffect | null => {
+    if (cellZones.size === 0 || geometry == null || lastWaypoint == null ||
+        previewX == null || previewY == null || previewDistance <= 0) return null;
+    const effects = computeSegmentWeatherEffects(
+      [lastWaypoint, { x: previewX, y: previewY }],
+      (x1, y1, x2, y2) => geometry.getCellsInLine(x1, y1, x2, y2),
+      cellZones,
+      effectForZone
+    );
+    return effects[0] ?? null;
+  }, [cellZones, geometry, lastWaypoint, previewX, previewY, previewDistance, effectForZone]);
+
+  const segmentWeather = useMemo(
+    () => (previewWeather != null ? [...committedWeather, previewWeather] : committedWeather),
+    [committedWeather, previewWeather]
+  );
+
+  const { travelLines, weatherNote } = useMemo((): { travelLines: TravelTimeLine[]; weatherNote: string | null } => {
+    if (selectedModes.length === 0 || waypoints.length === 0) return { travelLines: [], weatherNote: null };
 
     // Distances in map units, preview segment included live (TM-18); the
     // preview's terrain-to-be is its predecessor's (TM-21), so its
@@ -231,16 +299,20 @@ const MeasurementLayer = ({
       distances.push(previewDistance * distanceSettings.distancePerCell);
       terrainIds.push(segmentTerrains[segmentTerrains.length - 1] ?? firstSegmentTerrainId);
     }
-    const multipliers = terrainIds.map(id => findTerrainById(enabledPacks, id)?.multiplier ?? 1);
+    const terrainMultipliers = terrainIds.map(id => findTerrainById(enabledPacks, id)?.multiplier ?? 1);
+    const weatherMultipliers = terrainMultipliers.map((_, i) => segmentWeather[i]?.multiplier ?? 1);
+    const multipliers = terrainMultipliers.map((m, i) => m * weatherMultipliers[i]);
 
-    return selectedModes.map(({ mode, pack }) => {
+    const lines = selectedModes.map(({ mode, pack }) => {
       const result = computeRouteTravelTime(distances, multipliers, distanceSettings.distanceUnit, mode, pack);
       if (!result.ok) {
         return { modeId: mode.id, name: mode.name, text: result.reason, isError: true };
       }
       return { modeId: mode.id, name: mode.name, text: formatTravelTime(result, selectedAllowance), isError: false };
     });
-  }, [selectedModes, selectedAllowance, waypoints.length, segmentDistances, previewDistance, segmentTerrains, distanceSettings, enabledPacks, firstSegmentTerrainId]);
+    const note = formatWeatherNote(segmentWeather, computeWeatherTimeRatio(distances, terrainMultipliers, weatherMultipliers));
+    return { travelLines: lines, weatherNote: note };
+  }, [selectedModes, selectedAllowance, waypoints.length, segmentDistances, previewDistance, segmentTerrains, distanceSettings, enabledPacks, firstSegmentTerrainId, segmentWeather]);
 
   const modeOptions = useMemo((): TravelModeOption[] => {
     const selected = new Set(travelSettings?.modeIds ?? []);
@@ -329,6 +401,7 @@ const MeasurementLayer = ({
         waypointCount={waypoints.length}
         formattedTotal={formattedTotal}
         travelLines={travelLines}
+        weatherNote={weatherNote}
         modeOptions={modeOptions}
         allowanceOptions={allowanceOptions}
         selectedAllowanceId={travelSettings?.allowanceId ?? null}

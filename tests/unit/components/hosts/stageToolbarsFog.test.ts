@@ -22,6 +22,11 @@ vi.mock('../../../../src/core/settingsAccessor', async (importOriginal) => {
 vi.mock('../../../../src/components/shared/obsidianTooltip', () => ({ tooltipRef: () => () => {} }));
 
 vi.mock('../../../../src/components/shared/Icon', () => ({ Icon: () => null }));
+// The weather toggle subscribes to the weather plugin through app.workspace; these
+// harnesses mount with a bare App, so stand the weather plugin in as absent.
+vi.mock('../../../../src/hooks/state/useWeather', () => ({
+  useWeather: () => ({ available: false, dayOrdinal: null, units: 'metric', zones: [], reportFor: () => null, describe: () => null }),
+}));
 
 import { StageToolbars } from '../../../../src/components/hosts/StageToolbars';
 import { AppContext } from '../../../../src/context/AppContext';

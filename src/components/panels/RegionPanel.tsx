@@ -12,6 +12,8 @@ import type { VNode } from 'preact';
 import { useMemo } from 'preact/hooks';
 import { Icon } from '../shared/Icon';
 import { tooltipRef } from '../shared/obsidianTooltip';
+import { useWeather } from '../../hooks/state/useWeather';
+import { hasWeatherZone } from '../../weather/weatherZones';
 
 const REGION_NAME_MAX_LENGTH = 20;
 const REGION_NAME_TRUNCATE_AT = 17;
@@ -57,6 +59,21 @@ const RegionPanel = ({
     return [...regions].sort((a, b) => a.order - b.order);
   }, [regions]);
 
+  // Today's weather per weather-bound region, in the weather plugin's own
+  // wording; no entry when unbound or the plugin is unavailable
+  const weather = useWeather();
+  const weatherLines = useMemo(() => {
+    const lines = new Map<string, string>();
+    if (!weather.available) return lines;
+    for (const region of regions) {
+      if (!hasWeatherZone(region)) continue;
+      const report = weather.reportFor(region.weatherZoneId);
+      const line = report != null ? weather.describe(report) : 'Weather zone not found';
+      if (line != null) lines.set(region.id, line);
+    }
+    return lines;
+  }, [weather, regions]);
+
   if (regions.length === 0) return null;
 
   return (
@@ -73,7 +90,9 @@ const RegionPanel = ({
           key={region.id}
           className={`windrose-region-item ${!region.visible ? 'windrose-region-item-hidden' : ''}`}
           onClick={(e) => handleRegionClick(region.id, e)}
-          ref={tooltipRef(`${region.name} (${region.hexes.length} hexes)`)}
+          ref={tooltipRef(weatherLines.has(region.id)
+            ? `${region.name} (${region.hexes.length} hexes) — ${weatherLines.get(region.id) ?? ''}`
+            : `${region.name} (${region.hexes.length} hexes)`)}
         >
           <span
             className="windrose-region-color-dot"
@@ -85,6 +104,11 @@ const RegionPanel = ({
           <span className="windrose-region-name">
             {getDisplayName(region.name)}
           </span>
+          {weatherLines.has(region.id) && (
+            <span className="windrose-region-weather-icon">
+              <Icon icon="lucide-cloud-sun" size={12} />
+            </span>
+          )}
           <button
             className="windrose-region-visibility-btn"
             onClick={(e: Event) => handleToggleVisibility(region.id, e)}

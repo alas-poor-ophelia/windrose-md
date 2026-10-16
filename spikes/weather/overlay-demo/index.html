@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Weather spike — overlay + travel demo (offline harness)</title>
+<style>
+  html, body { margin: 0; padding: 0; }
+  body { background: #14171c; color: #dfe7f2; font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 14px 20px 4px; }
+  header h1 { margin: 0 0 2px; font-size: 16px; font-weight: 600; }
+  header p { margin: 0; opacity: 0.7; font-size: 12px; }
+  #panels { display: flex; gap: 16px; padding: 12px 20px 20px; }
+  .panel { flex: 1; min-width: 0; background: #1c2027; border: 1px solid #2c323c; border-radius: 6px; overflow: hidden; }
+  .panel h2 { margin: 0; padding: 8px 12px; font-size: 13px; font-weight: 600; border-bottom: 1px solid #2c323c; }
+  .windrose-canvas-container { position: relative; width: 100%; height: 400px; overflow: hidden; }
+  .windrose-canvas-container canvas { display: block; }
+  .facts { padding: 8px 12px 12px; font-size: 12px; }
+  .facts .zone { display: flex; gap: 8px; padding: 1px 0; }
+  .facts .zone b { flex: 0 0 132px; font-weight: 600; }
+  .facts .zone span { opacity: 0.8; }
+  .facts .travel { margin-top: 8px; padding-top: 8px; border-top: 1px solid #2c323c; display: grid; grid-template-columns: 132px 1fr; row-gap: 2px; }
+  .facts .travel .with { font-weight: 600; }
+  .facts .travel .note { color: #8fc0e8; }
+  .forecast { margin: 0 20px 20px; background: #1c2027; border: 1px solid #2c323c; border-radius: 6px; font-size: 12px; }
+  .forecast h2 { margin: 0; padding: 8px 12px; font-size: 13px; font-weight: 600; border-bottom: 1px solid #2c323c; }
+  .forecast-row { display: grid; grid-template-columns: 132px 120px 1fr; padding: 6px 12px; }
+  .forecast-row .with { font-weight: 600; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Windrose × U+13080 Weather — offline harness</h1>
+    <p>Real <code>WeatherOverlay</code> component, real region renderer and real travel maths from the worktree. Weather is captured from the live Wadjet world; the map is a mock.</p>
+  </header>
+  <div id="panels"></div>
+  <!-- IIFE bundle on purpose: chromium refuses ES modules over file:// -->
+  <script src="dist/bundle.js"></script>
+</body>
+</html>

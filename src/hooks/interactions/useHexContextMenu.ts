@@ -6,6 +6,7 @@ import { useEffect, useRef } from 'preact/hooks';
 import { Menu, Notice } from 'obsidian';
 import type { MenuItem } from 'obsidian';
 import { openNativeNoteLinkModal } from '../../components/modals/NoteLinkModal';
+import { addWeatherZoneMenuItems } from '../../weather/weatherRegionMenu';
 import { ConfirmModal } from '../../settings/modals/ConfirmModal';
 import { isFeatureEnabled } from '../../core/featureFlags';
 import { DEFAULTS } from '../../core/dmtConstants';
@@ -245,6 +246,13 @@ function useHexContextMenu({
               objectType: null
             });
           });
+        });
+
+        addWeatherZoneMenuItems(menu, app, region, weatherZoneId => {
+          const updated = (mapData.regions ?? []).map((r: Region) =>
+            r.id === region.id ? { ...r, weatherZoneId } : r
+          );
+          handleRegionsChange(updated);
         });
 
         menu.addSeparator();

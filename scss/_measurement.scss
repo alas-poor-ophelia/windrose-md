@@ -91,6 +91,21 @@
     color: oklch(70% 0.14 75deg / 0.9);
   }
 
+  /* Weather slowing the route (from the weather plugin, when present) */
+  &-weather {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 2px;
+    font-size: 10px;
+    line-height: 1.35;
+    color: oklch(78% 0.07 235deg);
+
+    > span {
+      flex: 1;
+    }
+  }
+
   @include host-proof-button('#{&}-toggle') {
     display: flex;
     align-items: center;

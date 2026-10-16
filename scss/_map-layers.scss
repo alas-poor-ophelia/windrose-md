@@ -562,6 +562,13 @@ button.windrose-region-item {
   text-align: left;
 }
 
+/* Marks a region bound to a weather zone (weather plugin present) */
+.windrose-region-weather-icon {
+  display: flex;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
 .is-tablet button.windrose-region-visibility-btn,
 button.windrose-region-visibility-btn {
   background: none;

@@ -11,6 +11,7 @@ import type { LayerVisibility } from '#types/contexts/context.types';
 import type { VNode } from 'preact';
 import { Icon } from '../shared/Icon';
 import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
+import { useWeather } from '../../hooks/state/useWeather';
 import { tooltipRef } from '../shared/obsidianTooltip';
 
 /** Fog of War tool identifiers */
@@ -29,6 +30,8 @@ interface LayerDef {
   icon: string;
   tooltip: string;
   hexOnly?: boolean;
+  /** Offered only while the weather plugin is usable and a region is bound to it */
+  requiresWeather?: boolean;
 }
 
 /** Props for VisibilityToolbar component */
@@ -36,6 +39,8 @@ interface VisibilityToolbarProps {
   isOpen: boolean;
   layerVisibility: LayerVisibility;
   onToggleLayer: (layerId: keyof LayerVisibility) => void;
+  /** True when the map has a region bound to a weather zone */
+  hasWeatherRegions?: boolean;
   mapType: MapType;
   showFogTools?: boolean;
   onFogToolsToggle?: () => void;
@@ -51,6 +56,7 @@ const VisibilityToolbar = ({
   isOpen,
   layerVisibility,
   onToggleLayer,
+  hasWeatherRegions = false,
   mapType,
   showFogTools = false,
   onFogToolsToggle,
@@ -59,6 +65,7 @@ const VisibilityToolbar = ({
   onToggleViewLock
 }: VisibilityToolbarProps): VNode => {
   const featureFlags = useFeatureFlags();
+  const weatherAvailable = useWeather().available && hasWeatherRegions;
   const layers: LayerDef[] = [
     {
       id: 'grid',
@@ -97,10 +104,20 @@ const VisibilityToolbar = ({
       icon: 'lucide-spline',
       tooltip: 'Toggle outline visibility',
       hexOnly: true
+    },
+    {
+      id: 'weather',
+      icon: 'lucide-cloud-sun',
+      tooltip: 'Toggle weather visibility',
+      hexOnly: true,
+      requiresWeather: true
     }
   ];
 
-  const visibleLayers = layers.filter(layer => layer.hexOnly !== true || mapType === 'hex');
+  const visibleLayers = layers.filter(layer =>
+    (layer.hexOnly !== true || mapType === 'hex') &&
+    (layer.requiresWeather !== true || weatherAvailable)
+  );
 
   return (
     <div className={`windrose-visibility-toolbar ${isOpen ? 'windrose-visibility-toolbar-open' : ''}`}>

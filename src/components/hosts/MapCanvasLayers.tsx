@@ -37,6 +37,8 @@ interface MapCanvasLayersProps {
   bareThresholdArmed: boolean;
   onDisarmOpening: () => void;
   showSavedRoutes: boolean;
+  /** Weather overlay over weather-bound regions (visibility toolbar toggle) */
+  showWeather: boolean;
   showRerollButton: boolean;
 }
 
@@ -44,7 +46,7 @@ const MapCanvasLayers = ({
   currentTool, selectedColor, selectedOpacity, onColorChange, selectedObjectType, freeformPlacementMode,
   customColors, distanceOverrides, globalSettings, data, fogActiveTool, onFogChange, updateMapData,
   tileBrush, onWallDragStateChange, onWallSurfaceChange, bareThresholdArmed, onDisarmOpening,
-  showSavedRoutes, showRerollButton,
+  showSavedRoutes, showWeather, showRerollButton,
 }: MapCanvasLayersProps): VNode => {
   const { selectedTilesetId, selectedTileId, tileSubtool, tileScale, brushSize, tileDepth } = tileBrush;
   return (
@@ -166,6 +168,9 @@ const MapCanvasLayers = ({
 
       {/* HexCoordinateLayer - displays coordinate labels when 'C' key is held */}
       <MapCanvas.HexCoordinateLayer />
+
+      {/* WeatherLayer - weather over weather-bound regions (below the beacons) */}
+      <MapCanvas.WeatherLayer visible={showWeather} />
 
       {/* PartyPinLayer - party pin marker and range ring */}
       <MapCanvas.PartyPinLayer currentTool={currentTool} onPartyPinsChange={data.handlePartyPinsChange} />

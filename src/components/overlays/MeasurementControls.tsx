@@ -50,6 +50,8 @@ interface MeasurementControlsProps {
   formattedTotal: string | null;
   /** Computed travel-time lines for the map's selected modes */
   travelLines?: TravelTimeLine[];
+  /** Weather already folded into the travel lines, e.g. "Heavy snow, Gale (+28%)"; null = none */
+  weatherNote?: string | null;
   /** All modes offered by enabled packs (empty = no travel block) */
   modeOptions?: TravelModeOption[];
   /** All allowances offered by enabled packs */
@@ -73,6 +75,7 @@ const MeasurementControls = ({
   waypointCount,
   formattedTotal,
   travelLines = [],
+  weatherNote = null,
   modeOptions = [],
   allowanceOptions = [],
   selectedAllowanceId = null,
@@ -163,6 +166,15 @@ const MeasurementControls = ({
             {travelLines.some(l => l.isError) && (
               <div className="windrose-measure-controls-travel-hint">
                 {travelLines.find(l => l.isError)?.text}
+              </div>
+            )}
+            {weatherNote != null && weatherNote !== '' && travelLines.some(l => !l.isError) && (
+              <div
+                className="windrose-measure-controls-travel-weather"
+                ref={tooltipRef('Weather along this route, included in the times above')}
+              >
+                <Icon icon="lucide-cloud-sun" size={11} />
+                <span>{weatherNote}</span>
               </div>
             )}
 

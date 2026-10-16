@@ -27,6 +27,8 @@ interface PanelBagSources {
   fog: ReturnType<typeof useFogOfWar>;
   tileBrush: ReturnType<typeof useTileBrush>;
   uiLayout: Pick<ReturnType<typeof useUILayout>, 'layerVisibility' | 'handleToggleLayerVisibility' | 'isFocused'>;
+  /** True when the map has a region bound to a weather zone (gates the weather toggle) */
+  hasWeatherRegions: boolean;
   boards: BoardHandlers;
   drawer: TileDrawerState;
   flyouts: TileFlyouts;
@@ -87,6 +89,7 @@ function buildPanelBags(src: PanelBagSources): PanelBags {
       onZoomOut: src.onZoomOut,
       layerVisibility: uiLayout.layerVisibility,
       onToggleLayer: uiLayout.handleToggleLayerVisibility,
+      hasWeatherRegions: src.hasWeatherRegions,
       mapType: mapData.mapType,
       fogOfWarState: fog.currentFogState,
       onFogToolSelect: fog.handleFogToolSelect,

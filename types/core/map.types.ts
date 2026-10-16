@@ -639,6 +639,12 @@ export interface Region {
   /** Z-order for rendering (lower = behind) */
   order: number;
   tags?: string[];
+  /**
+   * Zone id in the U+13080 Weather plugin whose weather applies to this
+   * region's hexes. Absent = no weather. May outlive the zone it names
+   * (deleted in the weather plugin) — readers treat that as no weather.
+   */
+  weatherZoneId?: string;
 }
 
 // ===========================================

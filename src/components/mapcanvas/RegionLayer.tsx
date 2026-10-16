@@ -21,6 +21,7 @@ import { useRegionTools } from '../../hooks/interactions/useRegionTools';
 import type { MenuItem } from 'obsidian';
 import { Menu } from 'obsidian';
 import { openNativeNoteLinkModal } from '../modals/NoteLinkModal';
+import { addWeatherZoneMenuItems } from '../../weather/weatherRegionMenu';
 import { Icon } from '../shared/Icon';
 import type { InstanceScopedDetail, RegionIdDetail } from '../../core/windroseEvents';
 import { isForeignInstanceEvent } from '../../core/windroseEvents';
@@ -418,6 +419,8 @@ const RegionLayer = ({
         item.onClick(() => updateRegion(region.id, { labelPosition: undefined }));
       });
     }
+
+    addWeatherZoneMenuItems(menu, app, region, weatherZoneId => updateRegion(region.id, { weatherZoneId }));
 
     menu.addSeparator();
 

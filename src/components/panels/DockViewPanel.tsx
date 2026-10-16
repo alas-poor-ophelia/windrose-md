@@ -10,12 +10,15 @@ import { useApp } from '../../context/AppContext';
 import { Icon } from '../shared/Icon';
 import { tooltipRef } from '../shared/obsidianTooltip';
 import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
+import { useWeather } from '../../hooks/state/useWeather';
 
 interface LayerDef {
   id: keyof LayerVisibility;
   icon: string;
   label: string;
   hexOnly?: boolean;
+  /** Offered only while the weather plugin is usable and a region is bound to it */
+  requiresWeather?: boolean;
 }
 
 const LAYERS: LayerDef[] = [
@@ -25,6 +28,7 @@ const LAYERS: LayerDef[] = [
   { id: 'hexCoordinates', icon: 'lucide-key-round', label: 'Coords', hexOnly: true },
   { id: 'regions', icon: 'lucide-hexagon', label: 'Regions', hexOnly: true },
   { id: 'outlines', icon: 'lucide-spline', label: 'Outlines', hexOnly: true },
+  { id: 'weather', icon: 'lucide-cloud-sun', label: 'Weather', hexOnly: true, requiresWeather: true },
 ];
 
 interface FogToolDef {
@@ -45,6 +49,8 @@ interface DockViewPanelProps {
   onZoomOut: () => void;
   layerVisibility: LayerVisibility;
   onToggleLayer: (layerId: keyof LayerVisibility) => void;
+  /** True when the map has a region bound to a weather zone */
+  hasWeatherRegions?: boolean;
   mapType: MapType;
   fogOfWarState: FogOfWarState;
   onFogToolSelect: (tool: FogToolId) => void;
@@ -59,6 +65,7 @@ const DockViewPanel = ({
   onZoomOut,
   layerVisibility,
   onToggleLayer,
+  hasWeatherRegions = false,
   mapType,
   fogOfWarState,
   onFogToolSelect,
@@ -68,7 +75,11 @@ const DockViewPanel = ({
 }: DockViewPanelProps): VNode => {
   const app = useApp();
   const featureFlags = useFeatureFlags();
-  const visibleLayers = LAYERS.filter(l => l.hexOnly !== true || mapType === 'hex');
+  const weatherAvailable = useWeather().available && hasWeatherRegions;
+  const visibleLayers = LAYERS.filter(l =>
+    (l.hexOnly !== true || mapType === 'hex') &&
+    (l.requiresWeather !== true || weatherAvailable)
+  );
 
   const handleClearAll = useCallback(() => {
     const modal = new Modal(app);

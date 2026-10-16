@@ -42,6 +42,7 @@ import { useCustomEventHandlers } from './hooks/interactions/useCustomEventHandl
 import { useKeyboardShortcuts } from './hooks/interactions/useKeyboardShortcuts';
 import { usePlayerFogClear } from './hooks/interactions/usePlayerFogClear';
 import { useUILayout } from './hooks/state/useUILayout';
+import { hasWeatherZone } from './weather/weatherZones';
 import { useFloatingPanels } from './hooks/state/useFloatingPanels';
 import { usePanelState } from './hooks/state/usePanelState';
 import { useViewControls } from './hooks/state/useViewControls';
@@ -215,6 +216,12 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     showVisibilityToolbar, setShowVisibilityToolbar,
     layerVisibility, handleToggleLayerVisibility
   } = useUILayout({ mapData, updateMapData, fullPane });
+
+  // The weather visibility toggle is offered only where it can do something
+  const hasWeatherRegions = useMemo(
+    () => (mapData?.regions ?? []).some(hasWeatherZone),
+    [mapData?.regions]
+  );
 
   // The MAIN map canvas is the first <canvas> under this container (fog
   // canvas renders after it) — same contract getCanvasSize relies on.
@@ -610,7 +617,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // One prop set per panel (STRUCT-A-02): every layout spreads the same bag.
   const bags = buildPanelBags({
     mapData, tool: toolState, layerHistory, data: dataHandlers, fog, tileBrush,
-    uiLayout: { layerVisibility, handleToggleLayerVisibility, isFocused },
+    uiLayout: { layerVisibility, handleToggleLayerVisibility, isFocused }, hasWeatherRegions,
     boards: boardHandlers, drawer: drawerState, flyouts, art: artHandlers, featureFlags,
     availableTilesets, getCachedImage, onEditLayer: setEditingLayerId, onLayerClone: handleCloneLayerRequest,
     onZoomIn: handleZoomIn, onZoomOut: handleZoomOut, onUndo: wrappedHandleUndo,
@@ -668,7 +675,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             paletteDocked={!isFloating('toolPalette')}
             onPopOutPalette={(pos) => toggleFloat('toolPalette', pos)}
             visibility={fullPane ? null : {
-              isOpen: showVisibilityToolbar, layerVisibility, onToggleLayer: handleToggleLayerVisibility,
+              isOpen: showVisibilityToolbar, layerVisibility, onToggleLayer: handleToggleLayerVisibility, hasWeatherRegions,
               mapType: mapData.mapType, showFogTools, onFogToolsToggle: handleFogToolsToggle,
               onTogglePictureFrame: handleTogglePictureFrame,
               viewLocked: rootMapData?.lockedViewState != null, onToggleViewLock: handleToggleViewLock,
@@ -788,6 +795,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 bareThresholdArmed={bareThresholdArmed}
                 onDisarmOpening={() => setBareThresholdArmed(false)}
                 showSavedRoutes={layerVisibility.savedRoutes}
+                showWeather={layerVisibility.weather}
                 showRerollButton={featureFlags.dungeonGenerator}
               />
             </MapCanvas>
