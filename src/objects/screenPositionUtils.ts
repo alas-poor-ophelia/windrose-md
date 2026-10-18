@@ -5,6 +5,10 @@
 import type { MapData } from '#types/core/map.types';
 import type { MapObject, ObjectAlignment } from '#types/objects/object.types';
 import type { IGeometry } from '#types/core/geometry.types';
+import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
+
+import { ladderObjectFootprint } from './ladderHitTest';
+import { getActiveLayer } from '../persistence/layerAccessor';
 import { calculateViewportOffset, rotateAboutCanvasCenter } from '../geometry/core/viewportMath';
 
 /** Screen position result */
@@ -33,15 +37,18 @@ interface HexGeometryLike extends IGeometry {
 }
 
 /**
- * Calculate an object's screen position accounting for zoom, pan, rotation, alignment, and container positioning
- * @returns Screen position data or null if inputs invalid
+ * Calculate an object's screen position accounting for zoom, pan, rotation, alignment, and container positioning.
+ * Under the ladder the anchor is the drawn footprint on the object's home rung
+ * (held size included); null when the object is not drawn at this zoom.
+ * @returns Screen position data (screenX/screenY = centre) or null if inputs invalid
  */
 function calculateObjectScreenPosition(
   object: MapObject,
   canvas: HTMLCanvasElement,
   mapData: MapData,
   geometry: IGeometry,
-  containerRef: ContainerRef | null = null
+  containerRef: ContainerRef | null = null,
+  ladder: GeometryLadder | null = null
 ): ScreenPosition | null {
   if (mapData == null || canvas == null || geometry == null) {
     return null;
@@ -59,7 +66,16 @@ function calculateObjectScreenPosition(
   let screenX: number, screenY: number;
   let objectWidth: number, objectHeight: number;
 
-  if (object.freeform === true && object.worldPosition != null) {
+  if (ladder !== null && mapType === 'hex') {
+    const rect = ladderObjectFootprint(object, getActiveLayer(mapData).objects, {
+      ladder, level: ladder.activeLevel(zoom), zoom, orientation: mapData.orientation ?? 'flat'
+    });
+    if (rect === null) return null;
+    screenX = offsetX + rect.screenX + rect.objectWidth / 2;
+    screenY = offsetY + rect.screenY + rect.objectHeight / 2;
+    objectWidth = rect.objectWidth;
+    objectHeight = rect.objectHeight;
+  } else if (object.freeform === true && object.worldPosition != null) {
     const cellUnit = mapType === 'hex' ? (geometry as HexGeometryLike).hexSize : gridSize ?? 32;
     const cellUnitValue = cellUnit ?? 32;
     // worldPosition is the object center; screenX/screenY should also be center

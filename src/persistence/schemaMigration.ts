@@ -10,17 +10,29 @@
  * working.
  */
 
-import type { MapData, MapLayer, ShapeOverlay } from '#types/core/map.types';
+import type { MapData, MapLayer, ShapeOverlay, SubHexMapData } from '#types/core/map.types';
 import type { WallPath } from '#types/core/wallpath.types';
 
 import { DEFAULTS, SCHEMA_VERSION } from '../core/dmtConstants';
-import { migrateToLayerSchema, ensureBoards, LAYER_SCHEMA_VERSION } from './layerAccessor';
+import { homeLevelOf } from '../core/homeLevel';
+import { migrateToLayerSchema, ensureBoards, LAYER_SCHEMA_VERSION, normaliseLevels } from './layerAccessor';
 
 // ===========================================
 // Version-stepped schema runner
 // ===========================================
 
 type SchemaStep = (mapData: MapData) => MapData;
+
+/**
+ * Version stamped on entries that carry detail-ladder data (`lod`, rung
+ * `levels`, an element homed on a rung >= 1, here or in any nested sub-hex
+ * map). Builds from the 2026-10-13 audit onward refuse such an entry, per
+ * entry, with MapSchemaError 'newer-version' when they predate the ladder.
+ * Released 2.4.x and older builds do NOT: they open a v3 entry as v2 and may
+ * strip or restamp its ladder fields (see SCHEMA_VERSION in dmtConstants.ts,
+ * decision D-12).
+ */
+const LADDER_SCHEMA_VERSION = 3;
 
 /**
  * Schema migration steps, keyed by the TARGET version: `migrations[n]` upgrades
@@ -36,6 +48,11 @@ const migrations: Record<number, SchemaStep> = {
   // v1 -> v2: root-level cells/edges/objects/textLabels move into one layer.
   // Only ever reached for maps WITHOUT a layers array (see detectSchemaVersion).
   [LAYER_SCHEMA_VERSION]: (m) => migrateToLayerSchema(m) as MapData,
+  // v2 -> v3: the detail-ladder fence. Nothing to reshape: `lod`, rung
+  // `levels` and `homeLevel` are additive fields a v2 map simply lacks. The
+  // step must never touch `layers` (2026-10-13 DATA-01); the version on disk is
+  // decided per entry at write time (stampSchemaVersions).
+  [LADDER_SCHEMA_VERSION]: (m) => m,
 };
 
 /**
@@ -135,6 +152,76 @@ function runSchemaMigrations(mapData: MapData): MapData {
 }
 
 // ===========================================
+// Per-entry version stamp (write time)
+// ===========================================
+
+/** Whether any element is homed on a rung >= 1 (homeLevelOf: 0, null, "2" or 1.5 count as root). */
+function hasHomedElement(elements: readonly unknown[] | undefined): boolean {
+  if (!Array.isArray(elements)) return false;
+  return elements.some(e => homeLevelOf(e) > 0);
+}
+
+/** Whether this map level ITSELF (not its sub-hex children) carries ladder data. */
+function carriesLadderData(mapData: MapData): boolean {
+  if ((mapData as { lod?: unknown }).lod != null) return true;
+  const layers: unknown = (mapData as { layers?: unknown }).layers;
+  if (!Array.isArray(layers)) return false;
+  return (layers as Array<MapLayer | null>).some(layer =>
+    layer !== null && typeof layer === 'object' &&
+    ((layer as { levels?: unknown }).levels != null ||
+      hasHomedElement(layer.objects) || hasHomedElement(layer.textLabels) || hasHomedElement(layer.tiles))
+  );
+}
+
+function stampEntry(mapData: MapData): { map: MapData; ladder: boolean } {
+  // Never lower a stamp above the ladder fence: a newer plugin's entry (never
+  // opened for editing here), or a future schema step's. A later bump past
+  // LADDER_SCHEMA_VERSION decides its own stamping rule; this one only splits
+  // v2 from v3.
+  const claimed = claimedSchemaVersion(mapData);
+  if (claimed !== null && claimed > LADDER_SCHEMA_VERSION) return { map: mapData, ladder: true };
+  let childLadder = false;
+  let subHexMaps = mapData.subHexMaps;
+  if (subHexMaps != null) {
+    let changed = false;
+    const next: Record<string, SubHexMapData> = {};
+    for (const key of Object.keys(subHexMaps)) {
+      const sub = subHexMaps[key];
+      if (sub?.mapData == null) { next[key] = sub; continue; }
+      const r = stampEntry(sub.mapData);
+      if (r.ladder) childLadder = true;
+      if (r.map !== sub.mapData) { next[key] = { ...sub, mapData: r.map }; changed = true; }
+      else next[key] = sub;
+    }
+    if (changed) subHexMaps = next;
+  }
+  const ladder = childLadder || carriesLadderData(mapData);
+  const version = ladder ? LADDER_SCHEMA_VERSION : LAYER_SCHEMA_VERSION;
+  if (mapData.schemaVersion === version && subHexMaps === mapData.subHexMaps) return { map: mapData, ladder };
+  // Spread keeps an existing `schemaVersion` key in place, so a classic entry
+  // serialises exactly as before the ladder existed.
+  const map: MapData = { ...mapData, schemaVersion: version };
+  if (subHexMaps !== mapData.subHexMaps) map.subHexMaps = subHexMaps;
+  return { map, ladder };
+}
+
+/**
+ * The schema version each stored entry is WRITTEN with (DATA-05, decision
+ * D-8). In memory every map is at SCHEMA_VERSION; on disk an entry carrying
+ * ladder data (itself or any nested sub-hex map) is stamped
+ * LADDER_SCHEMA_VERSION and every other entry LAYER_SCHEMA_VERSION (2), so a
+ * classic map's bytes are exactly what builds before the ladder wrote. Each
+ * nested sub-hex map is stamped by the same rule over its own subtree.
+ *
+ * Copy-on-write: the caller's tree is never edited; the same reference comes
+ * back when every stamp is already right. Used by every store write and by
+ * the save journal, so the journal's on-disk comparison stays a string match.
+ */
+function stampSchemaVersions(mapData: MapData): MapData {
+  return stampEntry(mapData).map;
+}
+
+// ===========================================
 // Per-layer sanitation
 // ===========================================
 
@@ -187,12 +274,43 @@ function normalizeShapeOverlays(shapes: ShapeOverlay[]): void {
 }
 
 /**
+ * Normalise an element's explicit ladder rung set (kgc.31) in place: keep
+ * non-negative integers only, dedupe, sort; delete the key when it is not an
+ * array or nothing survives (absent = Auto, never an empty set).
+ */
+function sanitizeVisibleLevels(element: { visibleLevels?: unknown } | null): void {
+  // A null or non-object entry is left for the renderer's own guards: this
+  // sanitiser must never be the thing that makes a map fail to load (DATA-09).
+  if (element === null || typeof element !== 'object') return;
+  if (!('visibleLevels' in element)) return;
+  const raw = element.visibleLevels;
+  const kept = Array.isArray(raw)
+    ? [...new Set(raw.filter((n): n is number => Number.isInteger(n) && (n as number) >= 0))].sort((a, b) => a - b)
+    : [];
+  if (kept.length === 0) delete element.visibleLevels;
+  else element.visibleLevels = kept;
+}
+
+/**
+ * Drop an element's `homeLevel` unless it is a rung (a positive safe integer,
+ * homeLevelOf). Absent means root, so 0 goes too; 1.5, "2", -1 and NaN would
+ * otherwise pass the quarantine checks and throw in `geometryForLevel` at
+ * export (DATA-08). Null and non-object entries are left alone.
+ */
+function sanitizeHomeLevel(element: { homeLevel?: unknown } | null): void {
+  if (element === null || typeof element !== 'object' || !('homeLevel' in element)) return;
+  if (homeLevelOf(element) === 0) delete element.homeLevel;
+}
+
+/**
  * Defaults, crash filters, wall-gap sanitation and the two legacy-shape
  * upgrades for ONE layer (in place). Shared by the root and every sub-hex
  * level so they can no longer drift apart.
  */
 function sanitizeLayer(layer: MapLayer): void {
   layer.tiles ??= [];
+  // A hand-edited `levels: null` is absent, not an empty rung record.
+  if ((layer as { levels?: unknown }).levels === null) delete layer.levels;
 
   // Tile assignment migration: q→col, r→row, layer→placement (boundary cast: legacy schema)
   for (const tile of layer.tiles) {
@@ -209,6 +327,12 @@ function sanitizeLayer(layer: MapLayer): void {
       delete legacy.layer;
     }
   }
+
+  for (const obj of layer.objects ?? []) sanitizeVisibleLevels(obj);
+  for (const label of layer.textLabels ?? []) sanitizeVisibleLevels(label);
+  for (const obj of layer.objects ?? []) sanitizeHomeLevel(obj);
+  for (const label of layer.textLabels ?? []) sanitizeHomeLevel(label);
+  for (const tile of layer.tiles) sanitizeHomeLevel(tile);
 
   layer.wallPaths ??= [];
   layer.wallPaths = layer.wallPaths.filter(w => Array.isArray(w.vertices) && w.vertices.length >= 2 &&
@@ -296,6 +420,10 @@ function migrateOneMap(input: MapData, options: MigrateOptions): MapData {
   mapData.expandedState ??= false;
   mapData.lastTextLabelSettings ??= null;
 
+  // A hand-edited `lod: null` means "no ladder": every ladder predicate tests
+  // `lod === undefined`, so null would pass as a ladder block (Codex review).
+  if ((mapData as { lod?: unknown }).lod === null) delete mapData.lod;
+
   // Hex-specific migration
   if (mapData.mapType === 'hex') {
     if (!mapData.hexBounds) {
@@ -352,6 +480,18 @@ function migrateOneMap(input: MapData, options: MigrateOptions): MapData {
   }
 
   for (const layer of mapData.layers) sanitizeLayer(layer);
+
+  // Ladder levels (design 06, s19 item 1): validation NEVER destroys. `lod`
+  // (m / minCellPx / maxLevel) is left exactly as stored, and `levels` is kept
+  // even when `lod` is absent: both cases are depth quarantine, a derived
+  // read-time state (isDepthQuarantined), not a load-time rewrite. Only empty
+  // or non-array rung values are removed; content under a key that is not a
+  // rung, and an array-shaped `levels`, are kept as stored and quarantined
+  // (layerAccessor.levelsShapeIsValid).
+  for (let i = 0; i < mapData.layers.length; i++) {
+    const normalised = normaliseLevels(mapData.layers[i]);
+    if (normalised !== mapData.layers[i]) mapData.layers[i] = normalised;
+  }
 
   // Board (floor) projection: ensure every layer has a boardId, the boards registry
   // exists, and activeBoardId is valid. Idempotent — safe on already-migrated maps.
@@ -439,9 +579,14 @@ function stripDerivedTileLists<T>(mapData: T): T {
   }
 }
 
-/** Load-time migration of one stored map entry (root plus every nested sub-hex map). */
+/**
+ * Load-time migration of one stored map entry (root plus every nested sub-hex
+ * map). The runner brings each level to SCHEMA_VERSION; the result is then
+ * stamped by content (stampSchemaVersions), so a loaded tree carries the same
+ * versions the writer would put on disk and a classic map reads as 2.
+ */
 function migrateMapData(mapData: MapData): MapData {
-  return migrateOneMap(mapData, { isRoot: true });
+  return stampSchemaVersions(migrateOneMap(mapData, { isRoot: true }));
 }
 
 export {
@@ -453,7 +598,11 @@ export {
   stripDerivedTileLists,
   isDerivedTileList,
   sanitizeLayer,
+  sanitizeVisibleLevels,
+  sanitizeHomeLevel,
   sanitizeWallGaps,
+  stampSchemaVersions,
+  LADDER_SCHEMA_VERSION,
   normalizeShapeOverlays,
   runSchemaMigrations,
   detectSchemaVersion,

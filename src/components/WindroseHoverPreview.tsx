@@ -11,8 +11,14 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { loadMapData } from '../persistence/fileOperations';
 import { buildTilesetsFromSettings, applyBuiltTilesets } from '../assets/tilesetOperations';
 import { renderCanvas } from '../geometry/renderers/mapRenderer';
+import { HexGeometry } from '../geometry/core/HexGeometry';
 import { getApp, getSettings, resolveTheme } from '../core/settingsAccessor';
 import { resolveHoverPreviewView } from '../core/deepLinkHoverTarget';
+import { deepestAuthoredRungOfLayers, isLadderView, ladderParamsFor } from '../core/lodFlags';
+import { createGeometryLadder } from '../geometry/core/createGeometryLadder';
+import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
+import { overrideRungFor } from '../geometry/renderers/elementBands';
+import { getActiveLayer } from '../persistence/layerAccessor';
 
 const BASE_WIDTH = 240;
 const BASE_HEIGHT = 180;
@@ -108,9 +114,29 @@ function WindroseHoverPreview({ mapId, x, y, zoom: linkZoom, layerId, subHexPath
         canvas.width = preview.width;
         canvas.height = preview.height;
 
+        // A deep-authored map previews its deepest rung on the focused layer
+        // (design 06 s19 item 3), but never a rung finer than the preview zoom
+        // activates (kgc.20): at that zoom the finer cells are sub-pixel, and
+        // enumerating them costs seconds. The ladder is built locally and the
+        // render bypasses the surface cache: a preview never takes a per-level
+        // surface, a budget slot or the active-canvas claim (s3.5). No rung, no
+        // ladder: classic previews stay byte-identical.
+        // Rung cells or elements homed on a rung, like the export (PX-03).
+        const deepestAuthored = deepestAuthoredRungOfLayers([getActiveLayer(focused)]);
+        let previewLadder: GeometryLadder | null = null;
+        let previewLevel = 0;
+        // isLadderView already includes the quarantine gate.
+        if (deepestAuthored > 0 && view.geometry instanceof HexGeometry && isLadderView(view.levelMap)) {
+          const { m, minCellPx, maxLevel } = ladderParamsFor(view.levelMap);
+          const ladder = createGeometryLadder(view.geometry, { m, minCellPx, maxLevel });
+          previewLevel = overrideRungFor(ladder, deepestAuthored, view.zoom);
+          if (previewLevel > 0) previewLadder = ladder;
+        }
+
         renderCanvas(canvas, null, focused, view.geometry, view.highlight != null ? [view.highlight] : [], {
           theme,
-          layerVisibility: { grid: true, objects: true, textLabels: true, hexCoordinates: false, regions: false, outlines: false }
+          layerVisibility: { grid: true, objects: true, textLabels: true, hexCoordinates: false, regions: false, outlines: false },
+          ...(previewLadder !== null ? { ladder: previewLadder, level: previewLevel, bypassSurfaceCache: true } : {})
         });
 
         // Corner brackets framing the target (viewState.center). Spread wide

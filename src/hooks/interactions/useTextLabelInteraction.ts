@@ -27,6 +27,11 @@ import { getNextRotation } from '../../drawing/rotationOperations';
 import { useMapState, useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { getActiveLayer } from '../../persistence/layerAccessor';
+import { Notice } from 'obsidian';
+import { guardDepthWrite, elementBytes } from '../../persistence/depthAuthoring';
+import { depthRefusalMessage } from '../../drawing/depthCellOps';
+import { authoredCells } from '../../persistence/layerAccessor';
+import { toggledDepthMode } from '../../geometry/renderers/elementBands';
 
 
 // Inline context types for not-yet-migrated contexts
@@ -45,7 +50,8 @@ const useTextLabelInteraction = (
     canvasRef,
     mapData,
     screenToWorld,
-    getClientCoords
+    getClientCoords,
+    getEditLevel
   } = useMapState();
 
   const {
@@ -85,10 +91,26 @@ const useTextLabelInteraction = (
     const worldCoords = screenToWorld(clientX, clientY);
     if (!worldCoords) return false;
 
-    setPendingTextPosition({ x: worldCoords.worldX, y: worldCoords.worldY });
+    // Latch the rung now: zoom may drift while the modal is open. Same gate
+    // and notice as object and tile placement; a refused click is consumed.
+    const homeLevel = getEditLevel();
+    if (homeLevel > 0) {
+      const layer = getActiveLayer(mapData);
+      const refusal = guardDepthWrite(mapData, layer.id, homeLevel, authoredCells(layer, homeLevel));
+      if (refusal !== null) {
+        new Notice(depthRefusalMessage(refusal));
+        return true;
+      }
+    }
+
+    setPendingTextPosition({
+      x: worldCoords.worldX,
+      y: worldCoords.worldY,
+      ...(homeLevel > 0 ? { homeLevel } : {})
+    });
     setShowTextModal(true);
     return true;
-  }, [currentTool, canvasRef, mapData, screenToWorld]);
+  }, [currentTool, canvasRef, mapData, screenToWorld, getEditLevel]);
 
   /**
    * Handle text label selection
@@ -278,13 +300,25 @@ const useTextLabelInteraction = (
           fontSize: labelData.fontSize,
           fontFace: labelData.fontFace,
           color: labelData.color,
-          ...(labelData.opacity !== undefined ? { opacity: labelData.opacity } : {})
+          ...(labelData.opacity !== undefined ? { opacity: labelData.opacity } : {}),
+          ...(pendingTextPosition.homeLevel !== undefined ? { homeLevel: pendingTextPosition.homeLevel } : {})
         }
       );
-      onTextLabelsChange(newLabels);
+      // A deep label grows the map without growing the rung's cells: hold it
+      // to the byte budget at commit, when its real size is known (kgc.25).
+      const homeLevel = pendingTextPosition.homeLevel ?? 0;
+      let refusal = null;
+      if (homeLevel > 0) {
+        const layer = getActiveLayer(mapData);
+        const before = new Set(layer.textLabels);
+        const added = newLabels.filter((l) => !before.has(l));
+        refusal = guardDepthWrite(mapData, layer.id, homeLevel, authoredCells(layer, homeLevel), { addedBytes: elementBytes(added) });
+        if (refusal !== null) new Notice(depthRefusalMessage(refusal));
+      }
+      if (refusal === null) onTextLabelsChange(newLabels);
 
       // Save text label settings for future new labels (per-map)
-      if (onMapDataUpdate) {
+      if (refusal === null && onMapDataUpdate) {
         onMapDataUpdate({
           lastTextLabelSettings: {
             fontSize: labelData.fontSize,
@@ -319,6 +353,32 @@ const useTextLabelInteraction = (
       e?.stopPropagation();
       handleTextRotation();
     }
+  };
+
+  /**
+   * Ladder depth mode (kgc.13): pop at the next rung, or hold the on-screen font size.
+   */
+  const handleDepthModeToggle = (e?: Event): void => {
+    if (!selectedItem || selectedItem.type !== 'text' || !selectedItem.data || !mapData) return;
+    e?.preventDefault();
+    e?.stopPropagation();
+
+    const selectedData = selectedItem.data;
+    const depthMode = toggledDepthMode(selectedData);
+    const updatedLabels = updateTextLabel(getActiveLayer(mapData).textLabels, selectedItem.id, { depthMode });
+    onTextLabelsChange(updatedLabels);
+    setSelectedItem({ ...selectedItem, data: { ...selectedData, depthMode } });
+  };
+
+  /**
+   * Ladder level picker (kgc.31): write the label's explicit rung set
+   * (undefined = Auto, the home band).
+   */
+  const handleVisibleLevelsChange = (visibleLevels: number[] | undefined): void => {
+    if (!selectedItem || selectedItem.type !== 'text' || !selectedItem.data || !mapData) return;
+    const updatedLabels = updateTextLabel(getActiveLayer(mapData).textLabels, selectedItem.id, { visibleLevels });
+    onTextLabelsChange(updatedLabels);
+    setSelectedItem({ ...selectedItem, data: { ...selectedItem.data, visibleLevels } });
   };
 
   /**
@@ -389,6 +449,8 @@ const useTextLabelInteraction = (
     handleTextSubmit,
     handleTextCancel,
     handleRotateClick,
+    handleDepthModeToggle,
+    handleVisibleLevelsChange,
     handleEditClick,
     handleCanvasDoubleClick
   };

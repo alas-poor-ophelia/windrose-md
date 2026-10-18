@@ -28,12 +28,14 @@ export function registerInteractTools(server: McpServer): void {
     {
       x: z.number().describe("World X coordinate for the viewport center"),
       y: z.number().describe("World Y coordinate for the viewport center"),
-      zoom: z.number().min(0.1).max(8).optional().describe("Zoom level 0.1–8 (default: current zoom unchanged)"),
+      zoom: z.number().min(0.1).max(2048).optional().describe("Zoom level 0.1–2048; the app clamps to the map's own range (ceiling 4 on classic maps, higher on ladder maps). Default: current zoom unchanged"),
+      level: z.number().int().min(0).optional().describe("Ladder maps only: zoom to the middle of this rung's band (overrides zoom; clamped to the map's maxLevel). Ignored on classic maps"),
     },
-    async ({ x, y, zoom }) => {
-      const zoomArg = zoom !== undefined ? `,${zoom}` : "";
+    async ({ x, y, zoom, level }) => {
+      const zoomArg = zoom !== undefined ? `${zoom}` : "undefined";
+      const extraArgs = level !== undefined ? `,${zoomArg},${level}` : (zoom !== undefined ? `,${zoomArg}` : "");
       const body =
-        `var r=ops.setViewport(${x},${y}${zoomArg});` +
+        `var r=ops.setViewport(${x},${y}${extraArgs});` +
         `return JSON.stringify(r);`;
       const result = await obsidianEvalJson<{ ok: boolean; viewState?: { x: number; y: number; zoom: number }; error?: string }>(opCall(body));
       if (result.error) {
@@ -150,8 +152,9 @@ export function registerInteractTools(server: McpServer): void {
       rotation: z.number().int().min(0).max(359).optional().describe("Rotation in degrees (default: 0). Grid maps: 0, 90, 180, 270. Hex maps: 0, 60, 120, 180, 240, 300. Other values are rejected."),
       depth: z.string().optional().describe("Depth tier string (e.g. 'floor', 'wall', 'object') — omit to use the tile's default depth"),
       scale: z.number().min(0.1).max(4).optional().describe("Scale factor 0.1–4 (default: 1.0)"),
+      level: z.number().int().min(0).optional().describe("Ladder rung (default 0 = root). On a rung, coordinates are rung cell indices and must exist at that level"),
     },
-    async ({ col, row, tilesetId, tileId, rotation, depth, scale }) => {
+    async ({ col, row, tilesetId, tileId, rotation, depth, scale, level }) => {
       // Build the argument object JS literal inline to avoid nested JSON.stringify
       const argParts = [
         `col:${col}`,
@@ -163,7 +166,7 @@ export function registerInteractTools(server: McpServer): void {
       if (depth !== undefined) argParts.push(`depth:${jsStr(depth)}`);
       if (scale !== undefined) argParts.push(`scale:${scale}`);
       const body =
-        `var r=ops.placeTile({${argParts.join(",")}});` +
+        `var r=ops.placeTile({${argParts.join(",")}}${level ? `,${level}` : ""});` +
         `return JSON.stringify(r);`;
       const result = await obsidianEvalJson<{ ok: boolean; tileCount: number; error?: string }>(opCall(body));
       if (result.error) {
@@ -186,14 +189,15 @@ export function registerInteractTools(server: McpServer): void {
     "Precondition: a map must be mounted — use windrose_open_map / windrose_ensure_visible first.",
     {
       types: z.boolean().default(false).describe("true → list placeable object types (catalog); false → list placed objects on the active layer"),
+      level: z.number().int().min(0).optional().describe("Only list objects homed on this ladder rung (default: all rungs; each result carries its level)"),
     },
-    async ({ types }) => {
+    async ({ types, level }) => {
       const body = types
         ? `var r=ops.listObjectTypes();return JSON.stringify({catalog:r,count:r.length});`
-        : `var r=ops.listObjects();return JSON.stringify({objects:r,count:r.length});`;
+        : `var r=ops.listObjects(${level !== undefined ? level : ""});return JSON.stringify({objects:r,count:r.length});`;
       const result = await obsidianEvalJson<{
         catalog?: Array<{ id: string; label: string; category: string }>;
-        objects?: Array<{ id: string; type: string; x: number; y: number; label?: string }>;
+        objects?: Array<{ id: string; type: string; x: number; y: number; label?: string; level: number; depthMode?: "pop" | "persist"; visibleLevels?: number[] }>;
         count: number;
         error?: string;
       }>(opCall(body));
@@ -217,10 +221,13 @@ export function registerInteractTools(server: McpServer): void {
       typeId: z.string().describe("Object type ID (from windrose_list_objects with types=true)"),
       x: z.number().describe("World X coordinate"),
       y: z.number().describe("World Y coordinate"),
+      level: z.number().int().min(0).optional().describe("Ladder rung (default 0 = root). On a rung, coordinates are rung cell indices and must exist at that level"),
+      visibleLevels: z.array(z.number().int().min(0)).optional().describe("Ladder maps: explicit rungs the object is visible on (omit = Auto, the home band)"),
     },
-    async ({ typeId, x, y }) => {
+    async ({ typeId, x, y, level, visibleLevels }) => {
+      const levelsArg = visibleLevels !== undefined && visibleLevels.length > 0 ? `,${JSON.stringify(visibleLevels)}` : "";
       const body =
-        `var r=ops.placeObject(${jsStr(typeId)},${x},${y});` +
+        `var r=ops.placeObject(${jsStr(typeId)},${x},${y},${level ?? 0}${levelsArg});` +
         `return JSON.stringify(r);`;
       const result = await obsidianEvalJson<{ ok: boolean; objectId?: string; error?: string }>(opCall(body));
       if (result.error) {

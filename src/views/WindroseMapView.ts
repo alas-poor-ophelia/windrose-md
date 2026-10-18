@@ -109,7 +109,8 @@ class WindroseMapView extends ItemView {
     this.app.workspace.requestSaveLayout();
   }
 
-  private handleMapChange = (id: string, name: string, type: MapType): void => {
+  /** `ladderM` (new-map dialog preset) is parked by the dialog's host itself; the view only switches maps. */
+  private handleMapChange = (id: string, name: string, type: MapType, _ladderM?: number): void => {
     this.selectMap(id, name, type);
   };
 

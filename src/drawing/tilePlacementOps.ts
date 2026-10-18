@@ -8,7 +8,7 @@
 
 import type { TileAssignment } from '#types/tiles/tile.types';
 
-import { cellsCoveredByAssignment, assignmentCoversCell } from '../assets/tileFootprint';
+import { cellsCoveredByAssignment, assignmentCoversCell, assignmentsOverlap } from '../assets/tileFootprint';
 import type { CellCoord } from '../assets/tileFootprint';
 
 function getBrushCells(col: number, row: number, brushSize: number): Array<{ col: number; row: number }> {
@@ -255,5 +255,75 @@ function buildWallBarrier(
   return { canCross };
 }
 
-export { getBrushCells, bresenhamLine, floodFillCells, buildWallBarrier, segmentsIntersect, FLOOD_FILL_LIMIT };
+// ===========================================
+// Rung scoping (lattice ladder, design 06 s19 item 3)
+// ===========================================
+//
+// Rung cells of different ladder levels share (col,row) index space, so "the
+// tile in this cell" is only meaningful on one rung. Every same-cell match a
+// placement stroke makes (replace, erase, fill-clear, fill-block) goes through
+// these helpers, scoped to the stroke's latched level. Level 0 with no
+// homeLevel anywhere reduces exactly to the pre-ladder behaviour.
 
+/** The rung a tile was placed at (absent = root). */
+function tileRung(t: { homeLevel?: number }): number {
+  return t.homeLevel ?? 0;
+}
+
+/** The `homeLevel` field for a placement at `level`: `{}` at root, so root tiles keep no key. */
+function homeLevelFields(level: number): { homeLevel?: number } {
+  return level > 0 ? { homeLevel: level } : {};
+}
+
+/** Tiles homed on `level` (absent homeLevel counts as root). */
+function tilesOnRung(tiles: readonly TileAssignment[], level: number): TileAssignment[] {
+  return tiles.filter(t => tileRung(t) === level);
+}
+
+/**
+ * Place `newTile`, removing any tile on the SAME rung and placement tier whose
+ * footprint overlaps it. Tiles on other rungs are never replaced.
+ */
+function withTilePlaced(
+  tiles: readonly TileAssignment[],
+  newTile: TileAssignment,
+  targetPlacement: 'fill' | 'overlay'
+): TileAssignment[] {
+  const level = tileRung(newTile);
+  const remaining = tiles.filter(t =>
+    tileRung(t) !== level || (t.placement ?? 'fill') !== targetPlacement || !assignmentsOverlap(t, newTile)
+  );
+  return [...remaining, newTile];
+}
+
+/**
+ * Erase every tile on rung `level` that touches a cell in `keys` ("col,row").
+ * Snapped tiles match by footprint; freeform stamps by their drop cell.
+ */
+function withTilesErasedAt(tiles: readonly TileAssignment[], keys: ReadonlySet<string>, level: number): TileAssignment[] {
+  return tiles.filter(t => tileRung(t) !== level || !tileTouchesKeys(t, keys));
+}
+
+/**
+ * Clear the fill region's cells on rung `level` for one placement tier, ready
+ * for the fill to append its new tiles.
+ */
+function withFillRegionCleared(
+  tiles: readonly TileAssignment[],
+  fillKeys: ReadonlySet<string>,
+  targetPlacement: 'fill' | 'overlay',
+  level: number
+): TileAssignment[] {
+  return tiles.filter(t =>
+    tileRung(t) !== level || (t.placement ?? 'fill') !== targetPlacement || !tileTouchesKeys(t, fillKeys)
+  );
+}
+
+function tileTouchesKeys(t: TileAssignment, keys: ReadonlySet<string>): boolean {
+  return t.freeform === true
+    ? keys.has(`${t.col},${t.row}`)
+    : cellsCoveredByAssignment(t).some(c => keys.has(`${c.col},${c.row}`));
+}
+
+export { getBrushCells, bresenhamLine, floodFillCells, buildWallBarrier, segmentsIntersect, FLOOD_FILL_LIMIT };
+export { tileRung, homeLevelFields, tilesOnRung, withTilePlaced, withTilesErasedAt, withFillRegionCleared };

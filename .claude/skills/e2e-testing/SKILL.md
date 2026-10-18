@@ -322,3 +322,7 @@ WINDROSE_TEST_MODE=compiled npm run test:e2e  # Compiled mode
 | Generic selectors like `canvas` | May match other Obsidian elements | Use `.dmt-canvas-wrapper canvas` |
 | Tool selection by `.nth()` index | Breaks when tools are added/reordered | Use `selectToolByTitle()` instead |
 | Not closing layer panel before canvas ops | Panel intercepts mouse events | Call `openLayerPanel()` again to toggle closed |
+
+## Ladder coverage
+
+`tests/e2e/lod-ladder-view.test.ts` covers the lattice detail ladder view. The ladder is behind the `lodLadder` developer setting; the test flips it on for the run and restores it.

@@ -28,13 +28,19 @@ import { useCanvasInteraction } from '../../hooks/canvas/useCanvasInteraction';
 import { useViewController } from '../../hooks/canvas/useViewController';
 import { createCanvasCursorStore, toolCursorClass } from '../../hooks/canvas/canvasCursor';
 import type { ViewController } from '#types/hooks/viewController.types';
+import type { HandleLevelCellsChange } from '#types/hooks/dataHandlers.types';
 import { GridGeometry } from '../../geometry/core/GridGeometry';
 import { DEFAULTS } from '../../core/dmtConstants';
 import { getObjectAtPosition, addObject, removeObject, removeObjectsInRectangle, updateObject, isAreaFree } from '../../objects/objectOperations';
 import { addTextLabel, getTextLabelAtPosition, removeTextLabel, updateTextLabel } from '../../text/textLabelOperations';
 import { HexGeometry } from '../../geometry/core/HexGeometry';
 import { createGeometry } from '../../geometry/core/createGeometry';
+import { createGeometryLadder } from '../../geometry/core/createGeometryLadder';
+import type { GeometryLadder } from '../../geometry/core/createGeometryLadder';
+import { isLadderView, ladderParamsFor } from '../../core/lodFlags';
 import { LinkedNoteHoverOverlays } from '../overlays/LinkedNoteHoverOverlays';
+import { LadderLevelOverlay } from './LadderLevelOverlay';
+import { resolveEditLevel } from '../../hooks/state/layerHistoryOps';
 import { MapStateProvider, MapOperationsProvider } from '../../context/MapContext';
 import { MapSelectionProvider, useMapSelection } from '../../context/MapSelectionContext';
 import { ObjectLinkingProvider } from '../../context/ObjectLinkingContext';
@@ -60,6 +66,7 @@ import { WallLayer } from './WallLayer';
 import { focusMapOnPointerDown, shouldHandleMapKey } from '../../utils/keyboardTargets';
 import { RerollDungeonButton } from './RerollDungeonButton';
 import { getSetting } from '../../core/settingsAccessor';
+import { setActiveCanvas, releaseActiveCanvas } from '../../geometry/renderers/surfaceBudget';
 import { usePanZoomCoordinator } from '../../hooks/canvas/usePanZoomCoordinator';
 import { useEventCoordinator } from '../../hooks/canvas/useEventCoordinator';
 
@@ -88,6 +95,8 @@ interface MapCanvasContentProps {
   notePath?: string;
   mapData: MapData | null;
   onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
+  /** Deep (ladder rung >= 1) cell write; absent on hosts without depth authoring. */
+  onLevelCellsChange?: HandleLevelCellsChange;
   onCurvesChange: (curves: Curve[], skipHistory?: boolean) => void;
   onObjectsChange: (objects: MapObject[], suppressHistory?: boolean) => void;
   onTextLabelsChange: (labels: TextLabel[]) => void;
@@ -106,6 +115,15 @@ interface MapCanvasContentProps {
   onViewStateChange: (viewState: StoredViewState) => void;
   onTextLabelSettingsChange: (settings: TextLabelSettings) => void;
   currentTool: ToolId;
+  /** Ladder edit-level lock (null = edit follows the camera rung). Owned by useToolState. */
+  editLevelLock: number | null;
+  onEditLevelLockChange: (level: number | null) => void;
+  /**
+   * Receives the canvas's live ladder-rung getter (reads the view controller,
+   * so it is current mid-gesture), and null on unmount. The host hands it to
+   * the MCP bridge so the bridge and the tools agree on the rung (WIRE-01).
+   */
+  onActiveLevelGetterChange?: (getter: (() => number) | null) => void;
   selectedObjectType: ObjectTypeId | undefined;
   selectedColor: string;
   isColorPickerOpen: boolean;
@@ -173,7 +191,7 @@ const Coordinators = ({ canvasRef, mapData, geometry, isFocused, isColorPickerOp
  * MapCanvasContent - Inner component that uses context hooks
  * Contains all the map canvas logic and interacts with shared selection state
  */
-const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, clearTransient, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, adjacentEmptySlots, onViewStateChange, onTextLabelSettingsChange, currentTool, selectedObjectType, selectedColor, isColorPickerOpen, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex, children }: MapCanvasContentProps): VNode => {
+const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onLevelCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, clearTransient, onWallPathsChange, onTerrainStrokesChange, tileImagesReady, hiddenTileLayers, adjacentSubHexes, adjacentEmptySlots, onViewStateChange, onTextLabelSettingsChange, currentTool, editLevelLock, onEditLevelLockChange, onActiveLevelGetterChange, selectedObjectType, selectedColor, isColorPickerOpen, isFocused, isAnimating, theme, isAlignmentMode, interactionLocked = false, draggingWallId, distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex, children }: MapCanvasContentProps): VNode => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);  // Separate canvas for fog blur effect (CSS blur for iOS compat)
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -245,6 +263,29 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     });
   }, [hasGeometryMapData, geoMapType, geoGridSize, geoHexSize, geoOrientation, geoHexBounds]);
 
+  // Lattice ladder for this map, or null on every classic path. Built ONCE per
+  // geometry: the static surface cache keys on the ladder's identity, so a ladder
+  // rebuilt per render would invalidate every baked surface every frame. Whether
+  // this map is a ladder map at all (hex, unrotated, capability on) is decided in
+  // ONE place — `isLadderView` — shared with the camera clamps and the dive bail.
+  // It is read per render so toggling the developer setting takes effect on the
+  // next paint. Parameters come from `ladderParamsFor`, the same source as
+  // `getMaxZoom`: a map carrying `lod` uses its own m / minCellPx / maxLevel
+  // (the dev override can never re-partition it by setting m).
+  const ladderOn = isLadderView(mapData);
+  const ladderParams = ladderOn && mapData ? ladderParamsFor(mapData) : null;
+  const ladderM = ladderParams?.m;
+  const ladderMinCellPx = ladderParams?.minCellPx;
+  const ladderMaxLevel = ladderParams?.maxLevel;
+  const ladder = useMemo((): GeometryLadder | null => {
+    if (!ladderOn) return null;
+    if (geometry?.type !== 'hex') return null;
+    if (ladderM === undefined || ladderMinCellPx === undefined || ladderMaxLevel === undefined) return null;
+    return createGeometryLadder(geometry as unknown as HexGeometry, {
+      m: ladderM, minCellPx: ladderMinCellPx, maxLevel: ladderMaxLevel
+    });
+  }, [ladderOn, geometry, ladderM, ladderMinCellPx, ladderMaxLevel]);
+
   // Shared live pan/zoom controller. Holds viewState off the React path during a
   // gesture and commits to mapData once at gesture end (sink = onViewStateChange).
   // The SAME instance is passed to the coordinator's interaction handlers, this
@@ -268,8 +309,38 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
   const {
     screenToGrid,
     screenToWorld,
-    getClientCoords
-  } = useCanvasInteraction(canvasRef, mapData, geometry, isFocused, viewController);
+    getClientCoords,
+    screenToLevelCell
+  } = useCanvasInteraction(canvasRef, mapData, geometry, isFocused, viewController, false, null, undefined, undefined, ladder);
+
+  // The camera's ladder rung, read LIVE from the view controller at call time
+  // (design section 4.1: a function, not a value, so no per-tick re-render).
+  // Tools latch it once at pointerdown. Level 0 on every classic path.
+  const getActiveLevel = useCallback(
+    (): number => (ladder ? ladder.activeLevel(viewController.getLive().zoom) : 0),
+    [ladder, viewController]
+  );
+
+  // Publish the live getter to the host (MCP bridge); withdraw it on unmount.
+  useEffect(() => {
+    if (onActiveLevelGetterChange === undefined) return undefined;
+    onActiveLevelGetterChange(getActiveLevel);
+    return () => onActiveLevelGetterChange(null);
+  }, [getActiveLevel, onActiveLevelGetterChange]);
+
+  // The rung authoring tools write to: the camera rung, or the locked rung when
+  // shallower (a deeper lock is not on screen, so it yields to the camera).
+  // Read live at pointerdown like getActiveLevel. 0 on classic maps.
+  const getEditLevel = useCallback(
+    (): number => resolveEditLevel(editLevelLock, getActiveLevel()),
+    [editLevelLock, getActiveLevel]
+  );
+
+  // The lock is session-only and per map: drop it when the map changes or the
+  // map stops being a ladder view (flag off, rotation, non-hex).
+  useEffect(() => {
+    onEditLevelLockChange(null);
+  }, [mapId, ladderOn, onEditLevelLockChange]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -312,7 +383,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
   }, [isAnimating]);
 
   // Render canvas whenever relevant state changes
-  const { scheduleRender } = useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, draggingWallId, subHexPath: subHexPath ?? null }, viewController);
+  const { scheduleRender } = useCanvasRenderer(canvasRef, fogCanvasRef, mapData, geometry, selectedItems, { isResizeMode, theme, showCoordinates, layerVisibility, tileImagesReady, adjacentSubHexes, adjacentEmptySlots, hiddenTileLayers, draggingWallId, subHexPath: subHexPath ?? null, ladder }, viewController);
 
   // Canvas sizing on dimension change (expand/collapse). This effect only
   // resizes; every repaint goes through the coordinated renderer's
@@ -373,6 +444,31 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     container.addEventListener('pointerdown', handlePointerDown, true);
     return () => container.removeEventListener('pointerdown', handlePointerDown, true);
   }, []);
+
+  // Surface budget (MEM-04): the protected "active" canvas follows the user,
+  // not whichever canvas painted last. A press or wheel on this map, or focus,
+  // claims the slot; blur and unmount give it back (release clears the slot
+  // only while this canvas holds it).
+  useEffect(() => {
+    const container = containerRef.current;
+    const canvas = canvasRef.current;
+    if (!container || !canvas) return undefined;
+    const claim = (): void => setActiveCanvas(canvas);
+    container.addEventListener('pointerdown', claim, { capture: true, passive: true });
+    container.addEventListener('wheel', claim, { capture: true, passive: true });
+    return () => {
+      container.removeEventListener('pointerdown', claim, { capture: true });
+      container.removeEventListener('wheel', claim, { capture: true });
+      releaseActiveCanvas(canvas);
+    };
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    if (isFocused) setActiveCanvas(canvas);
+    else releaseActiveCanvas(canvas);
+  }, [isFocused]);
 
   // 'C' key handler for coordinate overlay (hex maps only)
   useEffect(() => {
@@ -435,6 +531,12 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     screenToWorld,
     getClientCoords,
     viewController,
+    ladder,
+    getActiveLevel,
+    editLevelLock,
+    setEditLevelLock: onEditLevelLockChange,
+    getEditLevel,
+    screenToLevelCell,
     GridGeometry,
     HexGeometry,
     distanceOverrides,
@@ -446,8 +548,16 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     cursorStore
   } as MapStateContextValue), [mapData, mapId, notePath, geometry, currentTool, selectedColor,
     selectedObjectType, screenToGrid, screenToWorld, getClientCoords, viewController,
+    ladder, getActiveLevel, editLevelLock, onEditLevelLockChange, getEditLevel, screenToLevelCell,
     distanceOverrides, isInSubHex, subHexPath, instanceId, requestEnterSubHex, requestExitSubHex,
     cursorStore]);
+
+  // Hit-tests honour the held label size and band visibility on ladder maps (live zoom, read at call time).
+  const getTextLabelAtPositionInView = useCallback(
+    (labels: TextLabel[], worldX: number, worldY: number, ctx: CanvasRenderingContext2D | null): TextLabel | null =>
+      getTextLabelAtPosition(labels, worldX, worldY, ctx, ladder ? { ladder, zoom: viewController.getLive().zoom, activeLevel: getActiveLevel() } : undefined),
+    [ladder, viewController, getActiveLevel]
+  );
 
   const mapOperationsValue = useMemo(() => ({
     // Object operations
@@ -459,13 +569,14 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     removeObjectsInRectangle,
 
     // Text operations
-    getTextLabelAtPosition,
+    getTextLabelAtPosition: getTextLabelAtPositionInView,
     addTextLabel,
     updateTextLabel,
     removeTextLabel,
 
     // Callbacks
     onCellsChange,
+    onLevelCellsChange,
     onCurvesChange,
     onObjectsChange,
     onTextLabelsChange,
@@ -476,7 +587,7 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
     onWallPathsChange,
     onTerrainStrokesChange,
     onMapDataUpdate
-  }), [onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, clearTransient, onWallPathsChange, onTerrainStrokesChange, onMapDataUpdate]);
+  }), [onCellsChange, onLevelCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange, onTilesChange, onLayerSelect, clearTransient, onWallPathsChange, onTerrainStrokesChange, onMapDataUpdate, getTextLabelAtPositionInView]);
 
   return (
     <EventHandlerProvider>
@@ -522,6 +633,9 @@ const MapCanvasContent = ({ mapId, notePath, mapData, onCellsChange, onCurvesCha
             <LinkedNoteHoverOverlays
               selectedItem={selectedItem}
             />
+
+            {/* Ladder level chips + edit-level padlock (null on classic maps) */}
+            {!interactionLocked && <LadderLevelOverlay />}
 
             {/* Render child layers */}
             {children}

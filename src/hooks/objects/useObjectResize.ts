@@ -13,6 +13,7 @@ import type {
 
 import { useCallback, useRef, useState } from 'preact/hooks';
 import { calculateViewportOffset, clientToCanvasPx, unrotateCanvasPx } from '../../geometry/core/viewportMath';
+import { ladderObjectFootprint } from '../../objects/ladderHitTest';
 import { useMapState } from '../../context/MapContext';
 import { useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
@@ -40,7 +41,7 @@ function useObjectResize(): {
   stopObjectResizing: () => boolean;
   beginResize: (corner: ResizeCorner, objects: MapObject[], dragStartData: ObjectDragStart) => void;
 } {
-  const { mapData, geometry, canvasRef, screenToGrid, getClientCoords } = useMapState();
+  const { mapData, geometry, canvasRef, screenToLevelCell, getClientCoords, ladder, viewController } = useMapState();
   const { updateObject, onObjectsChange, isAreaFree, clearTransient } = useMapOperations();
   const { selectedItem, setSelectedItem, isResizeMode, dragStart, setDragStart } = useMapSelection();
 
@@ -72,7 +73,20 @@ function useObjectResize(): {
     const canvasSize = { width: canvas.width, height: canvas.height };
     const { offsetX, offsetY } = calculateViewportOffset(geometry, center, canvasSize, zoom);
     let objectWidth: number, objectHeight: number;
-    if (geometry.type === 'hex') {
+    let ladderRect: { screenX: number; screenY: number } | null = null;
+    if (ladder !== null) {
+      // Ladder: the handles sit on the drawn footprint (home rung, held size),
+      // read from the LIVE view so they track a gesture like the chrome does.
+      const live = viewController?.getLive() ?? viewState;
+      const rect = ladderObjectFootprint(object, getActiveLayer(mapData).objects, {
+        ladder, level: ladder.activeLevel(live.zoom), zoom: live.zoom, orientation: mapData.orientation ?? 'flat'
+      });
+      if (rect === null) return null;
+      const liveOffset = calculateViewportOffset(geometry, live.center, canvasSize, live.zoom);
+      objectWidth = rect.objectWidth;
+      objectHeight = rect.objectHeight;
+      ladderRect = { screenX: liveOffset.offsetX + rect.screenX, screenY: liveOffset.offsetY + rect.screenY };
+    } else if (geometry.type === 'hex') {
       const hexSize = geometry.hexSize;
       const size = object.size ?? { width: 1, height: 1 };
       objectWidth = size.width * hexSize * zoom;
@@ -88,7 +102,10 @@ function useObjectResize(): {
     const { x, y } = unrotateCanvasPx(canvasPx.x, canvasPx.y, canvasSize, northDirection);
 
     let screenX: number, screenY: number;
-    if (geometry.type === 'hex') {
+    if (ladderRect !== null) {
+      screenX = ladderRect.screenX;
+      screenY = ladderRect.screenY;
+    } else if (geometry.type === 'hex') {
       const { worldX, worldY } = geometry.hexToWorld(object.position.x, object.position.y);
       screenX = offsetX + worldX * zoom;
       screenY = offsetY + worldY * zoom;
@@ -122,7 +139,7 @@ function useObjectResize(): {
     }
 
     return null;
-  }, [mapData, isResizeMode, canvasRef, geometry]);
+  }, [mapData, isResizeMode, canvasRef, geometry, ladder, viewController]);
 
   const handleObjectResizing = useCallback((e: PointerEvent | MouseEvent | TouchEvent): boolean => {
     if (!isResizing || !dragStart || !mapData || selectedItem?.type !== 'object') {
@@ -133,11 +150,13 @@ function useObjectResize(): {
     e.stopPropagation();
 
     const { clientX, clientY } = getClientCoords(e);
-    const coords = screenToGrid(clientX, clientY);
+    if (!dragStart.object) return false;
+    // The corner drags on the object's own home rung (level 0 is screenToGrid).
+    const home = dragStart.object.homeLevel ?? 0;
+    const coords = screenToLevelCell(clientX, clientY, home);
     if (!coords) return true;
 
     const { x, y } = coords;
-    if (!dragStart.object) return false;
     const originalObject = dragStart.object as { position: { x: number; y: number }; size?: { width: number; height: number } };
     const originalPos = originalObject.position;
     const originalSize = originalObject.size ?? { width: 1, height: 1 };
@@ -179,12 +198,12 @@ function useObjectResize(): {
     let finalY = newY;
     let resizeSucceeded = false;
 
-    if (isAreaFree(getActiveLayer(mapData).objects, newX, newY, newWidth, newHeight, selectedItem.id)) {
+    if (isAreaFree(getActiveLayer(mapData).objects, newX, newY, newWidth, newHeight, selectedItem.id, home)) {
       resizeSucceeded = true;
     }
 
     if (!resizeSucceeded && newWidth !== originalSize.width) {
-      if (isAreaFree(getActiveLayer(mapData).objects, newX, originalPos.y, newWidth, originalSize.height, selectedItem.id)) {
+      if (isAreaFree(getActiveLayer(mapData).objects, newX, originalPos.y, newWidth, originalSize.height, selectedItem.id, home)) {
         finalWidth = newWidth;
         finalHeight = originalSize.height;
         finalX = newX;
@@ -194,7 +213,7 @@ function useObjectResize(): {
     }
 
     if (!resizeSucceeded && newHeight !== originalSize.height) {
-      if (isAreaFree(getActiveLayer(mapData).objects, originalPos.x, newY, originalSize.width, newHeight, selectedItem.id)) {
+      if (isAreaFree(getActiveLayer(mapData).objects, originalPos.x, newY, originalSize.width, newHeight, selectedItem.id, home)) {
         finalWidth = originalSize.width;
         finalHeight = newHeight;
         finalX = originalPos.x;
@@ -224,7 +243,7 @@ function useObjectResize(): {
     }
     return true;
   }, [isResizing, dragStart, mapData, selectedItem, resizeCorner,
-    getClientCoords, screenToGrid, isAreaFree, updateObject, onObjectsChange, setSelectedItem]
+    getClientCoords, screenToLevelCell, isAreaFree, updateObject, onObjectsChange, setSelectedItem]
   );
 
   const stopObjectResizing = useCallback((): boolean => {

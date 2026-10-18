@@ -16,7 +16,7 @@ Encapsulate stateful logic, side effects, and event handling. Hooks sit between 
 | `app/` | Composition hooks for the root map component (DungeonMapTracker): drawer state, map-list actions, board handlers, adjacent sub-maps, tileset art handlers, chrome state. Only DMT calls these |
 | `interactions/` | Every other tool/feature interaction (fog, regions, outlines, measure, Beacon, sub-hex, keyboard) |
 
-Only real hooks use the `use*` prefix. The former non-hook files `useSelectionActions.ts` and `useToolbarPosition.ts` now live in `components/toolbars/` as `selectionActionBuilders.ts` and `toolbarPosition.ts`.
+Only real hooks use the `use*` prefix. The former non-hook files `useSelectionActions.ts` and `useToolbarPosition.ts` now live in `components/toolbars/` as `selectionActionBuilders.ts` and `toolbarPosition.ts`. Likewise the ladder's non-hook render support (`levelSurfaces`, `surfaceBudget`, `ladderTelemetry`) lives in `geometry/renderers/` and `rungFog` in `geometry/fog/`.
 
 ## Directory Structure
 
@@ -125,6 +125,10 @@ Pointer events are routed centrally; layers never attach their own canvas listen
 1. A layer builds its handler object and calls `useLayerHandlers(name, handlers, { enabled })` (names are the keys of `HandlerTypeMap` in `types/hooks/eventCoordinator.types.ts`: `'object'`, `'drawing'`, `'wall'`, `'region'`, `'partyPin'`, ...).
 2. `useLayerHandlers` stores the handlers in a ref refreshed every render and registers a stable Proxy with `EventHandlerContext`, so the coordinator always sees the latest closures and the layer never re-registers mid-gesture. Pass `enabled: false` (or a tool gate) to unregister.
 3. `useEventCoordinator` (called once from `MapCanvas`) attaches the canvas listeners and, per `currentTool`, modifier keys, touch state and selection state, looks handlers up with `getHandlers(name)` and dispatches. Routing lives in `TOOL_ROUTES` (`canvas/toolDispatch.ts`): every `ToolId` must declare its down/move/up/leave/doubleClick behaviour (noop or notConsumed included), so a new tool without a route is a compile error. To change which tool reaches which layer, edit its route, not the layer. Registration is typed: `useLayerHandlers<T>(name, handlers)` checks `handlers` against `HandlerTypeMap[T]`.
+
+### Level-aware Interaction (lattice ladder)
+
+Dormant unless the map is on the ladder view (`core/lodFlags.ts`, per-map opt-in); with `ladder === null` every path below is main's classic path. `screenToGrid` stays level 0 for its many consumers; `screenToLevelCell(clientX, clientY, level)` (useCanvasInteraction, via MapState) serves paint/erase/shape and objects on their home rung. Paint/erase/shape latch the stroke level at pointerdown and write deep cells only through `persistence/depthAuthoring` (one undo entry per deep stroke via `onLevelCellsChange`). Object hover, select/drag, resize handles, linking, context menu and group drag hit-test what is DRAWN (`objects/ladderHitTest.ts`, world-space, home rung, held size); group drag plans per rung via `objects/groupDragOps.ts`. Deep objects fog at their root ancestor (`geometry/fog/rungFog.ts`); `pickLadderObject` takes the layer's fog and skips fogged candidates, so a visible object beneath a fogged one is picked. A single drag refuses a rung cell that does not exist (`singleDragCellExists`), as group drag and placement do. On a `lod` map off the ladder view, `classicHitRung` scopes hits to rung 0. The wheel/pinch ceiling is `getMaxZoom(mapData)`, and a zoom-in never dives into a sub-hex on the ladder view.
 
 ### Sub-hex Navigation
 

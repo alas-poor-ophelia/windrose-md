@@ -5,7 +5,7 @@ import type { VNode } from 'preact';
 import type { MapData } from '#types/index';
 import type { ToolId } from '#types/tools/tool.types';
 import { getColorByHex, isDefaultColor } from '../../drawing/colorOperations';
-import { getActiveLayer } from '../../persistence/layerAccessor';
+import { allAuthoredCells, getActiveLayer } from '../../persistence/layerAccessor';
 
 interface FooterHelpProps {
   mapId: string;
@@ -40,7 +40,7 @@ const FooterHelp = ({ mapId, mapData, selectedColor, currentTool, selectedObject
   const layer = getActiveLayer(mapData);
   return (
     <div className="windrose-footer">
-      Map ID: {mapId} | Color: {colorDisplayName(selectedColor)} | {toolHint(currentTool, selectedObjectType)} | Undo/redo available | Middle-click, two-finger drag, or trackpad scroll to pan | Wheel or pinch to zoom | Click compass to rotate | {layer.cells.length} cells filled | {layer.objects.length} objects placed | {layer.textLabels.length} text labels
+      Map ID: {mapId} | Color: {colorDisplayName(selectedColor)} | {toolHint(currentTool, selectedObjectType)} | Undo/redo available | Middle-click, two-finger drag, or trackpad scroll to pan | Wheel or pinch to zoom | Click compass to rotate | {allAuthoredCells(layer).length} cells filled | {layer.objects.length} objects placed | {layer.textLabels.length} text labels
     </div>
   );
 };

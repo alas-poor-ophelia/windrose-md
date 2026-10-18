@@ -17,6 +17,7 @@ import { getActiveLayer } from '../../persistence/layerAccessor';
 import { findDuplicateTarget, generateObjectId } from '../../objects/objectOperations';
 import { rotateByIncrement } from '../../drawing/rotationOperations';
 import { mintId } from '../../core/ids';
+import { withLevelMembership } from '../../geometry/renderers/elementBands';
 
 /** The parts of a layer a selection edit reads */
 export interface SelectionLayerContent {
@@ -84,7 +85,8 @@ export function duplicateSelection(
   items: SelectedItem[],
   mapType: MapType,
   gridSize: number | undefined,
-  makeTextId: () => string = defaultTextId
+  makeTextId: () => string = defaultTextId,
+  cellExists?: (home: number, x: number, y: number) => boolean
 ): DuplicateSelectionResult {
   const objects = [...(layer.objects ?? [])];
   const textLabels = [...(layer.textLabels ?? [])];
@@ -99,7 +101,7 @@ export function duplicateSelection(
       // Same placement rules as single duplicate: first free neighbour, then
       // rings; hex gets a free slot. Searching the growing list keeps copies
       // made earlier in this loop from landing on each other.
-      const dest = findDuplicateTarget(objects, sourceObj, mapType);
+      const dest = findDuplicateTarget(objects, sourceObj, mapType, cellExists);
       if (!dest) {
         skippedObjects++;
         continue;
@@ -139,10 +141,50 @@ export function deleteSelection(layer: SelectionLayerContent, items: SelectedIte
   };
 }
 
+/** A level picker edit: clear back to Auto, or switch one rung on/off. */
+export type VisibleLevelsChange = { kind: 'auto' } | { kind: 'level'; level: number; on: boolean };
+
+export interface VisibleLevelsResult extends SelectionEdit {
+  updates: Array<{ id: string; visibleLevels: number[] | undefined }>;
+}
+
+/**
+ * Apply one level picker edit to every selected object and label (kgc.31).
+ * Each element's edit starts from its OWN effective set (Auto band included),
+ * and an element emptied by the edit reverts to Auto.
+ */
+export function setSelectionVisibleLevels(
+  layer: SelectionLayerContent,
+  items: SelectedItem[],
+  change: VisibleLevelsChange,
+  maxLevel: number
+): VisibleLevelsResult {
+  const next = (el: MapObject | TextLabel, kind: 'object' | 'label'): number[] | undefined =>
+    change.kind === 'auto' ? undefined : withLevelMembership(el, change.level, change.on, maxLevel, kind);
+  const objectIds = new Set(items.filter(i => i.type === 'object').map(i => i.id));
+  const textIds = new Set(items.filter(i => i.type === 'text').map(i => i.id));
+  const updates: VisibleLevelsResult['updates'] = [];
+  const objects = (layer.objects ?? []).map(obj => {
+    if (!objectIds.has(obj.id)) return obj;
+    const visibleLevels = next(obj, 'object');
+    updates.push({ id: obj.id, visibleLevels });
+    return { ...obj, visibleLevels };
+  });
+  const textLabels = (layer.textLabels ?? []).map(label => {
+    if (!textIds.has(label.id)) return label;
+    const visibleLevels = next(label, 'label');
+    updates.push({ id: label.id, visibleLevels });
+    return { ...label, visibleLevels };
+  });
+  return { objects, textLabels, updates };
+}
+
 export interface MultiSelectionActions {
   handleRotateAll: () => void;
   handleDuplicateAll: () => void;
   handleDeleteAll: () => void;
+  /** Ladder maps: one level picker edit across the whole selection. */
+  handleSetVisibleLevelsAll: (change: VisibleLevelsChange, maxLevel: number) => void;
 }
 
 /**
@@ -152,7 +194,7 @@ export interface MultiSelectionActions {
 export function useMultiSelectionActions(
   onObjectsChange: (objects: MapObject[], suppressHistory?: boolean) => void
 ): MultiSelectionActions {
-  const { mapData } = useMapState();
+  const { mapData, ladder } = useMapState();
   const { onTextLabelsChange } = useMapOperations();
   const { selectedItems, hasMultiSelection, selectMultiple, clearSelection, updateSelectedItemsData } = useMapSelection();
 
@@ -167,7 +209,8 @@ export function useMultiSelectionActions(
   const handleDuplicateAll = useCallback(() => {
     if (!hasMultiSelection || !mapData) return;
     const { objects, textLabels, newSelectedItems, skippedObjects } =
-      duplicateSelection(getActiveLayer(mapData), selectedItems, mapData.mapType, mapData.gridSize);
+      duplicateSelection(getActiveLayer(mapData), selectedItems, mapData.mapType, mapData.gridSize, undefined,
+        (home, x, y) => ladder === null || home <= 0 || ladder.existsAt(home, x, y));
     onObjectsChange(objects, true);
     onTextLabelsChange(textLabels, false);
     if (skippedObjects > 0) {
@@ -176,7 +219,7 @@ export function useMultiSelectionActions(
     if (newSelectedItems.length > 0) {
       selectMultiple(newSelectedItems);
     }
-  }, [hasMultiSelection, mapData, selectedItems, onObjectsChange, onTextLabelsChange, selectMultiple]);
+  }, [hasMultiSelection, mapData, ladder, selectedItems, onObjectsChange, onTextLabelsChange, selectMultiple]);
 
   const handleDeleteAll = useCallback(() => {
     if (!hasMultiSelection || !mapData) return;
@@ -186,5 +229,13 @@ export function useMultiSelectionActions(
     clearSelection();
   }, [hasMultiSelection, mapData, selectedItems, onObjectsChange, onTextLabelsChange, clearSelection]);
 
-  return { handleRotateAll, handleDuplicateAll, handleDeleteAll };
+  const handleSetVisibleLevelsAll = useCallback((change: VisibleLevelsChange, maxLevel: number) => {
+    if (!hasMultiSelection || !mapData) return;
+    const { objects, textLabels, updates } = setSelectionVisibleLevels(getActiveLayer(mapData), selectedItems, change, maxLevel);
+    onObjectsChange(objects, true);
+    onTextLabelsChange(textLabels, false);
+    updateSelectedItemsData(updates);
+  }, [hasMultiSelection, mapData, selectedItems, onObjectsChange, onTextLabelsChange, updateSelectedItemsData]);
+
+  return { handleRotateAll, handleDuplicateAll, handleDeleteAll, handleSetVisibleLevelsAll };
 }

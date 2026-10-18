@@ -10,6 +10,8 @@ import { calculateContentFitView } from "../../../../src/geometry/core/contentFi
 import { GridGeometry } from "../../../../src/geometry/core/GridGeometry";
 import { HexGeometry } from "../../../../src/geometry/core/HexGeometry";
 import { DEFAULTS } from "../../../../src/core/dmtConstants";
+import { createGeometryLadder } from "../../../../src/geometry/core/createGeometryLadder";
+import { LADDER_DEFAULTS } from "../../../../src/geometry/core/lattice";
 import { makeLayer, makeMapData } from "../../helpers/fixtures";
 
 describe("calculateContentFitView", () => {
@@ -188,6 +190,20 @@ describe("calculateContentFitView", () => {
       const result = calculateContentFitView(mapData, geometry, 800, 900);
 
       expect(result?.zoom).toBe(DEFAULTS.maxZoom);
+    });
+
+    it("includes ladder rung cells, placed with their rung's own geometry", () => {
+      const geometry = new HexGeometry(40, "flat", { maxCol: 20, maxRow: 20 });
+      const lod = { m: LADDER_DEFAULTS.m, minCellPx: LADDER_DEFAULTS.minCellPx, maxLevel: LADDER_DEFAULTS.maxLevel };
+      const layer = makeLayer({ levels: { 2: [{ q: 40, r: 24, color: "#fff" }] } });
+      const mapData = makeMapData({ mapType: "hex", hexSize: 40, lod, layers: [layer] });
+
+      const result = calculateContentFitView(mapData, geometry, 800, 900);
+
+      expect(result).not.toBeNull();
+      const expected = createGeometryLadder(geometry, lod).geometryForLevel(2).gridToWorld(40, 24);
+      expect(result?.center.x).toBeCloseTo(expected.worldX);
+      expect(result?.center.y).toBeCloseTo(expected.worldY);
     });
   });
 });

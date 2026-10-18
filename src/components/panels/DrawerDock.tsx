@@ -79,7 +79,7 @@ function FlyoutThumb({ vaultPath, className = 'windrose-flyout-img' }: { vaultPa
   if (src == null) return null;
   // No loading="lazy": the src is an in-memory image preloadImage already
   // decoded, so deferring the load saves nothing.
-  return <img className={className} src={src} />;
+  return <img className={className} src={src} draggable={false} />;
 }
 
 function FlyoutPreview({ tile }: { tile: FlyoutTile }): VNode {

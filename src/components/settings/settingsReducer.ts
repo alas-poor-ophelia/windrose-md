@@ -7,7 +7,7 @@
  */
 
 // Type-only imports
-import type { MapType, HexBounds, MeasurementMethod, SizingMode } from '#types/core/map.types';
+import type { MapType, HexBounds, MeasurementMethod, SizingMode, LadderConfig } from '#types/core/map.types';
 import type {
   HexOrientation,
   DiagonalRule,
@@ -28,6 +28,7 @@ import { calculateGridFromColumns, calculateGridFromMeasurement, calculateGridFr
 import { mergeSettingsOverrides } from '../../core/settingsAccessor';
 import { getEffectiveDistanceSettings } from '../../drawing/distanceOperations';
 import { getDisplayNameFromPath } from '../../assets/imageOperations';
+import { LADDER_DEFAULTS } from '../../geometry/core/lattice';
 
 
 // ===========================================
@@ -141,6 +142,12 @@ export interface SettingsModalState {
   // Sub-hex parent map backdrop override (undefined = inherit global)
   showParentBackdrop?: boolean;
 
+  // Lattice ladder settings (hex). `ladderEnabled` is the explicit opt-in
+  // (initially: the map stores a lod). `lod` is the pending config; null = no
+  // stored lod and no edit (enabling seeds it from LADDER_DEFAULTS).
+  ladderEnabled: boolean;
+  lod: LadderConfig | null;
+
   // Background image
   backgroundImagePath: string | null;
   backgroundImageDisplayName: string;
@@ -231,6 +238,8 @@ export interface BuildInitialStateProps {
   currentBackgroundImage?: CurrentBackgroundImage;
   currentDistanceSettings?: CurrentDistanceSettings;
   currentObjectSetId?: string | null;
+  /** Stored `mapData.lod` (top-level MapData field, not part of settings). */
+  currentLod?: LadderConfig | null;
 }
 
 // ===========================================
@@ -274,7 +283,9 @@ const Actions = {
   CLEAR_FOG_IMAGE: 'CLEAR_FOG_IMAGE',
   SET_OBJECT_SET_ID: 'SET_OBJECT_SET_ID',
   SET_BOUNDS_SHAPE: 'SET_BOUNDS_SHAPE',
-  SET_PARENT_BACKDROP: 'SET_PARENT_BACKDROP'
+  SET_PARENT_BACKDROP: 'SET_PARENT_BACKDROP',
+  SET_LADDER_CONFIG: 'SET_LADDER_CONFIG',
+  SET_LADDER_ENABLED: 'SET_LADDER_ENABLED'
 } as const;
 
 /** Action type union */
@@ -459,6 +470,18 @@ interface SetParentBackdropAction {
   payload: boolean | undefined;
 }
 
+interface SetLadderConfigAction {
+  type: typeof Actions.SET_LADDER_CONFIG;
+  /** Fields to change; merged over the current lod, or over LADDER_DEFAULTS when there is none. */
+  payload: Partial<Pick<LadderConfig, 'm' | 'minCellPx' | 'maxLevel'>>;
+}
+
+interface SetLadderEnabledAction {
+  type: typeof Actions.SET_LADDER_ENABLED;
+  /** Opt the map in or out of the detail ladder; enabling with no config seeds LADDER_DEFAULTS. */
+  payload: boolean;
+}
+
 /** Discriminated union of all actions */
 type SettingsAction =
   | InitializeAction
@@ -496,7 +519,9 @@ type SettingsAction =
   | ClearFogImageAction
   | SetObjectSetIdAction
   | SetBoundsShapeAction
-  | SetParentBackdropAction;
+  | SetParentBackdropAction
+  | SetLadderConfigAction
+  | SetLadderEnabledAction;
 
 // ===========================================
 // Constants
@@ -525,7 +550,8 @@ function getOrphanedContentInfo(
   mapType: MapType,
   currentCells: Cell[] | null | undefined,
   currentObjects: MapObject[] | null | undefined,
-  orientation: HexOrientation
+  orientation: HexOrientation,
+  levelOrphans: number = 0
 ): OrphanInfo {
   if (mapType !== 'hex') return { cells: 0, objects: 0 };
 
@@ -533,7 +559,9 @@ function getOrphanedContentInfo(
   const isOutOfBounds = (q: number, r: number): boolean =>
     !isAxialInHexBounds(q, r, newBounds, orientation);
 
-  let orphanedCells = 0;
+  // Rung (>= 1) cells that would be removed are counted by the caller (they need
+  // the map's ladder) and folded into the painted-cell total.
+  let orphanedCells = levelOrphans;
   let orphanedObjects = 0;
 
   if (currentCells && currentCells.length > 0) {
@@ -548,6 +576,9 @@ function getOrphanedContentInfo(
 
   if (currentObjects && currentObjects.length > 0) {
     currentObjects.forEach(obj => {
+      // Homed (rung) objects carry rung coordinates; their orphans arrive via
+      // levelOrphans (countLevelOrphansForBounds), never through this root test.
+      if ((obj.homeLevel ?? 0) > 0) return;
       if (isOutOfBounds(obj.position.x, obj.position.y)) {
         orphanedObjects++;
       }
@@ -659,6 +690,9 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
     coordinateDisplayMode: (currentSettings?.coordinateDisplayMode ?? 'rectangular') as CoordinateDisplayMode,
 
     showParentBackdrop: currentSettings?.showParentBackdrop,
+
+    ladderEnabled: props.currentLod != null,
+    lod: props.currentLod ?? null,
 
     backgroundImagePath: currentBackgroundImage?.path ?? null,
     backgroundImageDisplayName: currentBackgroundImage?.path != null && currentBackgroundImage.path !== ''
@@ -866,6 +900,18 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
 
     case Actions.SET_PARENT_BACKDROP:
       return { ...state, showParentBackdrop: action.payload };
+
+    case Actions.SET_LADDER_CONFIG:
+      return { ...state, lod: { ...(state.lod ?? LADDER_DEFAULTS), ...action.payload } };
+
+    case Actions.SET_LADDER_ENABLED:
+      // Disabling keeps the pending config, so toggling back restores the edits.
+      if (!action.payload) return { ...state, ladderEnabled: false };
+      return {
+        ...state,
+        ladderEnabled: true,
+        lod: state.lod ?? { m: LADDER_DEFAULTS.m, minCellPx: LADDER_DEFAULTS.minCellPx, maxLevel: LADDER_DEFAULTS.maxLevel }
+      };
 
     case Actions.SET_IMAGE_SEARCH_RESULTS:
       return { ...state, imageSearchResults: action.payload };

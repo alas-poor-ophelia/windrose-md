@@ -664,3 +664,207 @@ button.windrose-breadcrumb-link {
   font-weight: 500;
   padding: 2px 4px;
 }
+
+/* Lattice ladder HUD (LadderLevelOverlay): gold-bordered translucent row with
+   uppercase chips, a padlock and a level readout. */
+/* The host spans the canvas container's bottom edge and is the size container
+   the row queries: narrow embeds drop the readout, then the "L" prefixes. The
+   row is centred inside a side reserve that clears the bottom-left compass in
+   full-pane (12px inset + 60px compass + 12px gap). */
+.windrose-ladder-host {
+  --windrose-ladder-reserve: 8px;
+
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  container: windrose-ladder / inline-size;
+  pointer-events: none;
+
+  .windrose-full-pane-canvas & {
+    --windrose-ladder-reserve: 84px;
+  }
+}
+
+.windrose-ladder-levels {
+  display: flex;
+  min-width: 0;
+  max-width: calc(100% - 2 * var(--windrose-ladder-reserve));
+  overflow: hidden;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  pointer-events: auto;
+  user-select: none;
+}
+
+/* HUD surface: the shared gold-bordered translucent blurred floating look. */
+.windrose-ladder-hud {
+  background: color-mix(in srgb, var(--windrose-bg-primary) 80%, transparent);
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.4);
+  border-radius: 6px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 16px oklch(0 0 0 / 0.5);
+}
+
+/* Chip: works as a button or a span. Button reset is doubled with the
+   .is-tablet twin so Obsidian's app.css cannot restyle it. */
+.is-tablet button.windrose-ladder-chip,
+button.windrose-ladder-chip,
+.windrose-ladder-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 6px;
+  background: none;
+  border: 1px solid transparent;
+  box-shadow: none;
+  border-radius: 3px;
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.is-tablet button.windrose-ladder-chip:hover,
+button.windrose-ladder-chip:hover,
+.windrose-ladder-chip:hover {
+  background: var(--windrose-bg-tertiary);
+  text-decoration: none;
+}
+
+.is-tablet button.windrose-ladder-chip.is-current,
+button.windrose-ladder-chip.is-current,
+.windrose-ladder-chip.is-current,
+.is-tablet button.windrose-ladder-chip.is-on,
+button.windrose-ladder-chip.is-on,
+.windrose-ladder-chip.is-on {
+  background: oklch(from var(--windrose-border-primary) l c h / 0.18);
+  color: var(--windrose-gold-bright);
+  cursor: default;
+}
+
+/* Picker chips are toggles: "on" stays clickable. */
+.is-tablet button.windrose-ladder-chip.is-on,
+button.windrose-ladder-chip.is-on {
+  cursor: pointer;
+}
+
+.is-tablet button.windrose-ladder-chip.is-locked,
+button.windrose-ladder-chip.is-locked,
+.windrose-ladder-chip.is-locked {
+  border-color: oklch(from var(--windrose-border-primary) l c h / 0.8);
+}
+
+.is-tablet button.windrose-ladder-lock,
+button.windrose-ladder-lock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  background: none;
+  border: none;
+  box-shadow: none;
+  color: var(--windrose-text-muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  margin-left: 4px;
+  border-radius: 3px;
+  transition: background-color 150ms ease, color 150ms ease;
+
+  &:hover {
+    background: var(--windrose-bg-tertiary);
+  }
+
+  &.is-locked {
+    color: var(--windrose-gold-bright);
+  }
+}
+
+.windrose-ladder-readout {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: oklch(from var(--windrose-border-primary) l c h / 0.8);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.windrose-ladder-readout-edit {
+  color: var(--windrose-gold-bright);
+}
+
+/* Narrow host: the padlock outline already marks a locked edit rung, so the
+   text readout is the first thing to go. */
+@container windrose-ladder (width < 520px) {
+  .windrose-ladder-readout {
+    display: none;
+  }
+}
+
+/* Very narrow host: chips show the bare rung number with tighter padding. */
+@container windrose-ladder (width < 400px) {
+  .windrose-ladder-chip-prefix {
+    display: none;
+  }
+
+  .windrose-ladder-levels {
+    gap: 0;
+    padding: 2px 3px;
+  }
+
+  /* Two classes outrank the chip's single-class padding. */
+  .windrose-ladder-levels .windrose-ladder-chip,
+  .is-tablet .windrose-ladder-levels button.windrose-ladder-chip {
+    padding-inline: 3px;
+  }
+
+  .windrose-ladder-levels button.windrose-ladder-lock {
+    margin-left: 2px;
+  }
+}
+
+/* Touch: 44px targets for the chips and the padlock (HUD and level picker).
+   The row wraps so a deep ladder stays reachable instead of clipping. */
+@mixin ladder-touch-targets {
+  .windrose-ladder-chip,
+  button.windrose-ladder-chip,
+  .is-tablet button.windrose-ladder-chip,
+  button.windrose-ladder-lock,
+  .is-tablet button.windrose-ladder-lock {
+    min-height: 44px;
+    min-width: 44px;
+    justify-content: center;
+  }
+
+  .windrose-ladder-levels {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+.is-tablet {
+  @include ladder-touch-targets;
+}
+
+@media (pointer: coarse) {
+  @include ladder-touch-targets;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button.windrose-ladder-lock {
+    transition: none;
+  }
+}

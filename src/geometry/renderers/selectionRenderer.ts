@@ -19,11 +19,25 @@ interface SelectionRenderContext {
   offsetY: number;
   zoom: number;
   scaledSize: number;
+  /** Ladder depth hold for objects: footprint shrink around the object's centre (absent = 1). Matches objectRenderer. */
+  elementScale?: number;
+  /** Ladder depth hold for text labels: the zoom the font is sized at (absent = `zoom`). Position always uses `zoom`. */
+  fontZoom?: number;
+}
+
+/** Shrinks a selection footprint around its own centre; identity at scale 1. Cell size is left alone. */
+function holdSelectionAroundCentre<T extends { screenX: number; screenY: number; objectWidth: number; objectHeight: number }>(position: T, scale: number): T {
+  if (scale === 1) return position;
+  const centerX = position.screenX + position.objectWidth / 2;
+  const centerY = position.screenY + position.objectHeight / 2;
+  const objectWidth = position.objectWidth * scale;
+  const objectHeight = position.objectHeight * scale;
+  return { ...position, screenX: centerX - objectWidth / 2, screenY: centerY - objectHeight / 2, objectWidth, objectHeight };
 }
 
 interface SelectionRenderDeps {
   getFontCss: (fontFace: string) => string;
-  getObjectsInCell: (objects: MapObject[], x: number, y: number) => MapObject[];
+  getObjectsInCell: (objects: MapObject[], x: number, y: number, homeLevel?: number) => MapObject[];
   getSlotOffset: (slot: number, count: number, orientation: 'flat' | 'pointy') => { offsetX: number; offsetY: number };
   getMultiObjectScale: (count: number) => number;
 }
@@ -53,7 +67,7 @@ function renderTextLabelSelection(
   ctx.translate(screenX, screenY);
   ctx.rotate(((label.rotation ?? 0) * Math.PI) / 180);
 
-  const fontSize = label.fontSize * zoom;
+  const fontSize = label.fontSize * (context.fontZoom ?? zoom);
   const fontFamily = getFontCss(label.fontFace ?? 'sans');
   ctx.font = `${fontSize}px ${fontFamily}`;
   ctx.textAlign = 'center';
@@ -119,7 +133,7 @@ function calculateHexObjectSelectionPosition(
 
   const { worldX, worldY } = hexGeometry.hexToWorld(object.position.x, object.position.y);
 
-  const cellObjects = deps.getObjectsInCell(allObjects, object.position.x, object.position.y);
+  const cellObjects = deps.getObjectsInCell(allObjects, object.position.x, object.position.y, object.homeLevel ?? 0);
   const objectCount = cellObjects.length;
 
   let objectWidth = size.width * scaledSize;
@@ -309,12 +323,13 @@ function renderObjectSelection(
     position = calculateGridObjectSelectionPosition(object, geometry, context);
   }
 
-  const { screenX, screenY, objectWidth, objectHeight, cellWidth, cellHeight } = position;
-
-  // Draw occupied cells overlay in resize mode
+  // Draw occupied cells overlay in resize mode: cells are not held, so it
+  // lays out from the un-held footprint.
   if (isResizeMode) {
-    renderResizeOverlay(ctx, object, screenX, screenY, cellWidth, cellHeight);
+    renderResizeOverlay(ctx, object, position.screenX, position.screenY, position.cellWidth, position.cellHeight);
   }
+
+  const { screenX, screenY, objectWidth, objectHeight } = holdSelectionAroundCentre(position, context.elementScale ?? 1);
 
   // Draw selection rectangle and handles
   renderObjectSelectionRectangle(ctx, screenX, screenY, objectWidth, objectHeight, isResizeMode, object.freeform === true);

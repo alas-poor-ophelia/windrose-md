@@ -1043,3 +1043,20 @@
     color: var(--text-warning);
   }
 }
+
+// Detail ladder settings (LadderSection): number fields and clamp hints.
+input.windrose-ladder-number {
+  width: 70px;
+}
+
+.is-tablet input.windrose-ladder-number {
+  width: 84px;
+  min-height: 44px;
+}
+
+.windrose-ladder-hint {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  line-height: 1.3;
+  padding: 0 0 var(--size-4-2);
+}

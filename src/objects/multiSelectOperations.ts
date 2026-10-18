@@ -15,8 +15,12 @@ import type { TextLabel } from '#types/objects/note.types';
 import type { SelectedItem } from '#types/contexts/context.types';
 import type { HexOrientation } from '#types/settings/settings.types';
 
+import type { GeometryLadder } from '../geometry/core/createGeometryLadder';
+
 import { getActiveLayer } from '../persistence/layerAccessor';
+import { ladderObjectFootprint } from './ladderHitTest';
 import { getFontCss } from '../text/fontOptions';
+import { ladderLabelBounds } from '../text/textLabelOperations';
 
 
 // ===========================================
@@ -37,7 +41,14 @@ export interface WorldPoint {
   worldY: number;
 }
 
-/** Geometry with bounds check */
+/** The camera under the lattice ladder: marquee bounds follow the drawn footprint. */
+interface MarqueeLadderView {
+  ladder: GeometryLadder;
+  level: number;
+  zoom: number;
+  orientation: 'flat' | 'pointy';
+}
+
 // ===========================================
 // Rectangle Operations
 // ===========================================
@@ -67,8 +78,22 @@ function rectsOverlap(
 function getObjectWorldBounds(
   obj: MapObject,
   geometry: ExtendedGeometry,
-  mapData: MapData
-): WorldBounds {
+  mapData: MapData,
+  view?: MarqueeLadderView,
+  allObjects?: MapObject[]
+): WorldBounds | null {
+  if (view !== undefined && geometry.type === 'hex') {
+    // Ladder view: the drawn footprint (zoomed world px) is the selectable area
+    const rect = ladderObjectFootprint(obj, allObjects ?? [obj], view);
+    if (rect === null) return null;
+    return {
+      minX: rect.screenX / view.zoom,
+      minY: rect.screenY / view.zoom,
+      maxX: (rect.screenX + rect.objectWidth) / view.zoom,
+      maxY: (rect.screenY + rect.objectHeight) / view.zoom
+    };
+  }
+
   const pos = obj.position;
   const size: ObjectSize = obj.size ?? { width: 1, height: 1 };
 
@@ -100,11 +125,20 @@ function getObjectWorldBounds(
       halfHeight = hexSize;
     }
     
+    // The renderer draws a hex object from (center - hexSize / 2) at
+    // size * hexSize (objectRenderer.calculateObjectPosition), so a multi-cell
+    // object reaches past its anchor hex: extend the one-hex box to cover it.
+    // INTENTIONAL CLASSIC BEHAVIOUR CHANGE (kept after the 2026-10-12
+    // cross-model review, item 4): main used the one-hex box only, so a
+    // multi-cell hex object was marquee-selectable by its anchor hex alone.
+    // Single-cell objects get exactly the old box.
+    const drawnMinX = center.worldX - hexSize / 2;
+    const drawnMinY = center.worldY - hexSize / 2;
     return {
-      minX: center.worldX - halfWidth,
-      minY: center.worldY - halfHeight,
-      maxX: center.worldX + halfWidth,
-      maxY: center.worldY + halfHeight
+      minX: Math.min(center.worldX - halfWidth, drawnMinX),
+      minY: Math.min(center.worldY - halfHeight, drawnMinY),
+      maxX: Math.max(center.worldX + halfWidth, drawnMinX + size.width * hexSize),
+      maxY: Math.max(center.worldY + halfHeight, drawnMinY + size.height * hexSize)
     };
   }
   
@@ -150,7 +184,19 @@ function getTextLabelWorldBounds(
   const paddingY = 2;
   const boundingWidth = textWidth + paddingX * 2;
   const boundingHeight = textHeight + paddingY * 2;
-  
+  return labelBoxBounds(pos, boundingWidth, boundingHeight, rotation);
+}
+
+/**
+ * Axis-aligned world bounds of a label box of the given size centred on `pos`
+ * and rotated by `rotation` degrees.
+ */
+function labelBoxBounds(
+  pos: { x: number; y: number },
+  boundingWidth: number,
+  boundingHeight: number,
+  rotation: number
+): WorldBounds {
   // For rotated text, calculate the axis-aligned bounding box
   if (rotation !== 0) {
     const angleRad = (rotation * Math.PI) / 180;
@@ -188,7 +234,8 @@ function getItemsInWorldRect(
   corner1: WorldPoint,
   corner2: WorldPoint,
   geometry: ExtendedGeometry,
-  ctx: CanvasRenderingContext2D | null
+  ctx: CanvasRenderingContext2D | null,
+  view?: MarqueeLadderView
 ): SelectedItem[] {
   const activeLayer = getActiveLayer(mapData);
   const items: SelectedItem[] = [];
@@ -199,11 +246,17 @@ function getItemsInWorldRect(
   const minY = Math.min(corner1.worldY, corner2.worldY);
   const maxY = Math.max(corner1.worldY, corner2.worldY);
   
+  // A `lod` map off the ladder view (quarantined or rotated) draws rung 0
+  // only: its deep objects and labels are undrawn and must not be selected.
+  // Without `lod` nothing is filtered (byte-identical to main).
+  const rootOnly = view === undefined && mapData.lod !== undefined && mapData.lod !== null;
+
   // Check objects
   const objects = activeLayer.objects ?? [];
   for (const obj of objects) {
-    const objBounds = getObjectWorldBounds(obj, geometry, mapData);
-    if (rectsOverlap(minX, minY, maxX, maxY, objBounds)) {
+    if (rootOnly && (obj.homeLevel ?? 0) !== 0) continue;
+    const objBounds = getObjectWorldBounds(obj, geometry, mapData, view, objects);
+    if (objBounds !== null && rectsOverlap(minX, minY, maxX, maxY, objBounds)) {
       items.push({ type: 'object', id: obj.id, data: obj });
     }
   }
@@ -211,7 +264,17 @@ function getItemsInWorldRect(
   // Check text labels
   const textLabels = activeLayer.textLabels ?? [];
   for (const label of textLabels) {
-    const labelBounds = getTextLabelWorldBounds(label, ctx);
+    if (rootOnly && (label.homeLevel ?? 0) !== 0) continue;
+    let labelBounds: WorldBounds;
+    if (view !== undefined) {
+      // Ladder view: the label as drawn at this rung (band, visibleLevels,
+      // floor, held size), the same box the point pick uses.
+      const box = ladderLabelBounds(label, ctx, { ladder: view.ladder, zoom: view.zoom, activeLevel: view.level });
+      if (box === null) continue;
+      labelBounds = labelBoxBounds(label.position, box.width, box.height, label.rotation ?? 0);
+    } else {
+      labelBounds = getTextLabelWorldBounds(label, ctx);
+    }
     if (rectsOverlap(minX, minY, maxX, maxY, labelBounds)) {
       items.push({ type: 'text', id: label.id, data: label });
     }
@@ -221,31 +284,8 @@ function getItemsInWorldRect(
 }
 
 // ===========================================
-// Bounds Validation
-// ===========================================
-
-/**
- * Check if a position is within map bounds
- */
-function isWithinBounds(
-  gridX: number,
-  gridY: number,
-  geometry: ExtendedGeometry | null,
-  _mapData: MapData
-): boolean {
-  if (geometry == null) return true;
-  
-  // Use geometry's bounds check if available
-  if (geometry.isWithinBounds != null) {
-    return geometry.isWithinBounds(gridX, gridY);
-  }
-  
-  // For grid maps without explicit bounds, assume unbounded
-  return true;
-}
-
-// ===========================================
 // Exports
 // ===========================================
 
-export { getItemsInWorldRect, isWithinBounds };
+export type { MarqueeLadderView };
+export { getItemsInWorldRect };

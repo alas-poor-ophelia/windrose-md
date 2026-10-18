@@ -18,6 +18,7 @@ import type {
   LegacyMapData,
   MigrationValidation
 } from '#types/core/map.types';
+import type { Cell } from '#types/core/cell.types';
 import type { MapObject } from '#types/objects/object.types';
 import type { TileLayerRole } from '#types/tiles/tile.types';
 import type { ExportLayerOption } from '#types/core/export.types';
@@ -447,13 +448,23 @@ function promoteToStrata(mapData: MapData): MapData {
   });
 
   const otherLayers = mapData.layers.filter(l => layerBoardId(l) !== boardId);
-  return {
+  const promoted: MapData = {
     ...mapData,
     layers: [...otherLayers, ...strata],
     activeLayerId: base.id,
     activeBoardId: boardId,
     layerMode: 'strata',
   };
+
+  // Ladder rungs (kgc.14): fold every merged layer's rung cells into the ground
+  // stratum per level, exactly as level-0 `cells` merge above, through THE rung
+  // writer. Classic boards author no rungs, so no `levels` key is ever written.
+  const rungs = [...new Set(boardLayers.flatMap(l => authoredLevels(l).filter(lv => lv > 0)))]
+    .sort((a, b) => a - b);
+  return rungs.reduce(
+    (acc, level) => setLevelCells(acc, base.id, level, boardLayers.flatMap(l => authoredCells(l, level))),
+    promoted
+  );
 }
 
 /** Set the layer rendering mode. 'strata' runs the best-effort promotion; 'simple'
@@ -574,6 +585,145 @@ function removeLayer(mapData: MapData, layerId: LayerId): MapData {
   };
 }
 
+// ============================================================================
+// LADDER LEVELS (design 06, s2.1 and s19 items 1 and 6)
+// This section is the ONLY place `levels[...]` may be indexed (eslint enforces
+// it). `cells` is level 0; `levels` holds rungs >= 1, sparse, string keys on
+// disk, never an empty container.
+// ============================================================================
+
+function assertLevel(level: number, min: number): void {
+  if (!Number.isInteger(level) || level < min) {
+    throw new RangeError(`Invalid ladder level ${String(level)} (expected an integer >= ${String(min)})`);
+  }
+}
+
+/** Parse a `levels` record key; null for key "0" and anything that is not a positive integer. */
+function rungFromKey(key: string): number | null {
+  if (!/^[1-9]\d*$/.test(key)) return null;
+  const level = Number(key);
+  return Number.isSafeInteger(level) ? level : null;
+}
+
+/** Valid rung numbers present in `levels` (any content), ascending numerically. */
+function rungKeys(levels: Record<number, Cell[]> | undefined): number[] {
+  if (levels === undefined || levels === null) return [];
+  const out: number[] = [];
+  for (const key of Object.keys(levels)) {
+    const level = rungFromKey(key);
+    if (level !== null) out.push(level);
+  }
+  return out.sort((a, b) => a - b);
+}
+
+/** Authored cells of `layer` at `level`. Level 0 is `layer.cells`; an absent rung is `[]`. */
+function authoredCells(layer: MapLayer, level: number): Cell[] {
+  assertLevel(level, 0);
+  if (level === 0) return layer.cells;
+  return layer.levels?.[level] ?? [];
+}
+
+/** Every authored cell on the layer: level 0 first, then rungs in ascending numeric order. */
+function allAuthoredCells(layer: MapLayer): Array<{ level: number; cell: Cell }> {
+  const out: Array<{ level: number; cell: Cell }> = [];
+  for (const cell of layer.cells) out.push({ level: 0, cell });
+  for (const level of rungKeys(layer.levels)) {
+    const cells = layer.levels?.[level];
+    if (!Array.isArray(cells)) continue;
+    for (const cell of cells) out.push({ level, cell });
+  }
+  return out;
+}
+
+/** Levels that hold at least one authored cell, ascending (0 included iff `cells` is non-empty). */
+function authoredLevels(layer: MapLayer): number[] {
+  const out: number[] = layer.cells.length > 0 ? [0] : [];
+  for (const level of rungKeys(layer.levels)) {
+    const cells = layer.levels?.[level];
+    if (Array.isArray(cells) && cells.length > 0) out.push(level);
+  }
+  return out;
+}
+
+/**
+ * THE writer for rungs >= 1 (level 0 goes through `updateLayer({ cells })`).
+ * Empty `cells` deletes the rung key; an emptied container deletes `levels`.
+ * A no-op (same array reference stored, or absent and `cells` empty) returns
+ * the SAME `mapData` reference.
+ */
+function setLevelCells(mapData: MapData, layerId: LayerId, level: number, cells: Cell[]): MapData {
+  assertLevel(level, 1);
+  const layer = getLayerById(mapData, layerId);
+  if (!layer) return mapData;
+
+  const stored = layer.levels?.[level];
+  if (cells.length === 0 ? stored === undefined : stored === cells) return mapData;
+
+  const nextLevels: Record<number, Cell[]> = { ...(layer.levels ?? {}) };
+  if (cells.length === 0) delete nextLevels[level];
+  else nextLevels[level] = cells;
+
+  const { levels: _dropped, ...rest } = layer;
+  void _dropped;
+  const nextLayer: MapLayer = Object.keys(nextLevels).length > 0 ? { ...rest, levels: nextLevels } : rest;
+
+  return {
+    ...mapData,
+    layers: mapData.layers.map(l => (l.id === layerId ? nextLayer : l))
+  };
+}
+
+/** A `levels` value shaped like a keyed record (a non-null, non-array object). */
+function isLevelsRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Whether a stored `levels` value has a shape the ladder can read (C3): true
+ * when absent, or a record whose every non-empty array sits under a rung key
+ * (`rungFromKey`). False for an array-shaped `levels`, any other non-record
+ * value, or content under a key such as "0", "01" or "1.5". Load keeps such
+ * content as stored (normaliseLevels), so this is how the depth-quarantine
+ * check finds it.
+ */
+function levelsShapeIsValid(levels: unknown): boolean {
+  if (levels === undefined || levels === null) return true;
+  if (!isLevelsRecord(levels)) return false;
+  for (const key of Object.keys(levels)) {
+    const value = levels[key];
+    if (Array.isArray(value) && value.length > 0 && rungFromKey(key) === null) return false;
+  }
+  return true;
+}
+
+/**
+ * Remove empty containers only: empty or non-array rung values, and `levels`
+ * itself when it is null, not an object, or left empty. Never deletes content:
+ * a non-empty array under a key that is not a rung ("0", "01", "1.5") and an
+ * array-shaped `levels` stay exactly as stored, for depth quarantine
+ * (levelsShapeIsValid) to report (DATA-10). Returns the same layer when there
+ * is nothing to fix.
+ */
+function normaliseLevels(layer: MapLayer): MapLayer {
+  if (!('levels' in layer)) return layer;
+  const levels: unknown = (layer as { levels?: unknown }).levels;
+  if (Array.isArray(levels)) return layer;
+  const kept: Record<string, unknown> = {};
+  let dirty = !isLevelsRecord(levels);
+  if (isLevelsRecord(levels)) {
+    for (const key of Object.keys(levels)) {
+      const value = levels[key];
+      if (Array.isArray(value) && value.length > 0) kept[key] = value;
+      else dirty = true;
+    }
+  }
+  if (Object.keys(kept).length === 0) dirty = true;
+  if (!dirty) return layer;
+  const { levels: _dropped, ...rest } = layer;
+  void _dropped;
+  return Object.keys(kept).length > 0 ? { ...rest, levels: kept as Record<number, Cell[]> } : rest;
+}
+
 /**
  * Clone a layer and insert it directly above the source layer.
  * @param mode 'all' copies everything; 'mapOnly' copies cells, curves, edges, tiles only
@@ -649,6 +799,10 @@ function cloneLayer(mapData: MapData, layerId: LayerId, mode: 'all' | 'mapOnly')
     wallPaths,
     terrainStrokes: withFreshIds(sourceLayer.terrainStrokes, 'tstroke'),
   };
+
+  // Ladder rungs travel with the map content in both modes. Conditional: a
+  // classic layer's clone must never carry a `levels` key at all.
+  if (sourceLayer.levels !== undefined) clonedLayer.levels = deepCopy(sourceLayer.levels);
 
   // Clone stays on the same board (and same stratum, if any).
   if (sourceLayer.boardId != null) clonedLayer.boardId = sourceLayer.boardId;
@@ -902,9 +1056,11 @@ function needsMigration(mapData: MapData | LegacyMapData | null | undefined): bo
   if (!mapData) return false;
 
   const hasLayers = Array.isArray((mapData as Partial<MapData>).layers);
+  // v2 is current for a classic map: v3 is a per-entry fence that only the
+  // content stamp sets (schemaMigration.stampSchemaVersions); its step is a no-op.
   const needsIt = !hasLayers ||
                   mapData.schemaVersion == null ||
-                  mapData.schemaVersion < SCHEMA_VERSION;
+                  mapData.schemaVersion < LAYER_SCHEMA_VERSION;
 
   if (needsIt) {
     console.debug('[layerAccessor] Map needs migration:', {
@@ -921,7 +1077,9 @@ function needsMigration(mapData: MapData | LegacyMapData | null | undefined): bo
 // EXPORTS
 // ============================================================================
 
-export { generateLayerId, getActiveLayer, getLayersOrdered, getLayerById, getLayerIndex, getLayerBelow, updateLayer, updateActiveLayer, setActiveLayer, addLayer, cloneLayer, removeLayer, reorderLayers, migrateToLayerSchema, needsMigration, LAYER_SCHEMA_VERSION, // Board (floor) projection
+export { generateLayerId, getActiveLayer, getLayersOrdered, getLayerById, getLayerIndex, getLayerBelow, updateLayer, updateActiveLayer, setActiveLayer, addLayer, cloneLayer, removeLayer, reorderLayers, // Ladder levels (the only `levels` reader/writer)
+  authoredCells, allAuthoredCells, authoredLevels, setLevelCells, normaliseLevels, levelsShapeIsValid,
+  migrateToLayerSchema, needsMigration, LAYER_SCHEMA_VERSION, // Board (floor) projection
   DEFAULT_BOARD_ID, layerBoardId, getBoardsOrdered, getActiveBoardId, getBoardLayers, getActiveBoardLayers, getBoardBelow, updateBoard, getRenderLayers, getExportLayers, getDefaultExportLayers, ensureBoards, addBoard, removeBoard, setActiveBoard, promoteToStrata, setLayerMode };
 
 export {

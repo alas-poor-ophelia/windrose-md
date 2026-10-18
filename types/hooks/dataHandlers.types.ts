@@ -16,6 +16,7 @@ import type { HexColor } from '../core/common.types';
 import type { Edge } from '../core/rendering.types';
 import type { TileAssignment } from '../tiles/tile.types';
 import type { MapDataUpdater } from '../hooks/mapData.types';
+import type { DepthWriteContext, DepthWriteRefusal, DepthWriteResult } from '../../src/persistence/depthAuthoring';
 import type { AddToHistoryOptions, LayerHistorySnapshot } from '../hooks/layerHistory.types';
 
 // ===========================================
@@ -28,6 +29,13 @@ export interface UseDataHandlersOptions {
   updateMapData: MapDataUpdater;
   addToHistory: (state: LayerHistorySnapshot, options?: AddToHistoryOptions) => void;
   isApplyingHistory: () => boolean;
+  /**
+   * The open sub-hex level's path (useSubHexNavigation's `subHexPath`, the key
+   * useLayerHistory takes too); null or absent at the root. Non-null means the
+   * current map is a sub-hex child, where every deep write is refused
+   * 'nested-level' (decision D-1).
+   */
+  levelKey?: string | null;
 }
 
 // ===========================================
@@ -38,8 +46,15 @@ export interface UseDataHandlersOptions {
 // Handler Types
 // ===========================================
 
-/** Layer data change handler */
-export type LayerDataChangeHandler<T> = (newValue: T, suppressHistory?: boolean) => void;
+/**
+ * Layer data change handler. Returns the depth gate's refusal when the write
+ * adds an element on a ladder rung >= 1 and the gate refuses it (the map is
+ * then unchanged and nothing is recorded); null otherwise. `context` is the
+ * gesture's DepthWriteContext: pass `serialisedBytes` (depthBudgetBytesOf at
+ * gesture start) so a brush that adds deep elements per tick measures the map
+ * once; without it the write measures the map only when it adds one.
+ */
+export type LayerDataChangeHandler<T> = (newValue: T, suppressHistory?: boolean, context?: DepthWriteContext) => DepthWriteRefusal | null;
 
 /** Handle cells change */
 export type HandleCellsChange = LayerDataChangeHandler<Cell[]>;
@@ -93,6 +108,13 @@ export type HandleRegionsChange = (regions: Region[], suppressHistory?: boolean)
 // Grouped Handlers
 // ===========================================
 
+/**
+ * Deep (ladder rung >= 1) cell write on the active layer. `update` maps the
+ * rung's current cells to its next content; refused writes change nothing.
+ * `context` carries a multi-tick operation's start-of-op baseline (brush stroke).
+ */
+export type HandleLevelCellsChange = (level: number, update: (current: Cell[]) => Cell[], suppressHistory?: boolean, context?: DepthWriteContext) => DepthWriteResult | null;
+
 /** Layer data handlers group */
 export interface LayerDataHandlers {
   handleCellsChange: HandleCellsChange;
@@ -135,6 +157,8 @@ export interface UseDataHandlersResult {
 
   // Direct access
   handleNameChange: HandleNameChange;
+  /** Rewrite one ladder rung (level >= 1) of the active layer through writeDepthCells. */
+  handleLevelCellsChange: HandleLevelCellsChange;
   handleCellsChange: HandleCellsChange;
   handleCurvesChange: HandleCurvesChange;
   handleObjectsChange: HandleObjectsChange;

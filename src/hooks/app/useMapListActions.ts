@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import type { App } from 'obsidian';
 import type { MapType } from '#types/index';
-import { listMaps, deleteMapData } from '../../persistence/fileOperations';
+import { listMaps, deleteMapData, setPendingNewMapOptions } from '../../persistence/fileOperations';
 import type { MapListEntry } from '../../persistence/fileOperations';
 import { ConfirmModal } from '../../settings/modals/ConfirmModal';
 import { NewMapModal } from '../../components/modals/NewMapModal';
@@ -21,7 +21,7 @@ interface UseMapListActionsOptions {
   /** Root map data name, read at delete time to label the confirm prompt. */
   rootMapName: string | undefined;
   markDeleted: () => void;
-  onMapChange?: (mapId: string, mapName: string, mapType: MapType) => void;
+  onMapChange?: (mapId: string, mapName: string, mapType: MapType, ladderM?: number) => void;
   onMapDeleted?: () => void;
   /** Block mode: show the "map deleted" placeholder in place of the map. */
   setMapDeleted: (deleted: boolean) => void;
@@ -58,8 +58,12 @@ function useMapListActions({ app, fullPane, mapId, mapName, mapType, rootMapName
   }, [onMapChange]);
 
   const handleNewMap = useCallback(() => {
-    new NewMapModal(app, (newId, newName, newType) => {
-      onMapChange?.(newId, newName, newType);
+    new NewMapModal(app, (newId, newName, newType, ladderM) => {
+      // The map is built lazily on its first load, by whichever host opens it
+      // (full-pane view or an embed block), so the preset is parked here, at
+      // the dialog, rather than in any one host's map-change handler.
+      if (ladderM !== undefined && newType === 'hex') setPendingNewMapOptions(newId, { ladderM });
+      onMapChange?.(newId, newName, newType, ladderM);
     }).open();
   }, [app, onMapChange]);
 

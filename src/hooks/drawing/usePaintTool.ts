@@ -19,13 +19,17 @@ import type { TerrainStroke } from '#types/core/terrainstroke.types';
 import type { DragStartContext } from '#types/hooks/drawingTools.types';
 import type { Edge } from '#types/core/rendering.types';
 import type { ExtendedGeometry, MapStateContextValue } from '#types/contexts/context.types';
+import type { HandleLevelCellsChange } from '#types/hooks/dataHandlers.types';
+import type { GeometryLadder } from '../../geometry/core/createGeometryLadder';
 
 import { useRef, useState } from 'preact/hooks';
 import { setCell as accessorSetCell, removeCell as accessorRemoveCell, getCellIndex } from '../../geometry/core/cellAccessor';
 import { removeEdge, getEdgeAt } from '../../drawing/edgeOperations';
 import { eraseObjectAt } from '../../objects/objectOperations';
 import { eraseCellFromCurves, eraseWorldPolygonFromCurves } from '../../geometry/curves/curveBoolean';
-import { getActiveLayer, getActiveBoardLayers } from '../../persistence/layerAccessor';
+import { getActiveLayer, getActiveBoardLayers, authoredCells } from '../../persistence/layerAccessor';
+import { guardDepthWrite, depthBudgetBytesOf, type DepthWriteContext, type DepthWriteRefusal } from '../../persistence/depthAuthoring';
+import { withCellPainted, withCellErased, showDepthRefusal, drawnObjectAt } from '../../drawing/depthCellOps';
 import { findTileHitInLayers } from '../../assets/tileFootprint';
 import { distanceToWallPath } from '../../drawing/wallPathOperations';
 import { distancePointToPolyline } from '../../geometry/strokes/terrainStrokeGeometry';
@@ -67,7 +71,19 @@ interface UsePaintToolOptions {
   onTerrainStrokesChange?: (strokes: TerrainStroke[], suppressHistory?: boolean) => void;
   getTextLabelAtPosition: (labels: TextLabel[], worldX: number, worldY: number, ctx: CanvasRenderingContext2D | null) => TextLabel | null;
   removeTextLabel: (labels: TextLabel[], id: string) => TextLabel[];
-  getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
+  getObjectAtPosition: (objects: MapObject[], x: number, y: number, homeLevel?: number) => MapObject | null;
+  /** Lattice ladder (null/absent on classic maps). Deep strokes need all four ladder options. */
+  ladder?: GeometryLadder | null;
+  /** Edit rung (camera rung, or the shallower locked rung); latched once per stroke at pointerdown. */
+  getEditLevel?: () => number;
+  screenToLevelCell?: MapStateContextValue['screenToLevelCell'];
+  onLevelCellsChange?: HandleLevelCellsChange;
+  /**
+   * Drops held transient-history pins (useLayerHistory.clearTransient). A deep
+   * stroke that ends with its rung unchanged (paint then erase the same cell)
+   * records no entry, so the pins its suppressed ticks took are released here.
+   */
+  clearTransient?: () => void;
 }
 
 interface UsePaintToolResult {
@@ -88,7 +104,8 @@ function usePaintTool({
   canvasRef, screenToGrid, screenToWorld, getClientCoords,
   onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
   onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange,
-  getTextLabelAtPosition, removeTextLabel, getObjectAtPosition
+  getTextLabelAtPosition, removeTextLabel, getObjectAtPosition,
+  ladder = null, getEditLevel, screenToLevelCell, onLevelCellsChange, clearTransient
 }: UsePaintToolOptions): UsePaintToolResult {
 
   const [paintIsDrawing, setPaintIsDrawing] = useState<boolean>(false);
@@ -114,6 +131,21 @@ function usePaintTool({
   const strokeInitialTilesRef = useRef<TileAssignment[] | null>(null);
   const strokeInitialWallPathsRef = useRef<WallPath[] | null>(null);
   const strokeInitialTerrainStrokesRef = useRef<TerrainStroke[] | null>(null);
+  // Edit level, latched at pointerdown (design section 4.2): a stroke that
+  // crosses a rung boundary mid-drag stays on its starting rung. Always 0 when
+  // the map cannot take deep edits (flag off, classic map, quarantine).
+  const strokeLevelRef = useRef<number>(0);
+  // The rung's authored cells at stroke start (by reference), for the one
+  // undo entry per deep stroke. Null outside a deep stroke.
+  const strokeInitialLevelCellsRef = useRef<Cell[] | null>(null);
+  // A refused deep stroke shows one notice and paints nothing more until the
+  // pointer lifts: past the cap or the budget, every further tick would refuse too.
+  const strokeRefusedRef = useRef<boolean>(false);
+  // Serialised map size at deep-stroke start: the budget check adds a per-cell
+  // estimate to it instead of stringifying the whole map on every tick (kgc.23).
+  const strokeBytesRef = useRef<number | null>(null);
+  /** Whether the map had no lod block at stroke start (DepthWriteContext.lodAbsentAtStart). */
+  const strokeLodAbsentRef = useRef(false);
 
   /**
    * Commit history for whatever this stroke touched on `layer`, then clear the
@@ -159,8 +191,62 @@ function usePaintTool({
     }
   };
 
+  /**
+   * Paint or erase one cell on ladder rung `level` (>= 1). Touches ONLY the
+   * rung's authored cells (design section 19 item 4): no text, edge, object,
+   * tile, wall, curve or terrain hit-tests, and never `layer.cells`.
+   */
+  const toggleDeepCell = (coords: Point, shouldFill: boolean, level: number): void => {
+    if (!mapData || ladder === null || onLevelCellsChange === undefined) return;
+    if (strokeRefusedRef.current) return;
+    const q = coords.x;
+    const r = coords.y;
+    if (!ladder.existsAt(level, q, r)) return;
+
+    const layer = getActiveLayer(mapData);
+    const current = authoredCells(layer, level);
+    const next = shouldFill
+      ? withCellPainted(current, q, r, selectedColor, selectedOpacity)
+      : withCellErased(current, q, r);
+    if (next === current) return;
+
+    // Within a stroke the per-op cap and the budget count from the stroke's
+    // start, so a brush cannot add MAX_CELLS_PER_DEPTH_OP cells one tick at a time.
+    const baseline = strokeInitialLevelCellsRef.current;
+    const context: DepthWriteContext = baseline !== null && strokeBytesRef.current !== null
+      ? { baseline, serialisedBytes: strokeBytesRef.current, lodAbsentAtStart: strokeLodAbsentRef.current }
+      : {};
+    const refuse = (reason: DepthWriteRefusal): void => {
+      strokeRefusedRef.current = true;
+      showDepthRefusal(reason);
+    };
+    const refusal = guardDepthWrite(mapData, layer.id, level, next, context);
+    if (refusal !== null) {
+      refuse(refusal);
+      return;
+    }
+
+    const isBatchedStroke = baseline !== null;
+    const color = selectedColor;
+    const opacity = selectedOpacity;
+    const outcome = onLevelCellsChange(
+      level,
+      (cells: Cell[]) => (shouldFill ? withCellPainted(cells, q, r, color, opacity) : withCellErased(cells, q, r)),
+      isBatchedStroke,
+      context
+    );
+    // The writer re-guards against the LIVE map; honour its verdict too.
+    if (outcome !== null && !outcome.ok) refuse(outcome.reason);
+  };
+
   const toggleCell = (coords: Point, shouldFill: boolean, dragStart: DragStartContext | null = null): void => {
     if (!mapData || !geometry) return;
+
+    const strokeLevel = strokeLevelRef.current;
+    if (strokeLevel > 0) {
+      toggleDeepCell(coords, shouldFill, strokeLevel);
+      return;
+    }
 
     const activeLayer = getActiveLayer(mapData);
 
@@ -215,12 +301,23 @@ function usePaintTool({
 
       const coordX = coords.x;
       const coordY = coords.y;
-      const obj = getObjectAtPosition(activeLayer.objects, coordX, coordY);
+      // This is the level-0 erase (deep strokes go through toggleDeepCell and
+      // touch cells only). On a ladder map it removes the object DRAWN under
+      // the pointer, whatever its home rung (INT-08: a home-1 object shows at
+      // level 0); classic maps keep the index match on rung 0.
+      const mapType = mapData.mapType ?? 'grid';
+      const drawnObj = ladder !== null && worldCoords
+        ? drawnObjectAt(activeLayer.objects ?? [], ladder, mapData, worldCoords.worldX, worldCoords.worldY)
+        : null;
+      const obj = ladder !== null ? drawnObj : getObjectAtPosition(activeLayer.objects, coordX, coordY, 0);
       if (obj != null) {
-        const mapType = mapData.mapType ?? 'grid';
-        const result = eraseObjectAt(activeLayer.objects, coordX, coordY, mapType);
-        if (result.success) {
-          onObjectsChange(result.objects);
+        if (ladder !== null) {
+          onObjectsChange((activeLayer.objects ?? []).filter(o => o.id !== obj.id));
+        } else {
+          const result = eraseObjectAt(activeLayer.objects, coordX, coordY, mapType, 0);
+          if (result.success) {
+            onObjectsChange(result.objects);
+          }
         }
       } else {
         // Erase tile at cell coords. In strata mode every depth band is its own
@@ -232,7 +329,7 @@ function usePaintTool({
         if (onTilesChange != null) {
           const searchLayers = getActiveBoardLayers(mapData)
             .filter(l => l.visible !== false || l.id === activeLayer.id);
-          const hit = findTileHitInLayers(searchLayers, coordX, coordY);
+          const hit = findTileHitInLayers(searchLayers, coordX, coordY, 0);
           if (hit != null) {
             const layerTiles = hit.layer.tiles ?? [];
             const nextTiles = layerTiles.filter((_: TileAssignment, i: number) => i !== hit.index);
@@ -334,7 +431,11 @@ function usePaintTool({
 
   const processCellDuringDrag = (e: PointerEvent | MouseEvent | TouchEvent, _dragStart: DragStartContext | null = null): void => {
     const { clientX, clientY } = getClientCoords(e);
-    const coords = screenToGrid(clientX, clientY);
+    // Level 0 is screenToGrid exactly; a deep stroke resolves on its latched rung.
+    const strokeLevel = strokeLevelRef.current;
+    const coords = strokeLevel > 0
+      ? (screenToLevelCell?.(clientX, clientY, strokeLevel) ?? null)
+      : screenToGrid(clientX, clientY);
     if (!coords) return;
 
     const cellKey = `${coords.x},${coords.y}`;
@@ -352,9 +453,30 @@ function usePaintTool({
 
     const activeLayer = getActiveLayer(mapData);
 
+    // Zoomed onto a rung but the map cannot take this deep write: refuse with
+    // the real reason and consume the press, never painting level 0 instead
+    // (parity with objects, tiles and text; kgc.25). Classic maps (no ladder)
+    // stay on level 0 untouched.
+    const level = ladder !== null && getEditLevel !== undefined ? getEditLevel() : 0;
+    if (level > 0) {
+      const refusal = guardDepthWrite(mapData, activeLayer.id, level, authoredCells(activeLayer, level));
+      if (refusal !== null) {
+        showDepthRefusal(refusal);
+        return;
+      }
+    }
+
     setPaintIsDrawing(true);
     resetProcessed();
-    strokeInitialStateRef.current = [...activeLayer.cells];
+    strokeLevelRef.current = level;
+    strokeRefusedRef.current = false;
+    // Journal payload size, measured once per stroke (one stringify plus, on a
+    // large map, one deflate); every tick budgets against it (DATA-01).
+    strokeBytesRef.current = level > 0 ? depthBudgetBytesOf(mapData) : null;
+    strokeLodAbsentRef.current = mapData.lod === undefined;
+    // A deep stroke never touches layer.cells, so it snapshots only its rung.
+    strokeInitialStateRef.current = level > 0 ? null : [...activeLayer.cells];
+    strokeInitialLevelCellsRef.current = level > 0 ? authoredCells(activeLayer, level) : null;
     strokeInitialEdgesRef.current = null;
     strokeInitialCurvesRef.current = null;
     strokeInitialTilesRef.current = null;
@@ -369,9 +491,33 @@ function usePaintTool({
     setPaintIsDrawing(false);
     resetProcessed();
 
+    const level = strokeLevelRef.current;
+    const initialLevelCells = strokeInitialLevelCellsRef.current;
+    strokeLevelRef.current = 0;
+    strokeInitialLevelCellsRef.current = null;
+    strokeBytesRef.current = null;
+
     if (mapData == null) return;
 
-    flushStrokeHistory(getActiveLayer(mapData));
+    const layer = getActiveLayer(mapData);
+    // Deep stroke: one undo entry when the rung changed (reference compare;
+    // every rung writer returns the prior array on a no-op). The identity
+    // update re-writes the current rung only to record the snapshot.
+    if (level > 0 && initialLevelCells !== null && onLevelCellsChange !== undefined) {
+      // Reference first (a no-op stroke keeps the array), then content: a stroke
+      // that paints and erases the same cell ends on a new array with the old
+      // content and must not record a no-op undo entry.
+      const finalLevelCells = authoredCells(layer, level);
+      if (strokeChanged(finalLevelCells, initialLevelCells)) {
+        onLevelCellsChange(level, (cells: Cell[]) => cells, false);
+      } else {
+        // No commit claims the pins the suppressed ticks took; holding them
+        // would fold this no-op stroke into the next unrelated entry.
+        clearTransient?.();
+      }
+    }
+
+    flushStrokeHistory(layer);
   };
 
   const cancelPaintDrawing = (): void => {
@@ -385,6 +531,9 @@ function usePaintTool({
       strokeInitialWallPathsRef.current = null;
       strokeInitialTerrainStrokesRef.current = null;
     }
+    strokeLevelRef.current = 0;
+    strokeInitialLevelCellsRef.current = null;
+    strokeBytesRef.current = null;
   };
 
   return {

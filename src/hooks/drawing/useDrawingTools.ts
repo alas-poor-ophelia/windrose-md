@@ -61,10 +61,14 @@ const useDrawingTools = (
     screenToGrid,
     screenToWorld,
     getClientCoords,
+    ladder,
+    getEditLevel,
+    screenToLevelCell,
   } = useMapState();
 
   const {
     onCellsChange,
+    onLevelCellsChange,
     onCurvesChange,
     onObjectsChange,
     onTextLabelsChange,
@@ -76,7 +80,8 @@ const useDrawingTools = (
     getTextLabelAtPosition,
     removeTextLabel,
     getObjectAtPosition,
-    removeObjectsInRectangle
+    removeObjectsInRectangle,
+    clearTransient
   } = useMapOperations();
 
   // Compose sub-hooks
@@ -85,7 +90,8 @@ const useDrawingTools = (
     canvasRef, screenToGrid, screenToWorld, getClientCoords,
     onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
     onTilesChange, onLayerSelect, onWallPathsChange, onTerrainStrokesChange,
-    getTextLabelAtPosition, removeTextLabel, getObjectAtPosition
+    getTextLabelAtPosition, removeTextLabel, getObjectAtPosition,
+    ladder, getEditLevel, screenToLevelCell, onLevelCellsChange, clearTransient
   });
 
   const edgeDrag = useEdgeDragTool({
@@ -102,7 +108,8 @@ const useDrawingTools = (
     currentTool, selectedColor, selectedOpacity, edgeWidth, previewSettings,
     mapData, geometry, screenToWorld, getClientCoords,
     onCellsChange, onCurvesChange, onObjectsChange, onTextLabelsChange, onEdgesChange,
-    removeObjectsInRectangle
+    removeObjectsInRectangle,
+    ladder, getEditLevel, screenToLevelCell, onLevelCellsChange
   });
 
   const segmentPicker = useSegmentPicker({

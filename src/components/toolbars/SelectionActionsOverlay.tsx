@@ -23,6 +23,8 @@ import { CornerBrackets } from '../shared/CornerBrackets';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { getObjectAtPosition } from '../../objects/objectOperations';
 import { getSelectionBounds } from '../../objects/selectionBounds';
+import { pickLadderObject } from '../../objects/ladderHitTest';
+import { classicHitRung } from '../../objects/hexSlotPositioner';
 import { Menu } from 'obsidian';
 import { SelectionCardFiligree } from './SelectionCardFiligree';
 import { Icon } from '../shared/Icon';
@@ -124,7 +126,7 @@ const SelectionActionsOverlay = ({
 }: SelectionActionsOverlayProps): VNode | null => {
   // Per-mount instance id: this overlay always renders inside the MapCanvas
   // provider tree, and must only claim context-menu events from its own mount.
-  const { instanceId, viewController, screenToGrid } = useMapState();
+  const { instanceId, viewController, screenToGrid, screenToWorld, ladder, getActiveLevel } = useMapState();
 
   // Hide (via CSS, in the JSX below) mid pan/zoom gesture; reanchor on
   // commit. The card's bounds are computed from committed viewState and
@@ -153,11 +155,21 @@ const SelectionActionsOverlay = ({
       // that object and shows its menu. Everything else while this overlay is
       // mounted (on the selection, or on empty map) is ours. Disjoint
       // predicates, so listener registration order cannot pick the winner.
-      const coords = screenToGrid(detail.clientX, detail.clientY);
-      if (coords != null) {
-        const hit = getObjectAtPosition(getActiveLayer(mapData).objects ?? [], coords.x, coords.y);
-        if (hit != null && !selectedItems.some(s => s.id === hit.id)) return;
+      const objects = getActiveLayer(mapData).objects ?? [];
+      let hit: MapObject | null = null;
+      if (ladder !== null) {
+        const world = screenToWorld(detail.clientX, detail.clientY);
+        if (world != null) {
+          const zoom = viewController?.getLive().zoom ?? mapData.viewState?.zoom ?? 1;
+          hit = pickLadderObject(objects, world.worldX, world.worldY, {
+            ladder, level: getActiveLevel(), zoom, orientation: mapData.orientation ?? 'flat'
+          });
+        }
+      } else {
+        const coords = screenToGrid(detail.clientX, detail.clientY);
+        if (coords != null) hit = getObjectAtPosition(objects, coords.x, coords.y, classicHitRung(mapData));
       }
+      if (hit != null && !selectedItems.some(s => s.id === hit.id)) return;
       detail.handled = true;
       const { screenX, screenY } = detail;
 
@@ -185,12 +197,12 @@ const SelectionActionsOverlay = ({
     const doc = canvasRef.current?.ownerDocument ?? activeDocument;
     doc.addEventListener('windrose:selection-context-menu', handler);
     return () => doc.removeEventListener('windrose:selection-context-menu', handler);
-  }, [actions, instanceId, screenToGrid, mapData, selectedItems, canvasRef]);
+  }, [actions, instanceId, screenToGrid, screenToWorld, ladder, getActiveLevel, viewController, mapData, selectedItems, canvasRef]);
 
   const hasRequiredRefs = selectedItems.length > 0 && canvasRef.current != null && containerRef.current != null;
 
   const bounds = hasRequiredRefs
-    ? getSelectionBounds(selectedItems as Parameters<typeof getSelectionBounds>[0], mapData, canvasRef, containerRef, geometry)
+    ? getSelectionBounds(selectedItems as Parameters<typeof getSelectionBounds>[0], mapData, canvasRef, containerRef, geometry, ladder)
     : null;
 
   const visibleActions = actions.filter(a => a.visible === true);

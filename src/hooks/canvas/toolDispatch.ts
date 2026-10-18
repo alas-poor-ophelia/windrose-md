@@ -101,7 +101,7 @@ const drawingMove = ({ getHandlers, e, tool, clientX, clientY, isTouch, toGrid, 
                        ((tool === 'rectangle' || tool === 'clearArea') && drawingHandlers.rectangleStart != null);
       if (hasStart) {
         const coords = toGrid(clientX, clientY);
-        if (coords) drawingHandlers.updateShapeHover(coords.x, coords.y);
+        if (coords) drawingHandlers.updateShapeHover(coords.x, coords.y, clientX, clientY);
       }
     }
   }

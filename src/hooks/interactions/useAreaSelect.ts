@@ -15,6 +15,7 @@ import { useCallback, useState } from 'preact/hooks';
 import { useMapState } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { getItemsInWorldRect } from '../../objects/multiSelectOperations';
+import type { MarqueeLadderView } from '../../objects/multiSelectOperations';
 
 
 
@@ -35,6 +36,9 @@ const useAreaSelect = (currentTool: ToolId): UseAreaSelectResult => {
     canvasRef,
     mapData,
     geometry,
+    ladder,
+    getActiveLevel,
+    viewController,
     screenToWorld,
     screenToGrid,
     getClientCoords
@@ -100,7 +104,12 @@ const useAreaSelect = (currentTool: ToolId): UseAreaSelectResult => {
       // Get canvas context for text measurement
       const ctx = canvasRef.current?.getContext('2d') ?? null;
 
-      const items = getItemsInWorldRect(mapData, corner1, corner2, geometry, ctx);
+      const zoom = viewController?.getLive()?.zoom ?? mapData.viewState?.zoom ?? 1;
+      const view: MarqueeLadderView | undefined = ladder !== null
+        ? { ladder, level: getActiveLevel(), zoom, orientation: mapData.orientation ?? 'flat' }
+        : undefined;
+
+      const items = getItemsInWorldRect(mapData, corner1, corner2, geometry, ctx, view);
 
       if (items.length > 0) {
         selectMultiple(items);
@@ -117,6 +126,9 @@ const useAreaSelect = (currentTool: ToolId): UseAreaSelectResult => {
       isAreaSelectTool,
       mapData,
       geometry,
+      ladder,
+      getActiveLevel,
+      viewController,
       areaSelectStart,
       getClientCoords,
       screenToWorld,

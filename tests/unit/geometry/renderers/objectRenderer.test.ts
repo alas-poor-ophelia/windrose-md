@@ -566,6 +566,31 @@ describe("objectRenderer", () => {
       expect(ctx.fillText).toHaveBeenCalledTimes(2);
     });
 
+    it("lays hex slots out from context.slotObjects, not the drawn subset (ladder depth groups)", () => {
+      // One depth group holds only object 1, but object 2 shares its hex on the
+      // whole layer: the slot layout must still see two objects in that cell.
+      const shared = { id: '2', type: 'test', position: { x: 0, y: 0 } };
+      const layer = { objects: [{ id: '1', type: 'test', position: { x: 0, y: 0 } }] };
+      const context = { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40, slotObjects: [...layer.objects, shared] };
+
+      renderObjects(layer as any, context as any, geometry as unknown as IGeometry, true, 'flat', deps as any);
+
+      expect(ctx.fillText).toHaveBeenCalledTimes(1);
+      expect(deps.getMultiObjectScale).toHaveBeenCalledWith(2);
+      expect(deps.getSlotOffset).toHaveBeenCalledWith(0, 2, 'flat');
+    });
+
+    it("holds a footprint around its own centre when elementScale is set", () => {
+      const obj = { id: '1', type: 'test', position: { x: 2, y: 3 }, size: { width: 1, height: 1 } };
+      const full = calculateObjectPosition(obj as unknown as MapObject, [obj] as unknown as MapObject[], geometry as unknown as IGeometry, { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40 }, false, 'flat', deps as any);
+      const held = calculateObjectPosition(obj as unknown as MapObject, [obj] as unknown as MapObject[], geometry as unknown as IGeometry, { ctx, offsetX: 0, offsetY: 0, zoom: 1, scaledSize: 40, elementScale: 0.25 }, false, 'flat', deps as any);
+
+      expect(held.objectWidth).toBe(full.objectWidth * 0.25);
+      expect(held.objectHeight).toBe(full.objectHeight * 0.25);
+      expect(held.screenX + held.objectWidth / 2).toBeCloseTo(full.screenX + full.objectWidth / 2, 9);
+      expect(held.screenY + held.objectHeight / 2).toBeCloseTo(full.screenY + full.objectHeight / 2, 9);
+    });
+
     it("skips objects with unknown type", () => {
       const layer = {
         objects: [

@@ -103,7 +103,10 @@ const FALLBACK_SETTINGS: PluginSettings = {
   shapePreviewTouch: false,
 
   // Debug/diagnostic command palette entries hidden by default
-  developerMode: false
+  developerMode: false,
+
+  // Detail levels (zoom-native depth for hex maps): on by default; absent reads as on
+  lodLadder: true
 };
 
 /** Default object customization settings */

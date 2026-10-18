@@ -19,7 +19,7 @@ import type {
 import { getNextRotation } from '../drawing/rotationOperations';
 import { getObjectType } from './objectTypeResolver';
 import { updateById, removeById } from './entityList';
-import { assignSlot, getObjectsInCell, canAddObjectToCell, getOccupiedSlots, reorganizeAfterRemoval } from './hexSlotPositioner';
+import { assignSlot, getObjectsInCell, canAddObjectToCell, getOccupiedSlots, reorganizeAfterRemoval, homeLevelOf } from './hexSlotPositioner';
 
 
 // Import getObjectType from the resolver (handles overrides, custom objects, fallback)
@@ -43,12 +43,17 @@ function generateObjectId(): ObjectId {
 // ===========================================
 
 /**
- * Find object at specific grid coordinates
+ * Find object at specific grid coordinates.
+ *
+ * `homeLevel` restricts the search to objects homed on that ladder rung, since
+ * rung cells of different levels share index space; omitted, any rung matches
+ * (the classic single-rung behaviour).
  */
-function getObjectAtPosition(objects: MapObject[] | null | undefined, x: number, y: number): MapObject | null {
+function getObjectAtPosition(objects: MapObject[] | null | undefined, x: number, y: number, homeLevel?: number): MapObject | null {
   if (objects == null || !Array.isArray(objects)) return null;
-  
+
   return objects.find(obj => {
+    if (homeLevel !== undefined && homeLevelOf(obj) !== homeLevel) return false;
     // Ensure size exists (backward compatibility)
     const size = obj.size ?? { width: 1, height: 1 };
     const pos = obj.position;
@@ -57,6 +62,11 @@ function getObjectAtPosition(objects: MapObject[] | null | undefined, x: number,
     return x >= pos.x && x < pos.x + size.width &&
            y >= pos.y && y < pos.y + size.height;
   }) ?? null;
+}
+
+/** `{ homeLevel }` for a rung above the root, `{}` otherwise: root objects never carry the key. */
+function homeLevelField(homeLevel: number | undefined): { homeLevel?: number } {
+  return homeLevel !== undefined && homeLevel > 0 ? { homeLevel } : {};
 }
 
 // ===========================================
@@ -73,8 +83,8 @@ function addObject(objects: MapObject[], typeId: string, x: number, y: number, m
     return objects;
   }
   
-  // Check if object already exists at position
-  const existing = getObjectAtPosition(objects, x, y);
+  // Check if object already exists at position (addObject is root-only: note pins)
+  const existing = getObjectAtPosition(objects, x, y, 0);
   if (existing) {
     console.warn(`Object already exists at position (${x}, ${y})`);
     return objects;
@@ -103,9 +113,10 @@ function removeObject(objects: MapObject[] | null | undefined, objectId: ObjectI
 /**
  * Remove object at specific position
  */
-function removeObjectAtPosition(objects: MapObject[] | null | undefined, x: number, y: number): MapObject[] {
+function removeObjectAtPosition(objects: MapObject[] | null | undefined, x: number, y: number, homeLevel?: number): MapObject[] {
   if (!objects || !Array.isArray(objects)) return [];
-  return objects.filter(obj => !(obj.position.x === x && obj.position.y === y));
+  return objects.filter(obj => !(obj.position.x === x && obj.position.y === y &&
+    (homeLevel === undefined || homeLevelOf(obj) === homeLevel)));
 }
 
 /**
@@ -116,17 +127,19 @@ function removeObjectsInRectangle(
   x1: number,
   y1: number,
   x2: number,
-  y2: number
+  y2: number,
+  homeLevel?: number
 ): MapObject[] {
   if (!objects || !Array.isArray(objects)) return [];
-  
+
   const minX = Math.min(x1, x2);
   const maxX = Math.max(x1, x2);
   const minY = Math.min(y1, y2);
   const maxY = Math.max(y1, y2);
-  
+
   return objects.filter(obj => {
-    return !(obj.position.x >= minX && obj.position.x <= maxX && 
+    if (homeLevel !== undefined && homeLevelOf(obj) !== homeLevel) return true;
+    return !(obj.position.x >= minX && obj.position.x <= maxX &&
              obj.position.y >= minY && obj.position.y <= maxY);
   });
 }
@@ -144,7 +157,8 @@ function addObjectToHex(
   typeId: string,
   x: number,
   y: number,
-  objectSetId?: string | null
+  objectSetId?: string | null,
+  homeLevel?: number
 ): PlacementResult {
   const objectType = getObjectType(typeId, 'hex', objectSetId);
   if (objectType.isUnknown === true) {
@@ -155,8 +169,8 @@ function addObjectToHex(
     };
   }
 
-  // Check if cell can accept another object
-  if (!canAddObjectToCell(objects, x, y)) {
+  // Check if cell can accept another object (on this rung)
+  if (!canAddObjectToCell(objects, x, y, homeLevel ?? 0)) {
     return { 
       objects, 
       success: false, 
@@ -165,7 +179,7 @@ function addObjectToHex(
   }
   
   // Get occupied slots and assign next available
-  const occupiedSlots = getOccupiedSlots(objects, x, y);
+  const occupiedSlots = getOccupiedSlots(objects, x, y, homeLevel ?? 0);
   const slot = assignSlot(occupiedSlots);
   
   if (slot === -1) {
@@ -184,7 +198,8 @@ function addObjectToHex(
     label: objectType.label,
     linkedNote: null,
     alignment: 'center',
-    slot: slot
+    slot: slot,
+    ...homeLevelField(homeLevel)
   };
   
   return { 
@@ -209,18 +224,18 @@ function removeObjectFromHex(objects: MapObject[] | null | undefined, objectId: 
   // Remove the object
   const afterRemoval = objects.filter(obj => obj.id !== objectId);
   
-  // Reorganize remaining slots in that cell
-  return reorganizeAfterRemoval(afterRemoval, x, y);
+  // Reorganize remaining slots in that cell, on the removed object's rung
+  return reorganizeAfterRemoval(afterRemoval, x, y, homeLevelOf(objectToRemove));
 }
 
 /**
  * Remove a single object from a hex cell (the one with the highest slot number).
  */
-function removeOneObjectFromHex(objects: MapObject[] | null | undefined, x: number, y: number): MapObject[] {
+function removeOneObjectFromHex(objects: MapObject[] | null | undefined, x: number, y: number, homeLevel?: number): MapObject[] {
   if (!objects || !Array.isArray(objects)) return [];
-  
+
   // Get objects in this cell
-  const cellObjects = getObjectsInCell(objects, x, y);
+  const cellObjects = getObjectsInCell(objects, x, y, homeLevel);
   if (cellObjects.length === 0) return objects;
   
   // Find object with highest slot (most recently added)
@@ -274,13 +289,15 @@ function isAreaFree(
   y: number,
   width: number,
   height: number,
-  excludeId: ObjectId | null = null
+  excludeId: ObjectId | null = null,
+  homeLevel?: number
 ): boolean {
   if (!objects || !Array.isArray(objects)) return true;
-  
+
   for (const obj of objects) {
     if (excludeId != null && excludeId !== '' && obj.id === excludeId) continue;
-    
+    if (homeLevel !== undefined && homeLevelOf(obj) !== homeLevel) continue;
+
     const size = obj.size ?? { width: 1, height: 1 };
     const pos = obj.position;
     
@@ -315,8 +332,8 @@ function canResizeObject(
   const object = objects.find(obj => obj.id === objectId);
   if (!object) return false;
   
-  // Check if new size would overlap with other objects
-  return isAreaFree(objects, object.position.x, object.position.y, newWidth, newHeight, objectId);
+  // Check if new size would overlap with other objects on the same rung
+  return isAreaFree(objects, object.position.x, object.position.y, newWidth, newHeight, objectId, object.homeLevel ?? 0);
 }
 
 // ===========================================
@@ -375,11 +392,11 @@ function placeObject(
   y: number,
   options: PlacementOptions
 ): PlacementResult {
-  const { mapType, alignment = 'center', objectSetId } = options;
+  const { mapType, alignment = 'center', objectSetId, homeLevel } = options;
 
   if (mapType === 'hex') {
     // Hex: use multi-object placement with slot assignment
-    const result = addObjectToHex(objects, typeId, x, y, objectSetId);
+    const result = addObjectToHex(objects, typeId, x, y, objectSetId, homeLevel);
     if (result.success) {
       const newObject = result.objects[result.objects.length - 1];
       return { ...result, object: newObject };
@@ -397,7 +414,7 @@ function placeObject(
     };
   }
   
-  const existing = getObjectAtPosition(objects, x, y);
+  const existing = getObjectAtPosition(objects, x, y, homeLevel ?? 0);
   if (existing != null) {
     return { 
       objects, 
@@ -413,7 +430,8 @@ function placeObject(
     size: { width: 1, height: 1 },
     label: objectType.label,
     linkedNote: null,
-    alignment
+    alignment,
+    ...homeLevelField(homeLevel)
   };
   
   return { 
@@ -432,21 +450,22 @@ function eraseObjectAt(
   objects: MapObject[] | null | undefined,
   x: number,
   y: number,
-  mapType: MapType
+  mapType: MapType,
+  homeLevel?: number
 ): RemovalResult {
   if (!objects || !Array.isArray(objects)) {
     return { objects: [], success: false };
   }
-  
+
   // Check if any object exists at position
-  const existing = getObjectAtPosition(objects, x, y);
+  const existing = getObjectAtPosition(objects, x, y, homeLevel);
   if (!existing) {
     return { objects, success: false };
   }
-  
+
   if (mapType === 'hex') {
     // Hex: remove one object (highest slot), reorganize remaining
-    const newObjects = removeOneObjectFromHex(objects, x, y);
+    const newObjects = removeOneObjectFromHex(objects, x, y, homeLevel);
     // Find what was removed by comparing arrays
     const removed = objects.find(o => !newObjects.some(n => n.id === o.id));
     return { 
@@ -457,7 +476,7 @@ function eraseObjectAt(
   }
   
   // Grid: remove all objects at position
-  const newObjects = removeObjectAtPosition(objects, x, y);
+  const newObjects = removeObjectAtPosition(objects, x, y, homeLevel);
   return { 
     objects: newObjects, 
     success: true,
@@ -472,13 +491,14 @@ function canPlaceObjectAt(
   objects: MapObject[] | null | undefined,
   x: number,
   y: number,
-  mapType: MapType
+  mapType: MapType,
+  homeLevel?: number
 ): boolean {
   if (mapType === 'hex') {
-    return canAddObjectToCell(objects as MapObject[], x, y);
+    return canAddObjectToCell(objects as MapObject[], x, y, homeLevel ?? 0);
   }
   // Grid: check if cell is empty
-  return getObjectAtPosition(objects, x, y) === null;
+  return getObjectAtPosition(objects, x, y, homeLevel ?? 0) === null;
 }
 
 // ===========================================
@@ -504,18 +524,29 @@ const DUPLICATE_MAX_RING = 10;
  *
  * `objects` must include everything already placed, including copies made
  * earlier in the same bulk duplicate, so successive copies do not collide.
+ *
+ * `cellExists(home, x, y)`, when given, skips cells that do not exist on the
+ * source's rung (a deep rung cell past the root edge), so a duplicate lands
+ * only where placement could put it. Omitted, every cell counts as existing.
  */
 function findDuplicateTarget(
   objects: MapObject[] | null | undefined,
-  source: Pick<MapObject, 'position'>,
-  mapType: MapType
+  source: Pick<MapObject, 'position' | 'homeLevel'>,
+  mapType: MapType,
+  cellExists?: (home: number, x: number, y: number) => boolean
 ): DuplicateTarget | null {
   const list = objects ?? [];
   const { x: sourceX, y: sourceY } = source.position;
+  // The copy keeps the source's ladder rung (callers spread the source), so it
+  // looks for room among that rung's cells, not the root's.
+  const home = homeLevelOf(source);
+
+  const free = (x: number, y: number): boolean =>
+    (cellExists === undefined || cellExists(home, x, y)) && canPlaceObjectAt(list, x, y, mapType, home);
 
   const withSlot = (x: number, y: number): DuplicateTarget => {
     if (mapType !== 'hex') return { x, y };
-    return { x, y, slot: assignSlot(getOccupiedSlots(list, x, y)) };
+    return { x, y, slot: assignSlot(getOccupiedSlots(list, x, y, home)) };
   };
 
   const directions = mapType === 'hex'
@@ -523,7 +554,7 @@ function findDuplicateTarget(
     : [[1, 0], [0, 1], [-1, 0], [0, -1]];
 
   for (const [dx, dy] of directions) {
-    if (canPlaceObjectAt(list, sourceX + dx, sourceY + dy, mapType)) {
+    if (free(sourceX + dx, sourceY + dy)) {
       return withSlot(sourceX + dx, sourceY + dy);
     }
   }
@@ -532,7 +563,7 @@ function findDuplicateTarget(
     for (let dx = -ring; dx <= ring; dx++) {
       for (let dy = -ring; dy <= ring; dy++) {
         if (Math.abs(dx) !== ring && Math.abs(dy) !== ring) continue;
-        if (canPlaceObjectAt(list, sourceX + dx, sourceY + dy, mapType)) {
+        if (free(sourceX + dx, sourceY + dy)) {
           return withSlot(sourceX + dx, sourceY + dy);
         }
       }
@@ -557,7 +588,8 @@ function placeObjectFreeform(
   worldY: number,
   nearestGridPos: { x: number; y: number },
   mapType: MapType,
-  objectSetId?: string | null
+  objectSetId?: string | null,
+  homeLevel?: number
 ): PlacementResult {
   const objectType = getObjectType(typeId, mapType, objectSetId);
   if (objectType.isUnknown === true) {
@@ -572,7 +604,8 @@ function placeObjectFreeform(
     label: objectType.label,
     linkedNote: null,
     freeform: true,
-    worldPosition: { x: worldX, y: worldY }
+    worldPosition: { x: worldX, y: worldY },
+    ...homeLevelField(homeLevel)
   };
 
   return { objects: [...objects, newObject], success: true, object: newObject };

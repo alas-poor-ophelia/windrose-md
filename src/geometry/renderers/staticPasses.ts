@@ -11,6 +11,13 @@
  * board-below ghost, layer-below ghost, adjacent sub-hex previews, layer
  * composite (cells/edges, curves, wall paths, tiles), regions, outlines,
  * player lights, shape overlays, sub-hex indicators, objects, text labels.
+ *
+ * Lattice ladder (scene.ladder non-null): the grid is NOT baked (the live
+ * lattice is stroked after the blit), the cells pass draws the active rung's
+ * materialised layer at level >= 1, tiles draw per home rung with the
+ * crossing clip, adjacent sub-hex previews are skipped, and objects/labels
+ * are drawn live after the blit and the lattice (ladderElementPass.ts) instead
+ * of baked here, so they stay above the live lattice.
  */
 
 import type { MapData, MapLayer, Board } from '#types/core/map.types';
@@ -18,6 +25,7 @@ import type { MapObject } from '#types/objects/object.types';
 import type { LayerVisibility } from '#types/contexts/context.types';
 import type { RenderCanvasOptions, RendererViewState } from '#types/hooks/canvasRenderer.types';
 import type { RenderFrame } from '#types/rendering/renderFrame.types';
+import type { GeometryLadder } from '../core/createGeometryLadder';
 
 import { isGridCell } from '#types/core/cell.types';
 import { getObjectType } from '../../objects/objectOperations';
@@ -43,6 +51,19 @@ import { getLayerBelow, getBoardLayers } from '../../persistence/layerAccessor';
 import { renderLayerCellsAndEdges } from './layerCellsRenderer';
 import type { Renderer, CurveCellMergeIndex } from './layerCellsRenderer';
 import { GHOST_BOARD_OPACITY, INTERIOR_RATIO } from './renderConstants';
+import { ladderTileClipAt } from '../../core/lodFlags';
+import { tilesByHomeForRung } from './elementBands';
+import { deepRootCellKeys } from './tileClipRegion';
+import { materialiseLevelLayer } from '../core/materialiseLevel';
+
+/**
+ * Lattice epoch: bumped only when cell EXISTENCE changes. In Phase 1 existence is
+ * a pure function of the root bounds, which live in the ladder itself, so a new
+ * bounds means a new ladder identity and the epoch never has to move. The one
+ * declaration: mapRenderer's lattice clip cache imports it, so a bump moves the
+ * materialise memo and the clip cache together.
+ */
+const LADDER_EPOCH = 0;
 
 /**
  * Per-render map inputs shared by every static pass (independent of which
@@ -67,6 +88,10 @@ interface StaticScene {
   adjacentEmptySlots: RenderCanvasOptions['adjacentEmptySlots'];
   hiddenTileLayers: RenderCanvasOptions['hiddenTileLayers'];
   draggingWallId: string | null;
+  /** Lattice ladder for this map, or null on every classic path. */
+  ladder: GeometryLadder | null;
+  /** Rung this frame paints; always 0 without a ladder. */
+  level: number;
 }
 
 /** Values derived once per static draw, shared by the ghost and composite passes. */
@@ -89,6 +114,70 @@ function makeRenderFrame(
 ): RenderFrame {
   const viewState: RendererViewState = { x: offsetX, y: offsetY, zoom };
   return { ctx, geometry, theme, offsetX, offsetY, zoom, width, height, cullNorth, viewState };
+}
+
+/**
+ * Object renderer dependencies, shared by the baked pass (classic maps) and the
+ * live element pass (ladder maps, ladderElementPass.ts, which swaps in the
+ * indexed cell lookup).
+ */
+function objectRenderDeps(mapData: MapData): Parameters<typeof renderObjects>[5] {
+  const mapType = mapData.mapType ?? 'grid';
+  return {
+    getObjectType: (typeId: string): ReturnType<typeof getObjectType> => getObjectType(typeId, mapType, mapData.objectSetId),
+    getRenderChar,
+    isCellFogged: isCellFoggedIndexed,
+    getObjectsInCell,
+    getSlotOffset,
+    getMultiObjectScale,
+    renderNoteLinkBadge,
+    renderTooltipIndicator,
+    renderObjectLinkIndicator,
+    getCachedImage,
+  };
+}
+
+/**
+ * Tiles under the ladder, at every rung including 0, for the active layer and
+ * both ghost passes alike: each tile draws ONCE on its HOME rung's geometry
+ * (world-anchored at the parent's rect) and a tile homed finer than the active
+ * rung is skipped. At rungs >= 1 root tiles take the 'smart' clip by default
+ * (so root art never paints over a deeper rung's authored cells): each is
+ * clipped to its own hexagon plus every neighbour WITHOUT deep content, so its
+ * art never covers a neighbour's deep paint yet still runs across empty ones;
+ * a tile with no deep neighbour draws unclipped. The developer knob can swap
+ * in the whole-hex clip ('hex') or none. Level 0 stays unclipped like the
+ * classic path. `tilesets` stay the root list. Groups run sequentially
+ * (renderTiles' scratch canvases are not reentrant); the root-anchored
+ * terrain strokes ride with home 0.
+ */
+function renderLadderTiles(
+  frame: RenderFrame,
+  scene: StaticScene,
+  layer: MapLayer,
+  opacity: number,
+  hiddenLayers: Set<string> | undefined
+): void {
+  const { ladder, level, mapData } = scene;
+  if (ladder === null) return;
+  const { ctx, width, height, viewState: rendererViewState } = frame;
+  const tileClipMode = ladderTileClipAt(level);
+  const deepRoots = tileClipMode === 'smart' && level >= 1 ? deepRootCellKeys(layer, ladder, level) : undefined;
+  for (const [home, homeTiles] of tilesByHomeForRung(layer.tiles ?? [], level)) {
+    const strokes = home === 0 ? layer.terrainStrokes : undefined;
+    if (homeTiles.length === 0 && (strokes == null || strokes.length === 0)) continue;
+    const homeGeom = ladder.geometryForLevel(home);
+    const homeShim = { hexToWorld: homeGeom.hexToWorld.bind(homeGeom), worldToScreen: homeGeom.worldToScreen.bind(homeGeom), hexSize: homeGeom.hexSize, orientation: mapData.orientation ?? 'flat' };
+    renderTiles(
+      ctx,
+      homeTiles,
+      mapData.tilesets ?? [],
+      homeShim,
+      rendererViewState,
+      { opacity, getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers, terrainStrokes: strokes,
+        clipToHex: tileClipMode === 'hex', deepRoots: home === 0 ? deepRoots : undefined }
+    );
+  }
 }
 
 function makeStaticPassKit(frame: RenderFrame, scene: StaticScene): StaticPassKit {
@@ -143,12 +232,16 @@ function renderBackgroundAndGrid(frame: RenderFrame, scene: StaticScene): void {
   ctx.clip();
   ctx.restore();
 
-  // Draw grid lines
-  renderer.renderGrid(ctx, geometry, rendererViewState, { width, height }, visibility.grid !== false, {
-    lineColor: THEME.grid.lines,
-    lineWidth: THEME.grid.lineWidth ?? 1,
-    rotated: cullNorth % 360 !== 0
-  });
+  // Draw grid lines. Under the ladder the grid is NOT baked at any level: a baked
+  // lattice thickens under the crossing scale-blit, so `drawLadderLattice` strokes
+  // it live in screen space after the blit instead (mapRenderer.ts).
+  if (scene.ladder === null) {
+    renderer.renderGrid(ctx, geometry, rendererViewState, { width, height }, visibility.grid !== false, {
+      lineColor: THEME.grid.lines,
+      lineWidth: THEME.grid.lineWidth ?? 1,
+      rotated: cullNorth % 360 !== 0
+    });
+  }
 }
 
 /**
@@ -167,14 +260,18 @@ function renderGhostLayer(frame: RenderFrame, scene: StaticScene, kit: StaticPas
   const hasTiles = ghostLayer.tiles != null && ghostLayer.tiles.length > 0;
   const hasStrokes = ghostLayer.terrainStrokes != null && ghostLayer.terrainStrokes.length > 0;
   if ((hasTiles || hasStrokes) && mapData.tilesets != null && mapData.tilesets.length > 0) {
-    renderTiles(
-      ctx,
-      ghostLayer.tiles ?? [],
-      mapData.tilesets,
-      tileGeomShim,
-      rendererViewState,
-      { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, terrainStrokes: ghostLayer.terrainStrokes }
-    );
+    if (scene.ladder !== null) {
+      renderLadderTiles(frame, scene, ghostLayer, ghostOpacity, undefined);
+    } else {
+      renderTiles(
+        ctx,
+        ghostLayer.tiles ?? [],
+        mapData.tilesets,
+        tileGeomShim,
+        rendererViewState,
+        { opacity: ghostOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, terrainStrokes: ghostLayer.terrainStrokes }
+      );
+    }
   }
   if (ghostLayer.curves.length > 0) {
     renderCurves(ctx, ghostLayer.curves, rendererViewState, THEME, { opacity: ghostOpacity, gridConfig: curveGridConfig });
@@ -218,9 +315,12 @@ function renderAdjacentSubHexes(frame: RenderFrame, scene: StaticScene): void {
   const { ctx, geometry, offsetX, offsetY, zoom, width, height, cullNorth, theme: THEME } = frame;
   const { mapData, renderer, adjacentSubHexes, adjacentEmptySlots } = scene;
 
-  // Draw adjacent sub-hex ghost previews (when drilled into a sub-hex)
+  // Draw adjacent sub-hex ghost previews (when drilled into a sub-hex).
+  // Never under the ladder: one world has no sibling DOCUMENTS to ghost, so
+  // the whole pass (and its "+" create-sibling affordances) is dead there.
   const MAX_ADJACENT_COMPLEXITY = 500;
-  if (((adjacentSubHexes != null && adjacentSubHexes.length > 0)
+  if (scene.ladder === null
+    && ((adjacentSubHexes != null && adjacentSubHexes.length > 0)
     || (adjacentEmptySlots != null && adjacentEmptySlots.length > 0)) && geometry.type === 'hex') {
     const hexToWorldFn = geometry.hexToWorld;
     const hexSizeVal = geometry.hexSize;
@@ -250,6 +350,7 @@ function renderAdjacentSubHexes(frame: RenderFrame, scene: StaticScene): void {
       const adjLayers = adj.mapData.layers ?? [];
 
       // Skip detailed rendering for dense neighbors to cap render cost
+      // (ladder: level-0 cells only on purpose; this is a neighbour-preview cost cap, not a content statement)
       const totalItems = adjLayers.reduce((sum: number, l: MapLayer) =>
         sum + (l.cells?.length ?? 0) + (l.tiles?.length ?? 0), 0);
       const isDense = totalItems > MAX_ADJACENT_COMPLEXITY;
@@ -344,9 +445,16 @@ function renderAdjacentSubHexes(frame: RenderFrame, scene: StaticScene): void {
 
 /** Cells/edges, curves, wall paths and tiles for every render layer. */
 function renderLayerComposite(frame: RenderFrame, scene: StaticScene, kit: StaticPassKit): void {
-  const { ctx, geometry, width, height, cullNorth, theme: THEME, viewState: rendererViewState } = frame;
-  const { mapData, renderLayers, exportOpacityById, visibility, renderer, draggingWallId, hiddenTileLayers } = scene;
+  const { ctx, geometry, offsetX, offsetY, zoom, width, height, cullNorth, theme: THEME, viewState: rendererViewState } = frame;
+  const { mapData, renderLayers, exportOpacityById, visibility, renderer, draggingWallId, hiddenTileLayers, ladder, level } = scene;
   const { tileGeomShim, curveGridConfig, wallCellSize } = kit;
+
+  // At level >= 1 the cells pass draws INHERITED fills on the active rung instead
+  // of the authored level-0 cells. The rect is this target's own area in world
+  // coords, UNDILATED — the materialiser dilates by a ring itself so its boundary
+  // cells still see their neighbours and grow no phantom borders. Every other pass
+  // keeps the root geometry and the real layer.
+  const levelRect = { x0: -offsetX / zoom, y0: -offsetY / zoom, x1: (width - offsetX) / zoom, y1: (height - offsetY) / zoom };
 
   // Composite each render layer's cells/edges, curves and tiles in draw order.
   // Simple maps loop exactly once over the active layer (identical to before);
@@ -369,12 +477,22 @@ function renderLayerComposite(frame: RenderFrame, scene: StaticScene, kit: Stati
     }
 
     // Cells and edges
-    renderLayerCellsAndEdges(ctx, drawLayer, geometry, rendererViewState, THEME, renderer, {
-      opacity: layerOpacity,
-      showGrid: visibility.grid !== false,
-      mergeIndex,
-      northDirection: cullNorth
-    });
+    if (ladder !== null && level >= 1) {
+      const coarse = materialiseLevelLayer(drawLayer, ladder, level, levelRect, LADDER_EPOCH);
+      renderLayerCellsAndEdges(ctx, coarse.layer, ladder.geometryForLevel(level), rendererViewState, THEME, renderer, {
+        opacity: layerOpacity,
+        showGrid: visibility.grid !== false,
+        mergeIndex,
+        northDirection: cullNorth
+      });
+    } else {
+      renderLayerCellsAndEdges(ctx, drawLayer, geometry, rendererViewState, THEME, renderer, {
+        opacity: layerOpacity,
+        showGrid: visibility.grid !== false,
+        mergeIndex,
+        northDirection: cullNorth
+      });
+    }
 
     // Freehand curves (between cells and tiles)
     if (drawLayer.curves.length > 0) {
@@ -404,14 +522,19 @@ function renderLayerComposite(frame: RenderFrame, scene: StaticScene, kit: Stati
     const hasTiles = drawLayer.tiles != null && drawLayer.tiles.length > 0;
     const hasStrokes = drawLayer.terrainStrokes != null && drawLayer.terrainStrokes.length > 0;
     if ((hasTiles || hasStrokes) && mapData.tilesets != null && mapData.tilesets.length > 0) {
-      renderTiles(
-        ctx,
-        drawLayer.tiles ?? [],
-        mapData.tilesets,
-        tileGeomShim,
-        rendererViewState,
-        { opacity: layerOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers: hiddenTileLayers, terrainStrokes: drawLayer.terrainStrokes }
-      );
+      if (ladder !== null) {
+        // Tiles at depth, every rung including 0, each on its home rung: see renderLadderTiles.
+        renderLadderTiles(frame, scene, drawLayer, layerOpacity, hiddenTileLayers);
+      } else {
+        renderTiles(
+          ctx,
+          drawLayer.tiles ?? [],
+          mapData.tilesets,
+          tileGeomShim,
+          rendererViewState,
+          { opacity: layerOpacity, getCachedImage, canvasWidth: width, canvasHeight: height, hiddenLayers: hiddenTileLayers, terrainStrokes: drawLayer.terrainStrokes }
+        );
+      }
     }
   }
 }
@@ -512,34 +635,21 @@ function renderEntities(frame: RenderFrame, scene: StaticScene): void {
   const { ctx, geometry, offsetX, offsetY, zoom } = frame;
   const { mapData, activeLayer, visibility, showCoordinates, scaledSize } = scene;
 
-  // Draw objects
-  if (activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
-    const isHexMap = geometry.type === 'hex';
-    const mapType = mapData.mapType ?? 'grid';
-    const getObjectTypeForMap = (typeId: string): ReturnType<typeof getObjectType> => getObjectType(typeId, mapType, mapData.objectSetId);
+  // Draw objects. Under the ladder objects are drawn LIVE after the lattice
+  // instead (per home rung, sized from it), never baked into a rung surface.
+  if (scene.ladder === null && activeLayer.objects.length > 0 && !showCoordinates && visibility.objects) {
     renderObjects(
       activeLayer,
       { ctx, offsetX, offsetY, zoom, scaledSize },
       geometry,
-      isHexMap,
+      geometry.type === 'hex',
       mapData.orientation ?? 'flat',
-      {
-        getObjectType: getObjectTypeForMap,
-        getRenderChar,
-        isCellFogged: isCellFoggedIndexed,
-        getObjectsInCell,
-        getSlotOffset,
-        getMultiObjectScale,
-        renderNoteLinkBadge,
-        renderTooltipIndicator,
-        renderObjectLinkIndicator,
-        getCachedImage,
-      }
+      objectRenderDeps(mapData)
     );
   }
 
-  // Draw text labels
-  if (activeLayer.textLabels.length > 0 && !showCoordinates && visibility.textLabels) {
+  // Draw text labels (live under the ladder, like objects)
+  if (scene.ladder === null && activeLayer.textLabels.length > 0 && !showCoordinates && visibility.textLabels) {
     renderTextLabels(
       activeLayer.textLabels,
       { ctx, zoom, getFontCss },
@@ -564,7 +674,9 @@ function drawStaticScene(frame: RenderFrame, scene: StaticScene): void {
 }
 
 export {
+  LADDER_EPOCH,
   makeRenderFrame,
+  objectRenderDeps,
   drawStaticScene,
   renderBackgroundAndGrid,
   renderGhostLayer,

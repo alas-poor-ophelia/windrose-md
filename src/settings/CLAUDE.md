@@ -29,6 +29,10 @@ WindroseSettingsTab.ts        # PluginSettingTab subclass: getSettingDefinitions
 - `WindroseSettingsTab.getControlValue`/`setControlValue` delegate to these. Saving goes through `plugin.saveSettings()`.
 - Definitions must stay synchronous; async data (e.g. whether old-plugin data exists) is cached on the tab and read in `visible()`.
 
+## Ladder capability setting
+
+`lodLadder` (the "Detail levels" toggle at the end of the Features group in `settingDefinitions.ts`; default ON via `FALLBACK_SETTINGS`, absent reads as on; stored top-level, not under `features`) is the CAPABILITY only: whether this install may use the lattice ladder. The per-map opt-in is `mapData.lod`, set through `components/settings/hexmap/LadderSection.tsx`. A map that carries `lod` is a ladder map on every install, flag or not; read the combined answer through `core/lodFlags.ts`, never the setting directly.
+
 ## Adding a setting
 
 1. Add the field to `PluginSettings` in `types/settings/settings.types.ts` (and a default in `core/settingsAccessor.ts`).

@@ -286,6 +286,7 @@ button.windrose-object-grid-item,
   }
 
   .windrose-object-grid-image {
+    pointer-events: none;
     width: 32px;
     height: 32px;
   }

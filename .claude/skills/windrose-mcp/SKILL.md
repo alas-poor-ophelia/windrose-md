@@ -68,6 +68,17 @@ Canvas note: the render canvas is the non-`position:absolute` one; `windrose-can
 const setVal = (el, v) => { Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value').set.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); };
 ```
 
+**Paint a cell by synthetic events** (last verified live 2026-10-12 on lod-fixture, before the main merge; references are function names because line numbers drift). Prefer `windrose_paint_cell` / `windrose_paint_cells`; use this only to exercise the real pointer path. `windrose_set_tool` REFUSES an id outside the ToolId union (`{ok:false, error}`; table in `src/core/toolIds.ts`), so a silent wrong-id failure cannot recur. The canvas listens for plain `mousedown`/`mouseup`/`mousemove` (listeners attached in `useEventCoordinator`, handler `handleMouseDown`), NOT pointer events, so pointerdown/pointerup recipes do nothing. No `isTrusted`, `pointerId`, `buttons` or `detail` check exists on this path; only `button === 0` is required.
+1. The tool id must be `windrose_set_tool` `draw` (palette "Paint Cells", `ToolPalette.tsx`). `paint` is NOT a tool id: only `draw`/`erase`/`rectangle`/`circle`/`clearArea`/`edgeDraw`/`edgeErase`/`edgeLine`/`segmentDraw` reach the paint code (`DRAWING_TOOL_SET` in `useEventCoordinator.ts`). Any other id falls through every branch silently, which matches "selects/places but never paints, no notice".
+2. Fire on the visible render canvas (see above), with coordinates inside it:
+```js
+const cv = [...document.querySelectorAll('.windrose-container')].find(c => c.getBoundingClientRect().width > 50 && c.offsetParent != null).querySelector('canvas:not([style*="absolute"])');
+const r = cv.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+const ev = (t) => cv.dispatchEvent(new MouseEvent(t, { clientX: x, clientY: y, button: 0, buttons: t === 'mouseup' ? 0 : 1, bubbles: true, cancelable: true }));
+ev('mousedown'); await new Promise(r => setTimeout(r, 100)); ev('mousemove'); await new Promise(r => setTimeout(r, 50)); ev('mouseup');
+```
+Path: `handleMouseDown` -> `handlePointerDown` (mouse runs `executeToolAction` immediately) -> `handleDrawingPointerDown` (`useDrawingTools.ts`, `draw` branch) -> `usePaintTool.startDrawing` -> `processCellDuringDrag` -> `toggleCell` -> `onCellsChange(batched)`. The batched write is committed to history on `mouseup` via `stopDrawing` (`flushStrokeHistory`). The extra mousemove is belt-and-braces (it only feeds `processCellDuringDrag` in the mousemove handler). On a ladder map zoomed onto a rung the press may instead raise a Notice from `usePaintTool.startDrawing` (depth refusal); at level 0 nothing blocks it. If this still paints nothing, check `windrose_get_state` for the real `currentTool`, and that a mouse event shortly after a touch (500 ms window in `handlePointerDown`) is dropped.
+
 **Which CSS rules match an element** (specificity debugging):
 ```js
 const el = document.querySelector(SEL); const hits = []; for (const sh of document.styleSheets) { let rules; try { rules = sh.cssRules; } catch (e) { continue; } for (const r of rules) { if (r.style && r.selectorText) { let m = false; try { m = el.matches(r.selectorText); } catch (e) {} if (m) hits.push(r.selectorText); } } }
@@ -91,6 +102,16 @@ CanvasRenderingContext2D.prototype.drawImage = window.__probe.orig; delete windo
 const canvas = [...document.querySelectorAll('canvas')].find(c => c.width > 400 && c.offsetParent != null); const r = canvas.getBoundingClientRect(); const ev = (t, px, py) => canvas.dispatchEvent(new MouseEvent(t, { clientX: r.left + px, clientY: r.top + py, bubbles: true, button: 0 })); ev('mousedown', 200, 300); ev('mouseup', 200, 300); await new Promise(rs => setTimeout(rs, 120)); ev('mousedown', 400, 300); ev('mouseup', 400, 300); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 ```
 This is the exception: cell paint / tile placement / object placement all have real tools — use them.
+
+## Ladder maps
+
+Maps with a `lod` block (the lattice detail ladder) add a rung dimension. Verified against `mcp/tools/*.ts` and `useMcpBridge.ts`:
+- `paint_cell`, `paint_cells`, `erase_cell`, `get_cells`, `place_tile`, `place_object` and `list_objects` take an optional `level`. The default is 0 (the root lattice), NOT the camera's rung, so scripts never depend on zoom. `set_viewport` also takes `level` (zoom to the middle of that rung's band).
+- Rung cells are `{q,r}` objects (axial) stored under `layer.levels['<n>']` (string keys); on a rung, tile and object coordinates are that rung's cell indices and must exist at that level.
+- Rung writes go through the single deep-write gate (`persistence/depthAuthoring.ts`): refusals come back as `{ok:false, error}` with reasons such as `not-a-ladder`, `invalid-level`, `level-out-of-range`, `too-many-cells` (4096 per op), or a size-budget reason. A classic map or an unstamped map with the flag off is refused, not silently written.
+- Object and tile parity: `place_object` and `place_tile` write `homeLevel`; `place_object` also takes `visibleLevels` (explicit rungs; omit = Auto, the home band); `list_objects` results carry `level`, `depthMode` and `visibleLevels`.
+- `get_state` reports `getActiveLevel` (camera rung, read from the live canvas when one is mounted) and `getEditLevel` (the edit-level lock when set, else the camera rung). The lock is a UI authoring-tool setting; MCP writes use their explicit `level` and ignore it.
+- `set_tool` rejects any id outside the ToolId union (`src/core/toolIds.ts`).
 
 ## Safety rules (each one earned by a real incident)
 

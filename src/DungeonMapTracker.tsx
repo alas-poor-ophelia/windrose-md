@@ -22,6 +22,7 @@ import { useFeatureFlags } from './hooks/state/useFeatureFlags';
 import { useFogOfWar } from './hooks/interactions/useFogOfWar';
 import { useDataHandlers } from './hooks/state/useDataHandlers';
 import { useMcpBridge } from './hooks/state/useMcpBridge';
+import { installMediaClickGuard } from './utils/mediaClickGuard';
 import { createGeometry } from './geometry/core/createGeometry';
 import { MapHeader } from './components/controls/MapHeader';
 import { MapCanvas } from './components/mapcanvas/MapCanvas';
@@ -88,12 +89,14 @@ interface DungeonMapTrackerProps {
   notePath?: string;
   /** Sub-hex path ('/'-joined hexKeys, e.g. "0,0/2,-1") to auto-drill into on load. */
   initialSubHexPath?: string;
+  /** `level:` code-block key: open the map at this ladder rung once loaded (ladder maps only). */
+  initialLevel?: number;
   /** Optional explicit MCP registration key. When provided and non-empty, overrides
    *  notePath as the key in window.__windrose.mcpInstances. Used by full-pane ItemViews
    *  which have notePath === '' and would otherwise be invisible to MCP tools. */
   mcpKey?: string;
   fullPane?: boolean;
-  onMapChange?: (mapId: string, mapName: string, mapType: MapType) => void;
+  onMapChange?: (mapId: string, mapName: string, mapType: MapType, ladderM?: number) => void;
   onNameChange?: (name: string) => void;
   savedPanelState?: Partial<Record<PanelId, PanelState>>;
   onPanelStateChange?: (state: Partial<Record<PanelId, PanelState>>) => void;
@@ -114,7 +117,7 @@ let mapInstanceCounter = 0;
 // MAIN COMPONENT
 // ============================================================================
 
-const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', initialSubHexPath, mcpKey, fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange, onMapDeleted }: DungeonMapTrackerProps): VNode => {
+const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'grid', notePath = '', initialSubHexPath, initialLevel, mcpKey, fullPane = false, onMapChange, onNameChange, savedPanelState, onPanelStateChange, savedDockCollapsed, onDockCollapsedChange, onMapDeleted }: DungeonMapTrackerProps): VNode => {
   const app = useApp();
   const isLightTheme = useThemeMode();
   const { mapData: rootMapData, isLoading, loadFailure, mapDeleted: dataMapDeleted, reload: reloadMapData, saveStatus, updateMapData: rootUpdateMapData, forceSave, markDeleted, staleConflict, acknowledgeStaleConflict, settingsVersion, getCachedImage } = useMapData(mapId, mapName, mapType);
@@ -146,7 +149,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     adjacentEmptySlots,
     activeDistanceOverrides,
     subHexPath
-  } = useSubHexNavigation({ mapData: rootMapData, updateMapData: rootUpdateMapData, initialSubHexPath, getCanvas: getCanvasEl });
+  } = useSubHexNavigation({ mapData: rootMapData, updateMapData: rootUpdateMapData, initialSubHexPath, initialLevel, getCanvas: getCanvasEl });
 
   // Distance overrides for the active map: sub-hex levels get live-derived
   // scale from the parent chain; the root map uses its own stored settings.
@@ -179,6 +182,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     selectedOpacity,
     isColorPickerOpen, setIsColorPickerOpen,
     freeformPlacementMode,
+    editLevelLock, setEditLevelLock,
     handleOpacityChange
   } = toolState;
 
@@ -439,10 +443,11 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   const { cloningLayerId, setCloningLayerId, handleCloneLayerRequest } = useCloneLayerRequest(app, mapData, handleLayerClone);
 
   // Data change handlers (extracted to useDataHandlers hook)
-  const dataHandlers = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory });
+  const dataHandlers = useDataHandlers({ mapData, updateMapData, addToHistory, isApplyingHistory, levelKey: subHexPath });
   const {
     handleNameChange,
     handleCellsChange,
+    handleLevelCellsChange,
     handleCurvesChange,
     handleObjectsChange,
     handleTextLabelsChange,
@@ -517,6 +522,24 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     if (role != null && role !== tileDepth) setTileDepth(role);
   }, [mapData, tileDepth, setTileDepth]);
 
+  // Reading-view media guard (installMediaClickGuard). Attached through a
+  // callback ref on the container: an effect keyed on the ref object ran once
+  // while the loading placeholder was mounted and never attached (REACT-01).
+  const mediaGuardCleanupRef = useRef<(() => void) | null>(null);
+  const setContainerEl = useCallback((el: HTMLDivElement | null): void => {
+    containerRef.current = el;
+    mediaGuardCleanupRef.current?.();
+    mediaGuardCleanupRef.current = el !== null ? installMediaClickGuard(el) : null;
+  }, [containerRef]);
+
+  // The canvas's live ladder rung getter (reads the view controller, not the
+  // committed viewState), published by MapCanvas for the MCP bridge (WIRE-01).
+  const liveActiveLevelRef = useRef<(() => number) | null>(null);
+  const publishActiveLevelGetter = useCallback((getter: (() => number) | null): void => {
+    liveActiveLevelRef.current = getter;
+  }, []);
+  const readLiveActiveLevel = useCallback((): number | null => liveActiveLevelRef.current?.() ?? null, []);
+
   // Custom event listeners (deep links, regions, object links, hex context
   // menu) + the direct sub-hex dive/surface callbacks the canvas layer calls.
   const { requestEnterSubHex, requestExitSubHex } = useCustomEventHandlers({
@@ -563,13 +586,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // > notePath (block mode); the hook bails on an empty effective key.
   useMcpBridge({
     mapData, mapId, mapName, notePath, mcpKey, fullPane, geometry,
-    currentTool, selectedColor, selectedOpacity,
+    currentTool, selectedColor, selectedOpacity, editLevelLock,
     canUndo, canRedo, saveStatus, isExpanded,
     setCurrentTool, setSelectedColor, handleOpacityChange,
-    handleCellsChange, wrappedHandleUndo, handleRedo, handleLayerSelect, forceSave,
+    handleCellsChange, handleLevelCellsChange, wrappedHandleUndo, handleRedo, handleLayerSelect, forceSave,
     handleViewStateChange, availableTilesets, handleTileSelect, setSelectedTileForm,
     handleTilesChange, handleObjectsChange, selectPane, setTileBrowserCollapsed,
-    setRailOpenId, getCachedImage,
+    setRailOpenId, getCachedImage, readLiveActiveLevel,
   });
 
   // Deleted by this mount (mapDeleted) or by another mount this session
@@ -621,7 +644,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   return (
     <>
       <div
-        ref={containerRef}
+        ref={setContainerEl}
         className={`windrose-container interactive-child${fullPane ? '' : ' windrose-container-block'}${pictureFrameActive ? ' windrose-picture-frame' : ''}`}
         style={frameWidth != null ? { width: `${frameWidth}px`, maxWidth: '100%', marginInline: 'auto' } : undefined}
       >
@@ -735,6 +758,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               notePath={notePath}
               mapData={renderMapData ?? mapData}
               onCellsChange={handleCellsChange}
+              onLevelCellsChange={handleLevelCellsChange}
               onCurvesChange={handleCurvesChange}
               onObjectsChange={handleObjectsChange}
               onTextLabelsChange={handleTextLabelsChange}
@@ -749,6 +773,9 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
               onViewStateChange={handleViewStateChange}
               onTextLabelSettingsChange={handleTextLabelSettingsChange}
               currentTool={currentTool}
+              editLevelLock={editLevelLock}
+              onEditLevelLockChange={setEditLevelLock}
+              onActiveLevelGetterChange={publishActiveLevelGetter}
               isAlignmentMode={isAlignmentMode}
               interactionLocked={pictureFrameActive}
               selectedObjectType={selectedObjectType ?? undefined}

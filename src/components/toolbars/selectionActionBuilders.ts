@@ -7,6 +7,8 @@
 
 import type { MapData } from '#types/core/map.types';
 import type { SelectedItem } from '#types/contexts/context.types';
+import { DEFAULT_DEPTH_MODE, depthModeOf } from '../../geometry/renderers/elementBands';
+import type { DepthMode } from '../../geometry/renderers/elementBands';
 
 import { isFeatureEnabled } from '../../core/featureFlags';
 
@@ -40,6 +42,10 @@ interface ObjectHandlers {
   onDelete: (e?: Event) => void;
   onPlayerToggle?: (e?: Event) => void;
   onMeasureToggle?: (e?: Event) => void;
+  /** Ladder maps only: flips the object's depth mode (pop at the next rung / hold its size). */
+  onDepthModeToggle?: (e?: Event) => void;
+  /** Ladder maps only: opens the level picker (which rungs the object shows on). */
+  onLevels?: (e?: Event) => void;
 }
 
 interface TextHandlers {
@@ -47,18 +53,71 @@ interface TextHandlers {
   onRotate: (e?: Event) => void;
   onCopyLink: (e?: Event) => void;
   onDelete: (e?: Event) => void;
+  /** Ladder maps only: flips the label's depth mode (pop at the next rung / hold its size). */
+  onDepthModeToggle?: (e?: Event) => void;
+  /** Ladder maps only: opens the level picker (which rungs the label shows on). */
+  onLevels?: (e?: Event) => void;
+}
+
+interface TextActionOptions {
+  /** True when the map is shown as a lattice ladder; the depth toggle is hidden otherwise. */
+  isLadder?: boolean;
+  /** The label's current depth mode, for the toggle's state. */
+  depthMode?: DepthMode;
+  /** True when the label carries an explicit `visibleLevels` set. */
+  hasExplicitLevels?: boolean;
+}
+
+/** The level picker action (kgc.31), shared by objects, labels and multi-select. Hidden off the ladder. */
+function levelsAction(isLadder: boolean, hasExplicitLevels: boolean, invoke: ((e?: Event) => void) | undefined): SelectionAction {
+  return {
+    id: 'visibleLevels',
+    label: 'Visible levels',
+    icon: 'lucide-layers',
+    group: 'transform',
+    visible: isLadder && invoke !== undefined,
+    invoke: invoke ?? ((): void => {}),
+    active: hasExplicitLevels,
+    iconOnly: true
+  };
+}
+
+/** The depth toggle, shared by objects and labels. Hidden off the ladder. */
+function depthModeAction(isLadder: boolean, depthMode: DepthMode, invoke: ((e?: Event) => void) | undefined): SelectionAction {
+  const isPop = depthMode === 'pop';
+  return {
+    id: 'depthMode',
+    label: isPop ? 'Hides at next zoom level' : 'Holds size when zooming in',
+    icon: isPop ? 'lucide-eye-off' : 'lucide-anchor',
+    group: 'transform',
+    visible: isLadder,
+    invoke: invoke ?? ((): void => {}),
+    active: isPop,
+    iconOnly: true
+  };
 }
 
 interface MultiHandlers {
   onRotateAll: (e?: Event) => void;
   onDuplicateAll: (e?: Event) => void;
   onDeleteAll: (e?: Event) => void;
+  /** Ladder maps only: opens the level picker for every selected object and label. */
+  onLevels?: (e?: Event) => void;
+}
+
+interface MultiActionOptions {
+  /** True when the map is shown as a lattice ladder; the level picker is hidden otherwise. */
+  isLadder?: boolean;
+  /** True when any selected element carries an explicit `visibleLevels` set. */
+  hasExplicitLevels?: boolean;
 }
 
 interface ObjectActionOptions {
   isResizeMode?: boolean;
   isPlayer?: boolean;
   isMeasuring?: boolean;
+  /** True when the map is shown as a lattice ladder; the depth toggle is hidden otherwise. */
+  isLadder?: boolean;
 }
 
 function buildObjectActions(
@@ -94,6 +153,8 @@ function buildObjectActions(
       icon: 'lucide-ruler', group: 'transform', visible: true,
       invoke: handlers.onMeasureToggle ?? ((): void => {}), active: options?.isMeasuring === true, iconOnly: true
     },
+    depthModeAction(options?.isLadder === true, depthModeOf(item.data ?? {}), handlers.onDepthModeToggle),
+    levelsAction(options?.isLadder === true, item.data?.visibleLevels !== undefined, handlers.onLevels),
 
     // Content group
     {
@@ -149,7 +210,7 @@ function buildObjectActions(
   ];
 }
 
-function buildTextActions(handlers: TextHandlers): SelectionAction[] {
+function buildTextActions(handlers: TextHandlers, options?: TextActionOptions): SelectionAction[] {
   return [
     {
       id: 'edit', label: 'Edit', icon: 'lucide-pencil',
@@ -159,6 +220,8 @@ function buildTextActions(handlers: TextHandlers): SelectionAction[] {
       id: 'rotate', label: 'Rotate', icon: 'lucide-rotate-cw',
       group: 'transform', visible: true, invoke: handlers.onRotate
     },
+    depthModeAction(options?.isLadder === true, options?.depthMode ?? DEFAULT_DEPTH_MODE, handlers.onDepthModeToggle),
+    levelsAction(options?.isLadder === true, options?.hasExplicitLevels === true, handlers.onLevels),
     {
       id: 'copyLink', label: 'Copy Link', icon: 'lucide-link',
       group: 'links', visible: isFeatureEnabled('notePins'), invoke: handlers.onCopyLink, iconOnly: true
@@ -172,13 +235,15 @@ function buildTextActions(handlers: TextHandlers): SelectionAction[] {
 
 function buildMultiActions(
   _count: number,
-  handlers: MultiHandlers
+  handlers: MultiHandlers,
+  options?: MultiActionOptions
 ): SelectionAction[] {
   return [
     {
       id: 'rotate', label: 'Rotate All', icon: 'lucide-rotate-cw',
       group: 'transform', visible: true, invoke: handlers.onRotateAll
     },
+    levelsAction(options?.isLadder === true, options?.hasExplicitLevels === true, handlers.onLevels),
     {
       id: 'duplicate', label: 'Duplicate All', icon: 'lucide-copy',
       group: 'content', visible: true, invoke: handlers.onDuplicateAll

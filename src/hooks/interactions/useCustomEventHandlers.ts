@@ -37,6 +37,7 @@ import type { SubHexExitDetail } from '#types/hooks/canvasInteraction.types';
 import { isForeignInstanceEvent } from '../../core/windroseEvents';
 import { useHexContextMenu } from './useHexContextMenu';
 import { DEFAULTS } from '../../core/dmtConstants';
+import { zoomForLevel } from '../../core/lodFlags';
 import { calculateFitZoom, subHexAnchorToChildCenter } from '../../geometry/core/hexMeasurements';
 
 interface UseCustomEventHandlersOptions {
@@ -120,6 +121,8 @@ function useCustomEventHandlers({
   const requestEnterSubHex = useCallback((detail: SubHexCoordDetail): void => {
     const { q, r, viewOverride, anchor, canvasSize } = detail;
     if (mapData?.mapType !== 'hex') return;
+    // A map carrying `lod` never dives: depth is the ladder (design 06, s19 item 2).
+    if (mapData.lod !== undefined) return;
 
     // Seamless dives supply a full viewOverride. The double-click path
     // instead supplies the clicked world point (`anchor`) and the live
@@ -218,7 +221,7 @@ function useCustomEventHandlers({
 
   useEffect(() => {
     const handleNavigateTo = (event: CustomEvent<NavigationEventDetail>): void => {
-      const { mapId: targetMapId, x, y, zoom, layerId, subHexPath: targetSubHexPath } = event.detail;
+      const { mapId: targetMapId, x, y, zoom, layerId, subHexPath: targetSubHexPath, level } = event.detail;
 
       if (targetMapId !== mapId) return;
       // Same map mounted twice (block + embed): exactly ONE mount navigates.
@@ -247,7 +250,10 @@ function useCustomEventHandlers({
         return;
       }
 
-      applyViewRef.current(x, y, zoom, layerId);
+      // Ladder link (`|L<n>`): open at that rung's band middle instead of the
+      // raw zoom, which a minCellPx tweak would have invalidated.
+      const levelZoom = level !== undefined ? zoomForLevel(mapData, level) : null;
+      applyViewRef.current(x, y, levelZoom ?? zoom, layerId);
     };
 
     window.addEventListener('windrose-navigate-to', handleNavigateTo);

@@ -229,3 +229,11 @@ ctx.fill();
 ### Testing Tip
 
 Most coordinate bugs are invisible at zoom=1.0. Always test at zoom 0.5 and 2.0 to catch viewport offset errors, and click near hex boundaries to catch rounding errors.
+
+## Ladder (optional, additive)
+
+On a lattice-ladder map (hex only, never rotated) each rung >= 1 has its own finer lattice (`geometry/core/lattice.ts`, `createGeometryLadder.ts`).
+
+- `screenToGrid` is level 0 ONLY. For a rung, use `screenToLevelCell(clientX, clientY, level)` (rung-scoped; at level 0 it equals `screenToGrid`). Rung cells are axial `{q,r}` in that rung's lattice; element `homeLevel` says which lattice its x/y or col/row belongs to.
+- The active rung comes from the live zoom (`getActiveLevel()` getter), never from a value read per render.
+- Rules and invariants: `src/geometry/CLAUDE.md`, Ladder invariants.

@@ -25,13 +25,38 @@ interface ObjectRenderContext {
   offsetY: number;
   zoom: number;
   scaledSize: number;
+  /**
+   * Ladder depth hold (elementBands.elementScale): shrink each object's drawn
+   * size by this factor around its own centre. Position, slots and alignment
+   * stay on the real cell; only the footprint shrinks. Absent = 1.
+   */
+  elementScale?: number;
+  /**
+   * The objects the hex slot layout is computed from (absent = `layer.objects`).
+   * The ladder draws one depth group per call but must lay slots out from the
+   * WHOLE active layer, or objects sharing a hex forget their neighbours.
+   */
+  slotObjects?: MapObject[];
+}
+
+/** Shrinks a placed footprint around its own centre; identity at scale 1. */
+function holdAroundCentre(
+  position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number },
+  scale: number
+): { screenX: number; screenY: number; objectWidth: number; objectHeight: number } {
+  if (scale === 1) return position;
+  const centerX = position.screenX + position.objectWidth / 2;
+  const centerY = position.screenY + position.objectHeight / 2;
+  const objectWidth = position.objectWidth * scale;
+  const objectHeight = position.objectHeight * scale;
+  return { screenX: centerX - objectWidth / 2, screenY: centerY - objectHeight / 2, objectWidth, objectHeight };
 }
 
 interface ObjectRenderDeps {
   getObjectType: (typeId: string) => ObjectTypeDefinition | null;
   getRenderChar: (objType: ObjectTypeDefinition | null | undefined) => RenderChar;
   isCellFogged: (layer: MapLayer, col: number, row: number) => boolean;
-  getObjectsInCell: (objects: MapObject[], x: number, y: number) => MapObject[];
+  getObjectsInCell: (objects: MapObject[], x: number, y: number, homeLevel?: number) => MapObject[];
   getSlotOffset: (slot: number, count: number, orientation: 'flat' | 'pointy') => { offsetX: number; offsetY: number };
   getMultiObjectScale: (count: number) => number;
   renderNoteLinkBadge: (ctx: CanvasRenderingContext2D, position: { screenX: number; screenY: number; objectWidth: number; objectHeight: number }, config: { scaledSize: number }) => void;
@@ -73,17 +98,22 @@ function isObjectUnderFog(
 
 /**
  * Calculates object screen position, handling multi-object hex slots.
+ *
+ * This is THE drawn footprint: the ladder hit-tests (objects/ladderHitTest.ts)
+ * call it with the same rung geometry, scaledSize and elementScale the draw
+ * pass uses, so what the pointer hits is exactly what was painted.
  */
 function calculateObjectPosition(
   obj: MapObject,
   allObjects: MapObject[],
   geometry: IGeometry,
-  context: ObjectRenderContext,
+  context: Omit<ObjectRenderContext, 'ctx'> & Partial<Pick<ObjectRenderContext, 'ctx'>>,
   isHexMap: boolean,
   orientation: 'flat' | 'pointy',
   deps: Pick<ObjectRenderDeps, 'getObjectsInCell' | 'getSlotOffset' | 'getMultiObjectScale'>
 ): { screenX: number; screenY: number; objectWidth: number; objectHeight: number } {
   const { offsetX, offsetY, zoom, scaledSize } = context;
+  const hold = context.elementScale ?? 1;
   const size = obj.size ?? { width: 1, height: 1 };
 
   // Freeform objects use world-space coordinates directly
@@ -92,8 +122,8 @@ function calculateObjectPosition(
     const { screenX, screenY } = geometry.worldToScreen(
       obj.worldPosition.x, obj.worldPosition.y, offsetX, offsetY, zoom
     );
-    const objW = size.width * scaledSize;
-    const objH = size.height * scaledSize;
+    const objW = size.width * scaledSize * hold;
+    const objH = size.height * scaledSize * hold;
     return {
       screenX: screenX - objW / 2,
       screenY: screenY - objH / 2,
@@ -108,7 +138,7 @@ function calculateObjectPosition(
 
   // Multi-object support for hex maps
   if (isHexMap) {
-    const cellObjects = deps.getObjectsInCell(allObjects, obj.position.x, obj.position.y);
+    const cellObjects = deps.getObjectsInCell(allObjects, obj.position.x, obj.position.y, obj.homeLevel ?? 0);
     const objectCount = cellObjects.length;
 
     if (objectCount > 1) {
@@ -148,7 +178,7 @@ function calculateObjectPosition(
     }
   }
 
-  return { screenX, screenY, objectWidth, objectHeight };
+  return holdAroundCentre({ screenX, screenY, objectWidth, objectHeight }, hold);
 }
 
 /**
@@ -289,7 +319,7 @@ function renderObjects(
     // Calculate position
     const position = calculateObjectPosition(
       obj,
-      layer.objects,
+      context.slotObjects ?? layer.objects,
       geometry,
       context,
       isHexMap,

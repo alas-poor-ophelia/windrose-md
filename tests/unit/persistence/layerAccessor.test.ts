@@ -385,6 +385,27 @@ describe("layerAccessor", () => {
       expect(clone.tiles).toEqual(layer1.tiles);
     });
 
+    it("mode 'all' carries levels and the ladder fields on objects, labels and tiles (TEST-07)", () => {
+      const layer1 = createLayer("layer-1", "Deep", 0);
+      layer1.levels = { 2: [{ q: 3, r: -1, color: "#abc" }] } as any;
+      layer1.objects = [
+        { id: "obj1", type: "sword", position: { x: 0, y: 0 }, size: { width: 1, height: 1 }, homeLevel: 2, visibleLevels: [1, 2] },
+      ] as any;
+      layer1.textLabels = [
+        { id: "tl1", content: "deep", position: { x: 0, y: 0 }, fontSize: 12, fontFace: "sans", color: "#000", homeLevel: 1, depthMode: "pop" },
+      ] as any;
+      layer1.tiles = [{ col: 0, row: 0, tilesetId: "ts1", tileId: "t", homeLevel: 3 }] as any;
+      const mapData = createMapData([layer1], "layer-1");
+
+      const clone = cloneLayer(mapData, "layer-1", "all").layers.find((l) => l.id !== "layer-1")!;
+
+      expect(clone.levels).toEqual(layer1.levels);
+      expect(clone.levels).not.toBe(layer1.levels);
+      expect(stripIds(clone.objects)).toEqual(stripIds(layer1.objects));
+      expect(stripIds(clone.textLabels)).toEqual(stripIds(layer1.textLabels));
+      expect(clone.tiles).toEqual(layer1.tiles);
+    });
+
     it("mode 'mapOnly' copies cells, curves, edges, tiles but not objects, textLabels, fogOfWar", () => {
       const layer1 = createLayer("layer-1", "Full", 0);
       layer1.cells = [{ x: 1, y: 2, color: "#aaa" }] as any;

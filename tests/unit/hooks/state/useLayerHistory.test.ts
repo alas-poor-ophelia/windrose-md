@@ -5,6 +5,9 @@
  * - fog operations enter history and can be undone; undoing a paint keeps a later reveal
  * - history is per sub-hex level: undo only affects the open level, and a
  *   level change (including a trim fallback to an ancestor) clears it
+ * - ladder rungs (`levels`) are one diffed layer field: deep strokes, erase to
+ *   empty, the first-write `lod` stamp and the cross-rung camera move
+ *   (MERGE-01 / MERGE-02 / TEST-01)
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
@@ -12,14 +15,17 @@ import { h, render } from 'preact';
 import { act } from 'preact/test-utils';
 import { useCallback, useState } from 'preact/hooks';
 
-import type { MapData, FogOfWar, PartyPin } from '../../../../types/core/map.types';
+import type { MapData, FogOfWar, PartyPin, LadderConfig } from '../../../../types/core/map.types';
 import type { Cell } from '../../../../types/core/cell.types';
 import type { MapDataUpdater } from '../../../../types/hooks/mapData.types';
 import type { LayerHistorySnapshot } from '../../../../types/hooks/layerHistory.types';
 
 import { useLayerHistory } from '../../../../src/hooks/state/useLayerHistory';
 import { createNewMap } from '../../../../src/persistence/fileOperations';
-import { addLayer, getActiveLayer, getLayerById, updateActiveLayer } from '../../../../src/persistence/layerAccessor';
+import { addLayer, getActiveLayer, getLayerById, updateActiveLayer, setLevelCells, authoredCells } from '../../../../src/persistence/layerAccessor';
+import { snapshotLevelsOf, lodStampForCommit, viewStateAtRung, type ParkedLodStamp } from '../../../../src/hooks/state/layerHistoryOps';
+import { ladderParamsFor, getMaxZoom } from '../../../../src/core/lodFlags';
+import { chooseLevel } from '../../../../src/geometry/core/lattice';
 
 type Hook = ReturnType<typeof useLayerHistory>;
 
@@ -382,5 +388,173 @@ describe('live drags commit as one undo step (live check U2)', () => {
 
     act0(() => { m.hook().handleUndo(); });
     expect(m.map().partyPins?.[0].position).toEqual({ x: 1, y: 1 });
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// Ladder rungs
+// ---------------------------------------------------------------------------
+
+const LOD: LadderConfig = { m: 4, minCellPx: 64, maxLevel: 3 };
+const hexCell = (q: number): Cell => ({ q, r: 0, color: '#4a7c59' }) as unknown as Cell;
+
+/**
+ * Emulates useDataHandlers.handleLevelCellsChange: write the rung (stamping
+ * `lod` on the first deep write, as depthAuthoring.withLod does), then push
+ * the written layer's snapshot with `levels`, `level` and the stamp.
+ */
+function makeDeepWriter(m: Mounted): (level: number, cells: Cell[], suppress?: boolean) => void {
+  let parked: ParkedLodStamp = null;
+  return (level, cells, suppress = false) => {
+    m.update((prev: MapData) => {
+      let next = setLevelCells(prev, prev.activeLayerId, level, cells);
+      if (next.lod === undefined && cells.length > 0) next = { ...next, lod: LOD };
+      const out = lodStampForCommit(parked, prev, next, suppress, `level:${level}`);
+      parked = out.parked;
+      const written = getActiveLayer(next);
+      m.hook().addToHistory(
+        snapshot(next, { ...snapshotLevelsOf(written), level, ...out.stamp }),
+        { transient: suppress }
+      );
+      return next;
+    });
+  };
+}
+
+/** Level-0 paint through the full snapshot builder shape (carries `levels`). */
+function paintRoot(m: Mounted, cells: Cell[]): void {
+  m.update((prev: MapData) => {
+    const next = updateActiveLayer(prev, { cells });
+    m.hook().addToHistory(snapshot(next, snapshotLevelsOf(getActiveLayer(next))));
+    return next;
+  });
+}
+
+const levelsOf = (m: Mounted): MapData['layers'][number]['levels'] => getActiveLayer(m.map()).levels;
+
+describe('ladder rungs in history (MERGE-01, MERGE-02, TEST-01)', () => {
+  it('ladder: erasing the last rung to empty is undoable', () => {
+    const m = mount({ '<root>': createNewMap('Map', 'hex') });
+    const write = makeDeepWriter(m);
+
+    write(2, [hexCell(16)]);
+    const painted = levelsOf(m);
+    expect(authoredCells(getActiveLayer(m.map()), 2)).toEqual([hexCell(16)]);
+    expect(m.map().lod).toEqual(LOD);
+
+    write(2, []);
+    expect('levels' in getActiveLayer(m.map())).toBe(false);
+    expect(m.map().lod).toEqual(LOD);
+    expect(m.hook().canUndo).toBe(true);
+
+    // Undo the erase: the cells come back.
+    let changed = false;
+    act0(() => { changed = m.hook().handleUndo(); });
+    expect(changed).toBe(true);
+    expect(levelsOf(m)).toBe(painted);
+    expect(m.map().lod).toEqual(LOD);
+    expect(m.hook().canUndo).toBe(true);
+
+    // Undo the paint (the stamping entry): classic again, nothing skipped.
+    act0(() => { changed = m.hook().handleUndo(); });
+    expect(changed).toBe(true);
+    expect('levels' in getActiveLayer(m.map())).toBe(false);
+    expect('lod' in m.map()).toBe(false);
+    expect(m.hook().canUndo).toBe(false);
+
+    act0(() => { m.hook().handleRedo(); });
+    expect(levelsOf(m)).toBe(painted);
+    expect(m.map().lod).toEqual(LOD);
+
+    act0(() => { m.hook().handleRedo(); });
+    expect('levels' in getActiveLayer(m.map())).toBe(false);
+    expect(m.map().lod).toEqual(LOD);
+    expect(m.hook().canRedo).toBe(false);
+  });
+
+  it('erase-to-inherit (rung shrinks) records, and a no-op deep write records nothing', () => {
+    const m = mount({ '<root>': createNewMap('Map', 'hex') });
+    const write = makeDeepWriter(m);
+    const two = [hexCell(16), hexCell(17)];
+    write(2, two);
+    const full = levelsOf(m);
+
+    write(2, two); // same array reference: setLevelCells returns the same map
+    write(2, [hexCell(16)]);
+    act0(() => { m.hook().handleUndo(); });
+    expect(levelsOf(m)).toBe(full);
+    // The no-op left no entry between: the next undo is the first paint.
+    act0(() => { m.hook().handleUndo(); });
+    expect('levels' in getActiveLayer(m.map())).toBe(false);
+    expect(m.hook().canUndo).toBe(false);
+  });
+
+  it('a level-0 paint on a ladder layer does not record a rung change', () => {
+    const m = mount({ '<root>': createNewMap('Map', 'hex') });
+    const write = makeDeepWriter(m);
+    write(1, [hexCell(4)]);
+    const rungs = levelsOf(m);
+    paintRoot(m, [cell(1)]);
+    act0(() => { m.hook().handleUndo(); });
+    expect(getActiveLayer(m.map()).cells).toEqual([]);
+    expect(levelsOf(m)).toBe(rungs);
+  });
+
+  it('deep stroke records one entry', () => {
+    const m = mount({ '<root>': createNewMap('Map', 'hex') });
+    const write = makeDeepWriter(m);
+    // Suppressed ticks (the first one stamps lod and parks it), then the
+    // pointerup commit re-writes the same rung contents.
+    write(1, [hexCell(4)], true);
+    write(1, [hexCell(4), hexCell(5)], true);
+    const stroke = authoredCells(getActiveLayer(m.map()), 1);
+    write(1, stroke, false);
+    expect(m.hook().canUndo).toBe(true);
+
+    act0(() => { m.hook().handleUndo(); });
+    expect('levels' in getActiveLayer(m.map())).toBe(false);
+    expect('lod' in m.map()).toBe(false);
+    expect(m.hook().canUndo).toBe(false);
+  });
+
+  it('undo strips a first-stamp lod, redo re-stamps it', () => {
+    const m = mount({ '<root>': createNewMap('Map', 'hex') });
+    const write = makeDeepWriter(m);
+    write(1, [hexCell(4)]);
+    write(1, [hexCell(4), hexCell(5)]);
+    expect(m.map().lod).toEqual(LOD);
+
+    act0(() => { m.hook().handleUndo(); });
+    expect(m.map().lod).toEqual(LOD); // a non-stamping entry keeps it
+    act0(() => { m.hook().handleUndo(); });
+    expect('lod' in m.map()).toBe(false);
+
+    act0(() => { m.hook().handleRedo(); });
+    expect(m.map().lod).toEqual(LOD);
+    expect(authoredCells(getActiveLayer(m.map()), 1)).toEqual([hexCell(4)]);
+  });
+
+  it('cross-rung undo emits the camera move, same-rung undo emits none', () => {
+    const base: MapData = { ...createNewMap('Map', 'hex'), lod: LOD };
+    const params = ladderParamsFor(base);
+    const atRoot = viewStateAtRung({ zoom: 1, center: { x: 5, y: 7 } }, 0, params, getMaxZoom(base));
+    expect(chooseLevel(atRoot.zoom, params)).toBe(0);
+
+    // Cross-rung: authored on rung 2 while the camera sits on the root.
+    const m = mount({ '<root>': { ...base, viewState: atRoot } });
+    const write = makeDeepWriter(m);
+    write(2, [hexCell(16)]);
+    write(2, [hexCell(16), hexCell(17)]);
+    act0(() => { m.hook().handleUndo(); });
+    const moved = m.map().viewState;
+    expect(moved).not.toBe(atRoot);
+    expect(chooseLevel(moved?.zoom ?? 0, params)).toBe(2);
+    expect(moved?.center).toEqual({ x: 5, y: 7 });
+
+    // Same rung: the camera is already on rung 2; undo leaves the view alone.
+    const view = m.map().viewState;
+    act0(() => { m.hook().handleUndo(); });
+    expect(m.map().viewState).toBe(view);
   });
 });

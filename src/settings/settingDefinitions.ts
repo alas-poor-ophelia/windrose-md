@@ -58,7 +58,8 @@ type DirectSettingKey =
   | 'gridDiagonalRule'
   | 'distanceDisplayFormat'
   | 'showSubHexBackdrop'
-  | 'developerMode';
+  | 'developerMode'
+  | 'lodLadder';
 
 const DIRECT_KEYS = new Set<string>([
   'hexOrientation', 'coordinateKeyMode', 'coordinateTextColor', 'coordinateTextShadow',
@@ -68,6 +69,7 @@ const DIRECT_KEYS = new Set<string>([
   'pictureFrameWidth', 'pictureFrameWidthMobile',
   'distancePerCellGrid', 'distanceUnitGrid', 'distancePerCellHex', 'distanceUnitHex',
   'gridDiagonalRule', 'distanceDisplayFormat', 'showSubHexBackdrop', 'developerMode',
+  'lodLadder',
 ] satisfies DirectSettingKey[]);
 
 // Sliders present percentages; settings store fractions. These virtual keys
@@ -158,7 +160,14 @@ function buildFeaturesGroup(): SettingDefinitionItem {
           key: `features.${def.id}`,
           defaultValue: true
         }
-      }))
+      })),
+      // Not in FEATURE_DEFINITIONS: it is stored as the top-level `lodLadder`
+      // key (read by lodFlags), not under `features`. Absent reads as on.
+      {
+        name: 'Detail levels',
+        desc: 'Let hex maps add finer hexes as you zoom in. Maps without detail levels are unaffected.',
+        control: { type: 'toggle', key: 'lodLadder', defaultValue: true }
+      }
     ]
   };
 }

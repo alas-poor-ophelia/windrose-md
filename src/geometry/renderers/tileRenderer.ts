@@ -22,6 +22,7 @@ import { renderRegionFills, computeRegionPatternTransform, regionFeatherPx } fro
 import type { RegionGroup } from './regionFillRenderer';
 import { SQRT3, isFolderTileset, sortTilesForRendering, calculateTileDrawRect, tileOrientationAdaptation, makeEntryLookup } from './computeTileDrawPlan';
 import type { TileGeometry, TileViewState, TileRenderOptions } from './computeTileDrawPlan';
+import { hexClipPathString, tileClipHexes, unionHexClipPath } from './tileClipRegion';
 
 /** Fallbacks when a tileset does not set its own stamp threshold / minimum stamp scale. */
 const DEFAULT_STAMP_THRESHOLD = 0.5;
@@ -166,6 +167,8 @@ function renderTiles(
   const opacity = options?.opacity ?? 1;
   const canvasW = options?.canvasWidth ?? 4000;
   const canvasH = options?.canvasHeight ?? 4000;
+  const clipToHex = options?.clipToHex === true && !isGrid;
+  const deepRoots = !clipToHex && !isGrid && options?.deepRoots != null && options.deepRoots.size > 0 ? options.deepRoots : null;
 
   const drawCellTile = (tile: TileAssignment): void => {
     const lookup = lookupEntry(tile.tilesetId, tile.tileId);
@@ -271,6 +274,27 @@ function renderTiles(
       rect = { drawX: cx - w / 2, drawY: cy - h / 2, drawWidth: w, drawHeight: h };
     }
 
+    // Ladder depth: clip the snapped tile to its home-rung hexagon (screen space,
+    // before the rotation transform so the hexagon stays upright). Hex tiles have
+    // no multi-cell span (spans resolve on grid only), so one hexagon is the
+    // whole footprint.
+    // Smart mode instead clips a root tile only where it meets deep content:
+    // the union of its hexagon and every neighbour hexagon WITHOUT deep paint.
+    let clipPath: string | null = null;
+    if (tile.freeform !== true) {
+      if (clipToHex) {
+        clipPath = hexClipPathString(screen.screenX, screen.screenY, geometry.hexSize * viewState.zoom, geometry.orientation);
+      } else if (deepRoots !== null && (tile.homeLevel ?? 0) === 0) {
+        const hexes = tileClipHexes(tile.col, tile.row, deepRoots);
+        if (hexes !== null) clipPath = unionHexClipPath(hexes, geometry, viewState, geometry.hexSize * viewState.zoom);
+      }
+    }
+    const clipHex = clipPath !== null;
+    if (clipPath !== null) {
+      ctx.save();
+      ctx.clip(new Path2D(clipPath));
+    }
+
     // Apply opacity (per-tile and layer-level)
     const tileOpacity = tile.opacity ?? 1;
     if (opacity < 1 || tileOpacity < 1) {
@@ -315,6 +339,10 @@ function renderTiles(
     if (opacity < 1 || tileOpacity < 1) {
       ctx.globalAlpha = previousAlpha;
     }
+
+    if (clipHex) {
+      ctx.restore();
+    }
   };
 
   // Render in depth order. Within each tier: region fills (back) → cell fills
@@ -337,4 +365,4 @@ function renderTiles(
   }
 }
 
-export { renderTiles, sortTilesForRendering, calculateTileDrawRect, computeRegionPatternTransform, regionFeatherPx, shadowBlurImage, pyramidLevels, pyramidBlurImage, canvasBlurCapabilities, tileOrientationAdaptation, releaseTileScratchCanvases };
+export { renderTiles, hexClipPathString, sortTilesForRendering, calculateTileDrawRect, computeRegionPatternTransform, regionFeatherPx, shadowBlurImage, pyramidLevels, pyramidBlurImage, canvasBlurCapabilities, tileOrientationAdaptation, releaseTileScratchCanvases };

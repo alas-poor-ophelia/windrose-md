@@ -279,3 +279,14 @@ Key functions from `layerAccessor.ts`:
 | Constructing curves with `[x, y]` segments | Rendering breaks | Each segment is 6 numbers: `[cp1x, cp1y, cp2x, cp2y, endX, endY]` |
 | Assuming `layers` exists | Pre-v2 data has no layers | Check `needsMigration()` first |
 | Storing absolute paths for background images | Breaks on vault move | Use vault-relative paths |
+
+## Ladder (optional, additive)
+
+The lattice detail ladder adds optional fields. Classic maps never carry them and stay byte-identical.
+
+- `mapData.lod` (`LadderConfig`: `m`, `minCellPx`, `maxLevel`, optional `distanceOverrides`). Presence = ladder map. Stored values are never rewritten on load. The FIRST deep write stamps `lod` (`withLod` in `persistence/depthAuthoring.ts`).
+- `layer.levels['<n>']`: rung cells for rungs >= 1. Keys are STRINGS ("1", "2"), cells are `{q,r}` axial objects in that rung's own lattice. Level 0 stays in the layer's normal cells.
+- `homeLevel` (positive integer, absent = 0) on objects, text labels and tiles; `visibleLevels` (explicit rung list, absent = Auto) and `depthMode` ('pop' | 'persist') on objects and labels. `homeLevel` is sanitised on load (`schemaMigration.sanitizeLayer`): a value that is not a positive safe integer is dropped.
+- schemaVersion 3 fence: an entry carrying `lod`, `levels` or any `homeLevel` saves with schemaVersion 3; classic entries stay at 2 (`schemaMigration.stampSchemaVersions`, applied in `fileOperations`). A build that predates the ladder refuses v3 entries instead of dropping the fields.
+- Deep-write caps (`persistence/depthAuthoring.ts`, the single deep-write gate): 4096 cells added per operation (`MAX_CELLS_PER_DEPTH_OP`); and a size budget of 80% of the save journal payload, measured as the encoded journal payload (`depthBudgetBytesOf`), not raw JSON size. Over-cap writes are refused, never truncated.
+- Validation never destroys: a `levels` this build cannot read quarantines the map (`isDepthQuarantined` in `core/lodFlags.ts`): it renders level 0, refuses deep edits and keeps its bytes. Rules: `src/geometry/CLAUDE.md`, Ladder invariants.

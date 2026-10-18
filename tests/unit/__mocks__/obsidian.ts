@@ -55,6 +55,9 @@ export class Menu {
 export const Platform = {
   isMobile: false,
   isDesktop: true,
+  isMobileApp: false,
+  isIosApp: false,
+  isAndroidApp: false,
 };
 
 export class TAbstractFile {

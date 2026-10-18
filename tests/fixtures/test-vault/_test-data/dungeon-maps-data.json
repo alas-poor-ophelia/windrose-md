@@ -108,15 +108,51 @@
           "order": 0,
           "visible": true,
           "cells": [
-            { "x": 5, "y": 5, "color": "#666666" },
-            { "x": 6, "y": 5, "color": "#666666" },
-            { "x": 7, "y": 5, "color": "#666666" },
-            { "x": 5, "y": 6, "color": "#666666" },
-            { "x": 6, "y": 6, "color": "#888888" },
-            { "x": 7, "y": 6, "color": "#666666" },
-            { "x": 5, "y": 7, "color": "#666666" },
-            { "x": 6, "y": 7, "color": "#666666" },
-            { "x": 7, "y": 7, "color": "#666666" }
+            {
+              "x": 5,
+              "y": 5,
+              "color": "#666666"
+            },
+            {
+              "x": 6,
+              "y": 5,
+              "color": "#666666"
+            },
+            {
+              "x": 7,
+              "y": 5,
+              "color": "#666666"
+            },
+            {
+              "x": 5,
+              "y": 6,
+              "color": "#666666"
+            },
+            {
+              "x": 6,
+              "y": 6,
+              "color": "#888888"
+            },
+            {
+              "x": 7,
+              "y": 6,
+              "color": "#666666"
+            },
+            {
+              "x": 5,
+              "y": 7,
+              "color": "#666666"
+            },
+            {
+              "x": 6,
+              "y": 7,
+              "color": "#666666"
+            },
+            {
+              "x": 7,
+              "y": 7,
+              "color": "#666666"
+            }
           ],
           "edges": [],
           "objects": [
@@ -124,14 +160,20 @@
               "id": "test-door-001",
               "type": "door-single",
               "category": "doors",
-              "position": { "x": 8, "y": 6 },
+              "position": {
+                "x": 8,
+                "y": 6
+              },
               "rotation": 0
             },
             {
               "id": "test-stairs-001",
               "type": "stairs-down",
               "category": "stairs",
-              "position": { "x": 6, "y": 6 },
+              "position": {
+                "x": 6,
+                "y": 6
+              },
               "rotation": 0
             }
           ],
@@ -204,6 +246,104 @@
       "objects": [],
       "textLabels": [],
       "edges": []
+    },
+    "lod-fixture": {
+      "name": "LOD Fixture",
+      "description": "",
+      "mapType": "hex",
+      "northDirection": 0,
+      "customColors": [],
+      "sidebarCollapsed": false,
+      "expandedState": false,
+      "settings": {
+        "useGlobalSettings": true,
+        "overrides": {}
+      },
+      "uiPreferences": {
+        "rememberPanZoom": true,
+        "rememberSidebarState": true,
+        "rememberExpandedState": false
+      },
+      "lastTextLabelSettings": null,
+      "schemaVersion": 3,
+      "activeLayerId": "lod-layer-1",
+      "layerPanelVisible": false,
+      "layers": [
+        {
+          "id": "lod-layer-1",
+          "name": "Layer 1",
+          "order": 0,
+          "visible": true,
+          "cells": [],
+          "curves": [],
+          "edges": [],
+          "textLabels": [],
+          "fogOfWar": null,
+          "levels": {
+            "2": [
+              {
+                "q": 3,
+                "r": -1,
+                "color": "#4a7c59"
+              }
+            ]
+          },
+          "objects": [
+            {
+              "id": "lod-obj-home1",
+              "type": "entrance",
+              "position": {
+                "x": 3,
+                "y": -1
+              },
+              "size": {
+                "width": 1,
+                "height": 1
+              },
+              "homeLevel": 1
+            },
+            {
+              "id": "lod-obj-pinned2",
+              "type": "entrance",
+              "position": {
+                "x": 5,
+                "y": 0
+              },
+              "size": {
+                "width": 1,
+                "height": 1
+              },
+              "homeLevel": 1,
+              "visibleLevels": [
+                2
+              ]
+            }
+          ]
+        }
+      ],
+      "gridSize": 32,
+      "dimensions": {
+        "width": 300,
+        "height": 300
+      },
+      "viewState": {
+        "zoom": 8,
+        "center": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "hexSize": 80,
+      "orientation": "flat",
+      "hexBounds": {
+        "maxCol": 26,
+        "maxRow": 20
+      },
+      "lod": {
+        "m": 4,
+        "minCellPx": 64,
+        "maxLevel": 3
+      }
     }
   }
 }

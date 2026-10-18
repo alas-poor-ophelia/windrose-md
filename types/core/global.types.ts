@@ -1,4 +1,6 @@
 import type { TileForm } from '../tiles/tile.types';
+import type { LadderCrossingStats, LadderSnapshot } from '../../src/geometry/renderers/ladderTelemetry';
+import type { SurfaceSnapshot } from '../../src/geometry/renderers/surfaceBudget';
 
 /**
  * One wall's gap geometry, as computed by the render/edit-derive pipeline
@@ -34,20 +36,41 @@ interface WindroseRawGap {
   flip: boolean;
 }
 
+/**
+ * Result of a cell write addressed to a ladder rung (level >= 1), or of a
+ * refused paintCells request at any level. Level-0 writes keep their legacy
+ * boolean / number returns.
+ */
+interface WindroseLevelWriteResult {
+  ok: boolean;
+  level: number;
+  /** Cells written (painted or erased) on the rung. */
+  count: number;
+  /** Requested cells dropped because they do not exist at this rung (outside the root bounds). */
+  skipped: number;
+  /** Refusal reason (a DepthWriteRefusal, 'no-active-layer', 'no-ladder', 'too-many-cells', 'invalid-level'). */
+  error?: string;
+}
+
 interface WindroseMcpOps {
-  setTool: (toolId: string) => void;
+  /** Refuses an id outside the ToolId union (the paint tool is `draw`). */
+  setTool: (toolId: string) => { ok: true; tool: string } | { ok: false; error: string };
   setColor: (color: string) => void;
   setOpacity: (opacity: number) => void;
-  paintCell: (x: number, y: number, color?: string, opacity?: number) => boolean;
-  paintCells: (cells: Array<{ x: number; y: number; color?: string; opacity?: number }>) => number;
-  eraseCell: (x: number, y: number) => boolean;
-  getCells: (bbox?: { x0: number; y0: number; x1: number; y1: number }) => Array<{ x: number; y: number; color: string; opacity: number }>;
+  /** Level omitted or 0: legacy boolean. Level >= 1: rung write result. */
+  paintCell: (x: number, y: number, color?: string, opacity?: number, level?: number) => boolean | WindroseLevelWriteResult;
+  /** Level omitted or 0: legacy count (a request over MAX_CELLS_PER_DEPTH_OP is refused with a result object). Level >= 1: rung write result. */
+  paintCells: (cells: Array<{ x: number; y: number; color?: string; opacity?: number }>, level?: number) => number | WindroseLevelWriteResult;
+  /** Level omitted or 0: legacy boolean. Level >= 1: rung write result. */
+  eraseCell: (x: number, y: number, level?: number) => boolean | WindroseLevelWriteResult;
+  /** Level omitted or 0: the root lattice. Rung cells are in the rung's own axial coordinates. */
+  getCells: (bbox?: { x0: number; y0: number; x1: number; y1: number }, level?: number) => Array<{ x: number; y: number; color: string; opacity: number }>;
   undo: () => boolean;
   redo: () => boolean;
   selectLayer: (layerId: string) => void;
   forceSave: () => void;
-  /** Drive the live viewport (pan/zoom). Omitting zoom keeps the current zoom. */
-  setViewport: (x: number, y: number, zoom?: number) => { ok: boolean; viewState: { x: number; y: number; zoom: number } };
+  /** Drive the live viewport (pan/zoom). Omitting zoom keeps the current zoom; zoom is clamped to the map's range. `level` (ladder maps) overrides zoom with that rung's band-middle zoom. */
+  setViewport: (x: number, y: number, zoom?: number, level?: number) => { ok: boolean; viewState: { x: number; y: number; zoom: number } };
   /** Installed tilesets and their tiles (vaultPath is the human-meaningful name). */
   listTiles: () => Array<{ tilesetId: string; tilesetName: string; tileCount: number; tiles: Array<{ id: string; vaultPath: string }> }>;
   /** Select a tile and arm the tile-paint tool. */
@@ -62,13 +85,13 @@ interface WindroseMcpOps {
   /** Non-mutating derived-form probe (waits out async tile-metadata load in E2E). */
   deriveForm: (tilesetId: string, tileId: string) => TileForm | null;
   /** Place a tile at a grid/hex cell, removing overlapping same-tier tiles. */
-  placeTile: (a: { col: number; row: number; tilesetId: string; tileId: string; rotation?: number; depth?: string; scale?: number }) => { ok: boolean; tileCount: number; error?: string };
+  placeTile: (a: { col: number; row: number; tilesetId: string; tileId: string; rotation?: number; depth?: string; scale?: number }, level?: number) => { ok: boolean; tileCount: number; error?: string };
   /** Resolved object types for the active map's type + object set. */
   listObjectTypes: () => Array<{ id: string; label: string; category: string }>;
   /** Objects on the active layer. */
-  listObjects: () => Array<{ id: string; type: string; x: number; y: number; label?: string }>;
+  listObjects: (level?: number) => Array<{ id: string; type: string; x: number; y: number; label?: string; level: number; depthMode?: 'pop' | 'persist'; visibleLevels?: number[] }>;
   /** Place an object via the imperative placement API. */
-  placeObject: (typeId: string, x: number, y: number) => { ok: boolean; objectId?: string; error?: string };
+  placeObject: (typeId: string, x: number, y: number, level?: number, visibleLevels?: number[]) => { ok: boolean; objectId?: string; error?: string };
   /** Open a drawer pane or edge-rail flyout; null closes the rail. */
   openDrawer: (pane: 'tiles' | 'objects' | 'layers' | 'colors' | 'regions' | 'view' | null) => { ok: boolean; note?: string };
   /** Computed gap skip-intervals + seated-art transforms for the active board's walls (G-F9). */
@@ -99,8 +122,14 @@ interface WindroseMcpInstance {
   timestamp: number;
   /** Number of cells in the active layer */
   cellCount: number;
-  /** Cell count per layer id */
+  /** Cell count per layer id (level 0 only) */
   layerCellCounts: Record<string, number>;
+  /** Active layer cell count per ladder level; keys are level numbers as strings, '0' always present */
+  cellCountByLevel: Record<string, number>;
+  /** Ladder rung the current zoom shows; 0 on classic (non-ladder) maps */
+  getActiveLevel: () => number;
+  /** Rung authoring tools write to: the active level, or the locked edit level when shallower; 0 on classic maps */
+  getEditLevel: () => number;
   /** Total objects across all layers */
   objectCount: number;
   /** Total wall paths across all layers */
@@ -117,12 +146,37 @@ interface WindroseGlobal {
   /** Set to true once the plugin has fully initialized */
   ready?: boolean;
   mcpInstances?: Record<string, WindroseMcpInstance>;
+  /** Ladder frame telemetry (geometry/renderers/ladderTelemetry.ts), attached on the first recorded ladder frame. */
+  ladder?: {
+    snapshot: (canvasId?: number) => LadderSnapshot;
+    crossingStats: (canvasId?: number) => LadderCrossingStats;
+    reset: () => void;
+  };
+  /** Surface budget counters (geometry/renderers/surfaceBudget.ts), attached on the first surface registration. */
+  surfaces?: {
+    peakBytes: () => number;
+    currentBytes: () => number;
+    snapshot: () => SurfaceSnapshot;
+  };
+}
+
+/**
+ * Developer-only ladder parameter overrides (`window.__windroseLadder`), read by
+ * core/lodFlags.ts and the renderer's tile-clip knob. Dev-set input: readers keep
+ * their typeof checks.
+ */
+interface WindroseLadderDevKnobs {
+  m?: unknown;
+  minCellPx?: unknown;
+  maxLevel?: unknown;
+  tileClip?: unknown;
 }
 
 declare global {
   interface Window {
     __windrose?: WindroseGlobal;
+    __windroseLadder?: WindroseLadderDevKnobs;
   }
 }
 
-export type { WindroseMcpOps, WindroseMcpInstance, WindroseGlobal, WindroseWallGapDebug, WindroseRawGap };
+export type { WindroseMcpOps, WindroseMcpInstance, WindroseGlobal, WindroseWallGapDebug, WindroseRawGap, WindroseLevelWriteResult };

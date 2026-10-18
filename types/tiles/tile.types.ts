@@ -199,6 +199,8 @@ export const DEFAULT_TILE_LAYERS: ReadonlyArray<{
 
 /** Shared fields for all tile assignments */
 interface TileAssignmentBase {
+  /** Ladder rung this tile was placed at (absent = root); (col,row) index that rung's lattice. Written by TilePlacementLayer, read by the ladder tile pass (tilesByHomeForRung) and scopes same-cell replace/erase/fill to one rung (design 06, s19 item 3). */
+  homeLevel?: number;
   /** Grid position: col/row for grid maps, q/r for hex maps */
   col: number;
   row: number;

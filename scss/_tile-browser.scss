@@ -906,6 +906,7 @@ button.windrose-tb-cap-edit {
 }
 
 .windrose-tile-thumb-img {
+  pointer-events: none; // keep taps off the img: Obsidian opens its image viewer for img clicks in reading view
   width: 100%;
   height: 100%;
   object-fit: contain;

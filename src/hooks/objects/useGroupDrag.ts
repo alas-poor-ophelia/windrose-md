@@ -25,7 +25,11 @@ import type {
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { useMapState, useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
+import type { Point } from '#types/core/geometry.types';
 import { getActiveLayer } from '../../persistence/layerAccessor';
+import { homeLevelOf, classicHitRung } from '../../objects/hexSlotPositioner';
+import { groupItemHitsCell, reorganizeVacatedCells, groupMoveStacksInSlots, planGroupGridMove } from '../../objects/groupDragOps';
+import { ladderFootprintContains } from '../../objects/ladderHitTest';
 
 
 /**
@@ -38,8 +42,18 @@ const useGroupDrag = (): UseGroupDragResult => {
     screenToGrid,
     screenToWorld,
     getClientCoords,
-    canvasRef
+    canvasRef,
+    ladder,
+    screenToLevelCell,
+    getActiveLevel,
+    viewController
   } = useMapState();
+
+  // Geometry an object's `position` indexes into: its home rung under the
+  // lattice ladder, the root geometry otherwise (home 0 / classic maps).
+  const cellGeometryFor = useCallback((home: number) => {
+    return ladder !== null && home > 0 ? ladder.geometryForLevel(home) : geometry;
+  }, [ladder, geometry]);
 
   const {
     onObjectsChange,
@@ -87,7 +101,9 @@ const useGroupDrag = (): UseGroupDragResult => {
     x: number,
     y: number,
     worldX: number,
-    worldY: number
+    worldY: number,
+    clientX?: number,
+    clientY?: number
   ): SelectedItem | null => {
     if (!hasMultiSelection || !mapData) {
       return null;
@@ -99,11 +115,24 @@ const useGroupDrag = (): UseGroupDragResult => {
       if (item.type === 'object') {
         const obj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
         if (obj != null) {
-          const size = obj.size ?? { width: 1, height: 1 };
-          if (x >= obj.position.x && x < obj.position.x + size.width &&
-              y >= obj.position.y && y < obj.position.y + size.height) {
-            return item;
-          }
+          // Ladder: the drawn footprint is what the pointer grabs (a held
+          // persist object is drawn smaller/larger than its cell). Classic:
+          // the pointer cell on the object's own rung (home 0 = the root cell).
+          const hit = ladder !== null
+            ? ladderFootprintContains(obj, activeLayer.objects ?? [], worldX, worldY, {
+              ladder,
+              level: getActiveLevel(),
+              zoom: viewController?.getLive().zoom ?? mapData.viewState?.zoom ?? 1,
+              orientation: mapData.orientation ?? 'flat'
+            })
+            : groupItemHitsCell(obj, (home: number): Point | null => {
+              if (home === 0) return { x, y };
+              // A `lod` map off the ladder view draws rung 0 only: a deep member is not grabbable.
+              if (classicHitRung(mapData) !== undefined) return null;
+              if (clientX === undefined || clientY === undefined) return null;
+              return screenToLevelCell(clientX, clientY, home);
+            });
+          if (hit) return item;
         }
       } else if (item.type === 'text') {
         const label = activeLayer.textLabels?.find((l: TextLabel) => l.id === item.id);
@@ -121,7 +150,7 @@ const useGroupDrag = (): UseGroupDragResult => {
     }
 
     return null;
-  }, [hasMultiSelection, selectedItems, mapData]);
+  }, [hasMultiSelection, selectedItems, mapData, screenToLevelCell, ladder, getActiveLevel, viewController]);
 
   const startGroupDrag = useCallback((
     clientX: number,
@@ -156,15 +185,22 @@ const useGroupDrag = (): UseGroupDragResult => {
               gridOffsetY: 0,
               worldOffsetX: worldCoords.worldX - obj.worldPosition.x,
               worldOffsetY: worldCoords.worldY - obj.worldPosition.y,
-              freeform: true
+              freeform: true,
+              homeLevel: homeLevelOf(obj)
             });
           } else {
+            // Offset measured on the object's own rung: a group may mix rungs,
+            // and rung cell indexes are not comparable across levels.
+            const home = homeLevelOf(obj);
+            const pointerCell = home === 0 ? { x: gridX, y: gridY } : screenToLevelCell(clientX, clientY, home);
+            if (pointerCell === null) { groupDragInitialStateRef.current = null; return false; }
             offsets.set(item.id, {
               type: 'object',
-              gridOffsetX: gridX - obj.position.x,
-              gridOffsetY: gridY - obj.position.y,
+              gridOffsetX: pointerCell.x - obj.position.x,
+              gridOffsetY: pointerCell.y - obj.position.y,
               worldOffsetX: 0,
-              worldOffsetY: 0
+              worldOffsetY: 0,
+              homeLevel: home
             });
           }
         }
@@ -196,7 +232,7 @@ const useGroupDrag = (): UseGroupDragResult => {
     });
 
     return true;
-  }, [hasMultiSelection, selectedItems, mapData, screenToWorld, setIsDraggingSelection, setDragStart, groupDragInitialStateRef, groupDragOffsetsRef]);
+  }, [hasMultiSelection, selectedItems, mapData, screenToWorld, screenToLevelCell, setIsDraggingSelection, setDragStart, groupDragInitialStateRef, groupDragOffsetsRef]);
 
   const handleGroupDrag = useCallback((e: PointerEvent | MouseEvent | TouchEvent): boolean => {
     if (!isDraggingSelection || dragStart?.isGroupDrag !== true) {
@@ -208,15 +244,16 @@ const useGroupDrag = (): UseGroupDragResult => {
     const gridCoords = screenToGrid(clientX, clientY);
     const worldCoords = screenToWorld(clientX, clientY);
 
-    if (!gridCoords || !worldCoords) return true;
+    // Under the ladder the root cell may be off-canvas while a deep rung cell
+    // exists; only a home-0 grid mover needs it (pointerCellOn(0) then bails).
+    if (!worldCoords || (gridCoords === null && ladder === null)) return true;
 
-    const { x, y } = gridCoords;
-    const gridX = x;
-    const gridY = y;
+    const gridX = gridCoords?.x ?? dragStart.gridX ?? 0;
+    const gridY = gridCoords?.y ?? dragStart.gridY ?? 0;
     const { worldX, worldY } = worldCoords;
 
-    const gridDeltaX = x - (dragStart.gridX ?? 0);
-    const gridDeltaY = y - (dragStart.gridY ?? 0);
+    const gridDeltaX = gridX - (dragStart.gridX ?? 0);
+    const gridDeltaY = gridY - (dragStart.gridY ?? 0);
     const worldDeltaX = worldX - (dragStart.worldX ?? 0);
     const worldDeltaY = worldY - (dragStart.worldY ?? 0);
 
@@ -232,6 +269,13 @@ const useGroupDrag = (): UseGroupDragResult => {
 
     const isInverted = altKeyRef.current && shiftKeyRef.current;
 
+    // Pointer cell per rung, resolved lazily (rung 0 is the root cell above)
+    const rungCells = new Map<number, Point | null>([[0, gridCoords]]);
+    const pointerCellOn = (home: number): Point | null => {
+      if (!rungCells.has(home)) rungCells.set(home, screenToLevelCell(clientX, clientY, home));
+      return rungCells.get(home) ?? null;
+    };
+
     for (const item of selectedItems) {
       const offset = offsets.get(item.id);
       if (!offset) continue;
@@ -239,27 +283,30 @@ const useGroupDrag = (): UseGroupDragResult => {
       if (item.type === 'object') {
         const obj = activeLayer.objects?.find((o: MapObject) => o.id === item.id);
         if (obj != null) {
+          const home = offset.homeLevel ?? 0;
+          const cellGeometry = cellGeometryFor(home);
+          const rungCell = pointerCellOn(home);
+          if (rungCell === null || cellGeometry == null) return true;
           if (isInverted) {
             // Drag inversion: flip each object's snap behavior
             if (offset.freeform !== true) {
               // Grid → freeform inversion: use world-space delta
-              const cellCenter = geometry.getCellCenter(obj.position.x, obj.position.y);
+              const cellCenter = cellGeometry.getCellCenter(obj.position.x, obj.position.y);
               const baseX = obj.worldPosition?.x ?? cellCenter.worldX;
               const baseY = obj.worldPosition?.y ?? cellCenter.worldY;
               const newWorldX = baseX + worldDeltaX;
               const newWorldY = baseY + worldDeltaY;
-              const nearestGrid = screenToGrid(clientX, clientY);
               objectUpdates.push({
                 id: item.id,
                 oldObj: obj,
-                newPosition: nearestGrid ?? obj.position,
+                newPosition: rungCell,
                 freeformPosition: { x: newWorldX, y: newWorldY }
               });
             } else {
               // Freeform → grid inversion: snap to grid
-              const newX = gridX - offset.gridOffsetX;
-              const newY = gridY - offset.gridOffsetY;
-              const cellCenter = geometry.getCellCenter(newX, newY);
+              const newX = rungCell.x - offset.gridOffsetX;
+              const newY = rungCell.y - offset.gridOffsetY;
+              const cellCenter = cellGeometry.getCellCenter(newX, newY);
               objectUpdates.push({
                 id: item.id,
                 oldObj: obj,
@@ -277,8 +324,8 @@ const useGroupDrag = (): UseGroupDragResult => {
               freeformPosition: { x: newWorldX, y: newWorldY }
             });
           } else {
-            const newX = gridX - offset.gridOffsetX;
-            const newY = gridY - offset.gridOffsetY;
+            const newX = rungCell.x - offset.gridOffsetX;
+            const newY = rungCell.y - offset.gridOffsetY;
             objectUpdates.push({
               id: item.id,
               oldObj: obj,
@@ -303,12 +350,6 @@ const useGroupDrag = (): UseGroupDragResult => {
     // Bounds and overlap checks only apply to grid-anchored objects
     const gridUpdates = objectUpdates.filter(u => !u.freeformPosition);
 
-    for (const update of gridUpdates) {
-      if (!geometry.isWithinBounds(update.newPosition.x, update.newPosition.y)) {
-        return true;
-      }
-    }
-
     const selectedObjectIds = new Set(
       selectedItems.filter(item => item.type === 'object').map(item => item.id)
     );
@@ -317,31 +358,21 @@ const useGroupDrag = (): UseGroupDragResult => {
       (obj: MapObject) => !selectedObjectIds.has(obj.id)
     );
 
-    for (const update of gridUpdates) {
-      const movingSize = update.oldObj.size ?? { width: 1, height: 1 };
-      const movingMinX = update.newPosition.x;
-      const movingMinY = update.newPosition.y;
-      const movingMaxX = movingMinX + movingSize.width;
-      const movingMaxY = movingMinY + movingSize.height;
-
-      for (const staticObj of nonSelectedObjects) {
-        const staticSize = staticObj.size ?? { width: 1, height: 1 };
-        const staticMinX = staticObj.position.x;
-        const staticMinY = staticObj.position.y;
-        const staticMaxX = staticMinX + staticSize.width;
-        const staticMaxY = staticMinY + staticSize.height;
-
-        const overlapsX = movingMinX < staticMaxX && movingMaxX > staticMinX;
-        const overlapsY = movingMinY < staticMaxY && movingMaxY > staticMinY;
-
-        if (overlapsX && overlapsY) {
-          return true;
-        }
-      }
-    }
+    // Bounds (root bounds at home 0, ladder existence deeper) and overlap,
+    // both scoped to each moving object's own rung. On a LADDER hex map cells
+    // hold up to getMaxObjectsPerCell() objects in slots, so there the overlap
+    // check is replaced by per-cell slot assignment (refused on overflow). A
+    // classic hex map keeps main's refusal of any occupied cell.
+    const stackInSlots = groupMoveStacksInSlots(mapData.mapType, ladder !== null, mapData.lod != null);
+    const plan = planGroupGridMove(gridUpdates, nonSelectedObjects, (home, cx, cy) =>
+      ladder !== null && home > 0 ? ladder.existsAt(home, cx, cy) : geometry.isWithinBounds(cx, cy),
+      stackInSlots
+    );
+    if (plan.blocked) return true;
+    const hexSlots = plan.slots;
 
     if (objectUpdates.length > 0) {
-      const updatedObjects = [...activeLayer.objects];
+      let updatedObjects = [...activeLayer.objects];
 
       for (const update of objectUpdates) {
         const idx = updatedObjects.findIndex((o: MapObject) => o.id === update.id);
@@ -354,13 +385,18 @@ const useGroupDrag = (): UseGroupDragResult => {
               ...(isInverted && offsets.get(update.id)?.freeform !== true ? { freeform: true } : {})
             };
           } else {
+            const slot = hexSlots?.get(update.id);
             updatedObjects[idx] = {
               ...updatedObjects[idx],
-              position: update.newPosition
+              position: update.newPosition,
+              ...(slot !== undefined ? { slot } : {})
             };
           }
         }
       }
+
+      // Compact the hex cells the grid movers left (per rung)
+      if (stackInSlots) updatedObjects = reorganizeVacatedCells(updatedObjects, gridUpdates);
 
       onObjectsChange(updatedObjects, true);
     }
@@ -396,8 +432,8 @@ const useGroupDrag = (): UseGroupDragResult => {
     updateSelectedItemsData(allUpdates);
 
     return true;
-  }, [isDraggingSelection, dragStart, mapData, geometry, selectedItems, getClientCoords,
-      screenToGrid, screenToWorld, onObjectsChange, onTextLabelsChange, setDragStart, updateSelectedItemsData, groupDragOffsetsRef]);
+  }, [isDraggingSelection, dragStart, mapData, geometry, ladder, selectedItems, getClientCoords,
+      screenToGrid, screenToWorld, screenToLevelCell, cellGeometryFor, onObjectsChange, onTextLabelsChange, setDragStart, updateSelectedItemsData, groupDragOffsetsRef]);
 
   const stopGroupDrag = useCallback((): boolean => {
     if (!isDraggingSelection || dragStart?.isGroupDrag !== true) {
@@ -431,7 +467,7 @@ const useGroupDrag = (): UseGroupDragResult => {
         }
         // Freeform object that was snapped to grid → keep freeform, snap worldPosition to cell center
         if (offset.freeform === true && obj.worldPosition != null) {
-          const cellCenter = geometry.getCellCenter(obj.position.x, obj.position.y);
+          const cellCenter = (cellGeometryFor(homeLevelOf(obj)) ?? geometry).getCellCenter(obj.position.x, obj.position.y);
           updatedObjects[idx] = {
             ...obj,
             worldPosition: { x: cellCenter.worldX, y: cellCenter.worldY }
@@ -463,7 +499,7 @@ const useGroupDrag = (): UseGroupDragResult => {
     groupDragOffsetsRef.current = new Map();
 
     return true;
-  }, [isDraggingSelection, dragStart, mapData, geometry, setIsDraggingSelection, setDragStart, onObjectsChange, onTextLabelsChange, groupDragInitialStateRef, groupDragOffsetsRef, clearTransient]);
+  }, [isDraggingSelection, dragStart, mapData, geometry, cellGeometryFor, setIsDraggingSelection, setDragStart, onObjectsChange, onTextLabelsChange, groupDragInitialStateRef, groupDragOffsetsRef, clearTransient]);
 
   return {
     isGroupDragging,

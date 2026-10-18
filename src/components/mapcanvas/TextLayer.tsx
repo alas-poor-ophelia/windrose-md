@@ -26,6 +26,9 @@ import { SelectionActionsOverlay } from '../toolbars/SelectionActionsOverlay';
 import { buildTextActions } from '../toolbars/selectionActionBuilders';
 import { getActiveLayer } from '../../persistence/layerAccessor';
 import { copyDeepLinkToClipboard } from '../../persistence/deepLinkHandler';
+import { depthModeOf, effectiveVisibleLevels, withLevelMembership } from '../../geometry/renderers/elementBands';
+import { LevelPickerPopup } from '../overlays/LevelPickerPopup';
+import { useLevelPicker } from '../../hooks/objects/useLevelPicker';
 
 
 
@@ -60,7 +63,7 @@ const TextLayer = ({
   onDeleteCustomColor
 }: TextLayerProps): VNode | null => {
   const app = useApp();
-  const { mapData, mapId, notePath, canvasRef, containerRef, geometry, subHexPath } = useMapState();
+  const { mapData, mapId, notePath, canvasRef, containerRef, geometry, subHexPath, ladder, getActiveLevel } = useMapState();
   const { selectedItem, showCoordinates, layerVisibility, isDraggingSelection } = useMapSelection();
 
   const {
@@ -74,6 +77,8 @@ const TextLayer = ({
     handleTextSubmit,
     handleTextCancel,
     handleRotateClick,
+    handleDepthModeToggle,
+    handleVisibleLevelsChange,
     handleEditClick,
     handleCanvasDoubleClick,
     handleTextDeletion
@@ -130,14 +135,29 @@ const TextLayer = ({
     const x = label.position.x / gridSize;
     const y = label.position.y / gridSize;
 
-    copyDeepLinkToClipboard(displayText, notePath, mapId, x, y, zoom, layerId, subHexPath);
-  }, [selectedItem, mapData, mapId, notePath, subHexPath]);
+    copyDeepLinkToClipboard(displayText, notePath, mapId, x, y, zoom, layerId, subHexPath, ladder !== null && getActiveLevel() >= 1 ? getActiveLevel() : undefined);
+  }, [selectedItem, mapData, mapId, notePath, subHexPath, ladder, getActiveLevel]);
 
   useLayerHandlers('text', {
     handleTextPlacement, handleTextSelection,
     handleTextDragging, stopTextDragging,
     handleCanvasDoubleClick, handleTextKeyDown
   });
+
+  // Ladder level picker, tied to the label it was opened for.
+  const maxLevel = ladder?.params.maxLevel ?? 0;
+  const pickedLabel: TextLabel | undefined = selectedItem?.type === 'text' && mapData
+    ? getActiveLayer(mapData).textLabels?.find((l: TextLabel) => l.id === selectedItem.id)
+    : undefined;
+  const { picker: levelPicker, open: openLevelPicker, close: closeLevelPicker } = useLevelPicker(
+    selectedItem?.type === 'text' ? `text:${selectedItem.id}` : null,
+    containerRef
+  );
+  const handleLevelToggle = (level: number): void => {
+    if (!pickedLabel) return;
+    const on = !effectiveVisibleLevels(pickedLabel, maxLevel, 'label').includes(level);
+    handleVisibleLevelsChange(withLevelMembership(pickedLabel, level, on, maxLevel, 'label'));
+  };
 
   if (showCoordinates || !layerVisibility.textLabels) {
     return null;
@@ -152,13 +172,28 @@ const TextLayer = ({
             onEdit: handleEditClick,
             onRotate: handleRotateClick,
             onCopyLink: handleCopyLink,
-            onDelete: handleTextDeletion
-          })}
+            onDelete: handleTextDeletion,
+            onDepthModeToggle: handleDepthModeToggle,
+            onLevels: openLevelPicker
+          }, { isLadder: ladder !== null, depthMode: depthModeOf(selectedItem.data ?? {}), hasExplicitLevels: pickedLabel?.visibleLevels !== undefined })}
           mapData={mapData}
           canvasRef={canvasRef}
           containerRef={containerRef}
           geometry={geometry}
           selectionType="text"
+        />
+      )}
+
+      {levelPicker !== null && pickedLabel !== undefined && !isDraggingSelection && ladder !== null && (
+        <LevelPickerPopup
+          x={levelPicker.x}
+          y={levelPicker.y}
+          maxLevel={maxLevel}
+          autoState={pickedLabel.visibleLevels === undefined ? 'on' : 'off'}
+          levelState={(level) => (effectiveVisibleLevels(pickedLabel, maxLevel, 'label').includes(level) ? 'on' : 'off')}
+          onToggleLevel={handleLevelToggle}
+          onAuto={() => handleVisibleLevelsChange(undefined)}
+          onClose={closeLevelPicker}
         />
       )}
 

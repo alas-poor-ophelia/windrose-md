@@ -638,6 +638,7 @@ button:is(
 }
 
 .windrose-flyout-img {
+  pointer-events: none;
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -658,6 +659,7 @@ button:is(
 }
 
 .windrose-flyout-preview-img {
+  pointer-events: none;
   width: 100%;
   aspect-ratio: 1;
   object-fit: contain;

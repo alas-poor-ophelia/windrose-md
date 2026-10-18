@@ -20,6 +20,8 @@ import type { ToolId } from '../tools/tool.types';
 import type { ViewController } from '../hooks/viewController.types';
 import type { CanvasCursorStore } from '../hooks/canvasCursor.types';
 import type { MapDistanceOverrides } from '../hooks/distanceMeasurement.types';
+import type { HandleLevelCellsChange } from '../hooks/dataHandlers.types';
+import type { GeometryLadder } from '../../src/geometry/core/createGeometryLadder';
 
 // ===========================================
 // Shared Helper Types
@@ -101,6 +103,30 @@ export interface MapStateContextValue {
   selectedObjectType?: string;
   /** Shared live pan/zoom controller — overlays subscribe to track gestures. */
   viewController?: ViewController;
+  /** Lattice ladder for this map; null on every classic (non-ladder) path. */
+  ladder: GeometryLadder | null;
+  /**
+   * The camera's ladder rung, read from the LIVE zoom at call time (a function,
+   * not a value, so a zoom change never re-renders consumers). 0 when there is no ladder. Tools latch it
+   * at pointerdown; nothing should read it per render.
+   */
+  getActiveLevel: () => number;
+  /**
+   * Edit-level lock: the rung authoring tools are pinned to,
+   * or null when unlocked (edit follows the camera). Session-only, never
+   * persisted; cleared on map change and when the map stops being a ladder view.
+   */
+  editLevelLock: number | null;
+  /** Set (a rung) or clear (null) the edit-level lock. */
+  setEditLevelLock: (level: number | null) => void;
+  /**
+   * The rung authoring tools write to, read LIVE at call time (a function, like
+   * getActiveLevel): the camera rung, or the locked rung when it is shallower
+   * (`resolveEditLevel`). 0 on classic maps. Read at pointerdown, never per render.
+   */
+  getEditLevel: () => number;
+  /** Cell under the pointer on ladder rung `level`; level 0 equals screenToGrid. */
+  screenToLevelCell: (clientX: number, clientY: number, level: number) => Point | null;
   /**
    * Resolved distance overrides for the active map. Sub-hex-aware: inside a
    * sub-hex these are live-derived from the parent chain. Null/undefined means
@@ -153,16 +179,19 @@ export interface MapStateContextValue {
 export interface MapOperationsContextValue {
   // Cell operations
   onCellsChange: (cells: Cell[], skipHistory?: boolean) => void;
+  /** Deep (ladder rung >= 1) cell write on the active layer; absent on hosts without depth authoring. */
+  onLevelCellsChange?: HandleLevelCellsChange;
   onCurvesChange: (curves: Curve[], skipHistory?: boolean) => void;
   onEdgesChange: (edges: Edge[], skipHistory?: boolean) => void;
 
   // Object operations
-  getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
+  /** `homeLevel` scopes index matches to one ladder rung; omitted, any rung (classic) matches. */
+  getObjectAtPosition: (objects: MapObject[], x: number, y: number, homeLevel?: number) => MapObject | null;
   addObject: (objects: MapObject[], typeId: string, x: number, y: number, mapType?: MapType, objectSetId?: string | null) => MapObject[];
   updateObject: (objects: MapObject[] | null | undefined, objectId: string, updates: ObjectUpdate) => MapObject[];
   removeObject: (objects: MapObject[] | null | undefined, objectId: string) => MapObject[];
   removeObjectsInRectangle: (objects: MapObject[] | null | undefined, x1: number, y1: number, x2: number, y2: number) => MapObject[];
-  isAreaFree: (objects: MapObject[] | null | undefined, x: number, y: number, width: number, height: number, excludeId?: string | null) => boolean;
+  isAreaFree: (objects: MapObject[] | null | undefined, x: number, y: number, width: number, height: number, excludeId?: string | null, homeLevel?: number) => boolean;
   onObjectsChange: (objects: MapObject[], skipHistory?: boolean) => void;
 
   // Text label operations
@@ -248,6 +277,8 @@ export interface GroupDragOffset {
   worldOffsetX: number;
   worldOffsetY: number;
   freeform?: boolean;
+  /** Ladder rung the object lives on (absent = 0); the grid offset is measured on this rung. */
+  homeLevel?: number;
 }
 
 /** Layer visibility settings */

@@ -18,7 +18,11 @@ MapSettingsModal.tsx         # Modal shell + tab bar; wraps content in MapSettin
 ├── settingsReducer.ts       # State shape, Actions, reducer, buildInitialState, bounds helpers
 ├── gridmap/GridBackgroundTab.tsx
 └── hexmap/                  # HexGridTab + BackgroundImageSection, BoundsSection,
-                             #   CoordinateDisplaySection, SizingModeSection, SubHexBackdropSection
+                             #   CoordinateDisplaySection, SizingModeSection, SubHexBackdropSection,
+                             #   LadderSection ("Enable detail levels" opt-in toggle behind the 2.5.0 confirm
+                             #   (confirmEnableDetailLevels), then params + opens-at readout; shown with the
+                             #   lodLadder capability OR when the map already has lod (showsDetailLevelSettings); save emits a
+                             #   LadderPatch keep/set/remove via ladderSettingsPatch)
 ```
 
 `CollapsibleSection` and `ColorPicker` live in `components/shared/`.

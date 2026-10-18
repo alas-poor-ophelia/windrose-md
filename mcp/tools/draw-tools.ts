@@ -8,6 +8,35 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { obsidianEvalJson } from "../cli-bridge.js";
 import { opCall, jsStr } from "./ops-helper.js";
 
+/** Level-0 schema cap (pre-ladder behaviour). */
+const MAX_CELLS_PER_CALL = 10000;
+/** Rung (level >= 1) per-op cap, enforced by the bridge; matches MAX_CELLS_PER_DEPTH_OP in src/persistence/depthAuthoring.ts. */
+const MAX_CELLS_PER_RUNG_OP = 4096;
+
+/** Optional ladder rung. Omitted means level 0, never the camera's active level. */
+const levelParam = z.number().int().min(0).optional().describe(
+  "Ladder rung (default 0 = the root lattice). Rung cells are in the rung's own axial coordinates."
+);
+
+/** Trailing ",level" argument for an op call, or "" when the level is omitted. */
+function levelArg(level: number | undefined, padTo = ""): string {
+  return level !== undefined ? `${padTo},${level}` : "";
+}
+
+/**
+ * Eval tail that normalises an op return: rung writes (and refused batches)
+ * return a result object, level-0 writes the legacy boolean / count.
+ */
+const LEVEL_RESULT_JS =
+  `if(r&&typeof r==='object'){return JSON.stringify({ok:r.ok,count:r.count,skipped:r.skipped,level:r.level,error:r.error});}`;
+
+type LevelWriteReply = { ok: boolean; count?: number; skipped?: number; level?: number; error?: string };
+
+function levelSuffix(r: LevelWriteReply): string {
+  if (r.level === undefined) return "";
+  return ` on level ${r.level}` + (r.skipped ? ` (${r.skipped} skipped: outside the map at that level)` : "");
+}
+
 export function registerDrawTools(server: McpServer): void {
   server.tool(
     "windrose_paint_cell",
@@ -17,19 +46,23 @@ export function registerDrawTools(server: McpServer): void {
       y: z.number().describe("Grid Y coordinate"),
       color: z.string().optional().describe("Hex color (e.g. '#ff0000'). Default: current selected color"),
       opacity: z.number().min(0).max(1).optional().describe("Opacity 0-1. Default: current selected opacity"),
+      level: levelParam,
     },
-    async ({ x, y, color, opacity }) => {
-      const colorArg = color ? `,${jsStr(color)}` : "";
-      const opacityArg = opacity !== undefined ? `,${opacity}` : (color ? ",undefined" : "");
+    async ({ x, y, color, opacity, level }) => {
+      const colorArg = color ? `,${jsStr(color)}` : (level !== undefined ? ",undefined" : "");
+      const opacityArg = opacity !== undefined ? `,${opacity}` : ((color || level !== undefined) ? ",undefined" : "");
       const code = opCall(
-        `var r=ops.paintCell(${x},${y}${colorArg}${opacityArg});return JSON.stringify({ok:r,x:${x},y:${y}})`
+        `var r=ops.paintCell(${x},${y}${colorArg}${opacityArg}${levelArg(level)});${LEVEL_RESULT_JS}return JSON.stringify({ok:r,x:${x},y:${y}})`
       );
-      const result = await obsidianEvalJson<{ ok: boolean; error?: string }>(code);
+      const result = await obsidianEvalJson<LevelWriteReply>(code);
       if (result.error) {
         return { content: [{ type: "text" as const, text: result.error }], isError: true };
       }
+      if (result.level !== undefined && result.count === 0) {
+        return { content: [{ type: "text" as const, text: `Nothing painted${levelSuffix(result)}` }] };
+      }
       return {
-        content: [{ type: "text" as const, text: result.ok ? `Painted cell at (${x}, ${y})` : "Failed to paint cell" }],
+        content: [{ type: "text" as const, text: result.ok ? `Painted cell at (${x}, ${y})${levelSuffix(result)}` : "Failed to paint cell" }],
       };
     }
   );
@@ -43,19 +76,20 @@ export function registerDrawTools(server: McpServer): void {
         y: z.number().describe("Grid Y coordinate"),
         color: z.string().optional().describe("Hex color override for this cell"),
         opacity: z.number().min(0).max(1).optional().describe("Opacity override for this cell"),
-      })).max(10000).describe("Array of cells to paint"),
+      })).max(MAX_CELLS_PER_CALL).describe(`Array of cells to paint (at most ${MAX_CELLS_PER_CALL} per call; at most ${MAX_CELLS_PER_RUNG_OP} when level >= 1)`),
+      level: levelParam,
     },
-    async ({ cells }) => {
+    async ({ cells, level }) => {
       const cellsJson = JSON.stringify(cells);
       const code = opCall(
-        `var r=ops.paintCells(${cellsJson});return JSON.stringify({ok:true,count:r})`
+        `var r=ops.paintCells(${cellsJson}${levelArg(level)});${LEVEL_RESULT_JS}return JSON.stringify({ok:true,count:r})`
       );
-      const result = await obsidianEvalJson<{ ok: boolean; count: number; error?: string }>(code);
+      const result = await obsidianEvalJson<LevelWriteReply>(code);
       if (result.error) {
         return { content: [{ type: "text" as const, text: result.error }], isError: true };
       }
       return {
-        content: [{ type: "text" as const, text: `Painted ${result.count} cells` }],
+        content: [{ type: "text" as const, text: `Painted ${result.count ?? 0} cells${levelSuffix(result)}` }],
       };
     }
   );
@@ -66,17 +100,18 @@ export function registerDrawTools(server: McpServer): void {
     {
       x: z.number().describe("Grid X coordinate"),
       y: z.number().describe("Grid Y coordinate"),
+      level: levelParam,
     },
-    async ({ x, y }) => {
+    async ({ x, y, level }) => {
       const code = opCall(
-        `var r=ops.eraseCell(${x},${y});return JSON.stringify({ok:r,x:${x},y:${y}})`
+        `var r=ops.eraseCell(${x},${y}${levelArg(level)});${LEVEL_RESULT_JS}return JSON.stringify({ok:r,x:${x},y:${y}})`
       );
-      const result = await obsidianEvalJson<{ ok: boolean; error?: string }>(code);
+      const result = await obsidianEvalJson<LevelWriteReply>(code);
       if (result.error) {
         return { content: [{ type: "text" as const, text: result.error }], isError: true };
       }
       return {
-        content: [{ type: "text" as const, text: result.ok ? `Erased cell at (${x}, ${y})` : "Failed to erase cell" }],
+        content: [{ type: "text" as const, text: result.ok ? `Erased cell at (${x}, ${y})${levelSuffix(result)}` : "Failed to erase cell" }],
       };
     }
   );
@@ -100,14 +135,15 @@ export function registerDrawTools(server: McpServer): void {
         .describe(
           "When true, return only {count, bounds:{minX,minY,maxX,maxY}, colorHistogram (top 10)} without individual cells. Default false."
         ),
+      level: levelParam,
     },
-    async ({ bbox, summary }) => {
+    async ({ bbox, summary, level }) => {
       const bboxJson = bbox ? JSON.stringify(bbox) : "null";
       const summaryBool = summary ? "true" : "false";
 
       const code = opCall(
         // Fetch all cells
-        `var allCells = ops.getCells();` +
+        `var allCells = ops.getCells(${level !== undefined ? `undefined,${level}` : ""});` +
         // Apply bbox filter if requested
         `var bbox = ${bboxJson};` +
         `var cells = bbox ? allCells.filter(function(c){ return c.x >= bbox.x0 && c.x <= bbox.x1 && c.y >= bbox.y0 && c.y <= bbox.y1; }) : allCells;` +

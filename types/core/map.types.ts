@@ -6,6 +6,7 @@
  */
 
 import type { Cell } from './cell.types';
+import type { MapDistanceOverrides } from '../hooks/distanceMeasurement.types';
 import type { CustomColor } from './common.types';
 import type { Curve } from './curve.types';
 import type { WallPath } from './wallpath.types';
@@ -298,6 +299,27 @@ export interface MapLayer {
    * migration assigns every layer a default board. Stratum = (boardId, tileRole).
    */
   boardId?: BoardId;
+  /**
+   * Authored cells for ladder rungs >= 1, sparse (`cells` is level 0). JSON
+   * keys are strings after a round trip. Read ONLY through `authoredCells` /
+   * `allAuthoredCells` and written ONLY through `setLevelCells`
+   * (src/persistence/layerAccessor.ts). Never present as an empty container.
+   */
+  levels?: Record<number, Cell[]>;
+}
+
+/**
+ * Lattice ladder descriptor. Presence on MapData = ladder mode (see src/geometry/CLAUDE.md, Ladder invariants). Absent = classic map. Stored values are never rewritten on load.
+ */
+export interface LadderConfig {
+  /** Linear subdivision per rung. Allowlist in LADDER_M_ALLOWLIST. Immutable once any rung > 0 has content. */
+  m: number;
+  /** On-screen cell width (px) at which the ladder steps down a rung. */
+  minCellPx: number;
+  /** Deepest authorable rung. */
+  maxLevel: number;
+  /** Per-rung distance overrides; absent = derived from level 0 / m^L. */
+  distanceOverrides?: Record<number, MapDistanceOverrides>;
 }
 
 // ===========================================
@@ -328,6 +350,9 @@ export interface MapData {
   // Optional for back-compat; the load migration seeds a default board.
   boards?: Board[];
   activeBoardId?: BoardId;
+
+  /** Lattice ladder descriptor. Absent = classic map (mapType stays 'hex'). */
+  lod?: LadderConfig;
   /**
    * Layer rendering mode. 'simple' (default/absent) renders ONLY the active layer
    * (today's behavior — safe for non-tile maps). 'strata' composites the active
@@ -669,4 +694,5 @@ export interface MigrationValidation {
 // Layer Updates
 // ===========================================
 
-export type LayerUpdate = Partial<Omit<MapLayer, 'id'>>;
+/** `levels` is excluded: rungs >= 1 are written ONLY through `setLevelCells`. */
+export type LayerUpdate = Partial<Omit<MapLayer, 'id' | 'levels'>>;

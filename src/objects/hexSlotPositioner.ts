@@ -142,32 +142,87 @@ function getMultiObjectScale(objectCount: number): number {
   return 0.55;
 }
 
+/** The ladder rung an object is homed on (absent = 0). */
+function homeLevelOf(obj: { homeLevel?: number }): number {
+  return obj.homeLevel ?? 0;
+}
+
 /**
- * Get objects in a specific cell
+ * Rung scope for an index hit-test on the CLASSIC branch (no ladder view).
+ *
+ * A map carrying `lod` that is not shown as a ladder (quarantined, or rotated)
+ * draws level 0 only, so its deep objects are undrawn and must not be hit,
+ * dragged or deleted by their index (a rung-2 object at (3, -1) is not the
+ * root hex (3, -1)): scope to rung 0. A map without `lod` returns undefined,
+ * which keeps every call byte-identical to the unscoped (main) one.
  */
-function getObjectsInCell(objects: MapObject[], x: number, y: number): MapObject[] {
+function classicHitRung(mapData: { lod?: unknown } | null | undefined): 0 | undefined {
+  return mapData !== null && mapData !== undefined && mapData.lod !== undefined && mapData.lod !== null ? 0 : undefined;
+}
+
+/**
+ * Get objects in a specific cell.
+ *
+ * Rung cells of different ladder levels share index space: (3, -1) on rung 2 is
+ * a different place from (3, -1) on the root. Pass `homeLevel` to restrict the
+ * cell to one rung (the renderer and every ladder hit-test do); omitted, the
+ * match is by index alone, which is the classic (single-rung) behaviour.
+ */
+function getObjectsInCell(objects: MapObject[], x: number, y: number, homeLevel?: number): MapObject[] {
   if (objects == null || !Array.isArray(objects)) return [];
 
   return objects.filter(obj =>
     obj.position != null &&
     obj.position.x === x &&
-    obj.position.y === y
+    obj.position.y === y &&
+    (homeLevel === undefined || homeLevelOf(obj) === homeLevel)
   );
+}
+
+/** Per-cell buckets of one objects array, keyed `home:x,y`, plus the length it was built at. */
+interface ObjectCellIndex { length: number; byCell: Map<string, MapObject[]> }
+
+const objectCellIndexes = new WeakMap<readonly MapObject[], ObjectCellIndex>();
+
+/**
+ * `getObjectsInCell` through a per-cell index of `objects`, built once per
+ * array identity (objects arrays are replaced, never edited, on every write;
+ * the length check also rebuilds after an in-place push). Same members in the
+ * same order as the filter, so slot layouts are identical. The render pass
+ * asks for every drawn object's cell-mates, which made the plain filter O(n^2)
+ * per frame. Without `homeLevel` it falls back to the index-only filter.
+ */
+function getObjectsInCellIndexed(objects: MapObject[], x: number, y: number, homeLevel?: number): MapObject[] {
+  if (objects == null || !Array.isArray(objects)) return [];
+  if (homeLevel === undefined) return getObjectsInCell(objects, x, y);
+  let index = objectCellIndexes.get(objects);
+  if (index === undefined || index.length !== objects.length) {
+    const byCell = new Map<string, MapObject[]>();
+    for (const obj of objects) {
+      if (obj.position == null) continue;
+      const key = homeLevelOf(obj) + ':' + obj.position.x + ',' + obj.position.y;
+      const bucket = byCell.get(key);
+      if (bucket === undefined) byCell.set(key, [obj]); else bucket.push(obj);
+    }
+    index = { length: objects.length, byCell };
+    objectCellIndexes.set(objects, index);
+  }
+  return index.byCell.get(homeLevel + ':' + x + ',' + y) ?? [];
 }
 
 /**
  * Check if a cell can accept another object
  */
-function canAddObjectToCell(objects: MapObject[], x: number, y: number): boolean {
-  const cellObjects = getObjectsInCell(objects, x, y);
+function canAddObjectToCell(objects: MapObject[], x: number, y: number, homeLevel?: number): boolean {
+  const cellObjects = getObjectsInCell(objects, x, y, homeLevel);
   return cellObjects.length < getMaxObjectsPerCell();
 }
 
 /**
  * Get occupied slots in a cell
  */
-function getOccupiedSlots(objects: MapObject[], x: number, y: number): number[] {
-  const cellObjects = getObjectsInCell(objects, x, y);
+function getOccupiedSlots(objects: MapObject[], x: number, y: number, homeLevel?: number): number[] {
+  const cellObjects = getObjectsInCell(objects, x, y, homeLevel);
   return cellObjects
     .map(obj => obj.slot)
     .filter((slot): slot is number => slot !== undefined && slot !== null);
@@ -176,8 +231,8 @@ function getOccupiedSlots(objects: MapObject[], x: number, y: number): number[] 
 /**
  * Prepare objects array after removing an object from a multi-object cell
  */
-function reorganizeAfterRemoval(objects: MapObject[], x: number, y: number): MapObject[] {
-  const cellObjects = getObjectsInCell(objects, x, y);
+function reorganizeAfterRemoval(objects: MapObject[], x: number, y: number, homeLevel?: number): MapObject[] {
+  const cellObjects = getObjectsInCell(objects, x, y, homeLevel);
 
   if (cellObjects.length <= 1) {
     if (cellObjects.length === 1 && cellObjects[0].slot !== 0) {
@@ -197,7 +252,8 @@ function reorganizeAfterRemoval(objects: MapObject[], x: number, y: number): Map
   if (remapping.size === 0) return objects;
 
   return objects.map(obj => {
-    if (obj.position?.x === x && obj.position?.y === y && obj.slot !== undefined) {
+    if (obj.position?.x === x && obj.position?.y === y && obj.slot !== undefined &&
+        (homeLevel === undefined || homeLevelOf(obj) === homeLevel)) {
       const newSlot = remapping.get(obj.slot);
       if (newSlot !== undefined) {
         return { ...obj, slot: newSlot };
@@ -216,9 +272,10 @@ function getClickedObjectInCell(
   hexY: number,
   clickOffsetX: number,
   clickOffsetY: number,
-  orientation: HexOrientation
+  orientation: HexOrientation,
+  homeLevel?: number
 ): MapObject | null {
-  const cellObjects = getObjectsInCell(objects, hexX, hexY);
+  const cellObjects = getObjectsInCell(objects, hexX, hexY, homeLevel);
 
   if (cellObjects.length === 0) return null;
   if (cellObjects.length === 1) return cellObjects[0];
@@ -248,4 +305,4 @@ function getClickedObjectInCell(
   return closest;
 }
 
-export { getSlotOffset, assignSlot, getMaxObjectsPerCell, getMultiObjectScale, getObjectsInCell, canAddObjectToCell, getOccupiedSlots, reorganizeAfterRemoval, getClickedObjectInCell };
+export { getSlotOffset, assignSlot, getMaxObjectsPerCell, getMultiObjectScale, getObjectsInCell, getObjectsInCellIndexed, canAddObjectToCell, getOccupiedSlots, reorganizeAfterRemoval, getClickedObjectInCell, homeLevelOf, classicHitRung };

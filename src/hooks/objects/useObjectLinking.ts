@@ -17,6 +17,8 @@ import { useMapState } from '../../context/MapContext';
 import { useLinkingMode } from '../../context/ObjectLinkingContext';
 import type { LinkingSource } from '../../context/ObjectLinkingContext';
 import { getActiveLayer } from '../../persistence/layerAccessor';
+import { pickLadderObject } from '../../objects/ladderHitTest';
+import { classicHitRung, homeLevelOf } from '../../objects/hexSlotPositioner';
 
 export interface ObjectLinkingOptions {
   onObjectsChange: (objects: MapObject[], suppressHistory?: boolean) => void;
@@ -52,7 +54,7 @@ const removeLinkedObject = (o: MapObject): MapObject => {
 export function useObjectLinking({
   onObjectsChange, handleObjectSelection, selectedItem, setSelectedItem
 }: ObjectLinkingOptions): ObjectLinkingResult {
-  const { mapData, mapId, notePath, instanceId } = useMapState();
+  const { mapData, mapId, notePath, instanceId, ladder, screenToWorld, getActiveLevel, viewController } = useMapState();
   const { isLinkingMode, linkingFrom, startLinking, cancelLinking } = useLinkingMode();
 
   // Bidirectional link updates (handles same-layer vs cross-layer)
@@ -90,10 +92,26 @@ export function useObjectLinking({
     isTouchActive?: boolean
   ): boolean => {
     if (isLinkingMode && linkingFrom && mapData) {
+      // Under the ladder the target is whatever is DRAWN under the pointer
+      // (home rung, held size, depth-mode visibility); the level-0 cell is
+      // only right on classic maps.
       const activeLayer = getActiveLayer(mapData);
-      const targetObject = activeLayer.objects?.find((obj: MapObject) => {
-        return obj.position.x === gridX && obj.position.y === gridY;
-      });
+      let targetObject: MapObject | undefined;
+      if (ladder !== null) {
+        const world = screenToWorld(clientX, clientY);
+        const zoom = viewController?.getLive().zoom ?? mapData.viewState?.zoom ?? 1;
+        targetObject = world
+          ? pickLadderObject(activeLayer.objects ?? [], world.worldX, world.worldY, {
+            ladder, level: getActiveLevel(), zoom, orientation: mapData.orientation ?? 'flat'
+          }) ?? undefined
+          : undefined;
+      } else {
+        // A `lod` map off the ladder view draws rung 0 only: deep objects are not link targets.
+        const rung = classicHitRung(mapData);
+        targetObject = activeLayer.objects?.find((obj: MapObject) => {
+          return obj.position.x === gridX && obj.position.y === gridY && (rung === undefined || homeLevelOf(obj) === rung);
+        });
+      }
 
       if (targetObject) {
         // Prevent self-linking
@@ -150,7 +168,7 @@ export function useObjectLinking({
 
     // Not in linking mode or no target found - use normal selection
     return handleObjectSelection(clientX, clientY, gridX, gridY, isTouchActive);
-  }, [isLinkingMode, linkingFrom, mapData, handleObjectSelection, applyLinkUpdate, cancelLinking, setSelectedItem]);
+  }, [isLinkingMode, linkingFrom, mapData, handleObjectSelection, applyLinkUpdate, cancelLinking, setSelectedItem, ladder, screenToWorld, getActiveLevel, viewController]);
 
   const handleLinkObject = useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'object' || !mapData) return;

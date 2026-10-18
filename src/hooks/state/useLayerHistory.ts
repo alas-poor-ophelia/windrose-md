@@ -32,6 +32,14 @@
  *
  * Fog operations enter history through recordMapChange (prev -> next diff);
  * fog brush strokes coalesce into one entry, never across a layer switch.
+ *
+ * Ladder rungs (design 06 s5): a layer's `levels` record is one diffed layer
+ * field, restored whole (or stripped when the entry had none). A layer with no
+ * rungs reads as the `EMPTY_LEVELS` sentinel, so erasing the last rung to
+ * empty is a recorded change like any other (MERGE-01). An entry also
+ * carries the rung it edited (`level`, camera only) and the `lod` block its
+ * first deep write stamped (`lodStamped`): undo lifts the stamp unless depth
+ * content remains, redo puts it back, and both bring the camera to the rung.
  */
 
 // Type-only imports
@@ -67,10 +75,11 @@ import {
   stepHistoryUndo,
 } from './useHistory';
 import { getLayerById, updateLayer, addLayer, cloneLayer, removeLayer, reorderLayers, setActiveLayer } from '../../persistence/layerAccessor';
+import { EMPTY_LEVELS, applySnapshotLevels, viewStateForRung, undoLodStamp, redoLodStamp } from './layerHistoryOps';
 
 
 const LAYER_KEYS: readonly LayerHistoryLayerKey[] = [
-  'cells', 'curves', 'objects', 'textLabels', 'edges', 'tiles', 'wallPaths', 'terrainStrokes', 'fogOfWar'
+  'cells', 'curves', 'objects', 'textLabels', 'edges', 'tiles', 'wallPaths', 'terrainStrokes', 'fogOfWar', 'levels'
 ];
 const MAP_KEYS: readonly LayerHistoryMapKey[] = [
   'name', 'regions', 'outlines', 'shapeOverlays', 'partyPins', 'savedRoutes'
@@ -93,7 +102,9 @@ function readLayerValues(layer: MapLayer): LayerHistoryLayerValues {
     tiles: layer.tiles,
     wallPaths: layer.wallPaths,
     terrainStrokes: layer.terrainStrokes,
-    fogOfWar: layer.fogOfWar
+    fogOfWar: layer.fogOfWar,
+    // "No rungs" is a value (never undefined), so removing them diffs.
+    levels: layer.levels ?? EMPTY_LEVELS
   };
 }
 
@@ -108,10 +119,22 @@ function readMapValues(map: MapData): LayerHistoryMapValues {
   };
 }
 
-function pickLayerValues(s: LayerHistorySnapshot): Partial<LayerHistoryLayerValues> {
+/**
+ * The snapshot's layer fields. A snapshot without `levels` means "no rungs"
+ * (EMPTY_LEVELS) when it came from a rung write (`level` set) or the base
+ * still has rungs: snapshot builders copy the layer's `levels` whenever it
+ * has any, so its absence there is the last rung being emptied. Otherwise
+ * (a classic snapshot over a classic layer) the key is left out of the diff.
+ */
+function pickLayerValues(
+  s: LayerHistorySnapshot,
+  base: Partial<LayerHistoryLayerValues> | null
+): Partial<LayerHistoryLayerValues> {
+  const baseHasRungs = base?.levels !== undefined && base.levels !== EMPTY_LEVELS;
   return {
     cells: s.cells, curves: s.curves, objects: s.objects, textLabels: s.textLabels, edges: s.edges,
-    tiles: s.tiles, wallPaths: s.wallPaths, terrainStrokes: s.terrainStrokes, fogOfWar: s.fogOfWar
+    tiles: s.tiles, wallPaths: s.wallPaths, terrainStrokes: s.terrainStrokes, fogOfWar: s.fogOfWar,
+    levels: s.levels ?? (s.level !== undefined || baseHasRungs ? EMPTY_LEVELS : undefined)
   };
 }
 
@@ -145,9 +168,20 @@ export function applyLayerHistoryEntry(prev: MapData, entry: LayerHistoryEntry, 
       isUndo ? entry.layer.after : entry.layer.before,
       isUndo ? entry.layer.before : entry.layer.after
     );
-    if (layerPatch != null) next = updateLayer(next, entry.layerId, layerPatch);
+    if (layerPatch != null) {
+      const { levels, ...fields } = layerPatch;
+      next = updateLayer(next, entry.layerId, fields);
+      // Rungs go back whole, or the key is stripped for EMPTY_LEVELS (never
+      // `levels: undefined`, never the sentinel itself on a layer).
+      if ('levels' in layerPatch) {
+        next = { ...next, layers: next.layers.map((l) => l.id === entry.layerId ? applySnapshotLevels(l, { levels }) : l) };
+      }
+    }
   }
-  return next;
+  if (next === prev) return prev;
+  // Leaving the entry that stamped `lod` makes the map classic again (kept
+  // while depth content remains); entering it puts the block back.
+  return isUndo ? undoLodStamp(next, entry) : redoLodStamp(next, entry);
 }
 
 /** Last known values for the open level: the last rendered map plus edits recorded since. */
@@ -217,6 +251,12 @@ function useLayerHistory({
     rootStacksRef.current = null;
     lastRecordLayerRef.current = null;
     pinnedRef.current = { map: {}, layers: {} };
+  } else if (levelRef.current.key === levelKey && levelRef.current.nav !== navigationVersion && mapData?.lod !== undefined) {
+    // A map that IS a ladder (it carries `lod`) has no sub-hex navigation: a
+    // navigationVersion bump is a camera move and keeps history (design 06 s5).
+    // The test is the map's own `lod`, NOT the capability flag: a flag-on
+    // install still navigates legacy sub-hex maps (review finding, phase 3b).
+    levelRef.current = { nav: navigationVersion, key: levelKey };
   } else if (levelRef.current.nav !== navigationVersion || levelRef.current.key !== levelKey) {
     pinnedRef.current = { map: {}, layers: {} };
     const leaving = levelRef.current.key;
@@ -254,7 +294,8 @@ function useLayerHistory({
       layerId: LayerId,
       layerDiff: FieldDiff<LayerHistoryLayerValues> | null,
       mapDiff: FieldDiff<LayerHistoryMapValues> | null,
-      coalesceKey?: string
+      coalesceKey?: string,
+      meta?: Pick<LayerHistorySnapshot, 'level' | 'lodStamped'>
     ): void => {
       if (layerDiff == null && mapDiff == null) return;
       const now = Date.now();
@@ -264,7 +305,9 @@ function useLayerHistory({
         layer: layerDiff ?? emptyDiff<LayerHistoryLayerValues>(),
         map: mapDiff ?? emptyDiff<LayerHistoryMapValues>(),
         coalesceKey,
-        time: now
+        time: now,
+        ...(meta?.level !== undefined ? { level: meta.level } : {}),
+        ...(meta?.lodStamped !== undefined ? { lodStamped: meta.lodStamped } : {})
       };
 
       const top = coalesceKey != null && lastRecordLayerRef.current === layerId ? peekTopHistoryEntry(stack) : null;
@@ -307,7 +350,7 @@ function useLayerHistory({
         // `known` still holds them on the first move (no render in between);
         // later moves find the pin already held and leave it.
         const liveLayerDiff = knownLayer != null
-          ? diffHistoryFields(LAYER_KEYS, knownLayer, pickLayerValues(state), true)
+          ? diffHistoryFields(LAYER_KEYS, knownLayer, pickLayerValues(state, knownLayer), true)
           : null;
         const liveMapDiff = diffHistoryFields(MAP_KEYS, known.map, pickMapValues(state), true);
         pinnedRef.current = {
@@ -324,10 +367,10 @@ function useLayerHistory({
       pinnedRef.current = { map: {}, layers: { ...pinned.layers, [layerId]: {} } };
       // A layer not yet rendered has no known baseline: record only map-wide fields.
       const layerDiff = baseLayer != null
-        ? diffHistoryFields(LAYER_KEYS, baseLayer, pickLayerValues(state), true)
+        ? diffHistoryFields(LAYER_KEYS, baseLayer, pickLayerValues(state, baseLayer), true)
         : null;
       const mapDiff = diffHistoryFields(MAP_KEYS, baseMap, pickMapValues(state), true);
-      recordEntry(layerId, layerDiff, mapDiff);
+      recordEntry(layerId, layerDiff, mapDiff, undefined, { level: state.level, lodStamped: state.lodStamped });
     },
     [recordEntry]
   );
@@ -386,7 +429,9 @@ function useLayerHistory({
           const candidate = applyLayerHistoryEntry(prev, step.entry, direction);
           if (candidate !== prev) {
             stack = step.stack;
-            next = candidate;
+            // Cross-rung undo/redo: bring the camera to the rung the change lives on.
+            const view = viewStateForRung(candidate, step.entry.level);
+            next = view !== null ? { ...candidate, viewState: view } : candidate;
             break;
           }
           stack = dropHistoryStep(stack, direction);

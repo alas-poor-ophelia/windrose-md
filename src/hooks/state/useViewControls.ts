@@ -8,12 +8,18 @@ import type { HexBounds, MapData, StoredViewState } from '#types/core/map.types'
 import type { ExtendedGeometry } from '#types/contexts/context.types';
 
 import { DEFAULTS } from '../../core/dmtConstants';
+import { Notice } from 'obsidian';
+
+import { getMaxZoom, hasDepthContent, isLadderView } from '../../core/lodFlags';
 import { calculateContentFitView } from '../../geometry/core/contentFitView';
 import { calculateFitZoom } from '../../geometry/core/hexMeasurements';
 import { offsetToAxial } from '../../geometry/core/offsetCoordinates';
 
 
 
+
+/** Multiplicative zoom-button step, ladder maps only (~25% per press). */
+const ZOOM_BUTTON_FACTOR = 1.25;
 
 interface UseViewControlsOptions {
   mapData: MapData | null;
@@ -88,10 +94,15 @@ function useViewControls({
 
   const handleZoomIn = (): void => {
     if (!mapData || !mapData.viewState) return;
-    const newZoom = Math.min(
-      DEFAULTS.maxZoom,
-      mapData.viewState.zoom + DEFAULTS.zoomButtonStep
-    );
+    // A ladder map's ceiling is three orders of magnitude above the classic 4,
+    // so the additive +0.05 step would be dead there: go multiplicative, which
+    // keeps the perceived step uniform at every scale (the wheel already does).
+    const newZoom = isLadderView(mapData)
+      ? Math.min(getMaxZoom(mapData), mapData.viewState.zoom * ZOOM_BUTTON_FACTOR)
+      : Math.min(
+        DEFAULTS.maxZoom,
+        mapData.viewState.zoom + DEFAULTS.zoomButtonStep
+      );
     handleViewStateChange({
       ...mapData.viewState,
       zoom: newZoom
@@ -100,10 +111,12 @@ function useViewControls({
 
   const handleZoomOut = (): void => {
     if (!mapData || !mapData.viewState) return;
-    const newZoom = Math.max(
-      DEFAULTS.minZoom,
-      mapData.viewState.zoom - DEFAULTS.zoomButtonStep
-    );
+    const newZoom = isLadderView(mapData)
+      ? Math.max(DEFAULTS.minZoom, mapData.viewState.zoom / ZOOM_BUTTON_FACTOR)
+      : Math.max(
+        DEFAULTS.minZoom,
+        mapData.viewState.zoom - DEFAULTS.zoomButtonStep
+      );
     handleViewStateChange({
       ...mapData.viewState,
       zoom: newZoom
@@ -112,6 +125,12 @@ function useViewControls({
 
   const handleCompassClick = (): void => {
     if (!mapData) return;
+    // Depth content lives on the unrotated lattice; a rotated map leaves the
+    // ladder view and would strand it (design 06, s19 item 2).
+    if (hasDepthContent(mapData)) {
+      new Notice('Rotation is locked while this map has content above level 0.');
+      return;
+    }
     const rotations = [0, 90, 180, 270];
     updateMapData((prev: MapData) => {
       const currentIndex = rotations.indexOf(prev.northDirection ?? 0);

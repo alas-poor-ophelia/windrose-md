@@ -176,7 +176,7 @@ function loadVaultImage(
 
 const TileThumbnail = memo(({ url }: TileThumbnailProps): VNode => {
   if (url != null && url !== '') {
-    return <img src={url} className="windrose-tile-thumb-img" width={THUMB_SIZE} height={THUMB_SIZE} alt="" />;
+    return <img src={url} className="windrose-tile-thumb-img" draggable={false} width={THUMB_SIZE} height={THUMB_SIZE} alt="" />;
   }
   // '' = terminal load failure (static placeholder); null = still loading (shimmer).
   const failed = url === '';

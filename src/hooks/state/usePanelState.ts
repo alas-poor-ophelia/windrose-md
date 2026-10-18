@@ -15,11 +15,15 @@ import type {
 } from '#types/index';
 import { isHexCell } from '#types/core/cell.types';
 import type { HexBounds } from '#types/core/map.types';
+import { hasDepthContent, deepestAuthoredRung, isDepthQuarantined, type LadderPatch } from '../../core/lodFlags';
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { getLayerById } from '../../persistence/layerAccessor';
 
 import { offsetToAxial, isAxialInHexBounds, isOffsetInHexBounds } from '../../geometry/core/offsetCoordinates';
+import { HexGeometry } from '../../geometry/core/HexGeometry';
+import { DEFAULTS } from '../../core/dmtConstants';
+import { filterLevelsToBounds, ladderForAuthoredRungs } from '../../persistence/resizeOperations';
 
 
 
@@ -48,7 +52,8 @@ interface UsePanelStateResult {
     hexBounds?: HexBounds | null,
     backgroundImage?: BackgroundImage | null,
     hexSize?: number | null,
-    deleteOrphanedContent?: boolean
+    deleteOrphanedContent?: boolean,
+    ladderPatch?: LadderPatch
   ) => void;
   handleSettingsClose: () => void;
 }
@@ -93,12 +98,13 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
     hexBounds: HexBounds | null = null,
     backgroundImage: BackgroundImage | null = null,
     hexSize: number | null = null,
-    deleteOrphanedContent: boolean = false
+    deleteOrphanedContent: boolean = false,
+    ladderPatch: LadderPatch = { kind: 'keep' }
   ): void => {
     if (!mapData) return;
 
     updateMapData((prev: MapData) => {
-      const newMapData: MapData = {
+      let newMapData: MapData = {
         ...prev,
         settings: settingsData,
         uiPreferences: preferencesData,
@@ -121,8 +127,11 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
               const filteredCells = layer.cells?.filter((cell: Cell) =>
                 isHexCell(cell) && isInBounds(cell.q, cell.r)
               );
+              // Root-bounds filter on level-0 objects only: an object homed on a
+              // ladder rung carries RUNG coordinates, which this root test would
+              // misread; filterLevelsToBounds judges those by their root ancestor.
               const filteredObjects = layer.objects?.filter((obj: MapObject) =>
-                isInBounds(obj.position.x, obj.position.y)
+                (obj.homeLevel ?? 0) > 0 || isInBounds(obj.position.x, obj.position.y)
               );
               const filteredFog = layer.fogOfWar?.foggedCells?.filter(
                 (fc: { col: number; row: number }) => isFogCellInBounds(fc.col, fc.row)
@@ -139,6 +148,14 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
               };
             });
           }
+
+          // Rung (>= 1) cells: keep only those whose lattice ancestor exists under
+          // the NEW bounds. Written through setLevelCells, so emptied rungs go away.
+          const ladder = ladderForAuthoredRungs(
+            newMapData,
+            new HexGeometry(hexSize ?? prev.hexSize ?? DEFAULTS.hexSize, orientation, hexBounds)
+          );
+          if (ladder !== null) newMapData = filterLevelsToBounds(newMapData, ladder);
         }
       }
 
@@ -171,6 +188,35 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
 
       if (hexSize !== null && prev.mapType === 'hex') {
         newMapData.hexSize = hexSize;
+      }
+
+      // Ladder patch from the settings opt-in (ladderSettingsPatch): `set`
+      // arrives already merged over the stored lod; `keep` leaves the stored
+      // lod exactly as it was. `remove` was decided against the modal's
+      // snapshot, so it is re-checked against the LIVE map: rungs written
+      // since (another pane, an MCP write) turn it into `keep`, because
+      // stripping `lod` under depth content would quarantine the map (PX-07).
+      // `set` is re-checked the same way. Under live depth content the stored
+      // `m` is kept (a new `m` re-partitions every rung cell) and `maxLevel`
+      // never drops below the deepest authored rung. A map quarantined for
+      // rungs without a `lod` block is left as it is: a `set` would
+      // un-quarantine it with parameters its content was never laid out on.
+      if (prev.mapType === 'hex') {
+        if (ladderPatch.kind === 'set') {
+          if (isDepthQuarantined(prev).reason === 'levels-without-lod') {
+            // keep: the stored state (no lod) stays exactly as it was
+          } else if (prev.lod != null && hasDepthContent(prev)) {
+            newMapData.lod = {
+              ...ladderPatch.lod,
+              m: prev.lod.m,
+              maxLevel: Math.max(ladderPatch.lod.maxLevel, deepestAuthoredRung(prev))
+            };
+          } else {
+            newMapData.lod = ladderPatch.lod;
+          }
+        } else if (ladderPatch.kind === 'remove' && !hasDepthContent(prev)) {
+          delete newMapData.lod;
+        }
       }
 
       return newMapData;

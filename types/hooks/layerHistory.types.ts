@@ -11,7 +11,7 @@ import type { Cell } from '../core/cell.types';
 import type { Curve } from '../core/curve.types';
 import type { WallPath } from '../core/wallpath.types';
 import type { TerrainStroke } from '../core/terrainstroke.types';
-import type { Edge, TextLabel, MapData, LayerId, Region, ShapeOverlay, Outline, FogOfWar, PartyPin, SavedRoute } from '../core/map.types';
+import type { Edge, TextLabel, MapData, LayerId, Region, ShapeOverlay, Outline, FogOfWar, PartyPin, SavedRoute, LadderConfig } from '../core/map.types';
 import type { MapObject } from '../objects/object.types';
 import type { TileAssignment } from '../tiles/tile.types';
 import type { FieldDiff, HistoryStack } from './history.types';
@@ -57,11 +57,25 @@ export interface LayerHistorySnapshot {
   savedRoutes?: SavedRoute[];
   /** Fog of war state (layer-level, tracked for compound undo with player moves) */
   fogOfWar?: FogOfWar | null;
+  /**
+   * Ladder rungs >= 1 of the layer, by reference. Present ONLY
+   * when the layer has `levels`; never `levels: undefined`. Undo/redo restores
+   * this whole record.
+   */
+  levels?: Record<number, Cell[]>;
+  /** Rung the entry edited. UI/telemetry only; never selects what to restore. */
+  level?: number;
+  /**
+   * Set ONLY on the entry whose deep write stamped `lod` onto a previously
+   * classic map (the first rung write). Undoing past this entry strips `lod`
+   * again; redoing onto it puts this block back. Absent everywhere else.
+   */
+  lodStamped?: LadderConfig;
 }
 
 /** Snapshot keys that live on the layer (restored onto the entry's layer). */
 export type LayerHistoryLayerKey =
-  'cells' | 'curves' | 'objects' | 'textLabels' | 'edges' | 'tiles' | 'wallPaths' | 'terrainStrokes' | 'fogOfWar';
+  'cells' | 'curves' | 'objects' | 'textLabels' | 'edges' | 'tiles' | 'wallPaths' | 'terrainStrokes' | 'fogOfWar' | 'levels';
 
 /** Snapshot keys that live on the map root (map-wide). */
 export type LayerHistoryMapKey = 'name' | 'regions' | 'outlines' | 'shapeOverlays' | 'partyPins' | 'savedRoutes';
@@ -81,6 +95,10 @@ export interface LayerHistoryEntry {
   coalesceKey?: string;
   /** Push time (ms), for coalescing. */
   time: number;
+  /** Ladder rung the edit was made on (from the snapshot's `level`); undo/redo bring the camera there. */
+  level?: number;
+  /** The `lod` block this entry's deep write stamped (snapshot `lodStamped`); undo lifts it, redo restores it. */
+  lodStamped?: LadderConfig;
 }
 
 /** Undo stacks keyed by layer id (one map level; cleared on sub-hex navigation). */

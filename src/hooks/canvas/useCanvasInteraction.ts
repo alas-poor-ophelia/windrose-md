@@ -24,10 +24,13 @@ import type {
 import type { ViewController } from '#types/hooks/viewController.types';
 import type { SubHexCoordDetail } from '../../core/windroseEvents';
 import type { SubHexExitDetail } from '#types/hooks/canvasInteraction.types';
+import type { GeometryLadder } from '../../geometry/core/createGeometryLadder';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULTS } from '../../core/dmtConstants';
-import { useSeamlessSubHex, MAX_WHEEL_ZOOM } from './useSeamlessSubHex';
+import { useSeamlessSubHex } from './useSeamlessSubHex';
+import { getMaxZoom, isLadderView } from '../../core/lodFlags';
+import { levelCellAtWorld } from '../../drawing/depthCellOps';
 import { traceZoom } from '../../utils/zoomTraceProbe';
 import {
   anchoredZoomCenter,
@@ -112,7 +115,10 @@ function useCanvasInteraction(
   // map obeyed). Absent on the coordinate-utility instantiation in MapCanvas
   // when unwired — seamless transitions simply don't fire there.
   requestEnterSubHex?: (detail: SubHexCoordDetail) => void,
-  requestExitSubHex?: (detail: SubHexExitDetail | null) => void
+  requestExitSubHex?: (detail: SubHexExitDetail | null) => void,
+  // Lattice ladder (null on every classic path). Only screenToLevelCell reads
+  // it; screenToGrid stays level 0 (design section 19 item 5).
+  ladder: GeometryLadder | null = null
 ): UseCanvasInteractionResult {
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [isTouchPanning, setIsTouchPanning] = useState<boolean>(false);
@@ -335,6 +341,14 @@ function useCanvasInteraction(
     return world ? geometry.worldToGrid(world.worldX, world.worldY) : null;
   };
 
+  // Cell under the pointer on ladder rung `level`. Level 0 (or no ladder) is
+  // exactly screenToGrid; deeper rungs swap only the final worldToGrid.
+  const screenToLevelCell = (clientX: number, clientY: number, level: number): Point | null => {
+    if (!geometry) return null;
+    const world = screenToWorld(clientX, clientY);
+    return world ? levelCellAtWorld(ladder, geometry, level, world.worldX, world.worldY) : null;
+  };
+
   // One transform for every pointer -> map conversion: CSS scaling, inverse
   // north rotation, then the view offset (unit rule owned by viewportMath).
   const screenToWorld = (clientX: number, clientY: number): WorldCoords | null => {
@@ -349,7 +363,7 @@ function useCanvasInteraction(
 
   // Seamless sub-hex dive/surface (zoom-driven map swap): fires from the wheel
   // and touch-pinch zoom paths below.
-  const { maybeSeamlessSubHexTransition, resetPrewarm } = useSeamlessSubHex({
+  const seamlessSubHex = useSeamlessSubHex({
     canvasRef,
     mapData,
     geometry,
@@ -363,6 +377,18 @@ function useCanvasInteraction(
     clearWheelSettle,
     commitActiveGesture
   });
+  const { resetPrewarm } = seamlessSubHex;
+  // Under the lattice ladder there is no document to dive into: the whole
+  // world is one map that subdivides as you zoom, so a zoom-in keeps climbing
+  // on the root map to the ladder's ceiling (and skips the approach-band
+  // prewarm: nothing to prewarm). The zoom-OUT surface is deliberately NOT
+  // gated: a map entered through a legacy sub-hex link must still surface.
+  const maybeSeamlessSubHexTransition = (
+    zoomingIn: boolean, currentZoom: number, newZoom: number, anchorClientX: number, anchorClientY: number
+  ): boolean => {
+    if (zoomingIn && isLadderView(mapData)) return false;
+    return seamlessSubHex.maybeSeamlessSubHexTransition(zoomingIn, currentZoom, newZoom, anchorClientX, anchorClientY);
+  };
 
   // Trackpad two-finger scroll: pan the view by the wheel deltas, using the
   // same rotation/scale math as pointer-drag panning. Content follows document
@@ -443,10 +469,10 @@ function useCanvasInteraction(
         PINCH_ZOOM_FACTOR_MAX,
         Math.max(PINCH_ZOOM_FACTOR_MIN, Math.exp(-e.deltaY * PINCH_ZOOM_RATE))
       );
-      newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, viewState.zoom * factor));
+      newZoom = Math.max(DEFAULTS.minZoom, Math.min(getMaxZoom(mapData), viewState.zoom * factor));
     } else {
       const factor = e.deltaY > 0 ? 1 / WHEEL_ZOOM_STEP_FACTOR : WHEEL_ZOOM_STEP_FACTOR;
-      newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, viewState.zoom * factor));
+      newZoom = Math.max(DEFAULTS.minZoom, Math.min(getMaxZoom(mapData), viewState.zoom * factor));
     }
 
     traceZoom('wheel', { mode, pinch: isPinch, dY: e.deltaY, zoom: viewState.zoom, newZoom });
@@ -506,7 +532,7 @@ function useCanvasInteraction(
     }
     const ge = e as WebKitGestureEvent;
     const currentZoom = viewController.getLive().zoom;
-    const newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, startZoom * ge.scale));
+    const newZoom = Math.max(DEFAULTS.minZoom, Math.min(getMaxZoom(mapData), startZoom * ge.scale));
     traceZoom('gestChange', { scale: ge.scale, startZoom, zoom: currentZoom, newZoom });
 
     // Seamless sub-hex dive/surface: end the pinch cleanly when it fires —
@@ -663,7 +689,7 @@ function useCanvasInteraction(
     let newZoom = zoom;
     if (initialPinchDistanceRef.current != null) {
       const scale = distance / initialPinchDistanceRef.current;
-      newZoom = Math.max(DEFAULTS.minZoom, Math.min(MAX_WHEEL_ZOOM, zoom * scale));
+      newZoom = Math.max(DEFAULTS.minZoom, Math.min(getMaxZoom(mapData), zoom * scale));
       traceZoom('touchTick', { d: distance, d0: initialPinchDistanceRef.current, scale, zoom, newZoom });
 
       // Seamless sub-hex dive/surface: the pinch rides through the swap.
@@ -796,6 +822,7 @@ function useCanvasInteraction(
     getTouchCenter,
     getTouchDistance,
     screenToGrid,
+    screenToLevelCell,
     screenToWorld,
 
     handleWheel,

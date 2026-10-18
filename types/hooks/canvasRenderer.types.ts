@@ -10,6 +10,7 @@ import type { MapData, StoredViewState } from '../core/map.types';
 import type { ExtendedGeometry, LayerVisibility, SelectedItem } from '../contexts/context.types';
 import type { ExportLayerOption } from '../core/export.types';
 import type { ViewController } from './viewController.types';
+import type { GeometryLadder } from '../../src/geometry/core/createGeometryLadder';
 export type { LayerVisibility };
 
 /** Adjacent sub-hex map for ghost preview rendering */
@@ -112,6 +113,27 @@ export interface RenderCanvasOptions {
    * the active layer on simple maps and the active board's layers on strata maps.
    */
   exportLayers?: ExportLayerOption[] | null;
+  /**
+   * Lattice ladder for this map, or null (the default) for every classic path.
+   * Non-null only when the capability flag is on AND the map is an unrotated hex
+   * map; built once per map in MapCanvas's geometry memo, because the static
+   * cache keys on its identity. Hover previews and image export pass one only
+   * together with `bypassSurfaceCache` and an explicit `level` (phase 3c), so
+   * they never touch the per-level surface cache.
+   */
+  ladder?: GeometryLadder | null;
+  /**
+   * Ladder rung to paint, overriding `ladder.activeLevel(zoom)`. Ignored without
+   * a ladder. Export and hover previews pass the deepest authored rung so deep
+   * content shows regardless of their zoom.
+   */
+  level?: number;
+  /**
+   * Draw the static content straight onto the canvas: no per-level surface, no
+   * surface-budget entry, no active-canvas claim and no ladder telemetry. For
+   * one-shot canvases (hover previews, image export) that carry a ladder.
+   */
+  bypassSurfaceCache?: boolean;
 }
 
 /** Main render function */

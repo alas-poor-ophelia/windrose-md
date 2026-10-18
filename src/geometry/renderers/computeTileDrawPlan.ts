@@ -36,6 +36,18 @@ interface TileRenderOptions {
   /** Terrain brush strokes for the layer — join the region-fill pass so strokes
    *  and cell fills of the same texture share one mask (and one feather). */
   terrainStrokes?: TerrainStroke[];
+  /** Ladder depth (level >= 1): clip each snapped hex tile's art to its own
+   *  home-rung hexagon, so a parent tile re-drawn under its fine cells reads as
+   *  the parent's texture cut to the parent hex. Ignored on grid geometry and
+   *  for freeform stamps. Absent/false = today's unclipped draw. */
+  clipToHex?: boolean;
+  /** Ladder depth (level >= 1), "smart" clip (kgc.26): root keys `${q},${r}`
+   *  holding deep content on the active rungs (`deepRootCellKeys`). A snapped
+   *  ROOT tile (homeLevel absent/0) with a neighbour in this set is clipped to
+   *  the union of its own hexagon and its neighbours NOT in the set; a tile
+   *  with no such neighbour draws unclipped. Ignored on grid, for freeform
+   *  stamps and deep tiles, and when `clipToHex` is set (whole-hex wins). */
+  deepRoots?: ReadonlySet<string>;
 }
 
 

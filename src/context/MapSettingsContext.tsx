@@ -14,6 +14,7 @@ import type {
   HexBounds,
   BackgroundImage,
   MeasurementMethod,
+  LadderConfig,
 } from '#types/core/map.types';
 import type { Cell } from '#types/core/cell.types';
 import type { MapObject } from '#types/objects/object.types';
@@ -44,12 +45,16 @@ import type {
 } from '../components/settings/settingsReducer';
 
 import type { ComponentChildren, FunctionComponent } from 'preact';
+import { Notice } from 'obsidian';
 import { createContext } from 'preact';
 import type { MutableRef } from 'preact/hooks';
 import { useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'preact/hooks';
 import { Actions, GRID_DENSITY_PRESETS, settingsReducer, buildInitialState, calculateBoundsFromSettings, getOrphanedContentInfo } from '../components/settings/settingsReducer';
+import { getActiveLayer } from '../persistence/layerAccessor';
+import { countLevelOrphansForBounds } from '../persistence/resizeOperations';
 import type { CurrentSettings, CurrentBackgroundImage, CurrentDistanceSettings } from '../components/settings/settingsReducer';
 import { getSettings } from '../core/settingsAccessor';
+import { isLodLadderEnabled, hasSubHexChildren, hasDepthContent, ladderSettingsPatch, type LadderPatch } from '../core/lodFlags';
 import { THEME } from '../core/dmtConstants';
 import { getImageDisplayNames, getFullPathFromDisplayName, getDisplayNameFromPath, getImageDimensions } from '../assets/imageOperations';
 import { calculateGridFromColumns, measurementToHexSize, MEASUREMENT_CORNER } from '../geometry/core/hexMeasurements';
@@ -152,6 +157,10 @@ interface MapSettingsHandlers {
 
   // Sub-hex parent map backdrop override
   setShowParentBackdrop: (value: boolean | undefined) => void;
+
+  // Lattice ladder parameters (hex, capability flag on)
+  setLadderConfig: (updates: Partial<Pick<LadderConfig, 'm' | 'minCellPx' | 'maxLevel'>>) => void;
+  setLadderEnabled: (enabled: boolean) => void;
 
   // Color picker
   setActiveColorPicker: (picker: string | null) => void;
@@ -305,6 +314,12 @@ export interface HexGridContextValue {
   handleResizeConfirmCancel: () => void;
   showParentBackdrop: boolean | undefined;
   setShowParentBackdrop: (value: boolean | undefined) => void;
+  /** Explicit ladder opt-in (initially: the map stores a lod). */
+  ladderEnabled: boolean;
+  setLadderEnabled: (enabled: boolean) => void;
+  /** Pending ladder settings: stored `lod` merged with edits; null = none stored and none edited. */
+  lod: LadderConfig | null;
+  setLadderConfig: (updates: Partial<Pick<LadderConfig, 'm' | 'minCellPx' | 'maxLevel'>>) => void;
 }
 
 /** Provider props */
@@ -318,7 +333,9 @@ export interface MapSettingsProviderProps {
     hexBounds: HexBounds | null,
     backgroundImage: BackgroundImage | null,
     hexSize: number | null,
-    deleteOrphanedContent: boolean
+    deleteOrphanedContent: boolean,
+    /** What to do with the stored `mapData.lod`; absent = keep. */
+    ladderPatch?: LadderPatch
   ) => void;
   onOpenAlignmentMode?: (currentX: number, currentY: number) => void;
   initialTab?: SettingsTabId | null;
@@ -367,6 +384,17 @@ function useModalShell(): ModalShellContextValue {
   const ctx = useContext(ModalShellContext);
   if (!ctx) throw new Error('useModalShell must be used within MapSettingsProvider');
   return ctx;
+}
+
+/**
+ * Whether the map settings modal shows the detail-levels section: a hex map
+ * while the global capability is on, or any hex map that already HAS detail
+ * levels (`mapData.lod`), so a user who switched the capability off can still
+ * see and disable them.
+ */
+function showsDetailLevelSettings(mapType: string | null | undefined, mapData: { lod?: unknown } | null): boolean {
+  if (mapType !== 'hex') return false;
+  return isLodLadderEnabled() || (mapData !== null && mapData.lod != null);
 }
 
 function useAppearance(): AppearanceContextValue {
@@ -424,7 +452,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   // State via reducer
   const [state, dispatch] = useReducer(
     settingsReducer,
-    { props: { initialTab: initialTab ?? undefined, mapType, currentSettings: currentSettings ?? undefined, currentPreferences: currentPreferences ?? undefined, currentHexBounds: currentHexBounds ?? undefined, currentBackgroundImage: currentBackgroundImage ?? undefined, currentDistanceSettings: currentDistanceSettings ?? undefined, currentObjectSetId }, globalSettings },
+    { props: { initialTab: initialTab ?? undefined, mapType, currentSettings: currentSettings ?? undefined, currentPreferences: currentPreferences ?? undefined, currentHexBounds: currentHexBounds ?? undefined, currentBackgroundImage: currentBackgroundImage ?? undefined, currentDistanceSettings: currentDistanceSettings ?? undefined, currentObjectSetId, currentLod: mapData?.lod ?? null }, globalSettings },
     (init: { props: BuildInitialStateProps; globalSettings: PluginSettings }) => buildInitialState(init.props, init.globalSettings)
   );
 
@@ -458,7 +486,7 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     dispatch({
       type: Actions.INITIALIZE,
       payload: {
-        props: { initialTab: initialTab ?? undefined, mapType, currentSettings: currentSettings ?? undefined, currentPreferences: currentPreferences ?? undefined, currentHexBounds: currentHexBounds ?? undefined, currentBackgroundImage: currentBackgroundImage ?? undefined, currentDistanceSettings: currentDistanceSettings ?? undefined, currentObjectSetId },
+        props: { initialTab: initialTab ?? undefined, mapType, currentSettings: currentSettings ?? undefined, currentPreferences: currentPreferences ?? undefined, currentHexBounds: currentHexBounds ?? undefined, currentBackgroundImage: currentBackgroundImage ?? undefined, currentDistanceSettings: currentDistanceSettings ?? undefined, currentObjectSetId, currentLod: mapData?.lod ?? null },
         globalSettings
       }
     });
@@ -684,7 +712,17 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       objectSetId: settingsData.objectSetId,
       showParentBackdrop: settingsData.showParentBackdrop,
     };
-    onSave(mapSettings, state.preferences, mapType === 'hex' ? state.hexBounds : null, backgroundImageData, calculatedHexSize, forceDelete);
+    // Ladder settings: only from the shown section (see showsDetailLevelSettings;
+    // classic sub-maps keep it inert). The opt-in toggle decides set / remove;
+    // see ladderSettingsPatch.
+    const ladderShown = showsDetailLevelSettings(mapType, mapData) && !(mapData !== null && hasSubHexChildren(mapData));
+    const ladderPatch: LadderPatch = ladderShown
+      ? ladderSettingsPatch(mapData?.lod, state.ladderEnabled, state.lod, mapData !== null && hasDepthContent(mapData))
+      : { kind: 'keep' };
+    onSave(mapSettings, state.preferences, mapType === 'hex' ? state.hexBounds : null, backgroundImageData, calculatedHexSize, forceDelete, ladderPatch);
+    if (ladderPatch.kind !== 'remove' && ladderPatch.mRefused === true) {
+      new Notice('Child hexes per parent edge cannot change once a map has detail content; the other settings were saved.');
+    }
     onClose();
   };
 
@@ -699,7 +737,10 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       );
 
       if (isRectReduction || isRadialReduction) {
-        const orphans = getOrphanedContentInfo(state.hexBounds, mapType, currentCells, currentObjects, orientation);
+        // Scope is the ACTIVE layer only (currentCells/currentObjects are the active
+        // layer's level 0); rung cells are counted for that same layer.
+        const levelOrphans = mapData !== null ? countLevelOrphansForBounds(mapData, getActiveLayer(mapData), state.hexBounds) : 0;
+        const orphans = getOrphanedContentInfo(state.hexBounds, mapType, currentCells, currentObjects, orientation, levelOrphans);
         if (orphans.cells > 0 || orphans.objects > 0) {
           dispatch({
             type: Actions.SHOW_RESIZE_CONFIRM,
@@ -748,6 +789,8 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     setDistanceSettings: (updates) => dispatch({ type: Actions.SET_DISTANCE_SETTING, payload: updates }),
     setCoordinateDisplayMode: (mode) => dispatch({ type: Actions.SET_COORDINATE_MODE, payload: mode }),
     setShowParentBackdrop: (value) => dispatch({ type: Actions.SET_PARENT_BACKDROP, payload: value }),
+    setLadderConfig: (updates) => dispatch({ type: Actions.SET_LADDER_CONFIG, payload: updates }),
+    setLadderEnabled: (enabled) => dispatch({ type: Actions.SET_LADDER_ENABLED, payload: enabled }),
     setActiveColorPicker: (picker) => dispatch({ type: Actions.SET_ACTIVE_COLOR_PICKER, payload: picker as ColorPickerId }),
     setBackgroundImageDisplayName: (name) => dispatch({ type: Actions.SET_IMAGE_DISPLAY_NAME, payload: name }),
     handleImageClear: () => {
@@ -938,14 +981,18 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
     handleResizeConfirmCancel: handlers.handleResizeConfirmCancel,
     showParentBackdrop: state.showParentBackdrop,
     setShowParentBackdrop: handlers.setShowParentBackdrop,
+    ladderEnabled: state.ladderEnabled,
+    setLadderEnabled: handlers.setLadderEnabled,
+    lod: state.lod,
+    setLadderConfig: handlers.setLadderConfig,
   }), [
     state.hexBounds, state.boundsShape, state.boundsLocked,
     state.coordinateDisplayMode, state.showResizeConfirm,
-    state.pendingBoundsChange, state.orphanInfo, state.showParentBackdrop,
+    state.pendingBoundsChange, state.orphanInfo, state.showParentBackdrop, state.lod, state.ladderEnabled,
     stableHandleResizeConfirmDelete,
     handlers.handleBoundsLockToggle, handlers.handleBoundsShapeChange, handlers.handleHexBoundsChange,
     handlers.handleRadiusChange, handlers.handleResizeConfirmCancel, handlers.setCoordinateDisplayMode,
-    handlers.setShowParentBackdrop
+    handlers.setShowParentBackdrop, handlers.setLadderConfig, handlers.setLadderEnabled
   ]);
 
   return (
@@ -961,4 +1008,4 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   );
 };
 
-export { MapSettingsProvider, GRID_DENSITY_PRESETS, ModalShellContext, AppearanceContext, BackgroundImageContext, HexGridContext, useModalShell, useAppearance, useBackgroundImage, useHexGrid };
+export { MapSettingsProvider, showsDetailLevelSettings, GRID_DENSITY_PRESETS, ModalShellContext, AppearanceContext, BackgroundImageContext, HexGridContext, useModalShell, useAppearance, useBackgroundImage, useHexGrid };

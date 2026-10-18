@@ -92,6 +92,9 @@ function buildTileHitIndexForLayer(
   const overlaySeen = new Set<CellKey>();
   for (let i = 0; i < tiles.length; i++) {
     const t = tiles[i];
+    // Routes run on the root rung: a tile homed deeper shares index space but
+    // covers a different place, so it never counts for a root cell.
+    if ((t.homeLevel ?? 0) !== 0) continue;
     const cells = t.freeform === true
       ? [{ col: t.col, row: t.row }]
       : cellsCoveredByAssignment(t);
@@ -110,7 +113,10 @@ function buildTileHitIndexForLayer(
   return result;
 }
 
-/** Build the per-layer cell and tile lookups for a context. */
+/**
+ * Build the per-layer cell and tile lookups for a context.
+ * Ladder: samples level 0 only on purpose until distance-at-depth (phase 5).
+ */
 function buildLayerCellMaps(ctx: TerrainSampleContext): LayerCellMaps {
   return {
     color: ctx.layers.map(layer => buildCellMap(layer.cells, ctx.geometry)),
@@ -209,7 +215,7 @@ function classifyCell(
 ): string | null {
   const hit = cellMaps != null
     ? findTileHitViaIndex(cell, ctx, cellMaps)
-    : findTileHitInLayers(ctx.layers, cell.x, cell.y);
+    : findTileHitInLayers(ctx.layers, cell.x, cell.y, 0);
   if (hit != null) {
     const tile = hit.layer.tiles?.[hit.index];
     if (tile != null) {

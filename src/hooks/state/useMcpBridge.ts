@@ -17,6 +17,7 @@
  */
 
 import { useEffect, useRef } from 'preact/hooks';
+import { isToolId } from '../../core/toolIds';
 import type { MapData } from '#types/core/map.types';
 import type { ExtendedGeometry } from '#types/contexts/context.types';
 import type { ToolId } from '#types/tools/tool.types';
@@ -24,17 +25,25 @@ import type { Cell } from '#types/core/cell.types';
 import type { TileAssignment, TileLayerRole, TileForm } from '#types/tiles/tile.types';
 import { rotationStepsFor, tileGeometryKind } from '../../assets/tileRotation';
 import type { MapObject } from '#types/objects/object.types';
-import type { WindroseWallGapDebug, WindroseRawGap, WindroseMcpInstance, WindroseMcpOps } from '#types/core/global.types';
-import { getActiveLayer, getActiveBoardLayers } from '../../persistence/layerAccessor';
+import type { WindroseWallGapDebug, WindroseRawGap, WindroseMcpInstance, WindroseMcpOps, WindroseLevelWriteResult } from '#types/core/global.types';
+import type { HandleLevelCellsChange } from '#types/hooks/dataHandlers.types';
+import { getActiveLayer, getActiveBoardLayers, authoredCells, authoredLevels } from '../../persistence/layerAccessor';
+import { MAX_CELLS_PER_DEPTH_OP, type DepthWriteRefusal } from '../../persistence/depthAuthoring';
+import { isLadderView, ladderParamsFor } from '../../core/lodFlags';
+import { HexGeometry } from '../../geometry/core/HexGeometry';
+import { createGeometryLadder, type GeometryLadder } from '../../geometry/core/createGeometryLadder';
+import { withCellsPainted, withCellsErased } from '../../drawing/depthCellOps';
 import { getDataFilePath } from '../../core/settingsAccessor';
 import { setCell as accessorSetCell, removeCell as accessorRemoveCell, cellToPoint } from '../../geometry/core/cellAccessor';
-import { assignmentsOverlap } from '../../assets/tileFootprint';
 import { resolveTileEntry } from '../../assets/tilesetOperations';
 import { deriveTileForm } from '../../assets/tileForm';
 import { getTileMetadataForRender } from '../../persistence/tileMetadata';
 import { computeGapSpans, seatedLeafSize } from '../../geometry/renderers/wallPathRenderer';
 import { buildGapFlatten, clampGapToSegment, pointAtLength } from '../../drawing/wallGapOperations';
+import { withTilePlaced, homeLevelFields } from '../../drawing/tilePlacementOps';
+import { resolveEditLevel, resolveViewportZoom } from './layerHistoryOps';
 import { placeObject as opsPlaceObject } from '../../objects/objectOperations';
+import { sanitizeVisibleLevels } from '../../persistence/schemaMigration';
 import { getResolvedObjectTypes } from '../../objects/objectTypeResolver';
 
 /**
@@ -53,6 +62,8 @@ interface UseMcpBridgeParams {
   currentTool: string;
   selectedColor: string;
   selectedOpacity: number;
+  /** Ladder edit-level lock (null = follow the camera); feeds instance.getEditLevel. */
+  editLevelLock: number | null;
   canUndo: boolean;
   canRedo: boolean;
   saveStatus: string;
@@ -62,6 +73,12 @@ interface UseMcpBridgeParams {
   setSelectedColor: (color: string) => void;
   handleOpacityChange: (opacity: number) => void;
   handleCellsChange: (cells: Cell[]) => void;
+  /**
+   * Rung (level >= 1) writer: maps the LATEST rung content to its next content
+   * inside updateMapData's functional updater, through writeDepthCells, with
+   * an undo snapshot. Level 0 keeps handleCellsChange.
+   */
+  handleLevelCellsChange: HandleLevelCellsChange;
   /** Undo; a boolean return means "the map changed" (useLayerHistory's handleUndo). */
   wrappedHandleUndo: () => unknown;
   /** Redo; a boolean return means "the map changed". */
@@ -71,12 +88,20 @@ interface UseMcpBridgeParams {
   handleViewStateChange: (viewState: { center: { x: number; y: number }; zoom: number }) => void;
   handleTileSelect: (tilesetId: string, tileId: string) => void;
   setSelectedTileForm: (form: TileForm) => void;
-  handleTilesChange: (tiles: TileAssignment[]) => void;
-  handleObjectsChange: (objects: MapObject[]) => void;
+  /** Returns the depth gate's refusal for a deep placement, null when the write landed (useDataHandlers). */
+  handleTilesChange: (tiles: TileAssignment[]) => DepthWriteRefusal | null;
+  /** Returns the depth gate's refusal for a deep placement, null when the write landed (useDataHandlers). */
+  handleObjectsChange: (objects: MapObject[]) => DepthWriteRefusal | null;
   selectPane: (pane: 'tiles' | 'objects') => void;
   setTileBrowserCollapsed: (collapsed: boolean) => void;
   setRailOpenId: (id: string | null) => void;
   getCachedImage: (vaultPath: string) => HTMLImageElement | null;
+  /**
+   * The mounted canvas's live rung (view controller zoom, current mid-gesture);
+   * null when no canvas has published one. Preferred over the committed
+   * viewState so the bridge reports the rung the tools latch (WIRE-01).
+   */
+  readLiveActiveLevel?: () => number | null;
 }
 
 let instanceCounter = 0;
@@ -151,11 +176,106 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
       return cur;
     };
 
+    // Ladder rungs (design 06 s11 "MCP", s19 item 10). The default level is
+    // always 0, never the camera's active level, so existing scripts never
+    // become zoom-dependent. Built per call from the latest map.
+    const ladderOf = (): GeometryLadder | null => {
+      const { mapData, geometry } = S();
+      if (!isLadderView(mapData) || !(geometry instanceof HexGeometry)) return null;
+      const { m, minCellPx, maxLevel } = ladderParamsFor(mapData);
+      return createGeometryLadder(geometry, { m, minCellPx, maxLevel });
+    };
+    const getActiveLevel = (): number => {
+      const live = S().readLiveActiveLevel?.() ?? null;
+      if (live !== null) return live;
+      // No canvas mounted: derive it from the committed zoom.
+      const ladder = ladderOf();
+      return ladder != null ? ladder.activeLevel(S().mapData.viewState?.zoom ?? 1) : 0;
+    };
+    const isRung = (level: number | undefined): level is number => level !== undefined && level !== 0;
+    const levelFail = (level: number, error: string, skipped = 0): WindroseLevelWriteResult =>
+      ({ ok: false, level, count: 0, skipped, error });
+
+    /** null when (col,row) is placeable on `level`; otherwise an error string. Level 0 is ungated. */
+    const checkRungCell = (level: number, col: number, row: number): string | null => {
+      if (!Number.isInteger(level) || level < 0) return 'invalid-level';
+      if (level === 0) return null;
+      const ladder = ladderOf();
+      if (ladder == null) return 'not-a-ladder';
+      if (level > ladder.params.maxLevel) return 'level-out-of-range';
+      if (!Number.isInteger(col) || !Number.isInteger(row) || !ladder.existsAt(level, col, row)) {
+        return `cell (${col}, ${row}) does not exist at level ${level}`;
+      }
+      return null;
+    };
+
+    /**
+     * Rung write: drop coords that do not exist at `level`, then commit through
+     * handleLevelCellsChange, whose functional updater re-applies `next` to the
+     * LATEST rung content (so consecutive calls compose instead of overwriting
+     * each other) and hands back the guard's verdict against that live map.
+     */
+    const writeRung = (
+      level: number,
+      coords: ReadonlyArray<{ x: number; y: number }>,
+      next: (current: Cell[], kept: ReadonlyArray<{ x: number; y: number; i: number }>) => Cell[],
+    ): WindroseLevelWriteResult => {
+      if (!Number.isInteger(level) || level < 0) return levelFail(level, 'invalid-level');
+      if (getActiveLayer(S().mapData) == null) return levelFail(level, 'no-active-layer');
+      const rungLadder = ladderOf();
+      if (rungLadder == null) return levelFail(level, 'not-a-ladder');
+      if (level > rungLadder.params.maxLevel) return levelFail(level, 'level-out-of-range');
+      const kept = coords
+        .map((c, i) => ({ x: c.x, y: c.y, i }))
+        .filter(c => Number.isInteger(c.x) && Number.isInteger(c.y) && rungLadder.existsAt(level, c.x, c.y));
+      const skipped = coords.length - kept.length;
+      if (kept.length === 0) return { ok: true, level, count: 0, skipped };
+      // The handler guards against the LIVE map inside the updater and hands
+      // the verdict back; a pre-check against a render snapshot would report
+      // stale results when several writes land in one tick.
+      const outcome = S().handleLevelCellsChange(level, (current) => next(current, kept));
+      if (outcome === null) return levelFail(level, 'history-applying', skipped);
+      if (!outcome.ok) return levelFail(level, outcome.reason, skipped);
+      return { ok: true, level, count: kept.length, skipped };
+    };
+
+    /** Paint `kept` coords, last request per coordinate wins, batched per colour/opacity. */
+    const paintKept = (
+      current: Cell[],
+      kept: ReadonlyArray<{ x: number; y: number; i: number }>,
+      styleOf: (i: number) => { color: string; opacity: number },
+    ): Cell[] => {
+      const last = new Map<string, { x: number; y: number; i: number }>();
+      for (const k of kept) last.set(`${k.x},${k.y}`, k);
+      const groups = new Map<string, { color: string; opacity: number; coords: Array<{ x: number; y: number }> }>();
+      for (const k of last.values()) {
+        const style = styleOf(k.i);
+        const gk = `${style.color}|${style.opacity}`;
+        let g = groups.get(gk);
+        if (g == null) { g = { ...style, coords: [] }; groups.set(gk, g); }
+        g.coords.push({ x: k.x, y: k.y });
+      }
+      let out = current;
+      for (const g of groups.values()) out = withCellsPainted(out, g.coords, g.color, g.opacity);
+      return out;
+    };
+
     const ops: WindroseMcpOps = {
-      setTool: (toolId: string) => S().setCurrentTool(toolId as ToolId),
+      // A wrong id used to be accepted and echoed back as currentTool, then
+      // fell through every coordinator branch in silence (the paint tool is
+      // `draw`, there is no `paint`). Refuse it loudly instead.
+      setTool: (toolId: string): { ok: true; tool: ToolId } | { ok: false; error: string } => {
+        if (!isToolId(toolId)) return { ok: false, error: 'unknown tool id: ' + toolId + ' (paint cells is "draw"; see the ToolId type)' };
+        S().setCurrentTool(toolId);
+        return { ok: true, tool: toolId };
+      },
       setColor: (color: string) => S().setSelectedColor(color),
       setOpacity: (opacity: number) => S().handleOpacityChange(opacity),
-      paintCell: (x: number, y: number, color?: string, opacity?: number): boolean => {
+      paintCell: (x: number, y: number, color?: string, opacity?: number, level?: number): boolean | WindroseLevelWriteResult => {
+        if (isRung(level)) {
+          const style = { color: color ?? S().selectedColor, opacity: opacity ?? S().selectedOpacity };
+          return writeRung(level, [{ x, y }], (current, kept) => paintKept(current, kept, () => style));
+        }
         const { mapData, geometry } = S();
         const activeLayer = getActiveLayer(mapData);
         if (activeLayer == null) return false;
@@ -165,7 +285,16 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
         S().handleCellsChange(newCells);
         return true;
       },
-      paintCells: (cells: Array<{ x: number; y: number; color?: string; opacity?: number }>): number => {
+      paintCells: (cells: Array<{ x: number; y: number; color?: string; opacity?: number }>, level?: number): number | WindroseLevelWriteResult => {
+        if (isRung(level)) {
+          // Per-op depth budget applies to rung writes only; level 0 keeps the
+          // pre-ladder behaviour (bounded by the MCP schema's 10000 max).
+          if (cells.length > MAX_CELLS_PER_DEPTH_OP) return levelFail(level, 'too-many-cells');
+          return writeRung(level, cells, (current, kept) => paintKept(current, kept, (i) => ({
+            color: cells[i].color ?? S().selectedColor,
+            opacity: cells[i].opacity ?? S().selectedOpacity,
+          })));
+        }
         const { mapData, geometry } = S();
         const activeLayer = getActiveLayer(mapData);
         if (activeLayer == null) return 0;
@@ -178,7 +307,10 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
         S().handleCellsChange(currentCells);
         return cells.length;
       },
-      eraseCell: (x: number, y: number): boolean => {
+      eraseCell: (x: number, y: number, level?: number): boolean | WindroseLevelWriteResult => {
+        if (isRung(level)) {
+          return writeRung(level, [{ x, y }], (current, kept) => withCellsErased(current, kept.map(k => ({ x: k.x, y: k.y }))));
+        }
         const { mapData, geometry } = S();
         const activeLayer = getActiveLayer(mapData);
         if (activeLayer == null) return false;
@@ -186,11 +318,13 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
         S().handleCellsChange(newCells);
         return true;
       },
-      getCells: (bbox?: { x0: number; y0: number; x1: number; y1: number }): Array<{ x: number; y: number; color: string; opacity: number }> => {
+      getCells: (bbox?: { x0: number; y0: number; x1: number; y1: number }, level?: number): Array<{ x: number; y: number; color: string; opacity: number }> => {
         const { mapData } = S();
         const activeLayer = getActiveLayer(mapData);
         if (activeLayer == null) return [];
-        const mapped = activeLayer.cells.map((cell: Cell) => ({
+        if (level !== undefined && (!Number.isInteger(level) || level < 0)) return [];
+        const source = isRung(level) ? authoredCells(activeLayer, level) : activeLayer.cells;
+        const mapped = source.map((cell: Cell) => ({
           ...cellToPoint(cell),
           color: cell.color,
           opacity: cell.opacity ?? 1,
@@ -209,9 +343,11 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
       redo: (): boolean => { const r = S().handleRedo(); return typeof r === 'boolean' ? r : S().canRedo; },
       selectLayer: (layerId: string) => S().handleLayerSelect(layerId),
       forceSave: () => { void S().forceSave(); },
-      setViewport: (x: number, y: number, zoom?: number): { ok: boolean; viewState: { x: number; y: number; zoom: number } } => {
+      setViewport: (x: number, y: number, zoom?: number, level?: number): { ok: boolean; viewState: { x: number; y: number; zoom: number } } => {
         const { mapData } = S();
-        const nextZoom = zoom ?? mapData.viewState?.zoom ?? 1;
+        // Clamped to the map's own range (a classic map can never be stored
+        // past its ceiling); `level` on a ladder map picks that rung's zoom.
+        const nextZoom = resolveViewportZoom(mapData, zoom, level, mapData.viewState?.zoom ?? 1);
         S().handleViewStateChange({ center: { x, y }, zoom: nextZoom });
         return { ok: true, viewState: { x, y, zoom: nextZoom } };
       },
@@ -262,10 +398,12 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
         const meta = tile.vaultPath != null ? getTileMetadataForRender()[tile.vaultPath] : undefined;
         return deriveTileForm(meta, ts);
       },
-      placeTile: (a: { col: number; row: number; tilesetId: string; tileId: string; rotation?: number; depth?: string; scale?: number }): { ok: boolean; tileCount: number; error?: string } => {
+      placeTile: (a: { col: number; row: number; tilesetId: string; tileId: string; rotation?: number; depth?: string; scale?: number }, level: number = 0): { ok: boolean; tileCount: number; error?: string } => {
         const { mapData } = S();
         const activeLayer = getActiveLayer(mapData);
         if (activeLayer == null) return { ok: false, tileCount: 0, error: 'No active layer' };
+        const rungError = checkRungCell(level, a.col, a.row);
+        if (rungError != null) return { ok: false, tileCount: activeLayer.tiles?.length ?? 0, error: rungError };
         const ts = S().availableTilesets.find(t => t.id === a.tilesetId);
         const tile = resolveTileEntry(ts, a.tileId);
         if (ts == null || tile == null) {
@@ -287,42 +425,63 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
           scale: a.scale != null && a.scale !== 1 ? a.scale : undefined,
           spanW: 1,
           spanH: 1,
+          ...homeLevelFields(level),
         };
-        const targetPlacement = newTile.placement ?? 'fill';
-        const current = activeLayer.tiles ?? [];
-        const remaining = current.filter(
-          (t: TileAssignment) => (t.placement ?? 'fill') !== targetPlacement || !assignmentsOverlap(t, newTile)
-        );
-        const nextTiles = [...remaining, newTile];
-        S().handleTilesChange(nextTiles);
+        // Same-rung, same-tier replace only: a root placement never removes a deep tile at the same index.
+        const nextTiles = withTilePlaced(activeLayer.tiles ?? [], newTile, newTile.placement ?? 'fill');
+        // A deep placement is gated (capability, quarantine, byte budget) inside
+        // the handler's updater against the live map; report its verdict.
+        const refusal = S().handleTilesChange(nextTiles);
+        if (refusal != null) return { ok: false, tileCount: activeLayer.tiles?.length ?? 0, error: refusal };
         return { ok: true, tileCount: nextTiles.length };
       },
       listObjectTypes: (): Array<{ id: string; label: string; category: string }> =>
         getResolvedObjectTypes(S().mapData.mapType ?? 'grid', S().mapData.objectSetId)
           .map(t => ({ id: t.id, label: t.label, category: t.category })),
-      listObjects: (): Array<{ id: string; type: string; x: number; y: number; label?: string }> => {
+      listObjects: (level?: number): Array<{ id: string; type: string; x: number; y: number; label?: string; level: number; depthMode?: 'pop' | 'persist'; visibleLevels?: number[] }> => {
         const { mapData } = S();
         const activeLayer = getActiveLayer(mapData);
         if (activeLayer == null) return [];
-        return activeLayer.objects.map(o => ({
-          id: o.id,
-          type: o.type,
-          x: o.position.x,
-          y: o.position.y,
-          label: o.label,
-        }));
+        return activeLayer.objects
+          .filter(o => level === undefined || (o.homeLevel ?? 0) === level)
+          .map(o => ({
+            id: o.id,
+            type: o.type,
+            x: o.position.x,
+            y: o.position.y,
+            label: o.label,
+            level: o.homeLevel ?? 0,
+            ...(o.depthMode !== undefined ? { depthMode: o.depthMode } : {}),
+            ...(o.visibleLevels !== undefined ? { visibleLevels: o.visibleLevels } : {}),
+          }));
       },
-      placeObject: (typeId: string, x: number, y: number): { ok: boolean; objectId?: string; error?: string } => {
+      placeObject: (typeId: string, x: number, y: number, level: number = 0, visibleLevels?: number[]): { ok: boolean; objectId?: string; error?: string } => {
         const { mapData } = S();
         const activeLayer = getActiveLayer(mapData);
         if (activeLayer == null) return { ok: false, error: 'No active layer' };
+        // On a rung (level >= 1) x/y are rung cell indices; same existence gate as the cell ops.
+        const rungError = checkRungCell(level, x, y);
+        if (rungError != null) return { ok: false, error: rungError };
         const result = opsPlaceObject(activeLayer.objects, typeId, x, y, {
           mapType: mapData.mapType ?? 'grid',
           objectSetId: mapData.objectSetId,
+          homeLevel: level,
         });
         if (!result.success) return { ok: false, error: result.error };
-        S().handleObjectsChange(result.objects);
-        return { ok: true, objectId: result.object?.id };
+        let objects = result.objects;
+        const placedId = result.object?.id;
+        if (visibleLevels !== undefined && placedId !== undefined) {
+          // Same normalisation as load: integers >= 0, deduped, sorted; empty = Auto.
+          const levels: { visibleLevels?: unknown } = { visibleLevels };
+          sanitizeVisibleLevels(levels);
+          if (levels.visibleLevels !== undefined) {
+            objects = objects.map(o => (o.id === placedId ? { ...o, visibleLevels: levels.visibleLevels as number[] } : o));
+          }
+        }
+        // Deep placements pass the depth gate inside the handler (see placeTile).
+        const refusal = S().handleObjectsChange(objects);
+        if (refusal != null) return { ok: false, error: refusal };
+        return { ok: true, objectId: placedId };
       },
       openDrawer: (pane: 'tiles' | 'objects' | 'layers' | 'colors' | 'regions' | 'view' | null): { ok: boolean; note?: string } => {
         if (pane === 'tiles' || pane === 'objects') {
@@ -431,6 +590,18 @@ function useMcpBridge(params: UseMcpBridgeParams): void {
       get timestamp() { return renderedAtRef.current; },
       get cellCount() { return getActiveLayer(S().mapData)?.cells.length ?? 0; },
       get layerCellCounts() { return Object.fromEntries(S().mapData.layers.map((l) => [l.id, l.cells.length])); },
+      get cellCountByLevel() {
+        const activeLayer = getActiveLayer(S().mapData);
+        const counts: Record<string, number> = { '0': activeLayer?.cells.length ?? 0 };
+        if (activeLayer != null) {
+          for (const level of authoredLevels(activeLayer)) {
+            if (level >= 1) counts[String(level)] = authoredCells(activeLayer, level).length;
+          }
+        }
+        return counts;
+      },
+      getActiveLevel,
+      getEditLevel: (): number => resolveEditLevel(ladderOf() != null ? S().editLevelLock : null, getActiveLevel()),
       get objectCount() { return S().mapData.layers.reduce((n, l) => n + l.objects.length, 0); },
       get wallPathCount() { return S().mapData.layers.reduce((n, l) => n + (l.wallPaths?.length ?? 0), 0); },
       get textLabelCount() { return S().mapData.layers.reduce((n, l) => n + l.textLabels.length, 0); },

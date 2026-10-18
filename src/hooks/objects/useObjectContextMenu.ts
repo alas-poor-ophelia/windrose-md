@@ -31,6 +31,9 @@ import { useMapState, useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { buildObjectActions } from '../../components/toolbars/selectionActionBuilders';
 import { getActiveLayer } from '../../persistence/layerAccessor';
+import { pickLadderObject } from '../../objects/ladderHitTest';
+import { classicHitRung } from '../../objects/hexSlotPositioner';
+import { isLadderView } from '../../core/lodFlags';
 
 export type ObjectMenuHandlers = Parameters<typeof buildObjectActions>[1];
 
@@ -46,8 +49,13 @@ export interface ContextMenuTargetInput {
   mapData: MapData | null;
   hasGeometry: boolean;
   screenToGrid: (clientX: number, clientY: number) => Point | null;
-  getObjectAtPosition: (objects: MapObject[], x: number, y: number) => MapObject | null;
+  getObjectAtPosition: (objects: MapObject[], x: number, y: number, homeLevel?: number) => MapObject | null;
   selectedItems: SelectedItem[];
+  /**
+   * Lattice ladder pick: the object DRAWN under the pointer (home rung, held
+   * size, depth-mode visibility). When set it replaces the level-0 cell lookup.
+   */
+  pickAt?: ((clientX: number, clientY: number) => MapObject | null) | null;
 }
 
 /**
@@ -60,9 +68,15 @@ export function resolveContextMenuTarget(
   clientY: number
 ): MapObject | null {
   if (!input.mapData || !input.hasGeometry) return null;
-  const coords = input.screenToGrid(clientX, clientY);
-  if (!coords) return null;
-  const obj = input.getObjectAtPosition(getActiveLayer(input.mapData).objects ?? [], coords.x, coords.y);
+  let obj: MapObject | null;
+  if (input.pickAt != null) {
+    obj = input.pickAt(clientX, clientY);
+  } else {
+    const coords = input.screenToGrid(clientX, clientY);
+    if (!coords) return null;
+    // A `lod` map off the ladder view draws rung 0 only: deep objects are not hittable.
+    obj = input.getObjectAtPosition(getActiveLayer(input.mapData).objects ?? [], coords.x, coords.y, classicHitRung(input.mapData));
+  }
   if (!obj) return null;
   if (input.selectedItems.some(s => s.id === obj.id)) return null;
   return obj;
@@ -76,13 +90,24 @@ export interface ObjectContextMenuOptions {
 }
 
 export function useObjectContextMenu({ handlers, idActions, measureMovement }: ObjectContextMenuOptions): void {
-  const { mapData, geometry, screenToGrid, instanceId, canvasRef } = useMapState();
+  const { mapData, geometry, screenToGrid, screenToWorld, instanceId, canvasRef, ladder, getActiveLevel, viewController } = useMapState();
   const { getObjectAtPosition } = useMapOperations();
   const { selectedItems, setSelectedItem, isResizeMode } = useMapSelection();
 
   const handlersRef = useRef<ObjectMenuHandlers>(handlers);
   handlersRef.current = handlers;
-  const state = { mapData, geometry, screenToGrid, getObjectAtPosition, selectedItems, setSelectedItem, isResizeMode, measureMovement, idActions };
+  // Ladder: hit-test what is drawn (world-space, home rung), not the level-0 cell.
+  const pickAt = ladder !== null && mapData != null
+    ? (clientX: number, clientY: number): MapObject | null => {
+      const world = screenToWorld(clientX, clientY);
+      if (!world) return null;
+      const zoom = viewController?.getLive().zoom ?? mapData.viewState?.zoom ?? 1;
+      return pickLadderObject(getActiveLayer(mapData).objects ?? [], world.worldX, world.worldY, {
+        ladder, level: getActiveLevel(), zoom, orientation: mapData.orientation ?? 'flat'
+      });
+    }
+    : null;
+  const state = { mapData, geometry, screenToGrid, getObjectAtPosition, pickAt, selectedItems, setSelectedItem, isResizeMode, measureMovement, idActions };
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -121,8 +146,10 @@ export function useObjectContextMenu({ handlers, idActions, measureMovement }: O
         onCopyLink: (ev?: Event) => latest().onCopyLink(ev),
         onColorClick: (ev?: Event) => latest().onColorClick(ev),
         onResize: (ev?: Event) => latest().onResize(ev),
-        onMeasureToggle: (ev?: Event) => latest().onMeasureToggle?.(ev)
-      }, s.mapData, { isResizeMode: s.isResizeMode, isMeasuring: s.measureMovement });
+        onMeasureToggle: (ev?: Event) => latest().onMeasureToggle?.(ev),
+        onDepthModeToggle: (ev?: Event) => latest().onDepthModeToggle?.(ev),
+        onLevels: (ev?: Event) => latest().onLevels?.(ev)
+      }, s.mapData, { isResizeMode: s.isResizeMode, isMeasuring: s.measureMovement, isLadder: isLadderView(s.mapData) });
 
       const menu = new Menu();
       let lastGroup: string | null = null;

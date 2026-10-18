@@ -17,6 +17,7 @@ import type {
 } from '#types/hooks/notePinInteraction.types';
 
 import { useRef } from 'preact/hooks';
+import { Notice } from 'obsidian';
 import { useMapState, useMapOperations } from '../../context/MapContext';
 import { useMapSelection } from '../../context/MapSelectionContext';
 import { getActiveLayer } from '../../persistence/layerAccessor';
@@ -29,7 +30,7 @@ const useNotePinInteraction = (
   selectedObjectType: ObjectTypeId | null
 ): UseNotePinInteractionResult => {
   // Get all required state and operations from Context
-  const { mapData } = useMapState();
+  const { mapData, getEditLevel } = useMapState();
 
   const {
     onObjectsChange,
@@ -62,8 +63,16 @@ const useNotePinInteraction = (
 
     if (!mapData) return false;
 
-    // Check if position is occupied
-    const existingObj = getObjectAtPosition(getActiveLayer(mapData).objects, gridX, gridY);
+    // Pins live on the root rung only (design 06, s19 item 3): the cell the
+    // coordinator hands us is a level-0 cell, so refuse while zoomed deeper
+    // rather than stamp a root pin from a rung-2 click.
+    if (getEditLevel() > 0) {
+      new Notice('Note pins are placed at the root level only.');
+      return true;
+    }
+
+    // Check if position is occupied (on the root rung)
+    const existingObj = getObjectAtPosition(getActiveLayer(mapData).objects, gridX, gridY, 0);
     if (existingObj) {
       return true; // Handled but blocked
     }

@@ -203,6 +203,16 @@ function encodePayload(json: string): { enc: PayloadEncoding; data: string } {
   return { enc: 'deflate64', data: btoa(strFromU8(deflateSync(strToU8(json), { level: 1 }), true)) };
 }
 
+/**
+ * Stored length of a live payload for `json`: what writeLiveSlot compares with
+ * MAX_JOURNAL_PAYLOAD (plain JSON up to RAW_PAYLOAD_LIMIT, deflated base64
+ * above it). Costs one deflate for a large map, so callers measure once per
+ * operation, not per pointer tick (depthAuthoring's budget).
+ */
+function journalPayloadLength(json: string): number {
+  return encodePayload(json).data.length;
+}
+
 function decodePayload(enc: PayloadEncoding, data: string): string {
   return enc === 'deflate64' ? strFromU8(inflateSync(strToU8(atob(data), true))) : data;
 }
@@ -356,9 +366,10 @@ function journalPending(
   options?: { writerId?: string; version?: number }
 ): boolean {
   try {
-    // Match what saveMapData would write, so the on-disk comparison at load
-    // time is a plain string equality. Canonicalizes and strips derived tile
-    // lists on a copy; the live tree is never edited.
+    // Match what saveMapData would write (canonical tile ids, derived tile
+    // lists stripped, per-entry schema stamp), so the on-disk comparison at
+    // load time is a plain string equality. toStoredMap works on copies; the
+    // live tree is never edited.
     const json = JSON.stringify(toStoredMap(pendingData));
     return writeLiveSlot(app, mapId, options?.writerId ?? null, options?.version ?? null, json, Date.now());
   } catch (e) {
@@ -950,5 +961,5 @@ async function resolveJournalRound(
   return null;
 }
 
-export { journalPending, clearJournal, dropRestoredSlot, isJournalKept, readKeptEntries, moveJournalToConflict, readConflictJournal, readJournal, pruneJournal, setJournalWriterLive, compareJournalToDisk, resolveJournalOnLoad, resetJournalLoadState, MAX_JOURNAL_PAYLOAD, JOURNAL_MAX_AGE_MS, JOURNAL_INDEX_KEY, JOURNAL_KEY_PREFIX, JOURNAL_META_PREFIX, RAW_PAYLOAD_LIMIT, KEPT_KEY_PREFIX, KEPT_MAX_PER_MAP, CONFLICT_KEY_PREFIX };
+export { journalPending, journalPayloadLength, clearJournal, dropRestoredSlot, isJournalKept, readKeptEntries, moveJournalToConflict, readConflictJournal, readJournal, pruneJournal, setJournalWriterLive, compareJournalToDisk, resolveJournalOnLoad, resetJournalLoadState, MAX_JOURNAL_PAYLOAD, JOURNAL_MAX_AGE_MS, JOURNAL_INDEX_KEY, JOURNAL_KEY_PREFIX, JOURNAL_META_PREFIX, RAW_PAYLOAD_LIMIT, KEPT_KEY_PREFIX, KEPT_MAX_PER_MAP, CONFLICT_KEY_PREFIX };
 export type { LiveEntry, JournalSource, ConflictMoveResult };

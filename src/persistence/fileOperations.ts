@@ -15,13 +15,70 @@ import { getDataFilePath } from '../core/settingsAccessor';
 import { offsetToAxial } from '../geometry/core/offsetCoordinates';
 import { getSettings } from '../core/settingsAccessor';
 import { generateLayerId, DEFAULT_BOARD_ID } from './layerAccessor';
-import { migrateMapData, MapSchemaError, claimedSchemaVersion, isNewerSchema, stripDerivedTileLists } from './schemaMigration';
+import { migrateMapData, MapSchemaError, claimedSchemaVersion, isNewerSchema, stripDerivedTileLists, stampSchemaVersions } from './schemaMigration';
 import { calculateFitZoom } from '../geometry/core/hexMeasurements';
 import { resolveTileEntry } from '../assets/tilesetOperations';
 import {
   invalidateStoreCache, getValidStoreCache, commitStoreCache, snapshotFromParsed, serializeStore, cachedEntry, utf8ByteLength,
 } from './storeCache';
 import type { StoreSnapshot } from './storeCache';
+import { isLodLadderEnabled } from '../core/lodFlags';
+import { LADDER_DEFAULTS, LADDER_M_ALLOWLIST } from '../geometry/core/lattice';
+
+/** Creation-time presets for a brand-new map (lattice ladder phase 6). */
+interface NewMapOptions {
+  /** Ladder subdivision for a new hex map; honoured only while the ladder capability is on. */
+  ladderM?: number;
+}
+
+/**
+ * Presets chosen in the new-map dialog, keyed by the minted map id. A new map
+ * is built lazily on its first load (the entry is absent from the data file),
+ * which happens after a re-render the dialog's host cannot pass options
+ * through, so the preset waits here until that load consumes it. Cleared once
+ * the entry exists in the data file.
+ */
+const pendingNewMapOptions = new Map<string, { options: NewMapOptions; at: number }>();
+const PENDING_NEW_MAP_CAP = 32;
+const PENDING_NEW_MAP_TTL_MS = 10 * 60 * 1000;
+
+/** Drop presets for maps that were created and abandoned before their first save. */
+function prunePendingNewMapOptions(): void {
+  const now = Date.now();
+  for (const [id, entry] of pendingNewMapOptions) {
+    if (now - entry.at > PENDING_NEW_MAP_TTL_MS) pendingNewMapOptions.delete(id);
+  }
+}
+
+/**
+ * The preset parked for `mapId`, if any. A read refreshes its timestamp: the
+ * TTL only reaps presets nobody is using, so a new map that is re-mounted
+ * (pane switch, view change) before its first save keeps its preset (DATA-14).
+ */
+function getPendingNewMapOptions(mapId: string): NewMapOptions | undefined {
+  prunePendingNewMapOptions();
+  const entry = pendingNewMapOptions.get(mapId);
+  if (entry === undefined) return undefined;
+  entry.at = Date.now();
+  return entry.options;
+}
+
+/** Record creation presets for a map id that has not been created yet. */
+function setPendingNewMapOptions(mapId: string, options: NewMapOptions): void {
+  prunePendingNewMapOptions();
+  pendingNewMapOptions.delete(mapId);
+  while (pendingNewMapOptions.size >= PENDING_NEW_MAP_CAP) {
+    const oldest = pendingNewMapOptions.keys().next().value;
+    if (oldest === undefined) break;
+    pendingNewMapOptions.delete(oldest);
+  }
+  pendingNewMapOptions.set(mapId, { options, at: Date.now() });
+}
+
+/** Test hook: forget every pending preset. */
+function clearPendingNewMapOptions(): void {
+  pendingNewMapOptions.clear();
+}
 
 // Serializes EVERY data-file operation (reads as well as writes) so concurrent
 // access can't race or interleave. Reads have to share the mutex: a read that
@@ -506,9 +563,10 @@ function applyLockedViewState(mapData: MapData): MapData {
  * Serialized through the data-file mutex so it can never observe a write in
  * progress.
  */
-async function loadMapDataWithGeneration(app: App, mapId: string, mapName: string = '', mapType: MapType = 'grid'): Promise<{ data: MapData; generation: number }> {
+async function loadMapDataWithGeneration(app: App, mapId: string, mapName: string = '', mapType: MapType = 'grid', options?: NewMapOptions): Promise<{ data: MapData; generation: number }> {
   const dataPath = getDataFilePath();
   if (deletedMapIds.has(mapId)) throw new MapDeletedError(mapId);
+  const newMapOptions = options ?? getPendingNewMapOptions(mapId);
   return enqueueDataFileOp(async () => {
     // A delete that was queued ahead of this load tombstoned the id first.
     if (deletedMapIds.has(mapId)) throw new MapDeletedError(mapId);
@@ -524,7 +582,7 @@ async function loadMapDataWithGeneration(app: App, mapId: string, mapName: strin
       // Fresh install (no store, no backups, never seen): a blank map. Nothing
       // is written here; the new-map flows create the store up front and the
       // first save creates it otherwise.
-      return { data: createNewMap(mapName, mapType), generation };
+      return { data: createNewMap(mapName, mapType, newMapOptions), generation };
     }
 
     let data: DataFile;
@@ -551,9 +609,10 @@ async function loadMapDataWithGeneration(app: App, mapId: string, mapName: strin
     }
 
     if (data.maps[mapId] == null) {
-      return { data: createNewMap(mapName, mapType), generation };
+      return { data: createNewMap(mapName, mapType, newMapOptions), generation };
     }
 
+    pendingNewMapOptions.delete(mapId);
     // A map from a newer plugin is never opened for editing by this build:
     // everything that edits it assumes this version's shape, and the first
     // autosave would persist the loss under the newer stamp. Not corruption,
@@ -562,6 +621,7 @@ async function loadMapDataWithGeneration(app: App, mapId: string, mapName: strin
     if (isNewerSchema(data.maps[mapId])) {
       throw new MapSchemaError('newer-version', claimed ?? 0, `map schema v${String(claimed)}, this plugin knows v${String(SCHEMA_VERSION)}`);
     }
+
 
     try {
       data.maps[mapId] = migrateMapData(data.maps[mapId]);
@@ -809,11 +869,13 @@ function canonicalizeTileIds(mapData: MapData): MapData {
 /**
  * The exact tree persisted for a map: legacy tile ids upgraded (needs the
  * live `tiles[]` registry, so it runs first), then the derived folder tile
- * lists stripped. Copy-on-write throughout. Shared by the store write and the
- * crash journal so their texts stay string-equal.
+ * lists stripped, then every entry stamped with the schema version its
+ * content needs (a classic map reads as 2, a detail-levels map as 3).
+ * Copy-on-write throughout. Shared by the store write and the crash journal
+ * so their texts stay string-equal.
  */
 function toStoredMap(mapData: MapData): MapData {
-  return stripDerivedTileLists(canonicalizeTileIds(mapData));
+  return stampSchemaVersions(stripDerivedTileLists(canonicalizeTileIds(mapData)));
 }
 
 /**
@@ -933,8 +995,9 @@ async function writeMapEntryLocked(app: App, mapId: string, mapData: MapData, wr
   // output (no pretty-print): on a multi-MB multi-map file the indentation
   // pass plus the redundant re-parse tripled per-save main-thread time,
   // freezing the UI ~300-450ms on every autosave.
-  // Update this map with legacy tile ids upgraded (a copy-on-write result:
-  // the caller's live object is never edited). Only this entry is
+  // Update this map with legacy tile ids upgraded and each entry's schema
+  // version stamped by content (2 classic, 3 ladder; stampSchemaVersions). Both
+  // are copy-on-write: the caller's live object is never edited. Only this entry is
   // stringified; the others are spliced in as their stored text.
   let jsonString: string;
   try {
@@ -1052,7 +1115,7 @@ async function deleteMapData(app: App, mapId: string): Promise<boolean> {
   });
 }
 
-function createNewMap(mapName: string = '', mapType: MapType = 'grid'): MapData {
+function createNewMap(mapName: string = '', mapType: MapType = 'grid', options?: NewMapOptions): MapData {
   // Generate layer ID for initial layer
   const initialLayerId = generateLayerId();
 
@@ -1119,6 +1182,13 @@ function createNewMap(mapName: string = '', mapType: MapType = 'grid'): MapData 
     baseMap.hexBounds = { ...DEFAULTS.hexBounds };
     baseMap.dimensions = { ...DEFAULTS.dimensions };
 
+    // Ladder preset from the new-map dialog: the map is born a ladder map.
+    // Never without the capability flag, never with an m off the allowlist.
+    const ladderM = options?.ladderM;
+    if (ladderM !== undefined && LADDER_M_ALLOWLIST.includes(ladderM) && isLodLadderEnabled()) {
+      baseMap.lod = { m: ladderM, minCellPx: LADDER_DEFAULTS.minCellPx, maxLevel: LADDER_DEFAULTS.maxLevel };
+    }
+
     // Calculate proper viewport center for hex map using offset coordinates
     const hexSize = baseMap.hexSize;
     const orientation = baseMap.orientation;
@@ -1166,7 +1236,9 @@ function createNewMap(mapName: string = '', mapType: MapType = 'grid'): MapData 
     };
   }
 
-  return baseMap;
+  // Per-content version (2 classic, 3 when born a ladder map): the same stamp
+  // every write applies, so a fresh tree serialises exactly as it would load.
+  return stampSchemaVersions(baseMap);
 }
 
 /**
@@ -1255,10 +1327,10 @@ async function listMaps(app: App): Promise<MapListEntry[]> {
 export type { SaveMapResult };
 export {
   loadMapData, loadMapDataWithGeneration, getEntryGeneration,
-  saveMapData, deleteMapData, createNewMap, buildMapEntry, createMapEntry, listMaps, listMapsResult, migrateMapData,
+  saveMapData, deleteMapData, createNewMap, setPendingNewMapOptions, clearPendingNewMapOptions, buildMapEntry, createMapEntry, listMaps, listMapsResult, migrateMapData,
   canonicalizeTileIds, toStoredMap, applyLockedViewState, enqueueDataFileOp, getSaveQueue,
   notifyCorruptedDataFile, readRawMapEntry, storeFoundElsewhere, isMapTombstoned, MapDataUnreadableError, MapDeletedError, MapDataFileMissingError, MapSchemaError, createEmptyDataFile, ensureDataFileForNewMap,
   shouldRotateBak, otherBakSlot, bakPathForSlot, dailyBakPath, isSuspiciousShrink, backupTimestamp,
-  findBestBackup, restoreFromBackup, BAK_THROTTLE_MS
+  findBestBackup, restoreFromBackup, BAK_THROTTLE_MS, PENDING_NEW_MAP_CAP, PENDING_NEW_MAP_TTL_MS
 };
-export type { MapListEntry, MapListResult, BakSlot, DataFileBackup };
+export type { MapListEntry, MapListResult, BakSlot, DataFileBackup, NewMapOptions };

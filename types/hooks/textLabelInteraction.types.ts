@@ -16,6 +16,8 @@ import type { TextLabelId } from '../objects/note.types';
 export interface PendingTextPosition {
   x: number;
   y: number;
+  /** Ladder rung latched at placement time (absent/0 = root). */
+  homeLevel?: number;
 }
 
 /** Button position on screen */
@@ -107,6 +109,10 @@ export interface UseTextLabelInteractionResult {
   handleTextSubmit: HandleTextSubmit;
   handleTextCancel: HandleTextCancel;
   handleRotateClick: HandleRotateClick;
+  /** Ladder maps: flips the selected label's depth mode (pop at the next rung / hold its size). */
+  handleDepthModeToggle: HandleRotateClick;
+  /** Ladder level picker: set the selected label's explicit rungs (undefined = Auto). */
+  handleVisibleLevelsChange: (visibleLevels: number[] | undefined) => void;
   handleEditClick: HandleEditClick;
   handleCanvasDoubleClick: HandleCanvasDoubleClick;
 }

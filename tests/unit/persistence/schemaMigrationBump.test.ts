@@ -1,5 +1,5 @@
 /**
- * DATA-01 regression: simulate the first SCHEMA_VERSION bump (2 -> 3). Every
+ * DATA-01 regression: simulate the next SCHEMA_VERSION bump (3 -> 4). Every
  * stored v2 map must keep its layers; the old code rebuilt them as one empty
  * layer on load.
  */
@@ -17,7 +17,7 @@ vi.mock('obsidian', async (importOriginal) => {
 
 vi.mock('../../../src/core/dmtConstants', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/core/dmtConstants')>();
-  return { ...actual, SCHEMA_VERSION: 3 };
+  return { ...actual, SCHEMA_VERSION: 4 };
 });
 
 import type { App } from 'obsidian';
@@ -36,18 +36,18 @@ function storedV2Map(): MapData {
 }
 
 afterEach(() => {
-  delete migrations[3];
+  delete migrations[4];
 });
 
 describe('a SCHEMA_VERSION bump with a registered step', () => {
   it('runs only the new step on a v2 map and keeps its layers', () => {
     const step = vi.fn((m: MapData) => ({ ...m, description: 'upgraded to 3' }));
-    migrations[3] = step;
+    migrations[4] = step;
 
     const migrated = migrateMapData(storedV2Map());
 
     expect(step).toHaveBeenCalledTimes(1);
-    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.schemaVersion).toBe(4);
     expect(migrated.description).toBe('upgraded to 3');
     expect(migrated.layers.map(l => l.id)).toEqual(['real-layer']);
     expect(migrated.layers[0].cells).toEqual([{ x: 9, y: 9, color: '#000' }]);

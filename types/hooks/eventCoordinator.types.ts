@@ -92,7 +92,7 @@ export interface RegisteredDrawingHandlers {
   cancelDrawing?(this: void): void;
   isDrawing?: boolean;
   previewEnabled?: boolean;
-  updateShapeHover?(this: void, gridX: number, gridY: number): void;
+  updateShapeHover?(this: void, gridX: number, gridY: number, clientX?: number, clientY?: number): void;
   updateEdgeLineHover?(this: void, intX: number, intY: number): void;
   updateSegmentHover?(this: void, cellX: number, cellY: number, localX: number, localY: number): void;
   /** Called on pointer leave so the segment highlight does not stick at the edge. */
