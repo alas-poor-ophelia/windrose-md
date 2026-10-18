@@ -269,7 +269,7 @@ Bring tiles in through the **Add tiles** wizard (Settings → Tile Sets). It han
 - A **Dungeondraft pack** (`.dungeondraft_pack`) — the archive is **streamed** rather than loaded whole, so even multi-gigabyte packs import without exhausting memory. Categories and tags come straight from the pack.
 - A **folder of images** from your vault — subfolders map to strata tiers and tags are mined from filenames.
 
-The three steps are:
+Pack imports are stored as a [tile bundle]({{ site.baseurl }}/tile-bundles/) and add a **Storage** step (Exact by default, or opt-in lossy Compact) after Source. Folder imports stay loose. The steps are:
 1. **Source** — choose the pack file or vault folder. A pack preview shows tile, wall/path strip, and tag counts, and warns if it was already imported.
 2. **Tiers** — one row per subfolder/category, each with a guessed **stratum** (Terrain, Structure, Props, or Decoration) you can correct via a dropdown. Wall/path strips import automatically as line assets and skip this step.
 3. **Tags** — pack-shipped or folder-derived tags appear pre-applied as chips, alongside a frequency-ranked list of tags **suggested from filenames** (each with a sample filename and an Apply toggle). A manual tag input applies to everything being imported.
