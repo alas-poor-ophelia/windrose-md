@@ -8,7 +8,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { h, render } from 'preact';
 import { act } from 'preact/test-utils';
 
-import { LevelPickerPopup, chipStateOf } from '../../../../src/components/overlays/LevelPickerPopup';
+import { LevelPickerPopup, chipStateOf, lastOnLevel, LAST_LEVEL_TITLE } from '../../../../src/components/overlays/LevelPickerPopup';
 
 let root: HTMLElement | null = null;
 afterEach(() => {
@@ -65,6 +65,32 @@ describe('LevelPickerPopup', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     // The capture listener on the document stops it before the map's own handler.
     expect(mapKey).not.toHaveBeenCalled();
+  });
+
+  it('disables the only explicit level with a title saying why (D-5)', () => {
+    root = document.createElement('div');
+    document.body.appendChild(root);
+    const onToggleLevel = vi.fn();
+    render(h(LevelPickerPopup, {
+      x: 10, y: 10, maxLevel: 2, autoState: 'off' as const,
+      levelState: (l: number) => (l === 1 ? 'on' as const : 'off' as const),
+      onToggleLevel, onAuto: () => {}, onClose: () => {}
+    }), root);
+    const chips = [...root.querySelectorAll('button.windrose-ladder-chip')] as HTMLButtonElement[];
+    expect(chips[2].disabled).toBe(true);
+    expect(chips[2].title).toBe(LAST_LEVEL_TITLE);
+    expect(chips[1].disabled).toBe(false);
+    expect(chips[3].disabled).toBe(false);
+    chips[2].click();
+    expect(onToggleLevel).not.toHaveBeenCalled();
+  });
+
+  it('lastOnLevel: only for one explicit level, none mixed, Auto off', () => {
+    expect(lastOnLevel('off', ['off', 'on', 'off'])).toBe(1);
+    expect(lastOnLevel('off', ['on', 'on'])).toBeNull();
+    expect(lastOnLevel('off', ['on', 'mixed'])).toBeNull();
+    expect(lastOnLevel('on', ['on', 'off'])).toBeNull();
+    expect(lastOnLevel('mixed', ['on', 'off'])).toBeNull();
   });
 
   it('chipStateOf: all on, some on, none on', () => {

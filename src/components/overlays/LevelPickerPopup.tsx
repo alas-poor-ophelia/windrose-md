@@ -1,7 +1,7 @@
 /**
  * LevelPickerPopup.tsx
  *
- * Small transient popup for choosing which lattice-ladder rungs a selected
+ * Small transient popup for choosing which detail levels (rungs) a selected
  * object or text label (or a whole multi-selection) is visible on.
  * A chip row: `Auto` (clears `visibleLevels`, back to the home band) plus one
  * chip per rung, multi-toggle. Chips reuse the ladder overlay's
@@ -39,6 +39,21 @@ function chipStateOf(flags: readonly boolean[]): ChipState {
   return on === flags.length ? 'on' : 'mixed';
 }
 
+/** Tooltip on the one chip that cannot be switched off. */
+const LAST_LEVEL_TITLE = 'The last visible level cannot be turned off. Choose another level first, or use Auto.';
+
+/**
+ * The single level that must stay on, or null: every selected element has an
+ * explicit set (Auto off) and exactly one level is on for all of them, none
+ * mixed. Switching it off would empty the set, which reverts to automatic.
+ */
+function lastOnLevel(autoState: ChipState, states: readonly ChipState[]): number | null {
+  if (autoState !== 'off') return null;
+  if (states.includes('mixed')) return null;
+  const on = states.flatMap((state, level) => (state === 'on' ? [level] : []));
+  return on.length === 1 ? on[0] : null;
+}
+
 function pressedOf(state: ChipState): boolean | 'mixed' {
   return state === 'mixed' ? 'mixed' : state === 'on';
 }
@@ -55,6 +70,8 @@ const LevelPickerPopup = ({
 }: LevelPickerPopupProps): VNode => {
   const levels: number[] = [];
   for (let level = 0; level <= maxLevel; level++) levels.push(level);
+  const states = levels.map(level => levelState(level));
+  const lockedLevel = lastOnLevel(autoState, states);
 
   return (
     <AnchoredPopup
@@ -79,7 +96,8 @@ const LevelPickerPopup = ({
           Auto
         </button>
         {levels.map(level => {
-          const state = levelState(level);
+          const state = states[level];
+          const isLast = level === lockedLevel;
           return (
             <LevelChip
               key={level}
@@ -87,6 +105,8 @@ const LevelPickerPopup = ({
               state={state}
               pressed={pressedOf(state)}
               ariaLabel={`Level ${level} visible`}
+              disabled={isLast}
+              title={isLast ? LAST_LEVEL_TITLE : undefined}
               onClick={() => onToggleLevel(level)}
             />
           );
@@ -96,5 +116,5 @@ const LevelPickerPopup = ({
   );
 };
 
-export { LevelPickerPopup, chipStateOf };
+export { LevelPickerPopup, chipStateOf, lastOnLevel, LAST_LEVEL_TITLE };
 export type { ChipState, LevelPickerPopupProps };

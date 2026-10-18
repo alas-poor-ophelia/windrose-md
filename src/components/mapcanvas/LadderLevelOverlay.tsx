@@ -67,7 +67,7 @@ const LadderLevelOverlay = (): VNode | null => {
       <div
         className="windrose-ladder-hud windrose-ladder-levels"
         role="group"
-        aria-label="Ladder levels"
+        aria-label="Detail levels"
         onPointerDown={stop}
         onMouseDown={stop}
         onTouchStart={stop}

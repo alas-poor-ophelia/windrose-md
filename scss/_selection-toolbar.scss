@@ -512,4 +512,10 @@
     border-style: dashed;
     background: oklch(from var(--windrose-border-primary) l c h/0.12);
   }
+
+  /* The last explicit level: stays on (its title says why). */
+  .windrose-ladder-chip:disabled {
+    cursor: not-allowed;
+    opacity: 0.75;
+  }
 }

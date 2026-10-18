@@ -160,7 +160,14 @@ function buildFeaturesGroup(): SettingDefinitionItem {
           key: `features.${def.id}`,
           defaultValue: true
         }
-      }))
+      })),
+      // Not in FEATURE_DEFINITIONS: it is stored as the top-level `lodLadder`
+      // key (read by lodFlags), not under `features`. Absent reads as on.
+      {
+        name: 'Detail levels',
+        desc: 'Let hex maps add finer hexes as you zoom in. Maps without detail levels are unaffected.',
+        control: { type: 'toggle', key: 'lodLadder', defaultValue: true }
+      }
     ]
   };
 }
@@ -734,11 +741,6 @@ function buildAdvancedGroup(): SettingDefinitionItem {
         name: 'Developer mode',
         desc: 'Show debug and diagnostic commands in the command palette.',
         control: { type: 'toggle', key: 'developerMode' }
-      },
-      {
-        name: 'Lattice ladder (experimental)',
-        desc: 'Allow hex maps to use the zoom-native lattice ladder. Developer preview, off by default; classic maps are unaffected.',
-        control: { type: 'toggle', key: 'lodLadder' }
       }
     ]
   };

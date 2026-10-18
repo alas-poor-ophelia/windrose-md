@@ -111,7 +111,7 @@ src/
 ├── core/                  # App infrastructure
 │   ├── dmtConstants.ts    # Constants, theme, defaults, schema version, segment tables
 │   ├── settingsAccessor.ts # Plugin settings read/write
-│   ├── lodFlags.ts        # Lattice ladder capability flag (developer setting, default off) plus the ladder predicates (isLadderView, ladderParamsFor, isDepthQuarantined)
+│   ├── lodFlags.ts        # Detail levels (lattice ladder) capability flag (Features toggle, default on) plus the ladder predicates (isLadderView, ladderParamsFor, isDepthQuarantined)
 │   ├── homeLevel.ts       # homeLevelOf: reads an element's homeLevel, a malformed value counts as root
 │   ├── toolIds.ts         # Runtime ToolId table; the MCP bridge's set_tool rejects ids outside it
 │   ├── featureFlags.ts    # Feature gating (absent = enabled)

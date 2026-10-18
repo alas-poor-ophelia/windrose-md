@@ -45,6 +45,7 @@ import type {
 } from '../components/settings/settingsReducer';
 
 import type { ComponentChildren, FunctionComponent } from 'preact';
+import { Notice } from 'obsidian';
 import { createContext } from 'preact';
 import type { MutableRef } from 'preact/hooks';
 import { useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'preact/hooks';
@@ -385,6 +386,17 @@ function useModalShell(): ModalShellContextValue {
   return ctx;
 }
 
+/**
+ * Whether the map settings modal shows the detail-levels section: a hex map
+ * while the global capability is on, or any hex map that already HAS detail
+ * levels (`mapData.lod`), so a user who switched the capability off can still
+ * see and disable them.
+ */
+function showsDetailLevelSettings(mapType: string | null | undefined, mapData: { lod?: unknown } | null): boolean {
+  if (mapType !== 'hex') return false;
+  return isLodLadderEnabled() || (mapData !== null && mapData.lod != null);
+}
+
 function useAppearance(): AppearanceContextValue {
   const ctx = useContext(AppearanceContext);
   if (!ctx) throw new Error('useAppearance must be used within MapSettingsProvider');
@@ -700,13 +712,17 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
       objectSetId: settingsData.objectSetId,
       showParentBackdrop: settingsData.showParentBackdrop,
     };
-    // Ladder settings: only from the shown section (hex, flag on, no classic
-    // sub-maps). The opt-in toggle decides set / remove; see ladderSettingsPatch.
-    const ladderShown = mapType === 'hex' && isLodLadderEnabled() && !(mapData !== null && hasSubHexChildren(mapData));
+    // Ladder settings: only from the shown section (see showsDetailLevelSettings;
+    // classic sub-maps keep it inert). The opt-in toggle decides set / remove;
+    // see ladderSettingsPatch.
+    const ladderShown = showsDetailLevelSettings(mapType, mapData) && !(mapData !== null && hasSubHexChildren(mapData));
     const ladderPatch: LadderPatch = ladderShown
       ? ladderSettingsPatch(mapData?.lod, state.ladderEnabled, state.lod, mapData !== null && hasDepthContent(mapData))
       : { kind: 'keep' };
     onSave(mapSettings, state.preferences, mapType === 'hex' ? state.hexBounds : null, backgroundImageData, calculatedHexSize, forceDelete, ladderPatch);
+    if (ladderPatch.kind !== 'remove' && ladderPatch.mRefused === true) {
+      new Notice('Child hexes per parent edge cannot change once a map has detail content; the other settings were saved.');
+    }
     onClose();
   };
 
@@ -992,4 +1008,4 @@ const MapSettingsProvider: FunctionComponent<MapSettingsProviderProps> = ({
   );
 };
 
-export { MapSettingsProvider, GRID_DENSITY_PRESETS, ModalShellContext, AppearanceContext, BackgroundImageContext, HexGridContext, useModalShell, useAppearance, useBackgroundImage, useHexGrid };
+export { MapSettingsProvider, showsDetailLevelSettings, GRID_DENSITY_PRESETS, ModalShellContext, AppearanceContext, BackgroundImageContext, HexGridContext, useModalShell, useAppearance, useBackgroundImage, useHexGrid };

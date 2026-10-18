@@ -35,8 +35,8 @@ describe('createNewMap ladder preset', () => {
     expect(map.lod).toEqual({ m: 15, minCellPx: LADDER_DEFAULTS.minCellPx, maxLevel: LADDER_DEFAULTS.maxLevel });
   });
 
-  it('ignores the preset while the capability flag is off', () => {
-    getSettings.mockReturnValue({});
+  it('ignores the preset while the capability flag is explicitly off', () => {
+    getSettings.mockReturnValue({ lodLadder: false });
     const map = createNewMap('Off', 'hex', { ladderM: 2 });
     expect('lod' in map).toBe(false);
   });
@@ -121,6 +121,17 @@ describe('ladderSettingsPatch', () => {
   it("sets when editing an enabled map's values, keeping distanceOverrides", () => {
     expect(ladderSettingsPatch(stored, true, { m: 4, minCellPx: 40, maxLevel: 5 }, false))
       .toEqual({ kind: 'set', lod: { m: 4, minCellPx: 40, maxLevel: 5, distanceOverrides: stored.distanceOverrides } });
+  });
+
+  it('refuses an m change on a map with depth content, still applying minCellPx (D-4)', () => {
+    expect(ladderSettingsPatch(stored, true, { m: 3, minCellPx: 40, maxLevel: 3 }, true))
+      .toEqual({ kind: 'set', lod: { m: 4, minCellPx: 40, maxLevel: 3, distanceOverrides: stored.distanceOverrides }, mRefused: true });
+    expect(ladderSettingsPatch(stored, true, { m: 3, minCellPx: 64, maxLevel: 3 }, true)).toEqual({ kind: 'keep', mRefused: true });
+  });
+
+  it('applies an m change on a map without depth content', () => {
+    expect(ladderSettingsPatch(stored, true, { m: 3, minCellPx: 64, maxLevel: 3 }, false))
+      .toEqual({ kind: 'set', lod: { m: 3, minCellPx: 64, maxLevel: 3, distanceOverrides: stored.distanceOverrides } });
   });
 
   it('keeps when the edit equals the stored values', () => {

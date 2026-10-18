@@ -114,7 +114,7 @@ describe('useDataHandlers: ladder element writes', () => {
   });
 
   it('refused element write leaves mapData identity and history untouched', () => {
-    getSettings.mockReturnValue({}); // capability off: no map may START taking depth
+    getSettings.mockReturnValue({ lodLadder: false }); // capability off: no map may START taking depth
     const base = createNewMap('Off', 'hex');
     const t = mount(base);
 
@@ -130,12 +130,23 @@ describe('useDataHandlers: ladder element writes', () => {
     expect(t.addToHistory).not.toHaveBeenCalled();
   });
 
-  it('the first deep element stamps lod and records the stamp', () => {
-    const t = mount(createNewMap('First', 'hex'));
+  it('a deep element on a map without lod is refused not-a-ladder even with the capability on, and stamps nothing', () => {
+    const base = createNewMap('First', 'hex');
+    const t = mount(base);
+    expect(t.handlers().handleObjectsChange([obj('deep', 4, 0, 1)])).toBe('not-a-ladder');
+    expect(t.map()).toBe(base);
+    expect(t.map().lod).toBeUndefined();
+    expect(t.addToHistory).not.toHaveBeenCalled();
+  });
+
+  it('a deep element on an opted-in map is accepted and never re-stamps lod', () => {
+    const lod = { m: 4, minCellPx: 64, maxLevel: 3 };
+    const t = mount({ ...createNewMap('Opted', 'hex'), lod });
     expect(t.handlers().handleObjectsChange([obj('deep', 4, 0, 1)])).toBeNull();
-    expect(t.map().lod).toEqual({ m: 4, minCellPx: 64, maxLevel: 3 });
+    expect(t.map().lod).toBe(lod);
+    expect(t.map().layers[0].objects.map(o => o.id)).toEqual(['deep']);
     expect(t.addToHistory).toHaveBeenCalledTimes(1);
-    expect(t.addToHistory.mock.calls[0][0].lodStamped).toEqual({ m: 4, minCellPx: 64, maxLevel: 3 });
+    expect(t.addToHistory.mock.calls[0][0].lodStamped).toBeUndefined();
   });
 
   it('duplicate at depth goes through the gate', () => {
@@ -155,7 +166,7 @@ describe('useDataHandlers: ladder element writes', () => {
     expect(t.map()).toBe(afterMove);
 
     // With the capability off the duplicate is refused at the door instead.
-    getSettings.mockReturnValue({});
+    getSettings.mockReturnValue({ lodLadder: false });
     expect(t.handlers().handleObjectsChange(dup)).toBe('not-a-ladder');
     expect(t.map()).toBe(afterMove);
   });
@@ -167,7 +178,7 @@ describe('useDataHandlers: ladder element writes', () => {
     ({ ...map, layers: map.layers.map((l, i) => (i === 0 ? { ...l, tiles } : l)) });
 
   it('deep tile move with the capability flag off is not refused', () => {
-    getSettings.mockReturnValue({});
+    getSettings.mockReturnValue({ lodLadder: false });
     const t = mount(withTiles({ ...createNewMap('Off', 'hex'), lod: LOD }, [deepTile(4)]));
 
     // Tiles carry no id and are rebuilt per edit: a move, a rotation and a
@@ -193,14 +204,14 @@ describe('useDataHandlers: ladder element writes', () => {
     expect(t.handlers().handleTilesChange([deepTile(4), deepTile(4)])).toBe('over-budget');
     expect(t.handlers().handleTilesChange([deepTile(4), deepTile(6)])).toBe('over-budget');
     expect(t.map()).toBe(before);
-    getSettings.mockReturnValue({});
+    getSettings.mockReturnValue({ lodLadder: false });
     expect(t.handlers().handleTilesChange([deepTile(4), deepTile(6)])).toBe('not-a-ladder');
     expect(t.map()).toBe(before);
     expect(t.addToHistory).not.toHaveBeenCalled();
   });
 
   it('a deep write in a sub-hex child is refused nested-level and stamps nothing', () => {
-    // A leaf child with no lod would pass the flag-on gate on its own (finding C).
+    // A leaf child is refused as nested-level before any lod check (finding C).
     const child = createNewMap('Child', 'hex');
     const t = mount(child, '0,0');
 
@@ -219,7 +230,7 @@ describe('useDataHandlers: ladder element writes', () => {
   });
 
   it('classic writes are untouched by the gate', () => {
-    getSettings.mockReturnValue({});
+    getSettings.mockReturnValue({ lodLadder: false });
     const base = createNewMap('Classic', 'grid');
     const t = mount(base);
     expect(t.handlers().handleObjectsChange([obj('o', 1, 1)])).toBeNull();

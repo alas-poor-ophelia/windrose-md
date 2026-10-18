@@ -202,6 +202,8 @@ function addTerrainStrokeBounds(acc: BoundsAccumulator, strokes: TerrainStroke[]
  * have none. With a render `level` (deep export), objects and labels count only
  * when the band rule shows them at that level (`elementVisibleAt`, including a
  * per-element `visibleLevels`), and tiles only when homed at or above it.
+ * Without a ladder but with `level` 0 (a ladder map painted on the classic
+ * path), root elements still go through the band rule.
  */
 function calculateContentBounds(
   layer: MapLayer,
@@ -219,7 +221,7 @@ function calculateContentBounds(
   // Without a ladder only root elements are drawn; with a render level, only
   // those the band rule shows there.
   const drawn = (element: { homeLevel?: number }, kind: 'object' | 'label'): boolean => {
-    if (ladder === null) return homeLevelOf(element) === 0;
+    if (ladder === null) return homeLevelOf(element) === 0 && (level === undefined || elementVisibleAt(element, level, kind));
     return level === undefined || elementVisibleAt(element, level, kind);
   };
   for (const obj of layer.objects) {
@@ -428,6 +430,26 @@ function renderMapToCanvas(
 // ===========================================
 
 /**
+ * A ladder map painted on the classic path (level 0, e.g. when the size cap
+ * pulls the export down from a deeper rung): the classic draw places every
+ * object, label and tile on the root lattice, so keep only the root elements
+ * the band rule shows at level 0, matching the frame (kgc.40).
+ */
+function levelZeroElementsOnly(mapData: MapData): MapData {
+  const atZero = (element: { homeLevel?: number }, kind: 'object' | 'label'): boolean =>
+    homeLevelOf(element) === 0 && elementVisibleAt(element, 0, kind);
+  return {
+    ...mapData,
+    layers: mapData.layers.map(layer => ({
+      ...layer,
+      objects: layer.objects.filter(obj => atZero(obj, 'object')),
+      textLabels: layer.textLabels.filter(label => atZero(label, 'label')),
+      ...(layer.tiles !== undefined ? { tiles: layer.tiles.filter(tile => homeLevelOf(tile) === 0) } : {})
+    }))
+  };
+}
+
+/**
  * Export map as PNG image
  */
 async function exportMapAsImage(
@@ -460,7 +482,7 @@ async function exportMapAsImage(
   const frameAt = (level: number): { bounds: BoundingBox; zoom: number } | null => {
     const content = level > 0 && ladder !== null
       ? calculateExportBounds(mapData, exportLayers, geometry, ladder, level)
-      : calculateExportBounds(mapData, exportLayers, geometry, null);
+      : calculateExportBounds(mapData, exportLayers, geometry, null, ladder !== null ? 0 : undefined);
     if (!content) return null;
     const bounds: BoundingBox = {
       minX: content.minX - buffer,
@@ -509,7 +531,7 @@ async function exportMapAsImage(
   
   // Render map to canvas
   renderMapToCanvas(ctx, {
-    mapData: exportMapData,
+    mapData: ladder !== null && renderLadder === null ? levelZeroElementsOnly(exportMapData) : exportMapData,
     geometry,
     bounds: exportBounds,
     width,

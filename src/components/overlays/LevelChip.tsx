@@ -20,6 +20,9 @@ interface LevelChipProps {
   ariaLabel?: string;
   /** Picker chips are toggles; pass 'mixed' for a partial multi-selection. */
   pressed?: boolean | 'mixed';
+  /** Button chips only: render disabled (pair with `title` to say why). */
+  disabled?: boolean;
+  title?: string;
 }
 
 function levelChipClass(state: LevelChipState, locked = false): string {
@@ -31,14 +34,14 @@ function levelChipClass(state: LevelChipState, locked = false): string {
   return cls;
 }
 
-const LevelChip = ({ level, state = 'off', locked = false, onClick, ariaLabel, pressed }: LevelChipProps): VNode => {
+const LevelChip = ({ level, state = 'off', locked = false, onClick, ariaLabel, pressed, disabled, title }: LevelChipProps): VNode => {
   const className = levelChipClass(state, locked);
   const body = <><span className="windrose-ladder-chip-prefix">L</span>{level}</>;
   if (onClick === undefined) {
     return <span className={className} aria-current={state === 'current' ? 'true' : undefined}>{body}</span>;
   }
   return (
-    <button type="button" className={className} aria-label={ariaLabel} aria-pressed={pressed} onClick={onClick}>
+    <button type="button" className={className} aria-label={ariaLabel} aria-pressed={pressed} disabled={disabled} title={title} onClick={onClick}>
       {body}
     </button>
   );

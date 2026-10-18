@@ -1,10 +1,12 @@
 /**
  * LadderSection.tsx
  *
- * Lattice ladder settings for a hex map (design 06, section 10). Shown only
- * while the ladder capability flag is on. An explicit "Enable detail ladder"
- * toggle is the opt-in: a classic hex map never gains a `lod` block from a
- * nudged number. The parameters (m / minCellPx / maxLevel) show only while the
+ * Detail-level settings for a hex map (internally the lattice ladder, design
+ * 06 section 10). Shown while the capability flag is on, or whenever the map
+ * already has detail levels (showsDetailLevelSettings). An explicit "Enable
+ * detail levels" toggle is the opt-in, behind a version-compatibility
+ * confirmation: a classic hex map never gains a `lod` block from a nudged
+ * number. The parameters (m / minCellPx / maxLevel) show only while the
  * toggle is on; the save path turns toggle + edits into a LadderPatch
  * (ladderSettingsPatch: set / remove / keep, distanceOverrides kept).
  *
@@ -21,6 +23,8 @@ import type { VNode } from 'preact';
 import { useState } from 'preact/hooks';
 
 import { useModalShell, useHexGrid } from '../../../context/MapSettingsContext';
+import { getApp } from '../../../core/settingsAccessor';
+import { confirmEnableDetailLevels } from '../../modals/confirmEnableDetailLevels';
 import { SettingItem } from '../SettingItem';
 import { NativeToggle, NativeDropdown } from '../NativeControls';
 import { DEFAULTS } from '../../../core/dmtConstants';
@@ -37,6 +41,9 @@ function LadderSection(): VNode | null {
 
   // Why the last typed value changed on commit (the field is rewritten to the held value).
   const [clampHint, setClampHint] = useState<string | null>(null);
+  // Bumped when the enable confirmation is cancelled: remounts the native
+  // toggle, which flipped itself on click, back to the held value.
+  const [toggleKey, setToggleKey] = useState(0);
 
   if (mapData === null || mapData.mapType !== 'hex') return null;
 
@@ -81,20 +88,34 @@ function LadderSection(): VNode | null {
     setLadderConfig({ maxLevel: next });
   };
 
+  // Turning detail levels ON for a map that does not have them yet asks first:
+  // older Windrose versions drop `lod` on save. Cancel leaves the map as it is.
+  const handleToggle = (next: boolean): void => {
+    if (!next || mapData.lod != null) {
+      setLadderEnabled(next);
+      return;
+    }
+    void confirmEnableDetailLevels(getApp()).then((confirmed) => {
+      if (confirmed) setLadderEnabled(true);
+      else setToggleKey(k => k + 1);
+    });
+  };
+
   const toggleReason = sectionDisabled
     ? ' (unavailable while this map has sub-maps)'
-    : depth ? ' (locked on while this map holds depth content; remove that content to turn it off)' : '';
-  const opensAtText = ladderEnabled ? `. Opens at L${opensAt}` : '';
+    : depth ? ' (stays on while this map has content above level 0; remove that content to turn it off)' : '';
+  const opensAtText = ladderEnabled ? `. Opens at level ${opensAt}` : '';
 
   return (
     <div style={{ opacity: sectionDisabled ? 0.6 : 1 }}>
       <SettingItem
-        name="Enable detail ladder"
-        description={`Lets this map subdivide into finer hexes as you zoom in${opensAtText}${toggleReason}`}
+        name="Enable detail levels"
+        description={`Lets this map add finer hexes as you zoom in${opensAtText}${toggleReason}`}
       >
         <NativeToggle
+          key={toggleKey}
           value={ladderEnabled}
-          onChange={setLadderEnabled}
+          onChange={handleToggle}
           disabled={toggleDisabled}
         />
       </SettingItem>
@@ -102,8 +123,8 @@ function LadderSection(): VNode | null {
       {ladderEnabled && (
         <>
           <SettingItem
-            name="Subdivision"
-            description={`Child hexes per parent edge on each deeper level${mLocked && !sectionDisabled ? ' (fixed while the map has depth content; remove that content to change it)' : ''}`}
+            name="Child hexes per parent edge"
+            description={`How many child hexes each hex splits into per edge on each deeper level${mLocked && !sectionDisabled ? '. This cannot change once the map has content above level 0' : ''}`}
           >
             <NativeDropdown
               value={String(effective.m)}

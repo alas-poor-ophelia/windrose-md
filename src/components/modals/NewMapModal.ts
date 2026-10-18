@@ -6,21 +6,32 @@ import { mintId } from '../../core/ids';
 import { ensureDataFileForNewMap } from '../../persistence/fileOperations';
 import { isLodLadderEnabled } from '../../core/lodFlags';
 import { LADDER_DEFAULTS } from '../../geometry/core/lattice';
+import { confirmEnableDetailLevels } from './confirmEnableDetailLevels';
 
-/** Ladder presets offered for a new hex map, default first. */
-const LADDER_PRESETS: ReadonlyArray<{ m: number; label: string }> = [
-  { m: 4, label: 'm = 4 (default)' },
-  { m: 2, label: 'm = 2' },
-  { m: 15, label: 'm = 15' }
+/** Dropdown value for a classic hex map (no detail levels). */
+const DETAIL_LEVELS_OFF = 'off';
+
+/**
+ * Detail-level choices for a new hex map. "Off (classic)" is the default:
+ * nobody gets detail levels without picking a preset (and confirming).
+ */
+const DETAIL_LEVEL_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: DETAIL_LEVELS_OFF, label: 'Off (classic)' },
+  { value: String(LADDER_DEFAULTS.m), label: `${LADDER_DEFAULTS.m} child hexes per edge (recommended)` },
+  { value: '2', label: '2 child hexes per edge' },
+  { value: '15', label: '15 child hexes per edge' }
 ];
 
-/** `ladderM` is passed only for a hex map while the ladder capability is on. */
+/** `ladderM` is passed only for a hex map with a detail-levels preset chosen (and confirmed). */
 type NewMapCallback = (mapId: string, mapName: string, mapType: MapType, ladderM?: number) => void;
 
 class NewMapModal extends Modal {
   private mapName = '';
   private mapType: MapType | null = null;
-  private ladderM: number = LADDER_DEFAULTS.m;
+  /** Null = off (classic). */
+  private ladderM: number | null = null;
+  /** True while the detail-levels confirmation is open (Enter must not stack a second). */
+  private confirming = false;
   private onCreate: NewMapCallback;
 
   constructor(app: App, onCreate: NewMapCallback) {
@@ -69,18 +80,18 @@ class NewMapModal extends Modal {
       attr: { type: 'button' }
     }) : null;
 
-    // Ladder preset (developer capability): only meaningful for hex maps, so
-    // the row is shown only while Hex is the selected type.
+    // Detail levels: only meaningful for hex maps, so the row is shown only
+    // while Hex is the selected type. Off (classic) is the default.
     let ladderSetting: Setting | null = null;
     if (hexBtn != null && isLodLadderEnabled()) {
       ladderSetting = new Setting(contentEl)
-        .setName('Detail ladder')
-        .setDesc('How many child hexes each hex splits into per edge on each deeper level')
+        .setName('Detail levels')
+        .setDesc('Let this map add finer hexes as you zoom in. Each level splits every hex into this many child hexes per edge.')
         .addDropdown(dropdown => {
-          for (const preset of LADDER_PRESETS) dropdown.addOption(String(preset.m), preset.label);
+          for (const option of DETAIL_LEVEL_OPTIONS) dropdown.addOption(option.value, option.label);
           dropdown
-            .setValue(String(this.ladderM))
-            .onChange(value => { this.ladderM = Number(value); });
+            .setValue(this.ladderM === null ? DETAIL_LEVELS_OFF : String(this.ladderM))
+            .onChange(value => { this.ladderM = value === DETAIL_LEVELS_OFF ? null : Number(value); });
         });
       ladderSetting.settingEl.toggle(false);
     }
@@ -110,22 +121,29 @@ class NewMapModal extends Modal {
     cancelBtn.onclick = () => this.close();
 
     const createBtn = buttonContainer.createEl('button', { text: 'Create', cls: 'mod-cta' });
-    createBtn.onclick = () => this.submit();
+    createBtn.onclick = () => { void this.submit(); };
 
     contentEl.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'Enter' && this.mapType) {
         e.preventDefault();
-        this.submit();
+        void this.submit();
       }
     });
   }
 
-  private submit(): void {
-    if (!this.mapType) return;
+  private async submit(): Promise<void> {
+    if (!this.mapType || this.confirming) return;
+    const mapType = this.mapType;
+    const ladderM = mapType === 'hex' && isLodLadderEnabled() && this.ladderM !== null ? this.ladderM : undefined;
+    if (ladderM !== undefined) {
+      // Cancel keeps this dialog open with its choices, so nothing is created.
+      this.confirming = true;
+      const confirmed = await confirmEnableDetailLevels(this.app);
+      this.confirming = false;
+      if (!confirmed) return;
+    }
     const mapId = mintId('map');
     const mapName = this.mapName;
-    const mapType = this.mapType;
-    const ladderM = mapType === 'hex' && isLodLadderEnabled() ? this.ladderM : undefined;
     this.close();
     // First use: create the store before the block mounts, so a fresh vault's
     // first map renders instead of the missing-store panel. Refuses when a

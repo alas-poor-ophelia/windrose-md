@@ -238,8 +238,8 @@ export interface PluginSettings {
   // does not affect the vault-root WINDROSE-DEBUG.json mechanism.
   developerMode?: boolean;
 
-  // Capability flag for the global lattice ladder (zoom-native depth for hex
-  // maps). Absent = off. Whether a given map IS a ladder map is a property of
+  // Capability flag for detail levels (internally the lattice ladder:
+  // zoom-native depth for hex maps). Absent = on (FALLBACK_SETTINGS). Whether a given map IS a ladder map is a property of
   // the map (mapData.lod), not of this flag; the flag only gates whether the
   // ladder machinery may be used at all. Off keeps every path byte-identical.
   lodLadder?: boolean;

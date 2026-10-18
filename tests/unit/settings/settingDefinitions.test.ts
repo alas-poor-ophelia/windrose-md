@@ -135,14 +135,25 @@ describe('buildSettingDefinitions', () => {
     }
   });
 
-  it('declares one toggle per gateable feature under features.* keys', () => {
+  it('declares one toggle per gateable feature under features.* keys, then Detail levels', () => {
     const features = groupByHeading(buildSettingDefinitions(makeTab()), 'Features');
     const toggles = controlItems(features);
-    expect(toggles).toHaveLength(FEATURE_DEFINITIONS.length);
-    for (const item of toggles) {
+    expect(toggles).toHaveLength(FEATURE_DEFINITIONS.length + 1);
+    for (const item of toggles.slice(0, FEATURE_DEFINITIONS.length)) {
       expect(item.control.type).toBe('toggle');
       expect(item.control.key).toMatch(/^features\./);
     }
+    const detail = toggles[toggles.length - 1];
+    expect(detail.name).toBe('Detail levels');
+    expect(detail.control).toMatchObject({ type: 'toggle', key: 'lodLadder', defaultValue: true });
+    expect(String(detail.desc)).not.toMatch(/experimental|preview|ladder/i);
+  });
+
+  it('defaults the detail levels capability on and keeps it out of the Developer group', () => {
+    expect(FALLBACK_SETTINGS.lodLadder).toBe(true);
+    expect(getSettingControlValue(makeTab(), 'lodLadder')).toBe(true);
+    const dev = groupByHeading(buildSettingDefinitions(makeTab()), 'Developer');
+    expect(controlItems(dev).map(item => item.control.key)).toEqual(['developerMode']);
   });
 
   it('gates hex, dungeon generation, fog, and measurement groups on their feature flags', () => {

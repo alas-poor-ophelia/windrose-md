@@ -33,9 +33,15 @@ import { authoredLevels, levelsShapeIsValid } from '../persistence/layerAccessor
 import { homeLevelOf } from './homeLevel';
 import type { LadderOverrides } from '../geometry/core/createGeometryLadder';
 
-/** True when the lattice ladder capability is switched on in plugin settings. */
+/**
+ * True when the detail levels capability is switched on in plugin settings
+ * (absent = enabled, like every feature toggle). The capability gates only
+ * the authoring surfaces (new-map preset, the map-settings enable toggle,
+ * deep writes); whether a map IS shown with detail levels is data, see
+ * `isLadderView`.
+ */
 function isLodLadderEnabled(): boolean {
-  return getSettings().lodLadder === true;
+  return getSettings().lodLadder !== false;
 }
 
 /**
@@ -98,7 +104,10 @@ function ladderTileClipAt(level: number): LadderTileClipMode {
  * Hex only, and never a rotated map: the rotated branch of the renderer
  * bypasses the surface cache the ladder's per-rung bake lives in. Mode is data
  * (not a flag; see src/geometry/CLAUDE.md, Ladder invariants): a map carrying `lod` is a ladder map on every
- * install, flag or no flag; without `lod` the capability flag decides.
+ * install, flag or no flag; a map without `lod` is classic on every install,
+ * flag or no flag. The capability flag never ladders a map by itself: a map
+ * gets detail levels only when the user opts in (new-map preset or the
+ * map-settings toggle), which writes `lod`.
  *
  * Never a quarantined map (a map whose `lod`/`levels` this build cannot read is held untouched): it renders level 0 on the classic
  * path, clamps at the classic zoom, and refuses deep edits. Gating here, in
@@ -110,12 +119,7 @@ function isLadderView(mapData: MapData | null | undefined): boolean {
   if (mapData === null || mapData === undefined) return false;
   if (mapData.mapType !== 'hex') return false;
   if (((mapData.northDirection ?? 0) % 360) !== 0) return false;
-  if (mapData.lod === undefined) {
-    if (!isLodLadderEnabled()) return false;
-    // A classic map with sub-hex children keeps the classic dive and cannot
-    // enter ladder mode in v1 (design s9 / T1): the flag alone never ladders it.
-    if (hasSubHexChildren(mapData)) return false;
-  }
+  if (mapData.lod === undefined) return false;
   return !isDepthQuarantined(mapData).quarantined;
 }
 
@@ -289,8 +293,8 @@ function mergeLadderConfig(stored: LadderConfig | null | undefined, edited: Ladd
  * turns the map back into a classic hex map.
  */
 type LadderPatch =
-  | { kind: 'keep' }
-  | { kind: 'set'; lod: LadderConfig }
+  | { kind: 'keep'; mRefused?: true }
+  | { kind: 'set'; lod: LadderConfig; mRefused?: true }
   | { kind: 'remove' };
 
 /**
@@ -308,6 +312,11 @@ type LadderPatch =
  * Enabling a classic map writes a block even at the default values: the toggle
  * is the opt-in, not the numbers. A map holding depth content is never
  * stripped of its ladder (the UI disables the toggle; this is the backstop).
+ *
+ * D-4: on a map holding depth content (`hasDepthContent`) an edit to `m` is
+ * refused, because a new `m` re-partitions every rung cell. The stored `m`
+ * stays, `minCellPx`/`maxLevel` edits still apply, and the patch carries
+ * `mRefused: true` so the UI can say so.
  */
 function ladderSettingsPatch(
   stored: LadderConfig | null | undefined,
@@ -323,8 +332,12 @@ function ladderSettingsPatch(
     const c = edited ?? LADDER_DEFAULTS;
     return { kind: 'set', lod: { m: c.m, minCellPx: c.minCellPx, maxLevel: c.maxLevel } };
   }
-  const merged = mergeLadderConfig(stored, edited);
-  return merged === null ? { kind: 'keep' } : { kind: 'set', lod: merged };
+  const pinned = hasDepth && edited !== null && edited !== undefined && edited.m !== stored.m
+    ? { ...edited, m: stored.m }
+    : null;
+  const merged = mergeLadderConfig(stored, pinned ?? edited);
+  const patch: LadderPatch = merged === null ? { kind: 'keep' } : { kind: 'set', lod: merged };
+  return pinned !== null ? { ...patch, mRefused: true } : patch;
 }
 
 /**

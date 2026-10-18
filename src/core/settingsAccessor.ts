@@ -105,8 +105,8 @@ const FALLBACK_SETTINGS: PluginSettings = {
   // Debug/diagnostic command palette entries hidden by default
   developerMode: false,
 
-  // Lattice ladder capability (zoom-native depth for hex maps): developer preview, off by default
-  lodLadder: false
+  // Detail levels (zoom-native depth for hex maps): on by default; absent reads as on
+  lodLadder: true
 };
 
 /** Default object customization settings */

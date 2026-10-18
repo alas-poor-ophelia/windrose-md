@@ -15,6 +15,11 @@ function hexMap(): MapData {
   return createNewMap('Depth', 'hex');
 }
 
+/** A hex map the user opted into detail levels on (it carries a lod block). */
+function ladderMap(): MapData {
+  return withLod(hexMap());
+}
+
 /**
  * Deterministic text that deflate cannot shrink much (xorshift over `alphabet`),
  * so the journal's encoded payload tracks its length. 'x'.repeat(n) would
@@ -49,8 +54,8 @@ describe('depthAuthoring', () => {
   beforeEach(() => { getSettings.mockReset(); getSettings.mockReturnValue({ lodLadder: true }); });
 
   it('refuses every deep write while the capability is off', () => {
-    getSettings.mockReturnValue({});
-    const m = hexMap();
+    getSettings.mockReturnValue({ lodLadder: false });
+    const m = ladderMap();
     expect(canBeginDepthAuthoring(m)).toBe(false);
     const r = writeDepthCells(m, m.layers[0].id, 1, [{ q: 4, r: 0, color: '#123456' }]);
     expect(r.ok).toBe(false);
@@ -58,24 +63,36 @@ describe('depthAuthoring', () => {
     expect(r.mapData).toBe(m);
   });
 
-  it('the first deep write stamps lod from the defaults in the same update', () => {
+  it('a deep write on a map without lod is refused not-a-ladder with the capability on, and stamps nothing', () => {
     const m = hexMap();
     expect(m.lod).toBeUndefined();
+    expect(canBeginDepthAuthoring(m)).toBe(false);
+    const r = writeDepthCells(m, m.layers[0].id, 1, [{ q: 4, r: 0, color: '#123456' }]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('not-a-ladder');
+    expect(r.mapData).toBe(m);
+    expect(r.mapData.lod).toBeUndefined();
+  });
+
+  it('a deep write on an opted-in map lands and keeps its lod reference', () => {
+    const m = ladderMap();
+    expect(m.lod).toEqual({ m: 4, minCellPx: 64, maxLevel: 3 });
     const r = writeDepthCells(m, m.layers[0].id, 1, [{ q: 4, r: 0, color: '#123456' }]);
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.mapData.lod).toEqual({ m: 4, minCellPx: 64, maxLevel: 3 });
+      expect(r.mapData.lod).toBe(m.lod);
       expect(authoredCells(r.mapData.layers[0], 1)).toHaveLength(1);
     }
     expect(withLod(r.mapData)).toBe(r.mapData);
   });
 
-  it('the first deep write stamps the EFFECTIVE parameters under a developer override (kgc.16)', () => {
+  it('withLod stamps the EFFECTIVE parameters under a developer override, and the guard measures with the same rod (kgc.16)', () => {
     interface LadderGlobal { activeWindow?: { __windroseLadder?: unknown } }
     const g = globalThis as unknown as LadderGlobal;
     g.activeWindow = { __windroseLadder: { m: 2, minCellPx: 40, maxLevel: 2 } };
     try {
-      const m = hexMap();
+      const m = ladderMap();
+      expect(m.lod).toEqual({ m: 2, minCellPx: 40, maxLevel: 2 });
       // the guard and the stamp measure with the same rod: level 2 is in range, level 3 is not
       const refused = writeDepthCells(m, m.layers[0].id, 3, [{ q: 4, r: 0, color: '#123456' }]);
       expect(refused.ok).toBe(false);
@@ -83,7 +100,7 @@ describe('depthAuthoring', () => {
       const r = writeDepthCells(m, m.layers[0].id, 2, [{ q: 4, r: 0, color: '#123456' }]);
       expect(r.ok).toBe(true);
       if (r.ok) {
-        expect(r.mapData.lod).toEqual({ m: 2, minCellPx: 40, maxLevel: 2 });
+        expect(r.mapData.lod).toBe(m.lod);
         // the stamped map is a healthy ladder: no quarantine, same params on the next frame
         expect(canBeginDepthAuthoring(r.mapData)).toBe(true);
         expect(authoredCells(r.mapData.layers[0], 2)).toHaveLength(1);
@@ -94,21 +111,21 @@ describe('depthAuthoring', () => {
   });
 
   it('refuses a level above maxLevel or below 1', () => {
-    const m = hexMap();
+    const m = ladderMap();
     expect(guardDepthWrite(m, m.layers[0].id, 0, [])).toBe('level-out-of-range');
     expect(guardDepthWrite(m, m.layers[0].id, 4, [])).toBe('level-out-of-range');
     expect(guardDepthWrite(m, m.layers[0].id, 3, [])).toBeNull();
   });
 
   it('refuses a single operation adding more than the per-op cap', () => {
-    const m = hexMap();
+    const m = ladderMap();
     const many = Array.from({ length: MAX_CELLS_PER_DEPTH_OP + 1 }, (_, i) => ({ q: i, r: 0, color: '#abcdef' }));
     expect(guardDepthWrite(m, m.layers[0].id, 1, many)).toBe('too-many-cells');
     expect(guardDepthWrite(m, m.layers[0].id, 1, many.slice(0, MAX_CELLS_PER_DEPTH_OP))).toBeNull();
   });
 
   it('refuses a write that would cross the byte budget, and a shrinking write never does', () => {
-    const m = hexMap();
+    const m = ladderMap();
     const padded = paddedTo(m, DEPTH_BUDGET_BYTES - 500);
     expect(depthBudgetBytesOf(padded)).toBeLessThanOrEqual(DEPTH_BUDGET_BYTES - 500);
     expect(guardDepthWrite(padded, m.layers[0].id, 1, Array.from({ length: 100 }, (_, i) => ({ q: i, r: 0, color: '#abcdef' })))).toBe('over-budget');
@@ -146,7 +163,7 @@ describe('depthAuthoring', () => {
     const cellsFrom = (start: number, n: number) => Array.from({ length: n }, (_, i) => ({ q: start + i, r: 0, color: '#abcdef' }));
 
     it('caps a stroke against its start, even when each tick adds one cell', () => {
-      const m = hexMap();
+      const m = ladderMap();
       const id = m.layers[0].id;
       const baseline = cellsFrom(0, 10);
       const start = writeDepthCells(m, id, 1, baseline);
@@ -163,7 +180,7 @@ describe('depthAuthoring', () => {
     });
 
     it('uses the cached stroke-start size instead of serialising the map', () => {
-      const m = hexMap();
+      const m = ladderMap();
       const id = m.layers[0].id;
       const spy = vi.spyOn(JSON, 'stringify');
       try {
@@ -178,7 +195,7 @@ describe('depthAuthoring', () => {
     });
 
     it('an over-budget map still accepts the identity write that records the stroke undo entry', () => {
-      const m = hexMap();
+      const m = ladderMap();
       const id = m.layers[0].id;
       const stamped = writeDepthCells(m, id, 1, cellsFrom(0, 3));
       expect(stamped.ok).toBe(true);
@@ -192,24 +209,26 @@ describe('depthAuthoring', () => {
       expect(guardDepthWrite(fat, id, 1, current, { baseline: [], serialisedBytes: DEPTH_BUDGET_BYTES * 2 })).toBeNull();
     });
 
-    it('refuses an unknown layer and never stamps lod', () => {
-      const m = hexMap();
+    it('refuses an unknown layer and leaves the map and its lod untouched', () => {
+      const m = ladderMap();
       expect(guardDepthWrite(m, 'no-such-layer', 1, cellsFrom(0, 1))).toBe('unknown-layer');
       const r = writeDepthCells(m, 'no-such-layer', 1, cellsFrom(0, 1));
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.reason).toBe('unknown-layer');
       expect(r.mapData).toBe(m);
-      expect(r.mapData.lod).toBeUndefined();
+      expect(r.mapData.lod).toBe(m.lod);
     });
   });
   describe('depthEntryRefusal (paint-tool refusal parity, kgc.25)', () => {
-    it('names the reason a map cannot start deep edits, null when it can', () => {
-      const m = hexMap();
+    it('names the reason a map cannot start deep edits (not-a-ladder for a map without lod), null when it can', () => {
+      const m = ladderMap();
       expect(depthEntryRefusal(m)).toBeNull();
-      expect(depthEntryRefusal({ ...m, lod: { m: 7, minCellPx: 64, maxLevel: 3 } })).toBe('quarantined');
-      const nested: MapData = { ...m, subHexMaps: { '0,0': { mapData: hexMap() } as unknown as NonNullable<MapData['subHexMaps']>[string] } };
+      const classic = hexMap();
+      expect(depthEntryRefusal(classic)).toBe('not-a-ladder');
+      expect(depthEntryRefusal({ ...classic, lod: { m: 7, minCellPx: 64, maxLevel: 3 } })).toBe('quarantined');
+      const nested: MapData = { ...classic, subHexMaps: { '0,0': { mapData: hexMap() } as unknown as NonNullable<MapData['subHexMaps']>[string] } };
       expect(depthEntryRefusal(nested)).toBe('nested-classic');
-      getSettings.mockReturnValue({});
+      getSettings.mockReturnValue({ lodLadder: false });
       expect(depthEntryRefusal(m)).toBe('not-a-ladder');
     });
   });
@@ -224,7 +243,7 @@ describe('depthAuthoring', () => {
     });
 
     it('an over-budget map refuses an element write past its headroom and accepts one within it', () => {
-      const m = hexMap();
+      const m = ladderMap();
       const id = m.layers[0].id;
       const stamped = writeDepthCells(m, id, 1, [{ q: 0, r: 0, color: '#abcdef' }]);
       if (!stamped.ok) throw new Error('expected the stamp to land');
@@ -321,8 +340,8 @@ describe('depthAuthoring growth by key and size unit (Codex review)', () => {
 describe('sub-hex child maps refuse depth authoring (D-1)', () => {
   beforeEach(() => { getSettings.mockReset(); getSettings.mockReturnValue({ lodLadder: true }); });
 
-  it('a deep write in a sub-hex child is refused nested-level and stamps nothing', () => {
-    const child = hexMap();
+  it('a deep write in a sub-hex child is refused nested-level and leaves the map untouched', () => {
+    const child = ladderMap();
     expect(canBeginDepthAuthoring(child)).toBe(true);
     const cells = [{ q: 4, r: 0, color: '#123456' }];
     expect(guardDepthWrite(child, child.layers[0].id, 1, cells, { nested: true })).toBe('nested-level');
@@ -330,7 +349,13 @@ describe('sub-hex child maps refuse depth authoring (D-1)', () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toBe('nested-level');
     expect(r.mapData).toBe(child);
-    expect(r.mapData.lod).toBeUndefined();
+    expect(r.mapData.lod).toBe(child.lod);
+    // A child without lod is refused for its nesting too, and stamps nothing.
+    const classicChild = hexMap();
+    const c = writeDepthCells(classicChild, classicChild.layers[0].id, 1, cells, { nested: true });
+    expect(c.ok).toBe(false);
+    if (!c.ok) expect(c.reason).toBe('nested-level');
+    expect(c.mapData.lod).toBeUndefined();
     // Without the flag the same write goes through (the refusal is the nesting, nothing else).
     expect(writeDepthCells(child, child.layers[0].id, 1, cells).ok).toBe(true);
   });
@@ -339,24 +364,24 @@ describe('sub-hex child maps refuse depth authoring (D-1)', () => {
 describe('a deep write that changes nothing never stamps lod (DATA-02)', () => {
   beforeEach(() => { getSettings.mockReset(); getSettings.mockReturnValue({ lodLadder: true }); });
 
-  it('erase on an empty rung of a map without lod returns the same reference and no lod', () => {
-    const m = hexMap();
-    expect(m.lod).toBeUndefined();
+  it('erase on an empty rung of an opted-in map returns the same reference, lod unchanged', () => {
+    const m = ladderMap();
     const r = writeDepthCells(m, m.layers[0].id, 2, []);
     expect(r.ok).toBe(true);
     expect(r.mapData).toBe(m);
-    expect(r.mapData.lod).toBeUndefined();
+    expect(r.mapData.lod).toBe(m.lod);
   });
 
-  it('paint then erase the same cell in one stroke leaves no lod', () => {
+  it('a stroke on a map without lod is refused at its first tick, so it can never leave a lod behind', () => {
     const m = hexMap();
     const id = m.layers[0].id;
     const context = { baseline: [], serialisedBytes: depthBudgetBytesOf(m), lodAbsentAtStart: m.lod === undefined };
     const painted = writeDepthCells(m, id, 1, [{ q: 3, r: 1, color: '#abcdef' }], context);
-    if (!painted.ok) throw new Error('expected the paint tick to land');
-    expect(painted.mapData.lod).toBeDefined();
-    const erased = writeDepthCells(painted.mapData, id, 1, [], context);
-    expect(erased.ok).toBe(true);
+    expect(painted.ok).toBe(false);
+    if (!painted.ok) expect(painted.reason).toBe('not-a-ladder');
+    expect(painted.mapData).toBe(m);
+    const erased = writeDepthCells(m, id, 1, [], context);
+    expect(erased.mapData).toBe(m);
     expect(erased.mapData.lod).toBeUndefined();
     expect(erased.mapData.layers[0].levels).toBeUndefined();
   });

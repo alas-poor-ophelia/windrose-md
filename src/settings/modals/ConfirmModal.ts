@@ -2,6 +2,8 @@ import type { App} from 'obsidian';
 import { Modal } from 'obsidian';
 
 interface ConfirmModalOptions {
+  /** Optional modal title (sentence case). */
+  title?: string;
   message?: string;
   confirmText?: string;
   cancelText?: string;
@@ -9,6 +11,7 @@ interface ConfirmModalOptions {
 }
 
 class ConfirmModal extends Modal {
+  private title: string | null;
   private message: string;
   private confirmText: string;
   private cancelText: string;
@@ -18,6 +21,7 @@ class ConfirmModal extends Modal {
 
   constructor(app: App, options: ConfirmModalOptions = {}) {
     super(app);
+    this.title = options.title != null && options.title !== '' ? options.title : null;
     this.message = options.message != null && options.message !== '' ? options.message : 'Are you sure?';
     this.confirmText = options.confirmText != null && options.confirmText !== '' ? options.confirmText : 'Confirm';
     this.cancelText = options.cancelText != null && options.cancelText !== '' ? options.cancelText : 'Cancel';
@@ -28,6 +32,7 @@ class ConfirmModal extends Modal {
   override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
+    if (this.title !== null) this.titleEl.setText(this.title);
 
     const paragraphs = this.message.split('\n').filter(s => s.trim());
     for (const p of paragraphs) {

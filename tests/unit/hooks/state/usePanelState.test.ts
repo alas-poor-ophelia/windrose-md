@@ -70,6 +70,14 @@ describe('usePanelState ladder patch (PX-07)', () => {
     expect(saved.layers[0].levels).toBe(live.layers[0].levels);
   });
 
+  it('stale set with a different m keeps the stored m when only a homed object is deep', () => {
+    const snapshot = hexMap(layer());
+    const deepObject = { id: 'o', type: 'entrance', position: { x: 0, y: 0 }, size: { width: 1, height: 1 }, homeLevel: 2 };
+    const live = hexMap(layer({ objects: [deepObject] as unknown as MapLayer['objects'] }));
+    const saved = save(snapshot, live, { kind: 'set', lod: { m: 3, minCellPx: 48, maxLevel: 3 } });
+    expect(saved.lod).toEqual({ m: 4, minCellPx: 48, maxLevel: 3 });
+  });
+
   it('set without live depth content applies as given', () => {
     const m = hexMap(layer());
     expect(save(m, m, { kind: 'set', lod: { m: 3, minCellPx: 48, maxLevel: 2 } }).lod).toEqual({ m: 3, minCellPx: 48, maxLevel: 2 });

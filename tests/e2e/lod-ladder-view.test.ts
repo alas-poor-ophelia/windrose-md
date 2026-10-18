@@ -9,6 +9,8 @@ import {
   waitForContainer,
   openSettingsModal,
   closeSettingsModal,
+  selectToolByTitle,
+  pressMapKey,
   TEST_MAPS,
 } from "./helpers";
 
@@ -154,11 +156,38 @@ async function waitForHexInstance(page: any): Promise<void> {
   }, TEST_MAPS.hex, { timeout: 10000 });
 }
 
+/**
+ * Give the open smoke-test hex map detail levels through the real UI: Map
+ * settings > Hex Grid > "Enable detail levels" > confirm Enable > Save. A map
+ * without `lod` is never a ladder view (the capability only gates authoring),
+ * so every ladder-dependent test opts the map in first. The in-memory map
+ * takes the `lod` block on Save; cleanVault resets the store before the next
+ * test boots, so nothing leaks.
+ */
+async function optInDetailLevels(page: any): Promise<void> {
+  await openSettingsModal(page);
+  await page.locator('.windrose-settings-tab:has-text("Hex Grid")').click();
+  const modal = page.locator(".windrose-settings-modal");
+  const toggle = modal.locator('.setting-item:has-text("Enable detail levels") .checkbox-container').first();
+  await toggle.waitFor({ state: "visible", timeout: 5000 });
+  await toggle.click();
+  const confirm = page.locator(".modal:has-text('Enable detail levels?')");
+  await confirm.waitFor({ state: "visible", timeout: 5000 });
+  await confirm.locator("button", { hasText: "Enable" }).click();
+  await modal.getByText("Child hexes per parent edge", { exact: false }).first().waitFor({ state: "visible", timeout: 3000 });
+  const saveBtn = page.locator('.modal-button-container .mod-cta, .windrose-modal-btn-submit').first();
+  await saveBtn.dispatchEvent("click");
+  await page.waitForTimeout(500);
+  // The level overlay mounts only on a ladder view: proof the opt-in took.
+  await page.locator(".windrose-ladder-levels").first().waitFor({ state: "visible", timeout: 5000 });
+}
+
 async function gotoLadderHexMap(page: any): Promise<void> {
   await enableLadder(page);
   await navigateToMap(page, TEST_MAPS.hex);
   await waitForContainer(page);
   await waitForHexInstance(page);
+  await optInDetailLevels(page);
 }
 
 /** Calls ops.setViewport on the hex map's MCP instance from inside the page. */
@@ -301,11 +330,11 @@ describe("Lattice ladder view", () => {
     expect(errors).toHaveLength(0);
   });
 
-  test("flag off restores the classic grid", async ({ page }) => {
+  test("a hex map without detail levels renders the classic grid, capability on or not", async ({ page }) => {
     const errors = setupErrorTracking(page);
 
-    await gotoLadderHexMap(page);
-    await disableLadder(page);
+    // Capability ON, map never opted in: no ladder frames, no level overlay.
+    await enableLadder(page);
     await navigateToMap(page, TEST_MAPS.hex);
     await waitForContainer(page);
     await waitForHexInstance(page);
@@ -314,11 +343,23 @@ describe("Lattice ladder view", () => {
     await wheelZoomAtCenter(page, 10);
 
     const snapshot = await ladderSnapshot(page);
-    // With the capability off the bridge may be absent (null) or empty; it must never hold frames.
+    // The bridge may be absent (null) or empty; it must never hold frames.
     expect(
       snapshot?.frames.length ?? 0,
-      `expected no new ladder frames with lodLadder off, got ${JSON.stringify(snapshot?.frames)}`
+      `expected no ladder frames on a map without lod, got ${JSON.stringify(snapshot?.frames)}`
     ).toBe(0);
+    expect(await page.locator(".windrose-ladder-levels").count(), "no level overlay on a classic map").toBe(0);
+
+    // Capability OFF: same answer.
+    await disableLadder(page);
+    await navigateToMap(page, TEST_MAPS.hex);
+    await waitForContainer(page);
+    await waitForHexInstance(page);
+    await resetLadderTelemetry(page);
+    await wheelZoomAtCenter(page, 10);
+    const offSnapshot = await ladderSnapshot(page);
+    expect(offSnapshot?.frames.length ?? 0, "no ladder frames with the capability off").toBe(0);
+    expect(await page.locator(".windrose-ladder-levels").count()).toBe(0);
 
     expect(errors).toHaveLength(0);
   });
@@ -327,11 +368,10 @@ describe("Lattice ladder view", () => {
 // ===========================================
 // Phase 6 UI: level overlay, edit-level lock, settings section
 //
-// The numbers quoted in the design notes (zoom 8 -> L2; clicking the L1 chip
-// -> zoom 3.2 = crossingZoom(1) 1.6 * sqrt(m=4)) belong to the dev vault's
-// `lod-fixture` map, which is NOT in tests/fixtures/test-vault. These tests
-// therefore run on the smoke-test hex map and derive every expected level from
-// the DOM / the instance accessors instead of hardcoding rungs.
+// These tests run on the smoke-test hex map after gotoLadderHexMap opts it
+// into detail levels (default parameters, m = 4, plus the minCellPx override
+// from enableLadder), and derive every expected level from the DOM / the
+// instance accessors instead of hardcoding rungs.
 // ===========================================
 
 interface OverlayState {
@@ -450,7 +490,7 @@ describe("Lattice ladder phase 6 UI", () => {
     expect(errors).toHaveLength(0);
   });
 
-  test("level overlay is absent on a classic grid map", async ({ page }) => {
+  test("level overlay is absent on a grid map", async ({ page }) => {
     const errors = setupErrorTracking(page);
     await enableLadder(page);
     await navigateToMap(page, TEST_MAPS.grid);
@@ -460,7 +500,7 @@ describe("Lattice ladder phase 6 UI", () => {
     expect(errors).toHaveLength(0);
   });
 
-  test("hex settings tab shows the detail ladder section", async ({ page }) => {
+  test("hex settings tab shows the detail levels section behind a confirmation", async ({ page }) => {
     const errors = setupErrorTracking(page);
     await enableLadder(page);
     await navigateToMap(page, TEST_MAPS.hex);
@@ -469,29 +509,107 @@ describe("Lattice ladder phase 6 UI", () => {
     await page.locator('.windrose-settings-tab:has-text("Hex Grid")').click();
     const modal = page.locator(".windrose-settings-modal");
     // A classic hex map shows only the opt-in toggle; the parameter rows appear
-    // once it is switched on. Cancel afterwards so no lod block is ever saved.
-    expect(await modal.getByText("Enable detail ladder", { exact: false }).count(), 'missing "Enable detail ladder"').toBeGreaterThan(0);
-    for (const label of ["Subdivision", "Minimum cell size", "Deepest level"]) {
+    // once it is switched on and confirmed. Cancel afterwards so no lod block
+    // is ever saved.
+    const params = ["Child hexes per parent edge", "Minimum cell size", "Deepest level"];
+    expect(await modal.getByText("Enable detail levels", { exact: false }).count(), 'missing "Enable detail levels"').toBeGreaterThan(0);
+    expect(await modal.getByText(/ladder|rung/i).count(), "no ladder/rung wording in the modal").toBe(0);
+    for (const label of params) {
       expect(await modal.getByText(label, { exact: false }).count(), `"${label}" shown before opt-in`).toBe(0);
     }
-    await modal.locator('.setting-item:has-text("Enable detail ladder") .checkbox-container').first().click();
+    const toggleSel = '.setting-item:has-text("Enable detail levels") .checkbox-container';
+
+    // Cancel in the confirmation leaves the map classic: no parameter rows.
+    await modal.locator(toggleSel).first().click();
+    const confirm = page.locator(".modal:has-text('Enable detail levels?')");
+    await confirm.waitFor({ state: "visible", timeout: 5000 });
+    expect(await confirm.getByText("Windrose 2.5.0 or later", { exact: false }).count()).toBeGreaterThan(0);
+    await confirm.locator("button", { hasText: "Cancel" }).click();
     await page.waitForTimeout(300);
-    for (const label of ["Subdivision", "Minimum cell size", "Deepest level"]) {
+    for (const label of params) {
+      expect(await modal.getByText(label, { exact: false }).count(), `"${label}" shown after Cancel`).toBe(0);
+    }
+
+    // Enable in the confirmation opts in.
+    await modal.locator(toggleSel).first().click();
+    await confirm.waitFor({ state: "visible", timeout: 5000 });
+    await confirm.locator("button", { hasText: "Enable" }).click();
+    await page.waitForTimeout(300);
+    for (const label of params) {
       expect(await modal.getByText(label, { exact: false }).count(), `missing "${label}" after opt-in`).toBeGreaterThan(0);
     }
-    expect(await modal.getByText("Opens at L", { exact: false }).count(), 'missing "Opens at L" readout').toBeGreaterThan(0);
+    expect(await modal.getByText("Opens at level", { exact: false }).count(), 'missing "Opens at level" readout').toBeGreaterThan(0);
     await closeSettingsModal(page);
     expect(errors).toHaveLength(0);
   });
 
-  // Needs a map holding depth content (toggle ON + disabled, reason "(this map
-  // holds depth content)"); the E2E vault has no such map (the dev-vault
-  // `lod-fixture` lives outside tests/fixtures), so there is nothing to assert on.
-  test.skip("settings toggle is on and disabled on a map holding depth content", async () => {});
+  test("settings toggle is on and disabled on a map holding depth content", async ({ page }) => {
+    const errors = setupErrorTracking(page);
+    await gotoLodFixture(page);
+    await openSettingsModal(page);
+    await page.locator('.windrose-settings-tab:has-text("Hex Grid")').click();
+    const modal = page.locator(".windrose-settings-modal");
+    const row = modal.locator('.setting-item:has-text("Enable detail levels")').first();
+    await row.waitFor({ state: "visible", timeout: 5000 });
+    const toggle = row.locator(".checkbox-container").first();
+    expect(await toggle.evaluate((el: Element) => el.classList.contains("is-enabled")), "toggle is on").toBe(true);
+    expect(await toggle.evaluate((el: Element) => el.classList.contains("is-disabled")), "toggle is disabled").toBe(true);
+    expect(await row.getByText("content above level 0", { exact: false }).count(), "reason shown").toBeGreaterThan(0);
 
-  // NewMapModal "Detail ladder" dropdown: no existing E2E test creates a map
-  // through the modal, so the open/create path is unestablished.
-  test.skip("new hex map modal offers a Detail ladder preset", async () => {});
+    // D-4: the child-hexes select is locked, with the reason in its description.
+    const mRow = modal.locator('.setting-item:has-text("Child hexes per parent edge")').first();
+    expect(await mRow.locator("select").first().isDisabled(), "child hexes select is disabled").toBe(true);
+    expect(await mRow.getByText("cannot change once the map has content above level 0", { exact: false }).count()).toBeGreaterThan(0);
+    await closeSettingsModal(page);
+    expect(errors).toHaveLength(0);
+  });
+
+  // The New map dialog is reachable only from the full-pane view header
+  // ("Create new map"). This opens a fresh full-pane tab through the plugin
+  // command, never creates a map (Cancel at both dialogs), then closes the tab.
+  test("new hex map modal offers detail levels, off by default, behind a confirmation", async ({ page }) => {
+    const errors = setupErrorTracking(page);
+    await enableLadder(page);
+    await page.evaluate(() => {
+      const w = window as unknown as { app: { commands: { executeCommandById: (id: string) => boolean } } };
+      w.app.commands.executeCommandById("windrose-md:open-new-map-view");
+    });
+    try {
+      const newMapBtn = page.locator('.windrose-header-action-btn[aria-label="Create new map"]').last();
+      await newMapBtn.waitFor({ state: "visible", timeout: 10000 });
+      await newMapBtn.click();
+      const dialog = page.locator(".modal:has(.windrose-insert-map-modal)").last();
+      await dialog.waitFor({ state: "visible", timeout: 5000 });
+
+      const row = dialog.locator('.setting-item:has-text("Detail levels")').first();
+      expect(await row.isVisible(), "detail levels row hidden until Hex is chosen").toBe(false);
+      await dialog.locator(".windrose-map-type-btn", { hasText: "Hex" }).click();
+      await row.waitFor({ state: "visible", timeout: 3000 });
+
+      const select = row.locator("select").first();
+      expect(await select.inputValue(), "Off (classic) is the default").toBe("off");
+      const labels: string[] = await select.locator("option").allTextContents();
+      expect(labels[0]).toBe("Off (classic)");
+      expect(labels.some((l) => /child hexes per edge/.test(l)), "plain preset labels").toBe(true);
+      expect(labels.some((l) => /m = |ladder/i.test(l)), "no raw m = / ladder labels").toBe(false);
+
+      // A preset asks first; Cancel keeps the dialog open and creates nothing.
+      await select.selectOption("4");
+      await dialog.locator("button.mod-cta", { hasText: "Create" }).click();
+      const confirm = page.locator(".modal:has-text('Enable detail levels?')");
+      await confirm.waitFor({ state: "visible", timeout: 5000 });
+      await confirm.locator("button", { hasText: "Cancel" }).click();
+      await page.waitForTimeout(300);
+      expect(await dialog.isVisible(), "new map dialog stays open after Cancel").toBe(true);
+      await dialog.locator(".windrose-modal-buttons button", { hasText: "Cancel" }).first().click();
+    } finally {
+      await page.evaluate(() => {
+        const w = window as unknown as { app: { workspace: { getLeavesOfType: (t: string) => Array<{ detach: () => void }> } } };
+        for (const leaf of w.app.workspace.getLeavesOfType("windrose-map-view")) leaf.detach();
+      });
+    }
+    expect(errors).toHaveLength(0);
+  });
 });
 
 // ===========================================
@@ -558,8 +676,51 @@ describe("Lattice ladder depth authoring (lod-fixture)", () => {
     expect(errors).toHaveLength(0);
   });
 
-  // The level picker opens from an object's context menu at a screen position
-  // that depends on the rung geometry; write it after the first live walk has
-  // fixed the click coordinates (windrose_inspect_layout).
-  test.skip("level picker toggles hide the pinned object at its rung", async () => {});
+  // Selection without screen coordinates: Area Select (two corner clicks)
+  // across the whole canvas at level 2, where the pinned object is visible,
+  // then the selection toolbar's "Visible levels" action opens the picker.
+  // Assertions are on the pinned object's data, read back through listObjects.
+  test("level picker toggles hide the pinned object at its rung", async ({ page }) => {
+    const errors = setupErrorTracking(page);
+    await gotoLodFixture(page);
+    type Obj = { id: string; visibleLevels?: number[] };
+    const pinned = async (): Promise<Obj | undefined> =>
+      (await onFixtureOps<Obj[]>(page, "listObjects", [1])).find((o) => o.id === "lod-obj-pinned2");
+    expect((await pinned())?.visibleLevels).toEqual([2]);
+
+    await onFixtureOps(page, "setViewport", [0, 0, undefined, 2]);
+    await page.waitForTimeout(400);
+
+    await selectToolByTitle(page, "Area Select");
+    const canvas = page.locator(".windrose-canvas-wrapper canvas").first();
+    await canvas.scrollIntoViewIfNeeded();
+    const box = await canvas.boundingBox();
+    if (box == null) throw new Error("canvas not found");
+    await page.mouse.click(box.x + 12, box.y + 12);
+    await page.waitForTimeout(150);
+    await page.mouse.click(box.x + box.width - 12, box.y + box.height - 12);
+    await page.waitForTimeout(300);
+
+    const levelsBtn = page.locator('.windrose-sel-icon-btn[aria-label="Visible levels"]').first();
+    await levelsBtn.waitFor({ state: "visible", timeout: 5000 });
+    await levelsBtn.click();
+    const picker = page.locator(".windrose-level-picker");
+    await picker.waitFor({ state: "visible", timeout: 3000 });
+
+    // Turn level 1 on: the pinned object now shows on 1 and 2.
+    await picker.locator('[aria-label="Level 1 visible"]').click();
+    await page.waitForTimeout(200);
+    expect([...((await pinned())?.visibleLevels ?? [])].sort()).toEqual([1, 2]);
+
+    // Turn level 2 off: the pinned object is hidden at its rung-2 pin and
+    // shows on level 1 only.
+    await picker.locator('[aria-label="Level 2 visible"]').click();
+    await page.waitForTimeout(200);
+    const after = (await pinned())?.visibleLevels ?? [];
+    expect(after.includes(2), "level 2 switched off for the pinned object").toBe(false);
+    expect(after.includes(1)).toBe(true);
+
+    await pressMapKey(page, "Escape");
+    expect(errors).toHaveLength(0);
+  });
 });

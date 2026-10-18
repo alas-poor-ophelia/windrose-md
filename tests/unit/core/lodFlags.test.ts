@@ -10,6 +10,8 @@ const { setLevelCells } = await import('../../../src/persistence/layerAccessor')
 const { calculateContentBounds, exportLadderFor } = await import('../../../src/persistence/exportOperations');
 const { HexGeometry } = await import('../../../src/geometry/core/HexGeometry');
 const { DEFAULTS } = await import('../../../src/core/dmtConstants');
+const { LADDER_DEFAULTS } = await import('../../../src/geometry/core/lattice');
+const DEFAULT_LOD = { m: LADDER_DEFAULTS.m, minCellPx: LADDER_DEFAULTS.minCellPx, maxLevel: LADDER_DEFAULTS.maxLevel };
 
 /** `activeWindow` is an Obsidian global; the override reader goes through it. */
 interface LadderGlobal { activeWindow?: { __windroseLadder?: unknown } }
@@ -26,9 +28,9 @@ const hexMap = (over: Partial<MapData> = {}): MapData =>
 describe('lodFlags: lattice ladder capability', () => {
   beforeEach(() => { getSettings.mockReset(); });
 
-  it('is off when the setting is absent', () => {
+  it('is on when the setting is absent (absent = enabled, like every feature toggle)', () => {
     getSettings.mockReturnValue({});
-    expect(isLodLadderEnabled()).toBe(false);
+    expect(isLodLadderEnabled()).toBe(true);
   });
 
   it('is off when the setting is explicitly false', () => {
@@ -36,11 +38,13 @@ describe('lodFlags: lattice ladder capability', () => {
     expect(isLodLadderEnabled()).toBe(false);
   });
 
-  it('is on only for a literal true', () => {
+  it('is off only for a literal false', () => {
     getSettings.mockReturnValue({ lodLadder: true });
     expect(isLodLadderEnabled()).toBe(true);
     getSettings.mockReturnValue({ lodLadder: 'yes' });
-    expect(isLodLadderEnabled()).toBe(false);
+    expect(isLodLadderEnabled()).toBe(true);
+    getSettings.mockReturnValue({ lodLadder: 0 });
+    expect(isLodLadderEnabled()).toBe(true);
   });
 });
 
@@ -49,15 +53,19 @@ describe('lodFlags: isLadderView (capability path)', () => {
   afterEach(() => { clearLadderGlobal(); });
 
   it('is false for every map while the capability is off', () => {
-    getSettings.mockReturnValue({});
+    getSettings.mockReturnValue({ lodLadder: false });
     expect(isLadderView(hexMap())).toBe(false);
   });
 
-  it('is true for an unrotated hex map with the capability on', () => {
+  it('the capability flag never ladders a map without lod; an opted-in unrotated hex map is a ladder view', () => {
     getSettings.mockReturnValue({ lodLadder: true });
-    expect(isLadderView(hexMap())).toBe(true);
-    expect(isLadderView(hexMap({ northDirection: 0 }))).toBe(true);
-    expect(isLadderView(hexMap({ northDirection: 360 }))).toBe(true);
+    expect(isLadderView(hexMap())).toBe(false);
+    getSettings.mockReturnValue({});
+    expect(isLadderView(hexMap())).toBe(false);
+    getSettings.mockReturnValue({ lodLadder: true });
+    expect(isLadderView(hexMap({ lod: DEFAULT_LOD }))).toBe(true);
+    expect(isLadderView(hexMap({ lod: DEFAULT_LOD, northDirection: 0 }))).toBe(true);
+    expect(isLadderView(hexMap({ lod: DEFAULT_LOD, northDirection: 360 }))).toBe(true);
   });
 
   it('is false for a grid map', () => {
@@ -82,8 +90,10 @@ describe('lodFlags: getMaxZoom', () => {
   beforeEach(() => { getSettings.mockReset(); withLadderOverride(undefined); });
   afterEach(() => { clearLadderGlobal(); });
 
-  it('is the shipped ceiling on every classic path', () => {
-    getSettings.mockReturnValue({});
+  it('is the shipped ceiling on every classic path, including a hex map without lod under the capability', () => {
+    getSettings.mockReturnValue({ lodLadder: false });
+    expect(getMaxZoom(hexMap())).toBe(DEFAULTS.maxZoom);
+    getSettings.mockReturnValue({ lodLadder: true });
     expect(getMaxZoom(hexMap())).toBe(DEFAULTS.maxZoom);
     expect(getMaxZoom(null)).toBe(DEFAULTS.maxZoom);
     getSettings.mockReturnValue({ lodLadder: true });
@@ -93,19 +103,19 @@ describe('lodFlags: getMaxZoom', () => {
 
   it('climbs to the ladder ceiling on a ladder map, scaled by hex size', () => {
     getSettings.mockReturnValue({ lodLadder: true });
-    expect(getMaxZoom(hexMap())).toBeCloseTo(102.4, 6);
-    expect(getMaxZoom(hexMap({ hexSize: 120 }))).toBeCloseTo(102.4 * 80 / 120, 6);
+    expect(getMaxZoom(hexMap({ lod: DEFAULT_LOD }))).toBeCloseTo(102.4, 6);
+    expect(getMaxZoom(hexMap({ lod: DEFAULT_LOD, hexSize: 120 }))).toBeCloseTo(102.4 * 80 / 120, 6);
   });
 
   it('falls back to the default hex size when the map has none', () => {
     getSettings.mockReturnValue({ lodLadder: true });
-    expect(getMaxZoom({ mapType: 'hex' } as MapData)).toBeCloseTo(102.4, 6);
+    expect(getMaxZoom({ mapType: 'hex', lod: DEFAULT_LOD } as MapData)).toBeCloseTo(102.4, 6);
   });
 
   it('honours the developer minCellPx override', () => {
     getSettings.mockReturnValue({ lodLadder: true });
     withLadderOverride({ minCellPx: 40 });
-    expect(getMaxZoom(hexMap())).toBeCloseTo(64, 9);
+    expect(getMaxZoom(hexMap({ lod: DEFAULT_LOD }))).toBeCloseTo(64, 9);
   });
 });
 
@@ -147,7 +157,7 @@ describe('lodFlags: ladderTileClipAt (kgc.23 k, kgc.26)', () => {
   });
 
   it('ignores the knob when the capability flag is off (default policy applies)', () => {
-    getSettings.mockReturnValue({});
+    getSettings.mockReturnValue({ lodLadder: false });
     withLadderOverride({ tileClip: 'all' });
     expect(ladderTileClipAt(0)).toBe('none');
     expect(ladderTileClipAt(1)).toBe('smart');
@@ -214,20 +224,19 @@ describe('lodFlags: isLadderView, canAuthorDepth, ladderParamsFor', () => {
     expect(isLadderView(withLayers({ lod: { ...LOD, maxLevel: 1 } }, { 2: [cell(1, 1)] }))).toBe(false);
     // and the healthy neighbours stay ladder views
     expect(isLadderView(withLayers({ lod: LOD }, { 2: [cell(1, 1)] }))).toBe(true);
-    expect(isLadderView(withLayers({}))).toBe(true);
-    getSettings.mockReturnValue({});
+    getSettings.mockReturnValue({ lodLadder: false });
     expect(isLadderView(withLayers({ lod: { ...LOD, m: 1 } }))).toBe(false);
     expect(isLadderView(withLayers({ lod: LOD }))).toBe(true);
   });
 
-  it('a classic map with sub-hex children is never laddered by the flag alone (kgc.15, design s9)', () => {
+  it('a classic map, with or without sub-hex children, is never laddered by the flag alone (kgc.15, design s9)', () => {
     getSettings.mockReturnValue({ lodLadder: true });
     const child = { mapData: hexMap() } as unknown as NonNullable<MapData['subHexMaps']>[string];
     expect(hasSubHexChildren(withLayers({ subHexMaps: { '1,1': child } }))).toBe(true);
     expect(hasSubHexChildren(withLayers({ subHexMaps: {} }))).toBe(false);
     expect(hasSubHexChildren(withLayers({}))).toBe(false);
     expect(isLadderView(withLayers({ subHexMaps: { '1,1': child } }))).toBe(false);
-    expect(isLadderView(withLayers({ subHexMaps: {} }))).toBe(true);
+    expect(isLadderView(withLayers({ subHexMaps: {} }))).toBe(false);
     // mode is data: with lod the map is a ladder regardless of children
     expect(isLadderView(withLayers({ lod: LOD, subHexMaps: { '1,1': child } }))).toBe(true);
     expect(getMaxZoom(withLayers({ subHexMaps: { '1,1': child } }))).toBe(DEFAULTS.maxZoom);
@@ -239,12 +248,14 @@ describe('lodFlags: isLadderView, canAuthorDepth, ladderParamsFor', () => {
     expect(getMaxZoom(withLayers({}, { 1: [cell(1, 1)] }))).toBe(DEFAULTS.maxZoom);
   });
 
-  it('canAuthorDepth needs lod, the capability, and no quarantine', () => {
+  it('canAuthorDepth needs lod, the capability (absent = on), and no quarantine', () => {
     getSettings.mockReturnValue({ lodLadder: true });
     expect(canAuthorDepth(withLayers({ lod: LOD }))).toBe(true);
     expect(canAuthorDepth(withLayers({}))).toBe(false);
     expect(canAuthorDepth(withLayers({ lod: { ...LOD, m: 3 } }))).toBe(false);
     getSettings.mockReturnValue({});
+    expect(canAuthorDepth(withLayers({ lod: LOD }))).toBe(true);
+    getSettings.mockReturnValue({ lodLadder: false });
     expect(canAuthorDepth(withLayers({ lod: LOD }))).toBe(false);
   });
 

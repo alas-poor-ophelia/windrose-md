@@ -3,20 +3,20 @@
  *
  * Hex Grid settings tab for MapSettingsModal.
  * Composes BackgroundImageSection, SizingModeSection, BoundsSection,
- * LadderSection (ladder capability only) and CoordinateDisplaySection into a
+ * LadderSection (capability on, or the map already has detail levels) and CoordinateDisplaySection into a
  * unified tab.
  */
 
 import type { VNode } from 'preact';
 
-import { useModalShell } from '../../../context/MapSettingsContext';
+import { useModalShell, showsDetailLevelSettings } from '../../../context/MapSettingsContext';
 import { BackgroundImageSection } from './BackgroundImageSection';
 import { SizingModeSection } from './SizingModeSection';
 import { BoundsSection } from './BoundsSection';
 import { CoordinateDisplaySection } from './CoordinateDisplaySection';
 import { SubHexBackdropSection } from './SubHexBackdropSection';
 import { LadderSection } from './LadderSection';
-import { isLadderView, isLodLadderEnabled } from '../../../core/lodFlags';
+import { isLadderView } from '../../../core/lodFlags';
 
 
 
@@ -49,8 +49,8 @@ function HexGridTab(): VNode | null {
       {/* Map Bounds Section - columns × rows */}
       <BoundsSection />
 
-      {/* Lattice ladder parameters (capability flag only) */}
-      {isLodLadderEnabled() && <LadderSection />}
+      {/* Detail levels: capability on, or the map already has them */}
+      {showsDetailLevelSettings(mapType, mapData) && <LadderSection />}
 
       {/* Coordinate Display Section - mode selector and text colors */}
       <CoordinateDisplaySection />
