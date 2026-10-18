@@ -87,10 +87,10 @@ docs/_site/
 docs/.jekyll-cache/
 docs/vendor/
 
-# LOD spike build + capture artifacts
-spikes/**/dist/
-spikes/**/out/
-spikes/**/out-*/
+# Development harnesses and R&D prototypes (phone harness, weather harness, LOD demos):
+# never part of the plugin, kept local. The community store scanner lints every
+# TypeScript file in the release tree, so they must not be tracked here (2.5.1).
+spikes/
 
 # LOD R&D design handoffs (maintainer-only, stay local)
 .claude/lod-rd/
