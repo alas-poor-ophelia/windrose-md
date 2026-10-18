@@ -42,6 +42,10 @@ When neighboring hexes also hold sub-maps with content, Windrose can display the
 {: .note }
 The adjacent display is **off by default**: toggle it with the **layers button beside the breadcrumb** while inside a sub-map. The button appears when at least one neighboring sub-map has content.
 
+### Sub-maps versus detail levels
+
+Sub-maps are separate nested maps you drill into from one hex. If you want the same map to subdivide as you zoom, with no separate map to open, see [Detail levels]({{ site.baseurl }}/detail-levels/). The two cannot be combined on one map.
+
 ### Deleting a sub-map
 
 Right-click (or long-press) a hex that has a sub-map and choose **Delete Sub-Hex**. A confirmation itemizes everything inside — painted cells, shapes, tiles, objects, text labels, and any nested sub-maps — before anything is removed.

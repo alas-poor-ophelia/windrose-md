@@ -24,7 +24,8 @@ the sections walk through every tool — [drawing]({{ site.baseurl }}/drawing/),
 [measurement and travel]({{ site.baseurl }}/measurement-and-travel/),
 [weather]({{ site.baseurl }}/weather/),
 [fog of war]({{ site.baseurl }}/fog-of-war/),
-[regions and sub-maps]({{ site.baseurl }}/hex-maps/), and
+[regions and sub-maps]({{ site.baseurl }}/hex-maps/),
+[detail levels]({{ site.baseurl }}/detail-levels/), and
 [random dungeons]({{ site.baseurl }}/random-dungeons/).
 
 ## Installing

@@ -456,6 +456,9 @@ Objects can produce **deeplinks**. Selecting an object and pressing its **deepli
 
 Deeplinks work in both **Reading mode** and **Live Preview**. **Hovering** a deeplink shows a small map thumbnail with a crosshair on the target.
 
+## Detail Levels (HEX ONLY)
+A hex map can opt in to **detail levels**: zooming in subdivides each hex into a finer lattice, and you paint, draw and place tiles, objects and text labels at whichever level you are zoomed to. This is not the same as sub-maps, which are separate nested maps. Detail levels are off by default, unavailable on grid maps, rotated maps and inside sub-maps, and every device that opens the vault must run Windrose 2.5.0 or later, since older versions discard them on save. Enable them from the new-map dialog or Map settings, choose child hexes per parent edge (locked once the map has detail content), and use the level overlay to jump between levels or lock the edit level. See [Detail levels]({{ site.baseurl }}/detail-levels/).
+
 ## Weather
 Windrose can display weather from the separate **U+13080** companion plugin (id `wadjet`). It does not generate or edit weather itself, and without the companion installed and enabled nothing weather-related appears. Weather never reveals fog of war.
 
