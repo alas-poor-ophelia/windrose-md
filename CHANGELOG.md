@@ -608,6 +608,22 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.5.0
+
+Feature release: detail levels for hex maps, tile bundles for imported packs, weather from the U+13080 companion plugin, and phone layout fixes.
+
+**Before you enable detail levels on a map:** every device that opens the vault must run Windrose 2.5.0 or later. Older versions do not understand detail levels and discard them from a map the next time they save it. Classic maps are unaffected.
+
+### New Features
+- **Detail levels (hex maps).** A hex map can opt in to detail levels: zooming in subdivides each hex into a finer lattice, and you paint, erase, draw shapes, place tiles, objects and text labels at whichever level you are zoomed to. Zooming back out hides the fine content under the coarse fill. Enable them per map from the new-map dialog (**Detail levels**, off by default) or from **Map settings → Hex grid → Enable detail levels**; choose how many child hexes each parent edge divides into (this cannot change once a map holds detail content). A level overlay on the canvas shows the current level, jumps to a level, and can lock editing to one level. Objects and text labels have a **Visible levels** action to pin which levels show them. Undo follows the level of the change, and image export renders the map at the deepest level the size cap allows. Detail levels are not available inside sub-hex maps or on rotated maps. A **Detail levels** toggle under Features hides the authoring controls if you never want them.
+- **Tile bundles.** Importing a Dungeondraft pack with the Add tiles wizard now writes a tile bundle, a handful of large files inside the pack folder instead of thousands of loose images, so vault listings stay short and sync is far quicker. Tiles look, place and behave exactly as before. The wizard gains a Storage step: **Exact** keeps every image byte for byte; **Compact** (opt-in) re-encodes larger images at a measured quality floor to cut size further. Existing imported folders can be converted with **Bundle folder**, and bundles can be compacted later, returned to loose files with **Unbundle**, or tidied with **Clean up**; every removal goes through Obsidian's trash. A bundle written by a newer plugin version is left untouched. Obsidian Sync users must turn on **Sync all other types** for bundles to reach other devices.
+- **Weather.** With the separate **U+13080** weather plugin installed and enabled, a map or a hex region can be bound to one of its weather zones. The map gains an animated sky (rain, snow, fog, cloud shadows) with a per-map **Animate weather** toggle, a wind needle on the compass, an almanac panel with the forecast, and weather-aware travel times on measured routes with a departure window. A **Weather travel rules** setting picks how weather affects travel. Weather never reveals fog of war. Without the companion plugin nothing weather-related appears.
+
+### Bug Fixes
+- **Phones.** The horizontal tool palette wraps onto extra rows instead of running off the right edge. The Insert dungeon modal scrolls again, and the Map settings modal no longer caps its body at a sliver. The open tile drawer floats over the map instead of squeezing the canvas. Portalled color and icon pickers now stay inside the window on every platform.
+- **Hex maps.** Radial-mode grid drawing is culled to the viewport, so very large hex maps pan and zoom with less work per frame. The repaint after a zoom animation now paints the live view instead of the committed one, fixing a stale frame.
+- **Tapping a tile thumbnail, a dock flyout thumb, the loaded-brush chip or a custom image object no longer opens Obsidian's full-screen image viewer** in reading view; it selects, as intended.
+
 ## Version 2.4.2
 
 Patch release: completes the 2.4.0 multi-Beacon feature — Beacons can share a cell, and Beacons see each other.
