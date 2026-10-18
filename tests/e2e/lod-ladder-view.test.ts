@@ -9,7 +9,7 @@ import {
   waitForContainer,
   openSettingsModal,
   closeSettingsModal,
-  selectToolByTitle,
+  selectSubTool,
   pressMapKey,
   TEST_MAPS,
 } from "./helpers";
@@ -567,8 +567,11 @@ describe("Lattice ladder phase 6 UI", () => {
   });
 
   // The New map dialog is reachable only from the full-pane view header
-  // ("Create new map"). This opens a fresh full-pane tab through the plugin
-  // command, never creates a map (Cancel at both dialogs), then closes the tab.
+  // ("Create new map", MapHeader.tsx:88-92, rendered only with fullPane). A
+  // fresh "open-new-map-view" tab (main.ts addCommand) has no map yet and shows
+  // FullPaneMapPicker (WindroseMapView.ts renderPicker) instead of the header,
+  // so the test picks the smoke hex map there first. It never creates a map
+  // (Cancel at both dialogs), then closes the tab.
   test("new hex map modal offers detail levels, off by default, behind a confirmation", async ({ page }) => {
     const errors = setupErrorTracking(page);
     await enableLadder(page);
@@ -577,7 +580,14 @@ describe("Lattice ladder phase 6 UI", () => {
       w.app.commands.executeCommandById("windrose-md:open-new-map-view");
     });
     try {
-      const newMapBtn = page.locator('.windrose-header-action-btn[aria-label="Create new map"]').last();
+      // Both elements exist only in a full-pane view: the picker is
+      // WindroseMapView.ts FullPaneMapPicker, and the header button is passed
+      // onNewMap only when fullPane (DungeonMapTracker.tsx:671). The note's
+      // embedded map renders neither, so page-level locators are unambiguous.
+      const pickerItem = page.locator(".windrose-fullpane-picker-item", { hasText: "Smoke Test Hex Map" }).first();
+      await pickerItem.waitFor({ state: "visible", timeout: 10000 });
+      await pickerItem.click();
+      const newMapBtn = page.locator('.windrose-header-action-btn[aria-label="Create new map"]').first();
       await newMapBtn.waitFor({ state: "visible", timeout: 10000 });
       await newMapBtn.click();
       const dialog = page.locator(".modal:has(.windrose-insert-map-modal)").last();
@@ -693,7 +703,10 @@ describe("Lattice ladder depth authoring (lod-fixture)", () => {
     await onFixtureOps(page, "setViewport", [0, 0, undefined, 2]);
     await page.waitForTimeout(400);
 
-    await selectToolByTitle(page, "Area Select");
+    // Area Select is a sub-tool of the select group (ToolPalette.tsx:297-304):
+    // right-click the group button (aria-label from setTooltip, "Select/Move")
+    // and pick it from the .windrose-subtool-menu flyout (ToolPalette.tsx:154-166).
+    await selectSubTool(page, "Select/Move", "Area Select");
     const canvas = page.locator(".windrose-canvas-wrapper canvas").first();
     await canvas.scrollIntoViewIfNeeded();
     const box = await canvas.boundingBox();
