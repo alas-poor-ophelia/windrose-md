@@ -514,6 +514,7 @@ const ObjectLayer = ({
         <LevelPickerPopup
           x={levelPicker.x}
           y={levelPicker.y}
+          {...(levelPicker.anchorTop !== undefined ? { anchorTop: levelPicker.anchorTop } : {})}
           maxLevel={maxLevel}
           autoState={autoState()}
           levelState={levelStateFor}

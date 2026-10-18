@@ -2,7 +2,7 @@
  * LevelChip.tsx
  *
  * One rung chip, shared by the ladder HUD and the level picker so both render
- * the same markup (the "L" prefix span lets narrow embeds collapse it).
+ * the same markup (the "L" prefix shows at every width).
  * `current` = the camera's rung (HUD), `on` / `mixed` = picker membership.
  * With `onClick` it is a button, otherwise a static span.
  */

@@ -703,7 +703,7 @@ button.windrose-breadcrumb-link {
 /* Lattice ladder HUD (LadderLevelOverlay): gold-bordered translucent row with
    uppercase chips, a padlock and a level readout. */
 /* The host spans the canvas container's bottom edge and is the size container
-   the row queries: narrow embeds drop the readout, then the "L" prefixes. The
+   the row queries: narrow embeds drop the readout, then tighten the chips. The
    row is centred inside a side reserve that clears the bottom-left compass in
    full-pane (12px inset + 60px compass + 12px gap). */
 .windrose-ladder-host {
@@ -849,12 +849,9 @@ button.windrose-ladder-lock {
   }
 }
 
-/* Very narrow host: chips show the bare rung number with tighter padding. */
+/* Very narrow host: chips keep their "L" prefix at every width; only the
+   padding and gaps tighten. */
 @container windrose-ladder (width < 400px) {
-  .windrose-ladder-chip-prefix {
-    display: none;
-  }
-
   .windrose-ladder-levels {
     gap: 0;
     padding: 2px 3px;
@@ -887,6 +884,17 @@ button.windrose-ladder-lock {
   .windrose-ladder-levels {
     flex-wrap: wrap;
     justify-content: center;
+  }
+
+  /* Level picker chips (a popup over the map, not the HUD): still a
+     comfortable tap, but not the full 44px HUD block, so a deep ladder's
+     picker stays short enough to fit in the map frame. Listed after the
+     HUD rules and one class more specific, so it wins in both wrappers. */
+  .windrose-level-picker .windrose-ladder-chip,
+  .windrose-level-picker button.windrose-ladder-chip,
+  .is-tablet .windrose-level-picker button.windrose-ladder-chip {
+    min-height: 36px;
+    min-width: 36px;
   }
 }
 

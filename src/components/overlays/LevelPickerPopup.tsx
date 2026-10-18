@@ -21,6 +21,9 @@ interface LevelPickerPopupProps {
   /** Anchor position, container-relative (the action button's bottom centre). */
   x: number;
   y: number;
+  /** Top of the action button, container-relative: the popup flips above it
+   *  when the map frame lacks room below. */
+  anchorTop?: number;
   /** Deepest rung of the map's ladder; chips run L0..L<maxLevel>. */
   maxLevel: number;
   /** Auto chip state: on when every selected element has no explicit set. */
@@ -61,6 +64,7 @@ function pressedOf(state: ChipState): boolean | 'mixed' {
 const LevelPickerPopup = ({
   x,
   y,
+  anchorTop,
   maxLevel,
   autoState,
   levelState,
@@ -77,6 +81,7 @@ const LevelPickerPopup = ({
     <AnchoredPopup
       x={x}
       y={y}
+      {...(anchorTop !== undefined ? { anchorTop } : {})}
       className="windrose-level-picker"
       filterId="level-picker-bracket"
       onClose={onClose}

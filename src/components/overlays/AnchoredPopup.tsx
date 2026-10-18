@@ -14,12 +14,16 @@ import type { ComponentChildren, VNode } from 'preact';
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 
 import { CornerBrackets } from '../shared/CornerBrackets';
+import { popoverOpensAbove } from '../shared/popoverClamp';
 import { Z_INDEX } from '../../core/dmtConstants';
 
 interface AnchoredPopupProps {
-  /** Anchor position, container-relative. */
+  /** Anchor position, container-relative: opens below `y`. */
   x: number;
   y: number;
+  /** Top of the anchor (container-relative), for flipping above it when the
+   *  container lacks room below; defaults to `y` (a point anchor). */
+  anchorTop?: number;
   /** Root class names after the shared `windrose-selection-card`. */
   className: string;
   /** Unique SVG filter id for the corner brackets. */
@@ -35,10 +39,13 @@ interface AnchoredPopupProps {
 }
 
 const EDGE_MARGIN = 4;
+/** Gap between the anchor and the popup, above or below it. */
+const ANCHOR_GAP = 10;
 
 const AnchoredPopup = ({
   x,
   y,
+  anchorTop,
   className,
   filterId,
   onClose,
@@ -80,15 +87,40 @@ const AnchoredPopup = ({
     if (focusFirst) rootRef.current?.querySelector('button')?.focus({ preventScroll: true });
   }, [focusFirst]);
 
-  // Keep the box inside the container: measured, so it adapts to the content width.
+  // Keep the box inside the container: measured, so it adapts to the content
+  // size. Horizontally it slides; vertically it opens below the anchor and
+  // flips above it when only the space above fits (popoverOpensAbove, shared
+  // with the colour and icon pickers). When neither side fits, the body is
+  // capped to the container height and scrolls inside the chrome.
   useLayoutEffect(() => {
     const root = rootRef.current;
-    const parentWidth = root?.parentElement?.clientWidth ?? 0;
+    const parent = root?.parentElement;
+    const parentWidth = parent?.clientWidth ?? 0;
     if (root == null || parentWidth === 0 || root.offsetWidth === 0) return;
     const half = centered ? root.offsetWidth / 2 : 0;
     const max = Math.max(half + EDGE_MARGIN, parentWidth - root.offsetWidth + half - EDGE_MARGIN);
     root.style.left = `${Math.min(Math.max(x, half + EDGE_MARGIN), max)}px`;
-  }, [x, y, centered]);
+
+    const parentHeight = parent?.clientHeight ?? 0;
+    if (parentHeight === 0) return;
+    const content = root.querySelector<HTMLElement>('.windrose-selection-card-content');
+    root.classList.remove('is-capped');
+    content?.style.removeProperty('max-height');
+    const top = anchorTop ?? y;
+    const above = popoverOpensAbove(false, top, y, root.offsetHeight, ANCHOR_GAP, parentHeight);
+    const room = above ? top - ANCHOR_GAP : parentHeight - y - ANCHOR_GAP;
+    const fits = root.offsetHeight <= room;
+    if (!fits && content != null) {
+      // Neither side fits: cap the body to the container and scroll inside it.
+      const chrome = root.offsetHeight - content.offsetHeight;
+      content.style.maxHeight = `${Math.max(0, parentHeight - 2 * EDGE_MARGIN - chrome)}px`;
+      root.classList.add('is-capped');
+    }
+    const height = root.offsetHeight;
+    const wanted = above ? top - ANCHOR_GAP - height : y + ANCHOR_GAP;
+    const maxTop = Math.max(EDGE_MARGIN, parentHeight - height - EDGE_MARGIN);
+    root.style.top = `${fits ? wanted : Math.min(Math.max(wanted, EDGE_MARGIN), maxTop)}px`;
+  }, [x, y, anchorTop, centered]);
 
   return (
     <div
@@ -98,7 +130,7 @@ const AnchoredPopup = ({
       aria-label={ariaLabel}
       style={{
         left: `${x}px`,
-        top: `${y + 10}px`,
+        top: `${y + ANCHOR_GAP}px`,
         zIndex: Z_INDEX.DRAWING_LAYER + 2
       }}
     >

@@ -12,6 +12,8 @@ import { useCallback, useEffect, useState } from 'preact/hooks';
 interface LevelPickerState {
   x: number;
   y: number;
+  /** Top of the clicked button, so the popup can flip above it. */
+  anchorTop?: number;
 }
 
 interface LevelPickerStored extends LevelPickerState {
@@ -28,7 +30,7 @@ function levelPickerAnchor(e: Event | undefined, container: HTMLElement | null):
   const target = e?.currentTarget ?? e?.target;
   if (box !== undefined && target instanceof Element) {
     const rect = target.getBoundingClientRect();
-    return { x: rect.left + rect.width / 2 - box.left, y: rect.bottom - box.top };
+    return { x: rect.left + rect.width / 2 - box.left, y: rect.bottom - box.top, anchorTop: rect.top - box.top };
   }
   return { x: (box?.width ?? 300) / 2, y: 48 };
 }
@@ -59,7 +61,9 @@ function useLevelPicker(
 
   const close = useCallback((): void => setStored(null), []);
 
-  const picker = stored !== null && stored.key === selectionKey ? { x: stored.x, y: stored.y } : null;
+  const picker = stored !== null && stored.key === selectionKey
+    ? { x: stored.x, y: stored.y, ...(stored.anchorTop !== undefined ? { anchorTop: stored.anchorTop } : {}) }
+    : null;
   return { picker, open, close };
 }
 

@@ -41,8 +41,8 @@ function LadderSection(): VNode | null {
 
   // Why the last typed value changed on commit (the field is rewritten to the held value).
   const [clampHint, setClampHint] = useState<string | null>(null);
-  // Bumped when the enable confirmation is cancelled: remounts the native
-  // toggle, which flipped itself on click, back to the held value.
+  // Bumped when the enable confirmation is cancelled: remounts the toggle
+  // row, whose native switch flipped itself on click, back to the held value.
   const [toggleKey, setToggleKey] = useState(0);
 
   if (mapData === null || mapData.mapType !== 'hex') return null;
@@ -108,12 +108,19 @@ function LadderSection(): VNode | null {
 
   return (
     <div style={{ opacity: sectionDisabled ? 0.6 : 1 }}>
+      {/* A toggle row: carries Obsidian's own `mod-toggle` row class (the one
+          Setting.addToggle puts on native toggle rows, which NativeToggle's
+          throwaway Setting never hands over), so mobile layout rules keep the
+          switch inline beside its label. Keyed on the ROW: SettingItem moves
+          its children into the native control once at mount, so remounting
+          only the toggle would leave the new one in the hidden holder. */}
       <SettingItem
+        key={toggleKey}
         name="Enable detail levels"
         description={`Lets this map add finer hexes as you zoom in${opensAtText}${toggleReason}`}
+        className="mod-toggle windrose-ladder-enable"
       >
         <NativeToggle
-          key={toggleKey}
           value={ladderEnabled}
           onChange={handleToggle}
           disabled={toggleDisabled}

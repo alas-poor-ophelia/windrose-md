@@ -61,7 +61,7 @@ const LadderLevelOverlay = (): VNode | null => {
   const stop = (e: Event): void => { e.stopPropagation(); };
 
   // The host spans the canvas width and is the CSS size container the row
-  // queries (narrow embeds hide the readout, then the chip "L" prefixes).
+  // queries (narrow embeds hide the readout, then tighten the chips).
   return (
     <div className="windrose-ladder-host">
       <div

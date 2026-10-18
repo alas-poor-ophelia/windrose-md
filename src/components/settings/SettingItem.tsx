@@ -20,6 +20,8 @@ interface SettingItemProps {
   name: string;
   description?: string;
   vertical?: boolean;
+  /** Extra classes for the row element (space-separated), e.g. 'mod-toggle' */
+  className?: string;
   children?: ComponentChildren;
 }
 
@@ -29,16 +31,16 @@ interface SettingItemProps {
  * Fallback path: renders using Obsidian's .setting-item CSS classes.
  * When vertical=true, stacks label above control (for wide controls like color grids).
  */
-function SettingItem({ name, description, vertical, children }: SettingItemProps): VNode {
+function SettingItem({ name, description, vertical, className, children }: SettingItemProps): VNode {
   const containerRef = useRef<HTMLDivElement>(null);
   const controlRef = useRef<HTMLDivElement>(null);
   const settingRef = useRef<Setting | null>(null);
   // The native Setting is built once on mount from the first-render props.
-  const mountPropsRef = useRef({ name, description, vertical });
+  const mountPropsRef = useRef({ name, description, vertical, className });
 
   useEffect((): (() => void) | undefined => {
     if (!containerRef.current) return undefined;
-    const { name, description, vertical } = mountPropsRef.current;
+    const { name, description, vertical, className } = mountPropsRef.current;
 
     try {
       const setting = new Setting(containerRef.current);
@@ -49,6 +51,10 @@ function SettingItem({ name, description, vertical, children }: SettingItemProps
 
       if (vertical === true) {
         setting.settingEl.classList.add('windrose-setting-item-vertical');
+      }
+
+      if (className != null && className !== '') {
+        setting.settingEl.classList.add(...className.split(/\s+/).filter(Boolean));
       }
 
       // Move Preact children into the native control area

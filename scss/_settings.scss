@@ -1054,6 +1054,19 @@ input.windrose-ladder-number {
   min-height: 44px;
 }
 
+// The enable row is a toggle row (mod-toggle, set in LadderSection). Pin the
+// row-and-centre layout on tablet so the switch sits beside its label, level
+// with it, like every other toggle row, whatever the description's length.
+.is-tablet .setting-item.windrose-ladder-enable {
+  flex-direction: row;
+  align-items: center;
+
+  .setting-item-control {
+    flex: 0 0 auto;
+    align-self: center;
+  }
+}
+
 .windrose-ladder-hint {
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);

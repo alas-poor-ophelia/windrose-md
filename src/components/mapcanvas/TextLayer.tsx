@@ -188,6 +188,7 @@ const TextLayer = ({
         <LevelPickerPopup
           x={levelPicker.x}
           y={levelPicker.y}
+          {...(levelPicker.anchorTop !== undefined ? { anchorTop: levelPicker.anchorTop } : {})}
           maxLevel={maxLevel}
           autoState={pickedLabel.visibleLevels === undefined ? 'on' : 'off'}
           levelState={(level) => (effectiveVisibleLevels(pickedLabel, maxLevel, 'label').includes(level) ? 'on' : 'off')}

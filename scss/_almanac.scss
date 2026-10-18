@@ -448,4 +448,20 @@
     height: auto;
     padding: 4px 0 3px;
   }
+
+  /* The tablet range thumb is far taller than the desktop row, so the Day
+     and Hour thumbs (5px apart) overlapped. Give each scrubber row a
+     full touch-height box for its own thumb and open the gap between rows;
+     the thumb size itself is left alone. */
+  .windrose-almanac-time {
+    gap: 8px;
+  }
+
+  .windrose-almanac-slider {
+    min-height: 44px;
+
+    input[type='range'] {
+      height: 44px;
+    }
+  }
 }

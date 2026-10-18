@@ -489,9 +489,17 @@
 /* Ladder level picker popup (kgc.31): anchored under the selection toolbar's
    Levels action. Chip look comes from .windrose-ladder-chip (_map-layers);
    only the container and the multi-selection mixed state live here. */
+/* AnchoredPopup: when neither side of the anchor fits, the body is capped to
+   the container height (set inline) and scrolls inside the chrome. */
+.windrose-selection-card.is-capped > .windrose-selection-card-content {
+  overflow-y: auto;
+}
+
 .windrose-level-picker {
   position: absolute;
   min-width: 150px;
+  /* Never wider than the map frame: the chip row wraps instead. */
+  max-width: calc(100% - 8px);
   transform: translateX(-50%);
 
   &-title {
