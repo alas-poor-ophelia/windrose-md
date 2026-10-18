@@ -1,10 +1,9 @@
 import type { MapData } from '#types/core/map.types';
-import type { TilesetDef } from '#types/tiles/tile.types';
 import type { App } from 'obsidian';
 
 import { useEffect, useRef } from 'preact/hooks';
 import { getTilesetFolders, getEffectiveSettings, getSettings } from '../../core/settingsAccessor';
-import { createTilesetFromTiles, probeFirstTileImage, scanTilesetFolder } from '../../assets/tilesetOperations';
+import { buildTilesetsFromSettings, applyBuiltTilesets } from '../../assets/tilesetOperations';
 import { clearUnusedTileImages } from '../../assets/imageOperations';
 import { getResolvedObjectTypes } from '../../objects/objectTypeResolver';
 
@@ -35,7 +34,9 @@ function useTilesetBuilder(
   mapData: MapData | null,
   setMapData: MapDataSetter,
   isLoading: boolean,
-  settingsVersion: number
+  settingsVersion: number,
+  /** Bumped to force a rescan (an installed store/journal tree the live registry could not fill). */
+  rebuildRequest = 0
 ): void {
   const mapTypeRef = useRef<string | undefined>(undefined);
   const mapDataRef = useRef<MapData | null>(null);
@@ -65,41 +66,8 @@ function useTilesetBuilder(
       return;
     }
 
-    // Installed content packs store the human-readable pack name; the folder
-    // itself is named by pack id (a hash for Dungeondraft packs).
-    const installedPacks = getSettings().installedContentPacks ?? [];
-
     void (async () => {
-      const newTilesets: TilesetDef[] = [];
-      let scanFailed = false;
-      for (const folder of folders) {
-        try {
-          const parts = folder.split('/');
-          const packName = installedPacks.find(p => p.vaultPath === folder)?.name;
-          const name = packName ?? (parts[parts.length - 1] || folder);
-
-          const tiles = await scanTilesetFolder(app, folder);
-          const dims = await probeFirstTileImage(app, tiles);
-          const options = dims
-            ? {
-                tileWidth: dims.width,
-                tileHeight: dims.height,
-                artOrientation: dims.artOrientation,
-                hexWidth: dims.hexWidth,
-                hexHeight: dims.hexHeight,
-                overflowTop: dims.overflowTop,
-              }
-            : undefined;
-
-          const tileset = createTilesetFromTiles(folder, name, tiles, options);
-          if (tileset.tiles.length > 0) {
-            newTilesets.push(tileset);
-          }
-        } catch (e) {
-          scanFailed = true;
-          console.warn('[Windrose] Failed to scan tileset folder:', folder, e);
-        }
-      }
+      const { tilesets: newTilesets, scanFailed } = await buildTilesetsFromSettings(app, getSettings());
 
       // An empty result is a legitimate outcome — it is how the last remaining
       // pack gets unregistered — so this writes rather than bailing on `length
@@ -120,27 +88,10 @@ function useTilesetBuilder(
 
       setMapData((current: MapData | null) => {
         if (!current) return current;
-        // Nothing registered and nothing to register: return the same object so
-        // a repeat rebuild does not hand every consumer a fresh mapData.
-        if (newTilesets.length === 0 && (current.tilesets?.length ?? 0) === 0) return current;
-        const overrides = current.tilesetOverrides;
-        // Art nudges/scales are GLOBAL (plugin settings), not per-map
-        // overrides — one adjustment seats the set identically on every map.
-        const artOffsets = getSettings().tilesetArtOffsets ?? {};
-        const artScales = getSettings().tilesetArtScales ?? {};
-        const mergedTilesets = newTilesets.map(ts => {
-          const ov = overrides?.[ts.id];
-          let merged = ov != null ? { ...ts, ...ov } : ts;
-          const nudge = artOffsets[ts.id];
-          if (nudge != null) merged = { ...merged, artOffsetY: nudge };
-          const scale = artScales[ts.id];
-          if (scale != null) merged = { ...merged, artScale: scale };
-          return merged;
-        });
-        return { ...current, tilesets: mergedTilesets };
+        return applyBuiltTilesets(current, newTilesets, getSettings());
       });
     })();
-  }, [isLoading, settingsVersion, app, setMapData, mapData?.mapType]);
+  }, [isLoading, settingsVersion, rebuildRequest, app, setMapData, mapData?.mapType]);
 }
 
 export { useTilesetBuilder };

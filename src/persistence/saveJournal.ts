@@ -35,7 +35,7 @@ import type { App } from 'obsidian';
 import { deflateSync, inflateSync, strFromU8, strToU8 } from 'fflate';
 import { Modal, Notice } from 'obsidian';
 
-import { canonicalizeTileIds, isMapTombstoned, readRawMapEntry } from './fileOperations';
+import { toStoredMap, isMapTombstoned, readRawMapEntry } from './fileOperations';
 import { isNewerSchema, migrateMapData } from './schemaMigration';
 
 const JOURNAL_KEY_PREFIX = 'windrose-journal:';
@@ -357,9 +357,9 @@ function journalPending(
 ): boolean {
   try {
     // Match what saveMapData would write, so the on-disk comparison at load
-    // time is a plain string equality. Canonicalizes a copy; the live tree is
-    // never edited.
-    const json = JSON.stringify(canonicalizeTileIds(pendingData));
+    // time is a plain string equality. Canonicalizes and strips derived tile
+    // lists on a copy; the live tree is never edited.
+    const json = JSON.stringify(toStoredMap(pendingData));
     return writeLiveSlot(app, mapId, options?.writerId ?? null, options?.version ?? null, json, Date.now());
   } catch (e) {
     console.debug('[Windrose] Save journal skipped:', e);

@@ -7,12 +7,12 @@
  */
 
 import type { App } from 'obsidian';
-import { Notice, TFile } from 'obsidian';
+import { Notice, Platform, TFile } from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type { InstalledPack } from '#types/content-packs/contentPack.types';
 import type { TileEntry, TileLayerRole } from '#types/tiles/tile.types';
-import type { PckArchive, PckSource } from './pckParser';
-import { extractFileData } from './pckParser';
+import type { PckArchive, PckFileEntry, PckSource } from './pckParser';
+import { extractFileData, md5Hex } from './pckParser';
 import type { DungeondraftPackMeta } from './pckMetadata';
 import { parseDungeondraftTags, parseWallSidecars } from './pckMetadata';
 import { CONTENT_PACKS_FOLDER } from './contentPackConstants';
@@ -27,6 +27,18 @@ import {
 } from '../persistence/tileMetadata';
 import { runImportDetectionPass } from '../assets/importDetectionPass';
 import { ensureFolder } from '../persistence/vaultFolders';
+import { mintTileId } from '../assets/tileIds';
+import { BundleWriter } from '../assets/bundles/bundleWriter';
+import { sha256Hex, sniffImageMime } from '../assets/bundles/bundleFormat';
+import {
+	beginBundleWrite, endBundleWrite, mountBundleFolder,
+} from '../assets/bundles/bundleRegistry';
+import {
+	indexLooseByContent, listLooseImages, retireLooseImages, trashOptionOf,
+} from '../assets/bundles/bundleRetire';
+import { acceptShippedThumb, decodeTile } from '../assets/bundles/bundleThumbs';
+import { COMPACT_FLOOR_BYTES, COMPACT_QUALITY, compactEncode } from '../assets/bundles/bundleCompact';
+import type { CompactResult } from '../assets/bundles/bundleCompact';
 
 interface PluginLike {
 	app: App;
@@ -286,16 +298,321 @@ interface DdImportResult {
 	packName: string;
 	/** True when the caller's isCancelled() stopped extraction early. */
 	cancelled: boolean;
+	/** Textures left out of the bundle (zero-byte, undecodable, duplicate path), also counted in failed. */
+	skipped: Array<{ key: string; reason: string }>;
+	/**
+	 * Set when nothing was committed (the bundle index failed to write, or
+	 * every texture was skipped): settings were left untouched.
+	 */
+	error?: string;
+	/** Loose images from an earlier import moved to the trash once the bundle served their keys. */
+	looseReplaced?: number;
+	/** Loose images kept because the bundle does not serve identical bytes for them (folder-relative). */
+	looseKept?: string[];
+	/** Why each looseKept entry stayed (same order as looseKept). */
+	looseKeptReasons?: Array<{ path: string; reason: string }>;
+	/**
+	 * Loose images left in place because Obsidian's trash setting deletes
+	 * permanently (0 when retirement ran or nothing was loose).
+	 */
+	looseKeptPermanentDelete?: number;
+	/** Storage the bundle was written with (bundle imports only; mobile is always exact). */
+	storage?: DdStorage;
+	/** Compact runs only: re-encoded entries, entries kept exact, and source bytes minus stored bytes over the re-encoded ones. */
+	compact?: { compacted: number; keptExact: number; bytesSaved: number };
 }
 
 type DdProgressFn = (done: number, total: number, stage: string) => void;
+
+interface DdImportOptions {
+	/** Store textures as a tile bundle (default true); false writes loose files. */
+	bundle?: boolean;
+	/**
+	 * Bundle storage (default 'exact'). 'compact' re-encodes large images as
+	 * WebP (bundleCompact); it is desktop only, so mobile always writes exact.
+	 */
+	storage?: DdStorage;
+}
+
+type DdStorage = 'exact' | 'compact';
+
+/** The storage a run actually uses: compact only when asked for on the desktop app. */
+function effectiveStorage(opts: DdImportOptions): DdStorage {
+	return opts.storage === 'compact' && Platform.isDesktopApp === true ? 'compact' : 'exact';
+}
+
+/** One texture's routing: everything derived from its pack path before extraction. */
+interface TexturePlan {
+	entry: PckFileEntry;
+	relativePath: string;
+	filename: string;
+	sourceType: string | null;
+	isStrip: boolean;
+	/** Destination folder under the pack folder (= drawer category). */
+	folder: string;
+	/** Bundle key relative to the pack folder: `${folder}/${filename}`, or the key of a byte-identical loose file from an earlier import (preferLooseKeys). */
+	key: string;
+	/** Vault path of the tile (a real file when loose, virtual when bundled). */
+	destPath: string;
+}
+
+const BUNDLE_TARGET_SHARD_BYTES = 4 * 1024 * 1024;
+
+/** Folder part of a bundle key ("" at the root). */
+function keyDirOf(key: string): string {
+	const i = key.lastIndexOf('/');
+	return i >= 0 ? key.slice(0, i) : '';
+}
+
+/** Filename part of a bundle key. */
+function keyBaseOf(key: string): string {
+	return key.slice(key.lastIndexOf('/') + 1);
+}
+
+/**
+ * The existing loose layout wins: a texture whose bytes are identical to a
+ * loose image from an earlier import (possibly routed by an older rule) is
+ * bundled under that file's key, so its tile id stays the one the loose
+ * scan minted (placed maps keep resolving) and retirement can replace the
+ * file. Each loose key is claimed once, by an exact default-key match
+ * first, then a same-basename texture, then any. Textures with no
+ * byte-identical loose file keep the default routing. `folder` is left as
+ * routed: it is the wizard's decision group for the texture.
+ */
+async function preferLooseKeys(
+	app: App,
+	source: PckSource,
+	plans: TexturePlan[],
+	basePath: string,
+	loosePaths: string[],
+): Promise<TexturePlan[]> {
+	if (loosePaths.length === 0) return plans;
+	const { sizes, byHash } = await indexLooseByContent(app, basePath, loosePaths);
+	if (byHash.size === 0) return plans;
+	const hashes = new Map<number, string>();
+	for (let i = 0; i < plans.length; i++) {
+		if (!sizes.has(plans[i].entry.size)) continue;
+		try {
+			const data = await extractFileData(source, plans[i].entry);
+			if (data.byteLength > 0 && sizes.has(data.byteLength)) hashes.set(i, await sha256Hex(data));
+		} catch {
+			// Unreadable here means unreadable in the extraction loop too: it reports it.
+		}
+	}
+	const claimed = new Set<string>();
+	const chosen = new Map<number, string>();
+	const passes: Array<(plan: TexturePlan, key: string) => boolean> = [
+		(plan, key) => key === plan.key,
+		(plan, key) => keyBaseOf(key) === plan.filename,
+		() => true,
+	];
+	for (const accepts of passes) {
+		for (const [i, hash] of hashes) {
+			if (chosen.has(i)) continue;
+			const key = byHash.get(hash)?.find(k => !claimed.has(k) && accepts(plans[i], k));
+			if (key == null) continue;
+			claimed.add(key);
+			chosen.set(i, key);
+		}
+	}
+	return plans.map((p, i) => {
+		const key = chosen.get(i);
+		return key == null || key === p.key ? p : { ...p, key, destPath: basePath + '/' + key };
+	});
+}
+
+/** Dungeondraft-shipped thumbnails keyed by their file stem (md5 of the texture's res:// path). */
+function indexShippedThumbs(archive: PckArchive): Map<string, PckFileEntry> {
+	const out = new Map<string, PckFileEntry>();
+	for (const f of archive.files) {
+		const m = /\/thumbnails\/([0-9a-f]{32})\.(?:png|webp)$/i.exec(f.path);
+		if (m != null) out.set(m[1].toLowerCase(), f);
+	}
+	return out;
+}
+
+/**
+ * Write the planned textures into a tile bundle at basePath (4 MiB shards),
+ * in category-then-filename order. Storage 'compact' writes a mode
+ * 'compact' segment: the mode describes the policy, so entries compactEncode
+ * kept exact (below the floor, ICC, lossy WebP, poor gain, failed verify)
+ * hold their original bytes and no `src`, while re-encoded entries hold the
+ * WebP and `src` = sha256/size/mime of the original. Dims and thumbnails
+ * always come from the original. Ids are minted over the
+ * keys exactly as the loose scan would mint them over the same layout.
+ * Zero-byte, unrecognised, undecodable and duplicate-path textures are
+ * skipped and reported; a shipped thumbnail is used when it is a small
+ * PNG/WebP, else one is rendered. The bundle is mounted before returning so
+ * the detection pass reads the new entries through readTileBytes.
+ */
+async function extractToBundle(
+	app: App,
+	source: PckSource,
+	archive: PckArchive,
+	plansIn: TexturePlan[],
+	basePath: string,
+	meta: DungeondraftPackMeta,
+	onProgress: DdProgressFn | undefined,
+	isCancelled: (() => boolean) | undefined,
+	storage: DdStorage = 'exact',
+): Promise<{
+	landed: TexturePlan[];
+	compact: { compacted: number; keptExact: number; bytesSaved: number };
+	skipped: Array<{ key: string; reason: string }>;
+	failed: number;
+	cancelled: boolean;
+	/** Why nothing was committed; null when an index segment with at least one tile was written. */
+	commitError: string | null;
+}> {
+	// Key folder, then key filename: for default-routed plans this is the
+	// folder-then-filename order; a key kept from an earlier loose layout
+	// sorts among its own folder's files, as the loose scan would.
+	const plans = [...plansIn].sort((a, b) =>
+		keyDirOf(a.key).localeCompare(keyDirOf(b.key)) || keyBaseOf(a.key).localeCompare(keyBaseOf(b.key)));
+	const shippedThumbs = indexShippedThumbs(archive);
+	const writer = new BundleWriter(app, basePath, {
+		packId: meta.id, name: meta.name, mode: storage, targetShardBytes: BUNDLE_TARGET_SHARD_BYTES,
+	});
+	const compact = { compacted: 0, keptExact: 0, bytesSaved: 0 };
+	/** Original sha256 -> encode result, so byte-identical textures encode once. */
+	const encodedBySha = new Map<string, CompactResult>();
+	const added: TexturePlan[] = [];
+	const skipped: Array<{ key: string; reason: string }> = [];
+	const seenKeys = new Set<string>();
+	const seenIds = new Set<string>();
+	let failed = 0;
+	let cancelled = false;
+
+	for (let i = 0; i < plans.length; i++) {
+		if (isCancelled?.() === true) {
+			cancelled = true;
+			break;
+		}
+		// Yield before the body so long runs of skipped/duplicate textures still yield.
+		if (i > 0 && i % 20 === 0) {
+			await new Promise(r => window.setTimeout(r, 0));
+		}
+		const plan = plans[i];
+		try {
+			if (seenKeys.has(plan.key)) {
+				skipped.push({ key: plan.key, reason: 'another texture already uses this path' });
+				continue;
+			}
+			seenKeys.add(plan.key);
+			const data = await extractFileData(source, plan.entry);
+			if (data.byteLength === 0) {
+				skipped.push({ key: plan.key, reason: 'zero-byte texture' });
+				continue;
+			}
+			const mime = sniffImageMime(data);
+			if (mime == null) {
+				skipped.push({ key: plan.key, reason: 'not a recognised image' });
+				continue;
+			}
+			const shippedThumb = await readShippedThumb(source, shippedThumbs.get(md5Hex(plan.entry.path)), plan.key);
+			const decoded = await decodeTile(data, mime, { renderThumb: shippedThumb == null });
+			if (decoded == null) {
+				skipped.push({ key: plan.key, reason: 'image failed to decode' });
+				continue;
+			}
+			const id = mintTileId(plan.key, seenIds);
+			const thumb = shippedThumb ?? decoded.thumb ?? undefined;
+			if (storage === 'compact') {
+				const sha256 = await sha256Hex(data);
+				let enc = encodedBySha.get(sha256);
+				// A byte-identical repeat is stored once either way: it saves nothing more.
+				const repeat = enc != null;
+				if (enc == null) {
+					enc = await compactEncode(data, mime, { quality: COMPACT_QUALITY, floorBytes: COMPACT_FLOOR_BYTES });
+					encodedBySha.set(sha256, enc);
+				}
+				if (enc.kind === 'compact') {
+					await writer.add(plan.key, enc.bytes, enc.mime, id, decoded.dims, thumb, { sha256, bytes: data.byteLength, mime });
+					compact.compacted++;
+					if (!repeat) compact.bytesSaved += data.byteLength - enc.bytes.byteLength;
+				} else {
+					await writer.add(plan.key, data, mime, id, decoded.dims, thumb);
+					compact.keptExact++;
+				}
+			} else {
+				await writer.add(plan.key, data, mime, id, decoded.dims, thumb);
+			}
+			added.push(plan);
+		} catch (e) {
+			failed++;
+			console.error('[Windrose] Failed to bundle', plan.destPath, e);
+		} finally {
+			onProgress?.(i + 1, plans.length, 'extract');
+		}
+	}
+
+	let landed: TexturePlan[] = [];
+	let commitError: string | null = null;
+	try {
+		const result = await writer.finish();
+		const writerSkipped = new Set(result.skipped.map(x => x.key));
+		skipped.push(...result.skipped);
+		landed = added.filter(p => !writerSkipped.has(p.key));
+		if (result.indexFile === '' || result.entryCount === 0) {
+			commitError = 'no texture could be bundled';
+			landed = [];
+		}
+	} catch (e) {
+		// No index segment was committed: nothing from this run is visible.
+		failed += added.length;
+		commitError = `the tile bundle could not be written (${e instanceof Error ? e.message : String(e)})`;
+		console.error('[Windrose] Failed to commit the tile bundle for', basePath, e);
+	}
+	if (skipped.length > 0) {
+		const lines = skipped.map(x => `  ${x.key}: ${x.reason}`).join('\n');
+		console.warn(`[Windrose] ${skipped.length} texture(s) skipped importing ${meta.name}:\n${lines}`);
+	}
+	try {
+		await mountBundleFolder(app, basePath);
+	} catch (e) {
+		console.error('[Windrose] Failed to mount the tile bundle at', basePath, e);
+	}
+	return { landed, skipped, failed, cancelled, commitError, compact };
+}
+
+/**
+ * A shipped Dungeondraft thumbnail when it reads and passes acceptShippedThumb;
+ * null (render one instead) on any failure, so a corrupt or out-of-range
+ * thumbnail entry never drops the tile itself.
+ */
+async function readShippedThumb(
+	source: PckSource,
+	entry: PckFileEntry | undefined,
+	key: string,
+): Promise<Uint8Array | null> {
+	if (entry == null) return null;
+	try {
+		return acceptShippedThumb(await extractFileData(source, entry));
+	} catch (e) {
+		console.warn('[Windrose] Shipped thumbnail unreadable for', key, '- rendering one instead', e);
+		return null;
+	}
+}
+
+/**
+ * One import per pack folder at a time: two overlapping runs would write
+ * index segments, retire loose files and register settings against each
+ * other's half-finished state.
+ */
+const importsInFlight = new Map<string, Promise<DdImportResult>>();
+
+/** Vault folder a Dungeondraft pack imports into. */
+function packBasePath(meta: DungeondraftPackMeta): string {
+	return CONTENT_PACKS_FOLDER + '/dungeondraft-packs/' + meta.id;
+}
 
 /**
  * Run the full Dungeondraft pack import: extract textures into the vault,
  * write tile metadata (tags, source types, depth/render-mode/span predictions,
  * wall strip pairing), register the tileset folder, and record the installed pack.
+ * Callers go through runDdImport, which serializes runs per pack folder.
  */
-async function runDdImport(
+async function runDdImportUnlocked(
 	app: App,
 	plugin: PluginLike,
 	source: PckSource,
@@ -310,8 +627,10 @@ async function runDdImport(
 	 * pack later overwrites in place and completes it).
 	 */
 	isCancelled?: () => boolean,
+	/** bundle (default true): store textures as a tile bundle; false keeps the loose-file path. */
+	opts: DdImportOptions = {},
 ): Promise<DdImportResult> {
-	const basePath = CONTENT_PACKS_FOLDER + '/dungeondraft-packs/' + meta.id;
+	const basePath = packBasePath(meta);
 	await ensureFolder(app, basePath);
 
 	const textures = listTextureEntries(archive);
@@ -346,61 +665,140 @@ async function runDdImport(
 	let failedCount = 0;
 	let cancelled = false;
 
-	for (let i = 0; i < textures.length; i++) {
-		if (isCancelled?.() === true) {
-			cancelled = true;
-			break;
-		}
-		const entry = textures[i];
+	const plans: TexturePlan[] = textures.map(entry => {
 		const relativePath = toRelativeTexturePath(entry.path);
 		const filename = entry.path.split('/').pop() ?? 'unknown';
 		const sourceType = sourceTypeOf(relativePath);
 		const isStrip = sourceType != null && STRIP_SOURCE_TYPES.has(sourceType);
-
 		const folder = destFolderOf(relativePath, sourceType, pathToFirstTag.get(relativePath));
-		const destPath = basePath + '/' + folder + '/' + filename;
+		const key = folder + '/' + filename;
+		return { entry, relativePath, filename, sourceType, isStrip, folder, key, destPath: basePath + '/' + key };
+	});
 
-		try {
-			const parentDir = destPath.substring(0, destPath.lastIndexOf('/'));
-			await ensureFolder(app, parentDir);
-
-			const data = await extractFileData(source, entry);
-			const arrayBuf = new ArrayBuffer(data.byteLength);
-			new Uint8Array(arrayBuf).set(data);
-			const existing = app.vault.getAbstractFileByPath(destPath);
-			if (existing instanceof TFile) {
-				await app.vault.modifyBinary(existing, arrayBuf);
-			} else {
-				await app.vault.createBinary(destPath, arrayBuf);
-			}
-		} catch (e) {
-			// A single bad path (MAX_PATH, locked file, sync conflict) must not
-			// abort the whole import and skip the metadata-write phase below.
-			failedCount++;
-			console.error('[Windrose] Failed to extract', destPath, e);
-			onProgress?.(i + 1, textures.length, 'extract');
-			continue;
+	/** Record metadata for a texture that actually landed (loose file or bundle entry). */
+	const recordLanded = (p: TexturePlan): void => {
+		relToDest.set(p.relativePath, p.destPath);
+		if (!p.isStrip) {
+			const folderDests = cellDestsByFolder.get(p.folder);
+			if (folderDests != null) folderDests.push(p.destPath);
+			else cellDestsByFolder.set(p.folder, [p.destPath]);
 		}
-
-		// Record metadata only for files that actually landed in the vault.
-		relToDest.set(relativePath, destPath);
-		if (!isStrip) {
-			const folderDests = cellDestsByFolder.get(folder);
-			if (folderDests != null) folderDests.push(destPath);
-			else cellDestsByFolder.set(folder, [destPath]);
-		}
-		const allTags = pathToAllTags.get(relativePath);
+		const allTags = pathToAllTags.get(p.relativePath);
 		if (allTags != null && allTags.length > 0) {
-			importTagEntries.push({ vaultPath: destPath, tags: allTags });
+			importTagEntries.push({ vaultPath: p.destPath, tags: allTags });
 		}
-		if (sourceType != null) {
-			ddSourceEntries.push({ vaultPath: destPath, sourceType });
+		if (p.sourceType != null) {
+			ddSourceEntries.push({ vaultPath: p.destPath, sourceType: p.sourceType });
 		}
+	};
 
-		onProgress?.(i + 1, textures.length, 'extract');
+	let skipped: Array<{ key: string; reason: string }> = [];
+	let looseReplaced = 0;
+	let looseKept: string[] = [];
+	let looseKeptReasons: Array<{ path: string; reason: string }> = [];
+	let looseKeptPermanentDelete = 0;
+	const storage = effectiveStorage(opts);
+	let compactStats: DdImportResult['compact'];
+	if (opts.bundle !== false) {
+		// The vault watcher stays out of this folder until the bundle is
+		// committed and mounted and any replaced loose files are gone.
+		beginBundleWrite(basePath);
+		let out: Awaited<ReturnType<typeof extractToBundle>>;
+		try {
+			const loose = await listLooseImages(app, basePath);
+			const routed = await preferLooseKeys(app, source, plans, basePath, loose);
+			out = await extractToBundle(app, source, archive, routed, basePath, meta, onProgress, isCancelled, storage);
+			// A cancelled run holds a partial bundle: it may still register
+			// (below), but it never retires the earlier loose files.
+			if (out.commitError == null && !out.cancelled && loose.length > 0) {
+				if (trashOptionOf(app) === 'none') {
+					// "Permanently delete" in Obsidian's settings: trashFile would
+					// destroy the originals, so they stay and the user is told.
+					looseKeptPermanentDelete = loose.length;
+				} else {
+					// Belt and braces: retirement never throws by design, but a throw
+					// here must not skip registration of an already committed bundle.
+					let retired: Awaited<ReturnType<typeof retireLooseImages>> = { replaced: 0, kept: [] };
+					try {
+						retired = await retireLooseImages(app, basePath, loose, new Set(out.landed.map(p => p.key)));
+					} catch (e) {
+						console.warn('[Windrose] Retiring loose files failed for', basePath, e);
+					}
+					looseReplaced = retired.replaced;
+					looseKeptReasons = retired.kept;
+					looseKept = retired.kept.map(k => k.path);
+					// Clears the registry's loose-shadow answers for the trashed paths.
+					// The bundle is already committed and mounted: a failure here
+					// must not skip registration below.
+					if (looseReplaced > 0) {
+						try {
+							await mountBundleFolder(app, basePath);
+						} catch (e) {
+							console.warn('[Windrose] Remount after retiring loose files failed for', basePath, e);
+						}
+					}
+				}
+			}
+		} finally {
+			endBundleWrite(basePath);
+		}
+		cancelled = out.cancelled;
+		failedCount += out.failed;
+		if (storage === 'compact') compactStats = out.compact;
+		skipped = out.skipped;
+		if (out.commitError != null) {
+			// Nothing from this run is visible: leave tilesetFolders and
+			// installedContentPacks untouched rather than register a folder
+			// the registry would report as a bundle that never synced.
+			console.error(`[Windrose] Import of ${meta.name} committed nothing: ${out.commitError}`);
+			return {
+				imported: 0,
+				failed: failedCount + skipped.length,
+				skipped,
+				total: textures.length,
+				packName: meta.name,
+				cancelled,
+				error: out.commitError,
+			};
+		}
+		for (const p of out.landed) recordLanded(p);
+	} else {
+		for (let i = 0; i < plans.length; i++) {
+			if (isCancelled?.() === true) {
+				cancelled = true;
+				break;
+			}
+			const plan = plans[i];
+			const destPath = plan.destPath;
+			try {
+				const parentDir = destPath.substring(0, destPath.lastIndexOf('/'));
+				await ensureFolder(app, parentDir);
 
-		if (i % 20 === 0) {
-			await new Promise(r => window.setTimeout(r, 0));
+				const data = await extractFileData(source, plan.entry);
+				const arrayBuf = new ArrayBuffer(data.byteLength);
+				new Uint8Array(arrayBuf).set(data);
+				const existing = app.vault.getAbstractFileByPath(destPath);
+				if (existing instanceof TFile) {
+					await app.vault.modifyBinary(existing, arrayBuf);
+				} else {
+					await app.vault.createBinary(destPath, arrayBuf);
+				}
+			} catch (e) {
+				// A single bad path (MAX_PATH, locked file, sync conflict) must not
+				// abort the whole import and skip the metadata-write phase below.
+				failedCount++;
+				console.error('[Windrose] Failed to extract', destPath, e);
+				onProgress?.(i + 1, plans.length, 'extract');
+				continue;
+			}
+
+			// Record metadata only for files that actually landed in the vault.
+			recordLanded(plan);
+			onProgress?.(i + 1, plans.length, 'extract');
+
+			if (i % 20 === 0) {
+				await new Promise(r => window.setTimeout(r, 0));
+			}
 		}
 	}
 
@@ -527,11 +925,51 @@ async function runDdImport(
 
 	return {
 		imported: relToDest.size,
-		failed: failedCount,
+		failed: failedCount + skipped.length,
+		skipped,
 		total: textures.length,
 		packName: meta.name,
 		cancelled,
+		...(opts.bundle !== false ? { looseReplaced, looseKept, looseKeptReasons, looseKeptPermanentDelete, storage } : {}),
+		...(compactStats != null ? { compact: compactStats } : {}),
 	};
+}
+
+/**
+ * Run the full Dungeondraft pack import (runDdImportUnlocked), one run per
+ * pack folder at a time: a second run for the same pack while one is in
+ * flight is refused with an error result and touches nothing.
+ */
+async function runDdImport(
+	app: App,
+	plugin: PluginLike,
+	source: PckSource,
+	archive: PckArchive,
+	meta: DungeondraftPackMeta,
+	onProgress?: DdProgressFn,
+	wizard?: DdWizardDecisions,
+	isCancelled?: () => boolean,
+	opts: DdImportOptions = {},
+): Promise<DdImportResult> {
+	const basePath = packBasePath(meta);
+	if (importsInFlight.has(basePath)) {
+		return {
+			imported: 0,
+			failed: 0,
+			skipped: [],
+			total: listTextureEntries(archive).length,
+			packName: meta.name,
+			cancelled: false,
+			error: 'another import of this pack is still running; wait for it to finish and try again',
+		};
+	}
+	const run = runDdImportUnlocked(app, plugin, source, archive, meta, onProgress, wizard, isCancelled, opts);
+	importsInFlight.set(basePath, run);
+	try {
+		return await run;
+	} finally {
+		importsInFlight.delete(basePath);
+	}
 }
 
 export {
@@ -544,5 +982,6 @@ export {
 	isEndCapFilename,
 	destFolderOf,
 	analyzePckForWizard,
+	listTextureEntries,
 };
-export type { PluginLike, PckWizardAnalysis, DdWizardDecisions };
+export type { PluginLike, PckWizardAnalysis, DdWizardDecisions, DdImportOptions, DdImportResult, DdStorage };

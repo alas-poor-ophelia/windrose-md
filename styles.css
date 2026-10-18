@@ -2554,6 +2554,45 @@ button.windrose-tb-cap-edit:hover {
   font-size: 11px;
 }
 
+/* Bundle empty state: a folder's tile bundle has not synced yet or could not
+   be loaded. Same muted, centred language as the other empty states. */
+.windrose-tb-bundle-notice {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: clamp(1rem, 2vw, 1.5rem) clamp(0.75rem, 1.5vw, 1rem);
+  color: var(--windrose-text-muted);
+  font-size: 11px;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.windrose-tb-bundle-notice-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 32ch;
+  padding: 8px 10px;
+  border: 1px dashed oklch(from var(--windrose-border-primary) l c h/0.3);
+  border-radius: 4px;
+}
+.windrose-tb-bundle-notice-item.is-failed {
+  border-color: oklch(from var(--text-error) l c h/0.4);
+}
+
+.windrose-tb-bundle-notice-folder {
+  color: var(--windrose-text-secondary);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.windrose-tb-bundle-notice-text {
+  overflow-wrap: anywhere;
+}
+
 /* ---- Breadcrumb (compact drill-down) ---- */
 .windrose-tb-breadcrumb {
   padding: 6px 8px;
@@ -8646,6 +8685,21 @@ button.windrose-breadcrumb-link {
   line-height: 1.3;
 }
 
+/* Tile sets: per-folder bundle status line under each folder row
+   (settingDefinitionLists.ts attachBundleBadge). */
+.windrose-tileset-bundle-badge {
+  margin-top: var(--size-2-1);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.windrose-tileset-bundle-badge:empty {
+  display: none;
+}
+.windrose-tileset-bundle-badge.is-problem {
+  color: var(--text-warning);
+}
+
 .windrose-content-pack-modal .windrose-content-pack-tabs {
   display: flex;
   gap: 8px;
@@ -8866,6 +8920,37 @@ button.windrose-breadcrumb-link {
 .windrose-add-tiles-modal .windrose-wz-src.on .windrose-wz-radio {
   border-color: var(--interactive-accent);
   background: radial-gradient(circle at center, var(--interactive-accent) 0 45%, transparent 50%);
+}
+.windrose-add-tiles-modal .windrose-wz-src.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.windrose-add-tiles-modal .windrose-wz-src.is-disabled:hover {
+  border-color: var(--background-modifier-border);
+}
+.windrose-add-tiles-modal .windrose-wz-estimate {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px 0 8px;
+}
+.windrose-add-tiles-modal .windrose-wz-lineup {
+  margin-bottom: 14px;
+}
+.windrose-add-tiles-modal .windrose-wz-lineup-title {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.windrose-add-tiles-modal .windrose-wz-lineup-grid {
+  display: grid;
+  grid-template-columns: auto repeat(3, 150px);
+  gap: 6px;
+  align-items: center;
+}
+.windrose-add-tiles-modal .windrose-wz-lineup-grid canvas {
+  width: 150px;
+  height: 150px;
+  border: 1px solid var(--background-modifier-border);
 }
 .windrose-add-tiles-modal .windrose-wz-badge {
   display: inline-flex;

@@ -5,11 +5,11 @@
 
 import type { TileMetadataEntry } from '#types/tiles/tile.types';
 import type { VNode } from 'preact';
-import { TFile } from 'obsidian';
 import type { App } from 'obsidian';
 
 import { memo } from 'preact/compat';
 import { THUMB_SIZE } from '../../assets/thumbnailCache';
+import { readTileBlob } from '../../assets/tileBytes';
 import { predictSpan } from '../../assets/spanPredictor';
 
 /** Pure ref-callback body: (re)binds a ResizeObserver to whichever node is
@@ -152,25 +152,24 @@ function loadVaultImage(
     return undefined;
   }
   let blobUrl: string | null = null;
-  const file = app.vault.getAbstractFileByPath(vaultPath);
-  if (file instanceof TFile) {
-    void app.vault.readBinary(file).then((binary: ArrayBuffer) => {
-      const blob = new Blob([binary]);
-      blobUrl = URL.createObjectURL(blob);
-      const img = new Image();
-      img.onload = () => {
-        if (blobUrl != null) URL.revokeObjectURL(blobUrl);
-        blobUrl = null;
-        onDraw(img);
-      };
-      img.onerror = () => {
-        if (blobUrl != null) URL.revokeObjectURL(blobUrl);
-        blobUrl = null;
-      };
-      img.src = blobUrl;
-    });
-  }
+  let cancelled = false;
+  void readTileBlob(app, vaultPath).then((blob) => {
+    if (blob == null || cancelled) return;
+    blobUrl = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      if (blobUrl != null) URL.revokeObjectURL(blobUrl);
+      blobUrl = null;
+      onDraw(img);
+    };
+    img.onerror = () => {
+      if (blobUrl != null) URL.revokeObjectURL(blobUrl);
+      blobUrl = null;
+    };
+    img.src = blobUrl;
+  });
   return () => {
+    cancelled = true;
     if (blobUrl != null) URL.revokeObjectURL(blobUrl);
   };
 }

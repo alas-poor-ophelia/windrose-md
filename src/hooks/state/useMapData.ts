@@ -29,6 +29,10 @@ function useMapData(
   // Bumped by reload() to re-run the load effect after the data file has been
   // repaired underneath us (backup restore). Nothing else touches it.
   const [reloadNonce, setReloadNonce] = useState(0);
+  // Bumped when an installed tree (store adopt, journal restore) carries a
+  // folder tileset the live registry could not fill: re-runs the builder.
+  const [tilesetRebuild, setTilesetRebuild] = useState(0);
+  const requestTilesetRebuild = useCallback((): void => setTilesetRebuild((n: number) => n + 1), []);
   const app = useApp();
 
   // Assigned below, after useDebouncedSave — the load effect needs the updater
@@ -118,7 +122,7 @@ function useMapData(
   // this hook only ever holds the ROOT map, and preloading must follow the
   // ACTIVE map (root or sub-hex) — the caller invokes useImagePreloading
   // with the active map and this hook's settingsVersion (windrose-1mc).
-  useTilesetBuilder(app, mapData, setMapData, isLoading, settingsVersion);
+  useTilesetBuilder(app, mapData, setMapData, isLoading, settingsVersion, tilesetRebuild);
 
   // Silent re-read for useDebouncedSave's adopt path (a sibling pane restored
   // a crash copy, or a cosmetic write was refused): no loading state, no
@@ -133,7 +137,7 @@ function useMapData(
   }, [app, mapId, mapName, mapType]);
 
   const { saveStatus, updateMapData, forceSave, markDeleted, mapDeleted: saveDeleted, staleConflict, acknowledgeStaleConflict, writerId, applyRestored } =
-    useDebouncedSave(app, mapId, setMapData, baseGenRef, readStore);
+    useDebouncedSave(app, mapId, setMapData, baseGenRef, readStore, requestTilesetRebuild);
   applyRestoredRef.current = applyRestored;
   writerIdRef.current = writerId;
 

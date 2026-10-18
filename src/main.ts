@@ -1,4 +1,5 @@
-import { Plugin, Notice, TFile, MarkdownRenderChild } from 'obsidian';
+import { Plugin, Notice, TFile, TFolder, MarkdownRenderChild } from 'obsidian';
+import type { TAbstractFile } from 'obsidian';
 import type { PluginSettings } from '#types/settings/settings.types';
 import type { MapType } from '#types/index';
 import type { MapData, MapLayer } from '#types/core/map.types';
@@ -17,6 +18,10 @@ import { writeCanvasCapabilityReport } from './utils/canvasCapabilityReport';
 import { recordInputEventProbe } from './utils/inputEventProbe';
 import { recordZoomTrace } from './utils/zoomTraceProbe';
 import { scanTilesetFolder } from './assets/tilesetOperations';
+import { isBundleWriteInProgress, mountBundleFolder, remountOnRename } from './assets/bundles/bundleRegistry';
+import { clearTileBytesNegativeCache } from './assets/tileBytes';
+import { openBundleTileFolderDev } from './assets/bundles/bundleDevCommand';
+import { AddTilesModal } from './settings/modals/AddTilesModal';
 import { buildMapEntry, createMapEntry, getSaveQueue, listMapsResult } from './persistence/fileOperations';
 import { noteStoreFileModified, noteStoreFilePathGone } from './persistence/storeCache';
 import { disposeImageCache } from './assets/imageOperations';
@@ -163,6 +168,27 @@ export default class WindrosePlugin extends Plugin {
       },
     });
     this.addCommand({
+      id: 'add-tiles-dev',
+      name: 'Add tiles (developer)',
+      checkCallback: (checking) => {
+        if (this.settings.developerMode !== true) return false;
+        if (checking) return true;
+        const pluginLike = { app: this.app, settings: this.settings, saveSettings: () => this.saveSettings() };
+        new AddTilesModal(this.app, pluginLike, () => { void this.saveSettings(); }).open();
+        return true;
+      },
+    });
+    this.addCommand({
+      id: 'bundle-tile-folder-dev',
+      name: 'Bundle tile folder in place (developer)',
+      checkCallback: (checking) => {
+        if (this.settings.developerMode !== true) return false;
+        if (checking) return true;
+        openBundleTileFolderDev(this);
+        return true;
+      },
+    });
+    this.addCommand({
       id: 'input-event-probe',
       name: 'Record input event probe (15s)',
       checkCallback: (checking) => {
@@ -299,6 +325,43 @@ export default class WindrosePlugin extends Plugin {
       noteStoreFilePathGone(oldPath);
       noteStoreFilePathGone(file.path);
     }));
+
+    // Tile bundles: a renamed folder moves registered tileset paths and the
+    // mount; index/shard/thumb files arriving under a registered tileset
+    // folder (Sync delivering a bundle) remount it after a 1 s quiet period;
+    // a newly created image clears the byte reader's not-found memo. Handlers
+    // register after layout ready so Obsidian's initial vault load (one
+    // `create` per file) never triggers remounts.
+    const bundleFileArrived = (file: TAbstractFile): void => {
+      if (!(file instanceof TFile)) return;
+      for (const folder of this.settings.tilesetFolders ?? []) {
+        const root = folder.endsWith('/') ? folder.slice(0, -1) : folder;
+        if (!root || !file.path.startsWith(root + '/')) continue;
+        // An importer writing this bundle mounts and broadcasts on its own.
+        if (isBundleWriteInProgress(root)) continue;
+        const rel = file.path.slice(root.length + 1);
+        if (rel === 'bundle.wrbundle'
+          || (rel.startsWith('index/') && rel.endsWith('.wridx'))
+          || (rel.startsWith('shards/') && rel.endsWith('.wrshard'))
+          || (rel.startsWith('thumbs/') && rel.endsWith('.wrshard'))) {
+          this.scheduleBundleRemount(root);
+        }
+      }
+    };
+    this.app.workspace.onLayoutReady(() => {
+      this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
+        if (file instanceof TFolder) void this.onTileFolderRenamed(oldPath, file.path);
+      }));
+      this.registerEvent(this.app.vault.on('create', (file) => {
+        if (file instanceof TFile && /\.(png|jpe?g|gif|webp)$/i.test(file.path)) clearTileBytesNegativeCache(file.path);
+        bundleFileArrived(file);
+      }));
+      this.registerEvent(this.app.vault.on('modify', bundleFileArrived));
+    });
+    this.register(() => {
+      for (const t of this.bundleRemountTimers.values()) window.clearTimeout(t);
+      this.bundleRemountTimers.clear();
+    });
 
     // Beacon notes follow renames: mounted beacons repoint their stored path.
     this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
@@ -660,6 +723,47 @@ export default class WindrosePlugin extends Plugin {
     const mapDataExists = await this.app.vault.adapter.exists(this.dataFilePath);
     this.settings.onboardingState = decideOnboardingState(this.rawLoadedSettings, mapDataExists);
     await this.saveData(this.settings);
+  }
+
+  /** Per-root debounce timers for bundle remounts after Sync delivers files. */
+  private bundleRemountTimers = new Map<string, number>();
+
+  private scheduleBundleRemount(root: string): void {
+    const prev = this.bundleRemountTimers.get(root);
+    if (prev !== undefined) window.clearTimeout(prev);
+    this.bundleRemountTimers.set(root, window.setTimeout(() => {
+      this.bundleRemountTimers.delete(root);
+      void (async () => {
+        // mountBundleFolder replaces the record atomically; no unmount first
+        // (that would open a window where bundled reads return not-found).
+        if (isBundleWriteInProgress(root)) return;
+        await mountBundleFolder(this.app, root);
+        window.dispatchEvent(new CustomEvent('windrose-settings-changed'));
+      })();
+    }, 1000));
+  }
+
+  /**
+   * A renamed folder at or above a registered tileset folder rewrites that
+   * entry (and installed content pack paths under it), saves (which notifies
+   * open maps), then moves any bundle mount to the new path.
+   */
+  private async onTileFolderRenamed(oldPath: string, newPath: string): Promise<void> {
+    const move = (p: string): string => {
+      const root = p.endsWith('/') ? p.slice(0, -1) : p;
+      return root === oldPath || root.startsWith(oldPath + '/') ? newPath + root.slice(oldPath.length) : p;
+    };
+    const folders = this.settings.tilesetFolders ?? [];
+    const moved = folders.map(move);
+    if (moved.some((f, i) => f !== folders[i])) {
+      this.settings.tilesetFolders = moved;
+      if (this.settings.installedContentPacks) {
+        this.settings.installedContentPacks = this.settings.installedContentPacks
+          .map(pack => ({ ...pack, vaultPath: move(pack.vaultPath) }));
+      }
+      await this.saveSettings();
+    }
+    await remountOnRename(oldPath, newPath);
   }
 
   async saveSettings(): Promise<void> {

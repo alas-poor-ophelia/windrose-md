@@ -50,6 +50,13 @@ import type { FilterFacet } from './TileFilterScreen';
 import { TilesetConfigPanel } from './TilesetConfigPanel';
 import { tooltipRef } from '../shared/obsidianTooltip';
 import { assertNever } from '../../utils/assertNever';
+import { getBundleStateInfo, getBundleRegistryVersion, subscribeBundleRegistry } from '../../assets/bundles/bundleRegistry';
+import { getTilesetFolders } from '../../core/settingsAccessor';
+import { collectBundleNotices, shouldShowBundleNotice } from '../../settings/helpers/bundleStatus';
+import type { BundleNotice } from '../../settings/helpers/bundleStatus';
+
+/** Compact (non-virtualized) leaf/list views request thumbnails this many at a time. */
+const COMPACT_THUMB_STEP = 60;
 
 // ===========================================
 // Horizontal scroller (wheel→sideways + drag)
@@ -107,6 +114,25 @@ function HScroll({ className, children }: { className?: string; children: Compon
       onClickCapture={clickCapture}
     >
       {children}
+    </div>
+  );
+}
+
+/**
+ * Empty-state panel for folders whose tile bundle serves nothing (bundle files
+ * not synced yet, or a bundle that could not be loaded). Shown in place of the
+ * plain "No tiles" text; the scan's one Notice per folder stays the only toast.
+ */
+function BundleNoticePanel({ notices }: { notices: BundleNotice[] }): VNode {
+  return (
+    <div className="windrose-tb-bundle-notice" role="status">
+      <Icon icon="lucide-package" size={22} />
+      {notices.map(n => (
+        <div key={n.folder} className={`windrose-tb-bundle-notice-item is-${n.kind}`}>
+          {n.title != null && <span className="windrose-tb-bundle-notice-folder">{n.title}</span>}
+          <span className="windrose-tb-bundle-notice-text">{n.message}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -562,7 +588,7 @@ const TileAssetBrowser = memo(({
         .map(t => t.vaultPath);
       claimed = claimDetectionScanPaths(needsScan);
       if (claimed.length === 0) return;
-      const scanned = await runDetectionScan(app, claimed, { concurrency: 4, signal: controller.signal });
+      const scanned = await runDetectionScan(app, claimed, { signal: controller.signal });
       if (controller.signal.aborted) return;
       claimed = [];
       if (scanned.length === 0) return;
@@ -737,6 +763,29 @@ const TileAssetBrowser = memo(({
     fullVirtualizer.measure();
   }, [fullVirtualizer, fullCellWidth, listMode, gridGap]);
 
+  // Compact mode is not virtualized: its leaf/list views request thumbnails for
+  // a growing prefix (COMPACT_THUMB_STEP more each time the grid nears its
+  // bottom) instead of every filtered tile at once, which decoded a whole
+  // bundled set on open and ran an iPad out of memory.
+  const [compactLimit, setCompactLimit] = useState(COMPACT_THUMB_STEP);
+  // Reset on a stable signature, not array identity: filteredTiles is rebuilt on
+  // unrelated renders, which snapped the limit back to one step after each growth.
+  const compactShownCount = useRef(0);
+  const filteredCount = filteredTiles.length;
+  useEffect(() => { setCompactLimit(COMPACT_THUMB_STEP); }, [openCat, viewMode, filteredCount]);
+  const growCompactIfNearEnd = useCallback((): void => {
+    const el = gridWrapRef.current;
+    if (el && el.scrollTop + el.clientHeight >= el.scrollHeight - 200) {
+      setCompactLimit(n => (n < compactShownCount.current ? n + COMPACT_THUMB_STEP : n));
+    }
+  }, []);
+  useEffect(() => {
+    const el = gridWrapRef.current;
+    if (!compact || !active || el == null) return;
+    el.addEventListener('scroll', growCompactIfNearEnd, { passive: true });
+    return () => { el.removeEventListener('scroll', growCompactIfNearEnd); };
+  }, [compact, active, tilesets.length, openCat, viewMode, growCompactIfNearEnd]);
+
   // Request thumbnails only for visible tiles (virtualizer-driven).
   // Organize mode requests its own visible rows (TileOrganizePane).
   const fullRange = fullVirtualizer.range;
@@ -764,13 +813,36 @@ const TileAssetBrowser = memo(({
           for (let i = 0; i < n; i++) paths.push(group[i].vaultPath);
         }
       }
+    } else if (openCat == null && viewMode !== 'list') {
+      // Compact category cards: each mosaic shows its first 4 tiles.
+      for (const group of groupedTiles.values()) {
+        for (const t of group.slice(0, 4)) paths.push(t.vaultPath);
+      }
     } else {
-      // Compact mode: no virtualization, request all filtered tiles
-      for (const t of filteredTiles) paths.push(t.vaultPath);
+      // Compact leaf / flattened list: the shown prefix; scrolling grows it.
+      const shown = openCat != null ? (groupedTiles.get(openCat) ?? []) : [...groupedTiles.values()].flat();
+      compactShownCount.current = shown.length;
+      for (const t of shown.slice(0, compactLimit)) paths.push(t.vaultPath);
+      // A prefix too short to fill the grid never scrolls: grow it now.
+      if (shown.length > compactLimit) growCompactIfNearEnd();
     }
 
     if (paths.length > 0) requestThumbs(paths);
-  }, [active, tilesets, organize, compact, fullRows, fullRange, filteredTiles, requestThumbs, fullVirtualizer, showRail, groupedTiles]);
+  }, [active, tilesets, organize, compact, fullRows, fullRange, requestThumbs, fullVirtualizer, showRail, groupedTiles, openCat, viewMode, compactLimit, growCompactIfNearEnd]);
+
+  // Bundle problems for the empty states. The registry subscription only
+  // forces a re-render; the derivation is a few map lookups per configured
+  // folder, so it runs every render and always sees the current folder list.
+  const [, setBundleVersion] = useState(getBundleRegistryVersion);
+  useEffect(() => subscribeBundleRegistry(() => setBundleVersion(getBundleRegistryVersion())), []);
+  const tilesetFolders = getTilesetFolders();
+  const bundleNotices = collectBundleNotices(tilesetFolders, getBundleStateInfo);
+  const showBundleNotice = filteredTiles.length === 0 && shouldShowBundleNotice({
+    notices: bundleNotices,
+    folders: tilesetFolders,
+    scopedTileCount: allTiles.length,
+    filtersActive: searchFilter !== '' || activeTags.size > 0 || packFilter.size > 0 || railSel !== 'all',
+  });
 
   // ---- Empty state: no tilesets ----
 
@@ -804,17 +876,21 @@ const TileAssetBrowser = memo(({
         )}
         <div className="windrose-tb-body">
           {ribbon}
-          <div className="windrose-tile-browser-empty-message">
-            <Icon icon="lucide-image" size={24} />
-            <span>No tilesets configured</span>
-            <button
-              className="windrose-tile-browser-configure-btn"
-              onClick={openTilesetSettings}
-            >
-              <Icon icon="lucide-settings" size={14} />
-              <span>Configure Tilesets</span>
-            </button>
-          </div>
+          {bundleNotices.length > 0 ? (
+            <BundleNoticePanel notices={bundleNotices} />
+          ) : (
+            <div className="windrose-tile-browser-empty-message">
+              <Icon icon="lucide-image" size={24} />
+              <span>No tilesets configured</span>
+              <button
+                className="windrose-tile-browser-configure-btn"
+                onClick={openTilesetSettings}
+              >
+                <Icon icon="lucide-settings" size={14} />
+                <span>Configure Tilesets</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1138,11 +1214,11 @@ const TileAssetBrowser = memo(({
                     }),
                   ])}
                 </div>
-                {groupedTiles.size === 0 && (
+                {groupedTiles.size === 0 && (showBundleNotice ? <BundleNoticePanel notices={bundleNotices} /> : (
                   <div className="windrose-tb-empty">
                     {searchFilter !== '' ? 'No matching tiles' : 'No tiles loaded'}
                   </div>
-                )}
+                ))}
               </>
             ) : (
               // Compact category cards view
@@ -1159,13 +1235,15 @@ const TileAssetBrowser = memo(({
                     />
                   ))}
                 </div>
-                {groupedTiles.size === 0 && (
+                {groupedTiles.size === 0 && (showBundleNotice ? <BundleNoticePanel notices={bundleNotices} /> : (
                   <div className="windrose-tb-empty">
                     {searchFilter !== '' ? 'No matching tiles' : 'No tiles loaded'}
                   </div>
-                )}
+                ))}
               </>
             )
+          ) : showBundleNotice ? (
+            <BundleNoticePanel notices={bundleNotices} />
           ) : (
             // Full mode — virtualized grid
             <div style={{ height: fullVirtualizer.getTotalSize(), position: 'relative', width: '100%' }}>

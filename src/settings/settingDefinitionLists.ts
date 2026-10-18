@@ -1,5 +1,5 @@
 import type { SettingDefinitionItem, SettingGroupItem } from 'obsidian';
-import { Notice } from 'obsidian';
+import { Notice, Platform } from 'obsidian';
 import type { TravelPack } from '#types/settings/travelPack.types';
 import { BUILT_IN_COLORS } from '../core/settingsAccessor';
 import { isFeatureEnabled } from '../core/featureFlags';
@@ -20,6 +20,21 @@ import { ConfirmModal } from './modals/ConfirmModal';
 import { TravelPackEditModal } from './modals/TravelPackEditModal';
 import { AddTilesModal } from './modals/AddTilesModal';
 import type { SettingsTabThis } from './tabs/settingsTabContext';
+import { scanTilesetFolder, isBundleFailureState, bundleFailureLabel } from '../assets/tilesetScan';
+import type { BundleState } from '../assets/bundles/bundleRegistry';
+import {
+  entriesFor, getBundleModes, getBundleSegments, getBundleStateInfo, isBundleWriteInProgress, subscribeBundleRegistry,
+} from '../assets/bundles/bundleRegistry';
+import { bundleFolderInPlace } from '../assets/bundles/bundleFolderInPlace';
+import { compactBundleRefusal, compactExistingBundle } from '../assets/bundles/bundleCompactExisting';
+import { unbundleFolder, unbundleRefusal } from '../assets/bundles/bundleUnbundle';
+import { cleanupBundleOrphans, listBundleOrphans, partitionOrphans } from '../assets/bundles/bundleCleanup';
+import type { BundleOrphan } from '../assets/bundles/bundleCleanup';
+import { SHARDS_DIR, SHARD_EXT } from '../assets/bundles/bundleFormat';
+import {
+  bundleFolderConfirmMessage, compactBundleConfirmMessage, formatCompactBundleResult, formatBundleBadge, formatBundleFolderResult, isBundleBadgeProblem,
+  cleanupConfirmMessage, formatCleanupResult, formatUnbundleResult, unbundleConfirmMessage,
+} from './helpers/bundleStatus';
 
 // settingDefinitionLists.ts
 // Declarative Settings API (Obsidian 1.13+) list sections: Color palette,
@@ -369,11 +384,340 @@ function buildTravelPackSections(tab: SettingsTabThis): SettingDefinitionItem[] 
 
 // --- Tile sets ---
 
+function normalizeFolder(folder: string): string {
+  return folder.trim().replace(/\/+$/, '');
+}
+
+/** Shard file count and total size for a bundled folder (list + stat; no bytes read). */
+async function statBundleShards(tab: SettingsTabThis, folder: string): Promise<{ count: number; bytes: number }> {
+  const adapter = tab.app.vault.adapter;
+  let files: string[] = [];
+  try {
+    files = (await adapter.list(`${folder}/${SHARDS_DIR}`)).files.filter(f => f.endsWith(SHARD_EXT));
+  } catch {
+    return { count: 0, bytes: 0 };
+  }
+  const sizes = await Promise.all(files.map(async f => {
+    try { return (await adapter.stat(f))?.size ?? 0; } catch { return 0; }
+  }));
+  return { count: files.length, bytes: sizes.reduce((a, b) => a + b, 0) };
+}
+
+/**
+ * Status line under a tile folder row, recomputed on every bundle registry
+ * change. The loose count reuses the Preview scan (scanTilesetFolder), which
+ * also mounts the folder; it runs at most once per folder value, because a
+ * mount bumps the registry and a per-bump rescan would loop. Shard stats are
+ * keyed on state + entry count, so unrelated bumps reuse them.
+ */
+interface BundleBadgeView {
+  folder: string;
+  state: BundleState | null;
+  reason?: string;
+  looseFiles: number | null;
+  /** Unreferenced bundle files (desktop, mounted only); null while unknown. */
+  orphans?: BundleOrphan[] | null;
+}
+
+function attachBundleBadge(
+  tab: SettingsTabThis,
+  descEl: HTMLElement,
+  initialFolder: string,
+  onUpdate?: (view: BundleBadgeView) => void,
+): { setFolder: (folder: string) => void; recheck: () => void; dispose: () => void } {
+  const badgeEl = descEl.createDiv({ cls: 'windrose-tileset-bundle-badge' });
+  let folder = normalizeFolder(initialFolder);
+  let generation = 0;
+  let scanStarted = false;
+  let looseFiles: number | null = null;
+  let shardKey = '';
+  let shards: { count: number; bytes: number } | null = null;
+  let orphans: BundleOrphan[] | null = null;
+  let disposed = false;
+
+  const refresh = (): void => {
+    if (disposed) return;
+    if (folder === '') { badgeEl.setText(''); onUpdate?.({ folder, state: null, reason: '', looseFiles: null, orphans: null }); return; }
+    const info = getBundleStateInfo(folder);
+    const gen = generation;
+    // While the folder is a bundle the loose count is meaningless; re-arm the
+    // scan so an Unbundle in this settings session shows "Loose: N files"
+    // again instead of staying on "Checking folder…".
+    if (info != null && info.state !== 'loose') {
+      scanStarted = false;
+      looseFiles = null;
+    }
+    if (!scanStarted && (info == null || info.state === 'loose')) {
+      scanStarted = true;
+      void scanTilesetFolder(tab.app, folder).then(tiles => {
+        if (gen !== generation) return;
+        looseFiles = tiles.length;
+        refresh();
+      }, () => { /* the scan already reports its own failures */ });
+    }
+    let tiles = 0;
+    if (info != null && (info.state === 'mounted' || info.state === 'partial')) {
+      tiles = entriesFor(folder).entries.length;
+      // The segment set is part of the key: Compact and Clean up change the
+      // shard files on disk without changing the state or the tile count.
+      const key = `${info.state}:${tiles}:${getBundleSegments(folder).map(s => s.hash).join(',')}`;
+      if (key !== shardKey) {
+        shardKey = key;
+        shards = null;
+        orphans = null;
+        void statBundleShards(tab, folder).then(result => {
+          if (gen !== generation || key !== shardKey) return;
+          shards = result;
+          refresh();
+        });
+        // Lazy and cheap (list + stat), desktop only: drives the "Clean up" button.
+        if (Platform.isDesktopApp && info.state === 'mounted') {
+          void listBundleOrphans(tab.app, folder).then(result => {
+            if (gen !== generation || key !== shardKey) return;
+            orphans = result;
+            refresh();
+          }, () => { /* leave the button hidden */ });
+        }
+      }
+    } else {
+      orphans = null;
+    }
+    const writing = isBundleWriteInProgress(folder);
+    const modes = getBundleModes(folder);
+    badgeEl.setText(formatBundleBadge(info, { looseFiles, tiles, shards, writing, modes }));
+    badgeEl.toggleClass('is-problem', isBundleBadgeProblem(info, writing));
+    onUpdate?.({ folder, state: info?.state ?? null, reason: info?.reason ?? '', looseFiles, orphans });
+  };
+
+  const unsubscribe = subscribeBundleRegistry(refresh);
+  refresh();
+  return {
+    setFolder: (next: string) => {
+      const normalized = normalizeFolder(next);
+      if (normalized === folder) return;
+      folder = normalized;
+      generation++;
+      scanStarted = false;
+      looseFiles = null;
+      shardKey = '';
+      shards = null;
+      orphans = null;
+      refresh();
+    },
+    recheck: () => {
+      shardKey = '';
+      refresh();
+    },
+    dispose: () => { disposed = true; unsubscribe(); },
+  };
+}
+
+/**
+ * "Bundle folder": confirm, bundle the loose folder in place with progress in
+ * a Notice, then report the counts. The badge refreshes from the registry
+ * bumps of the mount and remount.
+ */
+async function runBundleFolderAction(tab: SettingsTabThis, folder: string, files: number | null): Promise<void> {
+  const confirmed = await new ConfirmModal(tab.app, {
+    message: bundleFolderConfirmMessage(files),
+    confirmText: 'Bundle',
+    cancelText: 'Cancel',
+  }).openAndGetValue();
+  if (!confirmed) return;
+  const progress = new Notice(`Bundling ${folder}…`, 0);
+  try {
+    const result = await bundleFolderInPlace(tab.app, folder, {
+      onProgress: (done, total) => progress.setMessage(`Bundling ${folder}: ${done} of ${total} files…`),
+    });
+    progress.hide();
+    new Notice(formatBundleFolderResult(result), 10_000);
+  } catch (err) {
+    progress.hide();
+    console.error('[Windrose] Bundling the tile folder failed:', folder, err);
+    new Notice(`Bundling ${folder} failed: ${(err as Error)?.message ?? String(err)}`);
+  }
+}
+
+/**
+ * "Compact bundle": refuse up front (trash deletes permanently, not exact,
+ * a write in flight), confirm, compact with progress in a Notice, report.
+ */
+async function runCompactBundleAction(tab: SettingsTabThis, folder: string): Promise<void> {
+  const refusal = compactBundleRefusal(tab.app, folder);
+  if (refusal != null) { new Notice(refusal, 10_000); return; }
+  const confirmed = await new ConfirmModal(tab.app, {
+    message: compactBundleConfirmMessage(folder),
+    confirmText: 'Compact',
+    cancelText: 'Cancel',
+  }).openAndGetValue();
+  if (!confirmed) return;
+  const progress = new Notice(`Compacting ${folder}…`, 0);
+  try {
+    const result = await compactExistingBundle(tab.app, folder, {
+      onProgress: (done, total, phase) => progress.setMessage(`Compacting ${folder}: ${phase} ${done} of ${total}…`),
+    });
+    progress.hide();
+    new Notice(formatCompactBundleResult(result), 10_000);
+  } catch (err) {
+    progress.hide();
+    console.error('[Windrose] Compacting the tile bundle failed:', folder, err);
+    new Notice(`Compacting ${folder} failed: ${(err as Error)?.message ?? String(err)}. The exact copy still serves every tile.`);
+  }
+}
+
+/**
+ * "Unbundle": refuse up front (not mounted, a write in flight), confirm,
+ * export with progress in a Notice, report.
+ */
+async function runUnbundleAction(tab: SettingsTabThis, folder: string): Promise<void> {
+  const refusal = unbundleRefusal(tab.app, folder);
+  if (refusal != null) { new Notice(refusal, 10_000); return; }
+  const confirmed = await new ConfirmModal(tab.app, {
+    message: unbundleConfirmMessage(entriesFor(folder).entries.length, getBundleModes(folder).includes('compact')),
+    confirmText: 'Unbundle',
+    cancelText: 'Cancel',
+  }).openAndGetValue();
+  if (!confirmed) return;
+  const progress = new Notice(`Unbundling ${folder}…`, 0);
+  try {
+    const result = await unbundleFolder(tab.app, folder, {
+      onProgress: (done, total) => progress.setMessage(`Unbundling ${folder}: ${done} of ${total} images…`),
+    });
+    progress.hide();
+    new Notice(formatUnbundleResult(result), 10_000);
+  } catch (err) {
+    progress.hide();
+    console.error('[Windrose] Unbundling the tile bundle failed:', folder, err);
+    new Notice(`Unbundling ${folder} failed: ${(err as Error)?.message ?? String(err)}. The bundle still serves every tile.`);
+  }
+}
+
+/** "Clean up": confirm with counts, trash the unused bundle files older than 7 days, report. */
+async function runCleanupAction(tab: SettingsTabThis, folder: string, onDone: () => void): Promise<void> {
+  const { old, young } = partitionOrphans(await listBundleOrphans(tab.app, folder));
+  if (old.length === 0 && young.length === 0) { onDone(); return; }
+  const confirmed = await new ConfirmModal(tab.app, {
+    message: cleanupConfirmMessage(old, young),
+    confirmText: 'Clean up',
+    cancelText: 'Cancel',
+  }).openAndGetValue();
+  if (!confirmed) return;
+  try {
+    new Notice(formatCleanupResult(await cleanupBundleOrphans(tab.app, folder)), 10_000);
+  } catch (err) {
+    console.error('[Windrose] Cleaning up the tile bundle failed:', folder, err);
+    new Notice(`Cleaning up ${folder} failed: ${(err as Error)?.message ?? String(err)}`);
+  } finally {
+    onDone();
+  }
+}
+
 function tilesetFolderRow(tab: SettingsTabThis, folderPath: string, index: number): SettingGroupItem {
   return {
     name: `Tile folder ${index + 1}`,
     render: (setting) => {
       let detectTimer: number | undefined;
+      // Desktop only: bundling holds a 4 MiB shard plus a full image in memory
+      // and rewrites the folder; mobile never shows the action.
+      let bundleBtn: HTMLButtonElement | null = null;
+      let view: BundleBadgeView = { folder: '', state: null, looseFiles: null };
+      let running = false;
+      let compactBtn: HTMLButtonElement | null = null;
+      let compacting = false;
+      let unbundleBtn: HTMLButtonElement | null = null;
+      let unbundling = false;
+      let cleanupBtn: HTMLButtonElement | null = null;
+      let cleaning = false;
+      const syncBundleButton = (): void => {
+        const anyRun = compacting || running || unbundling || cleaning || isBundleWriteInProgress(view.folder);
+        const mounted = view.folder !== '' && view.state === 'mounted';
+        if (unbundleBtn != null) {
+          unbundleBtn.toggle(mounted || unbundling);
+          unbundleBtn.disabled = anyRun;
+        }
+        if (cleanupBtn != null) {
+          cleanupBtn.toggle((mounted && (view.orphans?.length ?? 0) > 0) || cleaning);
+          cleanupBtn.disabled = anyRun;
+        }
+        if (compactBtn != null) {
+          const busy = anyRun;
+          const exact = view.folder !== '' && view.state === 'mounted' && getBundleModes(view.folder).includes('exact');
+          compactBtn.toggle(exact || compacting);
+          compactBtn.disabled = busy;
+        }
+        if (bundleBtn == null) return;
+        const writing = isBundleWriteInProgress(view.folder);
+        const offerLoose = view.folder !== '' && view.state === 'loose' && (view.looseFiles ?? 0) > 0;
+        // An interrupted run (marker and shards, no index) can be finished by running again.
+        const resume = view.folder !== '' && view.state === 'not-on-device' && view.reason === 'index-missing' && !writing;
+        bundleBtn.setText(resume ? 'Resume bundling' : 'Bundle folder');
+        bundleBtn.toggle(offerLoose || resume || running);
+        bundleBtn.disabled = running || writing;
+      };
+      const badge = attachBundleBadge(tab, setting.descEl, folderPath, next => {
+        view = next;
+        syncBundleButton();
+      });
+      if (Platform.isDesktopApp) {
+        setting.addButton(btn => {
+          bundleBtn = btn.buttonEl;
+          btn.setButtonText('Bundle folder')
+            .setTooltip('Store the images of this folder as a tile bundle in the same folder')
+            .onClick(() => {
+              if (running || view.folder === '') return;
+              if (view.looseFiles == null && view.reason !== 'index-missing') return;
+              running = true;
+              syncBundleButton();
+              void runBundleFolderAction(tab, view.folder, view.looseFiles).finally(() => {
+                running = false;
+                syncBundleButton();
+              });
+            });
+        });
+        setting.addButton(btn => {
+          compactBtn = btn.buttonEl;
+          btn.setButtonText('Compact bundle')
+            .setTooltip('Re-encode the large images of this bundle in a smaller format')
+            .onClick(() => {
+              if (compacting || running || view.folder === '') return;
+              compacting = true;
+              syncBundleButton();
+              void runCompactBundleAction(tab, view.folder).finally(() => {
+                compacting = false;
+                syncBundleButton();
+              });
+            });
+        });
+        setting.addButton(btn => {
+          unbundleBtn = btn.buttonEl;
+          btn.setButtonText('Unbundle')
+            .setTooltip('Write the images of this bundle back as loose files')
+            .onClick(() => {
+              if (unbundling || compacting || running || cleaning || view.folder === '') return;
+              unbundling = true;
+              syncBundleButton();
+              void runUnbundleAction(tab, view.folder).finally(() => {
+                unbundling = false;
+                syncBundleButton();
+              });
+            });
+        });
+        setting.addButton(btn => {
+          cleanupBtn = btn.buttonEl;
+          btn.setButtonText('Clean up')
+            .setTooltip('Move bundle files no longer in use to the trash')
+            .onClick(() => {
+              if (cleaning || unbundling || compacting || running || view.folder === '') return;
+              cleaning = true;
+              syncBundleButton();
+              void runCleanupAction(tab, view.folder, () => badge.recheck()).finally(() => {
+                cleaning = false;
+                syncBundleButton();
+              });
+            });
+        });
+        syncBundleButton();
+      }
       setting.addSearch(search => {
         new FolderSuggest(tab.app, search.inputEl);
         search
@@ -390,12 +734,14 @@ function tilesetFolderRow(tab: SettingsTabThis, folderPath: string, index: numbe
             if (detectTimer != null) window.clearTimeout(detectTimer);
             detectTimer = window.setTimeout(() => {
               void runFolderDetection(tab.app, value);
+              badge.setFolder(value);
             }, FOLDER_DETECT_DEBOUNCE_MS);
           });
       });
       // Drop a pending detection if the row is torn down mid-debounce
       return () => {
         if (detectTimer != null) window.clearTimeout(detectTimer);
+        badge.dispose();
       };
     }
   };
@@ -442,22 +788,27 @@ function buildTilesetSections(tab: SettingsTabThis): SettingDefinitionItem[] {
         name: 'Preview',
         desc: 'Check what tiles would be loaded from configured folders',
         action: () => {
-          let totalTiles = 0;
-          const results: string[] = [];
-          const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
-          for (const folder of tab.plugin.settings.tilesetFolders ?? []) {
-            if (!folder) continue;
-            const normalizedFolder = folder.endsWith('/') ? folder.slice(0, -1) : folder;
-            let count = 0;
-            for (const file of tab.app.vault.getFiles()) {
-              if (!file.path.startsWith(normalizedFolder + '/')) continue;
-              const ext = file.extension ? file.extension.toLowerCase() : '';
-              if (IMAGE_EXTENSIONS.has(ext)) count++;
+          void (async () => {
+            let totalTiles = 0;
+            const results: string[] = [];
+            for (const folder of tab.plugin.settings.tilesetFolders ?? []) {
+              if (!folder) continue;
+              const normalizedFolder = folder.endsWith('/') ? folder.slice(0, -1) : folder;
+              // Folder-scoped walk (loose images unioned with any mounted
+              // bundle's entries), not a whole-vault getFiles() pass.
+              const tiles = await scanTilesetFolder(tab.app, normalizedFolder);
+              const bundle = entriesFor(normalizedFolder);
+              let line = folder + ': ' + tiles.length + ' tile(s)';
+              if (bundle.state === 'mounted' || bundle.state === 'partial') {
+                line += ' (' + bundle.entries.length + ' bundled' + (bundle.state === 'partial' ? ', some unreadable' : '') + ')';
+              } else if (isBundleFailureState(bundle.state)) {
+                line += ' (tile bundle could not be loaded: ' + bundleFailureLabel(bundle.state) + ')';
+              }
+              totalTiles += tiles.length;
+              results.push(line);
             }
-            totalTiles += count;
-            results.push(folder + ': ' + count + ' tile(s)');
-          }
-          new Notice(results.join('\n') + '\nTotal: ' + totalTiles + ' tiles');
+            new Notice(results.join('\n') + '\nTotal: ' + totalTiles + ' tiles');
+          })();
         }
       }]
     });

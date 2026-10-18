@@ -9,6 +9,7 @@ import type { VNode } from 'preact';
 import { render } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { loadMapData } from '../persistence/fileOperations';
+import { buildTilesetsFromSettings, applyBuiltTilesets } from '../assets/tilesetOperations';
 import { renderCanvas } from '../geometry/renderers/mapRenderer';
 import { getApp, getSettings, resolveTheme } from '../core/settingsAccessor';
 import { resolveHoverPreviewView } from '../core/deepLinkHoverTarget';
@@ -64,13 +65,22 @@ function WindroseHoverPreview({ mapId, x, y, zoom: linkZoom, layerId, subHexPath
     let cancelled = false;
     void (async () => {
       try {
-        const mapData = await loadMapData(getApp(), mapId);
+        const loaded = await loadMapData(getApp(), mapId);
         if (cancelled) return;
 
-        if (mapData == null || !mapData.mapType) {
+        if (loaded == null || !loaded.mapType) {
           setStatus('missing');
           return;
         }
+
+        // Folder tilesets are not persisted on the map; rebuild them as a
+        // mounted map does. Zero folders -> []; a failed scan keeps the map's own.
+        const settings = getSettings();
+        const built = await buildTilesetsFromSettings(getApp(), settings);
+        if (cancelled) return;
+        const mapData = (built.tilesets.length === 0 && built.scanFailed)
+          ? loaded
+          : applyBuiltTilesets(loaded, built.tilesets, settings);
 
         setMapName((mapData.name) ?? mapId);
 
