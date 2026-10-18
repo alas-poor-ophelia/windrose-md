@@ -22,6 +22,7 @@ the sections walk through every tool — [drawing]({{ site.baseurl }}/drawing/),
 [objects and labels]({{ site.baseurl }}/objects-and-labels/),
 [the Beacon]({{ site.baseurl }}/beacon/),
 [measurement and travel]({{ site.baseurl }}/measurement-and-travel/),
+[weather]({{ site.baseurl }}/weather/),
 [fog of war]({{ site.baseurl }}/fog-of-war/),
 [regions and sub-maps]({{ site.baseurl }}/hex-maps/), and
 [random dungeons]({{ site.baseurl }}/random-dungeons/).

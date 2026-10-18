@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Fog of war
-nav_order: 9
+nav_order: 11
 permalink: /fog-of-war/
 ---
 

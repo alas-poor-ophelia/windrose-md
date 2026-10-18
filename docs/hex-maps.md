@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Regions and sub-maps
-nav_order: 10
+nav_order: 12
 permalink: /hex-maps/
 ---
 

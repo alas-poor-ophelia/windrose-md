@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Full pane and picture frame
-nav_order: 13
+nav_order: 15
 permalink: /full-pane-and-picture-frame/
 ---
 
