@@ -112,10 +112,16 @@ describe('lodFlags: getMaxZoom', () => {
     expect(getMaxZoom({ mapType: 'hex', lod: DEFAULT_LOD } as MapData)).toBeCloseTo(102.4, 6);
   });
 
-  it('honours the developer minCellPx override', () => {
-    getSettings.mockReturnValue({ lodLadder: true });
+  it('honours the developer minCellPx override in Developer mode', () => {
+    getSettings.mockReturnValue({ lodLadder: true, developerMode: true });
     withLadderOverride({ minCellPx: 40 });
     expect(getMaxZoom(hexMap({ lod: DEFAULT_LOD }))).toBeCloseTo(64, 9);
+  });
+
+  it('ignores the developer minCellPx override with Developer mode off', () => {
+    getSettings.mockReturnValue({ lodLadder: true, developerMode: false });
+    withLadderOverride({ minCellPx: 40 });
+    expect(getMaxZoom(hexMap({ lod: DEFAULT_LOD }))).toBeCloseTo(102.4, 9);
   });
 });
 
@@ -139,7 +145,8 @@ describe('lodFlags: ladderTileClipAt (kgc.23 k, kgc.26)', () => {
     expect(ladderTileClipAt(3)).toBe('smart');
   });
 
-  it('honours the developer knob: none, rungs (whole hex >= 1), all (whole hex everywhere), smart', () => {
+  it('honours the developer knob in Developer mode: none, rungs (whole hex >= 1), all (whole hex everywhere), smart', () => {
+    getSettings.mockReturnValue({ lodLadder: true, developerMode: true });
     withLadderOverride({ tileClip: 'none' });
     expect(ladderTileClipAt(0)).toBe('none');
     expect(ladderTileClipAt(2)).toBe('none');
@@ -156,8 +163,8 @@ describe('lodFlags: ladderTileClipAt (kgc.23 k, kgc.26)', () => {
     expect(ladderTileClipAt(2)).toBe('smart');
   });
 
-  it('ignores the knob when the capability flag is off (default policy applies)', () => {
-    getSettings.mockReturnValue({ lodLadder: false });
+  it('ignores the knob with Developer mode off (default policy applies)', () => {
+    getSettings.mockReturnValue({ lodLadder: true, developerMode: false });
     withLadderOverride({ tileClip: 'all' });
     expect(ladderTileClipAt(0)).toBe('none');
     expect(ladderTileClipAt(1)).toBe('smart');
@@ -248,7 +255,7 @@ describe('lodFlags: isLadderView, canAuthorDepth, ladderParamsFor', () => {
     expect(getMaxZoom(withLayers({}, { 1: [cell(1, 1)] }))).toBe(DEFAULTS.maxZoom);
   });
 
-  it('canAuthorDepth needs lod, the capability (absent = on), and no quarantine', () => {
+  it('canAuthorDepth needs lod and no quarantine, whatever the capability (mode is data)', () => {
     getSettings.mockReturnValue({ lodLadder: true });
     expect(canAuthorDepth(withLayers({ lod: LOD }))).toBe(true);
     expect(canAuthorDepth(withLayers({}))).toBe(false);
@@ -256,11 +263,13 @@ describe('lodFlags: isLadderView, canAuthorDepth, ladderParamsFor', () => {
     getSettings.mockReturnValue({});
     expect(canAuthorDepth(withLayers({ lod: LOD }))).toBe(true);
     getSettings.mockReturnValue({ lodLadder: false });
-    expect(canAuthorDepth(withLayers({ lod: LOD }))).toBe(false);
+    expect(canAuthorDepth(withLayers({ lod: LOD }))).toBe(true);
+    expect(canAuthorDepth(withLayers({}))).toBe(false);
+    expect(canAuthorDepth(withLayers({ lod: { ...LOD, m: 3 } }))).toBe(false);
   });
 
   it('a lod map uses its stored params; the dev override never applies m', () => {
-    getSettings.mockReturnValue({ lodLadder: true });
+    getSettings.mockReturnValue({ lodLadder: true, developerMode: true });
     withLadderOverride({ m: 2, minCellPx: 40, maxLevel: 2 });
     const p = ladderParamsFor(withLayers({ lod: { m: 15, minCellPx: 50, maxLevel: 1 } }));
     expect(p).toEqual({ hexSize: 80, m: 15, minCellPx: 40, maxLevel: 2 });

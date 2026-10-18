@@ -114,7 +114,7 @@ describe('useDataHandlers: ladder element writes', () => {
   });
 
   it('refused element write leaves mapData identity and history untouched', () => {
-    getSettings.mockReturnValue({ lodLadder: false }); // capability off: no map may START taking depth
+    getSettings.mockReturnValue({ lodLadder: false }); // a map without lod takes no depth, toggle or not
     const base = createNewMap('Off', 'hex');
     const t = mount(base);
 
@@ -165,9 +165,9 @@ describe('useDataHandlers: ladder element writes', () => {
     expect(t.handlers().handleObjectsChange(dup)).toBe('over-budget');
     expect(t.map()).toBe(afterMove);
 
-    // With the capability off the duplicate is refused at the door instead.
+    // With the capability off the lod map is still a ladder (mode is data): the size gate still refuses.
     getSettings.mockReturnValue({ lodLadder: false });
-    expect(t.handlers().handleObjectsChange(dup)).toBe('not-a-ladder');
+    expect(t.handlers().handleObjectsChange(dup)).toBe('over-budget');
     expect(t.map()).toBe(afterMove);
   });
 
@@ -177,7 +177,7 @@ describe('useDataHandlers: ladder element writes', () => {
   const withTiles = (map: MapData, tiles: TileAssignment[]): MapData =>
     ({ ...map, layers: map.layers.map((l, i) => (i === 0 ? { ...l, tiles } : l)) });
 
-  it('deep tile move with the capability flag off is not refused', () => {
+  it('on a lod map with the capability off, a deep tile move and a deep cell write are both accepted (mode is data)', () => {
     getSettings.mockReturnValue({ lodLadder: false });
     const t = mount(withTiles({ ...createNewMap('Off', 'hex'), lod: LOD }, [deepTile(4)]));
 
@@ -188,6 +188,10 @@ describe('useDataHandlers: ladder element writes', () => {
     expect(t.handlers().handleTilesChange([deepTile(5, { rotation: 90, scale: 1.5 } as Partial<TileAssignment>)])).toBeNull();
     expect(t.map().layers[0].tiles?.[0].rotation).toBe(90);
     expect(t.addToHistory).toHaveBeenCalledTimes(2);
+
+    const outcome = t.handlers().handleLevelCellsChange(1, (cells) => [...cells, { q: 4, r: 0, color: '#123456' }]);
+    expect(outcome?.ok).toBe(true);
+    expect(t.map().lod).toEqual(LOD);
   });
 
   it('deep tile move at ~79% of budget is not refused', () => {
@@ -204,8 +208,9 @@ describe('useDataHandlers: ladder element writes', () => {
     expect(t.handlers().handleTilesChange([deepTile(4), deepTile(4)])).toBe('over-budget');
     expect(t.handlers().handleTilesChange([deepTile(4), deepTile(6)])).toBe('over-budget');
     expect(t.map()).toBe(before);
+    // The capability toggle does not lift or replace the size gate on a lod map.
     getSettings.mockReturnValue({ lodLadder: false });
-    expect(t.handlers().handleTilesChange([deepTile(4), deepTile(6)])).toBe('not-a-ladder');
+    expect(t.handlers().handleTilesChange([deepTile(4), deepTile(6)])).toBe('over-budget');
     expect(t.map()).toBe(before);
     expect(t.addToHistory).not.toHaveBeenCalled();
   });

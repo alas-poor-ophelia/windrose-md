@@ -8,10 +8,10 @@
  * level band. Comparing a crossing against the global median would flatter it
  * whenever the coarse band is intrinsically cheaper than the fine one.
  *
- * Nothing here runs unless a ladder is active and the ladder capability is on:
+ * Nothing here runs unless a ladder is active and Developer mode is on:
  * every call site in `mapRenderer` is behind `ladder !== null` plus
- * `isLodLadderEnabled()` (read once per frame), so classic maps and users
- * without the capability pay nothing. Each frame carries the id of the canvas
+ * `isLadderDeveloperMode()` (read once per frame), so classic maps and users
+ * without Developer mode pay nothing. Each frame carries the id of the canvas
  * that painted it (surfaceBudget's `canvasIdOf`), so two ladder panes can be
  * measured separately: pass that id to `crossingStats` / `snapshot`.
  */

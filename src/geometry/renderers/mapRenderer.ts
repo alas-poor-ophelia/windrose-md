@@ -37,7 +37,7 @@ import type { LatticeClipCache } from './latticeRenderer';
 import type { GeometryLadder } from '../core/createGeometryLadder';
 import { recordFrame, recordRebuild, recordPhase } from './ladderTelemetry';
 import { canvasIdOf } from './surfaceBudget';
-import { isLodLadderEnabled } from '../../core/lodFlags';
+import { isLadderDeveloperMode } from '../../core/lodFlags';
 import { getFontCss } from '../../text/fontOptions';
 import { calculateViewportOffset, applyNorthRotation } from '../core/viewportMath';
 import { renderSubHexBackdrop } from './subHexBackdropRenderer';
@@ -93,9 +93,9 @@ const renderCanvas: RenderCanvas = (canvas, fogCanvas, mapData, geometry, select
   // export: `bypassSurfaceCache`), which draw the same ladder picture but stay out
   // of the surface cache, the budget's active slot and the live telemetry.
   const ladderOn = ladder !== null && !bypassSurfaceCache;
-  // Frame telemetry is measurement, not rendering: recorded only while the ladder
-  // capability is on (read once per frame), so other users pay no timing cost.
-  const telemetryOn = ladderOn && isLodLadderEnabled();
+  // Frame telemetry is measurement, not rendering: recorded only while Developer
+  // mode is on (read once per frame), so other users pay no timing cost.
+  const telemetryOn = ladderOn && isLadderDeveloperMode();
   const frameStart = telemetryOn ? performance.now() : 0;
 
   // Normalize selectedItems to array (backward compatibility)

@@ -31,7 +31,7 @@ WindroseSettingsTab.ts        # PluginSettingTab subclass: getSettingDefinitions
 
 ## Ladder capability setting
 
-`lodLadder` (the "Detail levels" toggle at the end of the Features group in `settingDefinitions.ts`; default ON via `FALLBACK_SETTINGS`, absent reads as on; stored top-level, not under `features`) is the CAPABILITY only: whether this install may use the lattice ladder. The per-map opt-in is `mapData.lod`, set through `components/settings/hexmap/LadderSection.tsx`. A map that carries `lod` is a ladder map on every install, flag or not; read the combined answer through `core/lodFlags.ts`, never the setting directly.
+`lodLadder` (the "Detail levels" toggle at the end of the Features group in `settingDefinitions.ts`; default ON via `FALLBACK_SETTINGS`, absent reads as on; stored top-level, not under `features`) is the CAPABILITY only: whether this install shows the controls that ADD detail levels to a map (new-map preset, the map-settings enable toggle). It never blocks editing or erasing a map that already has `lod`; the `window.__windroseLadder` knobs and ladder telemetry are gated on `developerMode` instead. The per-map opt-in is `mapData.lod`, set through `components/settings/hexmap/LadderSection.tsx`. A map that carries `lod` is a ladder map on every install, flag or not; read the combined answer through `core/lodFlags.ts`, never the setting directly.
 
 ## Adding a setting
 

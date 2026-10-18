@@ -28,7 +28,7 @@ geometry/
 │   ├── staticLayerCache.ts # Offscreen static snapshot cache (12M px budget, rotated maps blit under rotation, settle re-render)
 │   ├── levelSurfaces.ts   # Ladder: which per-level surface a frame may drift from at a crossing (pure selection)
 │   ├── surfaceBudget.ts   # Ladder: global byte budget and LRU eviction for per-level surfaces; active canvas slot; __windrose.surfaces
-│   ├── ladderTelemetry.ts # Ladder: frame ring buffer and crossing/median ratio per canvas, recorded only with the capability on; __windrose.ladder
+│   ├── ladderTelemetry.ts # Ladder: frame ring buffer and crossing/median ratio per canvas, recorded only in Developer mode; __windrose.ladder
 │   ├── latticeRenderer.ts # Ladder: live lattice stroke after the blit (active rung plus district rungs)
 │   ├── elementBands.ts    # Ladder: per-home-rung visibility bands, floors and held sizes for objects and labels
 │   ├── ladderElementPass.ts # Ladder: one banded, culled member set per frame; live draw and selection chrome share it

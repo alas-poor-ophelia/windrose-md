@@ -3,18 +3,18 @@
  * shown and edited as a detail ladder, and with which parameters.
  *
  * Two inputs, both needed:
- *  - the CAPABILITY (`settings.lodLadder`): may this install use the ladder
- *    machinery at all. Developer preview, off by default.
+ *  - the CAPABILITY (`settings.lodLadder`): may this install ADD detail
+ *    levels to a map (new-map preset, map-settings toggle). On by default.
  *  - the MAP MODE (`mapData.lod`): per-map ladder parameters (m, minCellPx,
  *    maxLevel). A map carrying `lod` is a ladder map on every install; absent
- *    means classic, unless the capability is on and the map qualifies.
+ *    means classic on every install.
  *
  * What lives here: the capability read, the ladder-view and depth-authoring
  * gates (`isLadderView`, `canAuthorDepth`), the derived depth quarantine
  * (`isDepthQuarantined`), the deepest-rung scan over cells and homed elements,
  * the ladder parameters and zoom ceiling of a map, the settings-panel merge
  * (`mergeLadderConfig`, `ladderSettingsPatch`), and the developer knobs on
- * `window.__windroseLadder`.
+ * `window.__windroseLadder` (read only while Developer mode is on).
  *
  * Developer knobs are read when a caller asks, not watched: changing
  * `minCellPx` / `maxLevel` on the window object takes effect at the next
@@ -36,17 +36,27 @@ import type { LadderOverrides } from '../geometry/core/createGeometryLadder';
 /**
  * True when the detail levels capability is switched on in plugin settings
  * (absent = enabled, like every feature toggle). The capability gates only
- * the authoring surfaces (new-map preset, the map-settings enable toggle,
- * deep writes); whether a map IS shown with detail levels is data, see
- * `isLadderView`.
+ * the surfaces that CREATE detail levels (new-map preset, the map-settings
+ * enable toggle flipping off to on). Mode is data: a map that already has
+ * `lod` is shown and fully editable whatever the toggle says, see
+ * `isLadderView` and `canBeginDepthAuthoring`.
  */
 function isLodLadderEnabled(): boolean {
   return getSettings().lodLadder !== false;
 }
 
 /**
+ * True when the plugin's Developer mode setting is on. Gates the ladder's
+ * developer knobs (`window.__windroseLadder`) and its frame telemetry, which
+ * must cost nothing for users.
+ */
+function isLadderDeveloperMode(): boolean {
+  return getSettings().developerMode === true;
+}
+
+/**
  * Developer-only override of the ladder parameters, read from
- * `window.__windroseLadder` while the capability is on. Never persisted.
+ * `window.__windroseLadder` while Developer mode is on. Never persisted.
  * `ladderParamsFor` applies it on top of the map's parameters: minCellPx and
  * maxLevel always, m only on a map without `lod` (a stored m is never
  * overridden). Today only unit tests set it (depthAuthoring.test.ts,
@@ -54,7 +64,7 @@ function isLodLadderEnabled(): boolean {
  * shows at the next MapCanvas render.
  */
 function getLadderOverrides(): LadderOverrides {
-  if (!isLodLadderEnabled()) return {};
+  if (!isLadderDeveloperMode()) return {};
   // `activeWindow` is an Obsidian global; absent on node (unit tests) and in any headless caller.
   if (typeof activeWindow === 'undefined') return {};
   const raw: unknown = (activeWindow as unknown as { __windroseLadder?: unknown }).__windroseLadder;
@@ -81,15 +91,15 @@ type LadderTileClipMode = 'none' | 'hex' | 'smart';
  * clip for cutting wall art into one-hex dashes) but stops hard
  * at the edge of a neighbour with deep paint instead of covering it.
  *
- * Developer knob for comparisons, flag-gated like the other overrides:
+ * Developer knob for comparisons, gated on Developer mode like the other overrides:
  * `activeWindow.__windroseLadder.tileClip` = 'smart' (default), 'none' (the
  * previous unclipped default), 'rungs' (whole hex on rungs >= 1) or 'all'
- * (whole hex at level 0 too). Without the capability flag the knob is ignored
- * and the default policy applies (a map carrying `lod` is a ladder map anyway).
+ * (whole hex at level 0 too). With Developer mode off the knob is ignored
+ * and the default policy applies.
  */
 function ladderTileClipAt(level: number): LadderTileClipMode {
   const policy: LadderTileClipMode = level >= 1 ? 'smart' : 'none';
-  if (!isLodLadderEnabled() || typeof activeWindow === 'undefined') return policy;
+  if (!isLadderDeveloperMode() || typeof activeWindow === 'undefined') return policy;
   const raw: unknown = (activeWindow as unknown as { __windroseLadder?: { tileClip?: unknown } }).__windroseLadder?.tileClip;
   if (raw === 'none') return 'none';
   if (raw === 'all') return 'hex';
@@ -216,12 +226,15 @@ function isDepthQuarantined(mapData: MapData): { quarantined: boolean; reason: s
   return { quarantined: false, reason: null };
 }
 
-/** May this map take deep (rung >= 1) edits? Ladder view, `lod` present, not quarantined, capability on. */
+/**
+ * May this map take deep (rung >= 1) edits? Ladder view, `lod` present, not
+ * quarantined. The capability toggle is NOT consulted: mode is data, so a map
+ * that has `lod` stays editable (and erasable) with the toggle off.
+ */
 function canAuthorDepth(mapData: MapData | null | undefined): boolean {
   if (mapData === null || mapData === undefined) return false;
   if (!isLadderView(mapData)) return false; // includes the quarantine gate
-  if (mapData.lod === undefined) return false;
-  return isLodLadderEnabled();
+  return mapData.lod !== undefined;
 }
 
 /**
@@ -355,7 +368,7 @@ function zoomForLevel(mapData: MapData | null | undefined, level: number): numbe
 }
 
 export {
-  zoomForLevel, isLodLadderEnabled, ladderTileClipAt, isLadderView, isDepthQuarantined, canAuthorDepth,
+  zoomForLevel, isLodLadderEnabled, isLadderDeveloperMode, ladderTileClipAt, isLadderView, isDepthQuarantined, canAuthorDepth,
   ladderParamsFor, getMaxZoom, hasDepthContent, hasSubHexChildren, deepestAuthoredRung, deepestAuthoredRungOfLayers,
   ladderOpensAt, mergeLadderConfig, ladderSettingsPatch, MAX_LADDER_LEVEL, MAX_LADDER_ZOOM
 };

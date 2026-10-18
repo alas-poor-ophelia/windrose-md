@@ -121,6 +121,7 @@ function resolveViewportZoom(mapData: MapData, zoom: number | undefined, level: 
  * Its history entry records that block, so the stamp is as reversible as the
  * cells it came with. `{}` for every other write, so classic snapshots and
  * later rung writes carry no `lodStamped` key.
+ * Dormant since 2.5.0: `lod` is created only by the opt-in paths, so no live write stamps it.
  */
 function stampedLodOf(before: MapData, after: MapData): { lodStamped?: LadderConfig } {
   return before.lod === undefined && after.lod !== undefined ? { lodStamped: after.lod } : {};

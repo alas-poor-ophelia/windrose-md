@@ -167,7 +167,7 @@ describe('viewStateForRung: cross-rung undo moves the camera to the rung the cha
     expect(view.zoom).toBeLessThan(25.6);
   });
 
-  it('returns null on a classic map (no lod, flag off) and for a rung past maxLevel', () => {
+  it('returns null on a classic map (no lod) and for a rung past maxLevel', () => {
     const classic = { ...ladderMap(1), lod: undefined } as unknown as MapData;
     expect(viewStateForRung(classic, 2)).toBeNull();
     expect(viewStateForRung(ladderMap(1), 4)).toBeNull();
