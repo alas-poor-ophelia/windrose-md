@@ -81,6 +81,7 @@ function createMockState(overrides: Partial<SettingsModalState> = {}): SettingsM
     objectSetId: null,
     ladderEnabled: false,
     lod: null,
+    weather: { weatherZoneId: '', weatherAnimate: true },
     ...overrides,
   };
 }

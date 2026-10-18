@@ -1,6 +1,7 @@
 // FullPaneRightGroup.tsx - Full-pane right group: the tile drawer (unless the
 // tile browser is floated) plus the stacked dock column (Layers / Colors /
-// View + Map settings), which collapses to an icon ribbon.
+// View [+ Almanac when the map has weather] + Map settings), which collapses
+// to an icon ribbon.
 
 import type { VNode } from 'preact';
 import { DrawerDock } from '../panels/DrawerDock';
@@ -8,6 +9,9 @@ import { DockPanel } from '../panels/DockPanel';
 import { DockRibbon } from '../panels/DockRibbon';
 import { DockLayerList } from '../panels/DockLayerList';
 import { DockViewPanel } from '../panels/DockViewPanel';
+import { AlmanacPanel } from '../panels/AlmanacPanel';
+import { useWeatherStore } from '../../context/WeatherContext';
+import { useWeatherFog } from '../../weather/weatherFog';
 import { ObjectSidebar } from '../panels/ObjectSidebar';
 import { ColorPicker } from '../shared/ColorPicker';
 import { Icon } from '../shared/Icon';
@@ -35,8 +39,16 @@ const DOCK_RIBBON_ITEMS: Array<{ id: PanelId; icon: string; title: string }> = [
   { id: 'view', icon: 'lucide-eye', title: 'View' },
 ];
 
+const ALMANAC_RIBBON_ITEM = { id: 'almanac', icon: 'lucide-cloud-sun', title: 'Almanac' };
+
 const FullPaneRightGroup = ({ bags, floating, dock, showTilePanel, drawerWidth, onDrawerWidthChange, drawerRibbon, onSettingsClick }: FullPaneRightGroupProps): VNode => {
   const { isFloating, toggleFloat } = floating;
+  // Offered while the shown level has weather the players can see (an
+  // area under fog is never named, not even by an empty Almanac)
+  const { hasWeather } = useWeatherStore();
+  const { revealedAreas } = useWeatherFog();
+  const almanacOffered = hasWeather && revealedAreas.length > 0;
+  const almanacCollapsed = dock.sectionCollapsed['almanac'] ?? true;
   return (
     <div className="windrose-right-group">
       {showTilePanel && !isFloating('tiles') && (
@@ -63,6 +75,7 @@ const FullPaneRightGroup = ({ bags, floating, dock, showTilePanel, drawerWidth, 
             items={DOCK_RIBBON_ITEMS.filter(it => !isFloating(it.id))
               // Settings is an action, not a panel — opens the modal directly
               .map((it): { id: string; icon: string; title: string } => it)
+              .concat(almanacOffered ? [ALMANAC_RIBBON_ITEM] : [])
               .concat([{ id: 'settings', icon: 'lucide-settings', title: 'Map settings' }])}
             onExpand={(id) => id === 'settings' ? onSettingsClick() : dock.expandFromRibbon(id)}
           />
@@ -97,6 +110,15 @@ const FullPaneRightGroup = ({ bags, floating, dock, showTilePanel, drawerWidth, 
                 onUndock={(pos) => toggleFloat('view', pos)}
               >
                 <DockViewPanel {...bags.viewPanel} />
+              </DockPanel>
+            )}
+            {almanacOffered && (
+              <DockPanel
+                title="Almanac"
+                collapsed={almanacCollapsed}
+                onToggleCollapse={() => dock.toggleSection('almanac')}
+              >
+                <AlmanacPanel {...bags.almanac} active={!almanacCollapsed} />
               </DockPanel>
             )}
             {/* Map settings — moved out of the View panel (windrose-5cx);

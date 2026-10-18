@@ -110,6 +110,21 @@ function renderRegionBorder(
   ctx.stroke();
 }
 
+const LABEL_PAD_Y = 3;
+
+/** Label font size in canvas px: scales with zoom, clamped to a readable minimum */
+function getRegionLabelFontSize(zoom: number): number {
+  return Math.max(12, 14 * zoom);
+}
+
+/**
+ * Half the height of a region's name plate in canvas px — for overlays that
+ * place something just under the label (which is centred on its anchor).
+ */
+function getRegionLabelHalfHeight(zoom: number): number {
+  return getRegionLabelFontSize(zoom) / 2 + LABEL_PAD_Y;
+}
+
 function renderRegionLabel(
   ctx: CanvasRenderingContext2D,
   region: Region,
@@ -134,8 +149,7 @@ function renderRegionLabel(
     viewState.x, viewState.y, viewState.zoom
   );
 
-  // Scale font with zoom, clamp to readable minimum
-  const baseFontSize = Math.max(12, 14 * viewState.zoom);
+  const baseFontSize = getRegionLabelFontSize(viewState.zoom);
   ctx.font = `bold ${baseFontSize}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -143,7 +157,7 @@ function renderRegionLabel(
   // Background plate for readability
   const metrics = ctx.measureText(region.name);
   const padX = 6;
-  const padY = 3;
+  const padY = LABEL_PAD_Y;
   ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
   ctx.fillRect(
     screen.screenX - metrics.width / 2 - padX,
@@ -198,4 +212,4 @@ function renderRegions(
   }
 }
 
-export { renderRegions, computeBoundaryEdges, computeCentroid, getRegionLabelWorldPosition };
+export { renderRegions, computeBoundaryEdges, computeCentroid, getRegionLabelWorldPosition, getRegionLabelHalfHeight };

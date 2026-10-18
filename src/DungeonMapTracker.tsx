@@ -43,6 +43,7 @@ import { useCustomEventHandlers } from './hooks/interactions/useCustomEventHandl
 import { useKeyboardShortcuts } from './hooks/interactions/useKeyboardShortcuts';
 import { usePlayerFogClear } from './hooks/interactions/usePlayerFogClear';
 import { useUILayout } from './hooks/state/useUILayout';
+import { WeatherProvider } from './context/WeatherContext';
 import { useFloatingPanels } from './hooks/state/useFloatingPanels';
 import { usePanelState } from './hooks/state/usePanelState';
 import { useViewControls } from './hooks/state/useViewControls';
@@ -227,6 +228,8 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
   // Block-mode left icon rail: which flyout (if any) is open. Canvas controls
   // (MapControls Layers/Regions buttons) drive this too, so it's lifted here.
   const [railOpenId, setRailOpenId] = useState<string | null>(null);
+  // Almanac's selected weather area, shared by its rail and dock copies
+  const [almanacAreaId, setAlmanacAreaId] = useState<string | null>(null);
 
   const floating = useFloatingPanels({ fullPane, savedState: savedPanelState, onStateChange: onPanelStateChange });
   const { isFloating, toggleFloat } = floating;
@@ -638,11 +641,13 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
     availableTilesets, getCachedImage, onEditLayer: setEditingLayerId, onLayerClone: handleCloneLayerRequest,
     onZoomIn: handleZoomIn, onZoomOut: handleZoomOut, onUndo: wrappedHandleUndo,
     onTileDepthChange: handleTileDepthChange, collapseTileBrowser, expandTileBrowser,
+    almanacAreaId, onAlmanacAreaChange: setAlmanacAreaId,
   });
 
-  // Main render
+  // Main render. WeatherProvider: the one weather store for this map
+  // instance (toolbars, panels, layers, measure tool, settings modal).
   return (
-    <>
+    <WeatherProvider mapId={mapId} rootMapData={rootMapData} subHexPath={subHexPath}>
       <div
         ref={setContainerEl}
         className={`windrose-container interactive-child${fullPane ? '' : ' windrose-container-block'}${pictureFrameActive ? ' windrose-picture-frame' : ''}`}
@@ -815,6 +820,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
                 bareThresholdArmed={bareThresholdArmed}
                 onDisarmOpening={() => setBareThresholdArmed(false)}
                 showSavedRoutes={layerVisibility.savedRoutes}
+                showWeather={layerVisibility.weather}
                 showRerollButton={featureFlags.dungeonGenerator}
               />
             </MapCanvas>
@@ -891,6 +897,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
           currentPreferences={mapData.uiPreferences}
           currentHexBounds={mapData.mapType === 'hex' ? mapData.hexBounds : null}
           currentObjectSetId={mapData.objectSetId}
+          currentWeather={{ weatherZoneId: mapData.weatherZoneId, weatherAnimate: mapData.weatherAnimate }}
           currentBackgroundImage={mapData.backgroundImage ?? null}
           currentCells={mapData.mapType === 'hex' ? getActiveLayer(mapData).cells : []}
           currentObjects={mapData.mapType === 'hex' ? getActiveLayer(mapData).objects : []}
@@ -935,7 +942,7 @@ const DungeonMapTracker = ({ mapId = 'default-map', mapName = '', mapType = 'gri
             both code-block and full-pane paths (same component). */}
         {onboarding === 'pending' && <OnboardingSurvey />}
       </div>
-    </>
+    </WeatherProvider>
   );
 };
 

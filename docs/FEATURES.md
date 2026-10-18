@@ -456,6 +456,15 @@ Objects can produce **deeplinks**. Selecting an object and pressing its **deepli
 
 Deeplinks work in both **Reading mode** and **Live Preview**. **Hovering** a deeplink shows a small map thumbnail with a crosshair on the target.
 
+## Weather
+Windrose can display weather from the separate **U+13080** companion plugin (id `wadjet`). It does not generate or edit weather itself, and without the companion installed and enabled nothing weather-related appears. Weather never reveals fog of war.
+
+- Bind a map, a hex-map region, or a sub-hex level to a weather zone (Map settings, **Weather** tab; region right-click menu).
+- An animated sky shows rain, snow, fog, and cloud shadows; **Animate weather** turns the motion off per map.
+- The compass shows a wind needle with its Beaufort force.
+- The **Almanac** shows the day's conditions, a seven-day strip, and an hour slider.
+- Measured routes are costed against the forecast, with a **Leave on** departure window; the **Weather travel rules** setting picks the rules.
+
 ## Fog of War
 Windrose supports a rich but deliberately straightforward **fog of war**, for hex crawls, solo dungeon delving (see [Random Dungeons](#random-dungeons)), or theatrics. (Requires the *Fog of war* feature.)
 

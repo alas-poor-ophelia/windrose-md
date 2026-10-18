@@ -425,6 +425,18 @@ export interface MapData {
   // Travel display selection (modes/allowance from enabled travel packs)
   travelSettings?: MapTravelSettings;
 
+  /**
+   * Map-level zone in the U+13080 Weather plugin ("whole map" weather):
+   * the weather of a grid map, and of every hex no weather-bound region
+   * claims on a hex map. Absent on a sub-hex level = inherit the parent
+   * hex's weather. May outlive the zone it names — readers treat that as
+   * no weather.
+   */
+  weatherZoneId?: string;
+
+  /** Animated weather (the "Sky") for this map; absent = on */
+  weatherAnimate?: boolean;
+
   // Regions (hex maps only, global not per-layer)
   regions?: Region[];
 
@@ -664,6 +676,12 @@ export interface Region {
   /** Z-order for rendering (lower = behind) */
   order: number;
   tags?: string[];
+  /**
+   * Zone id in the U+13080 Weather plugin whose weather applies to this
+   * region's hexes. Absent = no weather. May outlive the zone it names
+   * (deleted in the weather plugin) — readers treat that as no weather.
+   */
+  weatherZoneId?: string;
 }
 
 // ===========================================

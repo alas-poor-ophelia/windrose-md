@@ -16,6 +16,7 @@ import type {
 import { isHexCell } from '#types/core/cell.types';
 import type { HexBounds } from '#types/core/map.types';
 import { hasDepthContent, deepestAuthoredRung, isDepthQuarantined, type LadderPatch } from '../../core/lodFlags';
+import type { MapWeatherSave } from '../../context/MapSettingsContext';
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { getLayerById } from '../../persistence/layerAccessor';
@@ -53,6 +54,7 @@ interface UsePanelStateResult {
     backgroundImage?: BackgroundImage | null,
     hexSize?: number | null,
     deleteOrphanedContent?: boolean,
+    weather?: MapWeatherSave | null,
     ladderPatch?: LadderPatch
   ) => void;
   handleSettingsClose: () => void;
@@ -99,6 +101,7 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
     backgroundImage: BackgroundImage | null = null,
     hexSize: number | null = null,
     deleteOrphanedContent: boolean = false,
+    weather: MapWeatherSave | null = null,
     ladderPatch: LadderPatch = { kind: 'keep' }
   ): void => {
     if (!mapData) return;
@@ -110,6 +113,16 @@ function usePanelState({ mapData, updateMapData }: UsePanelStateOptions): UsePan
         uiPreferences: preferencesData,
         objectSetId: settingsData.objectSetId ?? null
       };
+
+      // Weather tab (only when it was offered): absent = no map-level zone /
+      // animation on (root) or inherited (sub-hex level), so the keys are
+      // removed rather than stored as defaults
+      if (weather != null) {
+        delete newMapData.weatherZoneId;
+        delete newMapData.weatherAnimate;
+        if (weather.weatherZoneId != null && weather.weatherZoneId !== '') newMapData.weatherZoneId = weather.weatherZoneId;
+        if (typeof weather.weatherAnimate === 'boolean') newMapData.weatherAnimate = weather.weatherAnimate;
+      }
 
       if (hexBounds !== null && prev.mapType === 'hex') {
         newMapData.hexBounds = hexBounds;

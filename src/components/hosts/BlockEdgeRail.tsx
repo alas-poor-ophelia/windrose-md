@@ -1,5 +1,6 @@
 // BlockEdgeRail.tsx - Block-mode left icon rail: Layers / Colors / View
-// (+ Regions on hex) flyouts over the canvas, plus the map-settings action.
+// (+ Regions on hex, + Almanac when the map has weather) flyouts over the
+// canvas, plus the map-settings action.
 
 import type { VNode } from 'preact';
 import type { Region } from '#types/core/map.types';
@@ -8,6 +9,9 @@ import { DockLayerList } from '../panels/DockLayerList';
 import { DockViewPanel } from '../panels/DockViewPanel';
 import { ColorPicker } from '../shared/ColorPicker';
 import { RegionPanel } from '../panels/RegionPanel';
+import { AlmanacPanel } from '../panels/AlmanacPanel';
+import { useWeatherStore } from '../../context/WeatherContext';
+import { useWeatherFog } from '../../weather/weatherFog';
 import type { PanelBags } from './panelBags';
 
 interface BlockEdgeRailProps {
@@ -19,32 +23,54 @@ interface BlockEdgeRailProps {
   onSettingsClick: () => void;
 }
 
-const BlockEdgeRail = ({ bags, openId, onOpenChange, regions, onSettingsClick }: BlockEdgeRailProps): VNode => (
-  <EdgeRail
-    openId={openId}
-    onOpenChange={onOpenChange}
-    panels={[
-      { id: 'layers', icon: 'lucide-layers', title: 'Layers', content: <DockLayerList {...bags.layerList} /> },
-      { id: 'colors', icon: 'lucide-palette', title: 'Colors', content: <ColorPicker {...bags.colorPicker} /> },
-      { id: 'view', icon: 'lucide-eye', title: 'View', content: <DockViewPanel {...bags.viewPanel} /> },
-      ...(regions != null ? [{
-        id: 'regions',
-        icon: 'lucide-map',
-        title: 'Regions',
-        content: (
-          <RegionPanel
-            regions={regions.regions}
-            onRegionsChange={regions.onRegionsChange}
-            isOpen
-            instanceId={regions.instanceId}
-          />
-        )
-      }] : [])
-    ]}
-    actions={[
-      { id: 'settings', icon: 'lucide-settings', title: 'Map settings', onClick: onSettingsClick }
-    ]}
-  />
-);
+/** The Almanac needs more room than the 198px default drawer */
+const ALMANAC_DRAWER_WIDTH = 252;
+
+const BlockEdgeRail = ({ bags, openId, onOpenChange, regions, onSettingsClick }: BlockEdgeRailProps): VNode => {
+  // Offered while the shown level has weather the players can see (an
+  // area under fog is never named, not even by an empty Almanac)
+  const { hasWeather } = useWeatherStore();
+  const { revealedAreas } = useWeatherFog();
+  const almanacOffered = hasWeather && revealedAreas.length > 0;
+  const openInAlmanac = (regionId: string): void => {
+    bags.almanac.onAreaChange(`region:${regionId}`);
+    onOpenChange('almanac');
+  };
+  return (
+    <EdgeRail
+      openId={openId}
+      onOpenChange={onOpenChange}
+      panels={[
+        { id: 'layers', icon: 'lucide-layers', title: 'Layers', content: <DockLayerList {...bags.layerList} /> },
+        { id: 'colors', icon: 'lucide-palette', title: 'Colors', content: <ColorPicker {...bags.colorPicker} /> },
+        { id: 'view', icon: 'lucide-eye', title: 'View', content: <DockViewPanel {...bags.viewPanel} /> },
+        ...(regions != null ? [{
+          id: 'regions',
+          icon: 'lucide-map',
+          title: 'Regions',
+          content: (
+            <RegionPanel
+              regions={regions.regions}
+              onRegionsChange={regions.onRegionsChange}
+              isOpen
+              instanceId={regions.instanceId}
+              onOpenInAlmanac={almanacOffered ? openInAlmanac : undefined}
+            />
+          )
+        }] : []),
+        ...(almanacOffered ? [{
+          id: 'almanac',
+          icon: 'lucide-cloud-sun',
+          title: 'Almanac',
+          width: ALMANAC_DRAWER_WIDTH,
+          content: <AlmanacPanel {...bags.almanac} active={openId === 'almanac'} />,
+        }] : [])
+      ]}
+      actions={[
+        { id: 'settings', icon: 'lucide-settings', title: 'Map settings', onClick: onSettingsClick }
+      ]}
+    />
+  );
+};
 
 export { BlockEdgeRail };

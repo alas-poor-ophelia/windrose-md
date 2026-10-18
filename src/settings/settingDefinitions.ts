@@ -9,6 +9,8 @@ import { ContentPackBrowserModal } from '../content-packs/ContentPackBrowserModa
 import { getInstalledPacks } from '../content-packs/installedPacksService';
 import { fogPackImagePath } from '../content-packs/contentPackConstants';
 import { getPackUnitOptions } from '../travel/travelPackOperations';
+import { getWadjetApi, listInterpreters } from '../weather/wadjetBridge';
+import { TRAVEL_FACET, WINDROSE_TRAVEL_INTERPRETER_ID } from '../weather/travelInterpreter';
 import { DUNGEON_STYLE_NAMES, DUNGEON_STYLE_COLOR_DEFAULTS } from '../generation/dungeonStyleColors';
 import { buildColorPaletteSections, buildTravelPackSections, buildTilesetSections, infoItem } from './settingDefinitionLists';
 import { buildObjectTypesSections, objectsPageDisplayValue } from './settingDefinitionObjects';
@@ -59,7 +61,8 @@ type DirectSettingKey =
   | 'distanceDisplayFormat'
   | 'showSubHexBackdrop'
   | 'developerMode'
-  | 'lodLadder';
+  | 'lodLadder'
+  | 'weatherTravelInterpreter';
 
 const DIRECT_KEYS = new Set<string>([
   'hexOrientation', 'coordinateKeyMode', 'coordinateTextColor', 'coordinateTextShadow',
@@ -70,6 +73,7 @@ const DIRECT_KEYS = new Set<string>([
   'distancePerCellGrid', 'distanceUnitGrid', 'distancePerCellHex', 'distanceUnitHex',
   'gridDiagonalRule', 'distanceDisplayFormat', 'showSubHexBackdrop', 'developerMode',
   'lodLadder',
+  'weatherTravelInterpreter',
 ] satisfies DirectSettingKey[]);
 
 // Sliders present percentages; settings store fractions. These virtual keys
@@ -533,6 +537,43 @@ function buildMeasurementGroup(tab: SettingsTabThis): SettingDefinitionItem {
   };
 }
 
+// --- Weather (U+13080 Weather plugin, optional companion) ---
+
+/**
+ * Choices for "Weather travel rules": the built-in rules first, then every
+ * other "travel" interpreter the weather plugin has registered right now.
+ * A saved choice that is no longer registered stays listed, so the
+ * dropdown never silently switches it (it falls back to the built-in rules
+ * at run time).
+ */
+function buildWeatherTravelOptions(tab: SettingsTabThis): Record<string, string> {
+  const options: Record<string, string> = { [WINDROSE_TRAVEL_INTERPRETER_ID]: 'Built-in rules' };
+  for (const interpreter of listInterpreters(tab.app, TRAVEL_FACET)) {
+    if (interpreter.id in options) continue;
+    options[interpreter.id] = interpreter.label;
+  }
+  const current = tab.plugin.settings.weatherTravelInterpreter;
+  if (typeof current === 'string' && current !== '' && !(current in options)) {
+    options[current] = `${current} (not loaded)`;
+  }
+  return options;
+}
+
+function buildWeatherGroup(tab: SettingsTabThis): SettingDefinitionItem {
+  return {
+    type: 'group',
+    heading: 'Weather',
+    visible: () => getWadjetApi(tab.app) != null,
+    items: [
+      {
+        name: 'Weather travel rules',
+        desc: 'How weather slows travel on measured routes. Other plugins can add their own rules.',
+        control: { type: 'dropdown', key: 'weatherTravelInterpreter', options: buildWeatherTravelOptions(tab) }
+      }
+    ]
+  };
+}
+
 // --- Import banner (Phase 3) ---
 
 function buildImportBannerItem(tab: SettingsTabThis): SettingDefinitionItem {
@@ -802,7 +843,8 @@ function buildSettingDefinitions(tab: SettingsTabThis): SettingDefinitionItem[] 
       visible: () => isFeatureEnabled('measurement'),
       items: [
         buildMeasurementGroup(tab),
-        ...buildTravelPackSections(tab)
+        ...buildTravelPackSections(tab),
+        buildWeatherGroup(tab)
       ]
     },
     {

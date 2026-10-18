@@ -7,6 +7,7 @@
 import type { VNode } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { WindroseCompass } from '../shared/WindroseCompass';
+import type { CompassWindProps } from '../shared/WindroseCompass';
 import { Icon } from '../shared/Icon';
 import { tooltipRef } from '../shared/obsidianTooltip';
 const COLLAPSE_DELAY_DESKTOP_MS = 800;   // Desktop: time after mouse leaves
@@ -21,6 +22,8 @@ interface MapControlsProps {
   onCompassClick: () => void;
   onRecenterView: () => void;
   northDirection: number;
+  /** Wind needle on the compass (weather present); null/omitted draws none */
+  wind?: CompassWindProps | null;
   currentZoom: number;
   isExpanded: boolean;
   onToggleExpand: () => void;
@@ -47,6 +50,7 @@ const MapControls = ({
   onCompassClick,
   onRecenterView,
   northDirection,
+  wind,
   currentZoom,
   isExpanded,
   onToggleExpand,
@@ -176,10 +180,12 @@ const MapControls = ({
       if (!controlsRevealed && !alwaysShowControls && hasTouchCapability) {
         return "Tap to show controls";
       }
+      const windLine = wind != null ? `
+${wind.label}` : '';
       if (mapType === 'hex') {
-        return `North indicator at ${northDirection}° (visual only, ${hasTouchCapability ? 'tap' : 'click'} to rotate)`;
+        return `North indicator at ${northDirection}° (visual only, ${hasTouchCapability ? 'tap' : 'click'} to rotate)${windLine}`;
       }
-      return `North is at ${northDirection}° (${hasTouchCapability ? 'tap' : 'click'} to rotate)`;
+      return `North is at ${northDirection}° (${hasTouchCapability ? 'tap' : 'click'} to rotate)${windLine}`;
     };
     
     return (
@@ -216,7 +222,7 @@ const MapControls = ({
             onClick={handleCompassClick}
             ref={tooltipRef(getCompassTitle())}
           >
-            <WindroseCompass rotation={northDirection} className="windrose-compass-svg" />
+            <WindroseCompass rotation={northDirection} className="windrose-compass-svg" wind={wind} />
           </div>
           
           {/* Collapsible controls container - Below compass */}

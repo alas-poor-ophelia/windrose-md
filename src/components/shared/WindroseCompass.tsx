@@ -1,9 +1,63 @@
-// WindroseCompass.jsx - Reusable branded compass rose SVG component
+// WindroseCompass.tsx - Reusable branded compass rose SVG component, with
+// an optional wind needle (weather plugin present and the map has weather).
 
 
 import type { VNode } from 'preact';
 import { useRef } from 'preact/hooks';
-const WindroseCompass = ({ rotation = 0, size, className = '' }: { rotation?: number; size?: number; className?: string }): VNode => {
+
+/** Wind shown on the compass */
+interface CompassWindProps {
+  /** Bearing the wind blows TOWARD, degrees clockwise from map north (the rose's rotation carries it to the screen) */
+  towardDeg: number;
+  /** 0..12 */
+  beaufort: number;
+  /** Tooltip wording, e.g. "Wind: Fresh breeze from WSW" (shown by the host's tooltip) */
+  label: string;
+}
+
+/** Radius (viewBox units) of the Beaufort badge's centre from the hub, on the upwind side */
+const WIND_BADGE_RADIUS = 33;
+
+/**
+ * Slim needle through the hub pointing downwind, with a small fletched
+ * tail, and the Beaufort force in a badge at the tail (upwind) end. The
+ * badge counter-rotates against the rose so its number stays upright.
+ */
+function renderWindNeedle(wind: CompassWindProps, rotation: number): VNode {
+  const toward = Number.isFinite(wind.towardDeg) ? wind.towardDeg : 0;
+  const rad = (toward * Math.PI) / 180;
+  const bx = 50 - WIND_BADGE_RADIUS * Math.sin(rad);
+  const by = 50 + WIND_BADGE_RADIUS * Math.cos(rad);
+  const calm = wind.beaufort <= 0;
+  return (
+    <g className={`windrose-compass-wind${calm ? ' is-calm' : ''}`} aria-hidden="true">
+      {!calm && (
+        <g transform={`rotate(${toward} 50 50)`}>
+          <line className="windrose-compass-wind-casing" x1="50" y1="76" x2="50" y2="17" />
+          <line className="windrose-compass-wind-shaft" x1="50" y1="76" x2="50" y2="17" />
+          <path className="windrose-compass-wind-fletch" d="M 46 79 L 50 74 L 54 79 M 46 75 L 50 70 L 54 75" />
+          <path className="windrose-compass-wind-head" d="M 50 7 L 55 19 L 50 16.5 L 45 19 Z" />
+        </g>
+      )}
+      <g transform={`rotate(${-rotation} ${bx} ${by})`}>
+        <circle className="windrose-compass-wind-badge" cx={bx} cy={by} r="8.5" />
+        <text className="windrose-compass-wind-force" x={bx} y={by} textAnchor="middle" dominantBaseline="central">
+          {wind.beaufort}
+        </text>
+      </g>
+    </g>
+  );
+}
+
+interface WindroseCompassProps {
+  rotation?: number;
+  size?: number;
+  className?: string;
+  /** Wind needle and Beaufort badge; omitted draws the plain rose */
+  wind?: CompassWindProps | null;
+}
+
+const WindroseCompass = ({ rotation = 0, size, className = '', wind }: WindroseCompassProps): VNode => {
   // Unique filter IDs to avoid document-global collisions
   const instanceIdRef = useRef<string | undefined>();
   instanceIdRef.current ??= `windrose-${Math.random().toString(36).slice(2, 11)}`;
@@ -291,9 +345,12 @@ const WindroseCompass = ({ rotation = 0, size, className = '' }: { rotation?: nu
           opacity="0.4"
           filter={`url(#${filterId('glow')})`}
         />
+
+        {wind != null && renderWindNeedle(wind, rotation)}
       </g>
     </svg>
   );
 };
 
 export { WindroseCompass };
+export type { CompassWindProps };

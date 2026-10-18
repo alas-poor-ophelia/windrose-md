@@ -20,8 +20,8 @@ function useDockLayout(savedCollapsed: boolean | undefined, onCollapsedChange: (
     setCollapsedState(value);
     onCollapsedChange?.(value);
   }, [onCollapsedChange]);
-  // View starts collapsed, matching its former defaultCollapsed.
-  const [sectionCollapsed, setSectionCollapsed] = useState<Record<string, boolean>>({ layers: false, colorPicker: false, view: true });
+  // View (and the Almanac, when offered) start collapsed; View matches its former defaultCollapsed.
+  const [sectionCollapsed, setSectionCollapsed] = useState<Record<string, boolean>>({ layers: false, colorPicker: false, view: true, almanac: true });
   const toggleSection = useCallback((id: string) => {
     setSectionCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
   }, []);

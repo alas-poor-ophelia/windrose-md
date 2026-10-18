@@ -33,6 +33,10 @@ WindroseSettingsTab.ts        # PluginSettingTab subclass: getSettingDefinitions
 
 `lodLadder` (the "Detail levels" toggle at the end of the Features group in `settingDefinitions.ts`; default ON via `FALLBACK_SETTINGS`, absent reads as on; stored top-level, not under `features`) is the CAPABILITY only: whether this install may use the lattice ladder. The per-map opt-in is `mapData.lod`, set through `components/settings/hexmap/LadderSection.tsx`. A map that carries `lod` is a ladder map on every install, flag or not; read the combined answer through `core/lodFlags.ts`, never the setting directly.
 
+## Weather group
+
+`buildWeatherGroup` (Measurement & travel page) holds "Weather travel rules" (`weatherTravelInterpreter`, a DIRECT key). Its dropdown options are built when definitions are built, from the weather plugin's `listInterpreters("travel")` (built-in rules first; a saved id no longer registered stays listed). The group is visible only while the weather plugin is usable. Changing it needs no map-side wiring: `saveSettings()` fires `windrose-settings-changed`, and each open map's `WeatherProvider` re-reads the id and bumps its store version when it changed, so routes re-cost.
+
 ## Adding a setting
 
 1. Add the field to `PluginSettings` in `types/settings/settings.types.ts` (and a default in `core/settingsAccessor.ts`).

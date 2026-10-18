@@ -147,6 +147,9 @@ export interface SettingsModalState {
   // stored lod and no edit (enabling seeds it from LADDER_DEFAULTS).
   ladderEnabled: boolean;
   lod: LadderConfig | null;
+  // Weather (U+13080 Weather plugin): map-level zone ('' = none / inherit)
+  // and the per-map "Animate weather" switch
+  weather: SettingsWeather;
 
   // Background image
   backgroundImagePath: string | null;
@@ -240,6 +243,34 @@ export interface BuildInitialStateProps {
   currentObjectSetId?: string | null;
   /** Stored `mapData.lod` (top-level MapData field, not part of settings). */
   currentLod?: LadderConfig | null;
+  currentWeather?: Partial<SettingsWeather>;
+}
+
+/** Map-level weather fields edited in the Weather tab */
+export interface SettingsWeather {
+  /** '' = no map-level zone (sub-hex levels then inherit the parent hex) */
+  weatherZoneId: string;
+  /**
+   * The level's own "Animate weather" value; null = none stored. A root map
+   * reads null as on; a sub-hex level reads it as "same as the parent hex".
+   */
+  weatherAnimate: boolean | null;
+}
+
+/**
+ * The map's weather fields to save from the Weather tab: absent keys are
+ * removed from the map. A root map stores animation only when it is off (on
+ * is the default); a sub-hex level stores on and off explicitly so it can
+ * override its parent either way, and stores nothing to inherit.
+ */
+export function buildWeatherSave(weather: SettingsWeather, isInSubHex: boolean): { weatherZoneId?: string; weatherAnimate?: boolean } {
+  const animate = isInSubHex
+    ? weather.weatherAnimate
+    : (weather.weatherAnimate === false ? false : null);
+  return {
+    ...(weather.weatherZoneId !== '' ? { weatherZoneId: weather.weatherZoneId } : {}),
+    ...(animate != null ? { weatherAnimate: animate } : {}),
+  };
 }
 
 // ===========================================
@@ -285,7 +316,8 @@ const Actions = {
   SET_BOUNDS_SHAPE: 'SET_BOUNDS_SHAPE',
   SET_PARENT_BACKDROP: 'SET_PARENT_BACKDROP',
   SET_LADDER_CONFIG: 'SET_LADDER_CONFIG',
-  SET_LADDER_ENABLED: 'SET_LADDER_ENABLED'
+  SET_LADDER_ENABLED: 'SET_LADDER_ENABLED',
+  SET_WEATHER: 'SET_WEATHER'
 } as const;
 
 /** Action type union */
@@ -482,6 +514,11 @@ interface SetLadderEnabledAction {
   payload: boolean;
 }
 
+interface SetWeatherAction {
+  type: typeof Actions.SET_WEATHER;
+  payload: Partial<SettingsWeather>;
+}
+
 /** Discriminated union of all actions */
 type SettingsAction =
   | InitializeAction
@@ -521,7 +558,8 @@ type SettingsAction =
   | SetBoundsShapeAction
   | SetParentBackdropAction
   | SetLadderConfigAction
-  | SetLadderEnabledAction;
+  | SetLadderEnabledAction
+  | SetWeatherAction;
 
 // ===========================================
 // Constants
@@ -690,6 +728,10 @@ function buildInitialState(props: BuildInitialStateProps, globalSettings: Plugin
     coordinateDisplayMode: (currentSettings?.coordinateDisplayMode ?? 'rectangular') as CoordinateDisplayMode,
 
     showParentBackdrop: currentSettings?.showParentBackdrop,
+    weather: {
+      weatherZoneId: props.currentWeather?.weatherZoneId ?? '',
+      weatherAnimate: props.currentWeather?.weatherAnimate ?? null
+    },
 
     ladderEnabled: props.currentLod != null,
     lod: props.currentLod ?? null,
@@ -912,6 +954,9 @@ function settingsReducer(state: SettingsModalState, action: SettingsAction): Set
         ladderEnabled: true,
         lod: state.lod ?? { m: LADDER_DEFAULTS.m, minCellPx: LADDER_DEFAULTS.minCellPx, maxLevel: LADDER_DEFAULTS.maxLevel }
       };
+
+    case Actions.SET_WEATHER:
+      return { ...state, weather: { ...state.weather, ...action.payload } };
 
     case Actions.SET_IMAGE_SEARCH_RESULTS:
       return { ...state, imageSearchResults: action.payload };

@@ -20,6 +20,8 @@ vi.mock('../../../../src/core/settingsAccessor', async (importOriginal) => {
 });
 vi.mock('../../../../src/components/shared/obsidianTooltip', () => ({ tooltipRef: () => () => {} }));
 vi.mock('../../../../src/components/shared/Icon', () => ({ Icon: () => null }));
+// The weather toggle reads the per-map weather store; without a
+// WeatherProvider useWeatherStore() is the inert, unavailable store.
 
 import { StageToolbars } from '../../../../src/components/hosts/StageToolbars';
 import { DockViewPanel } from '../../../../src/components/panels/DockViewPanel';

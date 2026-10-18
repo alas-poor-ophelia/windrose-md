@@ -11,6 +11,7 @@ import type { LayerVisibility } from '#types/contexts/context.types';
 import type { VNode } from 'preact';
 import { Icon } from '../shared/Icon';
 import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
+import { useWeatherStore } from '../../context/WeatherContext';
 import { tooltipRef } from '../shared/obsidianTooltip';
 
 /** Fog of War tool identifiers */
@@ -24,11 +25,29 @@ export interface FogOfWarState {
 }
 
 /** Layer definition for visibility toggles */
-interface LayerDef {
+interface LayerDef extends LayerOffer {
   id: keyof LayerVisibility;
   icon: string;
   tooltip: string;
+}
+
+/** What a layer toggle needs to say about where it applies */
+interface LayerOffer {
   hexOnly?: boolean;
+  /** Offered only while the map has weather (store.hasWeather) */
+  requiresWeather?: boolean;
+}
+
+/**
+ * The layer toggles that apply: hex-only toggles on hex maps, the weather
+ * toggle while the map has weather. Shared by this toolbar and the dock's
+ * View panel.
+ */
+function offeredLayers<T extends LayerOffer>(layers: readonly T[], mapType: MapType, hasWeather: boolean): T[] {
+  return layers.filter(layer =>
+    (layer.hexOnly !== true || mapType === 'hex') &&
+    (layer.requiresWeather !== true || hasWeather)
+  );
 }
 
 /** Props for VisibilityToolbar component */
@@ -59,6 +78,7 @@ const VisibilityToolbar = ({
   onToggleViewLock
 }: VisibilityToolbarProps): VNode => {
   const featureFlags = useFeatureFlags();
+  const { hasWeather } = useWeatherStore();
   const layers: LayerDef[] = [
     {
       id: 'grid',
@@ -97,10 +117,16 @@ const VisibilityToolbar = ({
       icon: 'lucide-spline',
       tooltip: 'Toggle outline visibility',
       hexOnly: true
+    },
+    {
+      id: 'weather',
+      icon: 'lucide-cloud-sun',
+      tooltip: 'Toggle weather visibility',
+      requiresWeather: true
     }
   ];
 
-  const visibleLayers = layers.filter(layer => layer.hexOnly !== true || mapType === 'hex');
+  const visibleLayers = offeredLayers(layers, mapType, hasWeather);
 
   return (
     <div className={`windrose-visibility-toolbar ${isOpen ? 'windrose-visibility-toolbar-open' : ''}`}>
@@ -180,4 +206,4 @@ const VisibilityToolbar = ({
   );
 };
 
-export { VisibilityToolbar };
+export { VisibilityToolbar, offeredLayers };

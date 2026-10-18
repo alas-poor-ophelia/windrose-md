@@ -22,13 +22,16 @@ import { isBundleWriteInProgress, mountBundleFolder, remountOnRename } from './a
 import { clearTileBytesNegativeCache } from './assets/tileBytes';
 import { openBundleTileFolderDev } from './assets/bundles/bundleDevCommand';
 import { AddTilesModal } from './settings/modals/AddTilesModal';
-import { buildMapEntry, createMapEntry, getSaveQueue, listMapsResult } from './persistence/fileOperations';
-import { noteStoreFileModified, noteStoreFilePathGone } from './persistence/storeCache';
+import { buildMapEntry, createMapEntry, getSaveQueue, listMapsResult, readRawMapEntry } from './persistence/fileOperations';
+import { noteStoreFileCreated, noteStoreFileModified, noteStoreFilePathGone } from './persistence/storeCache';
 import { disposeImageCache } from './assets/imageOperations';
 import { clearAll as clearThumbnailCache } from './assets/thumbnailCache';
 import { flushAll, installLifecycleJournaling, journalAll } from './persistence/saveCoordinator';
 import { pruneJournal } from './persistence/saveJournal';
 import { notifyPartyNoteRenamed } from './persistence/partyNoteOperations';
+import { connectInterpreter, connectZoneResolver } from './weather/wadjetBridge';
+import { createWindroseZoneAnswers, mapLoaderFromRawEntries } from './weather/windroseZoneResolver';
+import { windroseTravelInterpreter } from './weather/travelInterpreter';
 import { runImportDetectionPass } from './assets/importDetectionPass';
 import {
   ensureTileMetadataLoaded,
@@ -322,6 +325,9 @@ export default class WindrosePlugin extends Plugin {
     // Store cache (MEM-12): any change to the data file not made by this
     // session's own write drops the cached store, so the next save re-reads.
     this.registerEvent(this.app.vault.on('modify', (file) => noteStoreFileModified(file)));
+    // Creation (first use, a restore) also moves the data-file stamp, so the
+    // weather zone resolver's closed-map cache never outlives a recreated file.
+    this.registerEvent(this.app.vault.on('create', (file) => noteStoreFileCreated(file)));
     this.registerEvent(this.app.vault.on('delete', (file) => noteStoreFilePathGone(file.path)));
     this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
       noteStoreFilePathGone(oldPath);
@@ -381,6 +387,17 @@ export default class WindrosePlugin extends Plugin {
         if (result.status === 'ok') pruneJournal(this.app, { liveMapIds: result.maps.map(m => m.id) });
       });
     });
+
+    // Optional companion (U+13080 Weather): answer its zone resolver for
+    // Windrose hexes and regions (open maps synchronously, closed maps by a
+    // read-only load), and register Windrose's travel interpreter. Both are
+    // replayed on every wadjet:ready (re-enable builds a new API) and
+    // removed on unload. No-ops when that plugin is absent.
+    this.register(connectZoneResolver(
+      this.app,
+      createWindroseZoneAnswers(mapLoaderFromRawEntries(mapId => readRawMapEntry(this.app, mapId)))
+    ));
+    this.register(connectInterpreter(this.app, windroseTravelInterpreter));
   }
 
   /**

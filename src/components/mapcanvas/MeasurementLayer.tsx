@@ -7,6 +7,8 @@
  * Escape = clear), finish-by-double-click (double-tap on touch), route
  * persistence, the save-as-route flow, and — when enabled travel packs
  * exist — live travel times and on-map per-segment terrain assignment.
+ * Travel times, weather, the forecast itinerary, departure window and day
+ * ribbon come from useRouteWeather.
  */
 
 import type { ToolId } from '#types/tools/tool.types';
@@ -14,7 +16,7 @@ import type { VNode } from 'preact';
 import type { MapTravelSettings, MeasurementRoute, SavedRoute } from '#types/core/map.types';
 import type { EffectiveDistanceSettings } from '#types/hooks/distanceMeasurement.types';
 import type { PluginSettings } from '#types/settings/settings.types';
-import type { TravelTimeLine, TravelModeOption, TravelAllowanceOption } from '../overlays/MeasurementControls';
+import type { TravelAllowanceOption, TravelModeOption } from '../overlays/MeasurementControls';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useDistanceMeasurement } from '../../hooks/interactions/useDistanceMeasurement';
@@ -24,13 +26,13 @@ import { createSavedRoute } from '../../drawing/routeOperations';
 import { getEnabledTravelPacks, getEffectiveTravelSettings } from '../../travel/travelPackOperations';
 import {
   collectEnabledTerrains,
-  computeRouteTravelTime,
   findTerrainById,
-  formatTravelTime,
   resolveSelectedAllowance,
   resolveSelectedModes,
 } from '../../travel/travelTimeOperations';
+import { useRouteWeather } from '../../hooks/interactions/useRouteWeather';
 import { MeasurementOverlay } from '../overlays/MeasurementOverlay';
+import { MeasurementDayRibbon } from '../overlays/MeasurementDayRibbon';
 import { MeasurementControls } from '../overlays/MeasurementControls';
 import { TerrainPickerPopup } from '../overlays/TerrainPickerPopup';
 import { SaveRouteModal } from '../modals/SaveRouteModal';
@@ -219,28 +221,33 @@ const MeasurementLayer = ({
     [enabledPacks, travelSettings]
   );
 
-  const travelLines = useMemo((): TravelTimeLine[] => {
-    if (selectedModes.length === 0 || waypoints.length === 0) return [];
-
-    // Distances in map units, preview segment included live (TM-18); the
-    // preview's terrain-to-be is its predecessor's (TM-21), so its
-    // multiplier previews honestly too
-    const distances = segmentDistances.map(d => d * distanceSettings.distancePerCell);
-    const terrainIds: (string | null)[] = [...segmentTerrains];
-    if (previewDistance > 0) {
-      distances.push(previewDistance * distanceSettings.distancePerCell);
-      terrainIds.push(segmentTerrains[segmentTerrains.length - 1] ?? firstSegmentTerrainId);
-    }
-    const multipliers = terrainIds.map(id => findTerrainById(enabledPacks, id)?.multiplier ?? 1);
-
-    return selectedModes.map(({ mode, pack }) => {
-      const result = computeRouteTravelTime(distances, multipliers, distanceSettings.distanceUnit, mode, pack);
-      if (!result.ok) {
-        return { modeId: mode.id, name: mode.name, text: result.reason, isError: true };
-      }
-      return { modeId: mode.id, name: mode.name, text: formatTravelTime(result, selectedAllowance), isError: false };
-    });
-  }, [selectedModes, selectedAllowance, waypoints.length, segmentDistances, previewDistance, segmentTerrains, distanceSettings, enabledPacks, firstSegmentTerrainId]);
+  // Travel times with the map's weather folded in: the forecast walk when a
+  // travel day length is set (itinerary, departure window, day ribbon), the
+  // single-day fold otherwise (see useRouteWeather)
+  const {
+    travelLines,
+    weatherNote,
+    itinerary,
+    itineraryModeName,
+    departures,
+    departureDay,
+    setDepartureDay,
+    dayStretches,
+  } = useRouteWeather({
+    active: currentTool === 'measure',
+    geometry,
+    waypoints,
+    segmentDistances,
+    segmentTerrains,
+    previewTarget,
+    previewDistance,
+    distanceUnit: distanceSettings.distanceUnit,
+    distancePerCell: distanceSettings.distancePerCell,
+    enabledPacks,
+    selectedModes,
+    selectedAllowance,
+    firstSegmentTerrainId,
+  });
 
   const modeOptions = useMemo((): TravelModeOption[] => {
     const selected = new Set(travelSettings?.modeIds ?? []);
@@ -313,6 +320,9 @@ const MeasurementLayer = ({
 
   return (
     <>
+      {dayStretches.length > 1 && (
+        <MeasurementDayRibbon stretches={dayStretches} geometry={geometry} mapData={mapData} canvasRef={canvasRef} />
+      )}
       <MeasurementOverlay
         waypoints={waypoints}
         previewTarget={previewTarget}
@@ -329,6 +339,12 @@ const MeasurementLayer = ({
         waypointCount={waypoints.length}
         formattedTotal={formattedTotal}
         travelLines={travelLines}
+        weatherNote={weatherNote}
+        itinerary={itinerary}
+        itineraryModeName={itineraryModeName}
+        departures={departures}
+        departureDay={departureDay}
+        onDepartureChange={setDepartureDay}
         modeOptions={modeOptions}
         allowanceOptions={allowanceOptions}
         selectedAllowanceId={travelSettings?.allowanceId ?? null}

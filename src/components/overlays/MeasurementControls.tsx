@@ -11,15 +11,26 @@
  * block: live travel times for the map's selected modes (explicit guidance
  * lines when a mode's units cannot be reconciled — never silent wrong
  * numbers), plus a collapsible selector for per-map modes and allowance.
+ *
+ * With weather and a day length, the times come from the forecast walk and
+ * the card adds the itinerary (one row per travel day: glyph, day, distance
+ * made, weather, hours the weather adds) and a "Leave on" departure window
+ * (seven departure days from the view day with their total time, the
+ * fastest highlighted; clicking one sets the departure day). Weather time
+ * reads as added time everywhere ("+2.7 h"), in one colour.
+ *
+ * The card is opaque and theme-aware (scss/_measurement.scss): it floats
+ * over a busy map and must read in the light theme as well as the dark.
  */
 
 import type { VNode } from 'preact';
-import { useState } from 'preact/hooks';
+import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 
 import { CornerBrackets } from '../shared/CornerBrackets';
 import { Icon } from '../shared/Icon';
 import { Z_INDEX } from '../../core/dmtConstants';
 import { tooltipRef } from '../shared/obsidianTooltip';
+import { mountGlyphSvg } from '../../weather/svgGlyph';
 
 /** One computed travel-time line (or an explicit unit-guidance line) */
 interface TravelTimeLine {
@@ -27,6 +38,33 @@ interface TravelTimeLine {
   name: string;
   text: string;
   isError: boolean;
+  /** Extra time the weather costs over fair weather, e.g. "+5 h for weather" */
+  weatherDelta?: string;
+}
+
+/** One travel day of the forecast walk */
+interface ItineraryDay {
+  day: number;
+  /** The weather plugin's day label */
+  label: string;
+  /** The glyph of the day's slowest weather area (an SVG string from the weather plugin) */
+  glyphSvg: string | null;
+  /** Distance made, with unit */
+  distance: string;
+  /** Weather met that day, e.g. "Heavy rain, Gale"; null = fair */
+  weather: string | null;
+  /** Hours the weather adds that day, e.g. "2.7 h" (shown as "+2.7 h"); null when none */
+  hoursAdded: string | null;
+}
+
+/** One day of the departure window */
+interface DepartureChip {
+  day: number;
+  label: string;
+  /** Total travel time leaving that day */
+  time: string;
+  /** Fastest of the window */
+  best: boolean;
 }
 
 /** A selectable travel mode from an enabled pack */
@@ -50,6 +88,17 @@ interface MeasurementControlsProps {
   formattedTotal: string | null;
   /** Computed travel-time lines for the map's selected modes */
   travelLines?: TravelTimeLine[];
+  /** Weather already folded into the travel lines, e.g. "Heavy snow, Gale (+28%)"; null = none */
+  weatherNote?: string | null;
+  /** Forecast itinerary, one entry per travel day (empty = none) */
+  itinerary?: ItineraryDay[];
+  /** The mode the itinerary and departure window are costed for */
+  itineraryModeName?: string;
+  /** Departure window (empty = none) */
+  departures?: DepartureChip[];
+  /** The departure day in effect */
+  departureDay?: number | null;
+  onDepartureChange?: (day: number) => void;
   /** All modes offered by enabled packs (empty = no travel block) */
   modeOptions?: TravelModeOption[];
   /** All allowances offered by enabled packs */
@@ -69,10 +118,25 @@ interface MeasurementControlsProps {
   onRecategorize?: () => void;
 }
 
+/** The weather plugin's glyph, parsed and checked before it touches the DOM */
+const WeatherGlyph = ({ svg }: { svg: string | null }): VNode => {
+  const hostRef = useRef<HTMLSpanElement | null>(null);
+  useLayoutEffect(() => {
+    if (hostRef.current != null) mountGlyphSvg(hostRef.current, svg);
+  }, [svg]);
+  return <span ref={hostRef} className="windrose-measure-itinerary-glyph" aria-hidden="true" />;
+};
+
 const MeasurementControls = ({
   waypointCount,
   formattedTotal,
   travelLines = [],
+  weatherNote = null,
+  itinerary = [],
+  itineraryModeName = '',
+  departures = [],
+  departureDay = null,
+  onDepartureChange,
   modeOptions = [],
   allowanceOptions = [],
   selectedAllowanceId = null,
@@ -158,11 +222,71 @@ const MeasurementControls = ({
                 <span className="windrose-measure-controls-travel-time">
                   {line.isError ? 'units mismatch' : line.text}
                 </span>
+                {!line.isError && line.weatherDelta != null && (
+                  <span className="windrose-measure-controls-travel-delta">{line.weatherDelta}</span>
+                )}
               </div>
             ))}
             {travelLines.some(l => l.isError) && (
               <div className="windrose-measure-controls-travel-hint">
                 {travelLines.find(l => l.isError)?.text}
+              </div>
+            )}
+            {weatherNote != null && weatherNote !== '' && itinerary.length === 0 && travelLines.some(l => !l.isError) && (
+              <div
+                className="windrose-measure-controls-travel-weather"
+                ref={tooltipRef('Weather along this route, included in the times above')}
+              >
+                <Icon icon="lucide-cloud-sun" size={11} />
+                <span>{weatherNote}</span>
+              </div>
+            )}
+
+            {itinerary.length > 0 && travelLines.some(l => !l.isError) && (
+              <div className="windrose-measure-itinerary" aria-label="Itinerary">
+                {itineraryModeName !== '' && travelLines.filter(l => !l.isError).length > 1 && (
+                  <div className="windrose-measure-itinerary-caption">{itineraryModeName}</div>
+                )}
+                {itinerary.map((entry, i) => (
+                  <div key={entry.day} className="windrose-measure-itinerary-day">
+                    <span className="windrose-measure-itinerary-index">{`D${i + 1}`}</span>
+                    <WeatherGlyph svg={entry.glyphSvg} />
+                    <span className="windrose-measure-itinerary-label">{entry.label}</span>
+                    <span className="windrose-measure-itinerary-distance">{entry.distance}</span>
+                    {entry.weather != null && (
+                      <span className="windrose-measure-itinerary-weather">{entry.weather}</span>
+                    )}
+                    {entry.hoursAdded != null && (
+                      <span
+                        className="windrose-measure-itinerary-added"
+                        ref={tooltipRef('Time the weather adds this day')}
+                      >
+                        {`+${entry.hoursAdded}`}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {departures.length > 0 && onDepartureChange != null && (
+              <div className="windrose-measure-departures">
+                <span className="windrose-measure-departures-title">Leave on</span>
+                <div className="windrose-measure-departures-chips">
+                  {departures.map(chip => (
+                    <button
+                      key={chip.day}
+                      type="button"
+                      className={`windrose-measure-departure${chip.best ? ' is-best' : ''}${chip.day === departureDay ? ' is-selected' : ''}`}
+                      aria-pressed={chip.day === departureDay}
+                      ref={tooltipRef(chip.best ? `${chip.label}: ${chip.time}, the fastest start` : `${chip.label}: ${chip.time}`)}
+                      onClick={() => onDepartureChange(chip.day)}
+                    >
+                      <span className="windrose-measure-departure-day">{chip.label}</span>
+                      <span className="windrose-measure-departure-time">{chip.time}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -227,4 +351,4 @@ const MeasurementControls = ({
 };
 
 export { MeasurementControls };
-export type { TravelTimeLine, TravelModeOption, TravelAllowanceOption };
+export type { TravelTimeLine, TravelModeOption, TravelAllowanceOption, ItineraryDay, DepartureChip };

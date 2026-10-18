@@ -21,6 +21,7 @@ import { useRegionTools } from '../../hooks/interactions/useRegionTools';
 import type { MenuItem } from 'obsidian';
 import { Menu } from 'obsidian';
 import { openNativeNoteLinkModal } from '../modals/NoteLinkModal';
+import { addWeatherZoneMenuItems } from '../../weather/weatherRegionMenu';
 import { Icon } from '../shared/Icon';
 import type { InstanceScopedDetail, RegionIdDetail } from '../../core/windroseEvents';
 import { isForeignInstanceEvent } from '../../core/windroseEvents';
@@ -419,6 +420,8 @@ const RegionLayer = ({
       });
     }
 
+    addWeatherZoneMenuItems(menu, app, region, mapData?.regions ?? [], onRegionsChange);
+
     menu.addSeparator();
 
     menu.addItem((item: MenuItem) => {
@@ -430,7 +433,7 @@ const RegionLayer = ({
 
     menu.showAtPosition({ x: contextMenu.screenX, y: contextMenu.screenY });
     dismissContextMenu();
-  }, [contextMenu, mapData?.regions, app, deleteRegion, dismissContextMenu, startEditingRegion, updateRegion]);
+  }, [contextMenu, mapData?.regions, app, deleteRegion, dismissContextMenu, startEditingRegion, updateRegion, onRegionsChange]);
 
   // Touch long-press needs no timer here: the event coordinator's long-press
   // synthesizes a contextmenu that reaches the same handlers as a right-click

@@ -38,7 +38,7 @@ function save(snapshot: MapData, live: MapData, patch: LadderPatch): MapData {
     mapData: snapshot,
     updateMapData: (d) => { saved = typeof d === 'function' ? d(live) : d; }
   });
-  handleSettingsSave({ useGlobalSettings: true, overrides: {} }, {} as UIPreferences, null, null, null, false, patch);
+  handleSettingsSave({ useGlobalSettings: true, overrides: {} }, {} as UIPreferences, null, null, null, false, null, patch);
   if (!saved) throw new Error('updateMapData not called');
   return saved;
 }

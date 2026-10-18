@@ -3,6 +3,7 @@ import type { MapType } from '#types/core/map.types';
 import type { FogToolId } from '#types/hooks/fog.types';
 import type { LayerVisibility } from '#types/contexts/context.types';
 import type { FogOfWarState } from '../toolbars/VisibilityToolbar';
+import { offeredLayers } from '../toolbars/VisibilityToolbar';
 
 import { useCallback } from 'preact/hooks';
 import { Modal } from 'obsidian';
@@ -10,12 +11,15 @@ import { useApp } from '../../context/AppContext';
 import { Icon } from '../shared/Icon';
 import { tooltipRef } from '../shared/obsidianTooltip';
 import { useFeatureFlags } from '../../hooks/state/useFeatureFlags';
+import { useWeatherStore } from '../../context/WeatherContext';
 
 interface LayerDef {
   id: keyof LayerVisibility;
   icon: string;
   label: string;
   hexOnly?: boolean;
+  /** Offered only while the map has weather (store.hasWeather) */
+  requiresWeather?: boolean;
 }
 
 const LAYERS: LayerDef[] = [
@@ -25,6 +29,7 @@ const LAYERS: LayerDef[] = [
   { id: 'hexCoordinates', icon: 'lucide-key-round', label: 'Coords', hexOnly: true },
   { id: 'regions', icon: 'lucide-hexagon', label: 'Regions', hexOnly: true },
   { id: 'outlines', icon: 'lucide-spline', label: 'Outlines', hexOnly: true },
+  { id: 'weather', icon: 'lucide-cloud-sun', label: 'Weather', requiresWeather: true },
 ];
 
 interface FogToolDef {
@@ -68,7 +73,8 @@ const DockViewPanel = ({
 }: DockViewPanelProps): VNode => {
   const app = useApp();
   const featureFlags = useFeatureFlags();
-  const visibleLayers = LAYERS.filter(l => l.hexOnly !== true || mapType === 'hex');
+  const { hasWeather } = useWeatherStore();
+  const visibleLayers = offeredLayers(LAYERS, mapType, hasWeather);
 
   const handleClearAll = useCallback(() => {
     const modal = new Modal(app);

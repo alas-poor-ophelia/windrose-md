@@ -25,6 +25,8 @@ import { HexGridTab } from './hexmap/HexGridTab';
 import { GridBackgroundTab } from './gridmap/GridBackgroundTab';
 import { MeasurementTab } from './MeasurementTab';
 import { PreferencesTab } from './PreferencesTab';
+import { WeatherTab } from './WeatherTab';
+import { useWeatherStore } from '../../context/WeatherContext';
 import { ResizeConfirmDialog } from './ResizeConfirmDialog';
 
 
@@ -78,6 +80,7 @@ function TabContent({ tabs, activeTab, setActiveTab, mapType }: {
         {activeTab === 'hexgrid' && mapType === 'hex' && <HexGridTab />}
         {activeTab === 'gridbackground' && mapType === 'grid' && <GridBackgroundTab />}
         {activeTab === 'measurement' && <MeasurementTab />}
+        {activeTab === 'weather' && <WeatherTab />}
         {activeTab === 'preferences' && <PreferencesTab />}
       </div>
     </>
@@ -167,8 +170,13 @@ function MapSettingsModalContent(): VNode | null {
  * Main MapSettingsModal component
  */
 function MapSettingsModal(props: MapSettingsModalProps): VNode {
+  // The Weather tab is offered while the weather plugin is usable
+  const weather = useWeatherStore();
+  const weatherZones = props.weatherZones !== undefined
+    ? props.weatherZones
+    : weather.available ? weather.zones : null;
   return (
-    <MapSettingsProvider {...props} onClose={props.onCancel}>
+    <MapSettingsProvider {...props} weatherZones={weatherZones} onClose={props.onCancel}>
       <MapSettingsModalContent />
     </MapSettingsProvider>
   );

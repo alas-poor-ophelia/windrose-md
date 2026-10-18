@@ -23,6 +23,8 @@ import { TFile } from 'obsidian';
 
 import type { MapType } from '#types/core/map.types';
 
+import { getDataFilePath } from '../core/settingsAccessor';
+
 interface CachedEntry {
   /** Compact JSON text of the entry exactly as written to disk. */
   json: string;
@@ -53,6 +55,19 @@ interface CachedStore extends StoreSnapshot {
 const RACY_WINDOW_MS = 2500;
 
 let cache: CachedStore | null = null;
+
+/**
+ * Bumps on every vault create / modify / delete / rename event of the data file,
+ * whoever wrote it. Read-only consumers that keep something derived from
+ * the stored maps (the weather zone resolver's closed-map cache) key it on
+ * getDataFileStamp(); it never gates a write.
+ */
+let dataFileGeneration = 0;
+
+/** The data file's path plus its modification generation; changes whenever a cached read may be stale. */
+function getDataFileStamp(): string {
+  return `${getDataFilePath()}#${dataFileGeneration}`;
+}
 
 /** Drop the cache. Always safe; the next operation re-reads the file. */
 function invalidateStoreCache(): void {
@@ -185,6 +200,7 @@ async function commitStoreCache(app: App, path: string, snapshot: StoreSnapshot,
  * matches) keep it. Safe outside the mutex: it only ever drops.
  */
 function noteStoreFileModified(file: TAbstractFile): void {
+  if (file.path === getDataFilePath()) dataFileGeneration++;
   const current = cache;
   if (current == null || file.path !== current.path) return;
   if (!(file instanceof TFile) || file.stat.mtime !== current.mtime || file.stat.size !== current.size) {
@@ -192,8 +208,18 @@ function noteStoreFileModified(file: TAbstractFile): void {
   }
 }
 
+/**
+ * Vault 'create' handler: the data file appearing (first use, a restore, a
+ * sync bringing it in) moves the stamp like any other change. A cache is
+ * kept only when the stat is our own just-committed write.
+ */
+function noteStoreFileCreated(file: TAbstractFile): void {
+  noteStoreFileModified(file);
+}
+
 /** Vault 'delete' / 'rename' handler: any store path change drops the cache. */
 function noteStoreFilePathGone(path: string): void {
+  if (path === getDataFilePath()) dataFileGeneration++;
   if (cache != null && cache.path === path) cache = null;
 }
 
@@ -205,5 +231,6 @@ function hasStoreCache(): boolean {
 export type { CachedEntry, StoreSnapshot };
 export {
   invalidateStoreCache, snapshotFromParsed, serializeStore, cachedEntry, utf8ByteLength,
-  getValidStoreCache, commitStoreCache, noteStoreFileModified, noteStoreFilePathGone, hasStoreCache,
+  getValidStoreCache, commitStoreCache, noteStoreFileModified, noteStoreFileCreated, noteStoreFilePathGone, hasStoreCache,
+  getDataFileStamp,
 };

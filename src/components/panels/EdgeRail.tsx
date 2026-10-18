@@ -23,6 +23,8 @@ interface EdgeRailPanel {
   icon: string;
   title: string;
   content: ComponentChildren;
+  /** Folded-open width for this panel (px); default DRAWER_WIDTH */
+  width?: number;
 }
 
 /** Rail icon that fires an action directly instead of folding open a drawer panel. */
@@ -55,6 +57,7 @@ const EdgeRail = ({ panels, actions, openId, onOpenChange }: EdgeRailProps): VNo
   if (openPanel != null) lastPanelRef.current = openPanel;
   const shown = openPanel ?? lastPanelRef.current;
   const isOpen = openPanel != null;
+  const drawerWidth = shown?.width ?? DRAWER_WIDTH;
 
   return (
     <div className="windrose-edge-rail-root">
@@ -92,7 +95,7 @@ const EdgeRail = ({ panels, actions, openId, onOpenChange }: EdgeRailProps): VNo
           // Drive the fold via inline style (same proven pattern as DrawerDock).
           // Class-driven width transitions don't commit reliably for this overlay
           // in Obsidian's live-preview embed, so animate the values directly.
-          width: isOpen ? DRAWER_WIDTH : 0,
+          width: isOpen ? drawerWidth : 0,
           opacity: isOpen ? 1 : 0,
           visibility: isOpen ? 'visible' : 'hidden',
           pointerEvents: isOpen ? 'auto' : 'none',
@@ -104,7 +107,7 @@ const EdgeRail = ({ panels, actions, openId, onOpenChange }: EdgeRailProps): VNo
         {shown != null && (
           // Per-page header ("Layers"/"Colors"/…) removed by request — the rail
           // icon toggles the drawer closed, so no collapse button is needed here.
-          <div className="windrose-edge-rail-drawer-body">
+          <div className="windrose-edge-rail-drawer-body" style={drawerWidth !== DRAWER_WIDTH ? { width: drawerWidth } : undefined}>
             {shown.content}
           </div>
         )}

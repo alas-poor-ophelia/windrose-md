@@ -10,6 +10,9 @@ The per-map settings modal and its UI: appearance, measurement, preferences, and
 MapSettingsModal.tsx         # Modal shell + tab bar; wraps content in MapSettingsProvider via NativeModalPortal
 ├── AppearanceTab.tsx        # Colors, line width, object set, fog image
 ├── MeasurementTab.tsx       # Distance units / scale
+├── WeatherTab.tsx           # Map-level weather zone + "Animate weather" (tab offered only while the weather plugin is usable;
+│                            #   root: weatherAnimate stored only when false; sub-hex: tri-state dropdown, absent = inherit the parent hex,
+│                            #   true/false stored explicitly (buildWeatherSave); read as store.animate)
 ├── PreferencesTab.tsx       # Remember pan/zoom, sidebar, expanded state
 ├── NativeControls.tsx       # Native Obsidian control wrappers (Setting components created imperatively)
 ├── SettingItem.tsx          # Label + description + control row
@@ -51,7 +54,7 @@ User input -> tab handler (from a selector hook) -> dispatch(Actions.X) -> setti
 
 ## Conditional Rendering
 
-Hex-only vs grid-only sections branch on `isHexMap`/`mapType` from `useModalShell()`; the tab list itself is built per map type. `SubHexBackdropSection` is only relevant while editing a sub-hex map's settings.
+Hex-only vs grid-only sections branch on `isHexMap`/`mapType` from `useModalShell()`; the tab list itself is built per map type. The Weather tab is added when the provider gets non-null `weatherZones` (`MapSettingsModal` reads them from `useWeatherStore()`); its fields reach map data as the 7th `onSave` argument (`MapWeatherSave`, null = leave the map's weather fields alone). `SubHexBackdropSection` is only relevant while editing a sub-hex map's settings.
 
 ## Adding a New Setting
 

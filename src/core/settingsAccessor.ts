@@ -106,7 +106,9 @@ const FALLBACK_SETTINGS: PluginSettings = {
   developerMode: false,
 
   // Detail levels (zoom-native depth for hex maps): on by default; absent reads as on
-  lodLadder: true
+  lodLadder: true,
+  // Weather travel rules: Windrose's own interpreter
+  weatherTravelInterpreter: 'windrose.travel'
 };
 
 /** Default object customization settings */

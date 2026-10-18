@@ -32,6 +32,7 @@ interface LayerVisibilityState {
   regions: boolean;
   outlines: boolean;
   savedRoutes: boolean;
+  weather: boolean;
 }
 
 interface UseUILayoutResult {
@@ -75,7 +76,8 @@ function useUILayout({
     hexCoordinates: false,
     regions: true,
     outlines: true,
-    savedRoutes: true
+    savedRoutes: true,
+    weather: true
   });
 
   const handleToggleLayerVisibility = useCallback((layerId: keyof LayerVisibilityState) => {

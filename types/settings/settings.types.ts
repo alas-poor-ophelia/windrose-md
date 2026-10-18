@@ -33,6 +33,7 @@ export type SettingsTabId =
   | 'hexgrid'
   | 'gridbackground'
   | 'measurement'
+  | 'weather'
   | 'preferences';
 
 // ===========================================
@@ -217,6 +218,11 @@ export interface PluginSettings {
   // travelSettings override it). Absent or empty modeIds = no default,
   // so unset maps start empty exactly as before.
   defaultTravelSettings?: MapTravelSettings;
+
+  // Interpreter (registered on the U+13080 Weather plugin, facet "travel")
+  // whose result costs weather on routes. Absent = 'windrose.travel', the
+  // built-in rules; an id no longer registered falls back to them too.
+  weatherTravelInterpreter?: string;
 
   // Dungeon generation default colors per style
   // (absent style or channel = built-in style default)

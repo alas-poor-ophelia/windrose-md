@@ -290,6 +290,7 @@ export interface LayerVisibility {
   regions?: boolean;
   outlines?: boolean;
   savedRoutes?: boolean;
+  weather?: boolean;
 }
 
 /** Mouse position */

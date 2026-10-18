@@ -43,3 +43,7 @@ With a pack enabled, each route segment can be assigned a **terrain**: click a s
 You rarely have to assign anything by hand. As each waypoint lands, Windrose reads the map underneath the new segment and categorizes it for you: a cell whose paint color matches a terrain's color counts as a vote for that terrain, as does a cell holding a tile that carries the terrain's tile tag (tiles win over paint on the same cell). The majority of the cells along the segment decides, and a segment that crosses nothing recognizable simply keeps the terrain it inherited. Only terrains that define a color or a tile tag can be matched — a pack whose terrains define neither behaves exactly as it did before.
 
 Anything you pick by hand is left alone from then on: the automatic pass never overwrites a hand-picked segment. When you *want* a clean sweep — you repainted the region, or edited the pack's colors — use **Recategorize terrain**: the wand button in the measurement readout re-samples the in-progress route, and the same item in a saved route's right-click menu re-samples that route. That command is explicit, so it does overwrite hand-picked segments too.
+
+## Weather
+
+With the optional companion weather plugin installed, travel times can account for weather and ground conditions along the route, and the readout can suggest departure days. The **Weather travel rules** setting controls how. See [Weather]({{ site.baseurl }}/weather/).

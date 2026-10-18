@@ -12,6 +12,8 @@ import type { VNode } from 'preact';
 import { useMemo } from 'preact/hooks';
 import { Icon } from '../shared/Icon';
 import { tooltipRef } from '../shared/obsidianTooltip';
+import { useWeatherStore } from '../../context/WeatherContext';
+import { useWeatherFog } from '../../weather/weatherFog';
 
 const REGION_NAME_MAX_LENGTH = 20;
 const REGION_NAME_TRUNCATE_AT = 17;
@@ -22,13 +24,16 @@ interface RegionPanelProps {
   isOpen?: boolean;
   /** Per-mount instance id — stamped into center-on-region events. */
   instanceId?: string;
+  /** Present while the Almanac is offered: opens it on a weather-bound region */
+  onOpenInAlmanac?: (regionId: string) => void;
 }
 
 const RegionPanel = ({
   regions,
   onRegionsChange,
   isOpen = false,
-  instanceId
+  instanceId,
+  onOpenInAlmanac
 }: RegionPanelProps): VNode | null => {
 
   const getDisplayName = (name: string): string => {
@@ -57,6 +62,23 @@ const RegionPanel = ({
     return [...regions].sort((a, b) => a.order - b.order);
   }, [regions]);
 
+  // The view day's weather per weather-bound region the players can see,
+  // in the weather plugin's own wording; no entry when unbound, mostly
+  // under fog, or the plugin is unavailable
+  const weather = useWeatherStore();
+  const { revealedAreas } = useWeatherFog();
+  const weatherLines = useMemo(() => {
+    const lines = new Map<string, string>();
+    const day = weather.viewDay;
+    if (!weather.hasWeather || day == null) return lines;
+    for (const area of revealedAreas) {
+      if (area.regionId == null) continue;
+      const report = weather.report(area.zoneId, day);
+      lines.set(area.regionId, report != null ? weather.describe(report) : 'Weather zone not found');
+    }
+    return lines;
+  }, [weather, revealedAreas]);
+
   if (regions.length === 0) return null;
 
   return (
@@ -73,7 +95,9 @@ const RegionPanel = ({
           key={region.id}
           className={`windrose-region-item ${!region.visible ? 'windrose-region-item-hidden' : ''}`}
           onClick={(e) => handleRegionClick(region.id, e)}
-          ref={tooltipRef(`${region.name} (${region.hexes.length} hexes)`)}
+          ref={tooltipRef(weatherLines.has(region.id)
+            ? `${region.name} (${region.hexes.length} hexes) — ${weatherLines.get(region.id) ?? ''}`
+            : `${region.name} (${region.hexes.length} hexes)`)}
         >
           <span
             className="windrose-region-color-dot"
@@ -85,6 +109,20 @@ const RegionPanel = ({
           <span className="windrose-region-name">
             {getDisplayName(region.name)}
           </span>
+          {weatherLines.has(region.id) && (onOpenInAlmanac != null ? (
+            <button
+              className="windrose-region-visibility-btn windrose-region-almanac-btn"
+              onClick={(e: Event) => { e.stopPropagation(); onOpenInAlmanac(region.id); }}
+              ref={tooltipRef('Open in almanac')}
+              aria-label="Open in almanac"
+            >
+              <Icon icon="lucide-cloud-sun" size={12} />
+            </button>
+          ) : (
+            <span className="windrose-region-weather-icon">
+              <Icon icon="lucide-cloud-sun" size={12} />
+            </span>
+          ))}
           <button
             className="windrose-region-visibility-btn"
             onClick={(e: Event) => handleToggleVisibility(region.id, e)}

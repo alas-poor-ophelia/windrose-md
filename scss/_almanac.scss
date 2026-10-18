@@ -1,0 +1,451 @@
+/* ==========================================================================
+   Almanac panel (weather instrument): area picker, hero reading, facts,
+   seven-day strip, day/hour scrubbers, time-lapse. Lives in the block-mode
+   edge rail (widened to 252px for it) and the full-pane dock column.
+   Buttons use the `button.` prefix to beat Obsidian's
+   `button:not(.clickable-icon)` fill/bevel (see the edge-rail note).
+   ========================================================================== */
+
+.windrose-almanac {
+  /* Light theme first; .theme-dark below swaps the palette */
+  --almanac-accent: var(--windrose-border-primary-dark);
+  --almanac-high: oklch(0.56 0.15 42);
+  --almanac-low: oklch(0.52 0.13 248);
+  --almanac-line: oklch(from var(--windrose-border-primary) l c h / 0.4);
+  --almanac-wash: oklch(from var(--windrose-border-primary) l c h / 0.1);
+  --almanac-surface: color-mix(in oklch, var(--windrose-bg-primary) 93%, var(--windrose-border-primary));
+  --almanac-glow: oklch(from var(--windrose-border-primary) l c h / 0.16);
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 9px 9px;
+  border: 1px solid oklch(from var(--windrose-border-primary) l c h / 0.55);
+  border-radius: 4px;
+  background:
+    radial-gradient(120% 60% at 50% 0%, var(--almanac-glow), transparent 72%),
+    var(--almanac-surface);
+  box-shadow:
+    inset 0 0 0 2px var(--windrose-bg-primary),
+    inset 0 0 0 3px oklch(from var(--windrose-border-primary) l c h / 0.18);
+  color: var(--windrose-text-primary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+
+  &-bracket {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    pointer-events: none;
+    z-index: 1;
+
+    &-tl { top: 2px; left: 2px; }
+    &-tr { top: 2px; right: 2px; transform: scaleX(-1); }
+    &-bl { bottom: 2px; left: 2px; transform: scaleY(-1); }
+    &-br { bottom: 2px; right: 2px; transform: scale(-1, -1); }
+  }
+
+  &-empty {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 6px;
+    color: var(--windrose-text-muted);
+    line-height: 1.4;
+  }
+
+  /* ---- Area ---- */
+  &-area {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--almanac-accent);
+    min-width: 0;
+
+    > span:first-child { display: flex; flex: none; }
+  }
+
+  &-area-name {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  select.windrose-almanac-area-select {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 24px;
+    padding: 0 22px 0 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--almanac-accent);
+    background-color: transparent;
+    border: 1px solid var(--almanac-line);
+    border-radius: 3px;
+    box-shadow: none;
+  }
+
+  /* ---- Hero ---- */
+  &-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--almanac-line);
+  }
+
+  &-when {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  &-day {
+    font-family: var(--font-interface);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--windrose-text-primary);
+    line-height: 1.25;
+  }
+
+  &-when-sub {
+    font-size: 9.5px;
+    color: var(--windrose-text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  &-hero-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 2px 0;
+
+    .windrose-almanac-glyph {
+      color: var(--windrose-text-primary);
+      filter: drop-shadow(0 0 6px var(--almanac-glow));
+    }
+  }
+
+  &-temps {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1;
+  }
+
+  &-temp-now {
+    font-size: 30px;
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    color: var(--windrose-text-primary);
+  }
+
+  &-temp-range {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 10px;
+
+    .is-high { color: var(--almanac-high); }
+    .is-low { color: var(--almanac-low); }
+  }
+
+  &-describe {
+    text-align: center;
+    font-size: 11px;
+    color: var(--windrose-text-secondary);
+    line-height: 1.35;
+  }
+
+  &-missing {
+    text-align: center;
+    color: var(--windrose-text-muted);
+    padding: 8px 0;
+  }
+
+  /* ---- Glyph ---- */
+  &-glyph {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    color: var(--windrose-text-secondary);
+
+    > span { display: flex; }
+  }
+
+  &-glyph-svg:empty { display: none; }
+
+  &-glyph-svg svg {
+    display: block;
+    overflow: visible;
+  }
+
+  /* ---- Facts ---- */
+  &-facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 3px 8px;
+    margin: 0;
+
+    > div { display: contents; }
+
+    dt {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--windrose-text-muted);
+      font-size: 10px;
+      white-space: nowrap;
+
+      > span { display: flex; opacity: 0.8; }
+    }
+
+    dd {
+      margin: 0;
+      text-align: right;
+      color: var(--windrose-text-primary);
+      font-size: 10.5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  &-beaufort {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 14px;
+    height: 14px;
+    margin-right: 4px;
+    padding: 0 3px;
+    border-radius: 7px;
+    border: 1px solid var(--almanac-accent);
+    color: var(--almanac-accent);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    vertical-align: 1px;
+  }
+
+  /* ---- Week strip ---- */
+  &-week {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 2px;
+    padding: 6px 0 2px;
+    border-top: 1px solid var(--almanac-line);
+  }
+
+  button.windrose-almanac-week-day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    height: auto;
+    min-width: 0;
+    padding: 4px 0 3px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--windrose-text-secondary);
+    cursor: pointer;
+    transition: var(--windrose-transition);
+    line-height: 1;
+
+    &:hover {
+      background: var(--almanac-wash);
+      color: var(--windrose-text-primary);
+    }
+
+    &:focus-visible {
+      outline: 1px solid var(--almanac-accent);
+      outline-offset: 0;
+    }
+
+    &.is-selected {
+      border-color: oklch(from var(--almanac-accent) l c h / 0.6);
+      background: oklch(from var(--almanac-accent) l c h / 0.12);
+      color: var(--windrose-text-primary);
+    }
+
+    &.is-today .windrose-almanac-week-label {
+      color: var(--almanac-accent);
+      font-weight: 700;
+    }
+  }
+
+  &-week-label {
+    font-size: 8.5px;
+    letter-spacing: 0.02em;
+    color: var(--windrose-text-muted);
+  }
+
+  &-week-high {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--almanac-high);
+  }
+
+  &-week-low {
+    font-size: 9.5px;
+    color: var(--almanac-low);
+  }
+
+  /* Precip gauge: a slim vial filled to the day's share of the week's wettest */
+  &-week-precip {
+    position: relative;
+    width: 4px;
+    height: 16px;
+    margin-top: 1px;
+    border-radius: 2px;
+    background: oklch(from var(--windrose-border-primary) l c h / 0.12);
+    overflow: hidden;
+
+    > span {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: 2px;
+      background: linear-gradient(to top, oklch(0.6 0.12 240), oklch(0.78 0.08 220));
+    }
+  }
+
+  &-week-amount {
+    font-size: 7.5px;
+    color: var(--windrose-text-muted);
+    white-space: nowrap;
+  }
+
+  /* ---- Time controls ---- */
+  &-time {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding-top: 7px;
+    border-top: 1px solid var(--almanac-line);
+  }
+
+  &-slider {
+    display: grid;
+    grid-template-columns: 30px 1fr 38px;
+    align-items: center;
+    gap: 6px;
+
+    input[type='range'] {
+      width: 100%;
+      min-width: 0;
+      margin: 0;
+      accent-color: var(--almanac-accent);
+    }
+
+    &.is-all-day input[type='range'] { opacity: 0.45; }
+  }
+
+  &-slider-label {
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--windrose-text-muted);
+  }
+
+  &-slider-value {
+    text-align: right;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--almanac-accent);
+  }
+
+  &-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 3px;
+    margin-top: 2px;
+  }
+
+  button.windrose-almanac-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 24px;
+    min-width: 0;
+    padding: 0 6px;
+    border: 1px solid var(--almanac-line);
+    border-radius: 3px;
+    background: var(--almanac-wash);
+    box-shadow: none;
+    color: var(--windrose-text-secondary);
+    font-size: 10.5px;
+    cursor: pointer;
+    transition: var(--windrose-transition);
+    line-height: 0;
+
+    span { line-height: normal; white-space: nowrap; }
+    > span:first-child { display: flex; }
+
+    &:hover:not(:disabled) {
+      background: oklch(from var(--windrose-border-primary) l c h / 0.16);
+      color: var(--windrose-text-primary);
+    }
+
+    &:focus-visible {
+      outline: 1px solid var(--almanac-accent);
+      outline-offset: 1px;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    &.is-on {
+      border-color: oklch(from var(--almanac-accent) l c h / 0.65);
+      background: oklch(from var(--almanac-accent) l c h / 0.14);
+      color: var(--almanac-accent);
+    }
+  }
+
+  button.windrose-almanac-advance {
+    width: 100%;
+  }
+}
+
+.theme-dark .windrose-almanac {
+  --almanac-accent: var(--windrose-gold-bright);
+  --almanac-high: oklch(0.8 0.1 55);
+  --almanac-low: oklch(0.76 0.08 235);
+  --almanac-line: oklch(from var(--windrose-border-primary) l c h / 0.22);
+  --almanac-wash: oklch(from var(--windrose-border-primary) l c h / 0.07);
+  --almanac-surface: color-mix(in oklch, var(--windrose-bg-primary) 90%, oklch(0.3 0.03 75));
+  --almanac-glow: oklch(from var(--windrose-gold-bright) l c h / 0.09);
+}
+
+/* Inside the dock column the dock panel already draws a frame: keep the
+   instrument but drop the outer border so the two do not double up. */
+.windrose-dock-panel-body .windrose-almanac {
+  border-color: transparent;
+}
+
+/* Tablet: Obsidian's .is-tablet injects padding/height onto every <button> */
+.is-tablet .windrose-almanac {
+  button.windrose-almanac-btn {
+    height: 30px;
+    padding: 0 6px;
+  }
+
+  button.windrose-almanac-week-day {
+    height: auto;
+    padding: 4px 0 3px;
+  }
+}
