@@ -608,6 +608,13 @@ That is also now linked from the top of the README, just so it’s findable. I�
 - Fixed some UI bugs with the Map Settings modal
 - Reverted out the non-functional fix for the Color Palette automatically closing itself right after it opened on Linux, as that didn’t fix the bug, and introduced a new issue where the Color Palette couldn’t be closed by clicking outside of it. You can now once again close the palette by clicking outside of it.
 
+## Version 2.5.1
+
+Patch release: restores the community store listing. No plugin code changed.
+
+### Fixes
+- **Development harness code is no longer part of the repository.** The store's automated scan reviews every TypeScript file in a release, and the developer-only prototypes and test harnesses that lived alongside the plugin source were reported against 2.5.0 even though none of them ship in the plugin. They are kept out of the repository from this release on. The plugin itself is identical to 2.5.0.
+
 ## Version 2.5.0
 
 Feature release: detail levels for hex maps, tile bundles for imported packs, weather from the U+13080 companion plugin, and phone layout fixes.
