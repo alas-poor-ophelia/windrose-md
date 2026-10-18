@@ -53,14 +53,23 @@ function paddedTo(map: MapData, target: number): MapData {
 describe('depthAuthoring', () => {
   beforeEach(() => { getSettings.mockReset(); getSettings.mockReturnValue({ lodLadder: true }); });
 
-  it('refuses every deep write while the capability is off', () => {
+  it('a map with lod takes deep paint and erase while the capability is off (mode is data), and a map without lod still refuses', () => {
     getSettings.mockReturnValue({ lodLadder: false });
     const m = ladderMap();
-    expect(canBeginDepthAuthoring(m)).toBe(false);
+    expect(canBeginDepthAuthoring(m)).toBe(true);
     const r = writeDepthCells(m, m.layers[0].id, 1, [{ q: 4, r: 0, color: '#123456' }]);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe('not-a-ladder');
-    expect(r.mapData).toBe(m);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(authoredCells(r.mapData.layers[0], 1)).toHaveLength(1);
+    expect(r.mapData.lod).toBe(m.lod);
+    const erased = writeDepthCells(r.mapData, m.layers[0].id, 1, []);
+    expect(erased.ok).toBe(true);
+    if (erased.ok) expect(authoredCells(erased.mapData.layers[0], 1)).toHaveLength(0);
+    const classic = hexMap();
+    const refused = writeDepthCells(classic, classic.layers[0].id, 1, [{ q: 4, r: 0, color: '#123456' }]);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.reason).toBe('not-a-ladder');
+    expect(refused.mapData).toBe(classic);
   });
 
   it('a deep write on a map without lod is refused not-a-ladder with the capability on, and stamps nothing', () => {
@@ -90,6 +99,7 @@ describe('depthAuthoring', () => {
     interface LadderGlobal { activeWindow?: { __windroseLadder?: unknown } }
     const g = globalThis as unknown as LadderGlobal;
     g.activeWindow = { __windroseLadder: { m: 2, minCellPx: 40, maxLevel: 2 } };
+    getSettings.mockReturnValue({ lodLadder: true, developerMode: true }); // the override is read only in Developer mode
     try {
       const m = ladderMap();
       expect(m.lod).toEqual({ m: 2, minCellPx: 40, maxLevel: 2 });
@@ -220,7 +230,7 @@ describe('depthAuthoring', () => {
     });
   });
   describe('depthEntryRefusal (paint-tool refusal parity, kgc.25)', () => {
-    it('names the reason a map cannot start deep edits (not-a-ladder for a map without lod), null when it can', () => {
+    it('names the reason a map cannot start deep edits (not-a-ladder for a map without lod), null when it can, whatever the capability', () => {
       const m = ladderMap();
       expect(depthEntryRefusal(m)).toBeNull();
       const classic = hexMap();
@@ -229,7 +239,8 @@ describe('depthAuthoring', () => {
       const nested: MapData = { ...classic, subHexMaps: { '0,0': { mapData: hexMap() } as unknown as NonNullable<MapData['subHexMaps']>[string] } };
       expect(depthEntryRefusal(nested)).toBe('nested-classic');
       getSettings.mockReturnValue({ lodLadder: false });
-      expect(depthEntryRefusal(m)).toBe('not-a-ladder');
+      expect(depthEntryRefusal(m)).toBeNull();
+      expect(depthEntryRefusal(classic)).toBe('not-a-ladder');
     });
   });
 

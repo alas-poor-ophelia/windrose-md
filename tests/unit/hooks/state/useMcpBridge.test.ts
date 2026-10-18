@@ -199,13 +199,14 @@ describe('useMcpBridge', () => {
 
     afterEach(() => { ladderFlag.on = false; });
 
-    it('flag off, stamped map: placeObject(level 2) refused not-a-ladder', () => {
+    it('flag off, stamped map: placeObject(level 2) lands, mode is data (the toggle never locks a lod map)', () => {
       ladderFlag.on = false;
       const base = { ...createNewMap('Off', 'hex'), lod: STAMPED };
       const live = mountLive(base);
       const r = ops().placeObject('chest', 0, 0, 2);
-      expect(r).toEqual({ ok: false, error: 'not-a-ladder' });
-      expect(live.map()).toBe(base);
+      expect(r.ok).toBe(true);
+      expect(live.map().layers[0].objects.some(o => o.homeLevel === 2)).toBe(true);
+      expect(live.map().lod).toEqual(STAMPED);
     });
 
     it('over-budget placeTile refused', () => {
@@ -219,9 +220,9 @@ describe('useMcpBridge', () => {
       expect(live.map()).toBe(base);
     });
 
-    it('paint_cells at depth returns the gate verdict and leaves mapData identity on refusal', () => {
+    it('paint_cells at depth on a map without lod returns the gate verdict and leaves mapData identity on refusal', () => {
       ladderFlag.on = false;
-      const base = { ...createNewMap('Off', 'hex'), lod: STAMPED };
+      const base = createNewMap('Off', 'hex');
       const live = mountLive(base);
       const r = ops().paintCells([{ x: 0, y: 0, color: '#123456' }], 1) as WindroseLevelWriteResult;
       expect(r.ok).toBe(false);

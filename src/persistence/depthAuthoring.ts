@@ -2,9 +2,11 @@
  * The single gate every deep (rung >= 1) write passes through.
  *
  * Design .claude/lod-rd/06-integration-design.md section 19 items 1, 2, 9:
- *  - authoring at depth needs the capability flag, a ladder view, and no
- *    quarantine; the FIRST deep write stamps `lod` onto the map in the same
- *    update, so the map is a ladder map on every install from then on;
+ *  - authoring at depth needs a ladder view (which needs `lod`) and no
+ *    quarantine. The capability toggle is not consulted: mode is data, so a
+ *    map with `lod` stays editable and erasable with the toggle off. (The
+ *    first-write `lod` stamp below is dormant since 2.5.0: `lod` is created
+ *    only by the opt-in paths, new-map preset and map-settings toggle);
  *  - a single operation may not produce more than MAX_CELLS_PER_DEPTH_OP cells;
  *  - a write that would push the map's save-journal payload past
  *    DEPTH_BUDGET_BYTES is REFUSED, not warned about: the journal refuses a
@@ -25,7 +27,7 @@ import type { Cell } from '#types/core/cell.types';
 import { isHexCell } from '#types/core/cell.types';
 import type { LayerId } from '#types/core/map.types';
 
-import { isDepthQuarantined, isLadderView, isLodLadderEnabled, ladderParamsFor, hasSubHexChildren, hasDepthContent } from '../core/lodFlags';
+import { isDepthQuarantined, isLadderView, ladderParamsFor, hasSubHexChildren, hasDepthContent } from '../core/lodFlags';
 import { authoredCells, setLevelCells } from './layerAccessor';
 import { MAX_JOURNAL_PAYLOAD, journalPayloadLength } from './saveJournal';
 
@@ -101,6 +103,7 @@ interface DepthWriteContext {
    * and erases it) returns it WITHOUT the stamp an earlier tick added, so the
    * operation as a whole cannot turn a classic map into a ladder map (DATA-02).
    * Default false: the stamp is kept.
+   * Dormant since 2.5.0: `lod` is created only by the opt-in paths, so no live write starts without it.
    */
   lodAbsentAtStart?: boolean;
   /**
@@ -117,10 +120,13 @@ type DepthWriteResult =
   | { ok: true; mapData: MapData }
   | { ok: false; reason: DepthWriteRefusal; mapData: MapData };
 
-/** May this map START taking deep edits? Flag on, ladder view, not quarantined. `lod` may still be absent. */
+/**
+ * May this map START taking deep edits? Ladder view (so `lod` present), not
+ * quarantined. Never the capability toggle: it gates only the surfaces that
+ * create detail levels, so a `lod` map can always be edited and emptied.
+ */
 function canBeginDepthAuthoring(mapData: MapData | null | undefined): boolean {
   if (mapData === null || mapData === undefined) return false;
-  if (!isLodLadderEnabled()) return false;
   if (!isLadderView(mapData)) return false;
   return !isDepthQuarantined(mapData).quarantined;
 }
@@ -132,6 +138,7 @@ function canBeginDepthAuthoring(mapData: MapData | null | undefined): boolean {
 function depthEntryRefusal(mapData: MapData): DepthWriteRefusal | null {
   if (canBeginDepthAuthoring(mapData)) return null;
   if (isDepthQuarantined(mapData).quarantined) return 'quarantined';
+  // Dormant since 2.5.0 (isLadderView needs lod, so no classic map reaches a stamp); kept as a backstop.
   // A classic map with sub-hex children never takes the lod stamp: the stamp
   // would hide its children behind the ladder for good.
   if (mapData.lod === undefined && hasSubHexChildren(mapData)) return 'nested-classic';
@@ -146,6 +153,7 @@ function depthEntryRefusal(mapData: MapData): DepthWriteRefusal | null {
  * `maxLevel` override would re-partition the map on the next frame and read the
  * stroke's cells back at the wrong positions, or quarantine the map at once for
  * content past its stored maxLevel. Same reference when present.
+ * Dormant since 2.5.0: `lod` is created only by the opt-in paths, so live writes always arrive with it set.
  */
 function withLod(mapData: MapData): MapData {
   if (mapData.lod !== undefined) return mapData;

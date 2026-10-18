@@ -103,7 +103,7 @@ interface WindrosePageWindow {
   app: {
     plugins: {
       plugins: Record<string, {
-        settings: { lodLadder?: boolean };
+        settings: { lodLadder?: boolean; developerMode?: boolean };
         saveSettings: () => Promise<void>;
       }>;
     };
@@ -133,6 +133,8 @@ async function enableLadder(page: any): Promise<void> {
     const plugin = w.app.plugins.plugins["windrose-md"];
     if (plugin == null) throw new Error("windrose-md plugin not found");
     plugin.settings.lodLadder = true;
+    // The override and the frame telemetry are read only in Developer mode.
+    plugin.settings.developerMode = true;
     await plugin.saveSettings();
   });
 }

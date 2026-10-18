@@ -72,4 +72,21 @@ describe("export pulled to level 0 by the size cap (kgc.40)", () => {
     // The input map is untouched.
     expect(mapData.layers[0].objects).toHaveLength(2);
   });
+
+  it("a ladder map whose only content is a root object with visibleLevels [1] still exports that object (no depth content, so no ladder and no level-0 filter)", async () => {
+    const bounds = { maxCol: 20, maxRow: 20 };
+    const rungOnly = { ...obj("rung-only", 3, 3), visibleLevels: [1] } as unknown as MapObject;
+    const layer = makeLayer({ cells: [] as never, objects: [rungOnly] });
+    const mapData = makeMapData({
+      mapType: "hex", hexSize: 40, hexBounds: bounds, layers: [layer],
+      lod: { m: LADDER_DEFAULTS.m, minCellPx: LADDER_DEFAULTS.minCellPx, maxLevel: LADDER_DEFAULTS.maxLevel },
+    } as Partial<MapData>);
+    const geometry = new HexGeometry(40, "flat", bounds);
+
+    const result = await saveMapImageToVault(app, mapData, geometry as never, { layers: [{ id: "layer-1", opacity: 1 }], visibility: null } as never, "out.png");
+    expect(result).toEqual({ success: true, path: "out.png" });
+    expect(renderCalls).toHaveLength(1);
+    expect(renderCalls[0].ladder).toBeUndefined();
+    expect(rendered[0].layers[0].objects.map(o => o.id)).toEqual(["rung-only"]);
+  });
 });

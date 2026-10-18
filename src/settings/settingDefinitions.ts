@@ -169,7 +169,7 @@ function buildFeaturesGroup(): SettingDefinitionItem {
       // key (read by lodFlags), not under `features`. Absent reads as on.
       {
         name: 'Detail levels',
-        desc: 'Let hex maps add finer hexes as you zoom in. Maps without detail levels are unaffected.',
+        desc: 'Show the controls for adding detail levels to hex maps (finer hexes as you zoom in). Turning this off hides those controls only; maps that already have detail levels are unaffected.',
         control: { type: 'toggle', key: 'lodLadder', defaultValue: true }
       }
     ]
