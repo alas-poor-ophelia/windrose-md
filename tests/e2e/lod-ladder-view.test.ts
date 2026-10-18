@@ -700,7 +700,12 @@ describe("Lattice ladder depth authoring (lod-fixture)", () => {
       (await onFixtureOps<Obj[]>(page, "listObjects", [1])).find((o) => o.id === "lod-obj-pinned2");
     expect((await pinned())?.visibleLevels).toEqual([2]);
 
-    await onFixtureOps(page, "setViewport", [0, 0, undefined, 2]);
+    // Centre the camera on the pinned object (homeLevel 1 cell (5,0); m=4 and
+    // hexSize 80 give a 20-unit level-1 cell; flat-top axial -> world
+    // x = 1.5*20*5 = 150, y = sqrt(3)*20*(0 + 5/2) ~= 86.6). At level 2 the
+    // visible window is a few dozen world units wide, so a camera at the
+    // origin never shows it and the marquee below would sweep empty ground.
+    await onFixtureOps(page, "setViewport", [150, 86.6, undefined, 2]);
     await page.waitForTimeout(400);
 
     // Area Select is a sub-tool of the select group (ToolPalette.tsx:297-304):
@@ -711,10 +716,33 @@ describe("Lattice ladder depth authoring (lod-fixture)", () => {
     await canvas.scrollIntoViewIfNeeded();
     const box = await canvas.boundingBox();
     if (box == null) throw new Error("canvas not found");
-    await page.mouse.click(box.x + 12, box.y + 12);
-    await page.waitForTimeout(150);
-    await page.mouse.click(box.x + box.width - 12, box.y + box.height - 12);
-    await page.waitForTimeout(300);
+    // The EdgeRail covers the left band and the drawer dock the right, so a
+    // click near the canvas edge lands on chrome. Pick two corners around the
+    // centre (where the pinned object sits) whose topmost element IS the canvas.
+    const corners = await page.evaluate((b: { x: number; y: number; width: number; height: number }) => {
+      const cx = b.x + b.width / 2;
+      const cy = b.y + b.height / 2;
+      const isCanvas = (x: number, y: number): boolean => document.elementFromPoint(x, y)?.tagName === "CANVAS";
+      for (const d of [140, 110, 80, 60, 40]) {
+        const a = { x: cx - d, y: cy - d };
+        const z = { x: cx + d, y: cy + d };
+        if (isCanvas(a.x, a.y) && isCanvas(z.x, z.y)) return { a, z, d };
+      }
+      return null;
+    }, box);
+    if (corners == null) throw new Error("no canvas-topmost corner pair around the centre");
+    // Human-paced press/release per corner (Area Select is two clicks).
+    await page.mouse.move(corners.a.x, corners.a.y);
+    await page.mouse.down();
+    await page.waitForTimeout(100);
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    await page.mouse.move(corners.z.x, corners.z.y);
+    await page.waitForTimeout(100);
+    await page.mouse.down();
+    await page.waitForTimeout(100);
+    await page.mouse.up();
+    await page.waitForTimeout(400);
 
     const levelsBtn = page.locator('.windrose-sel-icon-btn[aria-label="Visible levels"]').first();
     await levelsBtn.waitFor({ state: "visible", timeout: 5000 });
